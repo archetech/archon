@@ -1,0 +1,212 @@
+{
+  "description": "The timestamp grammar both gatekeeper ports apply to proof.created, operation.created, registration.validUntil and an event's time. RFC 3339, as the Rust port's chrono parser accepts it. This file is the authority: RFC 3339 and xsd:dateTimeStamp differ at the corners, and the ports have to agree with each other before either agrees with a reference.",
+  "vectors": [
+    {
+      "value": "2026-09-11T00:00:00Z",
+      "valid": true,
+      "note": "the canonical form"
+    },
+    {
+      "value": "2026-09-11T00:00:00.000Z",
+      "valid": true,
+      "note": "what keymaster emits, via toISOString"
+    },
+    {
+      "value": "2026-09-11T00:00:00.1Z",
+      "valid": true
+    },
+    {
+      "value": "2026-09-11T00:00:00.123456789Z",
+      "valid": true
+    },
+    {
+      "value": "2026-09-11T00:00:00.000000000000Z",
+      "valid": true,
+      "note": "fractional digits are not bounded"
+    },
+    {
+      "value": "2026-09-11t00:00:00z",
+      "valid": true,
+      "note": "RFC 3339 is case-insensitive on the separators"
+    },
+    {
+      "value": "2026-09-11 00:00:00Z",
+      "valid": true,
+      "note": "RFC 3339 section 5.6 permits a space separator"
+    },
+    {
+      "value": "2026-09-11T00:00:00+00:00",
+      "valid": true
+    },
+    {
+      "value": "2026-09-11T00:00:00-00:00",
+      "valid": true
+    },
+    {
+      "value": "2026-09-11T00:00:00-05:00",
+      "valid": true
+    },
+    {
+      "value": "2026-09-11T00:00:00+23:59",
+      "valid": true,
+      "note": "the largest accepted offset"
+    },
+    {
+      "value": "2026-09-11T23:59:60Z",
+      "valid": true,
+      "note": "a leap second"
+    },
+    {
+      "value": "2026-09-11T12:30:60+05:00",
+      "valid": true,
+      "note": "second 60 is accepted at any minute"
+    },
+    {
+      "value": "2024-02-29T00:00:00Z",
+      "valid": true,
+      "note": "a leap day in a leap year"
+    },
+    {
+      "value": "0000-01-01T00:00:00Z",
+      "valid": true
+    },
+    {
+      "value": "9999-12-31T23:59:59Z",
+      "valid": true
+    },
+    {
+      "value": "",
+      "valid": false,
+      "note": "absent"
+    },
+    {
+      "value": "2026",
+      "valid": false,
+      "note": "Date parses this; RFC 3339 does not"
+    },
+    {
+      "value": "2026-09-11",
+      "valid": false,
+      "note": "Date parses this; RFC 3339 does not"
+    },
+    {
+      "value": "Sep 11 2026",
+      "valid": false,
+      "note": "Date parses this; RFC 3339 does not"
+    },
+    {
+      "value": "2026-09-11 00:00:00",
+      "valid": false,
+      "note": "no offset"
+    },
+    {
+      "value": "2026-09-11T00:00:00",
+      "valid": false,
+      "note": "no offset"
+    },
+    {
+      "value": "2026-9-11T00:00:00Z",
+      "valid": false,
+      "note": "fields are fixed width"
+    },
+    {
+      "value": "2026-09-11\t00:00:00Z",
+      "valid": false,
+      "note": "tab is not a separator"
+    },
+    {
+      "value": " 2026-09-11T00:00:00Z",
+      "valid": false,
+      "note": "no surrounding whitespace"
+    },
+    {
+      "value": "2026-09-11T00:00:00Z ",
+      "valid": false,
+      "note": "no surrounding whitespace"
+    },
+    {
+      "value": "+002026-09-11T00:00:00Z",
+      "valid": false,
+      "note": "no expanded year"
+    },
+    {
+      "value": "-2026-09-11T00:00:00Z",
+      "valid": false,
+      "note": "no signed year"
+    },
+    {
+      "value": "2026-09-11T00:00:00.Z",
+      "valid": false,
+      "note": "a fraction needs a digit"
+    },
+    {
+      "value": "2026-09-11T00:00:00,000Z",
+      "valid": false,
+      "note": "the fraction separator is a period"
+    },
+    {
+      "value": "2026-09-11T00:00:00+0000",
+      "valid": false,
+      "note": "the offset needs its colon"
+    },
+    {
+      "value": "2026-09-11T00:00:00Z+00:00",
+      "valid": false
+    },
+    {
+      "value": "2026-09-11T00:00:00+24:00",
+      "valid": false,
+      "note": "offset hour out of range"
+    },
+    {
+      "value": "2026-09-11T00:00:00+00:60",
+      "valid": false,
+      "note": "offset minute out of range"
+    },
+    {
+      "value": "2026-09-11T24:00:00Z",
+      "valid": false,
+      "note": "hour out of range"
+    },
+    {
+      "value": "2026-09-11T00:60:00Z",
+      "valid": false,
+      "note": "minute out of range"
+    },
+    {
+      "value": "2026-09-11T00:00:61Z",
+      "valid": false,
+      "note": "second out of range"
+    },
+    {
+      "value": "2026-00-11T00:00:00Z",
+      "valid": false,
+      "note": "month out of range"
+    },
+    {
+      "value": "2026-13-01T00:00:00Z",
+      "valid": false,
+      "note": "month out of range"
+    },
+    {
+      "value": "2026-09-00T00:00:00Z",
+      "valid": false,
+      "note": "day out of range"
+    },
+    {
+      "value": "2026-09-31T00:00:00Z",
+      "valid": false,
+      "note": "September has 30 days"
+    },
+    {
+      "value": "2026-02-30T00:00:00Z",
+      "valid": false,
+      "note": "February never has 30 days"
+    },
+    {
+      "value": "2026-02-29T00:00:00Z",
+      "valid": false,
+      "note": "2026 is not a leap year"
+    }
+  ]
+}

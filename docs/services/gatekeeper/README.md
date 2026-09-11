@@ -487,7 +487,8 @@ The signer MUST sign the prehashed message (no extra hashing inside ECDSA).
 `Proof` validation steps (any failure -> reject):
 
 1. `proof.type == "EcdsaSecp256k1Signature2019"`
-2. `proof.created` parses as RFC 3339
+2. `proof.created` parses as RFC 3339 — see
+   [§5.6](#56-timestamp-grammar)
 3. `proof.proofPurpose ∈ { "assertionMethod", "authentication" }`
 4. `proof.verificationMethod` contains `#`. Split on first `#`; the prefix
    MUST be empty (relative) or a valid DID
@@ -529,6 +530,21 @@ covers valid agent/asset create + update + delete, plus several invalid
 shapes that MUST be rejected.
 
 ---
+
+### 5.6 Timestamp grammar
+
+Every timestamp a node validates — `proof.created`, `operation.created`,
+`registration.validUntil`, and an event's `time` — is RFC 3339, and both ports
+MUST accept exactly the same set of strings. A node that accepts a timestamp its
+peers reject admits an operation they refuse, and the two then hold different
+histories for the same DID.
+
+`tests/gatekeeper/timestamp-vectors.json` is the authority, and both ports run
+it as a test. RFC 3339 and `xsd:dateTimeStamp` differ at the corners, so the
+vectors settle what neither reference settles alone. The accepted corners are a
+space separator in place of `T`, a lowercase `t` or `z`, a leap second at
+`:60`, and an unbounded fraction. Rejected are a missing offset, a bare date, a
+signed or expanded year, surrounding whitespace, and any calendar-invalid date.
 
 ## 6. DID resolution algorithm
 
@@ -1227,7 +1243,7 @@ timestamps and container labels.
 
 ## 16. Test fixtures
 
-Five shared JSON fixtures drive cross-language conformance:
+Six shared JSON fixtures drive cross-language conformance:
 
 | File | Purpose |
 | --- | --- |
@@ -1236,6 +1252,7 @@ Five shared JSON fixtures drive cross-language conformance:
 | [tests/gatekeeper/api-parity-fixtures.json](../../../tests/gatekeeper/api-parity-fixtures.json) | Stateless HTTP request/response fixtures across most endpoints. |
 | [tests/gatekeeper/api-parity-flows.json](../../../tests/gatekeeper/api-parity-flows.json) | Stateful flows (create + resolve + export + import + queue + block + IPFS round-trips). |
 | [tests/gatekeeper/metrics-parity.json](../../../tests/gatekeeper/metrics-parity.json) | Required metric names + route normalization expectations. |
+| [tests/gatekeeper/timestamp-vectors.json](../../../tests/gatekeeper/timestamp-vectors.json) | The RFC 3339 grammar every validated timestamp MUST satisfy — see [§5.6](#56-timestamp-grammar). |
 
 The script [scripts/gatekeeper-parity.mjs](../../../scripts/gatekeeper-parity.mjs)
 replays every fixture and flow against two running implementations and diffs
