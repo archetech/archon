@@ -134,17 +134,11 @@ export default abstract class CipherBase implements Cipher {
 
     verifyEd25519(message: Uint8Array, signature: Uint8Array, publicJwk: Ed25519JwkPublic): boolean {
         try {
-            // zip215:true is passed explicitly, not left to noble's default,
-            // so a library upgrade cannot silently change how this port verifies.
-            // It is noble's cofactored ZIP-215 rule. RFC 8032 underspecifies
-            // torsion behaviour, and this does NOT match the Python port's
-            // OpenSSL, which uses a stricter uncofactored equation: the two agree
-            // on every honest prime-order key -- so all real credentials verify
-            // identically -- but differ on adversarially-crafted small-order
-            // keys, which only a signer could plant in their own DID document (a
-            // self-repudiation edge, not impersonation). No library flag
-            // reconciles them; the tests record each port's behaviour so a
-            // change surfaces. See #1091 and docs/scheme.md.
+            // Pinned explicitly, not left to noble's default, so a library
+            // upgrade cannot move it. It is noble's cofactored rule, which
+            // accepts some small-order keys the Python port's OpenSSL rejects;
+            // the two agree on every honest key. docs/scheme.md covers the
+            // divergence and why it is tolerated.
             return ed25519.verify(signature, message, base64url.baseDecode(publicJwk.x), { zip215: true });
         }
         catch {

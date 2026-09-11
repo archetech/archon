@@ -54,16 +54,11 @@ describe('signEd25519', () => {
         expect(cipher.verifyEd25519(bytes('a credential'), mangled, publicJwk)).toBe(false);
     });
 
-    // Ed25519 verification strictness is delegated to noble here and to OpenSSL
-    // in the Python port, and RFC 8032 underspecifies how torsion points are
-    // handled (#1091, "Taming the Many EdDSAs"). This port pins noble's
-    // cofactored ZIP-215 rule (`zip215: true`), which accepts the classic
-    // small-order vectors: the identity point, and an order-2 point, each with
-    // R = identity and S = 0, verifying for any message. The Python counterpart
-    // (test_ed25519_torsion_divergence in test_didcomm.py) records that OpenSSL
-    // accepts the first but REJECTS the second -- a divergence on adversarial
-    // keys only, since no honest key is small-order. If a noble change drops the
-    // pin these turn false.
+    // Pins this port's small-order behaviour: noble's cofactored rule accepts
+    // both the identity point and an order-2 point (R = identity, S = 0). The
+    // Python port rejects the second -- the documented divergence, guarded by
+    // test_ed25519_torsion_divergence in test_didcomm.py. Drop the pin and
+    // these turn false.
     it('accepts small-order keys under the pinned ZIP-215 rule', () => {
         const identity = new Uint8Array(32);
         identity[0] = 1;

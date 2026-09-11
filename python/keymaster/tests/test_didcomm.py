@@ -715,14 +715,9 @@ def test_slip10_ed25519_matches_the_published_vector():
 
 
 def test_ed25519_torsion_divergence():
-    """Records the Python port's Ed25519 behaviour on small-order keys and the
-    documented divergence from the JS port (#1091). OpenSSL uses a strict
-    uncofactored equation: it accepts the identity point but rejects an order-2
-    key, both with R = identity and S = 0. The JS port (noble, cofactored
-    ZIP-215) accepts both -- see tests/cipher/ed25519.test.ts. The two agree on
-    every honest prime-order key; this divergence only reaches keys a signer
-    could plant in their own DID document. If a cryptography change flips either
-    result, this test surfaces it."""
+    """Pins this port's small-order behaviour: OpenSSL accepts the identity
+    point but rejects an order-2 key (R = identity, S = 0). The JS port accepts
+    both -- the documented divergence, guarded by tests/cipher/ed25519.test.ts."""
     from keymaster import didcomm_crypto as dc
 
     signature = bytes([1] + [0] * 31) + bytes(32)  # R = identity, S = 0
