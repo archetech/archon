@@ -518,6 +518,24 @@ document))`, where the proof configuration is the proof without `proofValue` and
 carrying the secured document's `@context`. `proofValue` is the 64-byte Ed25519
 signature in base58-btc multibase, so it begins with `z`.
 
+**Verification strictness.** Ed25519 verification is delegated to each port's
+library — `@noble/curves` in JS, OpenSSL (via `cryptography`) in Python — and
+RFC 8032 underspecifies how torsion (small-order) points are handled, so the two
+differ at the margin (see *Taming the Many EdDSAs*). The JS port pins noble's
+cofactored ZIP-215 rule explicitly (`zip215: true`) so a library default change
+cannot move it; OpenSSL uses a stricter uncofactored equation and offers no
+switch. **The two agree on every signature a standard signer produces**, so all real
+credentials verify identically. They diverge only on a deliberately crafted
+torsion-bearing signature — a small-order key, or a nonzero torsion component
+added to `R` under an ordinary prime-order key — which noble's cofactored
+equation accepts and OpenSSL's uncofactored equation rejects. (Concretely: both
+accept the identity point, but the JS port also accepts an order-2 key OpenSSL
+rejects.) Such a signature can only come from a signer sabotaging their own
+material — a self-repudiation edge, not impersonation of anyone else — and
+reconciling it would mean reimplementing verification in one port, which is not
+warranted. Per-port test vectors record the current behaviour so a library
+change fails a test rather than a credential.
+
 [vc-di-eddsa]: https://www.w3.org/TR/vc-di-eddsa/
 
 #### The legacy label

@@ -180,6 +180,9 @@ def sign_ed25519(message: bytes, private_jwk: dict[str, str]) -> bytes:
 
 
 def verify_ed25519(message: bytes, signature: bytes, public_jwk: dict[str, str]) -> bool:
+    # OpenSSL verifies with a strict uncofactored equation and no switch; the
+    # JS port (noble) is cofactored, so the two can disagree on a torsion-bearing
+    # signature that no standard signer emits. docs/scheme.md covers it.
     try:
         Ed25519PublicKey.from_public_bytes(ub64url(public_jwk["x"])).verify(signature, message)
         return True

@@ -134,12 +134,13 @@ export default abstract class CipherBase implements Cipher {
 
     verifyEd25519(message: Uint8Array, signature: Uint8Array, publicJwk: Ed25519JwkPublic): boolean {
         try {
-            // Left on noble's default zip215:true deliberately. Its RFC 8032
-            // mode (zip215:false) additionally rejects small-order public keys
-            // and non-canonical encodings, but Python's `cryptography` accepts
-            // both, so tightening this port alone would make the same proof
-            // verify in one language and fail in the other. See #1091.
-            return ed25519.verify(signature, message, base64url.baseDecode(publicJwk.x));
+            // Pinned explicitly, not left to noble's default, so a future
+            // default change cannot move it. It is noble's cofactored rule; the
+            // Python port's OpenSSL is uncofactored, so the two can disagree on
+            // a torsion-bearing signature (a small-order key, or a crafted R
+            // under an ordinary key) -- never on one a standard signer emits.
+            // docs/scheme.md covers the divergence and why it is tolerated.
+            return ed25519.verify(signature, message, base64url.baseDecode(publicJwk.x), { zip215: true });
         }
         catch {
             // A malformed signature or key is a failed verification, not a crash.

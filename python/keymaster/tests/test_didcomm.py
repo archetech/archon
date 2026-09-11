@@ -712,3 +712,21 @@ def test_slip10_ed25519_matches_the_published_vector():
     assert slip10_ed25519_bytes(seed, "m/0'/1'/2'/2'/1000000000'").hex() == (
         "8f94d394a8e8fd6b1bc2f3f49f5c47e385281d5c17e65324b0f62483e37e8793"
     )
+
+
+def test_ed25519_torsion_divergence():
+    """Pins this port's small-order behaviour: OpenSSL accepts the identity
+    point but rejects an order-2 key (R = identity, S = 0). The JS port accepts
+    both -- the documented divergence, guarded by tests/cipher/ed25519.test.ts."""
+    from keymaster import didcomm_crypto as dc
+
+    signature = bytes([1] + [0] * 31) + bytes(32)  # R = identity, S = 0
+    identity = bytes([1] + [0] * 31)
+    order2 = bytes.fromhex("ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f")
+
+    def verify(key: bytes) -> bool:
+        return dc.verify_ed25519(b"any message", signature, {"kty": "OKP", "crv": "Ed25519", "x": dc.b64url(key)})
+
+    assert verify(identity) is True
+    # Order-2 is where the ports diverge: rejected here, accepted by noble.
+    assert verify(order2) is False

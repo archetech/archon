@@ -54,6 +54,25 @@ describe('signEd25519', () => {
         expect(cipher.verifyEd25519(bytes('a credential'), mangled, publicJwk)).toBe(false);
     });
 
+    // Pins this port's small-order behaviour: noble's cofactored rule accepts
+    // both the identity point and an order-2 point (R = identity, S = 0), where
+    // the Python port rejects the second -- the documented divergence, guarded
+    // by test_ed25519_torsion_divergence in test_didcomm.py. The explicit
+    // zip215:true is future-proofing: noble already defaults to it, so these
+    // pass either way and turn false only if that default changes.
+    it('accepts small-order keys under the pinned ZIP-215 rule', () => {
+        const identity = new Uint8Array(32);
+        identity[0] = 1;
+        const order2 = Uint8Array.from(Buffer.from('ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f', 'hex'));
+        const signature = new Uint8Array(64);
+        signature.set(identity, 0); // R = identity, S = 0
+        const jwk = (key: Uint8Array) => ({ kty: 'OKP' as const, crv: 'Ed25519' as const, x: Buffer.from(key).toString('base64url') });
+
+        expect(cipher.verifyEd25519(bytes('any message'), signature, jwk(identity))).toBe(true);
+        // Order-2 is where the ports diverge: accepted here, rejected by OpenSSL.
+        expect(cipher.verifyEd25519(bytes('any message'), signature, jwk(order2))).toBe(true);
+    });
+
     // A caller that hands over garbage should get `false`, not an exception it
     // has to catch to decide a signature is bad.
     it('reports malformed input as unverified rather than throwing', () => {
