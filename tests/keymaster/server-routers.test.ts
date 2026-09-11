@@ -629,6 +629,17 @@ describe('keymaster admin key startup check', () => {
             expect(wrongPassphraseAdvice(false, true)[0]).toContain('ARCHON_ENCRYPTED_PASSPHRASE');
         });
 
+        // An exported legacy name displaces .env exactly as the current one
+        // does, so advice that inspects and unsets ARCHON_PASSPHRASE sends the
+        // operator after a variable that is not the one that failed.
+        it('inspects the variable it says failed', () => {
+            const advice = wrongPassphraseAdvice(false, true).join('\n');
+
+            expect(advice).toContain("env | grep -c '^ARCHON_ENCRYPTED_PASSPHRASE='");
+            expect(advice).toContain('env -u ARCHON_ENCRYPTED_PASSPHRASE');
+            expect(advice).not.toContain("env -u ARCHON_PASSPHRASE ");
+        });
+
         it('points at the other value when both are set', () => {
             const advice = wrongPassphraseAdvice(true, false).join('\n');
 

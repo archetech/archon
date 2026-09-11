@@ -1096,10 +1096,13 @@ labels.
 ### 15.3 Startup sequence
 
 > **Where the value comes from.** Under Docker Compose, a variable exported in
-> the shell is substituted in preference to the same name in `.env`, so an
-> `export ARCHON_PASSPHRASE=` left in a shell profile displaces the value in the
-> file with nothing in either file changed — and the wallet then refuses to
-> decrypt. The service warns at startup when both names hold different values,
+> the shell is substituted in preference to the same name in `.env`, so a stale
+> `export ARCHON_PASSPHRASE=<old value>` left in a shell profile displaces the
+> value in the file with nothing in either file changed — and the wallet then
+> refuses to decrypt. An *empty* export does not do this: the reader treats it
+> as unset and falls back to `ARCHON_ENCRYPTED_PASSPHRASE`, or startup refuses
+> a missing passphrase outright. The same applies to an export of
+> `ARCHON_ENCRYPTED_PASSPHRASE` on a deployment that uses the older name. The service warns at startup when both names hold different values,
 > and prints the same guidance if the wallet fails to open. To find out whether
 > this shell is the source: `env | grep -c '^ARCHON_PASSPHRASE='` — `1` means it
 > exports the variable, and Compose prefers that over the file. To ignore the

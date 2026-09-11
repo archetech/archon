@@ -111,3 +111,14 @@ def test_advice_always_gives_a_command_to_run():
     for advice in (wrong_passphrase_advice(True, False), wrong_passphrase_advice(False, False)):
         assert "env | grep -c '^ARCHON_PASSPHRASE='" in "\n".join(advice)
         assert "docker compose config" not in "\n".join(advice)
+
+
+def test_advice_inspects_the_variable_it_says_failed():
+    # An exported legacy name displaces .env exactly as the current one does, so
+    # advice that inspects and unsets ARCHON_PASSPHRASE sends the operator after
+    # a variable that is not the one that failed.
+    advice = "\n".join(wrong_passphrase_advice(False, True))
+
+    assert "env | grep -c '^ARCHON_ENCRYPTED_PASSPHRASE='" in advice
+    assert "env -u ARCHON_ENCRYPTED_PASSPHRASE" in advice
+    assert "env -u ARCHON_PASSPHRASE " not in advice

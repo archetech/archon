@@ -120,7 +120,7 @@ def wrong_passphrase_advice(shadowed: bool, from_old_name: bool) -> list[str]:
     return [
         *lines,
         "A value exported in the shell takes precedence over the same name in .env, so a "
-        "leftover export can displace it without either file changing:",
-        "  env | grep -c '^ARCHON_PASSPHRASE='              # 1 means this shell exports it, and compose prefers that",
-        "  env -u ARCHON_PASSPHRASE docker compose up -d    # ignores the export for one run",
+        f"stale export of {source} can displace it without either file changing:",
+        f"  env | grep -c '^{source}='   # 1 means this shell exports it, and compose prefers that",
+        f"  env -u {source} docker compose up -d   # ignores the export for one run",
     ]

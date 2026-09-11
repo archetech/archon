@@ -109,9 +109,9 @@ export function wrongPassphraseAdvice(shadowed: boolean, fromOldName: boolean): 
 
     return [
         ...lines,
-        'A value exported in the shell takes precedence over the same name in .env, so a leftover export can displace it without either file changing:',
-        '  env | grep -c \'^ARCHON_PASSPHRASE=\'              # 1 means this shell exports it, and compose prefers that',
-        '  env -u ARCHON_PASSPHRASE docker compose up -d    # ignores the export for one run',
+        `A value exported in the shell takes precedence over the same name in .env, so a stale export of ${source} can displace it without either file changing:`,
+        `  env | grep -c '^${source}='   # 1 means this shell exports it, and compose prefers that`,
+        `  env -u ${source} docker compose up -d   # ignores the export for one run`,
     ];
 }
 
