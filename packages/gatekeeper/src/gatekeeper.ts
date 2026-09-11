@@ -51,10 +51,9 @@ function daysInMonth(year: number, month: number): number {
 }
 
 // An IPFS read returns whatever is stored at a CID, and a gateway error document
-// parses as JSON like anything else. Checked on the way out of the operation
-// store as well as into it, so a value cached before this existed is treated as
-// a miss and fetched again rather than pinning that CID to something that can
-// never import.
+// parses as JSON like anything else. The store answers before the network, so a
+// non-operation that reaches it answers for that CID for good: values are
+// checked on the way out of the store as well as into it.
 function isOperation(value: unknown): value is Operation {
     const type = (value as Operation | null)?.type;
     return type === 'create' || type === 'update' || type === 'delete';
@@ -1407,9 +1406,8 @@ export default class Gatekeeper implements GatekeeperInterface {
             if (!op) {
                 op = await this.ipfs.getJSON(cid) as Operation | null;
 
-                // Still imported when it is not an operation, so the caller
-                // still sees it counted as rejected -- it just never enters the
-                // store, where it would answer for this CID forever.
+                // A non-operation is imported anyway and counted as rejected
+                // for the caller. What it must not do is enter the store.
                 if (isOperation(op)) {
                     await this.db.addOperation(cid, op);
                 }

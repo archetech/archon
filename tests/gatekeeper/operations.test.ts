@@ -155,8 +155,7 @@ describe('importBatchByCids', () => {
 
         const result = await gatekeeper.importBatchByCids([cid], metadata);
 
-        // Still reported, as it was before: what changes is that it does not
-        // become this CID's answer for good.
+        // Reported to the caller, and absent from the store.
         expect(result.rejected).toBe(1);
         expect(await db.getOperation(cid)).toBe(null);
     });
@@ -166,8 +165,8 @@ describe('importBatchByCids', () => {
         const agentOp = await helper.createAgentOp(keypair, { registry: 'hyperswarm' });
         const cid = await ipfs.addJSON(agentOp);
 
-        // What a node poisoned before the check looks like: the real operation
-        // is retrievable, but the store answers first.
+        // A poisoned store: the real operation is retrievable at this CID,
+        // but the store answers first.
         await db.addOperation(cid, notAnOperation as unknown as Operation);
 
         const metadata = {

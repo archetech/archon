@@ -686,9 +686,8 @@ pub(crate) async fn import_batch_by_cids(
 
         if operation.is_none() {
             operation = fetch_ipfs_json(&state, cid).await;
-            // Still imported when it is not an operation, so the caller still
-            // sees it counted as rejected -- it just never enters the store,
-            // where it would answer for this CID forever.
+            // A non-operation is imported anyway and counted as rejected for
+            // the caller. What it must not do is enter the store.
             if let Some(op) = operation.as_ref().filter(|value| is_operation(value)) {
                 let mut store = state.store.lock().await;
                 if let Err(error) = store.add_operation(cid, op.clone()) {
@@ -2222,10 +2221,9 @@ async fn fetch_ipfs_json(state: &AppState, cid: &str) -> Option<Value> {
 }
 
 // An IPFS read returns whatever is stored at a CID, and a gateway error document
-// deserializes like any other JSON. Checked on the way out of the operation
-// store as well as into it, so a value cached before this existed is treated as
-// a miss and fetched again rather than pinning that CID to something that can
-// never import.
+// deserializes like any other JSON. The store answers before the network, so a
+// non-operation that reaches it answers for that CID for good: values are
+// checked on the way out of the store as well as into it.
 pub(crate) fn is_operation(value: &Value) -> bool {
     matches!(
         value.get("type").and_then(Value::as_str),
