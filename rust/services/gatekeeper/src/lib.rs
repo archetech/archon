@@ -40,6 +40,7 @@ pub(crate) use store::{
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::{is_operation, resolve_cid_operation};
     use crate::proofs::{canonical_json, verify_proof_format};
     use crate::store::{
         compare_ordinals, hydrate_redis_event, redis_event_to_stored_value, DbBackend, JsonDbFile,
@@ -452,6 +453,58 @@ mod tests {
 
         // `as_str()` yields None for a non-string, which is skipped.
         assert_eq!(error_for(Value::Null).await, None);
+    }
+
+    #[test]
+    fn is_operation_rejects_what_ipfs_can_return_instead_of_an_operation() {
+        let vectors = proof_vectors();
+
+        assert!(is_operation(&vectors["agentCreateValid"]["operation"]));
+        assert!(is_operation(&json!({"type": "update"})));
+        assert!(is_operation(&json!({"type": "delete"})));
+
+        // Found in the operation store of a live node, cached from an IPFS
+        // read: a gateway error document, which deserializes like any other
+        // JSON.
+        assert!(!is_operation(
+            &json!({"Message": "unknown node type", "Code": 0, "Type": "error"})
+        ));
+        assert!(!is_operation(&json!({"type": "something-else"})));
+        assert!(!is_operation(&json!({})));
+        assert!(!is_operation(&Value::Null));
+        assert!(!is_operation(&json!("a string")));
+    }
+
+    #[test]
+    fn resolve_cid_operation_prefers_a_cached_operation_and_stores_only_operations() {
+        let operation = proof_vectors()["agentCreateValid"]["operation"].clone();
+        // Found in the operation store of a live node, cached from an IPFS
+        // read: a gateway error document, which deserializes like any other
+        // JSON.
+        let poison = json!({"Message": "unknown node type", "Code": 0, "Type": "error"});
+
+        // A cached operation answers, and is already stored.
+        let (resolved, persist) = resolve_cid_operation(Some(operation.clone()), None);
+        assert_eq!(resolved, Some(operation.clone()));
+        assert!(!persist);
+
+        // A cached non-operation is a miss, so the fetched operation stands in
+        // its place and corrects the entry.
+        let (resolved, persist) =
+            resolve_cid_operation(Some(poison.clone()), Some(operation.clone()));
+        assert_eq!(resolved, Some(operation.clone()));
+        assert!(persist);
+
+        // A fetched non-operation is still imported, so the caller sees it
+        // counted as rejected, but it never enters the store.
+        let (resolved, persist) = resolve_cid_operation(None, Some(poison.clone()));
+        assert_eq!(resolved, Some(poison.clone()));
+        assert!(!persist);
+
+        // Nothing anywhere.
+        let (resolved, persist) = resolve_cid_operation(None, None);
+        assert_eq!(resolved, None);
+        assert!(!persist);
     }
 
     #[test]
