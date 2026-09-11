@@ -1100,9 +1100,11 @@ labels.
 > `export ARCHON_PASSPHRASE=` left in a shell profile displaces the value in the
 > file with nothing in either file changed — and the wallet then refuses to
 > decrypt. The service warns at startup when both names hold different values,
-> and prints the same guidance if the wallet fails to open. To see which value
-> won: `docker compose config | grep ARCHON_PASSPHRASE`. To ignore an export for
-> one run: `env -u ARCHON_PASSPHRASE docker compose up -d`.
+> and prints the same guidance if the wallet fails to open. To find out whether
+> this shell is the source: `env | grep -c '^ARCHON_PASSPHRASE='` — `1` means it
+> exports the variable, and Compose prefers that over the file. To ignore the
+> export for one run: `env -u ARCHON_PASSPHRASE docker compose up -d`. Neither
+> command prints the secret; `docker compose config` would.
 
 1. Validate `ARCHON_ADMIN_API_KEY` and `ARCHON_PASSPHRASE`; exit
    non-zero if either is unset (§2.2).

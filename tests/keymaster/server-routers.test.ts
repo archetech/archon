@@ -608,7 +608,10 @@ describe('keymaster admin key startup check', () => {
 
         expect(fatal).toBeUndefined();
         expect(warning).toContain('different values');
-        expect(warning).toContain('docker compose config');
+        expect(warning).toContain("env | grep -c '^ARCHON_PASSPHRASE='");
+        // The obvious diagnostic prints the secret into scrollback, so it is
+        // not what the service tells an operator to run.
+        expect(warning).not.toContain('docker compose config');
         expect(warning).toContain('env -u ARCHON_PASSPHRASE');
     });
 
@@ -634,7 +637,8 @@ describe('keymaster admin key startup check', () => {
 
         it('always gives the operator a command to run', () => {
             for (const advice of [wrongPassphraseAdvice(true, false), wrongPassphraseAdvice(false, false)]) {
-                expect(advice.join('\n')).toContain('docker compose config | grep ARCHON_PASSPHRASE');
+                expect(advice.join('\n')).toContain("env | grep -c '^ARCHON_PASSPHRASE='");
+                expect(advice.join('\n')).not.toContain('docker compose config');
             }
         });
     });

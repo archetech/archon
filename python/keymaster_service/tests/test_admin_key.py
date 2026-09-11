@@ -82,7 +82,10 @@ def test_two_names_holding_different_values_are_flagged():
 
     assert result.fatal is None
     assert "different values" in (result.warning or "")
-    assert "docker compose config" in (result.warning or "")
+    assert "env | grep -c '^ARCHON_PASSPHRASE='" in (result.warning or "")
+    # The obvious diagnostic prints the secret into scrollback, so it is not
+    # what the service tells an operator to run.
+    assert "docker compose config" not in (result.warning or "")
     assert "env -u ARCHON_PASSPHRASE" in (result.warning or "")
 
 
@@ -106,4 +109,5 @@ def test_advice_points_at_the_other_value_when_both_are_set():
 
 def test_advice_always_gives_a_command_to_run():
     for advice in (wrong_passphrase_advice(True, False), wrong_passphrase_advice(False, False)):
-        assert "docker compose config | grep ARCHON_PASSPHRASE" in "\n".join(advice)
+        assert "env | grep -c '^ARCHON_PASSPHRASE='" in "\n".join(advice)
+        assert "docker compose config" not in "\n".join(advice)

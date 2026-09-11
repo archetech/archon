@@ -72,7 +72,7 @@ export function checkPassphrase(passphrase: string, fromOldName = false, shadowe
             warning: [
                 'Warning: ARCHON_PASSPHRASE and ARCHON_ENCRYPTED_PASSPHRASE hold different values, and the wallet is encrypted with only one of them.',
                 'ARCHON_PASSPHRASE is the one in use. If the wallet does not open, an exported shell variable may be displacing the value in .env:',
-                '  docker compose config | grep ARCHON_PASSPHRASE   # shows which value compose resolved',
+                '  env | grep -c \'^ARCHON_PASSPHRASE=\'              # 1 means this shell exports it, and compose prefers that',
                 '  env -u ARCHON_PASSPHRASE docker compose up -d    # ignores the export for one run',
             ].join('\n'),
         };
@@ -110,7 +110,7 @@ export function wrongPassphraseAdvice(shadowed: boolean, fromOldName: boolean): 
     return [
         ...lines,
         'A value exported in the shell takes precedence over the same name in .env, so a leftover export can displace it without either file changing:',
-        '  docker compose config | grep ARCHON_PASSPHRASE   # shows which value compose resolved',
+        '  env | grep -c \'^ARCHON_PASSPHRASE=\'              # 1 means this shell exports it, and compose prefers that',
         '  env -u ARCHON_PASSPHRASE docker compose up -d    # ignores the export for one run',
     ];
 }

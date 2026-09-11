@@ -79,7 +79,7 @@ def check_passphrase(
                     "different values, and the wallet is encrypted with only one of them.",
                     "ARCHON_PASSPHRASE is the one in use. If the wallet does not open, an "
                     "exported shell variable may be displacing the value in .env:",
-                    "  docker compose config | grep ARCHON_PASSPHRASE   # shows which value compose resolved",
+                    "  env | grep -c '^ARCHON_PASSPHRASE='              # 1 means this shell exports it, and compose prefers that",
                     "  env -u ARCHON_PASSPHRASE docker compose up -d    # ignores the export for one run",
                 ]
             )
@@ -121,6 +121,6 @@ def wrong_passphrase_advice(shadowed: bool, from_old_name: bool) -> list[str]:
         *lines,
         "A value exported in the shell takes precedence over the same name in .env, so a "
         "leftover export can displace it without either file changing:",
-        "  docker compose config | grep ARCHON_PASSPHRASE   # shows which value compose resolved",
+        "  env | grep -c '^ARCHON_PASSPHRASE='              # 1 means this shell exports it, and compose prefers that",
         "  env -u ARCHON_PASSPHRASE docker compose up -d    # ignores the export for one run",
     ]
