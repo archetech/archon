@@ -55,10 +55,11 @@ describe('signEd25519', () => {
     });
 
     // Pins this port's small-order behaviour: noble's cofactored rule accepts
-    // both the identity point and an order-2 point (R = identity, S = 0). The
-    // Python port rejects the second -- the documented divergence, guarded by
-    // test_ed25519_torsion_divergence in test_didcomm.py. Drop the pin and
-    // these turn false.
+    // both the identity point and an order-2 point (R = identity, S = 0), where
+    // the Python port rejects the second -- the documented divergence, guarded
+    // by test_ed25519_torsion_divergence in test_didcomm.py. The explicit
+    // zip215:true is future-proofing: noble already defaults to it, so these
+    // pass either way and turn false only if that default changes.
     it('accepts small-order keys under the pinned ZIP-215 rule', () => {
         const identity = new Uint8Array(32);
         identity[0] = 1;

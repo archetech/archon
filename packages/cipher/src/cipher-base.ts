@@ -134,11 +134,12 @@ export default abstract class CipherBase implements Cipher {
 
     verifyEd25519(message: Uint8Array, signature: Uint8Array, publicJwk: Ed25519JwkPublic): boolean {
         try {
-            // Pinned explicitly, not left to noble's default, so a library
-            // upgrade cannot move it. It is noble's cofactored rule, which
-            // accepts some small-order keys the Python port's OpenSSL rejects;
-            // the two agree on every honest key. docs/scheme.md covers the
-            // divergence and why it is tolerated.
+            // Pinned explicitly, not left to noble's default, so a future
+            // default change cannot move it. It is noble's cofactored rule; the
+            // Python port's OpenSSL is uncofactored, so the two can disagree on
+            // a torsion-bearing signature (a small-order key, or a crafted R
+            // under an ordinary key) -- never on one a standard signer emits.
+            // docs/scheme.md covers the divergence and why it is tolerated.
             return ed25519.verify(signature, message, base64url.baseDecode(publicJwk.x), { zip215: true });
         }
         catch {
