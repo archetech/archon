@@ -71,3 +71,22 @@ def test_secret_matches_handles_non_ascii_and_non_str():
     assert not _secret_matches(None, "secret")
     assert not _secret_matches(1234, "secret")
 
+
+def test_two_names_holding_different_values_are_flagged():
+    # Compose resolves ${ARCHON_PASSPHRASE} from an exported shell variable in
+    # preference to the same name in .env, so a leftover export displaces a
+    # correct file with nothing in either file changed. The wallet then refuses
+    # to decrypt and the operator has no trace to follow (#1121).
+    result = check_passphrase("from the shell", shadowed=True)
+
+    assert result.fatal is None
+    assert "different values" in (result.warning or "")
+    assert "exported in the shell" in (result.warning or "")
+    # Commands belong in the README, where they are read in context. A service's
+    # stderr is the wrong place to maintain them, and the obvious one --
+    # docker compose config -- prints the secret into scrollback.
+    assert "docker compose" not in (result.warning or "")
+
+
+def test_two_names_in_agreement_say_nothing():
+    assert check_passphrase("correct horse battery staple", shadowed=False).warning is None

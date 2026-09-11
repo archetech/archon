@@ -26,6 +26,12 @@ class Settings:
     passphrase_from_old_name: bool = (
         not os.environ.get("ARCHON_PASSPHRASE") and bool(os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE"))
     )
+    # Both names carrying different values. One of them is not the wallet's.
+    passphrase_shadowed: bool = (
+        bool(os.environ.get("ARCHON_PASSPHRASE"))
+        and bool(os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE"))
+        and os.environ.get("ARCHON_PASSPHRASE") != os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE")
+    )
     wallet_cache: bool = os.environ.get("ARCHON_WALLET_CACHE", "false").lower() == "true"
     default_registry: str = os.environ.get("ARCHON_DEFAULT_REGISTRY", "hyperswarm") or "hyperswarm"
     upload_limit: str = os.environ.get("ARCHON_KEYMASTER_UPLOAD_LIMIT", "10mb")

@@ -599,6 +599,26 @@ describe('keymaster admin key startup check', () => {
         expect(checkPassphrase('correct horse battery staple').fatal).toBeUndefined();
     });
 
+    // Compose resolves ${ARCHON_PASSPHRASE} from an exported shell variable in
+    // preference to the same name in .env, so a leftover export displaces a
+    // correct file with nothing in either file changed. The wallet then refuses
+    // to decrypt and the operator has no trace to follow (#1121).
+    it('flags two names holding different values', () => {
+        const { fatal, warning } = checkPassphrase('from the shell', false, true);
+
+        expect(fatal).toBeUndefined();
+        expect(warning).toContain('different values');
+        expect(warning).toContain('exported in the shell');
+        // Commands belong in the README, where they are read in context. A
+        // service's stderr is the wrong place to maintain them, and the obvious
+        // one -- docker compose config -- prints the secret into scrollback.
+        expect(warning).not.toContain('docker compose');
+    });
+
+    it('says nothing when the two names agree', () => {
+        expect(checkPassphrase('correct horse battery staple', false, false).warning).toBeUndefined();
+    });
+
     // The old name still works, so the only thing to say is which name to
     // move to -- and it has to start, not stop the service (#1020).
     it('says which name supersedes the old one, without refusing to start', () => {

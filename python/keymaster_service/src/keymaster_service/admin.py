@@ -44,7 +44,9 @@ def check_admin_api_key(admin_api_key: str) -> StartupCheck:
     return StartupCheck()
 
 
-def check_passphrase(passphrase: str, from_old_name: bool = False) -> StartupCheck:
+def check_passphrase(
+    passphrase: str, from_old_name: bool = False, shadowed: bool = False
+) -> StartupCheck:
     """Validate ARCHON_PASSPHRASE at startup.
 
     Fail closed: the passphrase is both the wallet's encryption secret and the
@@ -64,6 +66,21 @@ def check_passphrase(passphrase: str, from_old_name: bool = False) -> StartupChe
             )
         )
 
+    # Both names set to different values means one of them is wrong, and
+    # nothing here can tell which. Worth saying out loud because the usual
+    # cause is invisible: ``docker compose`` substitutes an exported shell
+    # variable in preference to the same name in .env, so a stale export can
+    # displace a correct file without either being edited (#1121).
+    if shadowed:
+        return StartupCheck(
+            warning=(
+                "Warning: ARCHON_PASSPHRASE and ARCHON_ENCRYPTED_PASSPHRASE hold "
+                "different values, and the wallet is encrypted with only one of them. "
+                "ARCHON_PASSPHRASE is the one in use, and a value exported in the shell "
+                "displaces the one in .env."
+            )
+        )
+
     if from_old_name:
         return StartupCheck(
             warning=(
@@ -75,4 +92,3 @@ def check_passphrase(passphrase: str, from_old_name: bool = False) -> StartupChe
         )
 
     return StartupCheck()
-

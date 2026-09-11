@@ -55,10 +55,21 @@ export function checkAdminApiKey(adminApiKey: string): StartupCheck {
  * The Keymaster constructor already rejects an empty passphrase, but it runs
  * inside the listen callback where the throw does not stop the server.
  */
-export function checkPassphrase(passphrase: string, fromOldName = false): StartupCheck {
+export function checkPassphrase(passphrase: string, fromOldName = false, shadowed = false): StartupCheck {
     if (!passphrase) {
         return {
             fatal: 'ARCHON_PASSPHRASE must be set — POST /login would otherwise return the admin API key without checking it. The older name ARCHON_ENCRYPTED_PASSPHRASE is read too.',
+        };
+    }
+
+    // Both names set to different values means one of them is wrong, and
+    // nothing here can tell which. Worth saying out loud because the usual
+    // cause is invisible: `docker compose` substitutes an exported shell
+    // variable in preference to the same name in .env, so a stale export can
+    // displace a correct file without either being edited (#1121).
+    if (shadowed) {
+        return {
+            warning: 'Warning: ARCHON_PASSPHRASE and ARCHON_ENCRYPTED_PASSPHRASE hold different values, and the wallet is encrypted with only one of them. ARCHON_PASSPHRASE is the one in use, and a value exported in the shell displaces the one in .env.',
         };
     }
 

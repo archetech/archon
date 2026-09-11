@@ -18,6 +18,9 @@ services:
       - ARCHON_DISABLE_SEARCH=${ARCHON_DISABLE_SEARCH:-false}
       - ARCHON_NODE_ID=${ARCHON_NODE_ID}
       - ARCHON_KEYMASTER_DB=${ARCHON_KEYMASTER_DB:-json}
+      # Compose substitutes an exported shell variable before .env, so a stale
+      # `export ARCHON_PASSPHRASE=<old value>` displaces the file's value and
+      # the wallet stops opening with neither file changed (#1121).
       - ARCHON_PASSPHRASE=${ARCHON_PASSPHRASE}
       # The older name for the same secret, still read so an existing .env
       # keeps working. Optional: unset means ARCHON_PASSPHRASE carries it.
