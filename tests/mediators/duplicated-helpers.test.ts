@@ -16,7 +16,7 @@ const MEDIATORS = 'services/mediators';
 // without being copies -- derivation.ts, state.ts and sync.ts are per-chain
 // implementations of 9 to 90 lines -- so identity has to be asserted only where
 // it is intended. A helper copied to a new package belongs here.
-const COPIED = ['batch.ts', 'fee.ts', 'reorg.ts'];
+const COPIED = ['batch.ts', 'fee.ts', 'reorg.ts', 'wallet-wait.ts'];
 
 function copiesOf(name: string): string[] {
     return readdirSync(MEDIATORS)

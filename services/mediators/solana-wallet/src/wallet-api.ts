@@ -177,6 +177,7 @@ async function main() {
     });
 
     let walletReady = false;
+    let metricsStarted = false;
     for (let attempt = 1; attempt <= 12; attempt++) {
         try {
             const keypair = await getKeypair();
@@ -195,6 +196,41 @@ async function main() {
     }
     walletSetupStatus.set(walletReady ? 1 : 0);
 
+    // Keymaster being slow to start is the ordinary reason setup runs out of
+    // attempts, and a chain mediator waits on this wallet to serve an address.
+    // Without a retry after startup the wallet stays unusable until somebody
+    // restarts it, long after the condition that caused it has cleared.
+    if (!walletReady) {
+        let retrying = false;
+
+        const retry = setInterval(async () => {
+            if (retrying) {
+                return;
+            }
+
+            retrying = true;
+
+            try {
+                const keypair = await getKeypair();
+                await connection.getVersion();
+                logger.info({ address: keypair.publicKey.toBase58(), network: config.network }, 'Solana wallet ready');
+                walletReady = true;
+                walletSetupStatus.set(1);
+                startMetrics();
+                clearInterval(retry);
+            }
+            catch (error: any) {
+                logger.debug({ err: error }, 'Wallet setup still failing');
+            }
+            finally {
+                retrying = false;
+            }
+        }, 30000);
+
+        retry.unref();
+    }
+
+
     async function updateMetrics() {
         try {
             const keypair = await getKeypair();
@@ -209,9 +245,18 @@ async function main() {
         }
     }
 
-    if (walletReady) {
+    function startMetrics() {
+        if (metricsStarted) {
+            return;
+        }
+
+        metricsStarted = true;
         updateMetrics();
         setInterval(updateMetrics, 60_000);
+    }
+
+    if (walletReady) {
+        startMetrics();
     }
 
     v1router.get('/wallet/version', (_req, res) => {
@@ -222,6 +267,12 @@ async function main() {
         try {
             const keypair = await getKeypair();
             walletSetupStatus.set(1);
+            // An operator repairing the wallet by hand reaches readiness through
+            // this route, so it carries the same transition as the other two:
+            // the address route stays refused and the gauges stay stale
+            // otherwise.
+            walletReady = true;
+            startMetrics();
             res.json({ ok: true, address: keypair.publicKey.toBase58(), network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Wallet setup failed');

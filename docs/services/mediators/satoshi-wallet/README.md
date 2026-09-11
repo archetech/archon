@@ -239,8 +239,16 @@ Only these three are supported — `regtest` is intentionally omitted.
 4. Start the main HTTP server.
 
 The service eagerly runs `setupWatchOnlyWallet` at startup with a
-12-attempt retry loop before serving requests, so the watch-only wallet
-is ready by the time the satoshi-mediator hits it.
+12-attempt retry loop before serving requests. Exhausting those attempts
+does not settle the matter: setup is retried every 30 seconds in the
+background until it succeeds, because the usual cause is a keymaster
+still starting, and the satoshi-mediator waits on this service for an
+address. A refusal is the exception — a descriptor mismatch, or a Core
+without sqlite — since repeating it cannot change the answer.
+
+Until setup succeeds, `GET /api/v1/wallet/address` answers `503`. The
+balance route does not: it reads from Core, which answers whether or not
+this service has a watch-only wallet, so it is not a readiness signal.
 
 ### 5.2 Environment variables
 
