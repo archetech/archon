@@ -274,13 +274,22 @@ export interface DidCidDocument {
     didDocumentRegistration?: DocumentRegistration,
 }
 
+// What a credential or presentation proof may claim: asserting a statement, or
+// proving you are the subject.
 export type ProofPurpose = "assertionMethod" | "authentication";
+
+// What an operation proof may claim. An operation exercises control over a DID
+// document, which is what `capabilityInvocation` names; `authentication` means
+// proving you are the subject, and every operation anchored before this was
+// written claims it, so both are accepted. `assertionMethod` is accepted for
+// the same reason -- nothing emitted it, but the gatekeepers took it.
+export type OperationProofPurpose = ProofPurpose | "capabilityInvocation";
 
 export interface Proof {
     type: "EcdsaSecp256k1Signature2019";
     created: string;
     verificationMethod: string;
-    proofPurpose: ProofPurpose;
+    proofPurpose: OperationProofPurpose;
     proofValue: string;
 }
 
@@ -325,8 +334,13 @@ export interface Operation {
 // leaves `cryptosuite` open because a credential's varies; both gatekeepers
 // refuse anything but this one on an operation, so a wider type here would
 // typecheck an operation into a guaranteed rejection.
-export interface ArchonEcdsaOperationProof extends DataIntegrityProof {
+export interface ArchonEcdsaOperationProof {
+    type: "DataIntegrityProof";
     cryptosuite: 'archon-ecdsa-jcs-2019';
+    created: string;
+    verificationMethod: string;
+    proofPurpose: OperationProofPurpose;
+    proofValue: string;
 }
 
 export type OperationProof = Proof | ArchonEcdsaOperationProof;

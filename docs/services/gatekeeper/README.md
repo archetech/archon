@@ -263,7 +263,7 @@ carries the legacy form — and a node MUST select the payload from the proof's 
   "type": "EcdsaSecp256k1Signature2019",      // the legacy form
   "created": "<RFC 3339>",                    // signature timestamp, NOT signed
   "verificationMethod": "<did>#key-1",         // for create-agent it is exactly "#key-1" (relative)
-  "proofPurpose": "assertionMethod" | "authentication",
+  "proofPurpose": "capabilityInvocation" | "authentication" | "assertionMethod",
   "proofValue": "<base64url(64-byte ECDSA r||s)>"
 }
 ```
@@ -274,7 +274,7 @@ carries the legacy form — and a node MUST select the payload from the proof's 
   "cryptosuite": "archon-ecdsa-jcs-2019",     // MUST be exactly this suite
   "created": "<RFC 3339>",                    // signed
   "verificationMethod": "<did>#key-1",
-  "proofPurpose": "assertionMethod" | "authentication",
+  "proofPurpose": "capabilityInvocation" | "authentication" | "assertionMethod",
   "proofValue": "<base64url(64-byte ECDSA r||s)>"
 }
 ```
@@ -529,7 +529,11 @@ The signer MUST sign the prehashed message (no extra hashing inside ECDSA).
    `proof.cryptosuite == "archon-ecdsa-jcs-2019"`
 2. `proof.created` parses as RFC 3339 — see
    [§5.6](#56-timestamp-grammar)
-3. `proof.proofPurpose ∈ { "assertionMethod", "authentication" }`
+3. `proof.proofPurpose ∈ { "capabilityInvocation", "authentication", "assertionMethod" }`.
+   An operation exercises control over a DID document, which is what
+   `capabilityInvocation` names and what a node emits. The other two MUST stay
+   accepted: every operation anchored before that was settled claims
+   `authentication`, and `assertionMethod` was accepted alongside it
 4. `proof.verificationMethod` contains `#`. Split on first `#`; the prefix
    MUST be empty (relative) or a valid DID
 5. `proof.proofValue` is a non-empty string

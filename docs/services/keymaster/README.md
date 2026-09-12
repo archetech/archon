@@ -503,8 +503,9 @@ delete), the Keymaster:
    - `created = now() in RFC 3339`
    - `verificationMethod` per Gatekeeper §5.3 (relative `#key-1` for agent
      create, otherwise `<signerDid>#key-1`)
-   - `proofPurpose = "authentication"` for the DID and asset write paths
-     (`create`, `update`, `delete`)
+   - `proofPurpose = "capabilityInvocation"` for the DID and asset write paths
+     (`create`, `update`, `delete`), naming the relationship that authorizes a
+     change to a DID document rather than one that proves who the signer is
 4. Computes
    `msgHash = sha256( sha256(canonicalize(config)) ‖ sha256(canonicalize(op_without_proof)) )`,
    which is what puts `created` and `proofPurpose` inside the signature.

@@ -135,3 +135,28 @@ describe('seed bank updates and wallet backups', () => {
         expect(bankEvents[bankEvents.length - 1].operation.proof!.type).toBe('DataIntegrityProof');
     });
 });
+
+// The relationship an operation claims. `capabilityInvocation` is what DID Core
+// names for exercising control over a document; `authentication` says the signer
+// is proving they are the subject, which is a different claim and the one every
+// operation anchored before this made.
+describe('the purpose an operation claims', () => {
+
+    it('is capabilityInvocation', async () => {
+        const keymaster = await newKeymaster();
+        const did = await keymaster.createId('Alice', { registry: 'local' });
+        const [events] = await gatekeeper.exportDIDs([did]);
+
+        expect(events[0].operation.proof!.proofPurpose).toBe('capabilityInvocation');
+    });
+
+    it('stays authentication on the seed bank, whose bytes fix its DID', async () => {
+        const keymaster = await newKeymaster();
+        await keymaster.createId('Alice', { registry: 'local' });
+
+        const bank = await keymaster.resolveSeedBank();
+        const [events] = await gatekeeper.exportDIDs([bank.didDocument!.id!]);
+
+        expect(events[0].operation.proof!.proofPurpose).toBe('authentication');
+    });
+});

@@ -82,3 +82,22 @@ describe('operation proofs', () => {
         await expect(gatekeeper.verifyCreateOperation(operation)).resolves.toBe(false);
     });
 });
+
+// An operation exercises control over a DID document, which is what
+// capabilityInvocation names. The other two stay accepted because every
+// operation anchored before that was settled claims authentication, and
+// assertionMethod was accepted alongside it.
+describe('operation proof purposes', () => {
+
+    it.each(['capabilityInvocation', 'authentication', 'assertionMethod'])('accepts %s', (proofPurpose) => {
+        const proof = { ...vector().proof, proofPurpose } as never;
+
+        expect(gatekeeper.verifyProofFormat(proof)).toBe(true);
+    });
+
+    it.each(['keyAgreement', 'capabilityDelegation', ''])('refuses %p', (proofPurpose) => {
+        const proof = { ...vector().proof, proofPurpose } as never;
+
+        expect(gatekeeper.verifyProofFormat(proof)).toBe(false);
+    });
+});

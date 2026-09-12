@@ -1281,7 +1281,11 @@ export default class Keymaster implements KeymasterInterface {
             cryptosuite: ARCHON_SECP256K1_CRYPTOSUITE,
             created: new Date().toISOString(),
             verificationMethod: signer.verificationMethod,
-            proofPurpose: 'authentication',
+            // What the operation does: exercise control over a DID document.
+            // `authentication` would say the signer is proving they are the
+            // subject, which is a different claim and the one every operation
+            // anchored before this made.
+            proofPurpose: 'capabilityInvocation',
             proofValue: '',
         };
 
@@ -1533,7 +1537,13 @@ export default class Keymaster implements KeymasterInterface {
     // `created` and `proofPurpose` unforgeable: the legacy
     // EcdsaSecp256k1Signature2019 payload omits it, so on those proofs both
     // members can be altered without breaking the signature.
-    private dataIntegrityPayload(unsecured: unknown, proof: DataIntegrityProof): Uint8Array {
+    private dataIntegrityPayload(
+        unsecured: unknown,
+        // Whatever carries a proofValue: credentials and operations share the
+        // construction but not their proof types, since the purposes they may
+        // claim differ.
+        proof: { proofValue: string },
+    ): Uint8Array {
         const { proofValue, ...config } = proof;
         void proofValue;
         const digests = this.cipher.hashJSON(config) + this.cipher.hashJSON(unsecured);

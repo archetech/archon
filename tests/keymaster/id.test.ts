@@ -182,7 +182,7 @@ describe('createIdOperation', () => {
         expect(operation.proof!.type).toBe('DataIntegrityProof');
         expect(operation.proof!.created).toBeDefined();
         expect(operation.proof!.verificationMethod).toBe('#key-1');
-        expect(operation.proof!.proofPurpose).toBe('authentication');
+        expect(operation.proof!.proofPurpose).toBe('capabilityInvocation');
         expect(operation.proof!.proofValue).toBeDefined();
     });
 

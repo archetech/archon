@@ -20,7 +20,7 @@ def test_signs_the_proof_configuration_into_every_operation():
 
     assert proof["type"] == "DataIntegrityProof"
     assert proof["cryptosuite"] == "archon-ecdsa-jcs-2019"
-    assert proof["proofPurpose"] == "authentication"
+    assert proof["proofPurpose"] == "capabilityInvocation"
 
 
 def test_the_bound_payload_covers_the_proof_configuration():

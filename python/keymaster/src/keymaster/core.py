@@ -1822,7 +1822,11 @@ class Keymaster:
             "cryptosuite": ARCHON_SECP256K1_CRYPTOSUITE,
             "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
             "verificationMethod": signer["verificationMethod"],
-            "proofPurpose": "authentication",
+            # What the operation does: exercise control over a DID document.
+            # "authentication" would say the signer is proving they are the
+            # subject, which is a different claim and the one every operation
+            # anchored before this made.
+            "proofPurpose": "capabilityInvocation",
         }
 
         return {

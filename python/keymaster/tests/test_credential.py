@@ -492,7 +492,7 @@ def test_operations_carry_one_proof_after_an_assertion_key_is_published(testbed)
     assert isinstance(signed["proof"], dict)
     assert signed["proof"]["type"] == "DataIntegrityProof"
     assert signed["proof"]["cryptosuite"] == "archon-ecdsa-jcs-2019"
-    assert signed["proof"]["proofPurpose"] == "authentication"
+    assert signed["proof"]["proofPurpose"] == "capabilityInvocation"
 
     # Both writers claim the same suite; the proof set is what separates them,
     # a credential carrying one proof per published key.
