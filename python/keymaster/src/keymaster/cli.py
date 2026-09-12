@@ -1871,6 +1871,8 @@ async def _run(args: argparse.Namespace) -> int:
             wallet_store=wallet_store,
             passphrase=passphrase,
             default_registry=default_registry or "hyperswarm",
+            bound_operation_proofs=os.environ.get("ARCHON_BOUND_OPERATION_PROOFS", "false").lower()
+            == "true",
         )
 
         # Only once it is known to open this wallet. Saving a mistyped one would

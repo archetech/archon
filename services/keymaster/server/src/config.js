@@ -18,6 +18,10 @@ const config = {
     passphraseShadowed: !!process.env.ARCHON_PASSPHRASE
         && !!process.env.ARCHON_ENCRYPTED_PASSPHRASE
         && process.env.ARCHON_PASSPHRASE !== process.env.ARCHON_ENCRYPTED_PASSPHRASE,
+    // Sign operation proofs under archon-ecdsa-jcs-2019, putting the proof
+    // configuration inside the signature (#1087). Off until every node accepts
+    // the form: one that has not upgraded refuses the operation outright.
+    boundOperationProofs: process.env.ARCHON_BOUND_OPERATION_PROOFS === 'true',
     walletCache: process.env.ARCHON_WALLET_CACHE ? process.env.ARCHON_WALLET_CACHE === 'true' : false,
     defaultRegistry: process.env.ARCHON_DEFAULT_REGISTRY,
     uploadLimit: process.env.ARCHON_KEYMASTER_UPLOAD_LIMIT || '10mb',

@@ -185,6 +185,7 @@ class Keymaster:
         default_registry: str = "hyperswarm",
         ephemeral_registry: str = "hyperswarm",
         max_alias_length: int = 32,
+        bound_operation_proofs: bool = False,
     ):
         self.gatekeeper = gatekeeper
         self.wallet_store = wallet_store
@@ -194,6 +195,11 @@ class Keymaster:
         # controlling agent is local.
         self.ephemeral_registry = ephemeral_registry
         self.max_alias_length = max_alias_length
+        # Sign operation proofs under archon-ecdsa-jcs-2019, which puts the
+        # proof configuration inside the signature (#1087). Off by default:
+        # every node has to accept the form before any wallet emits it, and a
+        # node that has not upgraded refuses the operation outright. See #1125.
+        self.bound_operation_proofs = bound_operation_proofs
         self.max_data_length = 8 * 1024
         self._wallet_cache: dict[str, Any] | None = None
         self._root_cache: _RootCache | None = None
@@ -512,14 +518,9 @@ class Keymaster:
         }
         if operation["blockid"] is None:
             operation.pop("blockid")
-        signature_hex = sign_hash(hash_json(operation), keypair["privateJwk"])
-        operation["proof"] = {
-            "type": "EcdsaSecp256k1Signature2019",
-            "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-            "verificationMethod": "#key-1",
-            "proofPurpose": "authentication",
-            "proofValue": b64url(bytes.fromhex(signature_hex)),
-        }
+        operation["proof"] = self._operation_proof(
+            operation, {"verificationMethod": "#key-1", "keypair": keypair}
+        )
         return operation
 
     async def create_id(self, name: str, options: dict[str, Any] | None = None) -> str:
@@ -1811,19 +1812,45 @@ class Keymaster:
         """
         signer = await self._proof_signer(payload, controller)
 
-        return {
-            **payload,
-            "proof": {
-                "type": "EcdsaSecp256k1Signature2019",
+        return {**payload, "proof": self._operation_proof(payload, signer)}
+
+    def _operation_proof(self, payload: dict[str, Any], signer: dict[str, Any]) -> dict[str, Any]:
+        """Shared by the two emission sites.
+
+        A create-agent operation cannot go through ``_add_operation_proof``,
+        because resolving its signer means resolving a DID that does not exist
+        yet -- it signs with its own new key under the relative ``#key-1``.
+
+        The seed bank's operation is deliberately not one of them: its DID is
+        the CID of the operation, proof included, so changing the proof changes
+        the DID and orphans every wallet that has one.
+        """
+        if self.bound_operation_proofs:
+            config = {
+                "type": "DataIntegrityProof",
+                "cryptosuite": ARCHON_SECP256K1_CRYPTOSUITE,
                 "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
                 "verificationMethod": signer["verificationMethod"],
                 "proofPurpose": "authentication",
-                # The document alone, never the proof configuration. Weaker
-                # than the Data Integrity construction below, and kept only
-                # because it is what every operation ever anchored was signed
-                # over.
-                "proofValue": self._sign_proof_value(lambda: hash_json(payload), signer["keypair"]),
-            },
+            }
+
+            return {
+                **config,
+                "proofValue": self._sign_proof_value(
+                    lambda: hash_message(self._data_integrity_payload(payload, config)),
+                    signer["keypair"],
+                ),
+            }
+
+        return {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+            "verificationMethod": signer["verificationMethod"],
+            "proofPurpose": "authentication",
+            # The document alone, never the proof configuration. Weaker than
+            # the Data Integrity construction above, and kept only because it
+            # is what every operation ever anchored was signed over.
+            "proofValue": self._sign_proof_value(lambda: hash_json(payload), signer["keypair"]),
         }
 
     async def _archon_ecdsa_jcs_2019_proof(

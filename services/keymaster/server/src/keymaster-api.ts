@@ -309,6 +309,7 @@ const server = app.listen(port, config.bindAddress, async () => {
         cipher,
         defaultRegistry,
         passphrase: config.keymasterPassphrase,
+        boundOperationProofs: config.boundOperationProofs,
     });
 
     // The one place this service provisions, so a fresh mnemonic is a

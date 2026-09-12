@@ -32,6 +32,12 @@ class Settings:
         and bool(os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE"))
         and os.environ.get("ARCHON_PASSPHRASE") != os.environ.get("ARCHON_ENCRYPTED_PASSPHRASE")
     )
+    # Sign operation proofs under archon-ecdsa-jcs-2019, putting the proof
+    # configuration inside the signature (#1087). Off until every node accepts
+    # the form: one that has not upgraded refuses the operation outright.
+    bound_operation_proofs: bool = (
+        os.environ.get("ARCHON_BOUND_OPERATION_PROOFS", "false").lower() == "true"
+    )
     wallet_cache: bool = os.environ.get("ARCHON_WALLET_CACHE", "false").lower() == "true"
     default_registry: str = os.environ.get("ARCHON_DEFAULT_REGISTRY", "hyperswarm") or "hyperswarm"
     upload_limit: str = os.environ.get("ARCHON_KEYMASTER_UPLOAD_LIMIT", "10mb")

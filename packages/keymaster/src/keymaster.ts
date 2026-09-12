@@ -25,7 +25,7 @@ import {
     DocumentMetadata,
     ResolveDIDOptions,
     Operation,
-    Proof,
+    OperationProof,
     ProofPurpose,
 } from '@didcid/clients/gatekeeper-types';
 import {
@@ -214,6 +214,7 @@ export default class Keymaster implements KeymasterInterface {
     private db: WalletBase;
     private cipher: Cipher;
     private readonly defaultRegistry: string;
+    private readonly boundOperationProofs: boolean;
     private readonly ephemeralRegistry: string;
     private readonly maxAliasLength: number;
     private readonly maxDataLength: number;
@@ -251,6 +252,7 @@ export default class Keymaster implements KeymasterInterface {
         this.cipher = options.cipher;
 
         this.defaultRegistry = options.defaultRegistry || 'hyperswarm';
+        this.boundOperationProofs = options.boundOperationProofs === true;
         // Ephemeral assets stay off-chain; `createAsset` downgrades them to `local` when the
         // controlling agent is local.
         this.ephemeralRegistry = 'hyperswarm';
@@ -610,6 +612,9 @@ export default class Keymaster implements KeymasterInterface {
         };
 
         const msgHash = this.cipher.hashJSON(operation);
+        // Deliberately not `operationProof`: this DID is the CID of the
+        // operation, proof included, so signing it any other way computes a
+        // different DID and orphans every wallet that already has one.
         const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
         const signed: Operation = {
             ...operation,
@@ -1274,22 +1279,50 @@ export default class Keymaster implements KeymasterInterface {
     private async addOperationProof<T extends object>(
         obj: T,
         controller?: string,
-    ): Promise<T & { proof: Proof }> {
+    ): Promise<T & { proof: OperationProof }> {
         const signer = await this.proofSigner(obj, controller);
 
-        return {
-            ...obj,
-            proof: {
-                type: "EcdsaSecp256k1Signature2019",
+        return { ...obj, proof: this.operationProof(obj, signer) };
+    }
+
+    // Shared by the two emission sites. A create-agent operation cannot go
+    // through `addOperationProof`, because resolving its signer means resolving
+    // a DID that does not exist yet -- it signs with its own new key under the
+    // relative `#key-1`.
+    private operationProof<T extends object>(
+        obj: T,
+        signer: { verificationMethod: string, keypair: EcdsaJwkPair },
+    ): OperationProof {
+        if (this.boundOperationProofs) {
+            const config: DataIntegrityProof = {
+                type: 'DataIntegrityProof',
+                cryptosuite: ARCHON_SECP256K1_CRYPTOSUITE,
                 created: new Date().toISOString(),
                 verificationMethod: signer.verificationMethod,
                 proofPurpose: 'authentication',
-                // The document alone, never the proof configuration. Weaker
-                // than the Data Integrity construction below, and kept only
-                // because it is what every operation ever anchored was signed
-                // over.
-                proofValue: this.signProofValue(() => this.cipher.hashJSON(obj), signer.keypair),
-            },
+                proofValue: '',
+            };
+
+            const { proofValue, ...unsigned } = config;
+            void proofValue;
+
+            return {
+                ...unsigned as DataIntegrityProof,
+                proofValue: this.signProofValue(
+                    () => this.cipher.hashMessage(this.dataIntegrityPayload(obj, unsigned as DataIntegrityProof)),
+                    signer.keypair),
+            };
+        }
+
+        return {
+            type: "EcdsaSecp256k1Signature2019",
+            created: new Date().toISOString(),
+            verificationMethod: signer.verificationMethod,
+            proofPurpose: 'authentication',
+            // The document alone, never the proof configuration. Weaker than
+            // the Data Integrity construction above, and kept only because it
+            // is what every operation ever anchored was signed over.
+            proofValue: this.signProofValue(() => this.cipher.hashJSON(obj), signer.keypair),
         };
     }
 
@@ -2058,19 +2091,10 @@ export default class Keymaster implements KeymasterInterface {
             publicJwk: keypair.publicJwk,
         };
 
-        const msgHash = this.cipher.hashJSON(operation);
-        const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
-        const signed: Operation = {
+        return {
             ...operation,
-            proof: {
-                type: "EcdsaSecp256k1Signature2019",
-                created: new Date().toISOString(),
-                verificationMethod: "#key-1",
-                proofPurpose: "authentication",
-                proofValue: hexToBase64url(signatureHex),
-            },
+            proof: this.operationProof(operation, { verificationMethod: '#key-1', keypair }),
         };
-        return signed;
     }
 
     async removeId(name: string): Promise<boolean> {
