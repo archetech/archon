@@ -552,7 +552,7 @@ Then signature verification:
 | Operation | verificationMethod | Key source |
 | --- | --- | --- |
 | `create` agent | MUST equal `#key-1` (relative, since the DID does not yet exist) | `operation.publicJwk` (self-signed) |
-| `create` asset | `<controller>#key-N`. `controller` portion MUST equal `operation.controller` | resolve `controller` DID with `confirm: true, versionTime: proof.created`; use the verification method the proof names |
+| `create` asset | `<controller>#key-N`. `controller` portion MUST equal `operation.controller` | resolve `controller` DID with `confirm: true, versionTime: <when the operation entered the network>` (§5.8); use the verification method the proof names |
 | `update` / `delete` on agent | `<did>#key-N` | resolve `operation.did`; use the verification method the proof names |
 | `update` / `delete` on asset | `<controller>#key-N` | resolve the doc, follow `controller`, use the verification method the proof names in that document |
 
@@ -615,6 +615,55 @@ An event's `registry` is validated as a name, not merely tested for presence.
 
 `tests/gatekeeper/event-shape-vectors.json` pins the verdict both ports MUST
 reach for each mutation of a valid event, and both run it as a test.
+
+### 5.8 Which controller document authorizes an asset operation
+
+An asset operation is authorized by its controller's key, and the controller
+may have rotated since. The document is resolved at the time the operation
+**entered the network**:
+
+| how the operation arrived | `versionTime` |
+| --- | --- |
+| submitted directly (`POST /did`) | none — the current document |
+| imported from a chain registry | the event's `time`, which is the block time |
+| replayed from the store (`verify`) | the stored event's `time` |
+
+It is never resolved at `proof.created`. The signer chooses that value, and a
+value from before a rotation selects the document that still lists the retired
+key — so a holder of a compromised-then-rotated key could go on authorizing
+every asset the agent controls by backdating (#1131). Binding `created` into the
+signature (§5.1) does not help: the attacker holds the key and signs over
+whatever `created` they like.
+
+Historical resolution is still required, which is why the rule is "when it
+entered" rather than "now": an operation anchored before a rotation was
+authorized by the key current *then*, and replaying it after the rotation has
+to reach that key. Both ports implement this as one helper
+(`controllerDocument` / `controller_document`) that every verification path
+calls with the time it knows.
+
+Times are compared as instants, not as text: an event time carrying an offset
+(`…+01:00`) is ordered by the moment it denotes, so both ports resolve the same
+document. A string comparison would fork them.
+
+**Where the clock is trusted.** Only a chain-anchored registry supplies a time
+the signer does not control: the event's `time` is the block time. A **direct
+submission** is safe for a different reason — it resolves the controller at the
+current document, so a retired key is simply absent. Between them these cover
+the reported attack.
+
+**Known limits**, each a separate follow-up:
+
+- A `local` event's `time` is the signer's `proof.created`, and a `hyperswarm`
+  event's is the time the sending peer asserted. Neither is an independent
+  clock, so the bound on those registries is only as good as that value.
+  `local` DIDs are single-node and never gossiped, and `hyperswarm` was already
+  exposed here by construction. A correct client stamps `created` at submission,
+  so for honest operations the stored time matches network entry regardless.
+- Every operation anchored in one batch shares that batch's `time`, so a rotation
+  and an operation authorized by the pre-rotation key in the *same* batch cannot
+  be ordered by time alone; resolving that needs the event's ordinal, not just
+  its time.
 
 ## 6. DID resolution algorithm
 
@@ -791,12 +840,13 @@ dereference resources. Standard document metadata (`created`, `updated`,
    format checks fail.
 3. Agent: `proof.verificationMethod == "#key-1"` and `publicJwk` is present.
    Verify signature against `publicJwk`.
-4. Asset: `proof.verificationMethod` is `<controller>#key-1`,
+4. Asset: `proof.verificationMethod` is `<controller>#key-N`,
    `operation.controller == controller`. Resolve the controller with
-   `confirm: true, versionTime: proof.created`. Reject if the controller's
+   `confirm: true` at the time the operation entered the network — never at
+   `proof.created` (§5.8). Reject if the controller's
    `registration.registry == "local"` and the new operation's registry is
-   non-`local`. Verify against the controller's `verificationMethod[0]
-   .publicKeyJwk`.
+   non-`local`. Verify against the verification method the proof names in
+   that document.
 5. Reject if `registration.registry` is not in the server's
    `supportedRegistries`.
 6. Append the event with `registry: "local"`, `ordinal: [0]`, `time:

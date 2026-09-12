@@ -134,7 +134,7 @@ pub(crate) async fn handle_did_operation(
         .and_then(Value::as_str)
         .ok_or_else(|| "missing operation.type".to_string())?;
 
-    let valid = verify_operation_impl(state, payload)
+    let valid = verify_operation_impl(state, payload, None)
         .await
         .map_err(|error| error.to_string())?;
     if !valid {
@@ -635,7 +635,7 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
             return ImportStatus::Rejected;
         }
 
-        let verified = match verify_operation_impl(state, &event.operation).await {
+        let verified = match verify_operation_impl(state, &event.operation, Some(&event.time)).await {
             Ok(verified) => verified,
             Err(error) => {
                 if trace {

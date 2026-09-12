@@ -245,6 +245,23 @@ fn encode_json_db_with_indent(data: &JsonDbFile) -> Result<Vec<u8>> {
     Ok(buf)
 }
 
+// True when `operation_time` is chronologically after `version_time`, which is
+// where resolution stops including events. Both are parsed to instants so that
+// an offset like `+01:00` is ordered by the moment it denotes, not by its
+// text -- a string comparison puts `13:00:00+01:00` (12:00Z) after `12:30:00Z`,
+// which would have the two ports resolve different documents and fork (#1131).
+// An unparseable time compares as not-after, matching JS `Date` NaN ordering;
+// event times are RFC 3339 validated on entry, so this is only a fallback.
+pub(crate) fn time_is_after(operation_time: &str, version_time: &str) -> bool {
+    match (
+        chrono::DateTime::parse_from_rfc3339(operation_time),
+        chrono::DateTime::parse_from_rfc3339(version_time),
+    ) {
+        (Ok(operation), Ok(version)) => operation > version,
+        _ => false,
+    }
+}
+
 pub(crate) fn chrono_like_now() -> String {
     use std::time::SystemTime;
     let now = SystemTime::now();
@@ -1736,7 +1753,7 @@ impl JsonDb {
             let operation_time = event.time.clone();
 
             if let Some(version_time) = options.version_time.as_ref() {
-                if operation_time > *version_time {
+                if time_is_after(&operation_time, version_time) {
                     break;
                 }
             }
@@ -2062,5 +2079,26 @@ impl GatekeeperDb for JsonDb {
     }
     fn resolve_doc(&self, config: &Config, did: &str, options: ResolveOptions) -> Result<Value> {
         JsonDb::resolve_doc(self, config, did, options)
+    }
+}
+
+#[cfg(test)]
+mod time_ordering {
+    use super::time_is_after;
+
+    // An offset time is ordered by the instant it denotes, not its text. The
+    // rotation at 13:00+01:00 (12:00Z) is before the operation at 12:30Z, so the
+    // operation IS after it -- a string comparison would say the reverse and
+    // fork the ports (#1131). Checked against the same vector in
+    // tests/gatekeeper/resolve-offset.test.ts, which asserts JS Date agrees.
+    #[test]
+    fn orders_offset_times_by_instant_not_text() {
+        assert!(time_is_after("2026-04-11T12:30:00Z", "2026-04-11T13:00:00+01:00"));
+        assert!(!time_is_after("2026-04-11T13:00:00+01:00", "2026-04-11T12:30:00Z"));
+        // Equal instants written differently are not "after" either way.
+        assert!(!time_is_after("2026-04-11T12:00:00Z", "2026-04-11T13:00:00+01:00"));
+        assert!(!time_is_after("2026-04-11T13:00:00+01:00", "2026-04-11T12:00:00Z"));
+        // Plain Z ordering is unchanged.
+        assert!(time_is_after("2026-04-11T12:31:00Z", "2026-04-11T12:30:00Z"));
     }
 }
