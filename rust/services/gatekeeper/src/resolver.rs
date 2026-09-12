@@ -220,7 +220,7 @@ pub(crate) async fn resolve_local_doc_async(
         let operation_time = event.time.clone();
 
         if let Some(version_time) = options.version_time.as_ref() {
-            if operation_time > *version_time {
+            if crate::store::time_is_after(&operation_time, version_time) {
                 break;
             }
         }

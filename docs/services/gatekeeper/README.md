@@ -642,9 +642,28 @@ to reach that key. Both ports implement this as one helper
 (`controllerDocument` / `controller_document`) that every verification path
 calls with the time it knows.
 
-**Known limit.** A DID registered on `hyperswarm` is never chain-anchored, so
-its events carry the time the sending peer asserted, and there is no trusted
-clock to bound against. That registry remains exposed to this by construction.
+Times are compared as instants, not as text: an event time carrying an offset
+(`…+01:00`) is ordered by the moment it denotes, so both ports resolve the same
+document. A string comparison would fork them.
+
+**Where the clock is trusted.** Only a chain-anchored registry supplies a time
+the signer does not control: the event's `time` is the block time. A **direct
+submission** is safe for a different reason — it resolves the controller at the
+current document, so a retired key is simply absent. Between them these cover
+the reported attack.
+
+**Known limits**, each a separate follow-up:
+
+- A `local` event's `time` is the signer's `proof.created`, and a `hyperswarm`
+  event's is the time the sending peer asserted. Neither is an independent
+  clock, so the bound on those registries is only as good as that value.
+  `local` DIDs are single-node and never gossiped, and `hyperswarm` was already
+  exposed here by construction. A correct client stamps `created` at submission,
+  so for honest operations the stored time matches network entry regardless.
+- Every operation anchored in one batch shares that batch's `time`, so a rotation
+  and an operation authorized by the pre-rotation key in the *same* batch cannot
+  be ordered by time alone; resolving that needs the event's ordinal, not just
+  its time.
 
 ## 6. DID resolution algorithm
 
