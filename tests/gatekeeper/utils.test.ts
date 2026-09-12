@@ -477,13 +477,10 @@ describe('Test operation validation errors', () => {
 
         delete doc.didDocument!.verificationMethod![0].publicKeyJwk;
 
-        try {
-            await gatekeeper.verifyUpdateOperation(updateOp, doc);
-            throw new ExpectedExceptionError();
-        }
-        catch (error: any) {
-            expect(error.message).toBe('Invalid operation: didDocument missing verificationMethod');
-        }
+        // Not verified rather than invalid: an operation whose key carries no
+        // material can never verify, and `Invalid operation` means defer on the
+        // import path -- it would be retried forever instead of refused.
+        expect(await gatekeeper.verifyUpdateOperation(updateOp, doc)).toBe(false);
     });
 
     it('create error with invalid type', async () => {

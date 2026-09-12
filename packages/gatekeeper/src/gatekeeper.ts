@@ -6,6 +6,7 @@ import {
     InvalidOperationError
 } from '@didcid/common/errors';
 import { IPFSClient } from '@didcid/ipfs/types';
+import { EcdsaJwkPublic } from '@didcid/cipher/types';
 import { base64url } from 'multiformats/bases/base64';
 import {
     BatchMetadata,
@@ -64,6 +65,17 @@ function daysInMonth(year: number, month: number): number {
 function isOperation(value: unknown): value is Operation {
     const type = (value as Operation | null)?.type;
     return type === 'create' || type === 'update' || type === 'delete';
+}
+
+// A DID URL, whichever form it was written in. A proof names its key absolutely
+// (`did:cid:...#key-1`) or relatively (`#key-1`), and a document may list it
+// either way, so the two are compared as URLs rather than as strings.
+function absoluteKeyId(ref: string | undefined, did: string | undefined): string | undefined {
+    if (!ref) {
+        return undefined;
+    }
+
+    return ref.startsWith('#') ? `${did ?? ''}${ref}` : ref;
 }
 
 function isOperationProofType(proof: { type?: string, cryptosuite?: string }): boolean {
@@ -403,6 +415,35 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.cipher.hashMessage(Uint8Array.from(Buffer.from(digests, 'hex')));
     }
 
+    // The key the proof names, which is not always the first one. Rotation
+    // replaces the identity key in place, so index 0 has been right for every
+    // operation anchored so far -- but a DID that publishes a second key could
+    // not sign with it, and a purpose can only be enforced against a key that
+    // was looked up (#1130).
+    private operationKey(doc: DidCidDocument, proof: OperationProof): EcdsaJwkPublic | undefined {
+        const methods = doc.didDocument?.verificationMethod ?? [];
+        const target = absoluteKeyId(proof.verificationMethod, doc.didDocument?.id);
+        const method = methods.find(
+            candidate => absoluteKeyId(candidate.id, doc.didDocument?.id) === target);
+
+        // Undefined rather than a throw: an operation naming a key the document
+        // does not list has not verified, and `InvalidOperationError` means
+        // something else on the import path -- importEvent defers on it, so a
+        // throw here would leave such an operation retried forever instead of
+        // refused.
+        if (!method?.publicKeyJwk) {
+            return undefined;
+        }
+
+        const publicJwk = method.publicKeyJwk;
+
+        if (publicJwk.kty !== 'EC') {
+            throw new InvalidOperationError('verification key is not a secp256k1 key');
+        }
+
+        return publicJwk as EcdsaJwkPublic;
+    }
+
     verifyDIDFormat(did: string): boolean {
         return did.startsWith('did:');
     }
@@ -557,17 +598,20 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
 
             const msgHash = this.operationMessageHash(operation);
-            if (!doc.didDocument ||
-                !doc.didDocument.verificationMethod ||
-                doc.didDocument.verificationMethod.length === 0 ||
-                !doc.didDocument.verificationMethod[0].publicKeyJwk) {
+
+            // Absent means the controller has not been imported yet, which the
+            // import state machine defers on. An empty array is a document
+            // with no keys, which is a refusal rather than a reason to wait.
+            if (!doc.didDocument?.verificationMethod) {
                 throw new InvalidOperationError('didDocument missing verificationMethod');
             }
-            // TBD select the right key here, not just the first one
-            const publicJwk = doc.didDocument.verificationMethod[0].publicKeyJwk;
-            if (publicJwk.kty !== 'EC') {
-                throw new InvalidOperationError('verification key is not a secp256k1 key');
+
+            const publicJwk = this.operationKey(doc, operation.proof!);
+
+            if (!publicJwk) {
+                return false;
             }
+
             const signatureHex = base64urlToHex(operation.proof!.proofValue);
             return this.cipher.verifySig(msgHash, signatureHex, publicJwk);
         }
@@ -605,16 +649,12 @@ export default class Gatekeeper implements GatekeeperInterface {
         const proof = operation.proof!;
         const msgHash = this.operationMessageHash(operation);
 
-        if (doc.didDocument.verificationMethod.length === 0 ||
-            !doc.didDocument.verificationMethod[0].publicKeyJwk) {
-            throw new InvalidOperationError('didDocument missing verificationMethod');
+        const publicJwk = this.operationKey(doc, proof);
+
+        if (!publicJwk) {
+            return false;
         }
 
-        // TBD get the right key here, not just the first one
-        const publicJwk = doc.didDocument.verificationMethod[0].publicKeyJwk;
-        if (publicJwk.kty !== 'EC') {
-            throw new InvalidOperationError('verification key is not a secp256k1 key');
-        }
         const signatureHex = base64urlToHex(proof.proofValue);
         return this.cipher.verifySig(msgHash, signatureHex, publicJwk);
     }

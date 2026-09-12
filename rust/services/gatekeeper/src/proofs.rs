@@ -268,6 +268,46 @@ fn operation_message_hash(operation: &Value) -> Result<String> {
     Ok(bytes_to_hex(hash.digest()))
 }
 
+// A DID URL, whichever form it was written in. A proof names its key absolutely
+// (`did:cid:...#key-1`) or relatively (`#key-1`), and a document may list it
+// either way, so the two are compared as URLs rather than as strings.
+fn absolute_key_id(reference: &str, did: &str) -> String {
+    if reference.starts_with('#') {
+        format!("{did}{reference}")
+    } else {
+        reference.to_string()
+    }
+}
+
+// The key the proof names, which is not always the first one. Rotation replaces
+// the identity key in place, so index 0 has been right for every operation
+// anchored so far -- but a DID that publishes a second key could not sign with
+// it, and a purpose can only be enforced against a key that was looked up
+// (#1130).
+//
+// None rather than an error: an operation naming a key the document does not
+// list has not verified, and an error means "Invalid operation" on the import
+// path, which defers -- such an operation would be retried forever instead of
+// refused.
+fn operation_key<'a>(doc: &'a Value, proof: &Value) -> Option<&'a Value> {
+    let did_document = doc.get("didDocument")?;
+    let did = did_document.get("id").and_then(Value::as_str).unwrap_or_default();
+    let named = proof.get("verificationMethod").and_then(Value::as_str)?;
+    let target = absolute_key_id(named, did);
+
+    did_document
+        .get("verificationMethod")
+        .and_then(Value::as_array)?
+        .iter()
+        .find(|method| {
+            method
+                .get("id")
+                .and_then(Value::as_str)
+                .is_some_and(|id| absolute_key_id(id, did) == target)
+        })
+        .and_then(|method| method.get("publicKeyJwk"))
+}
+
 fn value_without_proof(value: &Value) -> Value {
     let mut copy = value.clone();
     if let Some(object) = copy.as_object_mut() {
@@ -475,13 +515,20 @@ pub(crate) async fn verify_create_operation_impl(
         anyhow::bail!("Invalid operation: non-local registry={registry}");
     }
 
-    let public_jwk = controller_doc
+    // Absent means the controller has not been imported yet, which the import
+    // state machine defers on. An empty array is a document with no keys, which
+    // is a refusal rather than a reason to wait.
+    if controller_doc
         .get("didDocument")
         .and_then(|value| value.get("verificationMethod"))
-        .and_then(Value::as_array)
-        .and_then(|items| items.first())
-        .and_then(|value| value.get("publicKeyJwk"))
-        .context("Invalid operation: didDocument missing verificationMethod")?;
+        .is_none()
+    {
+        anyhow::bail!("Invalid operation: didDocument missing verificationMethod");
+    }
+
+    let Some(public_jwk) = operation_key(&controller_doc, proof) else {
+        return Ok(false);
+    };
 
     verify_sig(&msg_hash, proof_value, public_jwk)
 }
@@ -542,13 +589,9 @@ pub(crate) async fn verify_update_operation_impl(
 
     let proof = operation.get("proof").context("Invalid operation: proof")?;
     let msg_hash = operation_message_hash(operation)?;
-    let public_jwk = doc
-        .get("didDocument")
-        .and_then(|value| value.get("verificationMethod"))
-        .and_then(Value::as_array)
-        .and_then(|items| items.first())
-        .and_then(|value| value.get("publicKeyJwk"))
-        .context("Invalid operation: didDocument missing verificationMethod")?;
+    let Some(public_jwk) = operation_key(doc, proof) else {
+        return Ok(false);
+    };
     let proof_value = proof
         .get("proofValue")
         .and_then(Value::as_str)
@@ -769,6 +812,48 @@ mod operation_proofs {
             proof["proofPurpose"] = Value::String(purpose.to_string());
             assert!(!verify_proof_format(Some(&proof)), "{purpose} should be refused");
         }
+    }
+
+    // Selection is by the key the proof names, not by position. The TypeScript
+    // port has the same cases in tests/gatekeeper/operation-proofs.test.ts.
+    #[test]
+    fn selects_the_key_the_proof_names() {
+        let did = "did:cid:bagaaieratest";
+        let doc = serde_json::json!({
+            "didDocument": {
+                "id": did,
+                "verificationMethod": [
+                    { "id": "#key-1", "publicKeyJwk": { "kty": "EC", "x": "first" } },
+                    { "id": "#key-2", "publicKeyJwk": { "kty": "EC", "x": "second" } }
+                ]
+            }
+        });
+
+        let named = |value: &str| serde_json::json!({ "verificationMethod": value });
+
+        assert_eq!(
+            super::operation_key(&doc, &named(&format!("{did}#key-2")))
+                .and_then(|key| key.get("x"))
+                .and_then(Value::as_str),
+            Some("second"),
+            "a proof naming the second key must not select the first"
+        );
+
+        // The proof may name its key absolutely and the document relatively, so
+        // the two are compared as DID URLs rather than as strings.
+        assert_eq!(
+            super::operation_key(&doc, &named("#key-1"))
+                .and_then(|key| key.get("x"))
+                .and_then(Value::as_str),
+            Some("first")
+        );
+
+        assert!(super::operation_key(&doc, &named(&format!("{did}#key-9"))).is_none());
+
+        // An empty array is a document with no keys: a refusal, where an absent
+        // property is left to the caller as a structural error to defer on.
+        let empty = serde_json::json!({ "didDocument": { "id": did, "verificationMethod": [] } });
+        assert!(super::operation_key(&empty, &named("#key-1")).is_none());
     }
 
     #[test]

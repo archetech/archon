@@ -4,8 +4,8 @@ use anyhow::Result;
 use serde_json::{json, Value};
 
 use common::{
-    create_agent_operation, create_asset_operation, create_update_operation, make_event,
-    sign_operation, spawn_json, spawn_service,
+    create_agent_operation, create_asset_operation, create_update_operation,
+    create_update_operation_signed_by, make_event, sign_operation, spawn_json, spawn_service,
 };
 
 async fn admin_post(service: &common::TestService, path: &str, payload: Value) -> Result<Value> {
@@ -134,9 +134,10 @@ async fn sync_processing_handles_updates_imported_before_creates() -> Result<()>
     .await?;
     let mut asset_doc = resolve_did(&service, &asset_did).await?;
     asset_doc["didDocumentData"] = json!({ "asset": 2 });
-    let asset_update = create_update_operation(
+    let asset_update = create_update_operation_signed_by(
         7,
         &asset_did,
+        &agent_did,
         asset_doc["didDocumentMetadata"]["versionId"].as_str(),
         "2026-04-11T12:03:00Z",
         asset_doc.clone(),
@@ -220,9 +221,10 @@ async fn sync_processing_defers_signed_updates_with_unknown_previd() -> Result<(
             "local",
             "2026-04-11T12:03:00Z",
             &[3],
-            create_update_operation(
+            create_update_operation_signed_by(
                 7,
                 &asset_did,
+                &agent_did,
                 Some("mock-previd"),
                 "2026-04-11T12:03:00Z",
                 asset_doc,
