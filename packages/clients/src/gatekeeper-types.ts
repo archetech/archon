@@ -285,11 +285,17 @@ export type ProofPurpose = "assertionMethod" | "authentication";
 // written claims it, so both are accepted.
 export type OperationProofPurpose = "capabilityInvocation" | "authentication";
 
+// The legacy proof, carried by operations anchored before the suite was adopted
+// and by credentials issued before it. Its purpose is the credential set: a
+// legacy operation only ever claimed `authentication`, and nothing emits a
+// legacy proof now but the seed bank. Operations under the suite carry
+// `ArchonEcdsaOperationProof` below, which is where `capabilityInvocation`
+// lives.
 export interface Proof {
     type: "EcdsaSecp256k1Signature2019";
     created: string;
     verificationMethod: string;
-    proofPurpose: OperationProofPurpose;
+    proofPurpose: ProofPurpose;
     proofValue: string;
 }
 
