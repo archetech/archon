@@ -356,9 +356,14 @@ pub fn create_asset_operation(
     sign_operation(seed, &operation, &format!("{controller_did}#key-1"), created)
 }
 
-pub fn create_update_operation(
+// `signer` is the DID whose document holds the key. For an agent updating
+// itself that is the agent; for an asset it is its controller, since naming the
+// asset would name a key that exists nowhere -- which index-0 key selection used
+// to hide.
+pub fn create_update_operation_signed_by(
     seed: u8,
     did: &str,
+    signer: &str,
     previd: Option<&str>,
     created: &str,
     doc: Value,
@@ -371,7 +376,18 @@ pub fn create_update_operation(
     if let Some(previd) = previd {
         operation["previd"] = Value::String(previd.to_string());
     }
-    sign_operation(seed, &operation, &format!("{did}#key-1"), created)
+    sign_operation(seed, &operation, &format!("{signer}#key-1"), created)
+}
+
+// An agent signing its own update; the common case.
+pub fn create_update_operation(
+    seed: u8,
+    did: &str,
+    previd: Option<&str>,
+    created: &str,
+    doc: Value,
+) -> Value {
+    create_update_operation_signed_by(seed, did, did, previd, created, doc)
 }
 
 pub fn create_delete_operation(seed: u8, did: &str, previd: &str, created: &str) -> Value {

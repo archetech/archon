@@ -57,6 +57,16 @@ export default class TestHelper {
         };
     }
 
+    // The DID whose document holds the signing key. An asset's operations are
+    // signed by its controller, so naming the asset would name a key that
+    // exists nowhere -- which is what a real keymaster never does, and what
+    // index-0 key selection used to hide.
+    private async signerDid(did: string): Promise<string> {
+        const current = await this.gatekeeper.resolveDID(did);
+
+        return current.didDocument?.controller || did;
+    }
+
     async createUpdateOp(
         keypair: EcdsaJwkPair,
         did: string,
@@ -88,7 +98,7 @@ export default class TestHelper {
             proof: {
                 type: "EcdsaSecp256k1Signature2019",
                 created: new Date().toISOString(),
-                verificationMethod: `${did}#key-1`,
+                verificationMethod: `${await this.signerDid(did)}#key-1`,
                 proofPurpose: "authentication",
                 proofValue: hexToBase64url(signatureHex),
             }
@@ -116,7 +126,7 @@ export default class TestHelper {
             proof: {
                 type: "EcdsaSecp256k1Signature2019",
                 created: new Date().toISOString(),
-                verificationMethod: `${did}#key-1`,
+                verificationMethod: `${await this.signerDid(did)}#key-1`,
                 proofPurpose: "authentication",
                 proofValue: hexToBase64url(signatureHex),
             }

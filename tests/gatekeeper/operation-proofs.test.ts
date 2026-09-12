@@ -2,12 +2,25 @@ import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import MemoryClient from '@didcid/ipfs/memory';
 import { Operation } from '@didcid/clients/gatekeeper-types';
+import CipherNode from '@didcid/cipher/node';
+import TestHelper from './helper.ts';
 import proofVectors from './proof-vectors.json' with { type: 'json' };
 
+const ipfs = new MemoryClient();
+const cipher = new CipherNode();
 const gatekeeper = new Gatekeeper({
     db: new DbJsonMemory('test'),
-    ipfs: new MemoryClient(),
+    ipfs,
     registries: ['local', 'hyperswarm'],
+});
+const helper = new TestHelper(gatekeeper, cipher);
+
+beforeAll(async () => {
+    await ipfs.start();
+});
+
+afterAll(async () => {
+    await ipfs.stop();
 });
 
 // The Rust port checks the same vector, so a change here has to be made in both
@@ -100,5 +113,63 @@ describe('operation proof purposes', () => {
         const proof = { ...vector().proof, proofPurpose } as never;
 
         expect(gatekeeper.verifyProofFormat(proof)).toBe(false);
+    });
+});
+
+// Selection is by the key the proof names, not by position. Rotation replaces
+// the identity key in place, so index 0 has been right for every operation
+// anchored so far -- but that is a property of how rotation works, not a rule,
+// and a DID that publishes a second key could not sign with it (#1130).
+describe('which key authorizes an operation', () => {
+
+    async function agent() {
+        const keypair = cipher.generateRandomJwk();
+        const did = await gatekeeper.createDID(await helper.createAgentOp(keypair));
+
+        return { keypair, did, doc: await gatekeeper.resolveDID(did) };
+    }
+
+    it('accepts a proof naming a key the document lists', async () => {
+        const { keypair, did, doc } = await agent();
+
+        await expect(gatekeeper.verifyUpdateOperation(
+            await helper.createUpdateOp(keypair, did, doc), doc)).resolves.toBe(true);
+    });
+
+    it('refuses a proof naming a key the document does not list', async () => {
+        const { keypair, did, doc } = await agent();
+        const operation = await helper.createUpdateOp(keypair, did, doc);
+        operation.proof!.verificationMethod = `${did}#key-9`;
+
+        expect(await gatekeeper.verifyUpdateOperation(operation, doc)).toBe(false);
+    });
+
+    // The proof may name its key absolutely and the document relatively, so the
+    // two are compared as DID URLs rather than as strings.
+    it('matches a relative reference against an absolute one', async () => {
+        const { keypair, did, doc } = await agent();
+        const operation = await helper.createUpdateOp(keypair, did, doc);
+        operation.proof!.verificationMethod = '#key-1';
+
+        expect(await gatekeeper.verifyUpdateOperation(operation, doc)).toBe(true);
+    });
+
+    // A second key is unusable while selection is positional, which is what
+    // this changes.
+    it('accepts a second key the document lists', async () => {
+        const { did, doc } = await agent();
+        const second = cipher.generateRandomJwk();
+
+        doc.didDocument!.verificationMethod!.push({
+            id: '#key-2',
+            controller: did,
+            type: 'EcdsaSecp256k1VerificationKey2019',
+            publicKeyJwk: second.publicJwk,
+        });
+
+        const operation = await helper.createUpdateOp(second, did, doc);
+        operation.proof!.verificationMethod = `${did}#key-2`;
+
+        expect(await gatekeeper.verifyUpdateOperation(operation, doc)).toBe(true);
     });
 });

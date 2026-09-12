@@ -552,9 +552,16 @@ Then signature verification:
 | Operation | verificationMethod | Key source |
 | --- | --- | --- |
 | `create` agent | MUST equal `#key-1` (relative, since the DID does not yet exist) | `operation.publicJwk` (self-signed) |
-| `create` asset | `<controller>#key-1`. `controller` portion MUST equal `operation.controller` | resolve `controller` DID with `confirm: true, versionTime: proof.created`; use `didDocument.verificationMethod[0].publicKeyJwk` |
-| `update` / `delete` on agent | `<did>#key-N` | resolve `operation.did`; use `didDocument.verificationMethod[0].publicKeyJwk` |
-| `update` / `delete` on asset | controller's verification method | resolve the doc, follow `controller`, use that controller's `verificationMethod[0].publicKeyJwk` |
+| `create` asset | `<controller>#key-1`. `controller` portion MUST equal `operation.controller` | resolve `controller` DID with `confirm: true, versionTime: proof.created`; use the verification method the proof names |
+| `update` / `delete` on agent | `<did>#key-N` | resolve `operation.did`; use the verification method the proof names |
+| `update` / `delete` on asset | `<controller>#key-N` | resolve the doc, follow `controller`, use the verification method the proof names in that document |
+
+The key is selected by the DID URL in `proof.verificationMethod`, compared as a
+URL so a relative `#key-1` matches an absolute `<did>#key-1` and the reverse. An
+operation naming a method the document does not list does **not** verify, and
+that is a refusal rather than an `Invalid operation`: the import state machine
+defers on the latter, so such an operation would be retried forever instead of
+rejected.
 
 ### 5.4 Operation size limit
 
