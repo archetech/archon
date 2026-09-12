@@ -298,9 +298,9 @@ export interface DataIntegrityProof {
     proofValue: string;
 }
 
-// What may appear on a credential or a presentation. Never on an Operation:
-// both gatekeeper ports require an operation proof to be the literal
-// EcdsaSecp256k1Signature2019, so `Proof` stays exact.
+// What may appear on a credential or a presentation, where the suite varies.
+// An operation is narrower -- one proof, and only the suite `OperationProof`
+// below admits -- which is why the two are separate types.
 export type CredentialProof = Proof | DataIntegrityProof;
 
 export interface Operation {

@@ -467,10 +467,10 @@ describe('issuing', () => {
         expect(await keymaster.verifyProof(signed)).toBe(true);
     });
 
-    // Both gatekeeper ports require an operation proof to be a single object
-    // whose type is the literal EcdsaSecp256k1Signature2019, so an operation
-    // must never pick up the second proof however many keys its signer has.
-    it('leaves DID operations carrying one legacy proof', async () => {
+    // Both gatekeeper ports require an operation proof to be a single object,
+    // so an operation must never pick up the second proof however many keys its
+    // signer has published.
+    it('leaves DID operations carrying one proof', async () => {
         const did = await keymaster.createId('Alice', { registry: 'local' });
         await keymaster.publishAssertionKey();
 
@@ -485,9 +485,9 @@ describe('issuing', () => {
         expect(asset).toBeDefined();
     });
 
-    // Both writers now claim the suite Archon defines rather than a registered
-    // one it does not implement (#1087). What still separates them is the proof
-    // set: a credential carries one per published key, an operation one.
+    // Both writers claim the suite Archon defines rather than a registered one
+    // it does not implement (#1087). What separates them is the proof set: a
+    // credential carries one per published key, an operation carries one.
     it('gives an operation and a credential the corrected label', async () => {
         await keymaster.createId('Alice', { registry: 'local' });
         await keymaster.publishAssertionKey();

@@ -73,6 +73,13 @@ To create an agent DID, the client must sign and submit a "create" operation to 
     - The `proof.verificationMethod` must be set to `#key-1` (a relative reference) since the DID does not yet exist
 1. Submit the operation to a node. For example, with a REST API, post the operation to the node's endpoint to create new DIDs (e.g. `/api/v1/did/`)
 
+> The worked examples in this section and the two that follow were captured
+> before `archon-ecdsa-jcs-2019` was adopted for operations, so their proofs
+> carry the legacy `EcdsaSecp256k1Signature2019` label and the signature that
+> goes with it — the payload is the operation alone. Both remain accepted, and
+> the DIDs shown derive from these exact bytes. For the proof a node emits now,
+> and the payload it signs, see [Cryptosuites](#cryptosuites).
+
 Example
 ```json
 {
@@ -90,8 +97,7 @@ Example
         "y": "KHsWAaidAIGCosDjRYDIk-94793e4xVEL4UwFxjWgB8"
     },
     "proof": {
-        "type": "DataIntegrityProof",
-        "cryptosuite": "archon-ecdsa-jcs-2019",
+        "type": "EcdsaSecp256k1Signature2019",
         "created": "2026-01-14T19:29:06.927Z",
         "verificationMethod": "#key-1",
         "proofPurpose": "authentication",
@@ -143,8 +149,7 @@ Example
         }
     },
     "proof": {
-        "type": "DataIntegrityProof",
-        "cryptosuite": "archon-ecdsa-jcs-2019",
+        "type": "EcdsaSecp256k1Signature2019",
         "created": "2026-01-14T19:32:24.375Z",
         "verificationMethod": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q#key-1",
         "proofPurpose": "authentication",
@@ -212,8 +217,7 @@ Example update to rotate keys for an agent DID:
         }
     },
     "proof": {
-        "type": "DataIntegrityProof",
-        "cryptosuite": "archon-ecdsa-jcs-2019",
+        "type": "EcdsaSecp256k1Signature2019",
         "created": "2026-01-14T19:29:16.117Z",
         "verificationMethod": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q#key-1",
         "proofPurpose": "authentication",
@@ -251,8 +255,7 @@ Example deletion operation:
     "did": "did:cid:bagaaiera7vfnrxrmcvo7prrbmdhpvusroii4y2gir252nzk4jv5nxgkzldha",
     "previd": "bagaaiera7vfnrxrmcvo7prrbmdhpvusroii4y2gir252nzk4jv5nxgkzldha",
     "proof": {
-        "type": "DataIntegrityProof",
-        "cryptosuite": "archon-ecdsa-jcs-2019",
+        "type": "EcdsaSecp256k1Signature2019",
         "created": "2026-01-14T19:34:32.170Z",
         "verificationMethod": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q#key-1",
         "proofPurpose": "authentication",
@@ -468,9 +471,10 @@ The `proof.verificationMethod` field identifies which key was used to create the
 
 ### Cryptosuites
 
-A DID operation and a credential are signed with the same key, but not over the
-same bytes and not under the same name, because they are read by different
-verifiers.
+A DID operation and a credential are signed with the same key and under the same
+suite, but not over the same bytes: a credential's proof configuration carries
+the document's `@context`, and a credential may carry a proof set where an
+operation never does.
 
 **Operations** carry a single proof — never a proof set, however many keys the
 signer has published. It is an `archon-ecdsa-jcs-2019` proof, the same suite
