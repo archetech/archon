@@ -143,6 +143,9 @@ describe('generateDoc', () => {
                 assertionMethod: [
                     "#key-1",
                 ],
+                capabilityInvocation: [
+                    "#key-1",
+                ],
                 id: did,
                 verificationMethod: [
                     {
@@ -178,6 +181,9 @@ describe('generateDoc', () => {
                     "#key-1",
                 ],
                 assertionMethod: [
+                    "#key-1",
+                ],
+                capabilityInvocation: [
                     "#key-1",
                 ],
                 id: did,

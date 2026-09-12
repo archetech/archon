@@ -74,7 +74,7 @@ To create an agent DID, the client must sign and submit a "create" operation to 
 1. Submit the operation to a node. For example, with a REST API, post the operation to the node's endpoint to create new DIDs (e.g. `/api/v1/did/`)
 
 > The worked examples in this section and the two that follow were captured
-> before `archon-ecdsa-jcs-2019` was adopted for operations, so their proofs
+> before `archon-ecdsa-secp256k1-jcs-2026` was adopted for operations, so their proofs
 > carry the legacy `EcdsaSecp256k1Signature2019` label and the signature that
 > goes with it — the payload is the operation alone. Both remain accepted, and
 > the DIDs shown derive from these exact bytes. For the proof a node emits now,
@@ -477,15 +477,18 @@ the document's `@context`, and a credential may carry a proof set where an
 operation never does.
 
 **Operations** carry a single proof — never a proof set, however many keys the
-signer has published. It is an `archon-ecdsa-jcs-2019` proof, the same suite
-credentials use. Both gatekeeper implementations also accept the legacy
-`EcdsaSecp256k1Signature2019` and always will, because every operation anchored
-before the suite was adopted carries it and each node replays its own history.
+signer has published. It is an `archon-ecdsa-secp256k1-jcs-2026` proof, the same suite
+credentials use, and its `proofPurpose` is `capabilityInvocation`: an operation
+exercises control over a DID document, where `authentication` would claim the
+signer is proving they are the subject. Both gatekeeper implementations also
+accept the legacy `EcdsaSecp256k1Signature2019` and `authentication`, and always
+will — every operation anchored before either was settled carries them, and each
+node replays its own history.
 
 **Credentials** carry a `DataIntegrityProof`, and may carry more than one — see
 *Proof sets* below.
 
-#### `archon-ecdsa-jcs-2019`
+#### `archon-ecdsa-secp256k1-jcs-2026`
 
 The secp256k1 suite, defined here. It is deliberately **not** registered in the
 W3C cryptosuite registry: no registered Data Integrity cryptosuite covers
@@ -493,6 +496,13 @@ secp256k1 (`ecdsa-jcs-2019` is defined for P-256 and P-384 only), so claiming a
 registered name for this algorithm would misstate what the proof is. An outside
 verifier that does not recognise the name skips the proof — which is the correct
 outcome, since it could not have checked it under any other name either.
+
+The name is prefixed for the same reason. Registered suites are unprefixed, so an
+unprefixed name claims registry membership by convention, and a future registered
+suite taking that name would make every proof signed under it ambiguous. The
+curve is stated because it is the parameter that makes this suite necessary, and
+the date is the suite's own version — a later change to the construction takes a
+later date, leaving proofs under this one unambiguous.
 
 The proof configuration is the proof without `proofValue`: `type`,
 `cryptosuite`, `created`, `verificationMethod`, `proofPurpose`, and the secured
@@ -552,7 +562,7 @@ change fails a test rather than a credential.
 Credentials issued, and operations anchored, before this suite was named carry
 `EcdsaSecp256k1Signature2019`. Its payload is weaker: `SHA-256(JCS(document))`
 alone, with the proof configuration outside the signature. On such a proof `created` and `proofPurpose` can be altered without
-breaking it — which is the defect `archon-ecdsa-jcs-2019` was defined to fix,
+breaking it — which is the defect `archon-ecdsa-secp256k1-jcs-2026` was defined to fix,
 and the reason the two names are verified under different rules rather than
 treated as aliases.
 

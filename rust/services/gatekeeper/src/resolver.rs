@@ -154,7 +154,12 @@ pub(crate) async fn resolve_local_doc_async(
                     "publicKeyJwk": public_jwk
                 }],
                 "authentication": ["#key-1"],
-                "assertionMethod": ["#key-1"]
+                "assertionMethod": ["#key-1"],
+                // Operations claim capabilityInvocation, and a proof purpose
+                // the document does not grant is a safeguard nothing can check.
+                // This is the same key: an agent signs its own operations with
+                // it.
+                "capabilityInvocation": ["#key-1"]
             })
         }
         "asset" => json!({

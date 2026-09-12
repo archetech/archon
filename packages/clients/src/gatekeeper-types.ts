@@ -255,6 +255,7 @@ export interface DidCidDocument {
         }>,
         authentication?: string[],
         assertionMethod?: string[],
+        capabilityInvocation?: string[],
         keyAgreement?: string[],
         service?: Array<{
             id: string;
@@ -274,8 +275,23 @@ export interface DidCidDocument {
     didDocumentRegistration?: DocumentRegistration,
 }
 
+// What a credential or presentation proof may claim: asserting a statement, or
+// proving you are the subject.
 export type ProofPurpose = "assertionMethod" | "authentication";
 
+// What an operation proof may claim. An operation exercises control over a DID
+// document, which is what `capabilityInvocation` names and what a wallet emits.
+// The credential purposes stay representable because both gatekeepers accepted
+// them before this and cannot stop: an operation carrying one may already be
+// anchored, and each node replays its own history.
+export type OperationProofPurpose = ProofPurpose | "capabilityInvocation";
+
+// The legacy proof, carried by operations anchored before the suite was adopted
+// and by credentials issued before it. Its purpose is the credential set: a
+// legacy operation only ever claimed `authentication`, and nothing emits a
+// legacy proof now but the seed bank. Operations under the suite carry
+// `ArchonEcdsaOperationProof` below, which is where `capabilityInvocation`
+// lives.
 export interface Proof {
     type: "EcdsaSecp256k1Signature2019";
     created: string;
@@ -325,8 +341,13 @@ export interface Operation {
 // leaves `cryptosuite` open because a credential's varies; both gatekeepers
 // refuse anything but this one on an operation, so a wider type here would
 // typecheck an operation into a guaranteed rejection.
-export interface ArchonEcdsaOperationProof extends DataIntegrityProof {
-    cryptosuite: 'archon-ecdsa-jcs-2019';
+export interface ArchonEcdsaOperationProof {
+    type: "DataIntegrityProof";
+    cryptosuite: 'archon-ecdsa-secp256k1-jcs-2026';
+    created: string;
+    verificationMethod: string;
+    proofPurpose: OperationProofPurpose;
+    proofValue: string;
 }
 
 export type OperationProof = Proof | ArchonEcdsaOperationProof;

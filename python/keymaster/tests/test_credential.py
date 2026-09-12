@@ -406,7 +406,7 @@ def test_add_proof_emits_one_proof_until_an_assertion_key_is_published(testbed):
 
     assert isinstance(signed["proof"], dict)
     assert signed["proof"]["type"] == "DataIntegrityProof"
-    assert signed["proof"]["cryptosuite"] == "archon-ecdsa-jcs-2019"
+    assert signed["proof"]["cryptosuite"] == "archon-ecdsa-secp256k1-jcs-2026"
     assert run(km.verify_proof(signed)) is True
 
 
@@ -419,7 +419,7 @@ def test_add_proof_emits_both_proofs_once_published_and_each_verifies_alone(test
 
     assert len(signed["proof"]) == 2
     assert secp["type"] == "DataIntegrityProof"
-    assert secp["cryptosuite"] == "archon-ecdsa-jcs-2019"
+    assert secp["cryptosuite"] == "archon-ecdsa-secp256k1-jcs-2026"
     assert secp["@context"] == document["@context"]
     assert eddsa["cryptosuite"] == "eddsa-jcs-2022"
     assert eddsa["proofValue"].startswith("z")
@@ -472,7 +472,7 @@ def test_add_proof_attaches_nothing_for_a_purpose_the_document_does_not_authoriz
     signed = run(km.add_proof(document, "Alice", "authentication"))
 
     assert isinstance(signed["proof"], dict)
-    assert signed["proof"]["cryptosuite"] == "archon-ecdsa-jcs-2019"
+    assert signed["proof"]["cryptosuite"] == "archon-ecdsa-secp256k1-jcs-2026"
     assert signed["proof"]["proofPurpose"] == "authentication"
     assert run(km.verify_proof(signed)) is True
 
@@ -491,13 +491,13 @@ def test_operations_carry_one_proof_after_an_assertion_key_is_published(testbed)
 
     assert isinstance(signed["proof"], dict)
     assert signed["proof"]["type"] == "DataIntegrityProof"
-    assert signed["proof"]["cryptosuite"] == "archon-ecdsa-jcs-2019"
-    assert signed["proof"]["proofPurpose"] == "authentication"
+    assert signed["proof"]["cryptosuite"] == "archon-ecdsa-secp256k1-jcs-2026"
+    assert signed["proof"]["proofPurpose"] == "capabilityInvocation"
 
     # Both writers claim the same suite; the proof set is what separates them,
     # a credential carrying one proof per published key.
     assert credential_proofs["proof"][0]["type"] == "DataIntegrityProof"
-    assert credential_proofs["proof"][0]["cryptosuite"] == "archon-ecdsa-jcs-2019"
+    assert credential_proofs["proof"][0]["cryptosuite"] == "archon-ecdsa-secp256k1-jcs-2026"
 
 
 def _archon_proof(km):
@@ -516,7 +516,7 @@ def test_archon_suite_verifies_untouched(testbed):
     km = testbed.keymaster
     document, proof = _archon_proof(km)
 
-    assert proof["cryptosuite"] == "archon-ecdsa-jcs-2019"
+    assert proof["cryptosuite"] == "archon-ecdsa-secp256k1-jcs-2026"
     assert run(km.verify_proof({**document, "proof": [proof]})) is True
 
 
@@ -552,7 +552,7 @@ def test_archon_suite_rejects_a_proof_validly_signed_over_a_config_with_no_conte
     keypair = run(km.fetch_key_pair())
     config = {
         "type": "DataIntegrityProof",
-        "cryptosuite": "archon-ecdsa-jcs-2019",
+        "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
         "created": "2026-01-01T00:00:00.000Z",
         "verificationMethod": f"{did}#key-1",
         "proofPurpose": "assertionMethod",

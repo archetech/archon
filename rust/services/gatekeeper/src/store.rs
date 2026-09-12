@@ -1677,7 +1677,12 @@ impl JsonDb {
                         "publicKeyJwk": public_jwk
                     }],
                     "authentication": ["#key-1"],
-                    "assertionMethod": ["#key-1"]
+                    "assertionMethod": ["#key-1"],
+                    // Operations claim capabilityInvocation, and a proof
+                    // purpose the document does not grant is a safeguard
+                    // nothing can check. Kept identical to resolver.rs, which
+                    // builds the same document on the resolution path.
+                    "capabilityInvocation": ["#key-1"]
                 })
             }
             "asset" => {

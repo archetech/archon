@@ -53,7 +53,7 @@ describe('operation proof emission', () => {
         const proof = events[0][0].operation.proof! as unknown as Record<string, string>;
 
         expect(proof.type).toBe('DataIntegrityProof');
-        expect(proof.cryptosuite).toBe('archon-ecdsa-jcs-2019');
+        expect(proof.cryptosuite).toBe('archon-ecdsa-secp256k1-jcs-2026');
     });
 
     // An asset's operations are signed by its controller, where a create-agent
@@ -133,5 +133,30 @@ describe('seed bank updates and wallet backups', () => {
         expect(bankEvents[0].operation.proof!.type).toBe('EcdsaSecp256k1Signature2019');
         expect(bankEvents.length).toBeGreaterThan(1);
         expect(bankEvents[bankEvents.length - 1].operation.proof!.type).toBe('DataIntegrityProof');
+    });
+});
+
+// The relationship an operation claims. `capabilityInvocation` is what DID Core
+// names for exercising control over a document; `authentication` says the signer
+// is proving they are the subject, which is a different claim and the one every
+// operation anchored before this made.
+describe('the purpose an operation claims', () => {
+
+    it('is capabilityInvocation', async () => {
+        const keymaster = await newKeymaster();
+        const did = await keymaster.createId('Alice', { registry: 'local' });
+        const [events] = await gatekeeper.exportDIDs([did]);
+
+        expect(events[0].operation.proof!.proofPurpose).toBe('capabilityInvocation');
+    });
+
+    it('stays authentication on the seed bank, whose bytes fix its DID', async () => {
+        const keymaster = await newKeymaster();
+        await keymaster.createId('Alice', { registry: 'local' });
+
+        const bank = await keymaster.resolveSeedBank();
+        const [events] = await gatekeeper.exportDIDs([bank.didDocument!.id!]);
+
+        expect(events[0].operation.proof!.proofPurpose).toBe('authentication');
     });
 });

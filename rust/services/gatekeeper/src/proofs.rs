@@ -194,9 +194,13 @@ pub(crate) fn verify_proof_format(proof: Option<&Value>) -> bool {
     if !verify_date_format(proof.get("created").and_then(Value::as_str)) {
         return false;
     }
+    // An operation exercises control over a DID document, which is what
+    // `capabilityInvocation` names and what a node emits. The other two are what
+    // this accepted before, and refusing either would reject an operation
+    // already anchored -- which each node replays on restart.
     if !matches!(
         proof.get("proofPurpose").and_then(Value::as_str),
-        Some("assertionMethod" | "authentication")
+        Some("capabilityInvocation" | "authentication" | "assertionMethod")
     ) {
         return false;
     }
@@ -216,7 +220,7 @@ pub(crate) fn verify_proof_format(proof: Option<&Value>) -> bool {
         .is_some_and(|value| !value.is_empty())
 }
 
-pub(crate) const ARCHON_SECP256K1_CRYPTOSUITE: &str = "archon-ecdsa-jcs-2019";
+pub(crate) const ARCHON_SECP256K1_CRYPTOSUITE: &str = "archon-ecdsa-secp256k1-jcs-2026";
 pub(crate) const LEGACY_PROOF_TYPE: &str = "EcdsaSecp256k1Signature2019";
 
 fn is_operation_proof_type(proof: &Value) -> bool {
@@ -744,6 +748,27 @@ mod operation_proofs {
         assert!(verify_proof_format(
             vectors["agentCreateValidDataIntegrity"]["operation"].get("proof")
         ));
+    }
+
+    // An operation exercises control over a DID document, which is what
+    // capabilityInvocation names. The other two stay accepted because every
+    // operation anchored before that was settled claims authentication, and
+    // assertionMethod was accepted alongside it.
+    #[test]
+    fn accepts_the_purposes_an_operation_may_claim() {
+        let base = vectors()["agentCreateValidDataIntegrity"]["operation"]["proof"].clone();
+
+        for purpose in ["capabilityInvocation", "authentication", "assertionMethod"] {
+            let mut proof = base.clone();
+            proof["proofPurpose"] = Value::String(purpose.to_string());
+            assert!(verify_proof_format(Some(&proof)), "{purpose} should be accepted");
+        }
+
+        for purpose in ["keyAgreement", "capabilityDelegation", ""] {
+            let mut proof = base.clone();
+            proof["proofPurpose"] = Value::String(purpose.to_string());
+            assert!(!verify_proof_format(Some(&proof)), "{purpose} should be refused");
+        }
     }
 
     #[test]

@@ -263,7 +263,7 @@ carries the legacy form — and a node MUST select the payload from the proof's 
   "type": "EcdsaSecp256k1Signature2019",      // the legacy form
   "created": "<RFC 3339>",                    // signature timestamp, NOT signed
   "verificationMethod": "<did>#key-1",         // for create-agent it is exactly "#key-1" (relative)
-  "proofPurpose": "assertionMethod" | "authentication",
+  "proofPurpose": "capabilityInvocation" | "authentication" | "assertionMethod",
   "proofValue": "<base64url(64-byte ECDSA r||s)>"
 }
 ```
@@ -271,10 +271,10 @@ carries the legacy form — and a node MUST select the payload from the proof's 
 ```jsonc
 {
   "type": "DataIntegrityProof",
-  "cryptosuite": "archon-ecdsa-jcs-2019",     // MUST be exactly this suite
+  "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",     // MUST be exactly this suite
   "created": "<RFC 3339>",                    // signed
   "verificationMethod": "<did>#key-1",
-  "proofPurpose": "assertionMethod" | "authentication",
+  "proofPurpose": "capabilityInvocation" | "authentication" | "assertionMethod",
   "proofValue": "<base64url(64-byte ECDSA r||s)>"
 }
 ```
@@ -502,7 +502,7 @@ signature               = ecdsa_sign(secp256k1, private_key, msg_hash)
 proof.proofValue        = base64url(signature_64_bytes)
 ```
 
-`archon-ecdsa-jcs-2019` — the proof configuration and the operation, which is
+`archon-ecdsa-secp256k1-jcs-2026` — the proof configuration and the operation, which is
 what puts `created` and `proofPurpose` inside the signature:
 
 ```
@@ -526,10 +526,16 @@ The signer MUST sign the prehashed message (no extra hashing inside ECDSA).
 
 1. `proof.type == "EcdsaSecp256k1Signature2019"`, or
    `proof.type == "DataIntegrityProof"` with
-   `proof.cryptosuite == "archon-ecdsa-jcs-2019"`
+   `proof.cryptosuite == "archon-ecdsa-secp256k1-jcs-2026"`
 2. `proof.created` parses as RFC 3339 — see
    [§5.6](#56-timestamp-grammar)
-3. `proof.proofPurpose ∈ { "assertionMethod", "authentication" }`
+3. `proof.proofPurpose ∈ { "capabilityInvocation", "authentication", "assertionMethod" }`.
+   An operation exercises control over a DID document, which is what
+   `capabilityInvocation` names and what a node emits — so a generated agent
+   document lists `#key-1` under that relationship as well, since a purpose the
+   document does not grant is a safeguard nothing can check. The other two MUST
+   stay accepted: they were accepted before, so an operation carrying either may
+   already be anchored, and every node replays its own history
 4. `proof.verificationMethod` contains `#`. Split on first `#`; the prefix
    MUST be empty (relative) or a valid DID
 5. `proof.proofValue` is a non-empty string

@@ -37,9 +37,10 @@ function base64urlToHex(b64: string): string {
 // The secp256k1 suite Archon defines, documented in docs/scheme.md. Credentials
 // and operations both carry it, and it is the label that says the proof
 // configuration is inside the signature.
-const ARCHON_SECP256K1_CRYPTOSUITE = 'archon-ecdsa-jcs-2019';
+const ARCHON_SECP256K1_CRYPTOSUITE = 'archon-ecdsa-secp256k1-jcs-2026';
 const LEGACY_PROOF_TYPE = 'EcdsaSecp256k1Signature2019';
 
+const OPERATION_PROOF_PURPOSES = ['capabilityInvocation', 'authentication', 'assertionMethod'];
 const ValidVersions = [1];
 const ValidTypes = ['agent', 'asset'];
 const PIN_QUEUE = 'pin';
@@ -461,7 +462,11 @@ export default class Gatekeeper implements GatekeeperInterface {
             return false;
         }
 
-        if (!proof.proofPurpose || !["assertionMethod", "authentication"].includes(proof.proofPurpose)) {
+        // An operation exercises control over a DID document, which is what
+        // `capabilityInvocation` names and what a node emits. The other two are
+        // what this accepted before, and refusing either would reject an
+        // operation already anchored -- which each node replays on restart.
+        if (!proof.proofPurpose || !OPERATION_PROOF_PURPOSES.includes(proof.proofPurpose)) {
             return false;
         }
 
@@ -726,6 +731,13 @@ export default class Gatekeeper implements GatekeeperInterface {
                             "#key-1"
                         ],
                         "assertionMethod": [
+                            "#key-1"
+                        ],
+                        // Operations claim capabilityInvocation, and a proof
+                        // purpose the document does not grant is a safeguard
+                        // nothing can check. This is the same key: an agent
+                        // signs its own operations with it.
+                        "capabilityInvocation": [
                             "#key-1"
                         ],
                     },
