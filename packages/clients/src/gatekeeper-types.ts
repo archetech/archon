@@ -306,7 +306,11 @@ export type CredentialProof = Proof | DataIntegrityProof;
 export interface Operation {
     type: 'create' | 'update' | 'delete';
     created?: string;
-    proof?: Proof;
+    // The legacy proof signs the operation alone; the Data Integrity form signs
+    // the proof configuration with it, so `created` and `proofPurpose` are
+    // inside the signature (#1087). Both are accepted for good: every operation
+    // already anchored carries the legacy one.
+    proof?: OperationProof;
     registration?: DocumentRegistration;
     publicJwk?: EcdsaJwkPublic;
     controller?: string;
@@ -316,6 +320,8 @@ export interface Operation {
     data?: unknown;
     blockid?: string;
 }
+
+export type OperationProof = Proof | DataIntegrityProof;
 
 export type BlockId = number | string;
 

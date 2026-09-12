@@ -1803,9 +1803,11 @@ class Keymaster:
     async def _add_operation_proof(self, payload: dict[str, Any], controller: str | None = None) -> dict[str, Any]:
         """DID operations, which both gatekeeper ports validate.
 
-        verify_proof_format requires a single proof whose type is the literal
-        EcdsaSecp256k1Signature2019, so an operation never carries a proof set
-        however many keys its signer has published.
+        verify_proof_format takes a single proof, so an operation never
+        carries a proof set however many keys its signer has published. The
+        gatekeepers also accept the archon-ecdsa-jcs-2019 form, which binds the
+        proof configuration (#1087); emitting it is a separate change, since
+        every node has to accept it first.
         """
         signer = await self._proof_signer(payload, controller)
 

@@ -1265,10 +1265,12 @@ export default class Keymaster implements KeymasterInterface {
         }
     }
 
-    // DID operations, which both gatekeeper ports validate: verifyProofFormat
-    // requires a single proof whose type is the literal
-    // EcdsaSecp256k1Signature2019, so an operation never carries a proof set
-    // however many keys its signer has published.
+    // DID operations, which both gatekeeper ports validate. verifyProofFormat
+    // takes a single proof, so an operation never carries a proof set however
+    // many keys its signer has published. The gatekeepers also accept the
+    // archon-ecdsa-jcs-2019 form, which binds the proof configuration (#1087);
+    // emitting it is a separate change, since every node has to accept it
+    // first.
     private async addOperationProof<T extends object>(
         obj: T,
         controller?: string,

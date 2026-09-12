@@ -252,11 +252,28 @@ omitted from the JSON object; required fields MUST be present unless noted.
 
 ### 3.2 `Proof`
 
+Two accepted forms. The legacy one signs the operation alone; the Data Integrity
+one signs the proof configuration with it, so `created` and `proofPurpose` are
+inside the signature. Both MUST be accepted — every operation already anchored
+carries the legacy form — and a node MUST select the payload from the proof's own
+`type`.
+
 ```jsonc
 {
-  "type": "EcdsaSecp256k1Signature2019",      // MUST be exactly this string
-  "created": "<RFC 3339>",                    // signature timestamp
+  "type": "EcdsaSecp256k1Signature2019",      // the legacy form
+  "created": "<RFC 3339>",                    // signature timestamp, NOT signed
   "verificationMethod": "<did>#key-1",         // for create-agent it is exactly "#key-1" (relative)
+  "proofPurpose": "assertionMethod" | "authentication",
+  "proofValue": "<base64url(64-byte ECDSA r||s)>"
+}
+```
+
+```jsonc
+{
+  "type": "DataIntegrityProof",
+  "cryptosuite": "archon-ecdsa-jcs-2019",     // MUST be exactly this suite
+  "created": "<RFC 3339>",                    // signed
+  "verificationMethod": "<did>#key-1",
   "proofPurpose": "assertionMethod" | "authentication",
   "proofValue": "<base64url(64-byte ECDSA r||s)>"
 }
@@ -472,6 +489,11 @@ Curve: **secp256k1**. Hash: **SHA-256**. Signature scheme: **ECDSA**, fixed
 
 ### 5.1 Signing
 
+The payload depends on the proof's `type`.
+
+`EcdsaSecp256k1Signature2019` — the operation alone, so no member of the proof
+is covered:
+
 ```
 operation_without_proof = clone(operation); delete operation_without_proof.proof
 canonical               = canonicalize(operation_without_proof)
@@ -480,13 +502,31 @@ signature               = ecdsa_sign(secp256k1, private_key, msg_hash)
 proof.proofValue        = base64url(signature_64_bytes)
 ```
 
+`archon-ecdsa-jcs-2019` — the proof configuration and the operation, which is
+what puts `created` and `proofPurpose` inside the signature:
+
+```
+proof_config            = clone(proof); delete proof_config.proofValue
+operation_without_proof = clone(operation); delete operation_without_proof.proof
+digests                 = sha256(canonicalize(proof_config))
+                        ‖ sha256(canonicalize(operation_without_proof))   // 64 bytes
+msg_hash                = sha256(digests)              // 32 bytes
+signature               = ecdsa_sign(secp256k1, private_key, msg_hash)
+proof.proofValue        = base64url(signature_64_bytes)
+```
+
+The second hash has no counterpart in the Ed25519 credential suites: ECDSA signs
+a 32-byte digest where Ed25519 takes the message itself.
+
 The signer MUST sign the prehashed message (no extra hashing inside ECDSA).
 
 ### 5.2 Verifying
 
 `Proof` validation steps (any failure -> reject):
 
-1. `proof.type == "EcdsaSecp256k1Signature2019"`
+1. `proof.type == "EcdsaSecp256k1Signature2019"`, or
+   `proof.type == "DataIntegrityProof"` with
+   `proof.cryptosuite == "archon-ecdsa-jcs-2019"`
 2. `proof.created` parses as RFC 3339 — see
    [§5.6](#56-timestamp-grammar)
 3. `proof.proofPurpose ∈ { "assertionMethod", "authentication" }`
