@@ -1257,10 +1257,7 @@ export default class Keymaster implements KeymasterInterface {
 
     // DID operations, which both gatekeeper ports validate. verifyProofFormat
     // takes a single proof, so an operation never carries a proof set however
-    // many keys its signer has published. The gatekeepers also accept the
-    // archon-ecdsa-jcs-2019 form, which binds the proof configuration (#1087);
-    // emitting it is a separate change, since every node has to accept it
-    // first.
+    // many keys its signer has published.
     private async addOperationProof<T extends object>(
         obj: T,
         controller?: string,
@@ -1270,10 +1267,11 @@ export default class Keymaster implements KeymasterInterface {
         return { ...obj, proof: this.operationProof(obj, signer) };
     }
 
-    // Shared by the two emission sites. A create-agent operation cannot go
-    // through `addOperationProof`, because resolving its signer means resolving
-    // a DID that does not exist yet -- it signs with its own new key under the
-    // relative `#key-1`.
+    // Every operation proof a wallet writes comes from here. Most callers
+    // reach it through `addOperationProof`; the ones that cannot pass their own
+    // signer, because a create-agent operation would have to resolve a DID that
+    // does not exist yet and signs with its own new key under the relative
+    // `#key-1`.
     private operationProof<T extends object>(
         obj: T,
         signer: { verificationMethod: string, keypair: EcdsaJwkPair },

@@ -1799,21 +1799,19 @@ class Keymaster:
         """DID operations, which both gatekeeper ports validate.
 
         verify_proof_format takes a single proof, so an operation never
-        carries a proof set however many keys its signer has published. The
-        gatekeepers also accept the archon-ecdsa-jcs-2019 form, which binds the
-        proof configuration (#1087); emitting it is a separate change, since
-        every node has to accept it first.
+        carries a proof set however many keys its signer has published.
         """
         signer = await self._proof_signer(payload, controller)
 
         return {**payload, "proof": self._operation_proof(payload, signer)}
 
     def _operation_proof(self, payload: dict[str, Any], signer: dict[str, Any]) -> dict[str, Any]:
-        """Shared by the two emission sites.
+        """Every operation proof a wallet writes comes from here.
 
-        A create-agent operation cannot go through ``_add_operation_proof``,
-        because resolving its signer means resolving a DID that does not exist
-        yet -- it signs with its own new key under the relative ``#key-1``.
+        Most callers reach it through ``_add_operation_proof``; the ones that
+        cannot pass their own signer, because a create-agent operation would
+        have to resolve a DID that does not exist yet and signs with its own new
+        key under the relative ``#key-1``.
 
         The seed bank's operation is deliberately not one of them: its DID is
         the CID of the operation, proof included, so changing the proof changes

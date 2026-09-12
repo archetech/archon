@@ -49,9 +49,9 @@ describe('operation proofs', () => {
     });
 
     // The whole point of the suite: these members are inside the signature, so
-    // a third party can no longer rewrite them on an operation in flight.
-    // `created` selects the controller document version that authorizes an
-    // asset operation, which is why it matters (#1087).
+    // a third party cannot rewrite them on an operation in flight. `created`
+    // selects the controller document version that authorizes an asset
+    // operation, which is why it matters (#1087).
     it.each([
         ['created', '2026-04-12T12:00:00Z'],
         ['proofPurpose', 'assertionMethod'],

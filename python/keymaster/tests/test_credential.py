@@ -494,8 +494,8 @@ def test_operations_carry_one_proof_after_an_assertion_key_is_published(testbed)
     assert signed["proof"]["cryptosuite"] == "archon-ecdsa-jcs-2019"
     assert signed["proof"]["proofPurpose"] == "authentication"
 
-    # Both writers claim the same suite now; the proof set is what separates
-    # them, a credential carrying one proof per published key.
+    # Both writers claim the same suite; the proof set is what separates them,
+    # a credential carrying one proof per published key.
     assert credential_proofs["proof"][0]["type"] == "DataIntegrityProof"
     assert credential_proofs["proof"][0]["cryptosuite"] == "archon-ecdsa-jcs-2019"
 

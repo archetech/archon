@@ -35,9 +35,9 @@ async function newKeymaster(): Promise<Keymaster> {
     return keymaster;
 }
 
-// The emitted form has to be one the gatekeeper accepts, which is what makes
-// the ordering in #1125 load-bearing: a node that has not upgraded refuses the
-// bound form outright, so nothing may emit it until every node accepts it.
+// The emitted form has to be one the gatekeeper accepts. A node running older
+// code refuses the bound form outright, which is why every node upgrades in one
+// go (#1125) rather than a wallet meeting one that cannot read it.
 describe('operation proof emission', () => {
 
     it('signs the proof configuration into every operation', async () => {
@@ -56,8 +56,8 @@ describe('operation proof emission', () => {
         expect(proof.cryptosuite).toBe('archon-ecdsa-jcs-2019');
     });
 
-    // The other emission site: an asset's operations are signed by its
-    // controller, where a create-agent operation signs with its own new key.
+    // An asset's operations are signed by its controller, where a create-agent
+    // operation signs with its own new key.
     it('signs controller-signed creates and updates under the same suite', async () => {
         const keymaster = await newKeymaster();
         await keymaster.createId('Alice', { registry: 'local' });
