@@ -182,7 +182,7 @@ Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keyma
 | `ARCHON_GATEKEEPER_DID_PREFIX` | `did:cid` | DID method prefix |
 | `ARCHON_GATEKEEPER_REGISTRIES` | `hyperswarm` | Comma-separated list of registries |
 | `ARCHON_DEFAULT_REGISTRY` | `hyperswarm` | Default registry for new DIDs |
-| `ARCHON_PROTOCOL` | `/ARCHON/v0.13-beta` | Hyperswarm protocol identifier |
+| `ARCHON_PROTOCOL` | ships with the release | Hyperswarm topic seed. Pinning it means a release that moves the topic leaves the node alone on the old one. |
 | `ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL` | *(empty)* | Optional Gatekeeper peer for `confirm=true` resolution when local data is not confirmed |
 
 ### Services
