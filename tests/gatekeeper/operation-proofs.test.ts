@@ -154,6 +154,24 @@ describe('which key authorizes an operation', () => {
         expect(await gatekeeper.verifyUpdateOperation(operation, doc)).toBe(true);
     });
 
+    // Absent and empty are different verdicts, and the ports have to agree on
+    // both. Absent means the controller has not been imported yet, so the
+    // import state machine must defer; empty is a document with no keys, which
+    // can never verify and must be refused rather than retried.
+    it('defers on an absent verificationMethod and refuses an empty one', async () => {
+        const { keypair, did, doc } = await agent();
+        const operation = await helper.createUpdateOp(keypair, did, doc);
+
+        const empty = JSON.parse(JSON.stringify(doc));
+        empty.didDocument.verificationMethod = [];
+        expect(await gatekeeper.verifyUpdateOperation(operation, empty)).toBe(false);
+
+        const absent = JSON.parse(JSON.stringify(doc));
+        delete absent.didDocument.verificationMethod;
+        await expect(gatekeeper.verifyUpdateOperation(operation, absent))
+            .rejects.toThrow('Invalid operation');
+    });
+
     // A second key is unusable while selection is positional, which is what
     // this changes.
     it('accepts a second key the document lists', async () => {

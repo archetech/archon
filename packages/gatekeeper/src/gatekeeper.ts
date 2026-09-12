@@ -599,7 +599,10 @@ export default class Gatekeeper implements GatekeeperInterface {
 
             const msgHash = this.operationMessageHash(operation);
 
-            if (!doc.didDocument?.verificationMethod?.length) {
+            // Absent means the controller has not been imported yet, which the
+            // import state machine defers on. An empty array is a document
+            // with no keys, which is a refusal rather than a reason to wait.
+            if (!doc.didDocument?.verificationMethod) {
                 throw new InvalidOperationError('didDocument missing verificationMethod');
             }
 
@@ -645,10 +648,6 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         const proof = operation.proof!;
         const msgHash = this.operationMessageHash(operation);
-
-        if (doc.didDocument.verificationMethod.length === 0) {
-            throw new InvalidOperationError('didDocument missing verificationMethod');
-        }
 
         const publicJwk = this.operationKey(doc, proof);
 

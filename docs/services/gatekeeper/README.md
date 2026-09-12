@@ -552,16 +552,20 @@ Then signature verification:
 | Operation | verificationMethod | Key source |
 | --- | --- | --- |
 | `create` agent | MUST equal `#key-1` (relative, since the DID does not yet exist) | `operation.publicJwk` (self-signed) |
-| `create` asset | `<controller>#key-1`. `controller` portion MUST equal `operation.controller` | resolve `controller` DID with `confirm: true, versionTime: proof.created`; use the verification method the proof names |
+| `create` asset | `<controller>#key-N`. `controller` portion MUST equal `operation.controller` | resolve `controller` DID with `confirm: true, versionTime: proof.created`; use the verification method the proof names |
 | `update` / `delete` on agent | `<did>#key-N` | resolve `operation.did`; use the verification method the proof names |
 | `update` / `delete` on asset | `<controller>#key-N` | resolve the doc, follow `controller`, use the verification method the proof names in that document |
 
 The key is selected by the DID URL in `proof.verificationMethod`, compared as a
-URL so a relative `#key-1` matches an absolute `<did>#key-1` and the reverse. An
-operation naming a method the document does not list does **not** verify, and
-that is a refusal rather than an `Invalid operation`: the import state machine
-defers on the latter, so such an operation would be retried forever instead of
-rejected.
+URL so a relative `#key-1` matches an absolute `<did>#key-1` and the reverse. Any
+method the document lists may be named; only an agent create is pinned to the
+literal `#key-1`, since no document exists yet. An operation naming a method the
+document does not list does **not** verify, and so does one against a document
+whose `verificationMethod` is empty. Both are refusals rather than an
+`Invalid operation`: the import state machine defers on the latter, so such an
+operation would be retried forever instead of rejected. An **absent**
+`verificationMethod` is the structural error and does defer, because it is what
+a controller that has not been imported yet looks like.
 
 ### 5.4 Operation size limit
 

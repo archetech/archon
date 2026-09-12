@@ -515,6 +515,17 @@ pub(crate) async fn verify_create_operation_impl(
         anyhow::bail!("Invalid operation: non-local registry={registry}");
     }
 
+    // Absent means the controller has not been imported yet, which the import
+    // state machine defers on. An empty array is a document with no keys, which
+    // is a refusal rather than a reason to wait.
+    if controller_doc
+        .get("didDocument")
+        .and_then(|value| value.get("verificationMethod"))
+        .is_none()
+    {
+        anyhow::bail!("Invalid operation: didDocument missing verificationMethod");
+    }
+
     let Some(public_jwk) = operation_key(&controller_doc, proof) else {
         return Ok(false);
     };
@@ -838,6 +849,11 @@ mod operation_proofs {
         );
 
         assert!(super::operation_key(&doc, &named(&format!("{did}#key-9"))).is_none());
+
+        // An empty array is a document with no keys: a refusal, where an absent
+        // property is left to the caller as a structural error to defer on.
+        let empty = serde_json::json!({ "didDocument": { "id": did, "verificationMethod": [] } });
+        assert!(super::operation_key(&empty, &named("#key-1")).is_none());
     }
 
     #[test]
