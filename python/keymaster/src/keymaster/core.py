@@ -88,7 +88,7 @@ MULTIKEY_CONTEXT = "https://w3id.org/security/multikey/v1"
 # defines P-256 and P-384 only -- so the secp256k1 credential proof names a
 # suite Archon defines rather than claiming one it does not implement. The bytes
 # are unchanged: JCS canonicalization, sha256, base64url signature.
-ARCHON_SECP256K1_CRYPTOSUITE = "archon-ecdsa-jcs-2019"
+ARCHON_SECP256K1_CRYPTOSUITE = "archon-ecdsa-secp256k1-jcs-2026"
 
 
 def _proofs_of(payload: dict[str, Any]) -> list[dict[str, Any]]:

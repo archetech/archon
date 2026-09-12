@@ -258,11 +258,11 @@
       },
       "proof": {
         "type": "DataIntegrityProof",
-        "cryptosuite": "archon-ecdsa-jcs-2019",
+        "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
         "created": "2026-04-11T12:00:00Z",
         "verificationMethod": "#key-1",
-        "proofPurpose": "authentication",
-        "proofValue": "LfpCnwbyc7rw2i4TCnY2qIl3VfRqNLgL7zYZG7V1E5QZy6HduVa03CNaK1nxjMqbET8pSduDx2CbRRY0Ubrs3w"
+        "proofPurpose": "capabilityInvocation",
+        "proofValue": "YfAedMl3v4vLrxkSsw8PvJxVNOi0mxqfiVxijpMRhBoMVrRrLXibxDYWAuwSeqUrtAnd8IoKQtQHbQ8lqLJILQ"
       }
     },
     "expected": true

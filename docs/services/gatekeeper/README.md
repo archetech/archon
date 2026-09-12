@@ -271,7 +271,7 @@ carries the legacy form — and a node MUST select the payload from the proof's 
 ```jsonc
 {
   "type": "DataIntegrityProof",
-  "cryptosuite": "archon-ecdsa-jcs-2019",     // MUST be exactly this suite
+  "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",     // MUST be exactly this suite
   "created": "<RFC 3339>",                    // signed
   "verificationMethod": "<did>#key-1",
   "proofPurpose": "capabilityInvocation" | "authentication" | "assertionMethod",
@@ -502,7 +502,7 @@ signature               = ecdsa_sign(secp256k1, private_key, msg_hash)
 proof.proofValue        = base64url(signature_64_bytes)
 ```
 
-`archon-ecdsa-jcs-2019` — the proof configuration and the operation, which is
+`archon-ecdsa-secp256k1-jcs-2026` — the proof configuration and the operation, which is
 what puts `created` and `proofPurpose` inside the signature:
 
 ```
@@ -526,7 +526,7 @@ The signer MUST sign the prehashed message (no extra hashing inside ECDSA).
 
 1. `proof.type == "EcdsaSecp256k1Signature2019"`, or
    `proof.type == "DataIntegrityProof"` with
-   `proof.cryptosuite == "archon-ecdsa-jcs-2019"`
+   `proof.cryptosuite == "archon-ecdsa-secp256k1-jcs-2026"`
 2. `proof.created` parses as RFC 3339 — see
    [§5.6](#56-timestamp-grammar)
 3. `proof.proofPurpose ∈ { "capabilityInvocation", "authentication", "assertionMethod" }`.

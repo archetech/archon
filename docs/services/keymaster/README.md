@@ -499,7 +499,7 @@ delete), the Keymaster:
 3. Builds the proof configuration (Gatekeeper spec §3.2), which is the proof
    without its `proofValue`:
    - `type = "DataIntegrityProof"`
-   - `cryptosuite = "archon-ecdsa-jcs-2019"`
+   - `cryptosuite = "archon-ecdsa-secp256k1-jcs-2026"`
    - `created = now() in RFC 3339`
    - `verificationMethod` per Gatekeeper §5.3 (relative `#key-1` for agent
      create, otherwise `<signerDid>#key-1`)

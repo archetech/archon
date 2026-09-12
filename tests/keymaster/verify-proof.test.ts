@@ -267,7 +267,7 @@ describe('untrusted proof fields', () => {
 // The proof configuration is inside the signed payload, so every member of
 // the proof is covered -- not just the document. This is what separates the
 // named suite from the legacy label it replaces.
-describe('archon-ecdsa-jcs-2019 binds its proof configuration', () => {
+describe('archon-ecdsa-secp256k1-jcs-2026 binds its proof configuration', () => {
     async function archonProof() {
         const did = await keymaster.createId('Alice', { registry: 'local' });
         const document = { '@context': ['https://www.w3.org/ns/credentials/v2'], hello: 'world' };
@@ -279,7 +279,7 @@ describe('archon-ecdsa-jcs-2019 binds its proof configuration', () => {
     it('verifies untouched', async () => {
         const { document, proof } = await archonProof();
 
-        expect(proof.cryptosuite).toBe('archon-ecdsa-jcs-2019');
+        expect(proof.cryptosuite).toBe('archon-ecdsa-secp256k1-jcs-2026');
         expect(await keymaster.verifyProof({ ...document, proof: [proof] } as any)).toBe(true);
     });
 
@@ -318,7 +318,7 @@ describe('archon-ecdsa-jcs-2019 binds its proof configuration', () => {
         const keypair = await keymaster.fetchKeyPair();
         const config = {
             type: 'DataIntegrityProof',
-            cryptosuite: 'archon-ecdsa-jcs-2019',
+            cryptosuite: 'archon-ecdsa-secp256k1-jcs-2026',
             created: new Date().toISOString(),
             verificationMethod: `${did}#key-1`,
             proofPurpose: 'assertionMethod',
@@ -373,7 +373,7 @@ describe('issuing', () => {
 
         expect(Array.isArray(signed.proof)).toBe(false);
         expect((signed.proof as any).type).toBe('DataIntegrityProof');
-        expect((signed.proof as any).cryptosuite).toBe('archon-ecdsa-jcs-2019');
+        expect((signed.proof as any).cryptosuite).toBe('archon-ecdsa-secp256k1-jcs-2026');
         expect(await keymaster.verifyProof(signed)).toBe(true);
     });
 
@@ -384,7 +384,7 @@ describe('issuing', () => {
 
         expect(signed.proof).toHaveLength(2);
         expect(secp.type).toBe('DataIntegrityProof');
-        expect(secp.cryptosuite).toBe('archon-ecdsa-jcs-2019');
+        expect(secp.cryptosuite).toBe('archon-ecdsa-secp256k1-jcs-2026');
         expect(secp['@context']).toStrictEqual(document['@context']);
         expect(eddsa.type).toBe('DataIntegrityProof');
         expect(eddsa.cryptosuite).toBe('eddsa-jcs-2022');
@@ -431,7 +431,7 @@ describe('issuing', () => {
         const signed: any = await keymaster.addProof({ hello: 'world' });
 
         expect(Array.isArray(signed.proof)).toBe(false);
-        expect(signed.proof.cryptosuite).toBe('archon-ecdsa-jcs-2019');
+        expect(signed.proof.cryptosuite).toBe('archon-ecdsa-secp256k1-jcs-2026');
     });
 
     // A presentation is signed under authentication, so this is the path a
@@ -462,7 +462,7 @@ describe('issuing', () => {
         const signed: any = await keymaster.addProof(document, 'Alice', 'authentication');
 
         expect(Array.isArray(signed.proof)).toBe(false);
-        expect(signed.proof.cryptosuite).toBe('archon-ecdsa-jcs-2019');
+        expect(signed.proof.cryptosuite).toBe('archon-ecdsa-secp256k1-jcs-2026');
         expect(signed.proof.proofPurpose).toBe('authentication');
         expect(await keymaster.verifyProof(signed)).toBe(true);
     });
@@ -496,10 +496,10 @@ describe('issuing', () => {
         const credentialProofs: any = await keymaster.addProof({ hello: 'world' });
 
         expect(operation.proof.type).toBe('DataIntegrityProof');
-        expect(operation.proof.cryptosuite).toBe('archon-ecdsa-jcs-2019');
+        expect(operation.proof.cryptosuite).toBe('archon-ecdsa-secp256k1-jcs-2026');
         expect(Array.isArray(operation.proof)).toBe(false);
 
         expect(credentialProofs.proof[0].type).toBe('DataIntegrityProof');
-        expect(credentialProofs.proof[0].cryptosuite).toBe('archon-ecdsa-jcs-2019');
+        expect(credentialProofs.proof[0].cryptosuite).toBe('archon-ecdsa-secp256k1-jcs-2026');
     });
 });

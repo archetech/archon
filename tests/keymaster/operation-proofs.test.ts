@@ -53,7 +53,7 @@ describe('operation proof emission', () => {
         const proof = events[0][0].operation.proof! as unknown as Record<string, string>;
 
         expect(proof.type).toBe('DataIntegrityProof');
-        expect(proof.cryptosuite).toBe('archon-ecdsa-jcs-2019');
+        expect(proof.cryptosuite).toBe('archon-ecdsa-secp256k1-jcs-2026');
     });
 
     // An asset's operations are signed by its controller, where a create-agent

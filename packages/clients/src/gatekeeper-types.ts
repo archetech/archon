@@ -343,7 +343,7 @@ export interface Operation {
 // typecheck an operation into a guaranteed rejection.
 export interface ArchonEcdsaOperationProof {
     type: "DataIntegrityProof";
-    cryptosuite: 'archon-ecdsa-jcs-2019';
+    cryptosuite: 'archon-ecdsa-secp256k1-jcs-2026';
     created: string;
     verificationMethod: string;
     proofPurpose: OperationProofPurpose;

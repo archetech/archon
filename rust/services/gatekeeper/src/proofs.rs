@@ -220,7 +220,7 @@ pub(crate) fn verify_proof_format(proof: Option<&Value>) -> bool {
         .is_some_and(|value| !value.is_empty())
 }
 
-pub(crate) const ARCHON_SECP256K1_CRYPTOSUITE: &str = "archon-ecdsa-jcs-2019";
+pub(crate) const ARCHON_SECP256K1_CRYPTOSUITE: &str = "archon-ecdsa-secp256k1-jcs-2026";
 pub(crate) const LEGACY_PROOF_TYPE: &str = "EcdsaSecp256k1Signature2019";
 
 fn is_operation_proof_type(proof: &Value) -> bool {

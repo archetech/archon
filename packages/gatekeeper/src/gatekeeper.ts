@@ -37,7 +37,7 @@ function base64urlToHex(b64: string): string {
 // The secp256k1 suite Archon defines, documented in docs/scheme.md. Credentials
 // and operations both carry it, and it is the label that says the proof
 // configuration is inside the signature.
-const ARCHON_SECP256K1_CRYPTOSUITE = 'archon-ecdsa-jcs-2019';
+const ARCHON_SECP256K1_CRYPTOSUITE = 'archon-ecdsa-secp256k1-jcs-2026';
 const LEGACY_PROOF_TYPE = 'EcdsaSecp256k1Signature2019';
 
 const OPERATION_PROOF_PURPOSES = ['capabilityInvocation', 'authentication', 'assertionMethod'];
