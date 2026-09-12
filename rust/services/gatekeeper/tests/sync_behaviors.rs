@@ -734,3 +734,152 @@ async fn sync_export_batch_includes_dids_promoted_off_local() -> Result<()> {
 
     Ok(())
 }
+
+// The controller is resolved at the time an operation entered the network,
+// never at proof.created. The signer chooses proof.created, and choosing one
+// before a key rotation selects the document that still lists the retired key
+// -- so a compromised-then-rotated key went on authorizing every asset the
+// agent controls (#1131). Mirrors tests/gatekeeper/operation-proofs.test.ts.
+#[tokio::test]
+async fn a_retired_key_is_refused_however_early_the_proof_claims_to_be() -> Result<()> {
+    let service = spawn_json().await?;
+    let old = 7;
+    let new = 8;
+
+    let agent_did = create_did(
+        &service,
+        create_agent_operation(old, "2026-04-11T12:00:00Z", "local"),
+    )
+    .await?;
+    let asset_did = create_did(
+        &service,
+        create_asset_operation(old, &agent_did, "2026-04-11T12:01:00Z", "local", json!({ "v": 1 })),
+    )
+    .await?;
+
+    // Rotate #key-1 in place, as keymaster does, signed by the key being retired.
+    let mut agent_doc = resolve_did(&service, &agent_did).await?;
+    agent_doc["didDocument"]["verificationMethod"][0]["id"] = json!("#key-2");
+    agent_doc["didDocument"]["verificationMethod"][0]["publicKeyJwk"] = common::public_jwk(new);
+    agent_doc["didDocument"]["authentication"] = json!(["#key-2"]);
+    let rotation = create_update_operation(
+        old,
+        &agent_did,
+        agent_doc["didDocumentMetadata"]["versionId"].as_str(),
+        "2026-04-11T12:05:00Z",
+        agent_doc.clone(),
+    );
+    let rotated = service
+        .client
+        .post(format!("{}/did", service.base_url))
+        .json(&rotation)
+        .send()
+        .await?;
+    assert!(rotated.status().is_success(), "rotation should succeed");
+
+    // The retired key, with created placed before the rotation.
+    let mut asset_doc = resolve_did(&service, &asset_did).await?;
+    asset_doc["didDocumentData"] = json!({ "tampered": true });
+    let previd = asset_doc["didDocumentMetadata"]["versionId"]
+        .as_str()
+        .map(ToString::to_string);
+    let backdated = create_update_operation_signed_by(
+        old,
+        &asset_did,
+        &agent_did,
+        previd.as_deref(),
+        "2026-04-11T12:02:00Z",
+        asset_doc,
+    );
+    let response = service
+        .client
+        .post(format!("{}/did", service.base_url))
+        .json(&backdated)
+        .send()
+        .await?;
+
+    assert!(
+        !response.status().is_success(),
+        "a retired key must not authorize an asset update by backdating created"
+    );
+    Ok(())
+}
+
+// The reason resolution is historical at all: an operation made before a
+// rotation was authorized by the key that was current then, and replaying it
+// after the rotation has to reach that key. `verify=true` re-verifies every
+// event at its own time.
+#[tokio::test]
+async fn an_operation_made_before_a_rotation_still_verifies_at_its_own_time() -> Result<()> {
+    let service = spawn_json().await?;
+    let old = 7;
+    let new = 8;
+
+    let agent_did = create_did(
+        &service,
+        create_agent_operation(old, "2026-04-11T12:00:00Z", "local"),
+    )
+    .await?;
+    let asset_did = create_did(
+        &service,
+        create_asset_operation(old, &agent_did, "2026-04-11T12:01:00Z", "local", json!({ "v": 1 })),
+    )
+    .await?;
+
+    // An honest update, signed by the key that is current now.
+    let mut asset_doc = resolve_did(&service, &asset_did).await?;
+    asset_doc["didDocumentData"] = json!({ "before": "rotation" });
+    let previd = asset_doc["didDocumentMetadata"]["versionId"]
+        .as_str()
+        .map(ToString::to_string);
+    let honest = create_update_operation_signed_by(
+        old,
+        &asset_did,
+        &agent_did,
+        previd.as_deref(),
+        "2026-04-11T12:02:00Z",
+        asset_doc,
+    );
+    let updated = service
+        .client
+        .post(format!("{}/did", service.base_url))
+        .json(&honest)
+        .send()
+        .await?;
+    assert!(updated.status().is_success(), "the honest update should succeed");
+
+    // Then rotate.
+    let mut agent_doc = resolve_did(&service, &agent_did).await?;
+    agent_doc["didDocument"]["verificationMethod"][0]["id"] = json!("#key-2");
+    agent_doc["didDocument"]["verificationMethod"][0]["publicKeyJwk"] = common::public_jwk(new);
+    agent_doc["didDocument"]["authentication"] = json!(["#key-2"]);
+    let rotation = create_update_operation(
+        old,
+        &agent_did,
+        agent_doc["didDocumentMetadata"]["versionId"].as_str(),
+        "2026-04-11T12:05:00Z",
+        agent_doc.clone(),
+    );
+    let rotated = service
+        .client
+        .post(format!("{}/did", service.base_url))
+        .json(&rotation)
+        .send()
+        .await?;
+    assert!(rotated.status().is_success(), "rotation should succeed");
+
+    // The asset resolves with verification: the pre-rotation update is replayed
+    // at its own time and reaches the key that was current then.
+    let response = service
+        .client
+        .get(format!("{}/did/{}?verify=true", service.base_url, asset_did))
+        .send()
+        .await?;
+    assert!(
+        response.status().is_success(),
+        "an operation made before the rotation must still verify on replay"
+    );
+    let resolved = response.json::<Value>().await?;
+    assert_eq!(resolved["didDocumentData"], json!({ "before": "rotation" }));
+    Ok(())
+}

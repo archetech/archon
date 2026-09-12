@@ -3,6 +3,7 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import MemoryClient from '@didcid/ipfs/memory';
 import { Operation } from '@didcid/clients/gatekeeper-types';
 import CipherNode from '@didcid/cipher/node';
+import type { EcdsaJwkPair } from '@didcid/cipher/types';
 import TestHelper from './helper.ts';
 import proofVectors from './proof-vectors.json' with { type: 'json' };
 
@@ -189,5 +190,67 @@ describe('which key authorizes an operation', () => {
         operation.proof!.verificationMethod = `${did}#key-2`;
 
         expect(await gatekeeper.verifyUpdateOperation(operation, doc)).toBe(true);
+    });
+});
+
+// The controller is resolved at the time an operation entered the network,
+// never at proof.created. The signer chooses proof.created, and choosing one
+// before a key rotation selects the document that still lists the retired
+// key -- so a compromised-then-rotated key went on authorizing every asset the
+// agent controls (#1131).
+describe('which controller document authorizes an asset operation', () => {
+
+    // Rotate #key-1 in place, as keymaster does.
+    async function rotate(agentDID: string, oldKey: EcdsaJwkPair, newKey: EcdsaJwkPair) {
+        const doc = await gatekeeper.resolveDID(agentDID);
+        doc.didDocument!.verificationMethod![0] = {
+            ...doc.didDocument!.verificationMethod![0], id: '#key-2', publicKeyJwk: newKey.publicJwk,
+        };
+        doc.didDocument!.authentication = ['#key-2'];
+        await new Promise(resolve => setTimeout(resolve, 1100));
+        expect(await gatekeeper.updateDID(await helper.createUpdateOp(oldKey, agentDID, doc))).toBe(true);
+    }
+
+    it('refuses a retired key however early the proof claims to be', async () => {
+        const oldKey = cipher.generateRandomJwk();
+        const newKey = cipher.generateRandomJwk();
+        const agentDID = await gatekeeper.createDID(await helper.createAgentOp(oldKey));
+        const assetDID = await gatekeeper.createDID(await helper.createAssetOp(agentDID, oldKey));
+        const rotatedAt = Date.now();
+        await rotate(agentDID, oldKey, newKey);
+
+        const assetDoc = await gatekeeper.resolveDID(assetDID);
+        assetDoc.didDocumentData = { tampered: true };
+        const backdated = await helper.createUpdateOp(oldKey, assetDID, assetDoc);
+        // Legacy proof: created is outside the signature, so it can be moved
+        // without re-signing -- which is exactly what an attacker holding the
+        // old key would do.
+        backdated.proof!.created = new Date(rotatedAt - 60_000).toISOString();
+
+        expect(await gatekeeper.verifyOperation(backdated)).toBe(false);
+        expect(await gatekeeper.updateDID(backdated)).toBe(false);
+    });
+
+    // The reason resolution is historical at all: an operation anchored before
+    // a rotation was authorized by the key that was current then, and replaying
+    // it after the rotation has to reach that key.
+    it('still verifies an operation made before the rotation, at its own time', async () => {
+        const oldKey = cipher.generateRandomJwk();
+        const newKey = cipher.generateRandomJwk();
+        const agentDID = await gatekeeper.createDID(await helper.createAgentOp(oldKey));
+        const assetDID = await gatekeeper.createDID(await helper.createAssetOp(agentDID, oldKey));
+
+        const assetDoc = await gatekeeper.resolveDID(assetDID);
+        assetDoc.didDocumentData = { before: 'rotation' };
+        expect(await gatekeeper.updateDID(await helper.createUpdateOp(oldKey, assetDID, assetDoc))).toBe(true);
+
+        await rotate(agentDID, oldKey, newKey);
+
+        const [events] = await gatekeeper.exportDIDs([assetDID]);
+        const historical = events[events.length - 1];
+
+        expect(await gatekeeper.verifyOperation(historical.operation, historical.time)).toBe(true);
+        // And the same operation judged as if submitted now is refused.
+        expect(await gatekeeper.verifyOperation(historical.operation)).toBe(false);
     });
 });

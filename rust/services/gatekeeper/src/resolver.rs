@@ -210,7 +210,7 @@ pub(crate) async fn resolve_local_doc_async(
             .build_timestamp(registry, &resolved.version_id, anchor);
     }
 
-    let anchor_valid = verify_create_operation_impl(state, anchor_operation).await?;
+    let anchor_valid = verify_create_operation_impl(state, anchor_operation, Some(&anchor.time)).await?;
     if !anchor_valid {
         return Err(invalid_operation("Invalid operation: proof"));
     }
@@ -257,7 +257,7 @@ pub(crate) async fn resolve_local_doc_async(
             "didDocumentRegistration": resolved.did_document_registration
         });
 
-        let valid = verify_update_operation_impl(state, operation, &current_doc).await?;
+        let valid = verify_update_operation_impl(state, operation, &current_doc, Some(&event.time)).await?;
         if !valid {
             return Err(invalid_operation("Invalid operation: proof"));
         }

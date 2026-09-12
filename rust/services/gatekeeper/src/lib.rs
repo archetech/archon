@@ -431,7 +431,7 @@ mod tests {
             let mut operation = proof_vectors()["agentCreateValid"]["operation"].clone();
             operation["registration"]["validUntil"] = valid_until;
 
-            verify_create_operation_impl(&state, &operation)
+            verify_create_operation_impl(&state, &operation, None)
                 .await
                 .err()
                 .map(|error| error.to_string())
@@ -516,7 +516,7 @@ mod tests {
         let (state, _dir) = make_state(db);
         let operation = proof_vectors()["agentCreateValidDataIntegrity"]["operation"].clone();
 
-        assert!(verify_create_operation_impl(&state, &operation)
+        assert!(verify_create_operation_impl(&state, &operation, None)
             .await
             .expect("verification should not error"));
 
@@ -525,7 +525,7 @@ mod tests {
         let mut moved = operation;
         moved["proof"]["created"] = json!("2026-04-12T12:00:00Z");
 
-        assert!(!verify_create_operation_impl(&state, &moved)
+        assert!(!verify_create_operation_impl(&state, &moved, None)
             .await
             .expect("verification should not error"));
     }
