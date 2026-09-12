@@ -195,12 +195,12 @@ pub(crate) fn verify_proof_format(proof: Option<&Value>) -> bool {
         return false;
     }
     // An operation exercises control over a DID document, which is what
-    // `capabilityInvocation` names. `authentication` stays accepted because
-    // every operation anchored before that was settled claims it, and each node
-    // replays its own history.
+    // `capabilityInvocation` names and what a node emits. The other two are what
+    // this accepted before, and refusing either would reject an operation
+    // already anchored -- which each node replays on restart.
     if !matches!(
         proof.get("proofPurpose").and_then(Value::as_str),
-        Some("capabilityInvocation" | "authentication")
+        Some("capabilityInvocation" | "authentication" | "assertionMethod")
     ) {
         return false;
     }
@@ -758,13 +758,13 @@ mod operation_proofs {
     fn accepts_the_purposes_an_operation_may_claim() {
         let base = vectors()["agentCreateValidDataIntegrity"]["operation"]["proof"].clone();
 
-        for purpose in ["capabilityInvocation", "authentication"] {
+        for purpose in ["capabilityInvocation", "authentication", "assertionMethod"] {
             let mut proof = base.clone();
             proof["proofPurpose"] = Value::String(purpose.to_string());
             assert!(verify_proof_format(Some(&proof)), "{purpose} should be accepted");
         }
 
-        for purpose in ["assertionMethod", "keyAgreement", "capabilityDelegation", ""] {
+        for purpose in ["keyAgreement", "capabilityDelegation", ""] {
             let mut proof = base.clone();
             proof["proofPurpose"] = Value::String(purpose.to_string());
             assert!(!verify_proof_format(Some(&proof)), "{purpose} should be refused");

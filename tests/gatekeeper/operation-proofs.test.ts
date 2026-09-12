@@ -84,18 +84,19 @@ describe('operation proofs', () => {
 });
 
 // An operation exercises control over a DID document, which is what
-// capabilityInvocation names. authentication stays accepted because every
-// operation anchored before that was settled claims it -- all 43,020 of them on
-// the BTC-mainnet node, none of which claim anything else.
+// capabilityInvocation names and what a wallet emits. The other two are what
+// this accepted before: the BTC-mainnet node's 43,020 anchored operations all
+// claim authentication, but one store is not the network's history, and
+// refusing a purpose that was once accepted freezes any DID that used it.
 describe('operation proof purposes', () => {
 
-    it.each(['capabilityInvocation', 'authentication'])('accepts %s', (proofPurpose) => {
+    it.each(['capabilityInvocation', 'authentication', 'assertionMethod'])('accepts %s', (proofPurpose) => {
         const proof = { ...vector().proof, proofPurpose } as never;
 
         expect(gatekeeper.verifyProofFormat(proof)).toBe(true);
     });
 
-    it.each(['assertionMethod', 'keyAgreement', 'capabilityDelegation', ''])('refuses %p', (proofPurpose) => {
+    it.each(['keyAgreement', 'capabilityDelegation', ''])('refuses %p', (proofPurpose) => {
         const proof = { ...vector().proof, proofPurpose } as never;
 
         expect(gatekeeper.verifyProofFormat(proof)).toBe(false);

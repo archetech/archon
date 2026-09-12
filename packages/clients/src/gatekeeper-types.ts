@@ -280,10 +280,11 @@ export interface DidCidDocument {
 export type ProofPurpose = "assertionMethod" | "authentication";
 
 // What an operation proof may claim. An operation exercises control over a DID
-// document, which is what `capabilityInvocation` names; `authentication` means
-// proving you are the subject, and every operation anchored before this was
-// written claims it, so both are accepted.
-export type OperationProofPurpose = "capabilityInvocation" | "authentication";
+// document, which is what `capabilityInvocation` names and what a wallet emits.
+// The credential purposes stay representable because both gatekeepers accepted
+// them before this and cannot stop: an operation carrying one may already be
+// anchored, and each node replays its own history.
+export type OperationProofPurpose = ProofPurpose | "capabilityInvocation";
 
 // The legacy proof, carried by operations anchored before the suite was adopted
 // and by credentials issued before it. Its purpose is the credential set: a
