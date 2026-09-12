@@ -477,11 +477,11 @@ def test_add_proof_attaches_nothing_for_a_purpose_the_document_does_not_authoriz
     assert run(km.verify_proof(signed)) is True
 
 
-def test_operations_carry_one_legacy_proof_after_an_assertion_key_is_published(testbed):
-    """Both gatekeeper ports require an operation proof to be a single object
-    whose type is the literal EcdsaSecp256k1Signature2019. The testbed's
-    gatekeeper does not enforce that, so the shape is asserted directly rather
-    than relying on an operation being rejected."""
+def test_operations_carry_one_proof_after_an_assertion_key_is_published(testbed):
+    """Both gatekeeper ports require an operation proof to be a single object,
+    however many keys the signer has published. The testbed's gatekeeper does
+    not enforce that, so the shape is asserted directly rather than relying on
+    an operation being rejected."""
     km = testbed.keymaster
     run(km.create_id("Alice", {"registry": "local"}))
     run(km.publish_assertion_key())
@@ -490,11 +490,12 @@ def test_operations_carry_one_legacy_proof_after_an_assertion_key_is_published(t
     credential_proofs = run(km.add_proof({"hello": "world"}))
 
     assert isinstance(signed["proof"], dict)
-    assert signed["proof"]["type"] == "EcdsaSecp256k1Signature2019"
-    assert "cryptosuite" not in signed["proof"]
+    assert signed["proof"]["type"] == "DataIntegrityProof"
+    assert signed["proof"]["cryptosuite"] == "archon-ecdsa-jcs-2019"
     assert signed["proof"]["proofPurpose"] == "authentication"
 
-    # The label is the whole distinction between the two writers.
+    # Both writers claim the same suite; the proof set is what separates them,
+    # a credential carrying one proof per published key.
     assert credential_proofs["proof"][0]["type"] == "DataIntegrityProof"
     assert credential_proofs["proof"][0]["cryptosuite"] == "archon-ecdsa-jcs-2019"
 

@@ -240,5 +240,31 @@
       }
     },
     "expected": false
+  },
+  "agentCreateValidDataIntegrity": {
+    "operation": {
+      "type": "create",
+      "created": "2026-04-11T12:00:00Z",
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "dr9TPUsVUQ-p9BJLbkhhbwfevPLvDPsYXNxKV2RQtHU",
+        "y": "aoKKKiOW-Wwrs4EYjPF0PzoiEYYooBSWjt09bzSoVGM"
+      },
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "local"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "archon-ecdsa-jcs-2019",
+        "created": "2026-04-11T12:00:00Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "authentication",
+        "proofValue": "LfpCnwbyc7rw2i4TCnY2qIl3VfRqNLgL7zYZG7V1E5QZy6HduVa03CNaK1nxjMqbET8pSduDx2CbRRY0Ubrs3w"
+      }
+    },
+    "expected": true
   }
 }

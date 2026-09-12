@@ -507,6 +507,29 @@ mod tests {
         assert!(!persist);
     }
 
+    // The vector was signed by the TypeScript port. Verifying it here is what
+    // shows the two compute the same payload byte for byte -- the shared
+    // fixture only pins the bytes, not that either side agrees about them.
+    #[tokio::test]
+    async fn verifies_an_operation_proof_signed_by_the_other_port() {
+        let (db, _temp_dir) = temp_json_db();
+        let (state, _dir) = make_state(db);
+        let operation = proof_vectors()["agentCreateValidDataIntegrity"]["operation"].clone();
+
+        assert!(verify_create_operation_impl(&state, &operation)
+            .await
+            .expect("verification should not error"));
+
+        // Moving a member the suite binds breaks it, where the legacy payload
+        // left every proof member outside the signature (#1087).
+        let mut moved = operation;
+        moved["proof"]["created"] = json!("2026-04-12T12:00:00Z");
+
+        assert!(!verify_create_operation_impl(&state, &moved)
+            .await
+            .expect("verification should not error"));
+    }
+
     #[test]
     fn verify_proof_format_accepts_valid_and_rejects_invalid_vectors() {
         let vectors: Value = serde_json::from_str(include_str!(

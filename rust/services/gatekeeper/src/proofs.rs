@@ -184,7 +184,11 @@ pub(crate) fn verify_proof_format(proof: Option<&Value>) -> bool {
     let Some(proof) = proof else {
         return false;
     };
-    if proof.get("type").and_then(Value::as_str) != Some("EcdsaSecp256k1Signature2019") {
+    // Two accepted labels. The legacy one is permanent -- every operation ever
+    // anchored was signed under it -- and says the payload is the document
+    // alone. The Data Integrity one says the proof configuration is signed with
+    // it, which is what binds `created` and `proofPurpose`.
+    if !is_operation_proof_type(proof) {
         return false;
     }
     if !verify_date_format(proof.get("created").and_then(Value::as_str)) {
@@ -210,6 +214,54 @@ pub(crate) fn verify_proof_format(proof: Option<&Value>) -> bool {
         .get("proofValue")
         .and_then(Value::as_str)
         .is_some_and(|value| !value.is_empty())
+}
+
+pub(crate) const ARCHON_SECP256K1_CRYPTOSUITE: &str = "archon-ecdsa-jcs-2019";
+pub(crate) const LEGACY_PROOF_TYPE: &str = "EcdsaSecp256k1Signature2019";
+
+fn is_operation_proof_type(proof: &Value) -> bool {
+    match proof.get("type").and_then(Value::as_str) {
+        Some(LEGACY_PROOF_TYPE) => true,
+        Some("DataIntegrityProof") => {
+            proof.get("cryptosuite").and_then(Value::as_str) == Some(ARCHON_SECP256K1_CRYPTOSUITE)
+        }
+        _ => false,
+    }
+}
+
+// What the proof signs, which its own type decides.
+//
+// The legacy type signs the operation alone, leaving every member of the proof
+// outside the signature -- `created` selects the controller document version
+// that authorizes an asset operation, so a third party could move it (#1087).
+// The Archon suite signs the proof configuration alongside the operation,
+// concatenating the two digests and hashing once more because ECDSA signs a
+// 32-byte digest where Ed25519 takes the message.
+fn operation_message_hash(operation: &Value) -> Result<String> {
+    let unsecured = value_without_proof(operation);
+    let proof = operation
+        .get("proof")
+        .context("Invalid operation: proof")?;
+
+    if proof.get("type").and_then(Value::as_str) == Some(LEGACY_PROOF_TYPE) {
+        return generate_message_hash(&unsecured);
+    }
+
+    let mut config = proof.clone();
+
+    if let Some(object) = config.as_object_mut() {
+        object.remove("proofValue");
+    }
+
+    let digests = format!(
+        "{}{}",
+        generate_message_hash(&config)?,
+        generate_message_hash(&unsecured)?
+    );
+    let bytes = hex_to_bytes(&digests).context("Invalid operation: proof")?;
+    let hash = Code::Sha2_256.digest(&bytes);
+
+    Ok(bytes_to_hex(hash.digest()))
 }
 
 fn value_without_proof(value: &Value) -> Value {
@@ -370,8 +422,7 @@ pub(crate) async fn verify_create_operation_impl(
         }
     }
 
-    let operation_copy = value_without_proof(operation);
-    let msg_hash = generate_message_hash(&operation_copy)?;
+    let msg_hash = operation_message_hash(operation)?;
     let proof_value = proof
         .get("proofValue")
         .and_then(Value::as_str)
@@ -486,7 +537,7 @@ pub(crate) async fn verify_update_operation_impl(
     }
 
     let proof = operation.get("proof").context("Invalid operation: proof")?;
-    let msg_hash = generate_message_hash(&value_without_proof(operation))?;
+    let msg_hash = operation_message_hash(operation)?;
     let public_jwk = doc
         .get("didDocument")
         .and_then(|value| value.get("verificationMethod"))
@@ -668,5 +719,66 @@ mod event_shape_vectors {
                 "{name} should be {expected} ({note})"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod operation_proofs {
+    use super::{verify_proof_format, operation_message_hash};
+    use serde_json::Value;
+
+    // The TypeScript port checks the same vector, so a change here has to be
+    // made in both ports or one of the two suites fails.
+    fn vectors() -> Value {
+        serde_json::from_str(include_str!("../../../../tests/gatekeeper/proof-vectors.json"))
+            .expect("proof-vectors.json")
+    }
+
+    #[test]
+    fn accepts_both_proof_labels() {
+        let vectors = vectors();
+
+        assert!(verify_proof_format(
+            vectors["agentCreateValid"]["operation"].get("proof")
+        ));
+        assert!(verify_proof_format(
+            vectors["agentCreateValidDataIntegrity"]["operation"].get("proof")
+        ));
+    }
+
+    #[test]
+    fn refuses_a_cryptosuite_it_does_not_implement() {
+        let mut proof = vectors()["agentCreateValidDataIntegrity"]["operation"]["proof"].clone();
+        proof["cryptosuite"] = Value::String("ecdsa-jcs-2019".to_string());
+
+        assert!(!verify_proof_format(Some(&proof)));
+    }
+
+    // The payload is what both ports have to agree on byte for byte: a
+    // signature made by one and checked by the other is the whole point.
+    #[test]
+    fn hashes_the_proof_configuration_with_the_operation() {
+        let operation = vectors()["agentCreateValidDataIntegrity"]["operation"].clone();
+        let bound = operation_message_hash(&operation).expect("hash");
+
+        let mut moved = operation.clone();
+        moved["proof"]["created"] = Value::String("2026-04-12T12:00:00Z".to_string());
+
+        assert_ne!(
+            bound,
+            operation_message_hash(&moved).expect("hash"),
+            "moving created must change what the signature covers"
+        );
+
+        // The legacy payload ignores the proof entirely, which is the defect
+        // the suite exists to fix and stays true for what is already anchored.
+        let legacy = vectors()["agentCreateValid"]["operation"].clone();
+        let mut legacy_moved = legacy.clone();
+        legacy_moved["proof"]["created"] = Value::String("2026-04-12T12:00:00Z".to_string());
+
+        assert_eq!(
+            operation_message_hash(&legacy).expect("hash"),
+            operation_message_hash(&legacy_moved).expect("hash")
+        );
     }
 }

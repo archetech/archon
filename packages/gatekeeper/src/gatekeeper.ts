@@ -18,6 +18,7 @@ import {
     GatekeeperOptions,
     ImportEventsResult,
     Operation,
+    OperationProof,
     DidCidDocument,
     ResolveDIDOptions,
     GetDIDOptions,
@@ -25,7 +26,6 @@ import {
     ImportBatchResult,
     ProcessEventsResult,
     VerifyDbResult,
-    Proof,
 } from './types.js';
 import SearchIndex from './search-index.js';
 
@@ -33,6 +33,12 @@ function base64urlToHex(b64: string): string {
     const bytes = base64url.baseDecode(b64);
     return Buffer.from(bytes).toString('hex');
 }
+
+// The secp256k1 suite Archon defines, documented in docs/scheme.md. Credentials
+// and operations both carry it, and it is the label that says the proof
+// configuration is inside the signature.
+const ARCHON_SECP256K1_CRYPTOSUITE = 'archon-ecdsa-jcs-2019';
+const LEGACY_PROOF_TYPE = 'EcdsaSecp256k1Signature2019';
 
 const ValidVersions = [1];
 const ValidTypes = ['agent', 'asset'];
@@ -57,6 +63,14 @@ function daysInMonth(year: number, month: number): number {
 function isOperation(value: unknown): value is Operation {
     const type = (value as Operation | null)?.type;
     return type === 'create' || type === 'update' || type === 'delete';
+}
+
+function isOperationProofType(proof: { type?: string, cryptosuite?: string }): boolean {
+    if (proof.type === LEGACY_PROOF_TYPE) {
+        return true;
+    }
+
+    return proof.type === 'DataIntegrityProof' && proof.cryptosuite === ARCHON_SECP256K1_CRYPTOSUITE;
 }
 
 function isValidRegistryName(registry: unknown): registry is string {
@@ -363,6 +377,31 @@ export default class Gatekeeper implements GatekeeperInterface {
         return false;
     }
 
+    // What the proof signs, which its own type decides.
+    //
+    // The legacy type signs the operation alone, leaving every member of the
+    // proof outside the signature -- `created` selects the controller document
+    // version that authorizes an asset operation, so a third party could move
+    // it (#1087). The Archon suite signs the proof configuration alongside the
+    // operation, concatenating the two digests and hashing once more because
+    // ECDSA signs a 32-byte digest where Ed25519 takes the message.
+    private operationMessageHash(operation: Operation): string {
+        const unsecured = copyJSON(operation);
+        delete unsecured.proof;
+
+        const proof = operation.proof!;
+
+        if (proof.type === LEGACY_PROOF_TYPE) {
+            return this.cipher.hashJSON(unsecured);
+        }
+
+        const { proofValue, ...config } = proof;
+        void proofValue;
+        const digests = this.cipher.hashJSON(config) + this.cipher.hashJSON(unsecured);
+
+        return this.cipher.hashMessage(Uint8Array.from(Buffer.from(digests, 'hex')));
+    }
+
     verifyDIDFormat(did: string): boolean {
         return did.startsWith('did:');
     }
@@ -405,12 +444,16 @@ export default class Gatekeeper implements GatekeeperInterface {
         return hex64Regex.test(hash);
     }
 
-    verifyProofFormat(proof?: Proof): boolean {
+    verifyProofFormat(proof?: OperationProof): boolean {
         if (!proof) {
             return false;
         }
 
-        if (proof.type !== "EcdsaSecp256k1Signature2019") {
+        // Two accepted labels. The legacy one is permanent -- every operation
+        // ever anchored was signed under it -- and says the payload is the
+        // document alone. The Data Integrity one says the proof configuration
+        // is signed with it, which is what binds `created` and `proofPurpose`.
+        if (!isOperationProofType(proof)) {
             return false;
         }
 
@@ -490,10 +533,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 throw new InvalidOperationError('publicJwk');
             }
 
-            const operationCopy = copyJSON(operation);
-            delete operationCopy.proof;
-
-            const msgHash = this.cipher.hashJSON(operationCopy);
+            const msgHash = this.operationMessageHash(operation);
             const signatureHex = base64urlToHex(operation.proof!.proofValue);
             return this.cipher.verifySig(msgHash, signatureHex, operation.publicJwk);
         }
@@ -511,9 +551,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 throw new InvalidOperationError(`non-local registry=${operation.registration.registry}`);
             }
 
-            const operationCopy = copyJSON(operation);
-            delete operationCopy.proof;
-            const msgHash = this.cipher.hashJSON(operationCopy);
+            const msgHash = this.operationMessageHash(operation);
             if (!doc.didDocument ||
                 !doc.didDocument.verificationMethod ||
                 doc.didDocument.verificationMethod.length === 0 ||
@@ -560,9 +598,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         const proof = operation.proof!;
-        const jsonCopy = copyJSON(operation);
-        delete jsonCopy.proof;
-        const msgHash = this.cipher.hashJSON(jsonCopy);
+        const msgHash = this.operationMessageHash(operation);
 
         if (doc.didDocument.verificationMethod.length === 0 ||
             !doc.didDocument.verificationMethod[0].publicKeyJwk) {

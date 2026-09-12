@@ -179,7 +179,7 @@ describe('createIdOperation', () => {
         expect(operation.registration!.registry).toBe('hyperswarm'); // Default registry
         expect(operation.publicJwk).toBeDefined();
         expect(operation.proof).toBeDefined();
-        expect(operation.proof!.type).toBe('EcdsaSecp256k1Signature2019');
+        expect(operation.proof!.type).toBe('DataIntegrityProof');
         expect(operation.proof!.created).toBeDefined();
         expect(operation.proof!.verificationMethod).toBe('#key-1');
         expect(operation.proof!.proofPurpose).toBe('authentication');
@@ -255,22 +255,22 @@ describe('createIdOperation', () => {
         const name = 'Frank';
         const operation = await keymaster.createIdOperation(name);
 
-        // Verify that the proof matches the operation
+        // The signature covers the proof's own configuration alongside the
+        // operation, so the payload is both digests hashed once more (#1087).
         const operationWithoutProof = {
             type: operation.type,
             created: operation.created,
             registration: operation.registration,
             publicJwk: operation.publicJwk
         };
-        const msgHash = cipher.hashJSON(operationWithoutProof);
 
-        // Verify proof can be validated
-        const publicKey = operation.publicJwk!;
-        // Convert proofValue from base64url to hex
+        const { proofValue, ...config } = operation.proof!;
+        const digests = cipher.hashJSON(config) + cipher.hashJSON(operationWithoutProof);
+        const msgHash = cipher.hashMessage(Uint8Array.from(Buffer.from(digests, 'hex')));
+
         const { base64url } = await import('multiformats/bases/base64');
-        const proofValueBytes = base64url.baseDecode(operation.proof!.proofValue);
-        const proofValueHex = Buffer.from(proofValueBytes).toString('hex');
-        const isValid = cipher.verifySig(msgHash, proofValueHex, publicKey);
+        const proofValueHex = Buffer.from(base64url.baseDecode(proofValue)).toString('hex');
+        const isValid = cipher.verifySig(msgHash, proofValueHex, operation.publicJwk!);
         expect(isValid).toBe(true);
     });
 

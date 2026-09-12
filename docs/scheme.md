@@ -73,6 +73,13 @@ To create an agent DID, the client must sign and submit a "create" operation to 
     - The `proof.verificationMethod` must be set to `#key-1` (a relative reference) since the DID does not yet exist
 1. Submit the operation to a node. For example, with a REST API, post the operation to the node's endpoint to create new DIDs (e.g. `/api/v1/did/`)
 
+> The worked examples in this section and the two that follow were captured
+> before `archon-ecdsa-jcs-2019` was adopted for operations, so their proofs
+> carry the legacy `EcdsaSecp256k1Signature2019` label and the signature that
+> goes with it — the payload is the operation alone. Both remain accepted, and
+> the DIDs shown derive from these exact bytes. For the proof a node emits now,
+> and the payload it signs, see [Cryptosuites](#cryptosuites).
+
 Example
 ```json
 {
@@ -464,14 +471,16 @@ The `proof.verificationMethod` field identifies which key was used to create the
 
 ### Cryptosuites
 
-A DID operation and a credential are signed with the same key, but not over the
-same bytes and not under the same name, because they are read by different
-verifiers.
+A DID operation and a credential are signed with the same key and under the same
+suite, but not over the same bytes: a credential's proof configuration carries
+the document's `@context`, and a credential may carry a proof set where an
+operation never does.
 
-**Operations** carry a single proof of type `EcdsaSecp256k1Signature2019`. Both
-gatekeeper implementations require exactly that literal and reject anything else,
-so an operation never carries a proof set however many keys its signer has
-published.
+**Operations** carry a single proof — never a proof set, however many keys the
+signer has published. It is an `archon-ecdsa-jcs-2019` proof, the same suite
+credentials use. Both gatekeeper implementations also accept the legacy
+`EcdsaSecp256k1Signature2019` and always will, because every operation anchored
+before the suite was adopted carries it and each node replays its own history.
 
 **Credentials** carry a `DataIntegrityProof`, and may carry more than one — see
 *Proof sets* below.
@@ -540,17 +549,18 @@ change fails a test rather than a credential.
 
 #### The legacy label
 
-Credentials issued before this suite was named carry
-`EcdsaSecp256k1Signature2019`, and DID operations carry it still. Its payload is
-weaker: `SHA-256(JCS(document))` alone, with the proof configuration outside the
-signature. On such a proof `created` and `proofPurpose` can be altered without
+Credentials issued, and operations anchored, before this suite was named carry
+`EcdsaSecp256k1Signature2019`. Its payload is weaker: `SHA-256(JCS(document))`
+alone, with the proof configuration outside the signature. On such a proof `created` and `proofPurpose` can be altered without
 breaking it — which is the defect `archon-ecdsa-jcs-2019` was defined to fix,
 and the reason the two names are verified under different rules rather than
 treated as aliases.
 
 Those credentials and operations are immutable, so verifiers accept the legacy
-type indefinitely rather than deprecating it. Nothing issues it for a credential
-any more.
+type indefinitely rather than deprecating it. Nothing issues it any more, with
+one exception: the seed bank's create operation, whose DID is the CID of that
+operation including its proof, so signing it any other way would compute a
+different DID and orphan every wallet holding one.
 
 Because a verifier accepts a credential when any one proof verifies, a proof set
 is only as strong as its strongest *surviving* proof: an attacker may drop the

@@ -467,10 +467,10 @@ describe('issuing', () => {
         expect(await keymaster.verifyProof(signed)).toBe(true);
     });
 
-    // Both gatekeeper ports require an operation proof to be a single object
-    // whose type is the literal EcdsaSecp256k1Signature2019, so an operation
-    // must never pick up the second proof however many keys its signer has.
-    it('leaves DID operations carrying one legacy proof', async () => {
+    // Both gatekeeper ports require an operation proof to be a single object,
+    // so an operation must never pick up the second proof however many keys its
+    // signer has published.
+    it('leaves DID operations carrying one proof', async () => {
         const did = await keymaster.createId('Alice', { registry: 'local' });
         await keymaster.publishAssertionKey();
 
@@ -485,17 +485,20 @@ describe('issuing', () => {
         expect(asset).toBeDefined();
     });
 
-    // The label is the whole distinction between the two writers, so it is
-    // asserted directly rather than inferred from an operation being accepted.
-    it('gives an operation the registered label and a credential the corrected one', async () => {
+    // Both writers claim the suite Archon defines rather than a registered one
+    // it does not implement (#1087). What separates them is the proof set: a
+    // credential carries one per published key, an operation carries one.
+    it('gives an operation and a credential the corrected label', async () => {
         await keymaster.createId('Alice', { registry: 'local' });
         await keymaster.publishAssertionKey();
 
         const operation: any = await (keymaster as any).addOperationProof({ type: 'update' });
         const credentialProofs: any = await keymaster.addProof({ hello: 'world' });
 
-        expect(operation.proof.type).toBe('EcdsaSecp256k1Signature2019');
-        expect(operation.proof.cryptosuite).toBeUndefined();
+        expect(operation.proof.type).toBe('DataIntegrityProof');
+        expect(operation.proof.cryptosuite).toBe('archon-ecdsa-jcs-2019');
+        expect(Array.isArray(operation.proof)).toBe(false);
+
         expect(credentialProofs.proof[0].type).toBe('DataIntegrityProof');
         expect(credentialProofs.proof[0].cryptosuite).toBe('archon-ecdsa-jcs-2019');
     });

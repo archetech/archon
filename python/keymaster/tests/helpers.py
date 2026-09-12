@@ -54,6 +54,9 @@ class FakeGatekeeper:
         self.text_blobs: dict[str, str] = {}
         self._counter = 0
         self._operation_dids: dict[str, str] = {}
+        # Every operation as it was handed over, proof included, for tests about
+        # what a wallet emits rather than what the gatekeeper makes of it.
+        self.operations: list[dict[str, Any]] = []
 
     async def list_registries(self) -> list[str]:
         return list(self.registries)
@@ -65,6 +68,7 @@ class FakeGatekeeper:
         return {"hash": f"block-{registry}"}
 
     async def create_did(self, operation: dict[str, Any]) -> str:
+        self.operations.append(deepcopy(operation))
         operation_payload = {key: value for key, value in operation.items() if key != "proof"}
         operation_key = hashlib.sha256(
             json.dumps(operation_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -124,6 +128,7 @@ class FakeGatekeeper:
         return deepcopy(self.docs[did])
 
     async def update_did(self, operation: dict[str, Any]) -> bool:
+        self.operations.append(deepcopy(operation))
         did = operation["did"]
         current = deepcopy(self.docs[did])
         doc_update = deepcopy(operation.get("doc") or {})

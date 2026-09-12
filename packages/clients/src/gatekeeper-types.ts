@@ -298,15 +298,19 @@ export interface DataIntegrityProof {
     proofValue: string;
 }
 
-// What may appear on a credential or a presentation. Never on an Operation:
-// both gatekeeper ports require an operation proof to be the literal
-// EcdsaSecp256k1Signature2019, so `Proof` stays exact.
+// What may appear on a credential or a presentation, where the suite varies.
+// An operation is narrower -- one proof, and only the suite `OperationProof`
+// below admits -- which is why the two are separate types.
 export type CredentialProof = Proof | DataIntegrityProof;
 
 export interface Operation {
     type: 'create' | 'update' | 'delete';
     created?: string;
-    proof?: Proof;
+    // The legacy proof signs the operation alone; the Data Integrity form signs
+    // the proof configuration with it, so `created` and `proofPurpose` are
+    // inside the signature (#1087). Both are accepted for good: every operation
+    // already anchored carries the legacy one.
+    proof?: OperationProof;
     registration?: DocumentRegistration;
     publicJwk?: EcdsaJwkPublic;
     controller?: string;
@@ -316,6 +320,16 @@ export interface Operation {
     data?: unknown;
     blockid?: string;
 }
+
+// The only Data Integrity suite an operation may carry. `DataIntegrityProof`
+// leaves `cryptosuite` open because a credential's varies; both gatekeepers
+// refuse anything but this one on an operation, so a wider type here would
+// typecheck an operation into a guaranteed rejection.
+export interface ArchonEcdsaOperationProof extends DataIntegrityProof {
+    cryptosuite: 'archon-ecdsa-jcs-2019';
+}
+
+export type OperationProof = Proof | ArchonEcdsaOperationProof;
 
 export type BlockId = number | string;
 

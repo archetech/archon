@@ -512,14 +512,9 @@ class Keymaster:
         }
         if operation["blockid"] is None:
             operation.pop("blockid")
-        signature_hex = sign_hash(hash_json(operation), keypair["privateJwk"])
-        operation["proof"] = {
-            "type": "EcdsaSecp256k1Signature2019",
-            "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-            "verificationMethod": "#key-1",
-            "proofPurpose": "authentication",
-            "proofValue": b64url(bytes.fromhex(signature_hex)),
-        }
+        operation["proof"] = self._operation_proof(
+            operation, {"verificationMethod": "#key-1", "keypair": keypair}
+        )
         return operation
 
     async def create_id(self, name: str, options: dict[str, Any] | None = None) -> str:
@@ -1803,25 +1798,39 @@ class Keymaster:
     async def _add_operation_proof(self, payload: dict[str, Any], controller: str | None = None) -> dict[str, Any]:
         """DID operations, which both gatekeeper ports validate.
 
-        verify_proof_format requires a single proof whose type is the literal
-        EcdsaSecp256k1Signature2019, so an operation never carries a proof set
-        however many keys its signer has published.
+        verify_proof_format takes a single proof, so an operation never
+        carries a proof set however many keys its signer has published.
         """
         signer = await self._proof_signer(payload, controller)
 
+        return {**payload, "proof": self._operation_proof(payload, signer)}
+
+    def _operation_proof(self, payload: dict[str, Any], signer: dict[str, Any]) -> dict[str, Any]:
+        """Every operation proof a wallet writes comes from here.
+
+        Most callers reach it through ``_add_operation_proof``; the ones that
+        cannot pass their own signer, because a create-agent operation would
+        have to resolve a DID that does not exist yet and signs with its own new
+        key under the relative ``#key-1``.
+
+        The seed bank's operation is deliberately not one of them: its DID is
+        the CID of the operation, proof included, so changing the proof changes
+        the DID and orphans every wallet that has one.
+        """
+        config = {
+            "type": "DataIntegrityProof",
+            "cryptosuite": ARCHON_SECP256K1_CRYPTOSUITE,
+            "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+            "verificationMethod": signer["verificationMethod"],
+            "proofPurpose": "authentication",
+        }
+
         return {
-            **payload,
-            "proof": {
-                "type": "EcdsaSecp256k1Signature2019",
-                "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-                "verificationMethod": signer["verificationMethod"],
-                "proofPurpose": "authentication",
-                # The document alone, never the proof configuration. Weaker
-                # than the Data Integrity construction below, and kept only
-                # because it is what every operation ever anchored was signed
-                # over.
-                "proofValue": self._sign_proof_value(lambda: hash_json(payload), signer["keypair"]),
-            },
+            **config,
+            "proofValue": self._sign_proof_value(
+                lambda: hash_message(self._data_integrity_payload(payload, config)),
+                signer["keypair"],
+            ),
         }
 
     async def _archon_ecdsa_jcs_2019_proof(
@@ -2454,16 +2463,11 @@ class Keymaster:
             "previd": current.get("didDocumentMetadata", {}).get("versionId"),
             "doc": doc,
         }
-        signature_hex = sign_hash(hash_json(payload), keypair["privateJwk"])
         signed = {
             **payload,
-            "proof": {
-                "type": "EcdsaSecp256k1Signature2019",
-                "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-                "verificationMethod": f"{did}#key-1",
-                "proofPurpose": "authentication",
-                "proofValue": b64url(bytes.fromhex(signature_hex)),
-            },
+            "proof": self._operation_proof(
+                payload, {"verificationMethod": f"{did}#key-1", "keypair": keypair}
+            ),
         }
         return await self.gatekeeper.update_did(signed)
 
@@ -2481,16 +2485,15 @@ class Keymaster:
             "controller": seed_bank.get("didDocument", {}).get("id"),
             "data": {"backup": backup},
         }
-        signature_hex = sign_hash(hash_json(operation), keypair["privateJwk"])
         signed = {
             **operation,
-            "proof": {
-                "type": "EcdsaSecp256k1Signature2019",
-                "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-                "verificationMethod": f"{seed_bank.get('didDocument', {}).get('id')}#key-1",
-                "proofPurpose": "authentication",
-                "proofValue": b64url(bytes.fromhex(signature_hex)),
-            },
+            "proof": self._operation_proof(
+                operation,
+                {
+                    "verificationMethod": f"{seed_bank.get('didDocument', {}).get('id')}#key-1",
+                    "keypair": keypair,
+                },
+            ),
         }
         backup_did = await self.gatekeeper.create_did(signed)
         data = seed_bank.get("didDocumentData") or {}
