@@ -109,3 +109,29 @@ describe('seed bank', () => {
         expect(agentEvents[0].operation.proof!.type).toBe('DataIntegrityProof');
     });
 });
+
+// The seed bank is the one exception, and only its create operation. Its
+// updates and the backup asset it points at are ordinary operations, and were
+// each signing the legacy form from their own copy of the code until they
+// shared the builder.
+describe('seed bank updates and wallet backups', () => {
+
+    it('bind their proof configuration like any other operation', async () => {
+        const keymaster = await newKeymaster();
+        await keymaster.createId('Alice', { registry: 'local' });
+
+        const backup = await keymaster.backupWallet('local');
+        const bank = await keymaster.resolveSeedBank();
+
+        const [backupEvents] = await gatekeeper.exportDIDs([backup]);
+        const [bankEvents] = await gatekeeper.exportDIDs([bank.didDocument!.id!]);
+
+        expect(backupEvents[0].operation.proof!.type).toBe('DataIntegrityProof');
+
+        // The create keeps the legacy proof; the update that records the
+        // backup does not.
+        expect(bankEvents[0].operation.proof!.type).toBe('EcdsaSecp256k1Signature2019');
+        expect(bankEvents.length).toBeGreaterThan(1);
+        expect(bankEvents[bankEvents.length - 1].operation.proof!.type).toBe('DataIntegrityProof');
+    });
+});

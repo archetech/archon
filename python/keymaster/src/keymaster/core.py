@@ -2465,16 +2465,11 @@ class Keymaster:
             "previd": current.get("didDocumentMetadata", {}).get("versionId"),
             "doc": doc,
         }
-        signature_hex = sign_hash(hash_json(payload), keypair["privateJwk"])
         signed = {
             **payload,
-            "proof": {
-                "type": "EcdsaSecp256k1Signature2019",
-                "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-                "verificationMethod": f"{did}#key-1",
-                "proofPurpose": "authentication",
-                "proofValue": b64url(bytes.fromhex(signature_hex)),
-            },
+            "proof": self._operation_proof(
+                payload, {"verificationMethod": f"{did}#key-1", "keypair": keypair}
+            ),
         }
         return await self.gatekeeper.update_did(signed)
 
@@ -2492,16 +2487,15 @@ class Keymaster:
             "controller": seed_bank.get("didDocument", {}).get("id"),
             "data": {"backup": backup},
         }
-        signature_hex = sign_hash(hash_json(operation), keypair["privateJwk"])
         signed = {
             **operation,
-            "proof": {
-                "type": "EcdsaSecp256k1Signature2019",
-                "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-                "verificationMethod": f"{seed_bank.get('didDocument', {}).get('id')}#key-1",
-                "proofPurpose": "authentication",
-                "proofValue": b64url(bytes.fromhex(signature_hex)),
-            },
+            "proof": self._operation_proof(
+                operation,
+                {
+                    "verificationMethod": f"{seed_bank.get('didDocument', {}).get('id')}#key-1",
+                    "keypair": keypair,
+                },
+            ),
         }
         backup_did = await self.gatekeeper.create_did(signed)
         data = seed_bank.get("didDocumentData") or {}

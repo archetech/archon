@@ -90,7 +90,8 @@ Example
         "y": "KHsWAaidAIGCosDjRYDIk-94793e4xVEL4UwFxjWgB8"
     },
     "proof": {
-        "type": "EcdsaSecp256k1Signature2019",
+        "type": "DataIntegrityProof",
+        "cryptosuite": "archon-ecdsa-jcs-2019",
         "created": "2026-01-14T19:29:06.927Z",
         "verificationMethod": "#key-1",
         "proofPurpose": "authentication",
@@ -142,7 +143,8 @@ Example
         }
     },
     "proof": {
-        "type": "EcdsaSecp256k1Signature2019",
+        "type": "DataIntegrityProof",
+        "cryptosuite": "archon-ecdsa-jcs-2019",
         "created": "2026-01-14T19:32:24.375Z",
         "verificationMethod": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q#key-1",
         "proofPurpose": "authentication",
@@ -210,7 +212,8 @@ Example update to rotate keys for an agent DID:
         }
     },
     "proof": {
-        "type": "EcdsaSecp256k1Signature2019",
+        "type": "DataIntegrityProof",
+        "cryptosuite": "archon-ecdsa-jcs-2019",
         "created": "2026-01-14T19:29:16.117Z",
         "verificationMethod": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q#key-1",
         "proofPurpose": "authentication",
@@ -248,7 +251,8 @@ Example deletion operation:
     "did": "did:cid:bagaaiera7vfnrxrmcvo7prrbmdhpvusroii4y2gir252nzk4jv5nxgkzldha",
     "previd": "bagaaiera7vfnrxrmcvo7prrbmdhpvusroii4y2gir252nzk4jv5nxgkzldha",
     "proof": {
-        "type": "EcdsaSecp256k1Signature2019",
+        "type": "DataIntegrityProof",
+        "cryptosuite": "archon-ecdsa-jcs-2019",
         "created": "2026-01-14T19:34:32.170Z",
         "verificationMethod": "did:cid:bagaaieradidcs4hohalzexldr5mdmbmt553tqq3ifqd56mvhifppvyfdc32q#key-1",
         "proofPurpose": "authentication",
@@ -468,10 +472,11 @@ A DID operation and a credential are signed with the same key, but not over the
 same bytes and not under the same name, because they are read by different
 verifiers.
 
-**Operations** carry a single proof of type `EcdsaSecp256k1Signature2019`. Both
-gatekeeper implementations require exactly that literal and reject anything else,
-so an operation never carries a proof set however many keys its signer has
-published.
+**Operations** carry a single proof — never a proof set, however many keys the
+signer has published. It is an `archon-ecdsa-jcs-2019` proof, the same suite
+credentials use. Both gatekeeper implementations also accept the legacy
+`EcdsaSecp256k1Signature2019` and always will, because every operation anchored
+before the suite was adopted carries it and each node replays its own history.
 
 **Credentials** carry a `DataIntegrityProof`, and may carry more than one — see
 *Proof sets* below.
@@ -540,17 +545,18 @@ change fails a test rather than a credential.
 
 #### The legacy label
 
-Credentials issued before this suite was named carry
-`EcdsaSecp256k1Signature2019`, and DID operations carry it still. Its payload is
-weaker: `SHA-256(JCS(document))` alone, with the proof configuration outside the
-signature. On such a proof `created` and `proofPurpose` can be altered without
+Credentials issued, and operations anchored, before this suite was named carry
+`EcdsaSecp256k1Signature2019`. Its payload is weaker: `SHA-256(JCS(document))`
+alone, with the proof configuration outside the signature. On such a proof `created` and `proofPurpose` can be altered without
 breaking it — which is the defect `archon-ecdsa-jcs-2019` was defined to fix,
 and the reason the two names are verified under different rules rather than
 treated as aliases.
 
 Those credentials and operations are immutable, so verifiers accept the legacy
-type indefinitely rather than deprecating it. Nothing issues it for a credential
-any more.
+type indefinitely rather than deprecating it. Nothing issues it any more, with
+one exception: the seed bank's create operation, whose DID is the CID of that
+operation including its proof, so signing it any other way would compute a
+different DID and orphan every wallet holding one.
 
 Because a verifier accepts a credential when any one proof verifies, a proof set
 is only as strong as its strongest *surviving* proof: an attacker may drop the

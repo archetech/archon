@@ -321,7 +321,15 @@ export interface Operation {
     blockid?: string;
 }
 
-export type OperationProof = Proof | DataIntegrityProof;
+// The only Data Integrity suite an operation may carry. `DataIntegrityProof`
+// leaves `cryptosuite` open because a credential's varies; both gatekeepers
+// refuse anything but this one on an operation, so a wider type here would
+// typecheck an operation into a guaranteed rejection.
+export interface ArchonEcdsaOperationProof extends DataIntegrityProof {
+    cryptosuite: 'archon-ecdsa-jcs-2019';
+}
+
+export type OperationProof = Proof | ArchonEcdsaOperationProof;
 
 export type BlockId = number | string;
 

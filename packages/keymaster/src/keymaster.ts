@@ -26,6 +26,7 @@ import {
     ResolveDIDOptions,
     Operation,
     OperationProof,
+    ArchonEcdsaOperationProof,
     ProofPurpose,
 } from '@didcid/clients/gatekeeper-types';
 import {
@@ -644,17 +645,9 @@ export default class Keymaster implements KeymasterInterface {
             doc,
         };
 
-        const msgHash = this.cipher.hashJSON(operation);
-        const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
         const signed: Operation = {
             ...operation,
-            proof: {
-                type: "EcdsaSecp256k1Signature2019",
-                created: new Date().toISOString(),
-                verificationMethod: `${did}#key-1`,
-                proofPurpose: "authentication",
-                proofValue: hexToBase64url(signatureHex),
-            }
+            proof: this.operationProof(operation, { verificationMethod: `${did}#key-1`, keypair }),
         };
 
         return await this.gatekeeper.updateDID(signed);
@@ -683,18 +676,12 @@ export default class Keymaster implements KeymasterInterface {
             data: { backup: backup },
         };
 
-        const msgHash = this.cipher.hashJSON(operation);
-        const signatureHex = this.cipher.signHash(msgHash, keypair.privateJwk);
-
         const signed: Operation = {
             ...operation,
-            proof: {
-                type: "EcdsaSecp256k1Signature2019",
-                created: new Date().toISOString(),
+            proof: this.operationProof(operation, {
                 verificationMethod: `${seedBank.didDocument?.id}#key-1`,
-                proofPurpose: "authentication",
-                proofValue: hexToBase64url(signatureHex),
-            }
+                keypair,
+            }),
         };
 
         const backupDID = await this.gatekeeper.createDID(signed);
@@ -1291,7 +1278,7 @@ export default class Keymaster implements KeymasterInterface {
         obj: T,
         signer: { verificationMethod: string, keypair: EcdsaJwkPair },
     ): OperationProof {
-        const config: DataIntegrityProof = {
+        const config: ArchonEcdsaOperationProof = {
             type: 'DataIntegrityProof',
             cryptosuite: ARCHON_SECP256K1_CRYPTOSUITE,
             created: new Date().toISOString(),
@@ -1304,9 +1291,9 @@ export default class Keymaster implements KeymasterInterface {
         void proofValue;
 
         return {
-            ...unsigned as DataIntegrityProof,
+            ...unsigned,
             proofValue: this.signProofValue(
-                () => this.cipher.hashMessage(this.dataIntegrityPayload(obj, unsigned as DataIntegrityProof)),
+                () => this.cipher.hashMessage(this.dataIntegrityPayload(obj, config)),
                 signer.keypair),
         };
     }

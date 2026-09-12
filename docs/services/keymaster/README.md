@@ -496,17 +496,26 @@ delete), the Keymaster:
 
 1. Builds the unsigned `Operation` (per Gatekeeper spec §3.1).
 2. Removes any existing `proof` field (defensive).
-3. Computes `msgHash = sha256(canonicalize(op_without_proof))`.
-4. Signs with the ID's private key: `sig = ECDSA(secp256k1, priv, msgHash)`.
-5. Builds the `proof` object (Gatekeeper spec §3.2):
-   - `type = "EcdsaSecp256k1Signature2019"`
+3. Builds the proof configuration (Gatekeeper spec §3.2), which is the proof
+   without its `proofValue`:
+   - `type = "DataIntegrityProof"`
+   - `cryptosuite = "archon-ecdsa-jcs-2019"`
    - `created = now() in RFC 3339`
    - `verificationMethod` per Gatekeeper §5.3 (relative `#key-1` for agent
      create, otherwise `<signerDid>#key-1`)
-   - `proofPurpose = "authentication"` for the current TypeScript DID and
-     asset write paths (`create`, `update`, `delete`)
-   - `proofValue = base64url(sig)`
+   - `proofPurpose = "authentication"` for the DID and asset write paths
+     (`create`, `update`, `delete`)
+4. Computes
+   `msgHash = sha256( sha256(canonicalize(config)) ‖ sha256(canonicalize(op_without_proof)) )`,
+   which is what puts `created` and `proofPurpose` inside the signature.
+5. Signs with the ID's private key: `sig = ECDSA(secp256k1, priv, msgHash)`, and
+   sets `proofValue = base64url(sig)`.
 6. Submits via `gatekeeper.createDID(op)` / `updateDID(op)`.
+
+The seed bank's **create** operation is the one exception: it keeps the legacy
+`EcdsaSecp256k1Signature2019` proof and the `sha256(canonicalize(op))` payload,
+because its DID is the CID of that operation including the proof. Its updates,
+and the wallet backup asset, use the suite above like everything else.
 
 ---
 
