@@ -275,6 +275,9 @@ describe('resolveDID', () => {
                 assertionMethod: [
                     "#key-1",
                 ],
+                capabilityInvocation: [
+                    "#key-1",
+                ],
                 id: did,
                 verificationMethod: [
                     {
@@ -321,6 +324,9 @@ describe('resolveDID', () => {
                     "#key-1",
                 ],
                 assertionMethod: [
+                    "#key-1",
+                ],
+                capabilityInvocation: [
                     "#key-1",
                 ],
                 id: did,
@@ -394,6 +400,9 @@ describe('resolveDID', () => {
                 assertionMethod: [
                     "#key-1",
                 ],
+                capabilityInvocation: [
+                    "#key-1",
+                ],
                 id: did,
                 verificationMethod: [
                     {
@@ -442,6 +451,9 @@ describe('resolveDID', () => {
                     "#key-1",
                 ],
                 assertionMethod: [
+                    "#key-1",
+                ],
+                capabilityInvocation: [
                     "#key-1",
                 ],
                 id: did,

@@ -733,6 +733,13 @@ export default class Gatekeeper implements GatekeeperInterface {
                         "assertionMethod": [
                             "#key-1"
                         ],
+                        // Operations claim capabilityInvocation, and a proof
+                        // purpose the document does not grant is a safeguard
+                        // nothing can check. This is the same key: an agent
+                        // signs its own operations with it.
+                        "capabilityInvocation": [
+                            "#key-1"
+                        ],
                     },
                     "didDocumentMetadata": {
                         "created": anchor.created,

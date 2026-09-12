@@ -531,8 +531,11 @@ The signer MUST sign the prehashed message (no extra hashing inside ECDSA).
    [§5.6](#56-timestamp-grammar)
 3. `proof.proofPurpose ∈ { "capabilityInvocation", "authentication" }`. An
    operation exercises control over a DID document, which is what
-   `capabilityInvocation` names and what a node emits. `authentication` MUST
-   stay accepted: every operation anchored before that was settled claims it
+   `capabilityInvocation` names and what a node emits — so a generated agent
+   document lists `#key-1` under that relationship as well, since a purpose the
+   document does not grant is a safeguard nothing can check. `authentication`
+   MUST stay accepted: every operation anchored before that was settled claims
+   it
 4. `proof.verificationMethod` contains `#`. Split on first `#`; the prefix
    MUST be empty (relative) or a valid DID
 5. `proof.proofValue` is a non-empty string

@@ -255,6 +255,7 @@ export interface DidCidDocument {
         }>,
         authentication?: string[],
         assertionMethod?: string[],
+        capabilityInvocation?: string[],
         keyAgreement?: string[],
         service?: Array<{
             id: string;
