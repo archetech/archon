@@ -480,11 +480,10 @@ operation never does.
 signer has published. It is an `archon-ecdsa-jcs-2019` proof, the same suite
 credentials use, and its `proofPurpose` is `capabilityInvocation`: an operation
 exercises control over a DID document, where `authentication` would claim the
-signer is proving they are the subject and `assertionMethod` that they are
-stating something. Both gatekeeper implementations also accept the legacy
-`EcdsaSecp256k1Signature2019`, and `authentication` and `assertionMethod`
-alongside it, and always will — every operation anchored before either was
-settled carries them, and each node replays its own history.
+signer is proving they are the subject. Both gatekeeper implementations also
+accept the legacy `EcdsaSecp256k1Signature2019` and `authentication`, and always
+will — every operation anchored before either was settled carries them, and each
+node replays its own history.
 
 **Credentials** carry a `DataIntegrityProof`, and may carry more than one — see
 *Proof sets* below.

@@ -17,7 +17,7 @@
       "proof": {
         "type": "EcdsaSecp256k1Signature2019",
         "created": "2026-04-11T12:00:00Z",
-        "proofPurpose": "assertionMethod",
+        "proofPurpose": "authentication",
         "verificationMethod": "#key-1",
         "proofValue": "94Uctck5HwNrWXRX9N2b0Yxr9RYJ3pLB5jhKOC_YRH8TqJiaKLygxWDNhavVWmYzGBedR9s0-6w1jeROgqxoYg"
       }
@@ -42,7 +42,7 @@
       "proof": {
         "type": "EcdsaSecp256k1Signature2019",
         "created": "2026-04-11T12:00:00Z",
-        "proofPurpose": "assertionMethod",
+        "proofPurpose": "authentication",
         "verificationMethod": "#key-1",
         "proofValue": "94Uctck5HwNrWXRX9N2b0Yxr9RYJ3pLB5jhKOC_YRH8TqJiaKLygxWDNhavVWmYzGBedR9s0-6w1jeROgqxoYA"
       }

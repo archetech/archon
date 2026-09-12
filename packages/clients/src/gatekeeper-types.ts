@@ -281,9 +281,8 @@ export type ProofPurpose = "assertionMethod" | "authentication";
 // What an operation proof may claim. An operation exercises control over a DID
 // document, which is what `capabilityInvocation` names; `authentication` means
 // proving you are the subject, and every operation anchored before this was
-// written claims it, so both are accepted. `assertionMethod` is accepted for
-// the same reason -- nothing emitted it, but the gatekeepers took it.
-export type OperationProofPurpose = ProofPurpose | "capabilityInvocation";
+// written claims it, so both are accepted.
+export type OperationProofPurpose = "capabilityInvocation" | "authentication";
 
 export interface Proof {
     type: "EcdsaSecp256k1Signature2019";

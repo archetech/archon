@@ -40,7 +40,7 @@ function base64urlToHex(b64: string): string {
 const ARCHON_SECP256K1_CRYPTOSUITE = 'archon-ecdsa-jcs-2019';
 const LEGACY_PROOF_TYPE = 'EcdsaSecp256k1Signature2019';
 
-const OPERATION_PROOF_PURPOSES = ['capabilityInvocation', 'authentication', 'assertionMethod'];
+const OPERATION_PROOF_PURPOSES = ['capabilityInvocation', 'authentication'];
 const ValidVersions = [1];
 const ValidTypes = ['agent', 'asset'];
 const PIN_QUEUE = 'pin';
@@ -463,9 +463,9 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         // An operation exercises control over a DID document, which is what
-        // `capabilityInvocation` names. `authentication` is what every
-        // operation anchored before that was settled claims, and
-        // `assertionMethod` was accepted alongside it, so both stay.
+        // `capabilityInvocation` names. `authentication` stays accepted because
+        // every operation anchored before that was settled claims it, and each
+        // node replays its own history.
         if (!proof.proofPurpose || !OPERATION_PROOF_PURPOSES.includes(proof.proofPurpose)) {
             return false;
         }
