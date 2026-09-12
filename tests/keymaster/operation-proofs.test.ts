@@ -22,13 +22,12 @@ beforeEach(async () => {
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm'] });
 });
 
-async function keymasterWith(boundOperationProofs: boolean): Promise<Keymaster> {
+async function newKeymaster(): Promise<Keymaster> {
     const keymaster = new Keymaster({
         gatekeeper,
         wallet: new WalletJsonMemory(),
         cipher: new CipherNode(),
         passphrase: 'passphrase',
-        boundOperationProofs,
     });
 
     await keymaster.newWallet();
@@ -41,21 +40,8 @@ async function keymasterWith(boundOperationProofs: boolean): Promise<Keymaster> 
 // bound form outright, so nothing may emit it until every node accepts it.
 describe('operation proof emission', () => {
 
-    it('emits the legacy proof by default', async () => {
-        const keymaster = await keymasterWith(false);
-        const did = await keymaster.createId('Alice', { registry: 'local' });
-        const doc = await keymaster.resolveDID(did);
-
-        expect(doc.didDocument!.id).toBe(did);
-
-        const events = await gatekeeper.exportDIDs([did]);
-        const proof = events[0][0].operation.proof!;
-
-        expect(proof.type).toBe('EcdsaSecp256k1Signature2019');
-    });
-
-    it('emits a proof that signs its configuration when asked', async () => {
-        const keymaster = await keymasterWith(true);
+    it('signs the proof configuration into every operation', async () => {
+        const keymaster = await newKeymaster();
         const did = await keymaster.createId('Alice', { registry: 'local' });
         const doc = await keymaster.resolveDID(did);
 
@@ -73,7 +59,7 @@ describe('operation proof emission', () => {
     // The other emission site: an asset's operations are signed by its
     // controller, where a create-agent operation signs with its own new key.
     it('signs controller-signed creates and updates under the same suite', async () => {
-        const keymaster = await keymasterWith(true);
+        const keymaster = await newKeymaster();
         await keymaster.createId('Alice', { registry: 'local' });
 
         const asset = await keymaster.createAsset({ note: 'asset' }, { registry: 'local' });
@@ -93,7 +79,7 @@ describe('operation proof emission', () => {
     });
 
     it('produces a proof whose bound members cannot be moved', async () => {
-        const keymaster = await keymasterWith(true);
+        const keymaster = await newKeymaster();
         const did = await keymaster.createId('Alice', { registry: 'local' });
         const events = await gatekeeper.exportDIDs([did]);
         const operation = JSON.parse(JSON.stringify(events[0][0].operation));
@@ -111,26 +97,15 @@ describe('operation proof emission', () => {
 // bank it already had.
 describe('seed bank', () => {
 
-    it('keeps the legacy proof whatever a wallet emits elsewhere', async () => {
-        // One wallet read by two keymasters, because the bank's DID derives
-        // from the wallet's own key: separate wallets would differ whatever
-        // the proof did.
-        const wallet = new WalletJsonMemory();
+    it('keeps the legacy proof, where every other operation is bound', async () => {
+        const keymaster = await newKeymaster();
+        const did = await keymaster.createId('Alice', { registry: 'local' });
+        const bank = await keymaster.resolveSeedBank();
 
-        const options = {
-            gatekeeper,
-            wallet,
-            cipher: new CipherNode(),
-            passphrase: 'passphrase',
-        };
+        const [bankEvents] = await gatekeeper.exportDIDs([bank.didDocument!.id!]);
+        const [agentEvents] = await gatekeeper.exportDIDs([did]);
 
-        const legacy = new Keymaster({ ...options, boundOperationProofs: false });
-        await legacy.newWallet();
-        await legacy.createId('Alice', { registry: 'local' });
-
-        const bound = new Keymaster({ ...options, boundOperationProofs: true });
-
-        expect((await bound.resolveSeedBank()).didDocument!.id)
-            .toBe((await legacy.resolveSeedBank()).didDocument!.id);
+        expect(bankEvents[0].operation.proof!.type).toBe('EcdsaSecp256k1Signature2019');
+        expect(agentEvents[0].operation.proof!.type).toBe('DataIntegrityProof');
     });
 });

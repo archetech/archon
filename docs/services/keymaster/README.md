@@ -1087,7 +1087,6 @@ labels.
 | `ARCHON_PASSPHRASE` | empty | Wallet passphrase, and the credential `/login` checks. The same value the CLIs, the lightning scripts and the MCP server read. **Required** — the service refuses to start without it. |
 | `ARCHON_ENCRYPTED_PASSPHRASE` | empty | Older name for `ARCHON_PASSPHRASE`, still read. Set only one; the newer name wins. Both set to different values is warned about at startup — see below. |
 | `ARCHON_WALLET_CACHE` | `false` | Enables the in-memory write-through cache. |
-| `ARCHON_BOUND_OPERATION_PROOFS` | `false` | Sign DID operations under `archon-ecdsa-jcs-2019`, putting `created` and `proofPurpose` inside the signature. A node running older code refuses such an operation, so leave it off until every node accepts the form — both gatekeeper ports do from this release. |
 | `ARCHON_DEFAULT_REGISTRY` | unset (uses `hyperswarm` in code) | Default registry for created DIDs. |
 | `ARCHON_KEYMASTER_UPLOAD_LIMIT` | `10mb` | Body cap for `/files`, `/images`, dmail attachments. |
 | `ARCHON_ADMIN_API_KEY` | empty | Admin auth header value. |

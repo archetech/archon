@@ -214,7 +214,6 @@ export default class Keymaster implements KeymasterInterface {
     private db: WalletBase;
     private cipher: Cipher;
     private readonly defaultRegistry: string;
-    private readonly boundOperationProofs: boolean;
     private readonly ephemeralRegistry: string;
     private readonly maxAliasLength: number;
     private readonly maxDataLength: number;
@@ -252,7 +251,6 @@ export default class Keymaster implements KeymasterInterface {
         this.cipher = options.cipher;
 
         this.defaultRegistry = options.defaultRegistry || 'hyperswarm';
-        this.boundOperationProofs = options.boundOperationProofs === true;
         // Ephemeral assets stay off-chain; `createAsset` downgrades them to `local` when the
         // controlling agent is local.
         this.ephemeralRegistry = 'hyperswarm';
@@ -1293,36 +1291,23 @@ export default class Keymaster implements KeymasterInterface {
         obj: T,
         signer: { verificationMethod: string, keypair: EcdsaJwkPair },
     ): OperationProof {
-        if (this.boundOperationProofs) {
-            const config: DataIntegrityProof = {
-                type: 'DataIntegrityProof',
-                cryptosuite: ARCHON_SECP256K1_CRYPTOSUITE,
-                created: new Date().toISOString(),
-                verificationMethod: signer.verificationMethod,
-                proofPurpose: 'authentication',
-                proofValue: '',
-            };
-
-            const { proofValue, ...unsigned } = config;
-            void proofValue;
-
-            return {
-                ...unsigned as DataIntegrityProof,
-                proofValue: this.signProofValue(
-                    () => this.cipher.hashMessage(this.dataIntegrityPayload(obj, unsigned as DataIntegrityProof)),
-                    signer.keypair),
-            };
-        }
-
-        return {
-            type: "EcdsaSecp256k1Signature2019",
+        const config: DataIntegrityProof = {
+            type: 'DataIntegrityProof',
+            cryptosuite: ARCHON_SECP256K1_CRYPTOSUITE,
             created: new Date().toISOString(),
             verificationMethod: signer.verificationMethod,
             proofPurpose: 'authentication',
-            // The document alone, never the proof configuration. Weaker than
-            // the Data Integrity construction above, and kept only because it
-            // is what every operation ever anchored was signed over.
-            proofValue: this.signProofValue(() => this.cipher.hashJSON(obj), signer.keypair),
+            proofValue: '',
+        };
+
+        const { proofValue, ...unsigned } = config;
+        void proofValue;
+
+        return {
+            ...unsigned as DataIntegrityProof,
+            proofValue: this.signProofValue(
+                () => this.cipher.hashMessage(this.dataIntegrityPayload(obj, unsigned as DataIntegrityProof)),
+                signer.keypair),
         };
     }
 

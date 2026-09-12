@@ -247,14 +247,13 @@ class TestBed:
     wallet_store: FakeWalletStore
 
 
-def make_testbed(passphrase: str = "passphrase", bound_operation_proofs: bool = False) -> TestBed:
+def make_testbed(passphrase: str = "passphrase") -> TestBed:
     gatekeeper = FakeGatekeeper()
     wallet_store = FakeWalletStore()
     keymaster = Keymaster(
         gatekeeper=gatekeeper,
         wallet_store=wallet_store,
         passphrase=passphrase,
-        bound_operation_proofs=bound_operation_proofs,
     )
     # FakeWalletStore starts empty, so the test bed provisions the way any
     # surface that expects to run without a wallet does.

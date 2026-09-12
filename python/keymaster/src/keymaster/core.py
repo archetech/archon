@@ -185,7 +185,6 @@ class Keymaster:
         default_registry: str = "hyperswarm",
         ephemeral_registry: str = "hyperswarm",
         max_alias_length: int = 32,
-        bound_operation_proofs: bool = False,
     ):
         self.gatekeeper = gatekeeper
         self.wallet_store = wallet_store
@@ -195,11 +194,6 @@ class Keymaster:
         # controlling agent is local.
         self.ephemeral_registry = ephemeral_registry
         self.max_alias_length = max_alias_length
-        # Sign operation proofs under archon-ecdsa-jcs-2019, which puts the
-        # proof configuration inside the signature (#1087). Off by default:
-        # every node has to accept the form before any wallet emits it, and a
-        # node that has not upgraded refuses the operation outright. See #1125.
-        self.bound_operation_proofs = bound_operation_proofs
         self.max_data_length = 8 * 1024
         self._wallet_cache: dict[str, Any] | None = None
         self._root_cache: _RootCache | None = None
@@ -1825,32 +1819,20 @@ class Keymaster:
         the CID of the operation, proof included, so changing the proof changes
         the DID and orphans every wallet that has one.
         """
-        if self.bound_operation_proofs:
-            config = {
-                "type": "DataIntegrityProof",
-                "cryptosuite": ARCHON_SECP256K1_CRYPTOSUITE,
-                "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-                "verificationMethod": signer["verificationMethod"],
-                "proofPurpose": "authentication",
-            }
-
-            return {
-                **config,
-                "proofValue": self._sign_proof_value(
-                    lambda: hash_message(self._data_integrity_payload(payload, config)),
-                    signer["keypair"],
-                ),
-            }
-
-        return {
-            "type": "EcdsaSecp256k1Signature2019",
+        config = {
+            "type": "DataIntegrityProof",
+            "cryptosuite": ARCHON_SECP256K1_CRYPTOSUITE,
             "created": __import__("datetime").datetime.utcnow().isoformat() + "Z",
             "verificationMethod": signer["verificationMethod"],
             "proofPurpose": "authentication",
-            # The document alone, never the proof configuration. Weaker than
-            # the Data Integrity construction above, and kept only because it
-            # is what every operation ever anchored was signed over.
-            "proofValue": self._sign_proof_value(lambda: hash_json(payload), signer["keypair"]),
+        }
+
+        return {
+            **config,
+            "proofValue": self._sign_proof_value(
+                lambda: hash_message(self._data_integrity_payload(payload, config)),
+                signer["keypair"],
+            ),
         }
 
     async def _archon_ecdsa_jcs_2019_proof(
