@@ -29,6 +29,9 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_USERS_DEFAULT_THEME=dark
     ports:
-      - "${ARCHON_GRAFANA_PORT:-3000}:3000"
+      # Loopback by default: an admin UI, and Docker publishes ports ahead of
+      # the host firewall, so a public bind is invisible to UFW. Set
+      # ARCHON_GRAFANA_BIND=0.0.0.0 to expose it deliberately.
+      - "${ARCHON_GRAFANA_BIND:-127.0.0.1}:${ARCHON_GRAFANA_PORT:-3000}:3000"
     depends_on:
       - prometheus

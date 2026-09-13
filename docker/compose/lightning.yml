@@ -136,7 +136,10 @@ services:
       - ../../scripts/rtl-entrypoint.sh:/scripts/rtl-entrypoint.sh:ro
       - ../../data/cln-mainnet/rtl:/data
     ports:
-      - "${ARCHON_RTL_PORT:-3002}:3000"
+      # Loopback by default: an admin UI, and Docker publishes ports ahead of
+      # the host firewall, so a public bind is invisible to UFW. Set
+      # ARCHON_RTL_BIND=0.0.0.0 to expose it deliberately.
+      - "${ARCHON_RTL_BIND:-127.0.0.1}:${ARCHON_RTL_PORT:-3002}:3000"
     depends_on:
       rtl-init:
         condition: service_completed_successfully
@@ -225,7 +228,10 @@ services:
       - ../../data/cln-mainnet:/data/lightning:ro
       - ../../data/lnbits:/data/lnbits
     ports:
-      - "${ARCHON_LNBITS_PORT:-5000}:5000"
+      # Loopback by default: the custodial wallet admin UI
+      # (LNBITS_ADMIN_UI=true), and Docker publishes ports ahead of the host
+      # firewall. Set ARCHON_LNBITS_BIND=0.0.0.0 to expose it deliberately.
+      - "${ARCHON_LNBITS_BIND:-127.0.0.1}:${ARCHON_LNBITS_PORT:-5000}:5000"
     depends_on:
       lnbits-init:
         condition: service_completed_successfully
