@@ -811,8 +811,8 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 4000 | Explorer | 4000 | -- | public |
 | 9736 | CLN P2P | 9736 | `ARCHON_CLN_PORT` | public |
 | 3001 | CLN REST | 3001 | -- | localhost |
-| 3002 | RTL | 3002 | `ARCHON_RTL_PORT` | localhost |
-| 5000 | LNbits | 5000 | `ARCHON_LNBITS_PORT` | localhost |
+| 3002 | RTL | 127.0.0.1:3002 | `ARCHON_RTL_BIND` / `ARCHON_RTL_PORT` | localhost (admin UI; set `ARCHON_RTL_BIND=0.0.0.0` to expose) |
+| 5000 | LNbits | 127.0.0.1:5000 | `ARCHON_LNBITS_BIND` / `ARCHON_LNBITS_PORT` | localhost (custodial wallet admin UI; set `ARCHON_LNBITS_BIND=0.0.0.0` to expose) |
 | 9050 | Tor SOCKS | 127.0.0.1:9050 | `ARCHON_TOR_SOCKS_PORT` | localhost; overrides should use `HOST_IP:HOST_PORT` |
 | 38332 | BTC Signet Node RPC | 38332 | -- | localhost |
 | 4232 | Hyperswarm Metrics | 4232 | -- | localhost |
@@ -848,7 +848,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 5001 | IPFS API | 5001 | -- | localhost |
 | 4001 | IPFS Swarm | 4001 | -- | public |
 | 9090 | Prometheus | 9090 | -- | localhost |
-| 3000 | Grafana | 3000 | `ARCHON_GRAFANA_PORT` | configurable |
+| 3000 | Grafana | 127.0.0.1:3000 | `ARCHON_GRAFANA_BIND` / `ARCHON_GRAFANA_PORT` | localhost (admin UI; set `ARCHON_GRAFANA_BIND=0.0.0.0` to expose) |
 
 ---
 
