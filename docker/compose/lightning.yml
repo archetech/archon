@@ -136,11 +136,9 @@ services:
       - ../../scripts/rtl-entrypoint.sh:/scripts/rtl-entrypoint.sh:ro
       - ../../data/cln-mainnet/rtl:/data
     ports:
-      # Loopback by default: RTL is an admin UI, and Docker publishes ports
-      # ahead of the host firewall (a short "PORT:PORT" binds 0.0.0.0 and UFW
-      # never sees it). Reach it over an SSH tunnel or a reverse proxy; set
-      # ARCHON_RTL_BIND=0.0.0.0 to publish on every interface deliberately, or
-      # to a tailnet IP to expose it there only (#1138).
+      # Loopback by default: an admin UI, and Docker publishes ports ahead of
+      # the host firewall, so a public bind is invisible to UFW. Set
+      # ARCHON_RTL_BIND=0.0.0.0 to expose it deliberately.
       - "${ARCHON_RTL_BIND:-127.0.0.1}:${ARCHON_RTL_PORT:-3002}:3000"
     depends_on:
       rtl-init:
@@ -230,10 +228,9 @@ services:
       - ../../data/cln-mainnet:/data/lightning:ro
       - ../../data/lnbits:/data/lnbits
     ports:
-      # Loopback by default: this is the custodial wallet admin UI
-      # (LNBITS_ADMIN_UI=true), so exposing it on every interface is worse than
-      # RTL. Same override as RTL -- ARCHON_LNBITS_BIND=0.0.0.0 to publish
-      # deliberately (#1138).
+      # Loopback by default: the custodial wallet admin UI
+      # (LNBITS_ADMIN_UI=true), and Docker publishes ports ahead of the host
+      # firewall. Set ARCHON_LNBITS_BIND=0.0.0.0 to expose it deliberately.
       - "${ARCHON_LNBITS_BIND:-127.0.0.1}:${ARCHON_LNBITS_PORT:-5000}:5000"
     depends_on:
       lnbits-init:
