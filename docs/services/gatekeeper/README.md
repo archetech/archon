@@ -1332,6 +1332,22 @@ the responses per each entry's `compareMode`. It reads `TS_GATEKEEPER_URL` and
 first divergence. New implementations SHOULD pass it against the TypeScript
 reference before being considered drop-in.
 
+Beyond the curated fixtures it also **structurally fuzzes** a valid operation:
+it mutates every field — deleting it, setting it to `""`, `null`, a number, an
+object, an array; re-encoding a `created` with offsets, a lowercase `z`, a bare
+date — and asserts both ports agree on **accept vs reject** for each. Each
+mutation is re-signed with a test key first, so a port that wrongly *accepts* a
+malformed field returns 200 where the other rejects, rather than both failing a
+stale signature and hiding the split. This catches the acceptance fork — one
+port accepting what the other rejects — which is the class #1115 and #1118
+belonged to, and which no single-port test can see.
+
+`POST /did` collapses every rejection to HTTP 500, so this compares acceptance,
+not the finer refuse-vs-`Invalid operation` error class; distinguishing those
+needs a verdict surface the endpoint does not expose, and is a follow-on
+(#1140). Determinism under out-of-order import — the property #1134 violated —
+is a separate stateful check, also follow-on.
+
 It runs on every PR via the `gatekeeper parity` job in
 [.github/workflows/docker-build-test.yml](../../../.github/workflows/docker-build-test.yml),
 which starts both gatekeepers side by side using

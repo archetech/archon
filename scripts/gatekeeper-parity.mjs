@@ -3,6 +3,7 @@
 import fs from 'node:fs/promises';
 import CipherNode from '@didcid/cipher/node';
 import { generateCID } from '@didcid/ipfs/utils';
+import { base64url as fuzzBase64url } from 'multiformats/bases/base64';
 
 const tsBaseUrl = process.env.TS_GATEKEEPER_URL;
 const rustBaseUrl = process.env.RUST_GATEKEEPER_URL;
@@ -368,10 +369,154 @@ async function runMetricsChecks() {
     console.log('ok metrics required names');
 }
 
+// Structural fuzz: mutate a valid operation at every field and assert both
+// ports reach the same verdict for each mutation. The value is the acceptance
+// fork -- one port accepting a malformed operation the other rejects -- which is
+// a direct consensus split and the class #1115 and #1118 belonged to.
+//
+// Each mutation is RE-SIGNED with a test key (except a mutation to proofValue
+// itself), so a port that wrongly accepts a bad field returns 200 where the
+// other returns an error, instead of both failing a stale signature and hiding
+// the fork. POST /did wraps every rejection in a 500, so this compares
+// acceptance vs rejection; the finer refuse-vs-Invalid-operation error class is
+// not visible at this endpoint and needs a verdict surface (follow-on).
+function fuzzHexToBase64url(hex) {
+    return fuzzBase64url.baseEncode(Uint8Array.from(Buffer.from(hex, 'hex')));
+}
+
+const fuzzKeypair = cipher.generateRandomJwk();
+
+function fuzzSign(op) {
+    const { proof, ...unsecured } = op;
+    void proof;
+    return fuzzHexToBase64url(cipher.signHash(cipher.hashJSON(unsecured), fuzzKeypair.privateJwk));
+}
+
+function fuzzSeed() {
+    const op = {
+        type: 'create',
+        created: '2026-04-11T12:00:00Z',
+        publicJwk: fuzzKeypair.publicJwk,
+        registration: { version: 1, type: 'agent', registry: 'local' },
+    };
+    op.proof = {
+        type: 'EcdsaSecp256k1Signature2019',
+        created: '2026-04-11T12:00:00Z',
+        verificationMethod: '#key-1',
+        proofPurpose: 'authentication',
+        proofValue: fuzzSign(op),
+    };
+    return op;
+}
+
+function structuralPaths(obj, prefix = []) {
+    const out = [];
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+        for (const key of Object.keys(obj)) {
+            out.push([...prefix, key]);
+            out.push(...structuralPaths(obj[key], [...prefix, key]));
+        }
+    }
+    return out;
+}
+
+function mutateAt(root, path, kind, value) {
+    const copy = deepClone(root);
+    let node = copy;
+    for (const seg of path.slice(0, -1)) node = node[seg];
+    const last = path[path.length - 1];
+    if (kind === 'delete') delete node[last];
+    else node[last] = value;
+    return copy;
+}
+
+function structuralMutations(seed) {
+    const structural = [
+        ['delete', undefined], ['empty-string', ''], ['null', null],
+        ['number', 7], ['object', {}], ['array', []], ['bool', true],
+    ];
+    const timestamps = ['2026-04-11', '2026-04-11 12:00:00', '2026-04-11t12:00:00z',
+        '2026-04-11T12:00:00', '2026-04-11T12:00:00+00:00', '2026', 'not-a-date'];
+
+    const out = [];
+    for (const path of structuralPaths(seed)) {
+        const label = path.join('.');
+        const leaf = path[path.length - 1];
+        // Re-sign only operation-level mutations, which are inside the legacy
+        // signed payload; a stale signature there would mask an acceptance
+        // fork. Mutations under `proof` keep the seed signature -- legacy proof
+        // fields are outside the signed payload, so it stays valid -- and a
+        // mutation that deletes or replaces `proof` must not be re-signed at
+        // all (there is no proof object to sign into).
+        const reSign = path[0] !== 'proof';
+        const finish = op => {
+            if (reSign && op.proof && typeof op.proof === 'object') {
+                op.proof.proofValue = fuzzSign(op);
+            }
+            return op;
+        };
+        for (const [kind, value] of structural) {
+            out.push({ name: `${label}:${kind}`, op: finish(mutateAt(seed, path, kind, value)) });
+        }
+        if (leaf === 'created') {
+            for (const t of timestamps) out.push({ name: `${label}:ts=${t}`, op: finish(mutateAt(seed, path, 'set', t)) });
+        }
+    }
+    return out;
+}
+
+function errorClass(body) {
+    if (body && typeof body === 'object' && typeof body.error === 'string') return body.error;
+    return typeof body === 'string' ? body.slice(0, 80) : JSON.stringify(body).slice(0, 80);
+}
+
+async function runStructuralFuzz() {
+    const seed = fuzzSeed();
+    const post = op => ({
+        method: 'POST',
+        path: '/api/v1/did',
+        body: op,
+        requiresAdminKey: true,
+        headers: { 'content-type': 'application/json' },
+    });
+
+    // Control: the unmutated seed must be accepted by both ports. Without this,
+    // a broken signing/encoding path would reject every operation and the phase
+    // would pass while catching nothing -- a green-but-useless test.
+    const tsSeed = await request(tsBaseUrl, post(seed));
+    const rustSeed = await request(rustBaseUrl, post(seed));
+    if (tsSeed.status !== 200 || rustSeed.status !== 200) {
+        throw new Error(`structural fuzz control: the valid seed was not accepted by both ports ` +
+            `(TS ${tsSeed.status} ${errorClass(tsSeed.body)}, Rust ${rustSeed.status} ${errorClass(rustSeed.body)}); ` +
+            `the fuzz results would be meaningless`);
+    }
+    await resetServiceState(tsBaseUrl);
+    await resetServiceState(rustBaseUrl);
+
+    const mutations = structuralMutations(seed);
+    const forks = [];
+    for (const mutation of mutations) {
+        const ts = await request(tsBaseUrl, post(mutation.op));
+        const rust = await request(rustBaseUrl, post(mutation.op));
+        if (ts.status !== rust.status) {
+            forks.push(`${mutation.name}: TS ${ts.status} (${errorClass(ts.body)}) vs Rust ${rust.status} (${errorClass(rust.body)})`);
+        }
+    }
+
+    if (forks.length > 0) {
+        for (const fork of forks) console.error(`FORK ${fork}`);
+        throw new Error(`structural fuzz: ${forks.length} acceptance divergence(s) across ${mutations.length} mutations`);
+    }
+    console.log(`ok structural fuzz: ${mutations.length} mutations agree on accept/reject`);
+}
+
 await resetServiceState(tsBaseUrl);
 await resetServiceState(rustBaseUrl);
 await runApiFixtures();
 await runDeterministicVectorChecks();
 await runApiFlows();
+await resetServiceState(tsBaseUrl);
+await resetServiceState(rustBaseUrl);
+await runStructuralFuzz();
 await runMetricsChecks();
 console.log('Gatekeeper parity checks passed');
