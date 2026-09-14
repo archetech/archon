@@ -394,33 +394,10 @@ fn bytes_to_hex(bytes: &[u8]) -> String {
     encoded
 }
 
-// The controller's document as it stood when an operation entered the network.
-// `as_of` is an anchored event's block time, or a stored event's time on replay;
-// None means the operation is being submitted now.
-//
-// It is never `proof.created`. The signer chooses that, and choosing one from
-// before a key rotation selects the document that still lists the retired key
-// -- so a compromised-then-rotated key went on authorizing every asset the
-// agent controls (#1131). Confirmed only, so an unanchored rotation cannot be
-// conjured either.
-async fn controller_document(state: &AppState, controller: &str, as_of: Option<&str>) -> Result<Value> {
-    resolve_local_doc_async(
-        state,
-        controller,
-        ResolveOptions {
-            confirm: true,
-            version_time: as_of.map(ToString::to_string),
-            ..ResolveOptions::default()
-        },
-    )
-    .await
-}
-
 #[async_recursion]
 pub(crate) async fn verify_create_operation_impl(
     state: &AppState,
     operation: &Value,
-    as_of: Option<&str>,
 ) -> Result<bool> {
     if operation.is_null() {
         anyhow::bail!("Invalid operation: missing");
@@ -514,7 +491,19 @@ pub(crate) async fn verify_create_operation_impl(
         anyhow::bail!("Invalid operation: signer is not controller");
     }
 
-    let controller_doc = controller_document(state, &controller_did, as_of).await?;
+    let controller_doc = resolve_local_doc_async(
+        state,
+        &controller_did,
+        ResolveOptions {
+            confirm: true,
+            version_time: proof
+                .get("created")
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+            ..ResolveOptions::default()
+        },
+    )
+    .await?;
 
     if controller_doc
         .get("didDocumentRegistration")
@@ -549,7 +538,6 @@ pub(crate) async fn verify_update_operation_impl(
     state: &AppState,
     operation: &Value,
     doc: &Value,
-    as_of: Option<&str>,
 ) -> Result<bool> {
     if exceeds_json_size(operation, 64 * 1024) {
         anyhow::bail!("Invalid operation: size");
@@ -574,8 +562,21 @@ pub(crate) async fn verify_update_operation_impl(
         .and_then(|value| value.get("controller"))
         .and_then(Value::as_str)
     {
-        let controller_doc = controller_document(state, controller_did, as_of).await?;
-        return verify_update_operation_impl(state, operation, &controller_doc, as_of).await;
+        let controller_doc = resolve_local_doc_async(
+            state,
+            controller_did,
+            ResolveOptions {
+                confirm: true,
+                version_time: operation
+                    .get("proof")
+                    .and_then(|value| value.get("created"))
+                    .and_then(Value::as_str)
+                    .map(ToString::to_string),
+                ..ResolveOptions::default()
+            },
+        )
+        .await?;
+        return verify_update_operation_impl(state, operation, &controller_doc).await;
     }
 
     if doc
@@ -598,21 +599,16 @@ pub(crate) async fn verify_update_operation_impl(
     verify_sig(&msg_hash, proof_value, public_jwk)
 }
 
-// `as_of` is when the operation entered the network; see controller_document.
-pub(crate) async fn verify_operation_impl(
-    state: &AppState,
-    operation: &Value,
-    as_of: Option<&str>,
-) -> Result<bool> {
+pub(crate) async fn verify_operation_impl(state: &AppState, operation: &Value) -> Result<bool> {
     match operation.get("type").and_then(Value::as_str) {
-        Some("create") => verify_create_operation_impl(state, operation, as_of).await,
+        Some("create") => verify_create_operation_impl(state, operation).await,
         Some("update" | "delete") => {
             let did = operation
                 .get("did")
                 .and_then(Value::as_str)
                 .context("Invalid operation: missing operation.did")?;
             let doc = resolve_local_doc_async(state, did, ResolveOptions::default()).await?;
-            verify_update_operation_impl(state, operation, &doc, as_of).await
+            verify_update_operation_impl(state, operation, &doc).await
         }
         _ => Ok(false),
     }

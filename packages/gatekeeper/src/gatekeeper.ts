@@ -377,28 +377,14 @@ export default class Gatekeeper implements GatekeeperInterface {
         return `${prefix}:${cid}`;
     }
 
-    // The controller's document as it stood when an operation entered the
-    // network. `asOf` is an anchored event's block time, or a stored event's
-    // time on replay; absent means the operation is being submitted now.
-    //
-    // It is never `proof.created`. The signer chooses that, and choosing one
-    // from before a key rotation selects the document that still lists the
-    // retired key -- so a compromised-then-rotated key went on authorizing
-    // every asset the agent controls (#1131). Confirmed only, so an unanchored
-    // rotation cannot be conjured either.
-    private controllerDocument(controller: string, asOf?: string): Promise<DidCidDocument> {
-        return this.resolveDID(controller, { confirm: true, versionTime: asOf });
-    }
-
-    // `asOf` is when the operation entered the network; see controllerDocument.
-    async verifyOperation(operation: Operation, asOf?: string): Promise<boolean> {
+    async verifyOperation(operation: Operation): Promise<boolean> {
         if (operation.type === 'create') {
-            return this.verifyCreateOperation(operation, asOf);
+            return this.verifyCreateOperation(operation);
         }
 
         if (operation.type === 'update' || operation.type === 'delete') {
             const doc = await this.resolveDID(operation.did);
-            return this.verifyUpdateOperation(operation, doc, asOf);
+            return this.verifyUpdateOperation(operation, doc);
         }
 
         return false;
@@ -539,7 +525,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         return !!(proof.proofValue && typeof proof.proofValue === 'string');
     }
 
-    async verifyCreateOperation(operation: Operation, asOf?: string): Promise<boolean> {
+    async verifyCreateOperation(operation: Operation): Promise<boolean> {
         if (!operation) {
             throw new InvalidOperationError('missing');
         }
@@ -605,7 +591,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 throw new InvalidOperationError('signer is not controller');
             }
 
-            const doc = await this.controllerDocument(controllerDid, asOf);
+            const doc = await this.resolveDID(controllerDid, { confirm: true, versionTime: operation.proof!.created });
 
             if (doc.didDocumentRegistration && doc.didDocumentRegistration.registry === 'local' && operation.registration.registry !== 'local') {
                 throw new InvalidOperationError(`non-local registry=${operation.registration.registry}`);
@@ -633,7 +619,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         throw new InvalidOperationError(`registration.type=${operation.registration.type}`);
     }
 
-    async verifyUpdateOperation(operation: Operation, doc: DidCidDocument, asOf?: string): Promise<boolean> {
+    async verifyUpdateOperation(operation: Operation, doc: DidCidDocument): Promise<boolean> {
         if (JSON.stringify(operation).length > this.maxOpBytes) {
             throw new InvalidOperationError('size');
         }
@@ -652,8 +638,8 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         if (doc.didDocument.controller) {
             // This DID is an asset, verify with controller's keys
-            const controllerDoc = await this.controllerDocument(doc.didDocument.controller, asOf);
-            return this.verifyUpdateOperation(operation, controllerDoc, asOf);
+            const controllerDoc = await this.resolveDID(doc.didDocument.controller, { confirm: true, versionTime: operation.proof!.created });
+            return this.verifyUpdateOperation(operation, controllerDoc);
         }
 
         if (!doc.didDocument.verificationMethod) {
@@ -926,7 +912,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
             if (operation.type === 'create') {
                 if (verify) {
-                    const valid = await this.verifyCreateOperation(operation, time);
+                    const valid = await this.verifyCreateOperation(operation);
 
                     if (!valid) {
                         throw new InvalidOperationError('proof');
@@ -959,7 +945,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
 
             if (verify) {
-                const valid = await this.verifyUpdateOperation(operation, doc, time);
+                const valid = await this.verifyUpdateOperation(operation, doc);
 
                 if (!valid) {
                     throw new InvalidOperationError('proof');
@@ -1233,7 +1219,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                         return ImportStatus.REJECTED;
                     }
 
-                    const ok = await this.verifyOperation(event.operation, event.time);
+                    const ok = await this.verifyOperation(event.operation);
                     if (!ok) {
                         return ImportStatus.REJECTED;
                     }
