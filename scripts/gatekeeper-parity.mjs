@@ -442,12 +442,17 @@ function structuralMutations(seed) {
     for (const path of structuralPaths(seed)) {
         const label = path.join('.');
         const leaf = path[path.length - 1];
-        // A mutation to proofValue tests signature handling, so it is left as-is;
-        // every other mutation is re-signed so the operation reaches the
-        // structural checks with a valid proof.
-        const reSign = label !== 'proof.proofValue';
+        // Re-sign only operation-level mutations, which are inside the legacy
+        // signed payload; a stale signature there would mask an acceptance
+        // fork. Mutations under `proof` keep the seed signature -- legacy proof
+        // fields are outside the signed payload, so it stays valid -- and a
+        // mutation that deletes or replaces `proof` must not be re-signed at
+        // all (there is no proof object to sign into).
+        const reSign = path[0] !== 'proof';
         const finish = op => {
-            if (reSign) op.proof.proofValue = fuzzSign(op);
+            if (reSign && op.proof && typeof op.proof === 'object') {
+                op.proof.proofValue = fuzzSign(op);
+            }
             return op;
         };
         for (const [kind, value] of structural) {
@@ -466,7 +471,7 @@ function errorClass(body) {
 }
 
 async function runStructuralFuzz() {
-    const mutations = structuralMutations(fuzzSeed());
+    const seed = fuzzSeed();
     const post = op => ({
         method: 'POST',
         path: '/api/v1/did',
@@ -475,6 +480,20 @@ async function runStructuralFuzz() {
         headers: { 'content-type': 'application/json' },
     });
 
+    // Control: the unmutated seed must be accepted by both ports. Without this,
+    // a broken signing/encoding path would reject every operation and the phase
+    // would pass while catching nothing -- a green-but-useless test.
+    const tsSeed = await request(tsBaseUrl, post(seed));
+    const rustSeed = await request(rustBaseUrl, post(seed));
+    if (tsSeed.status !== 200 || rustSeed.status !== 200) {
+        throw new Error(`structural fuzz control: the valid seed was not accepted by both ports ` +
+            `(TS ${tsSeed.status} ${errorClass(tsSeed.body)}, Rust ${rustSeed.status} ${errorClass(rustSeed.body)}); ` +
+            `the fuzz results would be meaningless`);
+    }
+    await resetServiceState(tsBaseUrl);
+    await resetServiceState(rustBaseUrl);
+
+    const mutations = structuralMutations(seed);
     const forks = [];
     for (const mutation of mutations) {
         const ts = await request(tsBaseUrl, post(mutation.op));
