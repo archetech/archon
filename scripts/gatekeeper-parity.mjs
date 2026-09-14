@@ -3,6 +3,7 @@
 import fs from 'node:fs/promises';
 import CipherNode from '@didcid/cipher/node';
 import { generateCID } from '@didcid/ipfs/utils';
+import { base64url as fuzzBase64url } from 'multiformats/bases/base64';
 
 const tsBaseUrl = process.env.TS_GATEKEEPER_URL;
 const rustBaseUrl = process.env.RUST_GATEKEEPER_URL;
@@ -379,8 +380,6 @@ async function runMetricsChecks() {
 // the fork. POST /did wraps every rejection in a 500, so this compares
 // acceptance vs rejection; the finer refuse-vs-Invalid-operation error class is
 // not visible at this endpoint and needs a verdict surface (follow-on).
-import { base64url as fuzzBase64url } from 'multiformats/bases/base64';
-
 function fuzzHexToBase64url(hex) {
     return fuzzBase64url.baseEncode(Uint8Array.from(Buffer.from(hex, 'hex')));
 }
