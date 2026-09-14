@@ -66,7 +66,10 @@ To create an agent DID, the client must sign and submit a "create" operation to 
         1. `version`  number, e.g. 1
         1. `type`  must be "agent"
         1. `registry`  (from a list of valid registries, e.g. "BTC", "hyperswarm", etc.)
-    1. `publicJwk` is the public key in JWK format
+    1. `publicJwk` is the public key in JWK format. It must be a secp256k1 key:
+       `kty` is `"EC"`, `crv` is `"secp256k1"`, and `x` and `y` are each the
+       base64url encoding of a 32-byte coordinate. A node rejects the operation
+       if any of these do not hold.
     1. `created` time in ISO format
     1. `blockid` [optional] current block ID on registry (if registry is a blockchain)
 1. Sign the JSON with the private key corresponding to the public key (this enables the node to verify that the operation is coming from the owner of the public key)
@@ -107,6 +110,7 @@ Example
 ```
 
 Upon receiving the operation the node must:
+1. Check `publicJwk` is a well-formed secp256k1 key (see above), rejecting the operation otherwise
 1. Verify the proof
 1. Apply JSON canonicalization scheme to the operation.
 1. Pin the seed object to IPFS.
