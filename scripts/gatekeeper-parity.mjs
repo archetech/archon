@@ -368,10 +368,105 @@ async function runMetricsChecks() {
     console.log('ok metrics required names');
 }
 
+// Structural fuzz: mutate a valid operation at every field and assert both
+// ports reach the same verdict. Status parity is the load-bearing signal -- one
+// port accepting what the other rejects is a consensus fork -- and it is the
+// property four shipped divergences lacked (#1115, #1118, #1120, #1134), none of
+// which a single-port test could see (#1140). Error text is a softer signal
+// since the ports may word a rejection differently; it is reported, not enforced.
+function structuralPaths(obj, prefix = []) {
+    const out = [];
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+        for (const key of Object.keys(obj)) {
+            out.push([...prefix, key]);
+            out.push(...structuralPaths(obj[key], [...prefix, key]));
+        }
+    }
+    return out;
+}
+
+function mutateAt(root, path, kind, value) {
+    const copy = deepClone(root);
+    let node = copy;
+    for (const seg of path.slice(0, -1)) node = node[seg];
+    const last = path[path.length - 1];
+    if (kind === 'delete') delete node[last];
+    else node[last] = value;
+    return copy;
+}
+
+function structuralMutations(seed) {
+    const structural = [
+        ['delete', undefined], ['empty-string', ''], ['null', null],
+        ['number', 7], ['object', {}], ['array', []], ['bool', true],
+    ];
+    const timestamps = ['2026-04-11', '2026-04-11 12:00:00', '2026-04-11t12:00:00z',
+        '2026-04-11T12:00:00', '2026-04-11T12:00:00+00:00', '2026', 'not-a-date'];
+    const proofValues = ['not-base64url!!', 'AAAA',
+        (seed.proof?.proofValue || '').slice(0, 10)];
+
+    const out = [];
+    for (const path of structuralPaths(seed)) {
+        const label = path.join('.');
+        const leaf = path[path.length - 1];
+        for (const [kind, value] of structural) {
+            out.push({ name: `${label}:${kind}`, op: mutateAt(seed, path, kind, value) });
+        }
+        if (leaf === 'created') {
+            for (const t of timestamps) out.push({ name: `${label}:ts=${t}`, op: mutateAt(seed, path, 'set', t) });
+        }
+        if (leaf === 'proofValue') {
+            for (const v of proofValues) out.push({ name: `${label}:pv=${v}`, op: mutateAt(seed, path, 'set', v) });
+        }
+    }
+    return out;
+}
+
+function errorClass(body) {
+    if (body && typeof body === 'object' && typeof body.error === 'string') {
+        return body.error;
+    }
+    return typeof body === 'string' ? body.slice(0, 80) : JSON.stringify(body).slice(0, 80);
+}
+
+async function runStructuralFuzz() {
+    const seed = proofVectors.agentCreateValid.operation;
+    const mutations = structuralMutations(seed);
+    const post = op => ({ method: 'POST', path: '/api/v1/did', body: op, requiresAdminKey: true });
+
+    const statusForks = [];
+    let errorTextForks = 0;
+
+    for (const mutation of mutations) {
+        const ts = await request(tsBaseUrl, post(mutation.op));
+        const rust = await request(rustBaseUrl, post(mutation.op));
+
+        if (ts.status !== rust.status) {
+            statusForks.push(`${mutation.name}: TS ${ts.status} vs Rust ${rust.status}`);
+            continue;
+        }
+        if (ts.status >= 400 && errorClass(ts.body) !== errorClass(rust.body)) {
+            errorTextForks += 1;
+            console.warn(`warn error text differs (${mutation.name}): TS "${errorClass(ts.body)}" vs Rust "${errorClass(rust.body)}"`);
+        }
+    }
+
+    if (statusForks.length > 0) {
+        for (const fork of statusForks) console.error(`FORK ${fork}`);
+        throw new Error(`structural fuzz: ${statusForks.length} status divergence(s) across ${mutations.length} mutations`);
+    }
+
+    console.log(`ok structural fuzz: ${mutations.length} mutations agree on status` +
+        (errorTextForks ? ` (${errorTextForks} error-text differences, reported)` : ''));
+}
+
 await resetServiceState(tsBaseUrl);
 await resetServiceState(rustBaseUrl);
 await runApiFixtures();
 await runDeterministicVectorChecks();
 await runApiFlows();
+await resetServiceState(tsBaseUrl);
+await resetServiceState(rustBaseUrl);
+await runStructuralFuzz();
 await runMetricsChecks();
 console.log('Gatekeeper parity checks passed');

@@ -1332,6 +1332,16 @@ the responses per each entry's `compareMode`. It reads `TS_GATEKEEPER_URL` and
 first divergence. New implementations SHOULD pass it against the TypeScript
 reference before being considered drop-in.
 
+Beyond the curated fixtures it also **structurally fuzzes** a valid operation:
+it mutates every field — deleting it, setting it to `""`, `null`, a number, an
+object, an array; re-encoding a `created` with offsets, a lowercase `z`, a bare
+date; corrupting a `proofValue` — and asserts both ports return the **same HTTP
+status** for each. Status parity is the fork signal: one port accepting what the
+other rejects is a split. Error *wording* may differ between ports and is
+reported, not enforced. This exists because four shipped divergences
+(#1115, #1118, #1120, #1134) were all structural edges the curated vectors did
+not name, and none was catchable by a single-port test.
+
 It runs on every PR via the `gatekeeper parity` job in
 [.github/workflows/docker-build-test.yml](../../../.github/workflows/docker-build-test.yml),
 which starts both gatekeepers side by side using
