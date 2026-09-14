@@ -30,6 +30,33 @@ import {
 } from './types.js';
 import SearchIndex from './search-index.js';
 
+// A well-formed secp256k1 public key, matching the Rust port's
+// public_jwk_to_sec1_bytes: `kty` EC, `crv` secp256k1, and `x`/`y` each 32
+// bytes of base64url. TS `verifySig` reconstructs the key from `x` and ignores
+// the rest, so without this an operation carrying a malformed `publicJwk` (no
+// `kty`, no `crv`, a truncated coordinate) verified on TS while Rust refused it
+// -- a fork found by the structural parity fuzzer (#1140).
+function isWellFormedSecp256k1Jwk(jwk: unknown): jwk is EcdsaJwkPublic {
+    const key = jwk as { kty?: unknown, crv?: unknown, x?: unknown, y?: unknown };
+    if (key?.kty !== 'EC' || key?.crv !== 'secp256k1') {
+        return false;
+    }
+    for (const coordinate of [key.x, key.y]) {
+        if (typeof coordinate !== 'string') {
+            return false;
+        }
+        try {
+            if (base64url.baseDecode(coordinate).length !== 32) {
+                return false;
+            }
+        }
+        catch {
+            return false;
+        }
+    }
+    return true;
+}
+
 function base64urlToHex(b64: string): string {
     const bytes = base64url.baseDecode(b64);
     return Buffer.from(bytes).toString('hex');
@@ -437,7 +464,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         const publicJwk = method.publicKeyJwk;
 
-        if (publicJwk.kty !== 'EC') {
+        if (!isWellFormedSecp256k1Jwk(publicJwk)) {
             throw new InvalidOperationError('verification key is not a secp256k1 key');
         }
 
@@ -575,7 +602,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         if (operation.registration.type === 'agent') {
-            if (!operation.publicJwk) {
+            if (!isWellFormedSecp256k1Jwk(operation.publicJwk)) {
                 throw new InvalidOperationError('publicJwk');
             }
 
