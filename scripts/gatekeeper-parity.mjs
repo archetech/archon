@@ -369,11 +369,47 @@ async function runMetricsChecks() {
 }
 
 // Structural fuzz: mutate a valid operation at every field and assert both
-// ports reach the same verdict. Status parity is the load-bearing signal -- one
-// port accepting what the other rejects is a consensus fork -- and it is the
-// property four shipped divergences lacked (#1115, #1118, #1120, #1134), none of
-// which a single-port test could see (#1140). Error text is a softer signal
-// since the ports may word a rejection differently; it is reported, not enforced.
+// ports reach the same verdict for each mutation. The value is the acceptance
+// fork -- one port accepting a malformed operation the other rejects -- which is
+// a direct consensus split and the class #1115 and #1118 belonged to.
+//
+// Each mutation is RE-SIGNED with a test key (except a mutation to proofValue
+// itself), so a port that wrongly accepts a bad field returns 200 where the
+// other returns an error, instead of both failing a stale signature and hiding
+// the fork. POST /did wraps every rejection in a 500, so this compares
+// acceptance vs rejection; the finer refuse-vs-Invalid-operation error class is
+// not visible at this endpoint and needs a verdict surface (follow-on).
+import { base64url as fuzzBase64url } from 'multiformats/bases/base64';
+
+function fuzzHexToBase64url(hex) {
+    return fuzzBase64url.baseEncode(Uint8Array.from(Buffer.from(hex, 'hex')));
+}
+
+const fuzzKeypair = cipher.generateRandomJwk();
+
+function fuzzSign(op) {
+    const { proof, ...unsecured } = op;
+    void proof;
+    return fuzzHexToBase64url(cipher.signHash(cipher.hashJSON(unsecured), fuzzKeypair.privateJwk));
+}
+
+function fuzzSeed() {
+    const op = {
+        type: 'create',
+        created: '2026-04-11T12:00:00Z',
+        publicJwk: fuzzKeypair.publicJwk,
+        registration: { version: 1, type: 'agent', registry: 'local' },
+    };
+    op.proof = {
+        type: 'EcdsaSecp256k1Signature2019',
+        created: '2026-04-11T12:00:00Z',
+        verificationMethod: '#key-1',
+        proofPurpose: 'authentication',
+        proofValue: fuzzSign(op),
+    };
+    return op;
+}
+
 function structuralPaths(obj, prefix = []) {
     const out = [];
     if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
@@ -402,62 +438,58 @@ function structuralMutations(seed) {
     ];
     const timestamps = ['2026-04-11', '2026-04-11 12:00:00', '2026-04-11t12:00:00z',
         '2026-04-11T12:00:00', '2026-04-11T12:00:00+00:00', '2026', 'not-a-date'];
-    const proofValues = ['not-base64url!!', 'AAAA',
-        (seed.proof?.proofValue || '').slice(0, 10)];
 
     const out = [];
     for (const path of structuralPaths(seed)) {
         const label = path.join('.');
         const leaf = path[path.length - 1];
+        // A mutation to proofValue tests signature handling, so it is left as-is;
+        // every other mutation is re-signed so the operation reaches the
+        // structural checks with a valid proof.
+        const reSign = label !== 'proof.proofValue';
+        const finish = op => {
+            if (reSign) op.proof.proofValue = fuzzSign(op);
+            return op;
+        };
         for (const [kind, value] of structural) {
-            out.push({ name: `${label}:${kind}`, op: mutateAt(seed, path, kind, value) });
+            out.push({ name: `${label}:${kind}`, op: finish(mutateAt(seed, path, kind, value)) });
         }
         if (leaf === 'created') {
-            for (const t of timestamps) out.push({ name: `${label}:ts=${t}`, op: mutateAt(seed, path, 'set', t) });
-        }
-        if (leaf === 'proofValue') {
-            for (const v of proofValues) out.push({ name: `${label}:pv=${v}`, op: mutateAt(seed, path, 'set', v) });
+            for (const t of timestamps) out.push({ name: `${label}:ts=${t}`, op: finish(mutateAt(seed, path, 'set', t)) });
         }
     }
     return out;
 }
 
 function errorClass(body) {
-    if (body && typeof body === 'object' && typeof body.error === 'string') {
-        return body.error;
-    }
+    if (body && typeof body === 'object' && typeof body.error === 'string') return body.error;
     return typeof body === 'string' ? body.slice(0, 80) : JSON.stringify(body).slice(0, 80);
 }
 
 async function runStructuralFuzz() {
-    const seed = proofVectors.agentCreateValid.operation;
-    const mutations = structuralMutations(seed);
-    const post = op => ({ method: 'POST', path: '/api/v1/did', body: op, requiresAdminKey: true });
+    const mutations = structuralMutations(fuzzSeed());
+    const post = op => ({
+        method: 'POST',
+        path: '/api/v1/did',
+        body: op,
+        requiresAdminKey: true,
+        headers: { 'content-type': 'application/json' },
+    });
 
-    const statusForks = [];
-    let errorTextForks = 0;
-
+    const forks = [];
     for (const mutation of mutations) {
         const ts = await request(tsBaseUrl, post(mutation.op));
         const rust = await request(rustBaseUrl, post(mutation.op));
-
         if (ts.status !== rust.status) {
-            statusForks.push(`${mutation.name}: TS ${ts.status} vs Rust ${rust.status}`);
-            continue;
-        }
-        if (ts.status >= 400 && errorClass(ts.body) !== errorClass(rust.body)) {
-            errorTextForks += 1;
-            console.warn(`warn error text differs (${mutation.name}): TS "${errorClass(ts.body)}" vs Rust "${errorClass(rust.body)}"`);
+            forks.push(`${mutation.name}: TS ${ts.status} (${errorClass(ts.body)}) vs Rust ${rust.status} (${errorClass(rust.body)})`);
         }
     }
 
-    if (statusForks.length > 0) {
-        for (const fork of statusForks) console.error(`FORK ${fork}`);
-        throw new Error(`structural fuzz: ${statusForks.length} status divergence(s) across ${mutations.length} mutations`);
+    if (forks.length > 0) {
+        for (const fork of forks) console.error(`FORK ${fork}`);
+        throw new Error(`structural fuzz: ${forks.length} acceptance divergence(s) across ${mutations.length} mutations`);
     }
-
-    console.log(`ok structural fuzz: ${mutations.length} mutations agree on status` +
-        (errorTextForks ? ` (${errorTextForks} error-text differences, reported)` : ''));
+    console.log(`ok structural fuzz: ${mutations.length} mutations agree on accept/reject`);
 }
 
 await resetServiceState(tsBaseUrl);
