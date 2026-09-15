@@ -176,7 +176,7 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
     router.post('/batch/import', requireAdminKey, async (req, res) => {
         try {
             const batch = req.body;
-            const response = await gatekeeper.importBatch(batch);
+            const response = await gatekeeper.importRelayedBatch(batch);
             res.json(response);
         } catch (error: any) {
             console.error(error);

@@ -822,21 +822,33 @@ async function importBatches(): Promise<boolean> {
     const db = await loadDb();
 
     for (const item of db.discovered) {
-        try {
-            const update = await importBatch(item);
-            if (!update) {
-                continue;
-            }
+        let update: DiscoveredItem | undefined;
 
-            await jsonPersister.updateDb((db) => {
-                updateDiscoveredItems(db, update);
-            });
+        try {
+            update = await importBatch(item);
         }
         catch (error: any) {
             if (error.error !== 'DID not found') {
                 console.error(`Error importing ${item.did}: ${formatError(error?.error ?? error)}`);
             }
+            // The batch could not be retrieved, so nothing from this block is
+            // applied. Stop rather than move on: an operation in a later block
+            // is judged against the controller history the chain committed
+            // before it, and that history is not complete until this block is
+            // in (#1131). The next cycle retries from here. A fetched batch
+            // whose events merely defer is not a reason to stop -- an event can
+            // wait on a later block, and blocking on it would deadlock a sync.
+            break;
         }
+
+        if (!update) {
+            continue;
+        }
+
+        const done = update;
+        await jsonPersister.updateDb((db) => {
+            updateDiscoveredItems(db, done);
+        });
     }
 
     return true;

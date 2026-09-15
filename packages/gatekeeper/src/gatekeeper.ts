@@ -120,6 +120,23 @@ function isValidRegistryName(registry: unknown): registry is string {
         /^[A-Za-z0-9][A-Za-z0-9:_-]*$/.test(registry);
 }
 
+// A registry whose anchoring gives an event a time the signer did not choose.
+// `local` and `hyperswarm` are the two that do not: a local event carries the
+// signer's own `created`, and a hyperswarm event the receiving node's clock.
+function isChainRegistry(registry: unknown): boolean {
+    return isValidRegistryName(registry) && registry !== 'local' && registry !== 'hyperswarm';
+}
+
+// Where a chain committed an event, if one has. `registration` is what a
+// mediator stamps on an event when it anchors it; for such an event `time` is
+// the block time rather than the signer's `created`, and `ordinal` is its
+// position, which orders it against other events in the same block.
+type OperationAnchor = { registry: string, time?: string, ordinal?: number[] };
+
+function anchorOf(event: { registration?: unknown, registry: string, time?: string, ordinal?: number[] }): OperationAnchor | undefined {
+    return event.registration ? { registry: event.registry, time: event.time, ordinal: event.ordinal } : undefined;
+}
+
 enum ImportStatus {
     ADDED = 'added',
     MERGED = 'merged',
@@ -404,17 +421,52 @@ export default class Gatekeeper implements GatekeeperInterface {
         return `${prefix}:${cid}`;
     }
 
-    async verifyOperation(operation: Operation): Promise<boolean> {
+    async verifyOperation(operation: Operation, anchor?: OperationAnchor): Promise<boolean> {
         if (operation.type === 'create') {
-            return this.verifyCreateOperation(operation);
+            return this.verifyCreateOperation(operation, anchor);
         }
 
         if (operation.type === 'update' || operation.type === 'delete') {
             const doc = await this.resolveDID(operation.did);
-            return this.verifyUpdateOperation(operation, doc);
+            return this.verifyUpdateOperation(operation, doc, anchor);
         }
 
         return false;
+    }
+
+    // The controller document that authorizes an operation on an asset.
+    //
+    // By default the controller is resolved at `proof.created`, which keeps a
+    // signature valid at the historical time it was made. But `proof.created`
+    // is the signer's own claim: a key rotated out of the controller can name
+    // a `created` from before the rotation and be authorized by the document
+    // that still listed it (#1131). Once a chain has committed the operation it
+    // has a position the signer did not choose -- the anchoring block -- and the
+    // controller is resolved there instead. Only when the controller's own
+    // rotation history is on a chain, though: a hyperswarm controller stamps
+    // its events with each node's clock, and resolving it at a block time
+    // forked on import order (#1134).
+    //
+    // Within a block every event shares the block's time, so time cannot order
+    // a rotation against an operation the chain committed earlier in the same
+    // block; the ordinal can. When the controller is on the same chain its
+    // ordinals are comparable and the controller is resolved at the
+    // operation's ordinal. On a different chain only the times compare.
+    private async controllerAt(controllerDid: string, operation: Operation, anchor?: OperationAnchor): Promise<DidCidDocument> {
+        if (anchor?.time) {
+            const doc = await this.resolveDID(controllerDid, { confirm: true, versionTime: anchor.time });
+            const registry = doc.didDocumentRegistration?.registry;
+
+            if (isChainRegistry(registry)) {
+                if (registry === anchor.registry && anchor.ordinal) {
+                    return this.resolveDID(controllerDid, { confirm: true, versionOrdinal: anchor.ordinal });
+                }
+
+                return doc;
+            }
+        }
+
+        return this.resolveDID(controllerDid, { confirm: true, versionTime: operation.proof!.created });
     }
 
     // What the proof signs, which its own type decides.
@@ -552,7 +604,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         return !!(proof.proofValue && typeof proof.proofValue === 'string');
     }
 
-    async verifyCreateOperation(operation: Operation): Promise<boolean> {
+    async verifyCreateOperation(operation: Operation, anchor?: OperationAnchor): Promise<boolean> {
         if (!operation) {
             throw new InvalidOperationError('missing');
         }
@@ -618,7 +670,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 throw new InvalidOperationError('signer is not controller');
             }
 
-            const doc = await this.resolveDID(controllerDid, { confirm: true, versionTime: operation.proof!.created });
+            const doc = await this.controllerAt(controllerDid, operation, anchor);
 
             if (doc.didDocumentRegistration && doc.didDocumentRegistration.registry === 'local' && operation.registration.registry !== 'local') {
                 throw new InvalidOperationError(`non-local registry=${operation.registration.registry}`);
@@ -646,7 +698,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         throw new InvalidOperationError(`registration.type=${operation.registration.type}`);
     }
 
-    async verifyUpdateOperation(operation: Operation, doc: DidCidDocument): Promise<boolean> {
+    async verifyUpdateOperation(operation: Operation, doc: DidCidDocument, anchor?: OperationAnchor): Promise<boolean> {
         if (JSON.stringify(operation).length > this.maxOpBytes) {
             throw new InvalidOperationError('size');
         }
@@ -665,8 +717,8 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         if (doc.didDocument.controller) {
             // This DID is an asset, verify with controller's keys
-            const controllerDoc = await this.resolveDID(doc.didDocument.controller, { confirm: true, versionTime: operation.proof!.created });
-            return this.verifyUpdateOperation(operation, controllerDoc);
+            const controllerDoc = await this.controllerAt(doc.didDocument.controller, operation, anchor);
+            return this.verifyUpdateOperation(operation, controllerDoc, anchor);
         }
 
         if (!doc.didDocument.verificationMethod) {
@@ -846,7 +898,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         did?: string,
         options?: ResolveDIDOptions
     ): Promise<DidCidDocument> {
-        const { versionTime, versionSequence, confirm = false, verify = false } = options || {};
+        const { versionTime, versionSequence, versionOrdinal, confirm = false, verify = false } = options || {};
 
         if (!did || !isValidDID(did)) {
             return {
@@ -888,7 +940,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         let versionNum = 1; // initial version is version 1 by definition
         let confirmed = true; // create event is always confirmed by definition
 
-        for (const { time, operation, registry, registration: blockchain } of events) {
+        for (const { time, ordinal, operation, registry, registration: blockchain } of events) {
             const versionId = await this.generateCID(operation);
             const updated = generateStandardDatetime(time);
             let timestamp;
@@ -939,7 +991,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
             if (operation.type === 'create') {
                 if (verify) {
-                    const valid = await this.verifyCreateOperation(operation);
+                    const valid = await this.verifyCreateOperation(operation, blockchain ? { registry, time, ordinal } : undefined);
 
                     if (!valid) {
                         throw new InvalidOperationError('proof');
@@ -961,6 +1013,10 @@ export default class Gatekeeper implements GatekeeperInterface {
                 break;
             }
 
+            if (versionOrdinal && ordinal && compareOrdinals(ordinal, versionOrdinal) >= 0) {
+                break;
+            }
+
             if (versionSequence && versionNum === versionSequence) {
                 break;
             }
@@ -972,7 +1028,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
 
             if (verify) {
-                const valid = await this.verifyUpdateOperation(operation, doc);
+                const valid = await this.verifyUpdateOperation(operation, doc, blockchain ? { registry, time, ordinal } : undefined);
 
                 if (!valid) {
                     throw new InvalidOperationError('proof');
@@ -1233,6 +1289,22 @@ export default class Gatekeeper implements GatekeeperInterface {
                     }
 
                     if (expectedRegistry && event.registry === expectedRegistry) {
+                        // Confirming is what first gives the event a position the
+                        // signer did not choose, so it is where a backdated proof
+                        // is caught; replacing unchecked would launder an
+                        // operation accepted at its own claimed `created`. It is
+                        // verified against the version it chained from, as replay
+                        // does -- resolving at present would judge a self-update
+                        // by the document it produced.
+                        const anchor = anchorOf(event);
+                        const valid = index === 0
+                            ? await this.verifyCreateOperation(event.operation, anchor)
+                            : await this.verifyUpdateOperation(event.operation, await this.resolveDID(did, { versionSequence: index }), anchor);
+
+                        if (!valid) {
+                            return ImportStatus.REJECTED;
+                        }
+
                         // Import is confirmed on the expected registry for this version, replace existing event
                         currentEvents[index] = event;
                         await this.db.setEvents(did, currentEvents);
@@ -1246,7 +1318,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                         return ImportStatus.REJECTED;
                     }
 
-                    const ok = await this.verifyOperation(event.operation);
+                    const ok = await this.verifyOperation(event.operation, anchorOf(event));
                     if (!ok) {
                         return ImportStatus.REJECTED;
                     }
@@ -1465,6 +1537,36 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         return true;
+    }
+
+    // Events handed in from outside the node's own registry mediators: a peer
+    // relaying them, or an operator restoring an export. Such a source cannot
+    // vouch that a chain committed an event, and cannot be relied on to deliver
+    // committed events in the chain's order -- an export is sorted by
+    // `proof.created`, not by ordinal. Chain confirmation is therefore accepted
+    // only from `importBatchByCids`, which a mediator drives block by block.
+    // Anything here that claims a chain registry is taken as an unconfirmed
+    // hint: the node's own mediator will confirm it, in order, when its scan
+    // reaches that block. Otherwise a controller rotation could arrive after an
+    // operation the chain committed later than it, and the operation would be
+    // judged against a controller history that was not yet complete (#1131).
+    async importRelayedBatch(batch: GatekeeperEvent[]): Promise<ImportBatchResult> {
+        if (!batch || !Array.isArray(batch)) {
+            throw new InvalidParameterError('batch');
+        }
+
+        const hints = batch.map(event => {
+            if (!event || typeof event !== 'object' || !isChainRegistry(event.registry)) {
+                return event;
+            }
+
+            const { registration, ...rest } = event;
+            void registration;
+
+            return { ...rest, registry: 'hyperswarm' };
+        });
+
+        return this.importBatch(hints);
     }
 
     async importBatch(batch: GatekeeperEvent[]): Promise<ImportBatchResult> {

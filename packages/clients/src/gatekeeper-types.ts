@@ -45,6 +45,10 @@ export interface VerifyDbResult {
 export interface ResolveDIDOptions {
     versionTime?: string;
     versionSequence?: number;
+    // Resolve as of a chain position: only events the chain committed
+    // strictly before this ordinal are applied. Orders within a block, which
+    // versionTime cannot, since every event in a block shares its time.
+    versionOrdinal?: number[];
     confirm?: boolean;
     verify?: boolean;
 }
