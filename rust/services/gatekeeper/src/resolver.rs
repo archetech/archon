@@ -8,8 +8,9 @@ use tracing::info;
 
 use crate::store::ResolvedDoc;
 use crate::{
-    chrono_like_now, generate_json_cid, is_valid_did, verify_create_operation_impl,
-    verify_update_operation_impl, AppState, EventRecord, GatekeeperDb, ResolveOptions,
+    anchor_of, chrono_like_now, generate_json_cid, is_valid_did, past_cutoff,
+    verify_create_operation_impl, verify_update_operation_impl, AppState, EventRecord,
+    GatekeeperDb, ResolveOptions,
 };
 
 /// Typed classes for resolution failures that are the DID's own problem (a missing DID or an
@@ -210,7 +211,8 @@ pub(crate) async fn resolve_local_doc_async(
             .build_timestamp(registry, &resolved.version_id, anchor);
     }
 
-    let anchor_valid = verify_create_operation_impl(state, anchor_operation).await?;
+    let anchor_valid =
+        verify_create_operation_impl(state, anchor_operation, anchor_of(anchor).as_ref()).await?;
     if !anchor_valid {
         return Err(invalid_operation("Invalid operation: proof"));
     }
@@ -219,10 +221,8 @@ pub(crate) async fn resolve_local_doc_async(
         let operation = &event.operation;
         let operation_time = event.time.clone();
 
-        if let Some(version_time) = options.version_time.as_ref() {
-            if operation_time > *version_time {
-                break;
-            }
+        if past_cutoff(&options, event) {
+            break;
         }
         if let Some(version_sequence) = options.version_sequence {
             if resolved.version_sequence == version_sequence {
@@ -257,7 +257,9 @@ pub(crate) async fn resolve_local_doc_async(
             "didDocumentRegistration": resolved.did_document_registration
         });
 
-        let valid = verify_update_operation_impl(state, operation, &current_doc).await?;
+        let valid =
+            verify_update_operation_impl(state, operation, &current_doc, anchor_of(event).as_ref())
+                .await?;
         if !valid {
             return Err(invalid_operation("Invalid operation: proof"));
         }

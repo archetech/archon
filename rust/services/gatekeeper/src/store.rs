@@ -87,6 +87,16 @@ pub(crate) trait GatekeeperDb {
 pub(crate) struct ResolveOptions {
     pub(crate) version_time: Option<String>,
     pub(crate) version_sequence: Option<usize>,
+    /// A chain position, as (registry, ordinal). Not a resolution mode a
+    /// caller can ask for -- the resolution surface is time- and
+    /// sequence-based and ordinals are registry-internal -- but what
+    /// `controller_at` resolves a controller at. For events on that registry
+    /// only those the chain committed strictly before the ordinal are
+    /// applied, which orders within a block where `version_time` cannot and
+    /// survives a later block carrying an earlier timestamp. Events on any
+    /// other registry fall back to `version_time`, since ordinals do not
+    /// compare across registries.
+    pub(crate) version_ordinal: Option<(String, Vec<u64>)>,
     pub(crate) confirm: bool,
     pub(crate) verify: bool,
 }
@@ -109,6 +119,24 @@ pub(crate) struct ResolvedDoc {
 pub(crate) enum BlockLookup {
     Height(u64),
     Hash(String),
+}
+
+/// Whether resolution stops before this event: by ordinal if the event is on
+/// the cutoff's registry, by time otherwise.
+pub(crate) fn past_cutoff(options: &ResolveOptions, event: &EventRecord) -> bool {
+    if let Some((registry, ordinal)) = options.version_ordinal.as_ref() {
+        if event.registry == *registry {
+            return event
+                .ordinal
+                .as_ref()
+                .map(|position| compare_ordinals(Some(position), Some(ordinal)).is_ge())
+                .unwrap_or(false);
+        }
+    }
+    match options.version_time.as_ref() {
+        Some(version_time) => event.time > *version_time,
+        None => false,
+    }
 }
 
 pub(crate) fn compare_ordinals(
@@ -1735,10 +1763,8 @@ impl JsonDb {
             let operation = &event.operation;
             let operation_time = event.time.clone();
 
-            if let Some(version_time) = options.version_time.as_ref() {
-                if operation_time > *version_time {
-                    break;
-                }
+            if past_cutoff(&options, event) {
+                break;
             }
 
             if let Some(version_sequence) = options.version_sequence {
