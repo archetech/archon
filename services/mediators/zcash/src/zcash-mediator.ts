@@ -182,6 +182,15 @@ const zcashImportErrors = new promClient.Counter({
     help: 'Failed import attempts',
 });
 
+// Import stops at a block whose batch could not be retrieved or applied
+// rather than moving past it (#1131), so a batch that stays unretrievable
+// halts confirmation of every later block until it resolves. This names the
+// block, so an operator can see the node has stopped confirming and why.
+const zcashImportStalledHeight = new promClient.Gauge({
+    name: 'zcash_import_stalled_height',
+    help: 'Block height import is stopped at because its batch could not be retrieved or applied; 0 when not stalled',
+});
+
 const zcashReorgs = new promClient.Counter({
     name: 'zcash_reorgs_total',
     help: 'Chain reorganization events detected',
@@ -523,6 +532,8 @@ function sameItem(a: DiscoveredItem, b: DiscoveredItem) {
 async function importBatches(): Promise<boolean> {
     const db = await loadDb();
 
+    let stalledAt: number | null = null;
+
     for (const item of db.discovered) {
         // A block whose batch could not be retrieved or applied last time is
         // still a gap in the chain's order. It is retried here, in order,
@@ -553,6 +564,8 @@ async function importBatches(): Promise<boolean> {
             await jsonPersister.updateDb((db) => {
                 updateDiscoveredItems(db, { ...item, error: stalledError });
             });
+            stalledAt = item.height;
+            console.warn(`Import stalled at block ${item.height} (${item.did}): ${stalledError}`);
             break;
         }
 
@@ -568,9 +581,13 @@ async function importBatches(): Promise<boolean> {
         // importBatch reports a retrieval or apply failure in the item rather
         // than throwing. Still not applied: stop here for the same reason.
         if (done.error && !done.processed) {
+            stalledAt = item.height;
+            console.warn(`Import stalled at block ${item.height} (${item.did}): ${done.error}`);
             break;
         }
     }
+
+    zcashImportStalledHeight.set(stalledAt ?? 0);
 
     return true;
 }

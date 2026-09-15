@@ -210,6 +210,15 @@ const solanaImportErrors = new promClient.Counter({
     help: 'Failed import attempts',
 });
 
+// Import stops at a block whose batch could not be retrieved or applied
+// rather than moving past it (#1131), so a batch that stays unretrievable
+// halts confirmation of every later block until it resolves. This names the
+// block, so an operator can see the node has stopped confirming and why.
+const solanaImportStalledHeight = new promClient.Gauge({
+    name: 'solana_import_stalled_height',
+    help: 'Block height import is stopped at because its batch could not be retrieved or applied; 0 when not stalled',
+});
+
 const solanaAnchorFailures = new promClient.Counter({
     name: 'solana_anchor_failures_total',
     help: 'Anchor attempts that produced no transaction',
@@ -821,6 +830,8 @@ async function importBatch(item: DiscoveredItem, retry = false) {
 async function importBatches(): Promise<boolean> {
     const db = await loadDb();
 
+    let stalledAt: number | null = null;
+
     for (const item of db.discovered) {
         // A block whose batch could not be retrieved or applied last time is
         // still a gap in the chain's order. It is retried here, in order,
@@ -850,6 +861,8 @@ async function importBatches(): Promise<boolean> {
             await jsonPersister.updateDb((db) => {
                 updateDiscoveredItems(db, { ...item, error: stalledError });
             });
+            stalledAt = item.height;
+            console.warn(`Import stalled at block ${item.height} (${item.did}): ${stalledError}`);
             break;
         }
 
@@ -865,9 +878,13 @@ async function importBatches(): Promise<boolean> {
         // importBatch reports a retrieval or apply failure in the item rather
         // than throwing. Still not applied: stop here for the same reason.
         if (done.error && !done.processed) {
+            stalledAt = item.height;
+            console.warn(`Import stalled at block ${item.height} (${item.did}): ${done.error}`);
             break;
         }
     }
+
+    solanaImportStalledHeight.set(stalledAt ?? 0);
 
     return true;
 }
