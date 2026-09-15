@@ -409,7 +409,9 @@ export default class Gatekeeper implements GatekeeperInterface {
         // event seen before the reset must import again. The Rust port clears
         // these on reset; leaving them made a reset TypeScript node skip such
         // events as already processed.
-        this.eventsSeen = {};
+        for (const key of Object.keys(this.eventsSeen)) {
+            delete this.eventsSeen[key];
+        }
         this.eventsQueue = [];
         return true;
     }
