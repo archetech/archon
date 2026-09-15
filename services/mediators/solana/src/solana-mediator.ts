@@ -843,6 +843,13 @@ async function importBatches(): Promise<boolean> {
             // in (#1131). The next cycle retries from here. A fetched batch
             // whose events merely defer is not a reason to stop -- an event can
             // wait on a later block, and blocking on it would deadlock a sync.
+            //
+            // Recorded on the item, so the retry pass that follows sees the gap
+            // too and stops at it instead of advancing a later failed block.
+            const stalledError = `${formatError(error?.error ?? error)}`;
+            await jsonPersister.updateDb((db) => {
+                updateDiscoveredItems(db, { ...item, error: stalledError });
+            });
             break;
         }
 

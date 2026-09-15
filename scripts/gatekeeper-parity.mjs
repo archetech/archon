@@ -731,7 +731,58 @@ async function runBackdatingParity() {
         }
     }
 
-    console.log('ok backdating parity: both ports refuse a proof the chain committed after the rotation, accept one committed before it, and downgrade relayed claims');
+    // 4. The same complete set of operations reaches fresh nodes with the
+    //    rotation and the forgery relayed in both orders; the confirmed
+    //    verdict must agree across the ports and across the orders. Nothing
+    //    but the two creates is applied before the relays land.
+    await resetServiceState(tsBaseUrl);
+    await resetServiceState(rustBaseUrl);
+    {
+        const k1 = cipher.generateRandomJwk();
+        const k2 = cipher.generateRandomJwk();
+        const createOp = { type: 'create', created: T(0), publicJwk: k1.publicJwk, registration: { version: 1, type: 'agent', registry: 'BTC:signet' } };
+        createOp.proof = legacyProof(createOp, k1, '#key-1', T(0));
+        const alice = agree('backdating parity: permute create', await both(post('/api/v1/did', createOp))).body;
+        const assetOp = { type: 'create', created: T(0), registration: { version: 1, type: 'asset', registry: 'BTC:signet' }, controller: alice, data: { mock: true } };
+        assetOp.proof = legacyProof(assetOp, k1, `${alice}#key-1`, T(0));
+        const asset = agree('backdating parity: permute asset', await both(post('/api/v1/did', assetOp))).body;
+        const v1 = agree('backdating parity: permute v1', await both(get(`/api/v1/did/${alice}`))).body;
+        const rotated = JSON.parse(JSON.stringify(v1.didDocument));
+        rotated.verificationMethod[0].publicKeyJwk = k2.publicJwk;
+        const rotationOp = { type: 'update', did: alice, previd: v1.didDocumentMetadata.versionId, doc: { didDocument: rotated } };
+        rotationOp.proof = legacyProof(rotationOp, k1, `${alice}#key-1`, T(0));
+        const forged = await forgeryOn(asset, alice, k1, T(0), { stolen: true });
+        const cids = { create: await pin(createOp), asset: await pin(assetOp), rotation: await pin(rotationOp), forgery: await pin(forged) };
+        const relay = (height, time, operation) => ({ registry: 'BTC:signet', time, ordinal: [height, 0], registration: { height, index: 0, txid: `tx${height}`, batch: `b${height}` }, operation });
+        const rotationEvent = relay(200, T(1), rotationOp);
+        const forgeryEvent = relay(300, T(2), forged);
+
+        const outcomes = [];
+        for (const forgeryFirst of [false, true]) {
+            await resetServiceState(tsBaseUrl);
+            await resetServiceState(rustBaseUrl);
+            agree('backdating parity: permute recreate', await both(post('/api/v1/did', createOp)));
+            agree('backdating parity: permute recreate asset', await both(post('/api/v1/did', assetOp)));
+            for (const event of forgeryFirst ? [forgeryEvent, rotationEvent] : [rotationEvent, forgeryEvent]) {
+                agree('backdating parity: permute relay', await both(post('/api/v1/batch/import', [event])));
+                agree('backdating parity: permute relay process', await both({ method: 'POST', path: '/api/v1/events/process', requiresAdminKey: true }));
+            }
+            await commit([cids.create, cids.asset], 100, T(0));
+            await commit([cids.rotation], 200, T(1));
+            await commit([cids.forgery], 300, T(2));
+            const controller = agree(`backdating parity: permute controller (forgery first: ${forgeryFirst})`, await both(get(`/api/v1/did/${alice}?confirm=true`))).body;
+            const after = agree(`backdating parity: permute asset (forgery first: ${forgeryFirst})`, await both(get(`/api/v1/did/${asset}?confirm=true`))).body;
+            outcomes.push({ key: controller.didDocument.verificationMethod[0].publicKeyJwk, data: after.didDocumentData });
+        }
+        if (JSON.stringify(outcomes[0]) !== JSON.stringify(outcomes[1])) {
+            throw new Error(`backdating parity: the confirmed verdict depended on relay order\n${JSON.stringify(outcomes[0])}\n${JSON.stringify(outcomes[1])}`);
+        }
+        if (JSON.stringify(outcomes[0].key) !== JSON.stringify(k2.publicJwk) || outcomes[0].data?.stolen === true) {
+            throw new Error(`backdating parity: permuted relay ended with the wrong confirmed state ${JSON.stringify(outcomes[0])}`);
+        }
+    }
+
+    console.log('ok backdating parity: both ports refuse a proof the chain committed after the rotation, accept one committed before it, downgrade relayed claims, and agree whichever order relays arrive in');
 }
 
 await resetServiceState(tsBaseUrl);

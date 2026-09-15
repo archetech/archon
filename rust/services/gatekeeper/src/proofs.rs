@@ -41,11 +41,13 @@ pub(crate) fn is_unanchored_registry(registry: &str) -> bool {
 }
 
 /// Whether "the document as of a chain position" is a consensus fact for this
-/// DID: it lives on a registry that can anchor, and every event that confirms
-/// it there carries the position the chain assigned. A hyperswarm DID fails
-/// the first test; a registry that stamps events without anchoring them would
-/// fail the second. Local and hyperswarm events on a chain DID are unconfirmed
-/// there and do not count either way.
+/// DID: it lives on a registry that can anchor, and the events that confirm it
+/// there exist and every one carries the position the chain assigned. A
+/// hyperswarm DID fails the first test; one that migrated to a chain but has
+/// no confirmed event there yet fails the second -- its history is still
+/// hyperswarm events with per-node times; a registry that stamps events
+/// without anchoring them fails the third. Local and hyperswarm events on a
+/// chain DID are unconfirmed there and do not count either way.
 async fn is_anchored(state: &AppState, did: &str, registry: Option<&str>) -> bool {
     let Some(registry) = registry else {
         return false;
@@ -57,10 +59,11 @@ async fn is_anchored(state: &AppState, did: &str, registry: Option<&str>) -> boo
         let store = state.store.lock().await;
         store.get_events(did)
     };
-    events
+    let anchored = events
         .iter()
-        .skip(1)
-        .all(|event| is_unanchored_registry(&event.registry) || event.registration.is_some())
+        .filter(|event| !is_unanchored_registry(&event.registry))
+        .collect::<Vec<_>>();
+    !anchored.is_empty() && anchored.iter().all(|event| event.registration.is_some())
 }
 
 /// The controller document that authorizes an operation on an asset.

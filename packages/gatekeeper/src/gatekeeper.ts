@@ -405,6 +405,12 @@ export default class Gatekeeper implements GatekeeperInterface {
         await this.db.resetDb();
         this.verifiedDIDs = {};
         this.searchIndex.clear();
+        // The store no longer holds anything to deduplicate against, so an
+        // event seen before the reset must import again. The Rust port clears
+        // these on reset; leaving them made a reset TypeScript node skip such
+        // events as already processed.
+        this.eventsSeen = {};
+        this.eventsQueue = [];
         return true;
     }
 
@@ -471,19 +477,23 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     // Whether "the document as of a chain position" is a consensus fact for
-    // this DID: it lives on a registry that can anchor, and every event that
-    // confirms it there carries the position the chain assigned. A hyperswarm
-    // DID fails the first test; a registry that stamps events without
-    // anchoring them would fail the second. Local and hyperswarm events on a
-    // chain DID are unconfirmed there and do not count either way.
+    // this DID: it lives on a registry that can anchor, and the events that
+    // confirm it there exist and every one carries the position the chain
+    // assigned. A hyperswarm DID fails the first test; one that migrated to a
+    // chain but has no confirmed event there yet fails the second -- its
+    // history is still hyperswarm events with per-node times; a registry that
+    // stamps events without anchoring them fails the third. Local and
+    // hyperswarm events on a chain DID are unconfirmed there and do not count
+    // either way.
     private async isAnchored(did: string, registry?: string): Promise<boolean> {
         if (!registry || isUnanchoredRegistry(registry)) {
             return false;
         }
 
         const events = await this.db.getEvents(did);
+        const anchored = events.filter(event => !isUnanchoredRegistry(event.registry));
 
-        return events.slice(1).every(event => isUnanchoredRegistry(event.registry) || !!event.registration);
+        return anchored.length > 0 && anchored.every(event => !!event.registration);
     }
 
     // What the proof signs, which its own type decides.

@@ -206,45 +206,110 @@ describe('backdating a proof on chain', () => {
     // relaying, an operator restoring an export -- cannot vouch for the chain
     // or for its order, so what it hands in is downgraded to an unconfirmed
     // hint. #1134 passed every test and still forked because nothing imported
-    // the same events in a different order; the confirmed verdict must not
-    // depend on the order relayed events arrive in.
+    // the same events in a different order; here the same complete set of
+    // operations reaches a fresh node in both orders, and the confirmed
+    // verdict must not depend on which came first.
     it('reaches the same confirmed verdict whichever order relayed events arrive in', async () => {
+        const now = Date.now();
+        const k1 = cipher.generateRandomJwk();
+        const k2 = cipher.generateRandomJwk();
+
+        // Every operation is built once, on a scratch node, so both runs
+        // receive identical bytes. Nothing but the two creates is applied.
+        const createOp = await helper.createAgentOp(k1, { registry: 'BTC:signet' });
+        const alice = await gatekeeper.createDID(createOp);
+        const assetOp = await helper.createAssetOp(alice, k1, { registry: 'BTC:signet' });
+        const asset = await gatekeeper.createDID(assetOp);
+        const v1 = await gatekeeper.resolveDID(alice);
+        v1.didDocument!.verificationMethod![0].publicKeyJwk = k2.publicJwk;
+        const rotationOp = await helper.createUpdateOp(k1, alice, v1);
+        rotationOp.proof!.created = new Date(now).toISOString();
+        const forged = await forgery(k1, asset, new Date(now).toISOString());
+
+        const block = (height: number, time: string, operation: typeof createOp) => ({
+            registry: 'BTC:signet', time, ordinal: [height, 0],
+            registration: { height, index: 0, txid: `tx${height}`, batch: `b${height}` }, operation,
+        });
+        const rotation = block(200, new Date(now + hour).toISOString(), rotationOp);
+        const forgeryEvent = block(300, new Date(now + 2 * hour).toISOString(), forged);
+
         async function run(forgeryFirst: boolean) {
             await gatekeeper.resetDb();
-            const now = Date.now();
-            const { k1, alice, asset } = await rotatedController('BTC:signet', new Date(now).toISOString());
-
-            const ops = await gatekeeper.exportDID(alice);
-            const create = { ...ops[0], registry: 'BTC:signet', registration: { height: 100, index: 0, txid: 'tx100', batch: 'b100' } };
-            const rotation = { ...ops[1], registry: 'BTC:signet', time: new Date(now + hour).toISOString(), ordinal: [200, 0],
-                registration: { height: 200, index: 0, txid: 'tx200', batch: 'b200' } };
-            const forged = await forgery(k1, asset, new Date(now).toISOString());
-            const forgeryEvent = { registry: 'BTC:signet', time: new Date(now + 2 * hour).toISOString(), ordinal: [300, 0],
-                registration: { height: 300, index: 0, txid: 'tx300', batch: 'b300' }, operation: forged };
+            expect(await gatekeeper.createDID(createOp)).toBe(alice);
+            expect(await gatekeeper.createDID(assetOp)).toBe(asset);
 
             // A peer relays both, in whichever order it has them. Neither is
             // trusted as confirmed.
-            const relayed = forgeryFirst ? [forgeryEvent, rotation] : [rotation, forgeryEvent];
-            for (const event of relayed) {
+            for (const event of forgeryFirst ? [forgeryEvent, rotation] : [rotation, forgeryEvent]) {
                 await gatekeeper.importRelayedBatch([event]);
                 await gatekeeper.processEvents();
             }
 
             // The node's own mediator then confirms them in the chain's order.
-            for (const event of [create, rotation, forgeryEvent]) {
+            for (const event of [block(100, new Date(now).toISOString(), createOp), rotation, forgeryEvent]) {
                 await gatekeeper.importBatch([event]);
                 await gatekeeper.processEvents();
             }
 
+            const controller = await gatekeeper.resolveDID(alice, { confirm: true });
             const confirmed = await gatekeeper.resolveDID(asset, { confirm: true });
-            return { data: confirmed.didDocumentData, confirmedEvents: (await gatekeeper.exportDID(asset)).filter(e => e.registry === 'BTC:signet').length };
+            return {
+                controllerKey: controller.didDocument!.verificationMethod![0].publicKeyJwk,
+                data: confirmed.didDocumentData,
+                confirmedEvents: (await gatekeeper.exportDID(asset)).filter(e => e.registry === 'BTC:signet').length,
+            };
         }
 
         const rotationFirst = await run(false);
         const forgeryFirst = await run(true);
 
-        expect(rotationFirst).toEqual({ data: 'mockData', confirmedEvents: 0 });
+        expect(rotationFirst).toEqual({ controllerKey: k2.publicJwk, data: 'mockData', confirmedEvents: 0 });
         expect(forgeryFirst).toEqual(rotationFirst);
+    });
+
+    // The gate resolves a controller at a chain position only when its
+    // confirmed history carries chain positions. A controller that migrated
+    // to a chain but has no confirmed event there yet has only hyperswarm
+    // events, stamped with per-node clocks; judging it at a block time would
+    // fork on import order, so it keeps the proof.created fallback -- and
+    // with it, the off-chain boundary.
+    it('does not gate a controller whose history holds no chain-anchored event', async () => {
+        const now = Date.now();
+        const k1 = cipher.generateRandomJwk();
+        const alice = await gatekeeper.createDID(await helper.createAgentOp(k1, { registry: 'hyperswarm' }));
+        const asset = await gatekeeper.createDID(await helper.createAssetOp(alice, k1, { registry: 'BTC:signet' }));
+
+        const k2 = cipher.generateRandomJwk();
+        const v1 = await gatekeeper.resolveDID(alice);
+        v1.didDocument!.verificationMethod![0].publicKeyJwk = k2.publicJwk;
+        const rotation = await helper.createUpdateOp(k1, alice, v1);
+        rotation.proof!.created = new Date(now + 1000).toISOString();
+        expect(await gatekeeper.updateDID(rotation)).toBe(true);
+        const v2 = await gatekeeper.resolveDID(alice);
+        v2.didDocumentRegistration = { ...v2.didDocumentRegistration!, registry: 'BTC:signet' };
+        const migration = await helper.createUpdateOp(k2, alice, v2);
+        migration.proof!.created = new Date(now + 2000).toISOString();
+        expect(await gatekeeper.updateDID(migration)).toBe(true);
+
+        // Confirmed on hyperswarm, where it was made: no chain position anywhere.
+        const ops = await gatekeeper.exportDID(alice);
+        for (const event of ops) {
+            event.registry = 'hyperswarm';
+        }
+        await gatekeeper.importBatch(ops);
+        await gatekeeper.processEvents();
+        const migrated = await gatekeeper.resolveDID(alice, { confirm: true });
+        expect(migrated.didDocumentRegistration?.registry).toBe('BTC:signet');
+        expect(migrated.didDocument!.verificationMethod![0].publicKeyJwk).toEqual(k2.publicJwk);
+
+        const forged = await forgery(k1, asset, new Date(now).toISOString());
+        await gatekeeper.importBatch([{
+            registry: 'BTC:signet', time: new Date(now + 2 * hour).toISOString(), ordinal: [300, 0],
+            registration: { height: 300, index: 0, txid: 'b300', batch: 'b300' }, operation: forged,
+        }]);
+        const result = await gatekeeper.processEvents();
+
+        expect(result).toMatchObject({ added: 1, rejected: 0 });
     });
 });
 
