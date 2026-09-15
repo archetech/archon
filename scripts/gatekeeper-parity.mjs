@@ -623,8 +623,12 @@ async function runBackdatingParity() {
         assertEqual(label, normalizeJson(ts.body), normalizeJson(rust.body));
         return ts;
     };
+    // Pinned in canonical form, as an anchoring node pins the operations it
+    // queues, so the CID is the one both ports compute for the operation.
+    // `POST /ipfs/json` encodes the body as sent, and a non-canonical CID is
+    // an input no mediator produces.
     const pin = async op => {
-        const pinned = await request(tsBaseUrl, post('/api/v1/ipfs/json', op));
+        const pinned = await request(tsBaseUrl, post('/api/v1/ipfs/json', JSON.parse(cipher.canonicalizeJSON(op))));
         if (pinned.status !== 200 || typeof pinned.body !== 'string') {
             throw new Error(`backdating parity: pin failed (${pinned.status} ${JSON.stringify(pinned.body)})`);
         }
