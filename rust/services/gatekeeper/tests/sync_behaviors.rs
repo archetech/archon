@@ -568,3 +568,66 @@ async fn sync_export_batch_includes_dids_promoted_off_local() -> Result<()> {
 
     Ok(())
 }
+
+// The store resolver answers a plain resolution and the verifying resolver a
+// `verify=true` one. They are two implementations of the same rules, and the
+// confirm-ordering fork (#1145) lived in the gap between them: one stopped
+// before the first unconfirmed event, the other one after. For a DID with a
+// pending unconfirmed update they must report the same confirmed version.
+#[tokio::test]
+async fn confirmed_resolution_agrees_with_and_without_verify() -> Result<()> {
+    let service = spawn_json().await?;
+    let agent_did = create_did(
+        &service,
+        create_agent_operation(7, "2026-04-11T12:00:00.000Z", "hyperswarm"),
+    )
+    .await?;
+    let mut agent_doc = resolve_did(&service, &agent_did).await?;
+    agent_doc["didDocumentData"] = json!({ "version": 2 });
+    let version_id = agent_doc["didDocumentMetadata"]["versionId"]
+        .as_str()
+        .map(ToString::to_string);
+    let update = create_update_operation(
+        7,
+        &agent_did,
+        version_id.as_deref(),
+        "2026-04-11T12:01:00.500Z",
+        agent_doc,
+    );
+    let response = service
+        .client
+        .post(format!("{}/did", service.base_url))
+        .json(&update)
+        .send()
+        .await?;
+    assert!(response.status().is_success(), "local update should succeed");
+
+    let fetch = |query: &str| {
+        let url = format!("{}/did/{}?{}", service.base_url, agent_did, query);
+        let client = service.client.clone();
+        async move {
+            let response = client.get(url).send().await?;
+            assert!(response.status().is_success());
+            let mut doc = response.json::<Value>().await?;
+            doc.as_object_mut().map(|object| object.remove("didResolutionMetadata"));
+            Ok::<Value, anyhow::Error>(doc)
+        }
+    };
+
+    let plain = fetch("confirm=true").await?;
+    let verified = fetch("confirm=true&verify=true").await?;
+    assert_eq!(plain["didDocumentMetadata"]["versionSequence"], "1");
+    assert_eq!(plain["didDocumentMetadata"]["confirmed"], true);
+    assert_eq!(plain["didDocumentMetadata"]["created"], "2026-04-11T12:00:00Z");
+    assert_eq!(plain, verified);
+
+    // And unconfirmed, where the pending update is applied and its stamp
+    // normalized the same way by both.
+    let plain = fetch("").await?;
+    let verified = fetch("verify=true").await?;
+    assert_eq!(plain["didDocumentMetadata"]["versionSequence"], "2");
+    assert_eq!(plain["didDocumentMetadata"]["updated"], "2026-04-11T12:01:00Z");
+    assert_eq!(plain, verified);
+
+    Ok(())
+}

@@ -36,7 +36,8 @@ pub(crate) use resolver::check_dids_impl;
 pub(crate) use search_index::SearchIndex;
 pub(crate) use store::{
     chrono_like_now, event_record_to_value, expected_registry_for_index, past_cutoff,
-    value_to_event_record, BlockLookup, EventRecord, GatekeeperDb, JsonDb, ResolveOptions,
+    standard_datetime, value_to_event_record, BlockLookup, EventRecord, GatekeeperDb, JsonDb,
+    ResolveOptions,
 };
 #[cfg(test)]
 mod tests {
@@ -983,6 +984,24 @@ mod tests {
             db.get_block("hyperswarm", Some(BlockLookup::Height(99))),
             None
         );
+    }
+
+    // Every accepted input form reports as UTC, second precision, `Z` -- the
+    // form the TypeScript port emits, and the one clients' millisecond stamps
+    // must collapse to or the ports' metadata timestamps differ on every DID.
+    #[test]
+    fn standard_datetime_matches_the_typescript_normalization() {
+        for (input, expected) in [
+            ("2026-04-11T12:00:00.000Z", "2026-04-11T12:00:00Z"),
+            ("2026-04-11T12:00:00.123Z", "2026-04-11T12:00:00Z"),
+            ("2026-04-11T12:00:00Z", "2026-04-11T12:00:00Z"),
+            ("2026-04-11t12:00:00z", "2026-04-11T12:00:00Z"),
+            ("2026-04-11 12:00:00Z", "2026-04-11T12:00:00Z"),
+            ("2026-04-11T14:00:00+02:00", "2026-04-11T12:00:00Z"),
+        ] {
+            assert_eq!(standard_datetime(input), expected, "input {input}");
+        }
+        assert_eq!(standard_datetime("not a date"), "not a date");
     }
 
     // The upper bound of a confirmed create's timestamp comes from the event's

@@ -121,6 +121,34 @@ pub(crate) enum BlockLookup {
     Hash(String),
 }
 
+/// A timestamp as the resolved document reports it: UTC, second precision,
+/// `Z`. The TypeScript port normalizes every metadata timestamp this way
+/// (`generateStandardDatetime`); clients stamp operations with millisecond
+/// precision, so echoing the input made every DID's `created`, `updated` and
+/// `deleted` differ between the ports. The accepted input is RFC 3339 with an
+/// optional fraction, either separator case, and `z` or an offset; an
+/// unparseable string is returned as given rather than failing resolution.
+pub(crate) fn standard_datetime(time: &str) -> String {
+    let mut normalized: Vec<char> = time.chars().collect();
+    if let Some(separator) = normalized.get_mut(10) {
+        if *separator == ' ' || *separator == 't' {
+            *separator = 'T';
+        }
+    }
+    if let Some(last) = normalized.last_mut() {
+        if *last == 'z' {
+            *last = 'Z';
+        }
+    }
+    let normalized: String = normalized.into_iter().collect();
+    match chrono::DateTime::parse_from_rfc3339(&normalized) {
+        Ok(parsed) => parsed
+            .with_timezone(&chrono::Utc)
+            .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        Err(_) => time.to_string(),
+    }
+}
+
 /// Whether resolution stops before this event: by ordinal if the event is on
 /// the cutoff's registry, by time otherwise.
 pub(crate) fn past_cutoff(options: &ResolveOptions, event: &EventRecord) -> bool {
@@ -1736,7 +1764,7 @@ impl JsonDb {
                 .cloned()
                 .unwrap_or_else(|| json!({})),
             did_document_registration: Value::Object(registration.clone()),
-            created: created.to_string(),
+            created: standard_datetime(created),
             updated: None,
             deleted: None,
             version_id: anchor
@@ -1761,7 +1789,7 @@ impl JsonDb {
 
         for event in events.iter().skip(1) {
             let operation = &event.operation;
-            let operation_time = event.time.clone();
+            let operation_time = standard_datetime(&event.time);
 
             if past_cutoff(&options, event) {
                 break;

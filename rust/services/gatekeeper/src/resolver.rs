@@ -9,8 +9,8 @@ use tracing::info;
 use crate::store::ResolvedDoc;
 use crate::{
     anchor_of, chrono_like_now, generate_json_cid, is_valid_did, past_cutoff,
-    verify_create_operation_impl, verify_update_operation_impl, AppState, EventRecord,
-    GatekeeperDb, ResolveOptions,
+    standard_datetime, verify_create_operation_impl, verify_update_operation_impl, AppState,
+    EventRecord, GatekeeperDb, ResolveOptions,
 };
 
 /// Typed classes for resolution failures that are the DID's own problem (a missing DID or an
@@ -184,7 +184,7 @@ pub(crate) async fn resolve_local_doc_async(
             .cloned()
             .unwrap_or_else(|| json!({})),
         did_document_registration: Value::Object(registration.clone()),
-        created: created.clone(),
+        created: standard_datetime(&created),
         updated: None,
         deleted: None,
         version_id: anchor
@@ -219,7 +219,7 @@ pub(crate) async fn resolve_local_doc_async(
 
     for event in events.iter().skip(1) {
         let operation = &event.operation;
-        let operation_time = event.time.clone();
+        let operation_time = standard_datetime(&event.time);
 
         if past_cutoff(&options, event) {
             break;
@@ -230,16 +230,20 @@ pub(crate) async fn resolve_local_doc_async(
             }
         }
 
-        resolved.confirmed = resolved.confirmed
+        // Decided before the flag is committed, so a confirmed resolution
+        // that stops here reports the version it stopped at as confirmed --
+        // the store resolver does the same, and the two must agree.
+        let event_confirmed = resolved.confirmed
             && resolved
                 .did_document_registration
                 .get("registry")
                 .and_then(Value::as_str)
                 .map(|registry| registry == event.registry)
                 .unwrap_or(false);
-        if options.confirm && !resolved.confirmed {
+        if options.confirm && !event_confirmed {
             break;
         }
+        resolved.confirmed = event_confirmed;
 
         let current_doc = json!({
             "didDocument": resolved.did_document,
