@@ -1074,11 +1074,13 @@ mod tests {
                 },
             )
             .expect("confirmed resolve should succeed");
-        assert_eq!(confirmed["didDocumentMetadata"]["confirmed"], false);
-        assert_eq!(confirmed["didDocumentMetadata"]["versionSequence"], "2");
+        // v2 arrived over hyperswarm and is unconfirmed for a local DID: a
+        // confirmed resolution stops before it, at v1, and says so.
+        assert_eq!(confirmed["didDocumentMetadata"]["confirmed"], true);
+        assert_eq!(confirmed["didDocumentMetadata"]["versionSequence"], "1");
         assert_eq!(
             confirmed["didDocumentData"]["displayName"],
-            Value::String("updated".to_string())
+            Value::String("created".to_string())
         );
 
         let by_sequence = db

@@ -515,8 +515,86 @@ await resetServiceState(rustBaseUrl);
 await runApiFixtures();
 await runDeterministicVectorChecks();
 await runApiFlows();
+// A confirmed resolution stops at the last confirmed version. The Rust store
+// resolver judged confirmation by the previous event's state and applied the
+// first unconfirmed one, so the two ports resolved a controller with a pending
+// update to different versions -- and, once a rotation is pending, to
+// different keys, forking on every asset operation in that window. Nothing
+// declarative reaches this: the update has to chain to a DID created in the
+// run, so it is built and signed here.
+async function runConfirmParity() {
+    const keypair = cipher.generateRandomJwk();
+    const sign = op => {
+        const { proof, ...unsecured } = op;
+        void proof;
+        return fuzzHexToBase64url(cipher.signHash(cipher.hashJSON(unsecured), keypair.privateJwk));
+    };
+    const post = (path, body) => ({ method: 'POST', path, body, requiresAdminKey: true, headers: { 'content-type': 'application/json' } });
+    const get = path => ({ method: 'GET', path, requiresAdminKey: true });
+    const both = fixture => Promise.all([request(tsBaseUrl, fixture), request(rustBaseUrl, fixture)]);
+
+    const createOp = {
+        type: 'create',
+        created: '2026-04-11T12:00:00Z',
+        publicJwk: keypair.publicJwk,
+        registration: { version: 1, type: 'agent', registry: 'local' },
+    };
+    createOp.proof = {
+        type: 'EcdsaSecp256k1Signature2019',
+        created: '2026-04-11T12:00:00Z',
+        verificationMethod: '#key-1',
+        proofPurpose: 'authentication',
+        proofValue: sign(createOp),
+    };
+    const [tsCreate, rustCreate] = await both(post('/api/v1/did', createOp));
+    if (tsCreate.status !== 200 || rustCreate.status !== 200 || tsCreate.body !== rustCreate.body) {
+        throw new Error(`confirm parity: agent create disagreed (TS ${tsCreate.status} ${JSON.stringify(tsCreate.body)}, Rust ${rustCreate.status} ${JSON.stringify(rustCreate.body)})`);
+    }
+    const did = tsCreate.body;
+
+    const [tsV1] = await both(get(`/api/v1/did/${did}`));
+    const updateOp = {
+        type: 'update',
+        did,
+        previd: tsV1.body.didDocumentMetadata.versionId,
+        doc: { didDocumentData: { displayName: 'pending' } },
+    };
+    updateOp.proof = {
+        type: 'EcdsaSecp256k1Signature2019',
+        created: '2026-04-11T12:05:00Z',
+        verificationMethod: `${did}#key-1`,
+        proofPurpose: 'authentication',
+        proofValue: sign(updateOp),
+    };
+
+    // The update arrives as a hyperswarm event: unconfirmed for a local DID.
+    const event = { registry: 'hyperswarm', time: '2026-04-11T12:05:00Z', ordinal: [1], operation: updateOp };
+    const [tsImport, rustImport] = await both(post('/api/v1/batch/import', [event]));
+    if (tsImport.status !== 200 || rustImport.status !== 200) {
+        throw new Error(`confirm parity: import disagreed (TS ${tsImport.status}, Rust ${rustImport.status})`);
+    }
+    await both({ method: 'POST', path: '/api/v1/events/process', requiresAdminKey: true });
+
+    const [tsPlain, rustPlain] = await both(get(`/api/v1/did/${did}`));
+    assertEqual('confirm parity: unconfirmed resolution', normalizeJson(tsPlain.body), normalizeJson(rustPlain.body));
+    if (tsPlain.body.didDocumentMetadata.versionSequence !== '2') {
+        throw new Error(`confirm parity: the unconfirmed update did not apply (version ${tsPlain.body.didDocumentMetadata.versionSequence}); the check would be vacuous`);
+    }
+
+    const [tsConfirmed, rustConfirmed] = await both(get(`/api/v1/did/${did}?confirm=true`));
+    assertEqual('confirm parity: confirmed resolution', normalizeJson(tsConfirmed.body), normalizeJson(rustConfirmed.body));
+    const metadata = tsConfirmed.body.didDocumentMetadata;
+    if (metadata.versionSequence !== '1' || metadata.confirmed !== true) {
+        throw new Error(`confirm parity: confirmed resolution must stop at v1 and say so, got v${metadata.versionSequence} confirmed=${metadata.confirmed}`);
+    }
+    console.log('ok confirm parity: both ports stop a confirmed resolution before the first unconfirmed event');
+}
+
 await resetServiceState(tsBaseUrl);
 await resetServiceState(rustBaseUrl);
 await runStructuralFuzz();
+await resetServiceState(tsBaseUrl);
+await resetServiceState(rustBaseUrl);
+await runConfirmParity();
 await runMetricsChecks();
 console.log('Gatekeeper parity checks passed');

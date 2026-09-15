@@ -1747,21 +1747,29 @@ impl JsonDb {
                 }
             }
 
-            if options.confirm && !state.confirmed {
-                break;
-            }
-
-            if options.verify {
-                // Signature verification is handled by higher-level resolver paths.
-            }
-
-            state.confirmed = state.confirmed
+            // Whether this event is confirmed is decided before it is applied,
+            // so that a confirmed resolution stops at the last confirmed
+            // version -- and reports that version's flag -- rather than one
+            // past it. That is what the verifying resolver and the TypeScript
+            // port do; judging by the previous event's state applied the first
+            // unconfirmed event and reported the result as unconfirmed.
+            let event_confirmed = state.confirmed
                 && state
                     .did_document_registration
                     .get("registry")
                     .and_then(Value::as_str)
                     .map(|registry| registry == event.registry)
                     .unwrap_or(false);
+
+            if options.confirm && !event_confirmed {
+                break;
+            }
+
+            state.confirmed = event_confirmed;
+
+            if options.verify {
+                // Signature verification is handled by higher-level resolver paths.
+            }
 
             let registry_for_timestamp = state
                 .did_document_registration
