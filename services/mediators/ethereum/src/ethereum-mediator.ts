@@ -560,10 +560,15 @@ async function importBatches(): Promise<boolean> {
     const db = await loadDb();
 
     for (const item of db.discovered) {
+        // A block whose batch could not be retrieved or applied last time is
+        // still a gap in the chain's order. It is retried here, in order,
+        // rather than skipped; only an item whose events merely deferred
+        // (imported and processed, some pending) is left to the queue.
+        const stalled = !!item.error && !item.processed;
         let update: DiscoveredItem | undefined;
 
         try {
-            update = await importBatch(item);
+            update = await importBatch(item, stalled);
         }
         catch (error: any) {
             if (error.error !== 'DID not found') {
@@ -587,6 +592,12 @@ async function importBatches(): Promise<boolean> {
         await jsonPersister.updateDb((db) => {
             updateDiscoveredItems(db, done);
         });
+
+        // importBatch reports a retrieval or apply failure in the item rather
+        // than throwing. Still not applied: stop here for the same reason.
+        if (done.error && !done.processed) {
+            break;
+        }
     }
 
     return true;
@@ -603,20 +614,31 @@ async function retryFailedImports(): Promise<void> {
     console.log(`Retrying ${failed.length} failed import(s)...`);
 
     for (const item of failed) {
-        try {
-            const update = await importBatch(item, true);
-            if (!update) {
-                continue;
-            }
+        let update: DiscoveredItem | undefined;
 
-            await jsonPersister.updateDb((db) => {
-                updateDiscoveredItems(db, update);
-            });
+        try {
+            update = await importBatch(item, true);
         }
         catch (error: any) {
             if (error.error !== 'DID not found') {
                 console.error(`Retry failed for ${item.did}: ${formatError(error?.error ?? error)}`);
             }
+            // Still unretrieved. A later failed block must not be applied
+            // ahead of it, so stop here and try again next pass.
+            break;
+        }
+
+        if (!update) {
+            continue;
+        }
+
+        const done = update;
+        await jsonPersister.updateDb((db) => {
+            updateDiscoveredItems(db, done);
+        });
+
+        if (done.error && !done.processed) {
+            break;
         }
     }
 }

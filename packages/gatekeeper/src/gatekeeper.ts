@@ -120,11 +120,14 @@ function isValidRegistryName(registry: unknown): registry is string {
         /^[A-Za-z0-9][A-Za-z0-9:_-]*$/.test(registry);
 }
 
-// A registry whose anchoring gives an event a time the signer did not choose.
-// `local` and `hyperswarm` are the two that do not: a local event carries the
-// signer's own `created`, and a hyperswarm event the receiving node's clock.
-function isChainRegistry(registry: unknown): boolean {
-    return isValidRegistryName(registry) && registry !== 'local' && registry !== 'hyperswarm';
+// The two registries whose events this node stamps itself, so that no event on
+// them can carry a position a chain assigned: a local event holds the signer's
+// own `created`, a hyperswarm event the receiving node's clock. Every other
+// registry is one an outside source might claim confirmation on. Whether a
+// registry actually anchors its events on a chain is not inferred from its
+// name -- `pin` does not -- but read from the events themselves (`isAnchored`).
+function isUnanchoredRegistry(registry: unknown): boolean {
+    return registry === 'local' || registry === 'hyperswarm';
 }
 
 // Where a chain committed an event, if one has. `registration` is what a
@@ -449,24 +452,38 @@ export default class Gatekeeper implements GatekeeperInterface {
     //
     // Within a block every event shares the block's time, so time cannot order
     // a rotation against an operation the chain committed earlier in the same
-    // block; the ordinal can. When the controller is on the same chain its
-    // ordinals are comparable and the controller is resolved at the
-    // operation's ordinal. On a different chain only the times compare.
+    // block; the ordinal can, but only among events on the same registry --
+    // ordinals are registry-local, and a controller that migrated registries
+    // carries events from both. So the cutoff is the ordinal for the
+    // controller's events on the operation's registry and the block time for
+    // any other.
     private async controllerAt(controllerDid: string, operation: Operation, anchor?: OperationAnchor): Promise<DidCidDocument> {
         if (anchor?.time) {
-            const doc = await this.resolveDID(controllerDid, { confirm: true, versionTime: anchor.time });
-            const registry = doc.didDocumentRegistration?.registry;
+            const cutoff = anchor.ordinal ? { registry: anchor.registry, ordinal: anchor.ordinal } : undefined;
+            const doc = await this.resolveDIDAt(controllerDid, { confirm: true, versionTime: anchor.time, versionOrdinal: cutoff });
 
-            if (isChainRegistry(registry)) {
-                if (registry === anchor.registry && anchor.ordinal) {
-                    return this.resolveDIDAt(controllerDid, { confirm: true, versionOrdinal: anchor.ordinal });
-                }
-
+            if (await this.isAnchored(controllerDid, doc.didDocumentRegistration?.registry)) {
                 return doc;
             }
         }
 
         return this.resolveDID(controllerDid, { confirm: true, versionTime: operation.proof!.created });
+    }
+
+    // Whether "the document as of a chain position" is a consensus fact for
+    // this DID: it lives on a registry that can anchor, and every event that
+    // confirms it there carries the position the chain assigned. A hyperswarm
+    // DID fails the first test; a registry that stamps events without
+    // anchoring them would fail the second. Local and hyperswarm events on a
+    // chain DID are unconfirmed there and do not count either way.
+    private async isAnchored(did: string, registry?: string): Promise<boolean> {
+        if (!registry || isUnanchoredRegistry(registry)) {
+            return false;
+        }
+
+        const events = await this.db.getEvents(did);
+
+        return events.slice(1).every(event => isUnanchoredRegistry(event.registry) || !!event.registration);
     }
 
     // What the proof signs, which its own type decides.
@@ -902,16 +919,18 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     // The resolver behind resolveDID, with one cutoff the public options do
-    // not offer: a chain position. Only events the chain committed strictly
-    // before `versionOrdinal` are applied, which orders within a block where
-    // versionTime cannot -- every event in a block shares the block's time.
-    // It exists for controllerAt, to judge an operation by the controller as
-    // of the operation's own ordinal, and is not a resolution mode a caller
-    // can ask for: ordinals are registry-internal, and the resolution surface
-    // is time- and sequence-based.
+    // not offer: a chain position. For events on the cutoff's registry only
+    // those the chain committed strictly before its ordinal are applied, which
+    // orders within a block where versionTime cannot -- every event in a block
+    // shares the block's time -- and survives a later block carrying an earlier
+    // timestamp. Events on any other registry fall back to versionTime, since
+    // ordinals do not compare across registries. It exists for controllerAt,
+    // and is not a resolution mode a caller can ask for: ordinals are
+    // registry-internal, and the resolution surface is time- and
+    // sequence-based.
     private async resolveDIDAt(
         did?: string,
-        options?: ResolveDIDOptions & { versionOrdinal?: number[] }
+        options?: ResolveDIDOptions & { versionOrdinal?: { registry: string, ordinal: number[] } }
     ): Promise<DidCidDocument> {
         const { versionTime, versionSequence, versionOrdinal, confirm = false, verify = false } = options || {};
 
@@ -1024,11 +1043,12 @@ export default class Gatekeeper implements GatekeeperInterface {
                 continue;
             }
 
-            if (versionTime && new Date(time) > new Date(versionTime)) {
-                break;
+            if (versionOrdinal && registry === versionOrdinal.registry) {
+                if (ordinal && compareOrdinals(ordinal, versionOrdinal.ordinal) >= 0) {
+                    break;
+                }
             }
-
-            if (versionOrdinal && ordinal && compareOrdinals(ordinal, versionOrdinal) >= 0) {
+            else if (versionTime && new Date(time) > new Date(versionTime)) {
                 break;
             }
 
@@ -1230,8 +1250,10 @@ export default class Gatekeeper implements GatekeeperInterface {
         return batch;
     }
 
+    // A DID export handed back in: an operator restoring, or a peer relaying.
+    // Neither can vouch for a chain's confirmation, so it enters as hints.
     async importDIDs(dids: GatekeeperEvent[][]): Promise<ImportBatchResult> {
-        return this.importBatch(dids.flat());
+        return this.importRelayedBatch(dids.flat());
     }
 
     async removeDIDs(dids: string[]): Promise<boolean> {
@@ -1571,7 +1593,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         const hints = batch.map(event => {
-            if (!event || typeof event !== 'object' || !isChainRegistry(event.registry)) {
+            if (!event || typeof event !== 'object' || isUnanchoredRegistry(event.registry)) {
                 return event;
             }
 

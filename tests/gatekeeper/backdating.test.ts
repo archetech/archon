@@ -19,7 +19,7 @@ const mockConsole = {
 const cipher = new CipherNode();
 const db = new DbJsonMemory('test');
 const ipfs = new MemoryClient();
-const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'BTC:signet'] });
+const gatekeeper = new Gatekeeper({ db, ipfs, console: mockConsole, registries: ['local', 'hyperswarm', 'BTC:signet', 'ETH:sepolia'] });
 const helper = new TestHelper(gatekeeper, cipher);
 
 const hour = 60 * 60 * 1000;
@@ -248,6 +248,71 @@ describe('backdating a proof on chain', () => {
     });
 });
 
+describe('backdating a proof across a registry migration', () => {
+    // Ordinals are registry-local. A controller that migrated carries events
+    // from its old chain whose heights bear no relation to the new chain's,
+    // and an old-chain height can exceed the operation's new-chain height.
+    // Such an event is ordered by its block time, not its ordinal; otherwise
+    // a rotation confirmed on the old chain would drop out of the resolved
+    // document and the key it retired would authorize again.
+    it('still sees a rotation confirmed on the controller\'s previous chain', async () => {
+        const now = Date.now();
+        const k1 = cipher.generateRandomJwk();
+        const alice = await gatekeeper.createDID(await helper.createAgentOp(k1, { registry: 'ETH:sepolia' }));
+        const asset = await gatekeeper.createDID(await helper.createAssetOp(alice, k1, { registry: 'BTC:signet' }));
+
+        // Rotate K1 -> K2 on the old chain, then migrate to BTC:signet.
+        const k2 = cipher.generateRandomJwk();
+        const v1 = await gatekeeper.resolveDID(alice);
+        v1.didDocument!.verificationMethod![0].publicKeyJwk = k2.publicJwk;
+        const rotation = await helper.createUpdateOp(k1, alice, v1);
+        rotation.proof!.created = new Date(now + 1000).toISOString();
+        expect(await gatekeeper.updateDID(rotation)).toBe(true);
+
+        const v2 = await gatekeeper.resolveDID(alice);
+        v2.didDocumentRegistration = { ...v2.didDocumentRegistration!, registry: 'BTC:signet' };
+        const migration = await helper.createUpdateOp(k2, alice, v2);
+        migration.proof!.created = new Date(now + 2000).toISOString();
+        expect(await gatekeeper.updateDID(migration)).toBe(true);
+
+        // Both confirmed on the old chain at a height far above anything on
+        // the new one. The migration is confirmed where it was made.
+        const ops = await gatekeeper.exportDID(alice);
+        ops[0].registry = 'ETH:sepolia';
+        ops[0].registration = { height: 1, index: 0, txid: 'e1', batch: 'e1' };
+        ops[1].registry = 'ETH:sepolia';
+        ops[1].time = new Date(now + hour).toISOString();
+        ops[1].ordinal = [999999, 0];
+        ops[1].registration = { height: 999999, index: 0, txid: 'e2', batch: 'e2' };
+        ops[2].registry = 'ETH:sepolia';
+        ops[2].time = new Date(now + hour + 1000).toISOString();
+        ops[2].ordinal = [999999, 1];
+        ops[2].registration = { height: 999999, index: 1, txid: 'e3', batch: 'e3' };
+        await gatekeeper.importBatch(ops);
+        await gatekeeper.processEvents();
+
+        const confirmed = await gatekeeper.resolveDID(alice, { confirm: true });
+        expect(confirmed.didDocumentMetadata?.confirmed).toBe(true);
+        expect(confirmed.didDocumentRegistration?.registry).toBe('BTC:signet');
+        expect(confirmed.didDocument!.verificationMethod![0].publicKeyJwk).toEqual(k2.publicJwk);
+
+        // The forgery: retired K1, backdated, committed on the new chain at a
+        // height numerically below the old chain's.
+        const forged = await forgery(k1, asset, new Date(now).toISOString());
+        await gatekeeper.importBatch([{
+            registry: 'BTC:signet',
+            time: new Date(now + 2 * hour).toISOString(),
+            ordinal: [300, 0],
+            registration: { height: 300, index: 0, txid: 'b300', batch: 'b300' },
+            operation: forged,
+        }]);
+        const result = await gatekeeper.processEvents();
+
+        expect(result).toMatchObject({ added: 0, rejected: 1 });
+        expect((await gatekeeper.resolveDID(asset, { confirm: true })).didDocumentData).not.toEqual({ stolen: true });
+    });
+});
+
 describe('relayed events cannot assert chain confirmation', () => {
     it('downgrades a relayed chain event to an unconfirmed hint', async () => {
         const now = Date.now();
@@ -263,6 +328,13 @@ describe('relayed events cannot assert chain confirmation', () => {
         const afterRelay = await gatekeeper.exportDID(alice);
         expect(afterRelay[0].registry).toBe('local');
         expect(afterRelay[0].registration).toBeUndefined();
+
+        // A DID export handed back in is the same kind of source.
+        await gatekeeper.importDIDs([[claimed]]);
+        await gatekeeper.processEvents();
+        const afterRestore = await gatekeeper.exportDID(alice);
+        expect(afterRestore[0].registry).toBe('local');
+        expect(afterRestore[0].registration).toBeUndefined();
 
         // From the node's own mediator: it is.
         await gatekeeper.importBatch([claimed]);
