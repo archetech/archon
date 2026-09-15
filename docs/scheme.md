@@ -163,7 +163,7 @@ Example
 ```
 
 Upon receiving the operation the node must:
-1. Verify the proof is valid for the specified controller.
+1. Verify the proof is valid for the specified controller — against the version of the controller's document chosen as described in [Authorizing an operation on a controlled DID](#authorizing-an-operation-on-a-controlled-did).
 1. Apply JSON canonicalization scheme to the operation object.
 1. Pin the seed object to IPFS.
 
@@ -231,7 +231,7 @@ Example update to rotate keys for an agent DID:
 ```
 
 Upon receiving the operation the node must:
-1. Verify the proof is valid for the controller of the DID.
+1. Verify the proof is valid for the controller of the DID — for an asset, against the version of the controller's document chosen as described in [Authorizing an operation on a controlled DID](#authorizing-an-operation-on-a-controlled-did).
 1. Verify the previd is identical to the latest version's operation CID.
 1. Record the operation on the DID specified registry (or forward the request to a trusted node that supports the specified registry).
 
@@ -346,7 +346,7 @@ A conformant resolution returns only the three members defined by the W3C [DID R
 - `didResolutionMetadata`
 - `didDocumentMetadata`
 
-The method-specific data and registration objects are **not** part of the resolution result; they are exposed as dereferenceable resources (see [DID URL Dereferencing](#did-url-dereferencing)). Standard document metadata — `created`, `updated`, `deleted`, `deactivated`, `versionId`, `versionSequence`, `canonicalId` — is carried in `didDocumentMetadata`.
+The method-specific data and registration objects are **not** part of the resolution result; they are exposed as dereferenceable resources (see [DID URL Dereferencing](#did-url-dereferencing)). Standard document metadata — `created`, `updated`, `deleted`, `deactivated`, `versionId`, `versionSequence`, `canonicalId` — is carried in `didDocumentMetadata`. Its timestamps are reported in UTC at second precision (`2026-01-14T19:32:24Z`), whatever precision the operation's own `created` carried.
 
 The method-specific `confirmed` and `timestamp` fields are **not** DID Core document metadata, so the conformant surface does not carry them in `didDocumentMetadata`; they are anchoring provenance, returned with the registration resource at `/registration`. The legacy `/api/v1/did/<did>` endpoint continues to include both inline in `didDocumentMetadata`.
 
@@ -464,6 +464,20 @@ function verifyProof(object):
 This temporal resolution ensures that a credential issued in 2020 can still be verified in 2030, even if the issuer has rotated keys multiple times since issuance.
 
 Note: While the W3C Data Integrity specification makes `proof.created` optional, DID:CID requires it to support proper verification after key rotation.
+
+### Authorizing an operation on a controlled DID
+
+An operation on an asset — its create, or any update — is authorized by a key in its controller's document, and the temporal rule above decides which version of that document: by default, the version as of the operation's `proof.created`.
+
+`proof.created` is the signer's own claim. On its own it cannot distinguish an operation genuinely made in the past from one made later and dated back, so a key the controller has since rotated out could name a `created` from when it was current and be authorized by the document that still listed it. The only thing that can tell the two apart is a record of when the operation appeared that the signer did not write. A registry with a blockchain provides one: once the chain has committed the operation, the node knows its position — block and index — and resolves the controller **at that position** instead of at `proof.created`:
+
+- For the controller's events on the operation's registry, the cutoff is the **ordinal**: only events the chain committed strictly before the operation's are applied. Every event in a block shares the block's time, so time cannot order a rotation against an operation committed earlier in the same block, and a later block may carry an earlier timestamp; the ordinal is the chain's order.
+- For the controller's events on any other registry, the cutoff is the operation's **block time**, since ordinals do not compare across registries.
+- This applies only when the controller's own confirmed history is chain-anchored — every event confirming it on its registry carries the position the chain assigned. A controller on `hyperswarm` or `local`, or one that migrated to a chain but has no confirmed event there yet, stamps its events with each node's clock and has no consensus timeline at a block time; it keeps the `proof.created` rule, and so does every operation on a registry without a blockchain, where no such record exists.
+
+A proof whose key the controller had retired by the operation's position is rejected. That also rejects an operation genuinely signed before a rotation but committed to the chain after it; the remedy is to sign it again with the current key. An agent's updates to its own document are unaffected: they are verified against its current document.
+
+Only the registry's own mediator, importing each block's batch in order, may mark an event confirmed on that registry. An event received from a relaying peer or restored from an export is taken as an unconfirmed hint whatever it claims, and confirms when the node's own mediator reaches its block — a relay cannot vouch for the chain or for its order, and an operation must not be judged against a controller history the chain committed more of than the node has yet applied. For the same reason a mediator does not advance past a block whose batch it could not retrieve.
 
 ### Verification Method Format
 
