@@ -459,7 +459,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
             if (isChainRegistry(registry)) {
                 if (registry === anchor.registry && anchor.ordinal) {
-                    return this.resolveDID(controllerDid, { confirm: true, versionOrdinal: anchor.ordinal });
+                    return this.resolveDIDAt(controllerDid, { confirm: true, versionOrdinal: anchor.ordinal });
                 }
 
                 return doc;
@@ -897,6 +897,21 @@ export default class Gatekeeper implements GatekeeperInterface {
     async resolveDID(
         did?: string,
         options?: ResolveDIDOptions
+    ): Promise<DidCidDocument> {
+        return this.resolveDIDAt(did, options);
+    }
+
+    // The resolver behind resolveDID, with one cutoff the public options do
+    // not offer: a chain position. Only events the chain committed strictly
+    // before `versionOrdinal` are applied, which orders within a block where
+    // versionTime cannot -- every event in a block shares the block's time.
+    // It exists for controllerAt, to judge an operation by the controller as
+    // of the operation's own ordinal, and is not a resolution mode a caller
+    // can ask for: ordinals are registry-internal, and the resolution surface
+    // is time- and sequence-based.
+    private async resolveDIDAt(
+        did?: string,
+        options?: ResolveDIDOptions & { versionOrdinal?: number[] }
     ): Promise<DidCidDocument> {
         const { versionTime, versionSequence, versionOrdinal, confirm = false, verify = false } = options || {};
 
