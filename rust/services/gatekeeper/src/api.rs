@@ -2223,9 +2223,30 @@ fn error_json(message: &str) -> Json<Value> {
     Json(json!({ "error": message }))
 }
 
+// An operation by CID, as a mediator's batch names it. JSON is stored as a
+// block (`addJSON` puts it with `block/put`; `GET /ipfs/json/:cid` reads it
+// with `block/get`), so it is read the same way here: `cat` serves UnixFS
+// files and cannot return such a block, and reading through it left a node
+// unable to confirm any chain batch whose operations it did not already hold.
 async fn fetch_ipfs_json(state: &AppState, cid: &str) -> Option<Value> {
-    let response = proxy_ipfs_cat_raw(state, cid).await.ok()?;
-    let (_status, body) = response;
+    let url = format!("{}/block/get", state.config.ipfs_url.trim_end_matches('/'));
+    let response = state
+        .client
+        .post(url)
+        .query(&[("arg", cid)])
+        .send()
+        .await
+        .map_err(|error| error!("ipfs block get failed for {cid}: {error}"))
+        .ok()?;
+    if !response.status().is_success() {
+        error!("ipfs block get for {cid} returned {}", response.status());
+        return None;
+    }
+    let body = response
+        .bytes()
+        .await
+        .map_err(|error| error!("ipfs block get body read failed for {cid}: {error}"))
+        .ok()?;
     serde_json::from_slice::<Value>(&body).ok()
 }
 
