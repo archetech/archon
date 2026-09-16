@@ -21,7 +21,7 @@ use tracing::error;
 
 use crate::{
     build_search_index, chrono_like_now, classify_conformant_error, clear_search_index,
-    delete_search_doc, generate_did_from_operation, handle_did_operation, import_batch_impl,
+    generate_did_from_operation, handle_did_operation, import_batch_impl,
     relay_hints,
     normalize_path, process_events_impl, query_docs_impl, record_metrics, refresh_metrics_snapshot,
     is_valid_did, resolve_local_doc_async, search_docs_impl, verify_db_impl, AppState, BlockLookup,
@@ -422,23 +422,9 @@ pub(crate) async fn remove_dids(
         );
     }
 
-    let mut store = state.store.lock().await;
-    let ok = dids.iter().all(|did| {
-        store
-            .delete_events(did)
-            .and_then(|_| store.set_candidates(did, Vec::new()))
-            .is_ok()
-    });
-    drop(store);
-    if let Some(cache) = state.candidate_history.lock().await.as_mut() {
-        for did in &dids {
-            cache.insert(did.clone(), Vec::new());
-        }
-    }
-    for did in &dids {
-        delete_search_doc(&state, did).await;
-    }
-    *state.status_snapshot.lock().await = None;
+    let ok = crate::history::remove_histories(&state, &dids)
+        .await
+        .is_ok();
     record_metrics(
         &state,
         "POST",

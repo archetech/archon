@@ -579,6 +579,85 @@
         "txid": "tx250",
         "batch": "batch250"
       }
+    },
+    "gc": {
+      "controller": "did:cid:bagaaieraqkuwnh57ejqt26j5dvjsacuwezqj4ac44z7hz7ghhuk42ld5qota",
+      "asset": "did:cid:bagaaiera5xiukkjpylfdcs5qlrx4xdblqvs57iz6u4lgv3pz5njq76ofjdeq",
+      "base": [
+        {
+          "did": "did:cid:bagaaieraqkuwnh57ejqt26j5dvjsacuwezqj4ac44z7hz7ghhuk42ld5qota",
+          "opid": "bagaaieraqkuwnh57ejqt26j5dvjsacuwezqj4ac44z7hz7ghhuk42ld5qota",
+          "operation": {
+            "type": "create",
+            "created": "2026-01-01T00:00:00.000Z",
+            "registration": {
+              "version": 1,
+              "type": "agent",
+              "registry": "BTC:signet",
+              "validUntil": "2026-01-01T00:08:20.000Z"
+            },
+            "publicJwk": {
+              "kty": "EC",
+              "crv": "secp256k1",
+              "x": "DpHEVPR6OjriFNp3o3PauEKVsiDjoLV71LnNyvkPRts",
+              "y": "ENCEnhIaUI35HGXIMOa6q7wzFMW2Bxjfw9aT7tJHYe0"
+            },
+            "proof": {
+              "type": "EcdsaSecp256k1Signature2019",
+              "created": "2026-01-01T00:00:00.000Z",
+              "verificationMethod": "#key-1",
+              "proofPurpose": "authentication",
+              "proofValue": "34VN37ka1bxV6DKP6ZTGPjqJVpWTM46pVhpK1sj6UYh7Z5x6iS0vElKbqmq-f4bMtVVMz1YwvWXeNLOimdqA-g"
+            }
+          },
+          "registry": "BTC:signet",
+          "time": "2026-01-01T00:01:40.000Z",
+          "ordinal": [
+            100,
+            0
+          ],
+          "registration": {
+            "height": 100,
+            "index": 0,
+            "txid": "tx100",
+            "batch": "batch100"
+          }
+        },
+        {
+          "did": "did:cid:bagaaiera5xiukkjpylfdcs5qlrx4xdblqvs57iz6u4lgv3pz5njq76ofjdeq",
+          "opid": "bagaaiera5xiukkjpylfdcs5qlrx4xdblqvs57iz6u4lgv3pz5njq76ofjdeq",
+          "operation": {
+            "type": "create",
+            "created": "2026-01-01T00:00:00.000Z",
+            "registration": {
+              "version": 1,
+              "type": "asset",
+              "registry": "BTC:signet"
+            },
+            "controller": "did:cid:bagaaieraqkuwnh57ejqt26j5dvjsacuwezqj4ac44z7hz7ghhuk42ld5qota",
+            "data": "gc-dependent",
+            "proof": {
+              "type": "EcdsaSecp256k1Signature2019",
+              "created": "2026-01-01T00:00:00.000Z",
+              "verificationMethod": "did:cid:bagaaieraqkuwnh57ejqt26j5dvjsacuwezqj4ac44z7hz7ghhuk42ld5qota#key-1",
+              "proofPurpose": "authentication",
+              "proofValue": "qoYeBG1qS7bSLNre-J_XyJ_5jqegH_BHg2UvurGt8M1j6J3u8vrEx5qc9EuFD9apdKk28zCAjN4QxCheZiyWPg"
+            }
+          },
+          "registry": "BTC:signet",
+          "time": "2026-01-01T00:01:50.000Z",
+          "ordinal": [
+            110,
+            0
+          ],
+          "registration": {
+            "height": 110,
+            "index": 0,
+            "txid": "tx110",
+            "batch": "batch110"
+          }
+        }
+      ]
     }
   },
   {

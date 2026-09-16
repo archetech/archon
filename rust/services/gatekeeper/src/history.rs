@@ -2,7 +2,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use serde_json::json;
 use tokio::sync::Mutex;
 
@@ -88,6 +88,68 @@ pub(crate) async fn retain_candidates(
     index_candidates(&mut dependents, did, &events);
     candidates.insert(did.to_string(), events);
     Ok(())
+}
+
+// Call with history_lock held. Remove the whole set before replaying dependents.
+pub(crate) async fn remove_histories(state: &AppState, dids: &[String]) -> Result<()> {
+    let Some(first) = dids.first() else {
+        return Ok(());
+    };
+    retain_candidates(state, first, None).await?;
+    let result = async {
+        for did in dids {
+            state.store.lock().await.set_candidates(did, Vec::new())?;
+            state
+                .candidate_history
+                .lock()
+                .await
+                .as_mut()
+                .unwrap()
+                .insert(did.clone(), Vec::new());
+            state.store.lock().await.delete_events(did)?;
+            state.verified_dids.lock().await.remove(did);
+            crate::delete_search_doc(state, did).await;
+        }
+        for did in dids {
+            reconcile_history(state, did, false).await?;
+        }
+        Ok(())
+    }
+    .await;
+    *state.status_snapshot.lock().await = None;
+    if result.is_err() {
+        *state.history_ready.lock().await = false;
+    }
+    result
+}
+
+// A repeated projection is unresolved evidence, not a node-wide readiness error.
+// Track every state in the cycle so stable neighbors keep their projections.
+#[derive(Default)]
+struct ReplayCycles {
+    snapshots: Vec<Vec<String>>,
+}
+impl ReplayCycles {
+    fn observe(&mut self, state: Vec<String>) -> Option<Vec<usize>> {
+        if let Some(cycle) = self
+            .snapshots
+            .iter()
+            .position(|previous| previous == &state)
+        {
+            let varying = (0..state.len())
+                .filter(|&index| {
+                    self.snapshots[cycle..]
+                        .iter()
+                        .any(|previous| previous[index] != state[index])
+                })
+                .collect();
+            self.snapshots.clear();
+            Some(varying)
+        } else {
+            self.snapshots.push(state);
+            None
+        }
+    }
 }
 
 pub(crate) async fn ensure_history_ready(state: &AppState) -> Result<()> {
@@ -206,13 +268,23 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
     }));
     replay.did_locks = Arc::new(Mutex::new(HashMap::new()));
     replay.search_index = Arc::new(Mutex::new(SearchIndex::default()));
-    let mut snapshots = HashSet::new();
+    let mut cycles = ReplayCycles::default();
+    let mut unresolved = HashSet::new();
     loop {
         let before = snapshot(&replay, &targets).await?;
-        if !snapshots.insert(before.clone()) {
-            bail!("Cyclic authorization history cannot converge");
+        if let Some(varying) = cycles.observe(before.clone()) {
+            for index in varying {
+                unresolved.insert(targets[index].clone());
+            }
+            for target in &targets {
+                replay.store.lock().await.set_events(target, Vec::new())?;
+            }
+            continue;
         }
         for target in &targets {
+            if unresolved.contains(target) {
+                continue;
+            }
             let mut events = candidates.get(target).cloned().unwrap_or_default();
             events.sort_by(|a, b| {
                 let a_hint = crate::is_unanchored_registry(&a.registry);
@@ -236,7 +308,9 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
                 let previous =
                     serde_json::to_string(&replay.store.lock().await.get_events(target))?;
                 if !seen.insert(previous.clone()) {
-                    bail!("Cyclic candidate history cannot converge");
+                    unresolved.insert(target.clone());
+                    replay.store.lock().await.set_events(target, Vec::new())?;
+                    break;
                 }
                 for event in &events {
                     import_event_once(&replay, event.clone()).await;
@@ -275,14 +349,12 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
     Ok(())
 }
 
-async fn snapshot(state: &AppState, targets: &[String]) -> Result<String> {
+async fn snapshot(state: &AppState, targets: &[String]) -> Result<Vec<String>> {
     let store = state.store.lock().await;
-    Ok(serde_json::to_string(
-        &targets
-            .iter()
-            .map(|target| store.get_events(target))
-            .collect::<Vec<_>>(),
-    )?)
+    targets
+        .iter()
+        .map(|target| Ok(serde_json::to_string(&store.get_events(target))?))
+        .collect()
 }
 
 #[cfg(test)]
@@ -290,6 +362,143 @@ mod tests {
     use super::*;
     use crate::{resolve_local_doc_async, ResolveOptions};
     use serde_json::Value;
+
+    #[test]
+    fn cycles_isolate_only_histories_that_vary_and_can_be_retried() {
+        let mut cycles = ReplayCycles::default();
+        let state = |a: &str, b: &str| vec![a.to_string(), b.to_string(), "stable".to_string()];
+        assert_eq!(cycles.observe(state("empty", "empty")), None);
+        assert_eq!(cycles.observe(state("A", "B")), None);
+        assert_eq!(cycles.observe(state("B", "A")), None);
+        assert_eq!(cycles.observe(state("A", "B")), Some(vec![0, 1]));
+        assert_eq!(cycles.observe(state("empty", "empty")), None);
+        assert_eq!(cycles.observe(state("resolved", "resolved")), None);
+    }
+
+    #[tokio::test]
+    async fn removing_controller_replays_dependents_even_before_cache_initialization() {
+        let vectors: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/history-recovery-vectors.json"
+        ))
+        .unwrap();
+        let vector = &vectors[0];
+        for restart in [false, true] {
+            let db = JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            };
+            let (state, _directory) = crate::tests::make_state(db);
+            for event in vector["base"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .chain(vector["delegation"].as_array().unwrap())
+                .chain([&vector["old"], &vector["delegated"]])
+            {
+                crate::events::import_event_impl(
+                    &state,
+                    serde_json::from_value(event.clone()).unwrap(),
+                )
+                .await;
+            }
+            if restart {
+                *state.candidate_history.lock().await = None;
+                state.dependents.lock().await.clear();
+                *state.history_ready.lock().await = false;
+            }
+            let controller = vector["controller"].as_str().unwrap();
+            let asset = vector["asset"].as_str().unwrap();
+            let child = vector["child"].as_str().unwrap();
+            let candidates = state.store.lock().await.get_candidates().unwrap();
+            remove_histories(&state, &[controller.to_string()])
+                .await
+                .unwrap();
+            assert!(state.store.lock().await.get_events(asset).is_empty());
+            assert_eq!(state.store.lock().await.get_events(child).len(), 2);
+            assert_eq!(
+                serde_json::to_value(&state.store.lock().await.get_candidates().unwrap()[asset])
+                    .unwrap(),
+                serde_json::to_value(&candidates[asset]).unwrap()
+            );
+            assert_eq!(
+                serde_json::to_value(&state.store.lock().await.get_candidates().unwrap()[child])
+                    .unwrap(),
+                serde_json::to_value(&candidates[child]).unwrap()
+            );
+            *state.history_ready.lock().await = false;
+            ensure_history_ready(&state).await.unwrap();
+            assert!(state.store.lock().await.get_events(asset).is_empty());
+            crate::events::import_event_impl(
+                &state,
+                serde_json::from_value(vector["base"][0].clone()).unwrap(),
+            )
+            .await;
+            assert_eq!(
+                resolve_local_doc_async(&state, asset, ResolveOptions::default())
+                    .await
+                    .unwrap()["didDocumentData"],
+                json!("retired")
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn gc_controller_replays_previously_verified_dependents() {
+        let vectors: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/history-recovery-vectors.json"
+        ))
+        .unwrap();
+        let vector = &vectors[0]["gc"];
+        for invalid in [false, true] {
+            let db = JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            };
+            let (state, _directory) = crate::tests::make_state(db);
+            for event in vector["base"].as_array().unwrap() {
+                crate::events::import_event_impl(
+                    &state,
+                    serde_json::from_value(event.clone()).unwrap(),
+                )
+                .await;
+            }
+            let controller = vector["controller"].as_str().unwrap();
+            let asset = vector["asset"].as_str().unwrap();
+            state
+                .verified_dids
+                .lock()
+                .await
+                .insert(asset.to_string(), true);
+            if invalid {
+                let mut store = state.store.lock().await;
+                let mut events = store.get_events(controller);
+                events[0].operation["proof"]["proofValue"] = json!("invalid");
+                store.set_events(controller, events).unwrap();
+            }
+            let result = crate::verify_db_impl(&state, false).await;
+            assert_eq!(
+                if invalid {
+                    result.invalid
+                } else {
+                    result.expired
+                },
+                1
+            );
+            assert!(state.store.lock().await.get_events(asset).is_empty());
+            assert_eq!(
+                state.store.lock().await.get_candidates().unwrap()[asset].len(),
+                1
+            );
+            assert!(state.store.lock().await.get_candidates().unwrap()[controller].is_empty());
+            *state.history_ready.lock().await = false;
+            *state.candidate_history.lock().await = None;
+            state.dependents.lock().await.clear();
+            ensure_history_ready(&state).await.unwrap();
+            assert!(state.store.lock().await.get_events(asset).is_empty());
+        }
+    }
 
     #[tokio::test]
     async fn shared_recovery_vectors_converge_in_both_orders_across_restart() {

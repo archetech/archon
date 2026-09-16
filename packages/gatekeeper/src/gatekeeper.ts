@@ -244,7 +244,8 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     private async verifyDbOnce(options?: { chatty?: boolean }): Promise<VerifyDbResult> {
         const chatty = options?.chatty ?? true;
-        const dids = await this.getDIDs() as string[];
+        const dids = await this.getDIDsOnce() as string[];
+        const removed: string[] = [];
         const total = dids.length;
         let n = 0;
         let expired = 0;
@@ -273,9 +274,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     console.log(`removing ${n}/${total} ${did} invalid`);
                 }
                 invalid += 1;
-                await this.db.deleteEvents(did);
-                await this.db.setCandidates(did, []);
-                if (this.candidateHistory) this.candidateHistory[did] = [];
+                removed.push(did);
                 continue;
             }
 
@@ -287,9 +286,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     if (chatty) {
                         console.log(`removing ${n}/${total} ${did} expired`);
                     }
-                    await this.db.deleteEvents(did);
-                    await this.db.setCandidates(did, []);
-                    if (this.candidateHistory) this.candidateHistory[did] = [];
+                    removed.push(did);
                     expired += 1;
                 }
                 else {
@@ -310,6 +307,8 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
         }
 
+        await this.removeDIDsOnce(removed);
+
         // Clear queue of permanently invalid events
         this.eventsQueue = [];
 
@@ -321,11 +320,16 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async checkDIDs(options?: CheckDIDsOptions): Promise<CheckDIDsResult> {
+        await this.ensureHistoryReady();
+        return this.withHistoryLock(() => this.checkDIDsOnce(options));
+    }
+
+    private async checkDIDsOnce(options?: CheckDIDsOptions): Promise<CheckDIDsResult> {
         const chatty = options?.chatty ?? false;
         let dids = options?.dids;
 
         if (!dids) {
-            dids = await this.getDIDs() as string[];
+            dids = await this.getDIDsOnce() as string[];
         }
 
         const total = dids.length;
@@ -1243,6 +1247,11 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async getDIDs(options?: GetDIDOptions): Promise<string[] | DidCidDocument[]> {
+        await this.ensureHistoryReady();
+        return this.withHistoryLock(() => this.getDIDsOnce(options));
+    }
+
+    private async getDIDsOnce(options?: GetDIDOptions): Promise<string[] | DidCidDocument[]> {
         let { dids, updatedAfter, updatedBefore, confirm, verify, resolve } = options || {};
         if (!dids) {
             const keys = await this.db.getAllKeys();
@@ -1324,11 +1333,21 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidParameterError('dids');
         }
 
-        for (const did of dids) {
-            await this.db.deleteEvents(did);
-            await this.db.setCandidates(did, []);
-            if (this.candidateHistory) this.candidateHistory[did] = [];
-            this.searchIndex.delete(did);
+        if (!dids.length) return true;
+        // Load dependencies before removing evidence, including pre-journal DBs.
+        await this.retainCandidates(dids[0]);
+        try {
+            for (const did of dids) {
+                await this.db.setCandidates(did, []);
+                this.candidateHistory![did] = [];
+                await this.db.deleteEvents(did);
+                delete this.verifiedDIDs[did];
+                this.searchIndex.delete(did);
+            }
+            for (const did of dids) await this.reconcileHistory(did);
+        } catch (error) {
+            this.historyReady = undefined;
+            throw error;
         }
 
         return true;
@@ -1440,12 +1459,25 @@ export default class Gatekeeper implements GatekeeperInterface {
         });
         const replay = new Gatekeeper({ db: overlay, ipfs: this.ipfs, didPrefix: this.didPrefix, registries: this.supportedRegistries });
         const targets = [...affected].sort();
-        const snapshots = new Set<string>();
+        const snapshots: string[][] = [];
+        const unresolved = new Set<string>();
         for (;;) {
-            const before = JSON.stringify(targets.map(target => staged.get(target)));
-            if (snapshots.has(before)) throw new Error('Cyclic authorization history cannot converge');
-            snapshots.add(before);
+            const state = targets.map(target => JSON.stringify(staged.get(target)));
+            const before = JSON.stringify(state);
+            const cycle = snapshots.findIndex(snapshot => JSON.stringify(snapshot) === before);
+            if (cycle !== -1) {
+                // Only histories that vary in the cycle lose their projection.
+                // Keep their evidence so later information can resolve them.
+                targets.forEach((target, index) => {
+                    if (snapshots.slice(cycle).some(snapshot => snapshot[index] !== state[index])) unresolved.add(target);
+                    staged.set(target, []);
+                });
+                snapshots.length = 0;
+                continue;
+            }
+            snapshots.push(state);
             for (const target of targets) {
+                if (unresolved.has(target)) continue;
                 const events = copyJSON(candidates[target] ?? []).sort((a, b) => {
                     // Registry-local order first; do not compare ordinal values
                     // across registries. Stable tie-breaking makes replay independent
@@ -1468,7 +1500,11 @@ export default class Gatekeeper implements GatekeeperInterface {
                 const seen = new Set<string>();
                 for (;;) {
                     const previous = JSON.stringify(staged.get(target));
-                    if (seen.has(previous)) throw new Error('Cyclic candidate history cannot converge');
+                    if (seen.has(previous)) {
+                        unresolved.add(target);
+                        staged.set(target, []);
+                        break;
+                    }
                     seen.add(previous);
                     for (const event of events) {
                         await replay.importEventOnce(event);
@@ -1476,7 +1512,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     if (JSON.stringify(staged.get(target)) === previous) break;
                 }
             }
-            if (JSON.stringify(targets.map(target => staged.get(target))) === before) break;
+            if (JSON.stringify(targets.map(target => JSON.stringify(staged.get(target)))) === before) break;
         }
         for (const target of targets) {
             if (JSON.stringify(staged.get(target)) !== original.get(target)) {

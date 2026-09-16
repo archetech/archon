@@ -875,9 +875,9 @@ attempted on the next pass).
 
 Imports first persist the candidate event, then run the insertion algorithm below and replay the affected DID and its transitive dependents. Imports and direct submissions serialize history mutations. Replay uses a separate working view and invokes the same insertion/authorization algorithm; it never trusts a previous authorization verdict merely because it was once accepted.
 
-The dependency index includes controller assignments on retained branches, not just the current document. Replay repeats until histories stop changing, ordering chain candidates by registry, ordinal, time, and operation CID; registry ordinals are never compared across chains. Local/gossip candidates preserve their existing arrival order. Controller traversal detects cycles, and replay rejects nonconverging cycles rather than looping indefinitely.
+The dependency index includes controller assignments on retained branches, not just the current document. Replay repeats until histories stop changing, ordering chain candidates by registry, ordinal, time, and operation CID; registry ordinals are never compared across chains. Local/gossip candidates preserve their existing arrival order. Controller traversal detects cycles. If replay does not converge, histories that vary in the cycle remain unresolved while their candidate evidence is retained. Stable histories continue to resolve, and later evidence triggers another attempt; a cyclic candidate cannot prevent startup or block unrelated DIDs.
 
-Accepted histories, search entries, and verification caches are refreshed when replay changes a DID. Startup rebuilds from the journal to recover interrupted publication. An operation accepted through dependent replay may report `MERGED` when its next queue attempt runs, so processing counters describe queue attempts, not every change to derived histories.
+Accepted histories, search entries, and verification caches are refreshed when replay changes a DID. Explicit removal and garbage collection also replay dependents before returning. Startup rebuilds from the journal to recover interrupted publication; public status and DID-list reads wait for repair and active replay. An operation accepted through dependent replay may report `MERGED` when its next queue attempt runs, so processing counters describe queue attempts, not every change to derived histories.
 
 The following is the insertion algorithm reused during replay:
 
@@ -1327,7 +1327,7 @@ timestamps and container labels.
 
 ## 16. Test fixtures
 
-Seven shared JSON fixtures drive cross-language conformance:
+Eight shared JSON fixtures drive cross-language conformance:
 
 | File | Purpose |
 | --- | --- |

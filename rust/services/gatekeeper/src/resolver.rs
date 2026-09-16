@@ -575,6 +575,7 @@ pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> VerifyDbRe
     let mut invalid = 0;
     let mut verified = state.verified_dids.lock().await.len();
     let mut n = 0usize;
+    let mut removed = Vec::new();
 
     for did in dids {
         n += 1;
@@ -597,13 +598,7 @@ pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> VerifyDbRe
                 info!("removing {}/{} {} invalid", n, total, did);
             }
             invalid += 1;
-            let mut store = state.store.lock().await;
-            let _ = store.delete_events(&did);
-            let _ = store.set_candidates(&did, Vec::new());
-            drop(store);
-            if let Some(cache) = state.candidate_history.lock().await.as_mut() {
-                cache.insert(did.clone(), Vec::new());
-            }
+            removed.push(did);
             continue;
         };
 
@@ -619,13 +614,7 @@ pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> VerifyDbRe
                     info!("removing {}/{} {} expired", n, total, did);
                 }
                 expired += 1;
-                let mut store = state.store.lock().await;
-                let _ = store.delete_events(&did);
-                let _ = store.set_candidates(&did, Vec::new());
-                drop(store);
-                if let Some(cache) = state.candidate_history.lock().await.as_mut() {
-                    cache.insert(did.clone(), Vec::new());
-                }
+                removed.push(did);
             } else {
                 if chatty {
                     let minutes_left = chrono::DateTime::parse_from_rfc3339(&valid_until)
@@ -652,6 +641,9 @@ pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> VerifyDbRe
         }
     }
 
+    if let Err(error) = crate::history::remove_histories(state, &removed).await {
+        tracing::error!(%error, "Failed to remove and revalidate histories during GC");
+    }
     state.import_queue.lock().await.clear();
 
     if chatty {

@@ -857,6 +857,22 @@ async function runHistoryRecoveryParity() {
     const vectors = JSON.parse(await fs.readFile(new URL('../tests/gatekeeper/history-recovery-vectors.json', import.meta.url), 'utf8'));
     const both = fixture => Promise.all([request(tsBaseUrl, fixture), request(rustBaseUrl, fixture)]);
     const post = (path, body) => ({ method: 'POST', path, body, requiresAdminKey: true, headers: { 'content-type': 'application/json' } });
+    const importEvents = async (events) => {
+        for (const event of events) {
+            const pinned = await request(tsBaseUrl, post('/api/v1/ipfs/json', JSON.parse(cipher.canonicalizeJSON(event.operation))));
+            if (pinned.status !== 200) throw new Error('history recovery: failed to pin fixture');
+            const { registry, time, registration } = event;
+            const imported = await both(post('/api/v1/batch/import/cids', {
+                cids: [pinned.body], metadata: { registry, time, registration, ordinal: [registration.height] },
+            }));
+            for (const result of imported) {
+                if (result.status !== 200 || result.body.rejected) throw new Error('history recovery: CID ingress failed');
+            }
+            const processed = await both(post('/api/v1/events/process'));
+            assertEqual('history recovery processing status', processed[0].status, processed[1].status);
+            assertEqual('history recovery processing', normalizeJson(processed[0].body), normalizeJson(processed[1].body));
+        }
+    };
     for (const vector of vectors) {
         for (const scenario of ['retired', 'new-key', 'early', 'migration', 'delegation', 'deletion', 'create']) {
             const outcomes = [];
@@ -872,20 +888,7 @@ async function runHistoryRecoveryParity() {
                             : scenario === 'retired' ? [vector.old, vector.oldNext]
                                 : scenario === 'early' ? [vector.early] : [vector.fresh, vector.freshNext];
                 const events = rotationFirst ? [...base, rotation, ...tail] : [...base, ...tail, rotation];
-                for (const event of events) {
-                    const pinned = await request(tsBaseUrl, post('/api/v1/ipfs/json', JSON.parse(cipher.canonicalizeJSON(event.operation))));
-                    if (pinned.status !== 200) throw new Error('history recovery: failed to pin fixture');
-                    const { registry, time, registration } = event;
-                    const imported = await both(post('/api/v1/batch/import/cids', {
-                        cids: [pinned.body], metadata: { registry, time, registration, ordinal: [registration.height] },
-                    }));
-                    for (const result of imported) {
-                        if (result.status !== 200 || result.body.rejected) throw new Error('history recovery: CID ingress failed');
-                    }
-                    const processed = await both(post('/api/v1/events/process'));
-                    assertEqual('history recovery processing status', processed[0].status, processed[1].status);
-                    assertEqual('history recovery processing', normalizeJson(processed[0].body), normalizeJson(processed[1].body));
-                }
+                await importEvents(events);
                 const docs = await both({ method: 'GET', path: `/api/v1/did/${target}?confirm=true&verify=true`, requiresAdminKey: true });
                 if (docs.some(result => result.status !== 200)) throw new Error('history recovery: resolution failed');
                 assertEqual('history recovery documents', normalizeJson(docs[0].body), normalizeJson(docs[1].body));
@@ -901,7 +904,25 @@ async function runHistoryRecoveryParity() {
             assertEqual(`history recovery arrival order ${vector.registry} ${scenario}`, outcomes[0], outcomes[1]);
         }
     }
-    console.log('ok history recovery parity: same/cross-registry, both key verdicts, predecessors, successors, and migration');
+    for (const collect of [false, true]) {
+        await resetServiceState(tsBaseUrl);
+        await resetServiceState(rustBaseUrl);
+        const vector = collect ? vectors[0].gc : vectors[0];
+        await importEvents(collect ? vector.base : [...vector.base, ...vector.delegation, vector.old, vector.delegated]);
+        const result = await both(collect
+            ? { method: 'GET', path: '/api/v1/db/verify', requiresAdminKey: true }
+            : post('/api/v1/dids/remove', [vector.controller]));
+        assertEqual('history removal status', result[0].status, 200);
+        assertEqual('history removal status parity', result[0].status, result[1].status);
+        assertEqual('history removal result parity', normalizeJson(result[0].body), normalizeJson(result[1].body));
+        for (const did of collect ? [vector.asset] : [vector.asset, vector.child]) {
+            const docs = await both({ method: 'GET', path: `/api/v1/did/${did}`, requiresAdminKey: true });
+            assertEqual('history removal documents', normalizeJson(docs[0].body), normalizeJson(docs[1].body));
+            if (did === vector.asset) assertEqual('history removal unresolved dependent', docs[0].body.didResolutionMetadata?.error, 'notFound');
+            else assertEqual('history removal transitive dependent', docs[0].body.didDocumentData, 'original');
+        }
+    }
+    console.log('ok history recovery parity: same/cross-registry, both key verdicts, predecessors, successors, migration, controller removal, and GC');
 }
 
 await runHistoryRecoveryParity();

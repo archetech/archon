@@ -89,3 +89,5 @@ These rules apply to coding agents working in this repository.
 - When a maintainer changes an issue’s scope or splits acceptance criteria into a follow-up, synchronize the issue bodies and PR description. Explicitly retain unresolved correctness requirements in the follow-up; resolving a review thread as tracked elsewhere does not mean the defect is fixed.
 
 - Archon nodes derive their best current authorization state from available evidence. Keep imported candidates durably separate from accepted histories; controller-history changes must reconsider rejected candidates and replay dependent histories at the import layer. `confirmed` records anchoring, not irrevocable authorization. Preserve original chain positions, distinguish repeated anchors of the same operation during deduplication, and retain existing arrival-order semantics for unanchored gossip.
+
+- Authorization replay must isolate nonconverging candidate histories without blocking unrelated DIDs or discarding evidence. Controller removal and garbage collection must replay dependents before returning; public history reads must wait for startup repair and active replay.
