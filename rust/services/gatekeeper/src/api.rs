@@ -383,6 +383,7 @@ pub(crate) async fn remove_dids(
     headers: HeaderMap,
     Json(payload): Json<Value>,
 ) -> Response {
+    let _history_guard = state.history_lock.lock().await;
     let start = Instant::now();
     if let Some(response) = require_admin_key(&state, &headers) {
         return response;
@@ -422,8 +423,18 @@ pub(crate) async fn remove_dids(
     }
 
     let mut store = state.store.lock().await;
-    let ok = dids.iter().all(|did| store.delete_events(did).is_ok());
+    let ok = dids.iter().all(|did| {
+        store
+            .delete_events(did)
+            .and_then(|_| store.set_candidates(did, Vec::new()))
+            .is_ok()
+    });
     drop(store);
+    if let Some(cache) = state.candidate_history.lock().await.as_mut() {
+        for did in &dids {
+            cache.insert(did.clone(), Vec::new());
+        }
+    }
     for did in &dids {
         delete_search_doc(&state, did).await;
     }
@@ -859,6 +870,7 @@ pub(crate) async fn process_events_route(
 }
 
 pub(crate) async fn db_reset(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let _history_guard = state.history_lock.lock().await;
     let start = Instant::now();
     if let Some(response) = require_admin_key(&state, &headers) {
         return response;
@@ -883,6 +895,9 @@ pub(crate) async fn db_reset(State(state): State<AppState>, headers: HeaderMap) 
         store.reset_db().is_ok()
     };
     state.events_seen.lock().await.clear();
+    *state.candidate_history.lock().await = None;
+    state.dependents.lock().await.clear();
+    *state.history_ready.lock().await = false;
     state.verified_dids.lock().await.clear();
     state.import_queue.lock().await.clear();
     clear_search_index(&state).await;
@@ -1079,6 +1094,10 @@ pub(crate) async fn resolve_did(
     headers: HeaderMap,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
+    if let Err(error) = crate::history::ensure_history_ready(&state).await {
+        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    }
+    let _history_guard = state.history_lock.lock().await;
     let start = Instant::now();
     let resolve_options = ResolveOptions {
         version_time: query.get("versionTime").cloned(),
@@ -1119,6 +1138,7 @@ pub(crate) async fn resolve_did(
         }
     };
 
+    drop(_history_guard);
     let has_resolver_error = local_doc
         .get("didResolutionMetadata")
         .and_then(|value| value.get("error"))
@@ -1256,6 +1276,10 @@ async fn resolve_conformant(
     did: &str,
     query: &HashMap<String, String>,
 ) -> std::result::Result<Value, (StatusCode, String)> {
+    crate::history::ensure_history_ready(state)
+        .await
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    let _history_guard = state.history_lock.lock().await;
     let options = ResolveOptions {
         version_time: query.get("versionTime").cloned(),
         version_sequence: query

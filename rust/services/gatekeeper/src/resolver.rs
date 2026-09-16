@@ -564,6 +564,7 @@ pub(crate) async fn check_dids_impl(
 }
 
 pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> VerifyDbResult {
+    let _history_guard = state.history_lock.lock().await;
     let started = std::time::Instant::now();
     let dids = {
         let store = state.store.lock().await;
@@ -598,6 +599,11 @@ pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> VerifyDbRe
             invalid += 1;
             let mut store = state.store.lock().await;
             let _ = store.delete_events(&did);
+            let _ = store.set_candidates(&did, Vec::new());
+            drop(store);
+            if let Some(cache) = state.candidate_history.lock().await.as_mut() {
+                cache.insert(did.clone(), Vec::new());
+            }
             continue;
         };
 
@@ -615,6 +621,11 @@ pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> VerifyDbRe
                 expired += 1;
                 let mut store = state.store.lock().await;
                 let _ = store.delete_events(&did);
+                let _ = store.set_candidates(&did, Vec::new());
+                drop(store);
+                if let Some(cache) = state.candidate_history.lock().await.as_mut() {
+                    cache.insert(did.clone(), Vec::new());
+                }
             } else {
                 if chatty {
                     let minutes_left = chrono::DateTime::parse_from_rfc3339(&valid_until)

@@ -34,6 +34,8 @@ pub(crate) struct EventRecord {
 pub(crate) struct JsonDbFile {
     pub(crate) dids: HashMap<String, Vec<EventRecord>>,
     #[serde(default)]
+    pub(crate) candidates: HashMap<String, Vec<EventRecord>>,
+    #[serde(default)]
     pub(crate) queue: HashMap<String, Vec<Value>>,
     #[serde(default)]
     pub(crate) blocks: HashMap<String, HashMap<String, Value>>,
@@ -49,6 +51,7 @@ pub(crate) struct JsonDb {
 
 #[derive(Clone)]
 pub(crate) enum DbBackend {
+    Memory,
     JsonFile {
         path: PathBuf,
     },
@@ -375,6 +378,81 @@ impl JsonDb {
             data,
             redis_connection,
         })
+    }
+
+    pub(crate) fn get_candidates(&self) -> Result<HashMap<String, Vec<EventRecord>>> {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self.with_redis_connection(|conn, namespace| {
+                let rows: HashMap<String, String> =
+                    conn.hgetall(format!("{namespace}/candidates"))?;
+                rows.into_iter()
+                    .map(|(did, raw)| Ok((did, serde_json::from_str(&raw)?)))
+                    .collect()
+            });
+        }
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let conn = DbBackend::open_sqlite(path)?;
+            let mut statement = conn.prepare("SELECT id, events FROM candidates")?;
+            let rows = statement.query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?;
+            return rows
+                .map(|row| {
+                    let (did, raw) = row?;
+                    Ok((did, serde_json::from_str(&raw)?))
+                })
+                .collect();
+        }
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let client = self.mongo_client()?;
+            let collection = client
+                .database(self.mongo_database_name()?)
+                .collection::<Document>("candidates");
+            let mut result = HashMap::new();
+            for row in collection.find(doc! {}).run()? {
+                let row = row?;
+                result.insert(
+                    row.get_str("id")?.to_string(),
+                    bson::from_bson(row.get("events").context("missing candidates")?.clone())?,
+                );
+            }
+            return Ok(result);
+        }
+        Ok(self.data.candidates.clone())
+    }
+
+    pub(crate) fn set_candidates(&mut self, did: &str, events: Vec<EventRecord>) -> Result<()> {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self.with_redis_connection(|conn, namespace| {
+                let _: usize = conn.hset(
+                    format!("{namespace}/candidates"),
+                    did,
+                    serde_json::to_string(&events)?,
+                )?;
+                Ok(())
+            });
+        }
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let conn = DbBackend::open_sqlite(path)?;
+            conn.execute("INSERT INTO candidates(id, events) VALUES (?1, ?2) ON CONFLICT(id) DO UPDATE SET events = excluded.events",
+                params![did, serde_json::to_string(&events)?])?;
+            return Ok(());
+        }
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            let client = self.mongo_client()?;
+            client
+                .database(self.mongo_database_name()?)
+                .collection::<Document>("candidates")
+                .update_one(
+                    doc! { "id": did },
+                    doc! { "$set": { "events": bson::to_bson(&events)? } },
+                )
+                .upsert(true)
+                .run()?;
+            return Ok(());
+        }
+        self.data.candidates.insert(did.to_string(), events);
+        self.save()
     }
 
     fn save(&self) -> Result<()> {
@@ -960,6 +1038,7 @@ impl JsonDb {
 
         if let DbBackend::Sqlite { path } = &self.backend {
             let conn = DbBackend::open_sqlite(path)?;
+            conn.execute("DELETE FROM candidates", [])?;
             conn.execute("DELETE FROM dids", [])
                 .context("failed to clear sqlite dids")?;
             conn.execute("DELETE FROM queue", [])
@@ -975,6 +1054,9 @@ impl JsonDb {
             let client = self.mongo_client()?;
             let database = self.mongo_database_name()?.to_string();
             let db = client.database(&database);
+            db.collection::<Document>("candidates")
+                .delete_many(doc! {})
+                .run()?;
             db.collection::<Document>("dids")
                 .delete_many(doc! {})
                 .run()
@@ -1936,6 +2018,7 @@ impl DbBackend {
 
     fn load_state(&self) -> Result<JsonDbFile> {
         match self {
+            Self::Memory => Ok(JsonDbFile::default()),
             Self::JsonFile { path } => match fs::read_to_string(path) {
                 Ok(raw) => {
                     serde_json::from_str::<JsonDbFile>(&raw).context("failed to decode json db")
@@ -1951,6 +2034,14 @@ impl DbBackend {
                 let client =
                     MongoClient::with_uri_str(url).context("failed to connect to mongodb")?;
                 let db = client.database(database);
+                db.collection::<Document>("candidates")
+                    .create_index(
+                        IndexModel::builder()
+                            .keys(doc! { "id": 1 })
+                            .options(IndexOptions::builder().unique(true).build())
+                            .build(),
+                    )
+                    .run()?;
                 db.collection::<Document>("dids")
                     .create_index(IndexModel::builder().keys(doc! { "id": 1 }).build())
                     .run()
@@ -1988,6 +2079,7 @@ impl DbBackend {
 
     fn save_state(&self, data: &JsonDbFile) -> Result<()> {
         match self {
+            Self::Memory => Ok(()),
             Self::JsonFile { path } => {
                 if let Some(parent) = path.parent() {
                     fs::create_dir_all(parent)
@@ -2033,6 +2125,10 @@ impl DbBackend {
         }
         let conn = Connection::open(path)
             .with_context(|| format!("failed to open sqlite db {}", path.display()))?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS candidates (id TEXT PRIMARY KEY, events TEXT NOT NULL)",
+            [],
+        )?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS dids (
                 id TEXT PRIMARY KEY,

@@ -3,6 +3,7 @@ mod app;
 mod authorization;
 mod config;
 mod events;
+mod history;
 mod metrics;
 mod proofs;
 mod resolver;
@@ -99,7 +100,7 @@ mod tests {
         (db, temp_dir)
     }
 
-    fn make_state(db: JsonDb) -> (AppState, TempDir) {
+    pub(crate) fn make_state(db: JsonDb) -> (AppState, TempDir) {
         make_state_with_pin_registries(db, Vec::new())
     }
 
@@ -126,6 +127,10 @@ mod tests {
             did_locks: Arc::new(Mutex::new(HashMap::new())),
             status_snapshot: Arc::new(Mutex::new(None)),
             search_index: Arc::new(Mutex::new(SearchIndex::default())),
+            candidate_history: Arc::new(Mutex::new(None)),
+            dependents: Arc::new(Mutex::new(HashMap::new())),
+            history_lock: Arc::new(Mutex::new(())),
+            history_ready: Arc::new(Mutex::new(false)),
             processing_events: Arc::new(Mutex::new(false)),
             ready: Arc::new(AtomicBool::new(false)),
             started_at: Instant::now(),

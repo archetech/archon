@@ -142,6 +142,7 @@ pub(crate) async fn authorize_operation(
                     resolve_local_doc_async(state, did, ResolveOptions::default()).await?
                 }
             };
+            let mut visited = std::collections::HashSet::new();
             while verify_proof_format(operation.get("proof"))
                 && authority
                     .pointer("/didDocumentMetadata/deactivated")
@@ -154,6 +155,9 @@ pub(crate) async fn authorize_operation(
                 else {
                     break;
                 };
+                if !visited.insert(did.to_string()) {
+                    return Ok(false);
+                }
                 authority = controller_for_event(state, did, operation, event).await?;
             }
             verify_update_operation_impl(operation, &authority)

@@ -195,10 +195,11 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async initSearchIndex(): Promise<void> {
+        await this.ensureHistoryReady();
         const dids = await this.getDIDs() as string[];
         for (const did of dids) {
             try {
-                const doc = await this.resolveDID(did);
+                const doc = await this.resolveDIDAt(did);
                 this.searchIndex.store(did, doc);
             } catch {
                 // Skip DIDs that can't be resolved
@@ -209,8 +210,9 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     private async updateSearchIndex(did: string): Promise<void> {
         try {
-            const doc = await this.resolveDID(did);
-            this.searchIndex.store(did, doc);
+            const doc = await this.resolveDIDAt(did);
+            if (doc.didResolutionMetadata?.error) this.searchIndex.delete(did);
+            else this.searchIndex.store(did, doc);
         } catch {
             // If DID can't be resolved, remove from index
             this.searchIndex.delete(did);
@@ -236,6 +238,11 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async verifyDb(options?: { chatty?: boolean }): Promise<VerifyDbResult> {
+        await this.ensureHistoryReady();
+        return this.withHistoryLock(() => this.verifyDbOnce(options));
+    }
+
+    private async verifyDbOnce(options?: { chatty?: boolean }): Promise<VerifyDbResult> {
         const chatty = options?.chatty ?? true;
         const dids = await this.getDIDs() as string[];
         const total = dids.length;
@@ -258,7 +265,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             let validUntil = null;
 
             try {
-                const doc = await this.resolveDID(did, { verify: true });
+                const doc = await this.resolveDIDAt(did, { verify: true });
                 validUntil = doc.didDocumentRegistration?.validUntil;
             }
             catch (error) {
@@ -267,6 +274,8 @@ export default class Gatekeeper implements GatekeeperInterface {
                 }
                 invalid += 1;
                 await this.db.deleteEvents(did);
+                await this.db.setCandidates(did, []);
+                if (this.candidateHistory) this.candidateHistory[did] = [];
                 continue;
             }
 
@@ -279,6 +288,8 @@ export default class Gatekeeper implements GatekeeperInterface {
                         console.log(`removing ${n}/${total} ${did} expired`);
                     }
                     await this.db.deleteEvents(did);
+                    await this.db.setCandidates(did, []);
+                    if (this.candidateHistory) this.candidateHistory[did] = [];
                     expired += 1;
                 }
                 else {
@@ -331,7 +342,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         for (const did of dids) {
             n += 1;
             try {
-                const doc = await this.resolveDID(did);
+                const doc = await this.resolveDIDAt(did);
 
                 if (doc.didResolutionMetadata?.error) {
                     invalid += 1;
@@ -392,7 +403,14 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     // For testing purposes
     async resetDb(): Promise<boolean> {
+        return this.withHistoryLock(() => this.resetDbOnce());
+    }
+
+    private async resetDbOnce(): Promise<boolean> {
         await this.db.resetDb();
+        this.candidateHistory = undefined;
+        this.dependents.clear();
+        this.historyReady = undefined;
         this.verifiedDIDs = {};
         this.searchIndex.clear();
         // The store no longer holds anything to deduplicate against, so an
@@ -434,11 +452,15 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         if (operation.type === 'update' || operation.type === 'delete') {
-            let authority = previous ?? await this.resolveDID(operation.did);
+            let authority = previous ?? await this.resolveDIDAt(operation.did);
+            const visited = new Set<string>();
             // Controller traversal is authorization policy, not cryptography.
             // Preserve the deactivation check for every document in the chain.
             while (authority.didDocument?.controller && !authority.didDocumentMetadata?.deactivated && this.verifyProofFormat(operation.proof)) {
-                authority = await this.controllerForEvent(authority.didDocument.controller, operation, event);
+                const controller = authority.didDocument.controller;
+                if (visited.has(controller)) return false;
+                visited.add(controller);
+                authority = await this.controllerForEvent(controller, operation, event);
             }
             return this.verifyUpdateOperation(operation, authority);
         }
@@ -483,7 +505,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
         }
 
-        return this.resolveDID(controllerDid, { confirm: true, versionTime: operation.proof!.created });
+        return this.resolveDIDAt(controllerDid, { confirm: true, versionTime: operation.proof!.created });
     }
 
     // Whether stored confirming events carry chain positions. This does not
@@ -798,6 +820,16 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async createDID(operation: Operation): Promise<string> {
+        await this.ensureHistoryReady();
+        return this.withHistoryLock(async () => {
+            const did = await this.createDIDOnce(operation);
+            delete this.verifiedDIDs[did];
+            await this.reconcileHistory(did);
+            return did;
+        });
+    }
+
+    private async createDIDOnce(operation: Operation): Promise<string> {
         const valid = await this.authorizeCreateOperation(operation);
         if (!valid) {
             throw new InvalidOperationError('proof')
@@ -813,7 +845,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         const did = await this.generateDID(operation);
 
         return this.withDidLock(did, async () => {
-            const ops = await this.exportDID(did);
+            const ops = await this.db.getEvents(did);
 
             // Check to see if we already have this DID in the db
             if (ops.length > 0) {
@@ -925,6 +957,8 @@ export default class Gatekeeper implements GatekeeperInterface {
         did?: string,
         options?: ResolveDIDOptions
     ): Promise<DidCidDocument> {
+        await this.ensureHistoryReady();
+        await this.historyLock;
         return this.resolveDIDAt(did, options);
     }
 
@@ -1148,11 +1182,23 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async updateDID(operation: Operation): Promise<boolean> {
+        await this.ensureHistoryReady();
+        return this.withHistoryLock(async () => {
+            const updated = await this.updateDIDOnce(operation);
+            if (updated) {
+                delete this.verifiedDIDs[operation.did!];
+                await this.reconcileHistory(operation.did!);
+            }
+            return updated;
+        });
+    }
+
+    private async updateDIDOnce(operation: Operation): Promise<boolean> {
         if (!operation.did) {
             throw new InvalidOperationError('missing operation.did')
         }
 
-        const doc = await this.resolveDID(operation.did);
+        const doc = await this.resolveDIDAt(operation.did);
         const updateValid = await this.authorizeOperation(operation, doc);
 
         if (!updateValid) {
@@ -1211,7 +1257,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
             for (const did of dids) {
                 try {
-                    const doc = await this.resolveDID(did, { confirm, verify });
+                    const doc = await this.resolveDIDAt(did, { confirm, verify });
                     const updatedStr = doc.didDocumentMetadata?.updated ?? doc.didDocumentMetadata?.created ?? 0;
                     const updated = new Date(updatedStr);
 
@@ -1244,6 +1290,8 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async exportDID(did: string): Promise<GatekeeperEvent[]> {
+        await this.ensureHistoryReady();
+        await this.historyLock;
         return this.db.getEvents(did);
     }
 
@@ -1268,19 +1316,198 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async removeDIDs(dids: string[]): Promise<boolean> {
+        return this.withHistoryLock(() => this.removeDIDsOnce(dids));
+    }
+
+    private async removeDIDsOnce(dids: string[]): Promise<boolean> {
         if (!Array.isArray(dids)) {
             throw new InvalidParameterError('dids');
         }
 
         for (const did of dids) {
             await this.db.deleteEvents(did);
+            await this.db.setCandidates(did, []);
+            if (this.candidateHistory) this.candidateHistory[did] = [];
             this.searchIndex.delete(did);
         }
 
         return true;
     }
 
+    // Candidate history is durable evidence; accepted history is a revisable view.
+    // Serialize imports so a controller change and dependent replay cannot race.
+    private historyLock: Promise<void> = Promise.resolve();
+    private historyReady?: Promise<void>;
+    private ensureHistoryReady(): Promise<void> {
+        this.historyReady ??= this.withHistoryLock(async () => {
+            // A journal write precedes projection writes. Rebuild on startup so
+            // an interrupted publication cannot leave dependent state stale.
+            const dids = new Set(Object.keys(await this.db.getCandidates()));
+            for (const key of await this.db.getAllKeys()) dids.add(`${this.didPrefix}:${key}`);
+            for (const did of [...dids].sort()) await this.reconcileHistory(did, true);
+        }).catch(error => { this.historyReady = undefined; throw error; });
+        return this.historyReady;
+    }
+    private async withHistoryLock<T>(fn: () => Promise<T>): Promise<T> {
+        const result = this.historyLock.then(fn, fn);
+        this.historyLock = result.then(() => undefined, () => undefined);
+        return result;
+    }
+
+    private candidateKey(event: GatekeeperEvent): string {
+        return JSON.stringify([event.opid, event.registry, event.time, event.ordinal]);
+    }
+
+    private candidateHistory?: Record<string, GatekeeperEvent[]>;
+    private dependents = new Map<string, Set<string>>();
+
+    private indexCandidates(did: string, events: GatekeeperEvent[]): void {
+        for (const { operation } of events) {
+            for (const controller of [operation.controller, operation.doc?.didDocument?.controller]) {
+                if (controller) {
+                    if (!this.dependents.has(controller)) this.dependents.set(controller, new Set());
+                    this.dependents.get(controller)!.add(did);
+                }
+            }
+        }
+    }
+
+    private async retainCandidates(did: string, incoming: GatekeeperEvent[] = []): Promise<Record<string, GatekeeperEvent[]>> {
+        if (!this.candidateHistory) {
+            const candidates = await this.db.getCandidates();
+            // Upgrade existing databases once, not on every import. Subsequent
+            // direct submissions and imports journal only the changed DID.
+            for (const key of await this.db.getAllKeys()) {
+                const currentDid = `${this.didPrefix}:${key}`;
+                if (!candidates[currentDid]) {
+                    candidates[currentDid] = await this.db.getEvents(currentDid);
+                    for (const event of candidates[currentDid]) event.opid ??= await this.generateCID(event.operation, true);
+                    await this.db.setCandidates(currentDid, candidates[currentDid]);
+                }
+            }
+            for (const [key, events] of Object.entries(candidates)) this.indexCandidates(key, events);
+            this.candidateHistory = candidates;
+        }
+        const candidates = this.candidateHistory;
+        const events = [...(candidates[did] ?? []), ...await this.db.getEvents(did), ...incoming];
+        for (const event of events) event.opid ??= await this.generateCID(event.operation, true);
+        const retained = [...new Map(events.map(event => [this.candidateKey(event), event])).values()];
+        await this.db.setCandidates(did, retained);
+        candidates[did] = retained;
+        this.indexCandidates(did, retained);
+        return candidates;
+    }
+
+    private async reconcileHistory(did: string, rebuildSelf = false): Promise<void> {
+        try {
+            await this.reconcileHistoryOnce(did, rebuildSelf);
+        } catch (error) {
+            this.historyReady = undefined;
+            throw error;
+        }
+    }
+
+    private async reconcileHistoryOnce(did: string, rebuildSelf: boolean): Promise<void> {
+        const candidates = await this.retainCandidates(did);
+        const affected = new Set([did]);
+        // Dependencies include all candidate controller assignments, including
+        // branches that are not currently accepted. Rejected candidates can
+        // become valid when previously missing controller history arrives.
+        for (const controller of affected) {
+            for (const dependent of this.dependents.get(controller) ?? []) affected.add(dependent);
+        }
+
+        if (!rebuildSelf) affected.delete(did);
+        if (!affected.size) return;
+        const staged = new Map<string, GatekeeperEvent[]>();
+        const original = new Map<string, string>();
+        for (const target of affected) {
+            const events = await this.db.getEvents(target);
+            staged.set(target, []);
+            original.set(target, JSON.stringify(events));
+        }
+        // Reuse the ordinary event authorization/import algorithm against an
+        // isolated view. Readers never observe a DID half way through replay.
+        const db = this.db;
+        const overlay = new Proxy(db, {
+            get(target, property) {
+                if (property === 'getEvents') return async (key: string) => copyJSON(staged.get(key) ?? await db.getEvents(key));
+                if (property === 'setEvents') return async (key: string, events: GatekeeperEvent[]) => { staged.set(key, copyJSON(events)); };
+                if (property === 'addEvent') return async (key: string, event: GatekeeperEvent) => { staged.set(key, [...(staged.get(key) ?? []), copyJSON(event)]); };
+                const value = Reflect.get(target, property);
+                return typeof value === 'function' ? value.bind(target) : value;
+            }
+        });
+        const replay = new Gatekeeper({ db: overlay, ipfs: this.ipfs, didPrefix: this.didPrefix, registries: this.supportedRegistries });
+        const targets = [...affected].sort();
+        const snapshots = new Set<string>();
+        for (;;) {
+            const before = JSON.stringify(targets.map(target => staged.get(target)));
+            if (snapshots.has(before)) throw new Error('Cyclic authorization history cannot converge');
+            snapshots.add(before);
+            for (const target of targets) {
+                const events = copyJSON(candidates[target] ?? []).sort((a, b) => {
+                    // Registry-local order first; do not compare ordinal values
+                    // across registries. Stable tie-breaking makes replay independent
+                    // of arrival order even when candidates compete for a predecessor.
+                    const aHint = isUnanchoredRegistry(a.registry);
+                    const bHint = isUnanchoredRegistry(b.registry);
+                    // Preserve existing arrival-order semantics for local/gossip
+                    // hints; they have no independently established chain order.
+                    if (aHint && bHint) return 0;
+                    if (aHint !== bHint) return aHint ? -1 : 1;
+                    if (a.registry !== b.registry) return a.registry < b.registry ? -1 : 1;
+                    const ordinal = compareOrdinals(a.ordinal ?? [], b.ordinal ?? []);
+                    if (ordinal) return ordinal;
+                    if (a.time !== b.time) return a.time < b.time ? -1 : 1;
+                    return (a.opid ?? '') < (b.opid ?? '') ? -1 : (a.opid ?? '') > (b.opid ?? '') ? 1 : 0;
+                });
+                staged.set(target, []);
+                // A candidate can precede its predecessor in the sorted input
+                // (notably during migration), so replay to a stable sequence.
+                const seen = new Set<string>();
+                for (;;) {
+                    const previous = JSON.stringify(staged.get(target));
+                    if (seen.has(previous)) throw new Error('Cyclic candidate history cannot converge');
+                    seen.add(previous);
+                    for (const event of events) {
+                        await replay.importEventOnce(event);
+                    }
+                    if (JSON.stringify(staged.get(target)) === previous) break;
+                }
+            }
+            if (JSON.stringify(targets.map(target => staged.get(target))) === before) break;
+        }
+        for (const target of targets) {
+            if (JSON.stringify(staged.get(target)) !== original.get(target)) {
+                if (staged.get(target)!.length) await this.db.setEvents(target, staged.get(target)!);
+                else await this.db.deleteEvents(target);
+                delete this.verifiedDIDs[target];
+                await this.updateSearchIndex(target);
+            }
+        }
+    }
+
     async importEvent(event: GatekeeperEvent): Promise<ImportStatus> {
+        await this.ensureHistoryReady();
+        if (!await this.verifyEvent(event)) return ImportStatus.REJECTED;
+        event = copyJSON(event);
+        event.did ??= event.operation.did ?? await this.generateDID(event.operation);
+        event.opid ??= await this.generateCID(event.operation, true);
+        return this.withHistoryLock(async () => {
+            await this.retainCandidates(event.did!, [event]);
+            const status = await this.importEventOnce(event);
+            if (status === ImportStatus.ADDED) delete this.verifiedDIDs[event.did!];
+            await this.reconcileHistory(event.did!, true);
+            const accepted = (await this.db.getEvents(event.did!))
+                .some(current => this.candidateKey(current) === this.candidateKey(event));
+            if (accepted && (status === ImportStatus.REJECTED || status === ImportStatus.DEFERRED)) return ImportStatus.ADDED;
+            if (!accepted && status === ImportStatus.ADDED) return ImportStatus.REJECTED;
+            return status;
+        });
+    }
+
+    private async importEventOnce(event: GatekeeperEvent): Promise<ImportStatus> {
         try {
             if (!event.did) {
                 if (event.operation.did) {
@@ -1344,7 +1571,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                         // verified against the version it chained from, as replay
                         // does -- resolving at present would judge a self-update
                         // by the document it produced.
-                        const previous = index === 0 ? undefined : await this.resolveDID(did, { versionSequence: index });
+                        const previous = index === 0 ? undefined : await this.resolveDIDAt(did, { versionSequence: index });
                         const valid = await this.authorizeOperation(event.operation, previous, event);
 
                         if (!valid) {
@@ -1368,7 +1595,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     if (currentEvents.length > 0 && index < 0) {
                         return ImportStatus.DEFERRED;
                     }
-                    const previous = index < 0 ? undefined : await this.resolveDID(did, { versionSequence: index + 1 });
+                    const previous = index < 0 ? undefined : await this.resolveDIDAt(did, { versionSequence: index + 1 });
                     const ok = await this.authorizeOperation(event.operation, previous, event);
                     if (!ok) {
                         return ImportStatus.REJECTED;
@@ -1454,6 +1681,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async processEvents(): Promise<ProcessEventsResult> {
+        await this.ensureHistoryReady();
         if (this.isProcessingEvents) {
             return { busy: true };
         }
@@ -1621,7 +1849,8 @@ export default class Gatekeeper implements GatekeeperInterface {
             const ok = await this.verifyEvent(event);
 
             if (ok) {
-                const eventKey = `${event.registry}/${event.operation.proof?.proofValue}`;
+                const position = event.registration ? `/${JSON.stringify([event.time, event.ordinal])}` : '';
+                const eventKey = `${event.registry}/${event.operation.proof?.proofValue}${position}`;
                 if (!this.eventsSeen[eventKey]) {
                     this.eventsSeen[eventKey] = true;
                     this.eventsQueue.push(event);

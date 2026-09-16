@@ -949,7 +949,12 @@ describe('processEvents', () => {
         await gatekeeper.importBatch(ops.reverse());
 
         const response1 = await gatekeeper.processEvents();
-        expect(response1.added).toBe(4);
+        // Controller import can now replay dependent candidates before their
+        // next queue attempt, which then reports a merge rather than an add.
+        expect((response1.added ?? 0) + (response1.merged ?? 0)).toBe(4);
+        expect(response1.pending).toBe(0);
+        expect((await gatekeeper.exportDID(agentDID)).length).toBe(2);
+        expect((await gatekeeper.exportDID(assetDID)).length).toBe(2);
     });
 
     it('should defer events with unknown previd property', async () => {

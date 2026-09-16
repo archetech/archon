@@ -839,6 +839,7 @@ for event in events:
         rejected += 1; continue
 
     key := event.registry + "/" + event.operation.proof.proofValue
+    if event.registration: key += "/" + JSON([event.time, event.ordinal])
     if seen[key]:
         processed += 1; continue
     seen[key] = true
@@ -871,6 +872,14 @@ counters. Events returning `DEFERRED` are pushed back onto the queue (to be
 attempted on the next pass).
 
 ### 8.4 `importEvent(event)` per-event flow
+
+Imports first persist the candidate event, then run the insertion algorithm below and replay the affected DID and its transitive dependents. Imports and direct submissions serialize history mutations. Replay uses a separate working view and invokes the same insertion/authorization algorithm; it never trusts a previous authorization verdict merely because it was once accepted.
+
+The dependency index includes controller assignments on retained branches, not just the current document. Replay repeats until histories stop changing, ordering chain candidates by registry, ordinal, time, and operation CID; registry ordinals are never compared across chains. Local/gossip candidates preserve their existing arrival order. Controller traversal detects cycles, and replay rejects nonconverging cycles rather than looping indefinitely.
+
+Accepted histories, search entries, and verification caches are refreshed when replay changes a DID. Startup rebuilds from the journal to recover interrupted publication. An operation accepted through dependent replay may report `MERGED` when its next queue attempt runs, so processing counters describe queue attempts, not every change to derived histories.
+
+The following is the insertion algorithm reused during replay:
 
 ```
 1. ensure event.did and event.opid are set (compute via DID generation if missing)
@@ -1013,11 +1022,12 @@ Errors:
 
 ## 10. Storage contract
 
-The Gatekeeper stores six logical resources:
+The Gatekeeper stores seven logical resources:
 
 | Resource | Purpose |
 | --- | --- |
-| `dids` | per-DID append-only `EventRecord[]` |
+| `dids` | per-DID accepted `EventRecord[]`, replaced when replay changes authorization |
+| `candidates` | persistent event evidence, including rejected operations and replaced branches, keyed by DID |
 | `ops` | content-addressed `opid -> Operation` cache (so events can be stored by reference) |
 | `queue` | per-registry outbound `Operation[]` awaiting distribution |
 | `blocks` | per-registry index of `BlockInfo` (by hash and by height) |
@@ -1043,6 +1053,10 @@ separately in the `ops` table keyed by `opid`. On read the event is
 "hydrated" by joining the operation back in. This both saves space (when a
 DID's chain has many small wrapper events around large ops) and supports
 content-addressed import via `/batch/import/cids`.
+
+Candidate journals store full events (including operations and original registration metadata). JSON uses a `candidates` map; SQLite and MongoDB use a `candidates` table/collection (`id`, `events`); Redis uses a `<namespace>/candidates` hash. Empty journal entries mark explicit removals or garbage collection so restart does not resurrect those histories. Database reset clears both accepted state and candidates. Existing stores without a journal adopt their available accepted histories; previously discarded evidence requires a chain rescan. DID exports still describe accepted state, not the journal.
+
+Custom TypeScript `GatekeeperDb` adapters must implement `getCandidates()` and `setCandidates(did, events)` with durable storage. Rejected candidates can become valid later, so they must not be pruned merely because the current authorization verdict is negative.
 
 ### 10.3 Filesystem layout
 
@@ -1323,6 +1337,7 @@ Seven shared JSON fixtures drive cross-language conformance:
 | [tests/gatekeeper/api-parity-flows.json](../../../tests/gatekeeper/api-parity-flows.json) | Stateful flows (create + resolve + export + import + queue + block + IPFS round-trips). |
 | [tests/gatekeeper/metrics-parity.json](../../../tests/gatekeeper/metrics-parity.json) | Required metric names + route normalization expectations. |
 | [tests/gatekeeper/timestamp-vectors.json](../../../tests/gatekeeper/timestamp-vectors.json) | The RFC 3339 grammar every validated timestamp MUST satisfy — see [§5.6](#56-timestamp-grammar). |
+| [tests/gatekeeper/history-recovery-vectors.json](../../../tests/gatekeeper/history-recovery-vectors.json) | Signed delayed-history cases shared by both ports and live parity: same/cross-registry, creation/update/deletion, delegation, successors, and migration. |
 | [tests/gatekeeper/event-shape-vectors.json](../../../tests/gatekeeper/event-shape-vectors.json) | Event shapes both ports MUST agree to accept or reject, mutation by mutation. |
 
 The script [scripts/gatekeeper-parity.mjs](../../../scripts/gatekeeper-parity.mjs)

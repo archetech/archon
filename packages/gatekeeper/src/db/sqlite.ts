@@ -59,8 +59,23 @@ export default class DbSqlite implements GatekeeperDb {
         return suffix;
     }
 
+    async getCandidates(): Promise<Record<string, GatekeeperEvent[]>> {
+        if (!this.db) throw new Error(SQLITE_NOT_STARTED_ERROR);
+        const rows = this.db.prepare('SELECT id, events FROM candidates').all() as unknown as DidsRow[];
+        return Object.fromEntries(rows.map(row => [row.id, JSON.parse(row.events)]));
+    }
+
+    async setCandidates(did: string, events: GatekeeperEvent[]): Promise<void> {
+        await this.runExclusive(() => this.withTx(async () => {
+            this.db!.prepare('INSERT OR REPLACE INTO candidates(id, events) VALUES (?, ?)')
+                .run(did, JSON.stringify(events));
+        }));
+    }
+
     async start(): Promise<void> {
         this.db = new DatabaseSync(this.dbName);
+
+        this.db.exec(`CREATE TABLE IF NOT EXISTS candidates (id TEXT PRIMARY KEY, events TEXT)`);
 
         this.db.exec(`CREATE TABLE IF NOT EXISTS dids (
             id TEXT PRIMARY KEY,
@@ -108,6 +123,7 @@ export default class DbSqlite implements GatekeeperDb {
                 this.db!.exec('DELETE FROM queue');
                 this.db!.exec('DELETE FROM blocks');
                 this.db!.exec('DELETE FROM operations');
+                this.db!.exec('DELETE FROM candidates');
             });
         });
     }

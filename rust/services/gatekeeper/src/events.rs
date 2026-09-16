@@ -156,6 +156,11 @@ pub(crate) async fn handle_did_operation(
     state: &AppState,
     payload: &Value,
 ) -> Result<Value, String> {
+    crate::history::ensure_history_ready(state)
+        .await
+        .map_err(|error| error.to_string())?;
+    let _history_guard = state.history_lock.lock().await;
+
     let op_type = payload
         .get("type")
         .and_then(Value::as_str)
@@ -288,7 +293,11 @@ pub(crate) async fn handle_did_operation(
     // on every write (which was the dominant cost for dmail creation).
     *state.status_snapshot.lock().await = None;
     update_search_doc(state, &did).await;
+    state.verified_dids.lock().await.remove(&did);
 
+    crate::history::reconcile_history(state, &did, false)
+        .await
+        .map_err(|error| error.to_string())?;
     Ok(result)
 }
 
@@ -364,7 +373,18 @@ fn event_key(event: &Value) -> Option<String> {
         .and_then(|value| value.get("proof"))
         .and_then(|value| value.get("proofValue"))
         .and_then(Value::as_str)?;
-    Some(format!("{registry}/{proof_value}"))
+    let position = if event
+        .get("registration")
+        .is_some_and(|value| !value.is_null())
+    {
+        format!(
+            "/{}",
+            serde_json::json!([event.get("time"), event.get("ordinal")])
+        )
+    } else {
+        String::new()
+    };
+    Some(format!("{registry}/{proof_value}{position}"))
 }
 
 pub(crate) async fn import_batch_impl(state: &AppState, batch: &[Value]) -> ImportBatchResult {
@@ -428,6 +448,16 @@ pub(crate) async fn import_batch_impl(state: &AppState, batch: &[Value]) -> Impo
 }
 
 pub(crate) async fn process_events_impl(state: &AppState) -> ProcessEventsResult {
+    if let Err(error) = crate::history::ensure_history_ready(state).await {
+        warn!("Failed to recover authorization history: {}", error);
+        return ProcessEventsResult {
+            busy: Some(true),
+            added: None,
+            merged: None,
+            rejected: None,
+            pending: None,
+        };
+    }
     {
         let mut busy = state.processing_events.lock().await;
         if *busy {
@@ -541,7 +571,47 @@ fn event_log_did(config: &crate::Config, event: &EventRecord) -> String {
     infer_event_did(config, &event_record_to_value(event)).unwrap_or_default()
 }
 
-async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus {
+pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) -> ImportStatus {
+    let _guard = state.history_lock.lock().await;
+    let did = match infer_event_did(&state.config, &event_record_to_value(&event)) {
+        Ok(did) => did,
+        Err(_) => return ImportStatus::Rejected,
+    };
+    event.did = Some(did.clone());
+    if event.opid.is_none() {
+        event.opid = generate_json_cid(&event.operation).ok();
+    }
+    if let Err(error) = crate::history::retain_candidates(state, &did, Some(event.clone())).await {
+        warn!("Failed to retain candidate: {}", error);
+        return ImportStatus::Deferred;
+    }
+    let key = crate::history::candidate_key(&event);
+    let status = import_event_once(state, event).await;
+    if matches!(status, ImportStatus::Added) {
+        state.verified_dids.lock().await.remove(&did);
+    }
+    if let Err(error) = crate::history::reconcile_history(state, &did, true).await {
+        warn!("Failed to reconcile authorization history: {}", error);
+        *state.history_ready.lock().await = false;
+        return ImportStatus::Deferred;
+    }
+    let accepted = state
+        .store
+        .lock()
+        .await
+        .get_events(&did)
+        .iter()
+        .any(|event| crate::history::candidate_key(event) == key);
+    if accepted && matches!(status, ImportStatus::Rejected | ImportStatus::Deferred) {
+        return ImportStatus::Added;
+    }
+    if !accepted && matches!(status, ImportStatus::Added) {
+        return ImportStatus::Rejected;
+    }
+    status
+}
+
+pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> ImportStatus {
     let trace = import_trace_enabled();
     let mut event_value = event_record_to_value(&event);
     let did = match infer_event_did(&state.config, &event_value) {

@@ -36,10 +36,23 @@ export default class DbMongo implements GatekeeperDb {
         return suffix;
     }
 
+    async getCandidates(): Promise<Record<string, GatekeeperEvent[]>> {
+        if (!this.db) throw new Error(MONGO_NOT_STARTED_ERROR);
+        const rows = await this.db.collection<DidsDoc>('candidates').find({}).toArray();
+        return Object.fromEntries(rows.map(row => [row.id, row.events]));
+    }
+
+    async setCandidates(did: string, events: GatekeeperEvent[]): Promise<void> {
+        if (!this.db) throw new Error(MONGO_NOT_STARTED_ERROR);
+        await this.db.collection<DidsDoc>('candidates').updateOne({ id: did },
+            { $set: { events } }, { upsert: true });
+    }
+
     async start(): Promise<void> {
         this.client = new MongoClient(process.env.ARCHON_MONGODB_URL || 'mongodb://localhost:27017');
         await this.client.connect();
         this.db = this.client.db(this.dbName);
+        await this.db.collection('candidates').createIndex({ id: 1 }, { unique: true });
         await this.db.collection('dids').createIndex({ id: 1 });
         await this.db.collection('blocks').createIndex({ registry: 1, height: -1 });  // for latest and height lookups
         await this.db.collection('blocks').createIndex({ registry: 1, hash: 1 }, { unique: true });  // for hash lookup
@@ -59,6 +72,7 @@ export default class DbMongo implements GatekeeperDb {
             throw new Error(MONGO_NOT_STARTED_ERROR)
         }
 
+        await this.db.collection('candidates').deleteMany({});
         await this.db.collection('dids').deleteMany({});
         await this.db.collection('queue').deleteMany({});
         await this.db.collection('operations').deleteMany({});
