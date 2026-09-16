@@ -3,6 +3,7 @@ mod app;
 mod authorization;
 mod config;
 mod events;
+mod history;
 mod metrics;
 mod proofs;
 mod resolver;
@@ -99,7 +100,7 @@ mod tests {
         (db, temp_dir)
     }
 
-    fn make_state(db: JsonDb) -> (AppState, TempDir) {
+    pub(crate) fn make_state(db: JsonDb) -> (AppState, TempDir) {
         make_state_with_pin_registries(db, Vec::new())
     }
 
@@ -126,6 +127,10 @@ mod tests {
             did_locks: Arc::new(Mutex::new(HashMap::new())),
             status_snapshot: Arc::new(Mutex::new(None)),
             search_index: Arc::new(Mutex::new(SearchIndex::default())),
+            candidate_history: Arc::new(Mutex::new(None)),
+            dependents: Arc::new(Mutex::new(HashMap::new())),
+            history_lock: Arc::new(Mutex::new(())),
+            history_ready: Arc::new(Mutex::new(false)),
             processing_events: Arc::new(Mutex::new(false)),
             ready: Arc::new(AtomicBool::new(false)),
             started_at: Instant::now(),
@@ -1371,7 +1376,7 @@ mod tests {
             did: Some("did:cid:queued".to_string()),
             registration: None,
         });
-        let result = verify_db_impl(&state, false).await;
+        let result = verify_db_impl(&state, false).await.unwrap();
         assert_eq!(result.total, 3);
         assert_eq!(result.verified, 1);
         assert_eq!(result.expired, 0);
@@ -1383,7 +1388,7 @@ mod tests {
         drop(store);
         assert_eq!(state.import_queue.lock().await.len(), 0);
 
-        let cached = verify_db_impl(&state, false).await;
+        let cached = verify_db_impl(&state, false).await.unwrap();
         assert_eq!(cached.total, 1);
         assert_eq!(cached.verified, 1);
     }

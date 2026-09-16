@@ -360,7 +360,15 @@ pub(crate) async fn resolve_local_doc_async(
     }))
 }
 
-pub(crate) async fn refresh_metrics_snapshot(state: &AppState) {
+pub(crate) async fn refresh_metrics_snapshot(state: &AppState) -> Result<()> {
+    crate::history::ensure_history_ready(state).await?;
+    let _guard = state.history_lock.lock().await;
+    refresh_metrics_snapshot_once(state).await;
+    Ok(())
+}
+
+// Caller holds history_lock so an old snapshot cannot be published after replay.
+pub(crate) async fn refresh_metrics_snapshot_once(state: &AppState) {
     let did_check = check_dids_impl(state, None, false).await;
     *state.status_snapshot.lock().await = Some(did_check.clone());
     update_metrics_from_check(state, &did_check).await;
@@ -563,7 +571,8 @@ pub(crate) async fn check_dids_impl(
     }
 }
 
-pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> VerifyDbResult {
+pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> Result<VerifyDbResult> {
+    let _history_guard = state.history_lock.lock().await;
     let started = std::time::Instant::now();
     let dids = {
         let store = state.store.lock().await;
@@ -574,6 +583,7 @@ pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> VerifyDbRe
     let mut invalid = 0;
     let mut verified = state.verified_dids.lock().await.len();
     let mut n = 0usize;
+    let mut removed = Vec::new();
 
     for did in dids {
         n += 1;
@@ -596,8 +606,7 @@ pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> VerifyDbRe
                 info!("removing {}/{} {} invalid", n, total, did);
             }
             invalid += 1;
-            let mut store = state.store.lock().await;
-            let _ = store.delete_events(&did);
+            removed.push(did);
             continue;
         };
 
@@ -613,8 +622,7 @@ pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> VerifyDbRe
                     info!("removing {}/{} {} expired", n, total, did);
                 }
                 expired += 1;
-                let mut store = state.store.lock().await;
-                let _ = store.delete_events(&did);
+                removed.push(did);
             } else {
                 if chatty {
                     let minutes_left = chrono::DateTime::parse_from_rfc3339(&valid_until)
@@ -641,18 +649,19 @@ pub(crate) async fn verify_db_impl(state: &AppState, chatty: bool) -> VerifyDbRe
         }
     }
 
+    crate::history::remove_histories(state, &removed).await?;
     state.import_queue.lock().await.clear();
 
     if chatty {
         info!("verifyDb: {}ms", started.elapsed().as_millis());
     }
 
-    VerifyDbResult {
+    Ok(VerifyDbResult {
         total,
         verified,
         expired,
         invalid,
-    }
+    })
 }
 
 pub(crate) async fn search_docs_impl(state: &AppState, q: &str) -> Vec<String> {
@@ -673,8 +682,11 @@ pub(crate) fn start_background_tasks(state: AppState) {
             let interval = Duration::from_secs(interval_minutes * 60);
             tokio::time::sleep(interval).await;
             loop {
-                refresh_metrics_snapshot(&status_state).await;
-                log_status_snapshot(&status_state).await;
+                if let Err(error) = refresh_metrics_snapshot(&status_state).await {
+                    tracing::error!(%error, "Failed to refresh DID status");
+                } else {
+                    log_status_snapshot(&status_state).await;
+                }
                 tokio::time::sleep(interval).await;
             }
         });
@@ -687,13 +699,19 @@ pub(crate) fn start_background_tasks(state: AppState) {
             let interval = Duration::from_secs(interval_minutes * 60);
             tokio::time::sleep(interval).await;
             loop {
-                let result = verify_db_impl(&gc_state, true).await;
-                info!(
-                    "DID garbage collection: {} waiting {} minutes...",
-                    serde_json::to_string(&result).unwrap_or_default(),
-                    interval_minutes
-                );
-                refresh_metrics_snapshot(&gc_state).await;
+                match verify_db_impl(&gc_state, true).await {
+                    Ok(result) => {
+                        info!(
+                            "DID garbage collection: {} waiting {} minutes...",
+                            serde_json::to_string(&result).unwrap_or_default(),
+                            interval_minutes
+                        );
+                        if let Err(error) = refresh_metrics_snapshot(&gc_state).await {
+                            tracing::error!(%error, "Failed to refresh DID status after GC");
+                        }
+                    }
+                    Err(error) => tracing::error!(%error, "DID garbage collection failed"),
+                }
                 tokio::time::sleep(interval).await;
             }
         });
@@ -701,7 +719,13 @@ pub(crate) fn start_background_tasks(state: AppState) {
 }
 
 pub(crate) async fn log_status_snapshot(state: &AppState) {
-    let status = if let Some(snapshot) = state.status_snapshot.lock().await.clone() {
+    if let Err(error) = crate::history::ensure_history_ready(state).await {
+        tracing::error!(%error, "Failed to read DID status");
+        return;
+    }
+    let _guard = state.history_lock.lock().await;
+    let cached = state.status_snapshot.lock().await.clone();
+    let status = if let Some(snapshot) = cached {
         snapshot
     } else {
         let started = std::time::Instant::now();

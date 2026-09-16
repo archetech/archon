@@ -10,6 +10,7 @@ export type * from '@didcid/clients/gatekeeper-types';
 
 export interface JsonDbFile {
     dids: Record<string, GatekeeperEvent[]>;
+    candidates?: Record<string, GatekeeperEvent[]>;
     queue?: Record<string, Operation[]>;
     blocks?: Record<string, any>;
     hashes?: Record<string, any>;
@@ -17,6 +18,8 @@ export interface JsonDbFile {
 }
 
 export interface GatekeeperDb {
+    getCandidates(): Promise<Record<string, GatekeeperEvent[]>>;
+    setCandidates(did: string, events: GatekeeperEvent[]): Promise<void>;
     start(): Promise<void>;
     stop(): Promise<void>;
     resetDb(): Promise<void | number | JsonDbFile>;

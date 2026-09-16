@@ -49,6 +49,10 @@ pub(crate) struct AppState {
     pub(crate) did_locks: Arc<Mutex<HashMap<String, Arc<Mutex<()>>>>>,
     pub(crate) status_snapshot: Arc<Mutex<Option<CheckDidsResult>>>,
     pub(crate) search_index: Arc<Mutex<SearchIndex>>,
+    pub(crate) candidate_history: Arc<Mutex<Option<HashMap<String, Vec<EventRecord>>>>>,
+    pub(crate) dependents: Arc<Mutex<HashMap<String, std::collections::HashSet<String>>>>,
+    pub(crate) history_lock: Arc<Mutex<()>>,
+    pub(crate) history_ready: Arc<Mutex<bool>>,
     pub(crate) processing_events: Arc<Mutex<bool>>,
     pub(crate) ready: Arc<AtomicBool>,
     pub(crate) started_at: Instant,
@@ -90,10 +94,11 @@ pub async fn run() -> Result<()> {
     let state = build_state(config.clone())?;
     let app = build_router(state.clone());
 
-    refresh_metrics_snapshot(&state).await;
+    refresh_metrics_snapshot(&state).await?;
     log_status_snapshot(&state).await;
 
     info!("Initializing search index...");
+    crate::history::ensure_history_ready(&state).await?;
     build_search_index(&state).await;
 
     if config.status_interval_minutes > 0 {
@@ -179,6 +184,10 @@ fn build_state(config: Config) -> Result<AppState> {
         did_locks: Arc::new(Mutex::new(HashMap::new())),
         status_snapshot: Arc::new(Mutex::new(None)),
         search_index: Arc::new(Mutex::new(SearchIndex::default())),
+        candidate_history: Arc::new(Mutex::new(None)),
+        dependents: Arc::new(Mutex::new(HashMap::new())),
+        history_lock: Arc::new(Mutex::new(())),
+        history_ready: Arc::new(Mutex::new(false)),
         processing_events: Arc::new(Mutex::new(false)),
         ready: Arc::new(AtomicBool::new(false)),
         started_at: Instant::now(),

@@ -21,6 +21,17 @@ export default class DbRedis implements GatekeeperDb {
         this.redis = null;
     }
 
+    async getCandidates(): Promise<Record<string, GatekeeperEvent[]>> {
+        if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
+        const rows = await this.redis.hgetall(`${this.dbName}/candidates`);
+        return Object.fromEntries(Object.entries(rows).map(([did, events]) => [did, JSON.parse(events)]));
+    }
+
+    async setCandidates(did: string, events: GatekeeperEvent[]): Promise<void> {
+        if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
+        await this.redis.hset(`${this.dbName}/candidates`, did, JSON.stringify(events));
+    }
+
     async start(): Promise<void> {
         const url = process.env.ARCHON_REDIS_URL || 'redis://localhost:6379';
         this.redis = new Redis(url);

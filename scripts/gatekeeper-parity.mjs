@@ -851,5 +851,102 @@ await runConfirmParity();
 await resetServiceState(tsBaseUrl);
 await resetServiceState(rustBaseUrl);
 await runBackdatingParity();
+// The same signed evidence is exercised by TypeScript and Rust unit tests.
+// Here use the mediator CID ingress on both running services as well.
+async function runHistoryRecoveryParity() {
+    const vectors = JSON.parse(await fs.readFile(new URL('../tests/gatekeeper/history-recovery-vectors.json', import.meta.url), 'utf8'));
+    const both = fixture => Promise.all([request(tsBaseUrl, fixture), request(rustBaseUrl, fixture)]);
+    const post = (path, body) => ({ method: 'POST', path, body, requiresAdminKey: true, headers: { 'content-type': 'application/json' } });
+    const importEvents = async (events) => {
+        for (const event of events) {
+            const pinned = await request(tsBaseUrl, post('/api/v1/ipfs/json', JSON.parse(cipher.canonicalizeJSON(event.operation))));
+            if (pinned.status !== 200) throw new Error('history recovery: failed to pin fixture');
+            const { registry, time, registration } = event;
+            // CID ingress appends its batch-local index; preserve every fixture position component.
+            const imported = await both(post('/api/v1/batch/import/cids', {
+                cids: [pinned.body], metadata: { registry, time, registration, ordinal: event.ordinal },
+            }));
+            for (const result of imported) {
+                if (result.status !== 200 || result.body.rejected) throw new Error('history recovery: CID ingress failed');
+            }
+            const processed = await both(post('/api/v1/events/process'));
+            assertEqual('history recovery processing status', processed[0].status, processed[1].status);
+            assertEqual('history recovery processing', normalizeJson(processed[0].body), normalizeJson(processed[1].body));
+        }
+    };
+    for (const vector of vectors) {
+        for (const scenario of ['retired', 'new-key', 'early', 'migration', 'delegation', 'deletion', 'create']) {
+            const outcomes = [];
+            for (const rotationFirst of [true, false]) {
+                await resetServiceState(tsBaseUrl);
+                await resetServiceState(rustBaseUrl);
+                const base = [...(scenario === 'create' ? vector.base.slice(0, 1) : vector.base), ...(scenario === 'migration' ? [vector.migration] : []), ...(scenario === 'delegation' ? vector.delegation : [])];
+                const target = scenario === 'delegation' ? vector.child : vector.asset;
+                const rotation = scenario === 'migration' ? vector.migrationRotation : vector.rotation;
+                const tail = scenario === 'create' ? [{ ...vector.base[1], time: vector.old.time, ordinal: vector.old.ordinal, registration: vector.old.registration }]
+                    : scenario === 'delegation' ? [vector.delegated]
+                        : scenario === 'deletion' ? [vector.deletion]
+                            : scenario === 'retired' ? [vector.old, vector.oldNext]
+                                : scenario === 'early' ? [vector.early] : [vector.fresh, vector.freshNext];
+                const events = rotationFirst ? [...base, rotation, ...tail] : [...base, ...tail, rotation];
+                await importEvents(events);
+                const docs = await both({ method: 'GET', path: `/api/v1/did/${target}?confirm=true&verify=true`, requiresAdminKey: true });
+                if (docs.some(result => result.status !== 200)) throw new Error('history recovery: resolution failed');
+                assertEqual('history recovery documents', normalizeJson(docs[0].body), normalizeJson(docs[1].body));
+                if (scenario === 'create') {
+                    assertEqual('history recovery invalid creation', docs[0].body.didResolutionMetadata?.error, 'notFound');
+                    outcomes.push(normalizeJson(docs[0].body));
+                    continue;
+                }
+                const expected = scenario === 'new-key' ? 'new-key-successor' : scenario === 'early' ? 'before-rotation' : 'original';
+                assertEqual('history recovery authorized state', docs[0].body.didDocumentData, expected);
+                outcomes.push(normalizeJson(docs[0].body));
+            }
+            assertEqual(`history recovery arrival order ${vector.registry} ${scenario}`, outcomes[0], outcomes[1]);
+        }
+    }
+    for (const collect of [false, true]) {
+        await resetServiceState(tsBaseUrl);
+        await resetServiceState(rustBaseUrl);
+        const vector = collect ? vectors[0].gc : vectors[0];
+        await importEvents(collect ? vector.base : [...vector.base, ...vector.delegation, vector.old, vector.delegated]);
+        const result = await both(collect
+            ? { method: 'GET', path: '/api/v1/db/verify', requiresAdminKey: true }
+            : post('/api/v1/dids/remove', [vector.controller]));
+        assertEqual('history removal status', result[0].status, 200);
+        assertEqual('history removal status parity', result[0].status, result[1].status);
+        assertEqual('history removal result parity', normalizeJson(result[0].body), normalizeJson(result[1].body));
+        for (const did of collect ? [vector.asset] : [vector.asset, vector.child]) {
+            const docs = await both({ method: 'GET', path: `/api/v1/did/${did}`, requiresAdminKey: true });
+            assertEqual('history removal documents', normalizeJson(docs[0].body), normalizeJson(docs[1].body));
+            if (did === vector.asset) assertEqual('history removal unresolved dependent', docs[0].body.didResolutionMetadata?.error, 'notFound');
+            else assertEqual('history removal transitive dependent', docs[0].body.didDocumentData, 'original');
+        }
+    }
+    const rules = JSON.parse(await fs.readFile(new URL('../tests/gatekeeper/controller-rules-vectors.json', import.meta.url), 'utf8'));
+    for (const fixture of rules.cases) {
+        await resetServiceState(tsBaseUrl);
+        await resetServiceState(rustBaseUrl);
+        await importEvents([...rules.base, ...fixture.setup, fixture.event]);
+        const did = fixture.event.did;
+        const docs = await both({ method: 'GET', path: `/api/v1/did/${did}?verify=true`, requiresAdminKey: true });
+        assertEqual(`controller rules ${fixture.name}`, normalizeJson(docs[0].body), normalizeJson(docs[1].body));
+        const versions = [...rules.base, ...fixture.setup].filter(event => event.did === did).length + Number(fixture.accepted);
+        if (versions) assertEqual(`controller rules version ${fixture.name}`, docs[0].body.didDocumentMetadata?.versionSequence, String(versions));
+        else assertEqual(`controller rules rejection ${fixture.name}`, docs[0].body.didResolutionMetadata?.error, 'notFound');
+    }
+    await resetServiceState(tsBaseUrl);
+    await resetServiceState(rustBaseUrl);
+    await importEvents(rules.cycle.events);
+    for (const did of rules.cycle.dids) {
+        const docs = await both({ method: 'GET', path: `/api/v1/did/${did}?verify=true`, requiresAdminKey: true });
+        assertEqual('signed cycle rejection parity', normalizeJson(docs[0].body), normalizeJson(docs[1].body));
+        assertEqual('signed cycle retains only agent creation', docs[0].body.didDocumentMetadata?.versionSequence, '1');
+    }
+    console.log('ok controller rules parity: self-control, agent-only owners, immutable creation type, and signed cycle rejection');
+    console.log('ok history recovery parity: same/cross-registry, both key verdicts, predecessors, successors, migration, controller removal, and GC');
+}
+
+await runHistoryRecoveryParity();
 await runMetricsChecks();
 console.log('Gatekeeper parity checks passed');

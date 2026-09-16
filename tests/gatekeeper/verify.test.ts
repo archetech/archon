@@ -86,15 +86,17 @@ describe('verifyDb', () => {
         const ok = await gatekeeper.updateDID(updateOp);
         expect(ok).toBe(true);
 
-        // Can't verify a DID that has been updated if the controller is removed
-        await gatekeeper.removeDIDs([agentDID]);
+        // Corrupt stored evidence after startup to exercise GC's invalid path.
+        const events = await db.getEvents(assetDID);
+        events[1].operation.proof!.proofValue = 'invalid';
+        await db.setEvents(assetDID, events);
 
         const { verified, expired, invalid, total } = await gatekeeper.verifyDb();
 
-        expect(verified).toBe(0);
+        expect(verified).toBe(1);
         expect(expired).toBe(0);
         expect(invalid).toBe(1);
-        expect(total).toBe(1);
+        expect(total).toBe(2);
     });
 
     it('should remove expired DIDs', async () => {

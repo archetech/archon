@@ -50,7 +50,7 @@ The *key concept of this design* is that DID creation is decentralized through I
 
 DIDs are anchored to IPFS prior to any declaration on a registry. This allows DIDs to be created very quickly (less than 10 seconds) and at (virtually) no cost.
 
-The `did:cid` method supports two main types of DID Subject: **agents** and **assets**. Agents have keys and control assets. Assets do not have keys, and are controlled by a single agent (the owner of the asset). The two types have slightly different creation methods.
+The `did:cid` method supports two main types of DID Subject: **agents** and **assets**. Agents have keys and control assets. Agents are self-controlled: an update cannot assign an external controller. Assets do not have keys, and are controlled by a single agent (the owner of the asset); an asset cannot own another asset. The two types have slightly different creation methods.
 
 ### Agents
 
@@ -232,6 +232,7 @@ Example update to rotate keys for an agent DID:
 
 Upon receiving the operation the node must:
 1. Verify the proof is valid for the controller of the DID — for an asset, against the version of the controller's document chosen as described in [Authorizing an operation on a controlled DID](#authorizing-an-operation-on-a-controlled-did).
+1. Validate the resulting controller relationship: agents may omit `didDocument.controller` or name only their own DID; assets must name an existing, active, self-controlled agent. Transfers are signed by the previous owner. The DID kind is fixed by its creation operation. Updates cannot change `type`; registry-only metadata updates may omit it without changing the DID kind.
 1. Verify the previd is identical to the latest version's operation CID.
 1. Record the operation on the DID specified registry (or forward the request to a trusted node that supports the specified registry).
 
@@ -481,7 +482,15 @@ Only the registry's own mediator may mark an event confirmed on that registry. A
 
 Mediators visit discovered batches in chain order but skip unavailable batches or operations and continue with later entries. An unavailable reference cannot be distinguished from a nonexistent one, so it must not indefinitely block the registry. Failures remain in mediator storage across restarts and are retried after new batches; retry failures also do not block later retries. Successful retries clear the previous error. A late import retains its original chain time and ordinal, not the retry time.
 
-Skipping does not declare a reference invalid or establish that controller history is complete. Available events can therefore be applied out of chain order. An asset update signed by a retired key can be accepted while an earlier controller rotation is unavailable, even within one registry; recovering the rotation currently does not revalidate the dependent asset. Authorization with delayed controller history remains the separate correctness problem tracked in [#1150](https://github.com/archetech/archon/issues/1150); this availability policy does not claim to resolve it.
+Skipping does not declare a reference invalid or establish that controller history is complete. A sovereign node derives its best current state from the evidence it has. `confirmed` means the accepted event sequence is anchored on its expected registries; it does not promise that authorization can never change when previously unavailable history arrives.
+
+Gatekeeper retains imported event candidates separately from accepted DID histories. When an import or direct submission changes controller history, it replays affected histories and their transitive dependents against the currently available evidence. A late rotation can remove an asset creation, update, or deletion authorized by a retired key, together with invalid successors. Conversely, a previously rejected operation can become accepted when its authorizing controller version arrives. Operations ordered before the rotation remain valid. Replay uses original chain positions, never recovery times. Removing controller evidence, explicitly or through garbage collection, also revalidates dependents.
+
+Controller constraints are enforced at the shared authorization boundary for direct submissions, imports, and verified replay. Startup reconstruction rejects historical operations that assigned external agent controllers, assigned asset owners that were not agents, or changed DID type. Their candidate evidence remains retained, but those operations and dependent successors are not accepted. Agent histories authorize themselves, and asset histories depend only on agents; replay has no separate oscillation/quarantine policy.
+
+Candidate journals persist across restart, including rejected candidates and replaced branches. Replay reconstructs accepted state before serving resolution after startup and refreshes dependent search and verification state. Existing databases adopt their stored histories into the journal; operations discarded before this upgrade must be recovered by rescanning their anchors. DID exports continue to contain accepted histories, so a DID export alone is not a backup of the candidate journal.
+
+This is convergence on available anchored evidence, not proof of complete history. If a relevant rotation never becomes available, the node cannot take it into account. Gossip hints retain their existing arrival-order semantics; this change does not introduce a trusted ordering for unanchored registries.
 
 ### Implementation boundary: event authorization and proof verification
 
@@ -489,7 +498,7 @@ Import and verified replay share event authorization: select the target state th
 
 Low-level operation verification checks structure, signer, and signature against the selected document; it does not resolve controller history or accept a chain anchor. Do not add a second verification against the `proof.created` document after selecting the chain-position document, since requiring both would change the authorization rule.
 
-This responsibility boundary does not establish that imported controller history is complete. Cross-registry scheduling and late recovery of skipped batch content still require order-independent authorization; see [#1150](https://github.com/archetech/archon/issues/1150) and [#1151](https://github.com/archetech/archon/issues/1151).
+Dependent replay lives at this event authorization boundary and reuses the import algorithm. The availability policy is described in [#1151](https://github.com/archetech/archon/issues/1151), and revisable authorization in [#1150](https://github.com/archetech/archon/issues/1150).
 
 ### Verification Method Format
 

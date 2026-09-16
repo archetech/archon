@@ -106,9 +106,34 @@ async fn controller_for_event(
     .await
 }
 
+async fn creation_type(state: &AppState, did: &str) -> Option<String> {
+    state
+        .store
+        .lock()
+        .await
+        .get_events(did)
+        .first()
+        .and_then(|event| event.operation.pointer("/registration/type"))
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+}
+
+async fn self_controlled_agent(state: &AppState, doc: &Value) -> bool {
+    let Some(id) = doc.pointer("/didDocument/id").and_then(Value::as_str) else {
+        return false;
+    };
+    creation_type(state, id).await.as_deref() == Some("agent")
+        && doc
+            .pointer("/didDocument/controller")
+            .map_or(true, |controller| controller.as_str() == Some(id))
+        && doc
+            .pointer("/didDocumentMetadata/deactivated")
+            .and_then(Value::as_bool)
+            != Some(true)
+}
+
 /// Select authority once, then verify the operation against that document.
-/// `previous` is the target state the operation chains from (especially on
-/// confirmation replacement and replay); `event` supplies trusted provenance.
+/// Agents authorize themselves; assets have exactly one agent as their owner.
 #[async_recursion]
 pub(crate) async fn authorize_operation(
     state: &AppState,
@@ -118,44 +143,99 @@ pub(crate) async fn authorize_operation(
 ) -> Result<bool> {
     match operation.get("type").and_then(Value::as_str) {
         Some("create") => {
-            let mut controller = None;
-            if operation
+            let kind = operation
                 .pointer("/registration/type")
-                .and_then(Value::as_str)
-                == Some("asset")
-                && verify_proof_format(operation.get("proof"))
-            {
+                .and_then(Value::as_str);
+            if kind == Some("agent") && operation.get("controller").is_some() {
+                return Ok(false);
+            }
+            let mut controller = None;
+            if kind == Some("asset") && verify_proof_format(operation.get("proof")) {
                 if let Some(did) = operation.get("controller").and_then(Value::as_str) {
                     controller = Some(controller_for_event(state, did, operation, event).await?);
+                }
+            }
+            if kind == Some("asset") {
+                let Some(owner) = controller.as_ref() else {
+                    return Ok(false);
+                };
+                if !self_controlled_agent(state, owner).await {
+                    return Ok(false);
                 }
             }
             verify_create_operation_impl(operation, controller.as_ref())
         }
         Some("update" | "delete") => {
-            let mut authority = match previous {
+            let did = operation
+                .get("did")
+                .and_then(Value::as_str)
+                .context("Invalid operation: missing operation.did")?;
+            let current = match previous {
                 Some(doc) => doc.clone(),
-                None => {
-                    let did = operation
-                        .get("did")
-                        .and_then(Value::as_str)
-                        .context("Invalid operation: missing operation.did")?;
-                    resolve_local_doc_async(state, did, ResolveOptions::default()).await?
-                }
+                None => resolve_local_doc_async(state, did, ResolveOptions::default()).await?,
             };
-            while verify_proof_format(operation.get("proof"))
-                && authority
-                    .pointer("/didDocumentMetadata/deactivated")
-                    .and_then(Value::as_bool)
-                    != Some(true)
+            let creation_kind = creation_type(state, did).await;
+            let kind = creation_kind.as_deref();
+            if current
+                .pointer("/didDocumentMetadata/deactivated")
+                .and_then(Value::as_bool)
+                == Some(true)
+                || !verify_proof_format(operation.get("proof"))
             {
-                let Some(did) = authority
-                    .pointer("/didDocument/controller")
-                    .and_then(Value::as_str)
-                else {
-                    break;
-                };
-                authority = controller_for_event(state, did, operation, event).await?;
+                return Ok(false);
             }
+            if let Some(next_kind) = operation.pointer("/doc/didDocumentRegistration/type") {
+                if next_kind.as_str() != kind {
+                    return Ok(false);
+                }
+            }
+            let next = operation
+                .pointer("/doc/didDocument")
+                .unwrap_or(&current["didDocument"]);
+            if next.get("id").and_then(Value::as_str) != Some(did) {
+                return Ok(false);
+            }
+            let authority = match kind {
+                Some("agent") => {
+                    if !self_controlled_agent(state, &current).await
+                        || next
+                            .get("controller")
+                            .is_some_and(|controller| controller.as_str() != Some(did))
+                    {
+                        return Ok(false);
+                    }
+                    current
+                }
+                Some("asset") => {
+                    let Some(controller) = current
+                        .pointer("/didDocument/controller")
+                        .and_then(Value::as_str)
+                    else {
+                        return Ok(false);
+                    };
+                    let Some(next_controller) = next
+                        .get("controller")
+                        .and_then(Value::as_str)
+                        .filter(|did| !did.is_empty())
+                    else {
+                        return Ok(false);
+                    };
+                    let authority =
+                        controller_for_event(state, controller, operation, event).await?;
+                    if !self_controlled_agent(state, &authority).await {
+                        return Ok(false);
+                    }
+                    if next_controller != controller {
+                        let owner =
+                            controller_for_event(state, next_controller, operation, event).await?;
+                        if !self_controlled_agent(state, &owner).await {
+                            return Ok(false);
+                        }
+                    }
+                    authority
+                }
+                _ => return Ok(false),
+            };
             verify_update_operation_impl(operation, &authority)
         }
         _ => Ok(false),
