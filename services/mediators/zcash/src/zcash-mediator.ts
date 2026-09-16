@@ -182,15 +182,6 @@ const zcashImportErrors = new promClient.Counter({
     help: 'Failed import attempts',
 });
 
-// Import stops at a block whose batch could not be retrieved or applied
-// rather than moving past it (#1131), so a batch that stays unretrievable
-// halts confirmation of every later block until it resolves. This names the
-// block, so an operator can see the node has stopped confirming and why.
-const zcashImportStalledHeight = new promClient.Gauge({
-    name: 'zcash_import_stalled_height',
-    help: 'Block height import is stopped at because its batch could not be retrieved or applied; 0 when not stalled',
-});
-
 const zcashReorgs = new promClient.Counter({
     name: 'zcash_reorgs_total',
     help: 'Chain reorganization events detected',
@@ -503,13 +494,15 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
 
     const previousPending = item.processed?.pending;
     let update: DiscoveredItem = { ...item };
+    delete update.error;
+    delete update.processed;
     const end = zcashImportBatchDuration.startTimer();
 
     try {
         update.imported = await gatekeeper.importBatchByCids(cids, metadata);
         update.processed = await gatekeeper.processEvents();
 
-        // If pending count didn't decrease, no progress was made — stop retrying
+        // Record stalled pending work for the retry pass.
         const newPending = update.processed?.pending ?? 0;
         if (!retry && newPending > 0 && previousPending !== undefined && newPending >= previousPending) {
             update.error = `No progress: ${newPending} pending event(s) unresolved`;
@@ -529,72 +522,40 @@ function sameItem(a: DiscoveredItem, b: DiscoveredItem) {
     return a.height === b.height && a.index === b.index && a.txid === b.txid && a.did === b.did;
 }
 
+// An unavailable batch is indistinguishable from a nonexistent reference.
+// Record the failure and continue; it is not evidence of complete history.
+// Failed entries survive restart and are retried after new batches (#1151).
 async function importBatches(): Promise<boolean> {
     const db = await loadDb();
 
-    let stalledAt: number | null = null;
-
     for (const item of db.discovered) {
-        // A block whose batch could not be retrieved or applied last time is
-        // still a gap in the chain's order. It is retried here, in order,
-        // rather than skipped; only an item whose events merely deferred
-        // (imported and processed, some pending) is left to the queue.
-        const stalled = !!item.error && !item.processed;
         let update: DiscoveredItem | undefined;
-
         try {
-            update = await importBatch(item, stalled);
+            update = await importBatch(item);
         }
         catch (error: any) {
-            // OK if DID not found, we'll just try again later
-            if (error.error !== 'DID not found') {
-                console.error(`Error importing ${item.did}: ${error.error || JSON.stringify(error)}`);
-            }
-            // The batch could not be retrieved, so nothing from this block is
-            // applied. Stop rather than move on: an operation in a later block
-            // is judged against the controller history the chain committed
-            // before it, and that history is not complete until this block is
-            // in (#1131). The next cycle retries from here. A fetched batch
-            // whose events merely defer is not a reason to stop -- an event can
-            // wait on a later block, and blocking on it would deadlock a sync.
-            //
-            // Recorded on the item, so the retry pass that follows sees the gap
-            // too and stops at it instead of advancing a later failed block.
-            const stalledError = `${error.error || JSON.stringify(error)}`;
+            zcashImportErrors.inc();
+            const importError = String(error?.error ?? error?.message ?? error);
+            console.warn(`Skipping batch ${item.did} at block ${item.height}: ${importError}`);
+            update = { ...item, error: importError };
+        }
+
+        if (update) {
+            const done = update;
             await jsonPersister.updateDb((db) => {
-                updateDiscoveredItems(db, { ...item, error: stalledError });
+                updateDiscoveredItems(db, done);
             });
-            stalledAt = item.height;
-            console.warn(`Import stalled at block ${item.height} (${item.did}): ${stalledError}`);
-            break;
-        }
-
-        if (!update) {
-            continue;
-        }
-
-        const done = update;
-        await jsonPersister.updateDb((db) => {
-            updateDiscoveredItems(db, done);
-        });
-
-        // importBatch reports a retrieval or apply failure in the item rather
-        // than throwing. Still not applied: stop here for the same reason.
-        if (done.error && !done.processed) {
-            stalledAt = item.height;
-            console.warn(`Import stalled at block ${item.height} (${item.did}): ${done.error}`);
-            break;
         }
     }
-
-    zcashImportStalledHeight.set(stalledAt ?? 0);
 
     return true;
 }
 
 async function retryFailedImports(): Promise<void> {
     const db = await loadDb();
-    const failed = db.discovered.filter(item => item.error && !item.imported);
+    // A failure after importBatchByCids succeeded still needs processEvents.
+    // Retrying only entries without `imported` strands those partial imports.
+    const failed = db.discovered.filter(item => item.error);
 
     if (failed.length === 0) {
         return;
@@ -604,34 +565,21 @@ async function retryFailedImports(): Promise<void> {
 
     for (const item of failed) {
         let update: DiscoveredItem | undefined;
-
         try {
             update = await importBatch(item, true);
         }
         catch (error: any) {
-            if (error.error !== 'DID not found') {
-                console.error(`Retry failed for ${item.did}: ${error.error || JSON.stringify(error)}`);
-            }
-            // Still unretrieved. A later failed block must not be applied
-            // ahead of it, so stop here and try again next pass.
-            break;
+            zcashImportErrors.inc();
+            const importError = String(error?.error ?? error?.message ?? error);
+            console.warn(`Retry failed for ${item.did}: ${importError}`);
+            update = { ...item, error: importError };
         }
 
-        if (!update) {
-            continue;
-        }
-
-        const done = update;
-        await jsonPersister.updateDb((db) => {
-            updateDiscoveredItems(db, done);
-        });
-
-        if (done.imported) {
-            console.log(`Successfully imported ${item.did}`);
-        }
-
-        if (done.error && !done.processed) {
-            break;
+        if (update) {
+            const done = update;
+            await jsonPersister.updateDb((db) => {
+                updateDiscoveredItems(db, done);
+            });
         }
     }
 }

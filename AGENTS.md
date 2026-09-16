@@ -83,3 +83,7 @@ These rules apply to coding agents working in this repository.
 
 - Keep chain-position and controller-history selection in Gatekeeper event authorization, shared by imports, confirmation replacements, reorganization, and verified replay. Low-level operation verification takes an explicitly selected authorizing document and does not resolve chain history. Select replacement/reorganization authority from the operation's predecessor, not the latest state.
 - When changing Gatekeeper resolution metadata, update the resolution algorithm and field-omission rules in `docs/services/gatekeeper/README.md` alongside the implementations and parity tests. Deleted documents omit `updated`, including any earlier update timestamp.
+
+- Chain mediators must skip unavailable batch/operation references and continue importing later entries; unavailable and nonexistent content cannot be distinguished. Persist failed entries for retry across restarts, continue past failures in retry passes too, and retain original chain metadata on recovery. Skipping is not evidence of complete controller history (#1150/#1151). Archon already gossips signed operations and batch assets; do not assume key-change records are absent merely because chain anchors contain references.
+
+- When a maintainer changes an issue’s scope or splits acceptance criteria into a follow-up, synchronize the issue bodies and PR description. Explicitly retain unresolved correctness requirements in the follow-up; resolving a review thread as tracked elsewhere does not mean the defect is fixed.

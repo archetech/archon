@@ -1582,17 +1582,12 @@ export default class Gatekeeper implements GatekeeperInterface {
         return true;
     }
 
-    // Events handed in from outside the node's own registry mediators: a peer
-    // relaying them, or an operator restoring an export. Such a source cannot
-    // vouch that a chain committed an event, and cannot be relied on to deliver
-    // committed events in the chain's order -- an export is sorted by
-    // `proof.created`, not by ordinal. Chain confirmation is therefore accepted
-    // only from `importBatchByCids`, which a mediator drives block by block.
-    // Anything here that claims a chain registry is taken as an unconfirmed
-    // hint: the node's own mediator will confirm it, in order, when its scan
-    // reaches that block. Otherwise a controller rotation could arrive after an
-    // operation the chain committed later than it, and the operation would be
-    // judged against a controller history that was not yet complete (#1131).
+    // Events handed in from a peer or restored export cannot vouch that a
+    // chain committed an event. Chain confirmation is accepted only through
+    // the mediator's CID import; externally supplied chain registrations are
+    // unconfirmed hints. Mediators discover anchors in chain order but skip
+    // unavailable content and retry it later (#1151), so confirmation provenance
+    // does not establish complete or ordered controller history (#1150).
     async importRelayedBatch(batch: GatekeeperEvent[]): Promise<ImportBatchResult> {
         if (!batch || !Array.isArray(batch)) {
             throw new InvalidParameterError('batch');
