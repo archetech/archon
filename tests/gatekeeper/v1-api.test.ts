@@ -439,7 +439,7 @@ describe('/api/v1 DID routes', () => {
             didResolutionMetadata: {},
             didDocumentMetadata: { confirmed: false },
         });
-        const confirmed = { didDocument: { id: 'did:cid:abc' }, didDocumentMetadata: { confirmed: true } };
+        const confirmed = { didDocument: { id: 'did:cid:abc' }, didDocumentMetadata: { confirmed: true, versionSequence: '1' } };
         global.fetch = jest.fn<any>().mockResolvedValue({ ok: true, json: async () => confirmed });
 
         const response = await request(app).get('/api/v1/did/did:cid:abc?confirm=true');
