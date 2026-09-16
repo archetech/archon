@@ -477,7 +477,11 @@ An operation on an asset — create, update, or delete — is authorized by a ke
 
 A proof whose key the controller had retired by the operation's position is rejected. That also rejects an operation genuinely signed before a rotation but committed to the chain after it; the remedy is to sign it again with the current key. An agent's updates to its own document are unaffected: they are verified against its current document.
 
-Only the registry's own mediator, importing each block's batch in order, may mark an event confirmed on that registry. An event received from a relaying peer or restored from an export is taken as an unconfirmed hint whatever it claims, and confirms when the node's own mediator reaches its block — a relay cannot vouch for the chain or for its order, and an operation must not be judged against a controller history the chain committed more of than the node has yet applied. For the same reason a mediator does not advance past a block whose batch it could not retrieve.
+Only the registry's own mediator may mark an event confirmed on that registry. An event received from a relaying peer or restored from an export is taken as an unconfirmed hint whatever it claims, and confirms when the node's own mediator imports its chain record. Non-local operations and batch assets are distributed through gossip; a chain reference alone does not guarantee their availability.
+
+Mediators visit discovered batches in chain order but skip unavailable batches or operations and continue with later entries. An unavailable reference cannot be distinguished from a nonexistent one, so it must not indefinitely block the registry. Failures remain in mediator storage across restarts and are retried after new batches; retry failures also do not block later retries. Successful retries clear the previous error. A late import retains its original chain time and ordinal, not the retry time.
+
+Skipping does not declare a reference invalid or establish that controller history is complete. Available events can therefore be applied out of chain order. Authorization with delayed controller history remains the separate correctness problem tracked in [#1150](https://github.com/archetech/archon/issues/1150); this availability policy does not claim to resolve it.
 
 ### Implementation boundary: event authorization and proof verification
 
@@ -485,7 +489,7 @@ Import and verified replay share event authorization: select the target state th
 
 Low-level operation verification checks structure, signer, and signature against the selected document; it does not resolve controller history or accept a chain anchor. Do not add a second verification against the `proof.created` document after selecting the chain-position document, since requiring both would change the authorization rule.
 
-This responsibility boundary does not establish that imported controller history is complete. Cross-registry import scheduling and unavailable batch content still require protocol decisions; see [#1150](https://github.com/archetech/archon/issues/1150) and [#1151](https://github.com/archetech/archon/issues/1151).
+This responsibility boundary does not establish that imported controller history is complete. Cross-registry scheduling and late recovery of skipped batch content still require order-independent authorization; see [#1150](https://github.com/archetech/archon/issues/1150) and [#1151](https://github.com/archetech/archon/issues/1151).
 
 ### Verification Method Format
 
