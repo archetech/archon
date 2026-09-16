@@ -1772,12 +1772,17 @@ impl JsonDb {
         if lower.is_none() && upper.is_none() {
             return None;
         }
-        Some(json!({
+        let mut timestamp = json!({
             "chain": registry,
-            "opid": version_id,
-            "lowerBound": lower.unwrap_or(Value::Null),
-            "upperBound": upper.unwrap_or(Value::Null)
-        }))
+            "opid": version_id
+        });
+        if let Some(lower) = lower {
+            timestamp["lowerBound"] = lower;
+        }
+        if let Some(upper) = upper {
+            timestamp["upperBound"] = upper;
+        }
+        Some(timestamp)
     }
 
     fn resolve_doc(&self, _config: &Config, did: &str, options: ResolveOptions) -> Result<Value> {

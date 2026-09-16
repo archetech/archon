@@ -426,7 +426,7 @@ This method defines two dereferenceable resources, selected by the DID URL path:
     "chain": "BTC:mainnet",
     "opid": "bagaaiera...",
     "lowerBound": { "time": 1768424000, "timeISO": "2026-01-14T19:33:20Z", "blockid": "0000...", "height": 878123 },
-    "upperBound": { "time": 1768425200, "timeISO": "2026-01-14T19:53:20Z", "blockid": "0000...", "height": 878125, "txid": "…", "txidx": 3 }
+    "upperBound": { "time": 1768425200, "timeISO": "2026-01-14T19:53:20Z", "blockid": "0000...", "height": 878125, "txid": "…", "txidx": 3, "opidx": 0 }
   }
 }
 ```

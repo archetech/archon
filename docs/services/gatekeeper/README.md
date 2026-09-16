@@ -361,8 +361,8 @@ standards-conformant `/1.0/identifiers/:did` surface returns only the
     "timestamp": {                             // internal/API provenance; omitted from /1.0/identifiers
       "chain": "BTC:signet",
       "opid": "<CID>",
-      "lowerBound": { time, timeISO, blockid, height } | null,
-      "upperBound": { time, timeISO, blockid, height, txid, txidx, batchid, opidx } | null
+      "lowerBound": { time, timeISO, blockid, height }, // omitted when unknown
+      "upperBound": { time, timeISO, blockid, height, txid, txidx, batchid, opidx } // omitted when unknown
     }
   },
   "didDocumentData": <arbitrary>,             // assets carry user data here
@@ -720,7 +720,9 @@ with a `height` (upper bound), look up the matching block(s) via
 }
 ```
 
-Each bound is `null` when unknown.
+Each bound is omitted when unknown. CID batch import derives `registration.opidx`
+from the operation’s zero-based position in the supplied CID list, overriding any
+batch-level value. It appears in `upperBound` when the anchoring block is known.
 
 ### 6.4 Final clean-up
 

@@ -1062,6 +1062,19 @@ mod tests {
         assert_eq!(timestamp["upperBound"]["height"], 101);
         assert_eq!(timestamp["upperBound"]["txid"], "zec-txid");
         assert_eq!(timestamp["upperBound"]["txidx"], 3);
+        assert_eq!(timestamp["upperBound"]["opidx"], 0);
+
+        let mut event = db.get_events(did)[0].clone();
+        event.operation.as_object_mut().unwrap().remove("blockid");
+        let upper_only = db.build_timestamp("ZEC:mainnet", "create-op", &event).unwrap();
+        assert!(upper_only.get("lowerBound").is_none());
+        assert!(upper_only.get("upperBound").is_some());
+        event.operation["blockid"] = json!("zec-lower-block");
+        event.registration = None;
+        let lower_only = db.build_timestamp("ZEC:mainnet", "create-op", &event).unwrap();
+        assert!(lower_only.get("upperBound").is_none());
+        event.operation.as_object_mut().unwrap().remove("blockid");
+        assert!(db.build_timestamp("ZEC:mainnet", "create-op", &event).is_none());
     }
 
     #[test]
