@@ -101,3 +101,5 @@ These rules apply to coding agents working in this repository.
 - Confirm-fallback eligibility compares the confirmed prefix with local resolution under the same version/time bounds. Peer replies must match the DID, respect those bounds, and advance existing confirmed state; HTTP delegation must not mutate local history.
 
 - CID batch ingress derives `registration.opidx` from the original CID-list index in both ports, independently of the batch ordinal prefix; parity coverage must record the anchoring block to exercise timestamp metadata.
+
+- Treat startup health timeouts after replay changes as performance regressions to measure, not merely timeout settings to increase. Benchmark populated histories in isolation; agents are self-controlled, so replay their histories before assets without repeatedly rebuilding each controller’s dependents. Finish snapshot comparisons before resetting benchmark storage.

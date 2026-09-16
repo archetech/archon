@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 
 use crate::{config::Config, generate_json_cid};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub(crate) struct EventRecord {
     pub(crate) registry: String,
     pub(crate) time: String,
@@ -382,6 +382,76 @@ impl JsonDb {
             backend,
             data,
             redis_connection,
+        })
+    }
+
+    // Startup reads a bounded batch at a time instead of issuing two round trips
+    // per DID. Other backends retain their ordinary history-read semantics.
+    pub(crate) fn get_histories(
+        &self,
+        dids: &[String],
+    ) -> Result<HashMap<String, Vec<EventRecord>>> {
+        if !matches!(self.backend, DbBackend::Redis { .. }) {
+            return Ok(dids
+                .iter()
+                .map(|did| (did.clone(), self.get_events(did)))
+                .collect());
+        }
+        self.with_redis_connection(|conn, namespace| {
+            let mut histories = HashMap::new();
+            for batch in dids.chunks(256) {
+                let mut pipe = redis::pipe();
+                for did in batch {
+                    pipe.cmd("LRANGE")
+                        .arg(Self::redis_did_key(namespace, did)?)
+                        .arg(0)
+                        .arg(-1);
+                }
+                let rows: Vec<Vec<String>> = pipe.query(conn)?;
+                let mut parsed = Vec::new();
+                let mut ids = std::collections::HashSet::new();
+                for events in rows {
+                    let events: Vec<EventRecord> = events
+                        .iter()
+                        .map(|raw| serde_json::from_str(raw))
+                        .collect::<std::result::Result<_, _>>()?;
+                    for event in &events {
+                        if event.operation.is_null() {
+                            if let Some(opid) = &event.opid {
+                                ids.insert(opid.clone());
+                            }
+                        }
+                    }
+                    parsed.push(events);
+                }
+                let ids: Vec<_> = ids.into_iter().collect();
+                let mut operations = HashMap::new();
+                if !ids.is_empty() {
+                    let keys: Vec<_> = ids
+                        .iter()
+                        .map(|id| Self::redis_operation_key(namespace, id))
+                        .collect();
+                    let values: Vec<Option<String>> = conn.get(keys)?;
+                    for (id, raw) in ids.into_iter().zip(values) {
+                        if let Some(raw) = raw {
+                            operations.insert(id, serde_json::from_str::<Value>(&raw)?);
+                        }
+                    }
+                }
+                for (did, mut events) in batch.iter().zip(parsed) {
+                    for event in &mut events {
+                        if event.operation.is_null() {
+                            if let Some(operation) =
+                                event.opid.as_ref().and_then(|id| operations.get(id))
+                            {
+                                event.operation = operation.clone();
+                            }
+                        }
+                    }
+                    histories.insert(did.clone(), events);
+                }
+            }
+            Ok(histories)
         })
     }
 
@@ -2232,5 +2302,67 @@ impl GatekeeperDb for JsonDb {
     }
     fn resolve_doc(&self, config: &Config, did: &str, options: ResolveOptions) -> Result<Value> {
         JsonDb::resolve_doc(self, config, did, options)
+    }
+}
+
+#[cfg(test)]
+mod startup_read_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires isolated Redis via ARCHON_TEST_REDIS_URL"]
+    fn redis_batched_histories_match_individual_reads() -> Result<()> {
+        let url = env::var("ARCHON_TEST_REDIS_URL")?;
+        let client = redis::Client::open(url.as_str())?;
+        let mut conn = client.get_connection()?;
+        let directory = tempfile::tempdir()?;
+        let namespace = format!(
+            "startup-test-{}",
+            directory.path().file_name().unwrap().to_string_lossy()
+        );
+        let operation = json!({"type": "create", "data": {"test": true}});
+        let op_key = JsonDb::redis_operation_key(&namespace, "op");
+        let _: () = conn.set(&op_key, operation.to_string())?;
+        let mut dids = Vec::new();
+        let mut keys = vec![op_key];
+        // Cross the batch boundary; include inline operations, shared cached
+        // operations, missing cache entries, and a missing DID.
+        for index in 0..257 {
+            let did = format!("did:cid:test-{index}");
+            let key = JsonDb::redis_did_key(&namespace, &did)?;
+            for event in [
+                json!({"registry": "hyperswarm", "time": "now", "opid": "op"}),
+                json!({"registry": "hyperswarm", "time": "now", "operation": operation}),
+                json!({"registry": "hyperswarm", "time": "now", "opid": "missing"}),
+            ] {
+                let _: usize = conn.rpush(&key, event.to_string())?;
+            }
+            dids.push(did);
+            keys.push(key);
+        }
+        dids.push("did:cid:absent".to_string());
+        let db = JsonDb {
+            backend: DbBackend::Redis {
+                url,
+                namespace: namespace.clone(),
+            },
+            data: JsonDbFile::default(),
+            redis_connection: Some(StdMutex::new(client.get_connection()?)),
+        };
+        let batch = db.get_histories(&dids)?;
+        for did in &dids {
+            assert!(
+                batch[did] == db.get_events(did),
+                "batch differs from individual read"
+            );
+        }
+        let bad_key = JsonDb::redis_did_key(&namespace, &dids[0])?;
+        let _: usize = conn.rpush(&bad_key, "malformed JSON")?;
+        assert!(
+            db.get_histories(&dids).is_err(),
+            "startup must propagate corrupt storage"
+        );
+        let _: usize = conn.del(keys)?;
+        Ok(())
     }
 }

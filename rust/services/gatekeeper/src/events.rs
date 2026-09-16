@@ -589,6 +589,12 @@ pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) 
         *state.history_ready.lock().await = false;
         return ImportStatus::Deferred;
     }
+    // Publish search state only after authorization replay has settled. The
+    // insertion primitive also runs in an isolated replay view, where indexing
+    // every intermediate version is unnecessary work.
+    if matches!(status, ImportStatus::Added) {
+        update_search_doc(state, &did).await;
+    }
     let accepted = state
         .store
         .lock()
@@ -708,7 +714,6 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
                     let mut store = state.store.lock().await;
                     let _ = store.set_events(&did, current_events);
                 }
-                update_search_doc(state, &did).await;
                 if trace {
                     info!(
                         "process_events added reason=replace_with_expected_registry expected_registry={} did={} opid={}",
@@ -805,7 +810,6 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
                 store.add_create_event(&did, event.clone()).is_ok()
             };
             return if added {
-                update_search_doc(state, &did).await;
                 if trace {
                     info!("process_events added reason=create did={} opid={}", did, opid);
                 }
@@ -832,7 +836,6 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
                 store.add_followup_event(&did, event.clone()).is_ok()
             };
             return if added {
-                update_search_doc(state, &did).await;
                 if trace {
                     info!(
                         "process_events added reason=append_followup did={} opid={} previd={}",
@@ -867,7 +870,6 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
                     let mut store = state.store.lock().await;
                     let _ = store.set_events(&did, new_sequence);
                 }
-                update_search_doc(state, &did).await;
                 if trace {
                     info!(
                         "process_events added reason=insert_reorg did={} opid={} previd={} next_registry={} expected_registry={}",
