@@ -1952,7 +1952,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     ordinal: [...metadata.ordinal, i],
                     operation: op,
                     opid: cid,
-                    registration: metadata.registration,
+                    registration: metadata.registration ? { ...metadata.registration, opidx: i } : undefined,
                 });
             }
         }
