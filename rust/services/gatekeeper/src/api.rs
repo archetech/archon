@@ -22,6 +22,7 @@ use tracing::error;
 use crate::{
     build_search_index, chrono_like_now, classify_conformant_error, clear_search_index,
     delete_search_doc, generate_did_from_operation, handle_did_operation, import_batch_impl,
+    relay_hints,
     normalize_path, process_events_impl, query_docs_impl, record_metrics, refresh_metrics_snapshot,
     is_valid_did, resolve_local_doc_async, search_docs_impl, verify_db_impl, AppState, BlockLookup,
     GatekeeperDb, ResolveOptions,
@@ -270,7 +271,8 @@ pub(crate) async fn list_dids(
             .get("verify")
             .and_then(Value::as_bool)
             .unwrap_or(false),
-    };
+            version_ordinal: None,
+        };
     let requested = payload.get("dids").and_then(Value::as_array).map(|items| {
         items
             .iter()
@@ -469,7 +471,8 @@ pub(crate) async fn import_dids(
         .flat_map(|events| events.iter().cloned())
         .collect::<Vec<_>>();
 
-    let result = import_batch_impl(&state, &flat_batch).await;
+    // A DID export handed back in cannot vouch for a chain's confirmation.
+    let result = import_batch_impl(&state, &relay_hints(&flat_batch)).await;
     record_metrics(
         &state,
         "POST",
@@ -598,7 +601,7 @@ pub(crate) async fn import_batch(
         }
     };
 
-    let result = import_batch_impl(&state, &batch).await;
+    let result = import_batch_impl(&state, &relay_hints(&batch)).await;
     record_metrics(
         &state,
         "POST",
@@ -1090,7 +1093,8 @@ pub(crate) async fn resolve_did(
             .get("verify")
             .map(|value| value == "true")
             .unwrap_or(false),
-    };
+            version_ordinal: None,
+        };
 
     let local_doc = match resolve_local_doc_async(&state, &did, resolve_options.clone()).await {
         Ok(doc) => doc,
@@ -1259,6 +1263,7 @@ async fn resolve_conformant(
             .and_then(|value| value.parse::<usize>().ok()),
         confirm: true,
         verify: true,
+        version_ordinal: None,
     };
 
     let status_for = |error_kind: &str| -> StatusCode {
@@ -2218,9 +2223,30 @@ fn error_json(message: &str) -> Json<Value> {
     Json(json!({ "error": message }))
 }
 
+// An operation by CID, as a mediator's batch names it. JSON is stored as a
+// block (`addJSON` puts it with `block/put`; `GET /ipfs/json/:cid` reads it
+// with `block/get`), so it is read the same way here: `cat` serves UnixFS
+// files and cannot return such a block, and reading through it left a node
+// unable to confirm any chain batch whose operations it did not already hold.
 async fn fetch_ipfs_json(state: &AppState, cid: &str) -> Option<Value> {
-    let response = proxy_ipfs_cat_raw(state, cid).await.ok()?;
-    let (_status, body) = response;
+    let url = format!("{}/block/get", state.config.ipfs_url.trim_end_matches('/'));
+    let response = state
+        .client
+        .post(url)
+        .query(&[("arg", cid)])
+        .send()
+        .await
+        .map_err(|error| error!("ipfs block get failed for {cid}: {error}"))
+        .ok()?;
+    if !response.status().is_success() {
+        error!("ipfs block get for {cid} returned {}", response.status());
+        return None;
+    }
+    let body = response
+        .bytes()
+        .await
+        .map_err(|error| error!("ipfs block get body read failed for {cid}: {error}"))
+        .ok()?;
     serde_json::from_slice::<Value>(&body).ok()
 }
 

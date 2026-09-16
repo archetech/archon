@@ -515,8 +515,281 @@ await resetServiceState(rustBaseUrl);
 await runApiFixtures();
 await runDeterministicVectorChecks();
 await runApiFlows();
+// A confirmed resolution stops at the last confirmed version. The Rust store
+// resolver judged confirmation by the previous event's state and applied the
+// first unconfirmed one, so the two ports resolved a controller with a pending
+// update to different versions -- and, once a rotation is pending, to
+// different keys, forking on every asset operation in that window. Nothing
+// declarative reaches this: the update has to chain to a DID created in the
+// run, so it is built and signed here.
+async function runConfirmParity() {
+    const keypair = cipher.generateRandomJwk();
+    const sign = op => {
+        const { proof, ...unsecured } = op;
+        void proof;
+        return fuzzHexToBase64url(cipher.signHash(cipher.hashJSON(unsecured), keypair.privateJwk));
+    };
+    const post = (path, body) => ({ method: 'POST', path, body, requiresAdminKey: true, headers: { 'content-type': 'application/json' } });
+    const get = path => ({ method: 'GET', path, requiresAdminKey: true });
+    const both = fixture => Promise.all([request(tsBaseUrl, fixture), request(rustBaseUrl, fixture)]);
+
+    const createOp = {
+        type: 'create',
+        created: '2026-04-11T12:00:00Z',
+        publicJwk: keypair.publicJwk,
+        registration: { version: 1, type: 'agent', registry: 'local' },
+    };
+    createOp.proof = {
+        type: 'EcdsaSecp256k1Signature2019',
+        created: '2026-04-11T12:00:00Z',
+        verificationMethod: '#key-1',
+        proofPurpose: 'authentication',
+        proofValue: sign(createOp),
+    };
+    const [tsCreate, rustCreate] = await both(post('/api/v1/did', createOp));
+    if (tsCreate.status !== 200 || rustCreate.status !== 200 || tsCreate.body !== rustCreate.body) {
+        throw new Error(`confirm parity: agent create disagreed (TS ${tsCreate.status} ${JSON.stringify(tsCreate.body)}, Rust ${rustCreate.status} ${JSON.stringify(rustCreate.body)})`);
+    }
+    const did = tsCreate.body;
+
+    const [tsV1] = await both(get(`/api/v1/did/${did}`));
+    const updateOp = {
+        type: 'update',
+        did,
+        previd: tsV1.body.didDocumentMetadata.versionId,
+        doc: { didDocumentData: { displayName: 'pending' } },
+    };
+    updateOp.proof = {
+        type: 'EcdsaSecp256k1Signature2019',
+        created: '2026-04-11T12:05:00Z',
+        verificationMethod: `${did}#key-1`,
+        proofPurpose: 'authentication',
+        proofValue: sign(updateOp),
+    };
+
+    // The update arrives as a hyperswarm event: unconfirmed for a local DID.
+    const event = { registry: 'hyperswarm', time: '2026-04-11T12:05:00Z', ordinal: [1], operation: updateOp };
+    const [tsImport, rustImport] = await both(post('/api/v1/batch/import', [event]));
+    if (tsImport.status !== 200 || rustImport.status !== 200) {
+        throw new Error(`confirm parity: import disagreed (TS ${tsImport.status}, Rust ${rustImport.status})`);
+    }
+    await both({ method: 'POST', path: '/api/v1/events/process', requiresAdminKey: true });
+
+    const [tsPlain, rustPlain] = await both(get(`/api/v1/did/${did}`));
+    assertEqual('confirm parity: unconfirmed resolution', normalizeJson(tsPlain.body), normalizeJson(rustPlain.body));
+    if (tsPlain.body.didDocumentMetadata.versionSequence !== '2') {
+        throw new Error(`confirm parity: the unconfirmed update did not apply (version ${tsPlain.body.didDocumentMetadata.versionSequence}); the check would be vacuous`);
+    }
+
+    const [tsConfirmed, rustConfirmed] = await both(get(`/api/v1/did/${did}?confirm=true`));
+    assertEqual('confirm parity: confirmed resolution', normalizeJson(tsConfirmed.body), normalizeJson(rustConfirmed.body));
+    const metadata = tsConfirmed.body.didDocumentMetadata;
+    if (metadata.versionSequence !== '1' || metadata.confirmed !== true) {
+        throw new Error(`confirm parity: confirmed resolution must stop at v1 and say so, got v${metadata.versionSequence} confirmed=${metadata.confirmed}`);
+    }
+    console.log('ok confirm parity: both ports stop a confirmed resolution before the first unconfirmed event');
+}
+
 await resetServiceState(tsBaseUrl);
 await resetServiceState(rustBaseUrl);
 await runStructuralFuzz();
+// The backdating gate (#1131), end to end on both ports through the paths a
+// mediator uses. A controller is confirmed on chain with a rotation; an
+// operation signed with the retired key and dated before the rotation is
+// committed by the chain after it, and both ports must refuse it -- while one
+// the chain committed earlier in the rotation's own block must be accepted
+// (#1136). And a chain event handed in through the relay ingress must land as
+// an unconfirmed hint on both. Every operation is pinned to the shared IPFS
+// first so both ports fetch identical bytes by CID.
+async function runBackdatingParity() {
+    const legacyProof = (op, keypair, verificationMethod, created) => {
+        const { proof, ...unsecured } = op;
+        void proof;
+        return {
+            type: 'EcdsaSecp256k1Signature2019',
+            created,
+            verificationMethod,
+            proofPurpose: 'authentication',
+            proofValue: fuzzHexToBase64url(cipher.signHash(cipher.hashJSON(unsecured), keypair.privateJwk)),
+        };
+    };
+    const post = (path, body) => ({ method: 'POST', path, body, requiresAdminKey: true, headers: { 'content-type': 'application/json' } });
+    const get = path => ({ method: 'GET', path, requiresAdminKey: true });
+    const both = fixture => Promise.all([request(tsBaseUrl, fixture), request(rustBaseUrl, fixture)]);
+    const agree = (label, [ts, rust]) => {
+        if (ts.status !== rust.status) {
+            throw new Error(`${label}: status disagreed (TS ${ts.status}, Rust ${rust.status})`);
+        }
+        assertEqual(label, normalizeJson(ts.body), normalizeJson(rust.body));
+        return ts;
+    };
+    // Pinned in canonical form, as an anchoring node pins the operations it
+    // queues, so the CID is the one both ports compute for the operation.
+    // `POST /ipfs/json` encodes the body as sent, and a non-canonical CID is
+    // an input no mediator produces.
+    const pin = async op => {
+        const pinned = await request(tsBaseUrl, post('/api/v1/ipfs/json', JSON.parse(cipher.canonicalizeJSON(op))));
+        if (pinned.status !== 200 || typeof pinned.body !== 'string') {
+            throw new Error(`backdating parity: pin failed (${pinned.status} ${JSON.stringify(pinned.body)})`);
+        }
+        return pinned.body;
+    };
+    // What a chain mediator does for one block: import the block's operations
+    // by CID with the block's position, then apply.
+    const commit = async (cids, height, time) => {
+        const imported = agree(`backdating parity: commit block ${height}`, await both(post('/api/v1/batch/import/cids', {
+            cids,
+            metadata: { registry: 'BTC:signet', time, ordinal: [height], registration: { height, index: 0, txid: `tx${height}`, batch: `b${height}` } },
+        })));
+        if (imported.body.rejected !== 0) {
+            throw new Error(`backdating parity: block ${height} import rejected ${imported.body.rejected} operation(s) before processing`);
+        }
+        return agree(`backdating parity: process block ${height}`, await both({ method: 'POST', path: '/api/v1/events/process', requiresAdminKey: true }));
+    };
+    const T = hours => new Date(Date.UTC(2026, 3, 11, 12 + hours, 0, 0)).toISOString();
+
+    const setup = async () => {
+        const k1 = cipher.generateRandomJwk();
+        const k2 = cipher.generateRandomJwk();
+        const createOp = { type: 'create', created: T(0), publicJwk: k1.publicJwk, registration: { version: 1, type: 'agent', registry: 'BTC:signet' } };
+        createOp.proof = legacyProof(createOp, k1, '#key-1', T(0));
+        const alice = agree('backdating parity: create controller', await both(post('/api/v1/did', createOp))).body;
+
+        const assetOp = { type: 'create', created: T(0), registration: { version: 1, type: 'asset', registry: 'BTC:signet' }, controller: alice, data: { mock: true } };
+        assetOp.proof = legacyProof(assetOp, k1, `${alice}#key-1`, T(0));
+        const asset = agree('backdating parity: create asset', await both(post('/api/v1/did', assetOp))).body;
+
+        const v1 = agree('backdating parity: resolve controller v1', await both(get(`/api/v1/did/${alice}`))).body;
+        const rotated = JSON.parse(JSON.stringify(v1.didDocument));
+        rotated.verificationMethod[0].publicKeyJwk = k2.publicJwk;
+        const rotationOp = { type: 'update', did: alice, previd: v1.didDocumentMetadata.versionId, doc: { didDocument: rotated } };
+        rotationOp.proof = legacyProof(rotationOp, k1, `${alice}#key-1`, T(0));
+        agree('backdating parity: rotate controller', await both(post('/api/v1/did', rotationOp)));
+
+        const cids = { create: await pin(createOp), asset: await pin(assetOp), rotation: await pin(rotationOp) };
+        return { k1, k2, alice, asset, cids };
+    };
+    const forgeryOn = async (asset, alice, k1, created, data) => {
+        const current = agree('backdating parity: resolve asset', await both(get(`/api/v1/did/${asset}`))).body;
+        const op = { type: 'update', did: asset, previd: current.didDocumentMetadata.versionId, doc: { didDocumentData: data } };
+        op.proof = legacyProof(op, k1, `${alice}#key-1`, created);
+        return op;
+    };
+
+    // 1. Committed after the rotation: refused by both.
+    {
+        const { k1, k2, alice, asset, cids } = await setup();
+        await commit([cids.create, cids.asset], 100, T(0));
+        await commit([cids.rotation], 200, T(1));
+        const confirmed = agree('backdating parity: controller confirmed', await both(get(`/api/v1/did/${alice}?confirm=true`))).body;
+        if (confirmed.didDocumentMetadata.confirmed !== true || JSON.stringify(confirmed.didDocument.verificationMethod[0].publicKeyJwk) !== JSON.stringify(k2.publicJwk)) {
+            throw new Error('backdating parity: the rotation did not confirm; the forgery check would be vacuous');
+        }
+
+        const forged = await forgeryOn(asset, alice, k1, T(0), { stolen: true });
+        const processed = await commit([await pin(forged)], 300, T(2));
+        if (processed.body.rejected !== 1 || processed.body.added !== 0) {
+            throw new Error(`backdating parity: a forgery committed after the rotation was not refused (${JSON.stringify(processed.body)})`);
+        }
+        const after = agree('backdating parity: asset after forgery', await both(get(`/api/v1/did/${asset}?confirm=true`))).body;
+        if (after.didDocumentData?.stolen === true) {
+            throw new Error('backdating parity: the forgery reached the confirmed document');
+        }
+    }
+
+    // 2. Committed earlier in the rotation's own block: accepted by both.
+    await resetServiceState(tsBaseUrl);
+    await resetServiceState(rustBaseUrl);
+    {
+        const { k1, alice, asset, cids } = await setup();
+        await commit([cids.create, cids.asset], 100, T(0));
+        const genuine = await forgeryOn(asset, alice, k1, T(0), { legit: true });
+        const processed = await commit([await pin(genuine), cids.rotation], 200, T(1));
+        if (processed.body.rejected !== 0 || processed.body.added !== 2) {
+            throw new Error(`backdating parity: an operation committed before the rotation in the same block was not accepted (${JSON.stringify(processed.body)})`);
+        }
+        const after = agree('backdating parity: asset after same-block', await both(get(`/api/v1/did/${asset}?confirm=true`))).body;
+        if (after.didDocumentData?.legit !== true) {
+            throw new Error('backdating parity: the genuine operation did not reach the confirmed document');
+        }
+    }
+
+    // 3. A chain event through the relay ingress is a hint on both.
+    await resetServiceState(tsBaseUrl);
+    await resetServiceState(rustBaseUrl);
+    {
+        const keypair = cipher.generateRandomJwk();
+        const createOp = { type: 'create', created: T(0), publicJwk: keypair.publicJwk, registration: { version: 1, type: 'agent', registry: 'BTC:signet' } };
+        createOp.proof = legacyProof(createOp, keypair, '#key-1', T(0));
+        const did = agree('backdating parity: relay create', await both(post('/api/v1/did', createOp))).body;
+        const claimed = { registry: 'BTC:signet', time: T(0), ordinal: [100, 0], registration: { height: 100, index: 0, txid: 'tx100', batch: 'b100' }, operation: createOp };
+        agree('backdating parity: relay import', await both(post('/api/v1/batch/import', [claimed])));
+        agree('backdating parity: relay process', await both({ method: 'POST', path: '/api/v1/events/process', requiresAdminKey: true }));
+        const exported = agree('backdating parity: relay export', await both(post('/api/v1/batch/export', { dids: [did] }))).body;
+        if (exported[0].registry !== 'local' || exported[0].registration !== undefined) {
+            throw new Error(`backdating parity: a relayed chain event was honoured as confirmed (${JSON.stringify(exported[0].registry)})`);
+        }
+    }
+
+    // 4. The same complete set of operations reaches fresh nodes with the
+    //    rotation and the forgery relayed in both orders; the confirmed
+    //    verdict must agree across the ports and across the orders. Nothing
+    //    but the two creates is applied before the relays land.
+    await resetServiceState(tsBaseUrl);
+    await resetServiceState(rustBaseUrl);
+    {
+        const k1 = cipher.generateRandomJwk();
+        const k2 = cipher.generateRandomJwk();
+        const createOp = { type: 'create', created: T(0), publicJwk: k1.publicJwk, registration: { version: 1, type: 'agent', registry: 'BTC:signet' } };
+        createOp.proof = legacyProof(createOp, k1, '#key-1', T(0));
+        const alice = agree('backdating parity: permute create', await both(post('/api/v1/did', createOp))).body;
+        const assetOp = { type: 'create', created: T(0), registration: { version: 1, type: 'asset', registry: 'BTC:signet' }, controller: alice, data: { mock: true } };
+        assetOp.proof = legacyProof(assetOp, k1, `${alice}#key-1`, T(0));
+        const asset = agree('backdating parity: permute asset', await both(post('/api/v1/did', assetOp))).body;
+        const v1 = agree('backdating parity: permute v1', await both(get(`/api/v1/did/${alice}`))).body;
+        const rotated = JSON.parse(JSON.stringify(v1.didDocument));
+        rotated.verificationMethod[0].publicKeyJwk = k2.publicJwk;
+        const rotationOp = { type: 'update', did: alice, previd: v1.didDocumentMetadata.versionId, doc: { didDocument: rotated } };
+        rotationOp.proof = legacyProof(rotationOp, k1, `${alice}#key-1`, T(0));
+        const forged = await forgeryOn(asset, alice, k1, T(0), { stolen: true });
+        const cids = { create: await pin(createOp), asset: await pin(assetOp), rotation: await pin(rotationOp), forgery: await pin(forged) };
+        const relay = (height, time, operation) => ({ registry: 'BTC:signet', time, ordinal: [height, 0], registration: { height, index: 0, txid: `tx${height}`, batch: `b${height}` }, operation });
+        const rotationEvent = relay(200, T(1), rotationOp);
+        const forgeryEvent = relay(300, T(2), forged);
+
+        const outcomes = [];
+        for (const forgeryFirst of [false, true]) {
+            await resetServiceState(tsBaseUrl);
+            await resetServiceState(rustBaseUrl);
+            agree('backdating parity: permute recreate', await both(post('/api/v1/did', createOp)));
+            agree('backdating parity: permute recreate asset', await both(post('/api/v1/did', assetOp)));
+            for (const event of forgeryFirst ? [forgeryEvent, rotationEvent] : [rotationEvent, forgeryEvent]) {
+                agree('backdating parity: permute relay', await both(post('/api/v1/batch/import', [event])));
+                agree('backdating parity: permute relay process', await both({ method: 'POST', path: '/api/v1/events/process', requiresAdminKey: true }));
+            }
+            await commit([cids.create, cids.asset], 100, T(0));
+            await commit([cids.rotation], 200, T(1));
+            await commit([cids.forgery], 300, T(2));
+            const controller = agree(`backdating parity: permute controller (forgery first: ${forgeryFirst})`, await both(get(`/api/v1/did/${alice}?confirm=true`))).body;
+            const after = agree(`backdating parity: permute asset (forgery first: ${forgeryFirst})`, await both(get(`/api/v1/did/${asset}?confirm=true`))).body;
+            outcomes.push({ key: controller.didDocument.verificationMethod[0].publicKeyJwk, data: after.didDocumentData });
+        }
+        if (JSON.stringify(outcomes[0]) !== JSON.stringify(outcomes[1])) {
+            throw new Error(`backdating parity: the confirmed verdict depended on relay order\n${JSON.stringify(outcomes[0])}\n${JSON.stringify(outcomes[1])}`);
+        }
+        if (JSON.stringify(outcomes[0].key) !== JSON.stringify(k2.publicJwk) || outcomes[0].data?.stolen === true) {
+            throw new Error(`backdating parity: permuted relay ended with the wrong confirmed state ${JSON.stringify(outcomes[0])}`);
+        }
+    }
+
+    console.log('ok backdating parity: both ports refuse a proof the chain committed after the rotation, accept one committed before it, downgrade relayed claims, and agree whichever order relays arrive in');
+}
+
+await resetServiceState(tsBaseUrl);
+await resetServiceState(rustBaseUrl);
+await runConfirmParity();
+await resetServiceState(tsBaseUrl);
+await resetServiceState(rustBaseUrl);
+await runBackdatingParity();
 await runMetricsChecks();
 console.log('Gatekeeper parity checks passed');

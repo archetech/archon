@@ -15,12 +15,13 @@ pub(crate) use app::AppState;
 pub(crate) use config::Config;
 pub(crate) use events::{
     handle_did_operation, import_batch_impl, process_events_impl, queue_outbound_operation,
+    relay_hints,
 };
 pub(crate) use metrics::{normalize_path, record_metrics, Metrics};
 pub(crate) use proofs::{
-    ensure_event_opid, generate_did_from_operation, generate_json_cid, infer_event_did,
-    is_valid_did, verify_create_operation_impl, verify_event_shape, verify_operation_impl,
-    verify_update_operation_impl,
+    anchor_of, ensure_event_opid, generate_did_from_operation, generate_json_cid,
+    infer_event_did, is_unanchored_registry, is_valid_did, verify_create_operation_impl,
+    verify_event_shape, verify_operation_impl, verify_update_operation_impl,
 };
 pub(crate) use resolver::{
     build_search_index, classify_conformant_error, clear_search_index, delete_search_doc,
@@ -34,8 +35,9 @@ pub(crate) use resolver::ResolveError;
 pub(crate) use resolver::check_dids_impl;
 pub(crate) use search_index::SearchIndex;
 pub(crate) use store::{
-    chrono_like_now, event_record_to_value, expected_registry_for_index, value_to_event_record,
-    BlockLookup, EventRecord, GatekeeperDb, JsonDb, ResolveOptions,
+    chrono_like_now, event_record_to_value, expected_registry_for_index, past_cutoff,
+    standard_datetime, value_to_event_record, BlockLookup, EventRecord, GatekeeperDb, JsonDb,
+    ResolveOptions,
 };
 #[cfg(test)]
 mod tests {
@@ -431,7 +433,7 @@ mod tests {
             let mut operation = proof_vectors()["agentCreateValid"]["operation"].clone();
             operation["registration"]["validUntil"] = valid_until;
 
-            verify_create_operation_impl(&state, &operation)
+            verify_create_operation_impl(&state, &operation, None)
                 .await
                 .err()
                 .map(|error| error.to_string())
@@ -516,7 +518,7 @@ mod tests {
         let (state, _dir) = make_state(db);
         let operation = proof_vectors()["agentCreateValidDataIntegrity"]["operation"].clone();
 
-        assert!(verify_create_operation_impl(&state, &operation)
+        assert!(verify_create_operation_impl(&state, &operation, None)
             .await
             .expect("verification should not error"));
 
@@ -525,7 +527,7 @@ mod tests {
         let mut moved = operation;
         moved["proof"]["created"] = json!("2026-04-12T12:00:00Z");
 
-        assert!(!verify_create_operation_impl(&state, &moved)
+        assert!(!verify_create_operation_impl(&state, &moved, None)
             .await
             .expect("verification should not error"));
     }
@@ -984,6 +986,82 @@ mod tests {
         );
     }
 
+    // Every accepted input form reports as UTC, second precision, `Z` -- the
+    // form the TypeScript port emits, and the one clients' millisecond stamps
+    // must collapse to or the ports' metadata timestamps differ on every DID.
+    #[test]
+    fn standard_datetime_matches_the_typescript_normalization() {
+        for (input, expected) in [
+            ("2026-04-11T12:00:00.000Z", "2026-04-11T12:00:00Z"),
+            ("2026-04-11T12:00:00.123Z", "2026-04-11T12:00:00Z"),
+            ("2026-04-11T12:00:00Z", "2026-04-11T12:00:00Z"),
+            ("2026-04-11t12:00:00z", "2026-04-11T12:00:00Z"),
+            ("2026-04-11 12:00:00Z", "2026-04-11T12:00:00Z"),
+            ("2026-04-11T14:00:00+02:00", "2026-04-11T12:00:00Z"),
+        ] {
+            assert_eq!(standard_datetime(input), expected, "input {input}");
+        }
+        assert_eq!(standard_datetime("not a date"), "not a date");
+    }
+
+    // The upper bound of a confirmed create's timestamp comes from the event's
+    // registration, the lower bound from the operation's blockid.
+    #[test]
+    fn resolve_doc_timestamp_uses_event_registration_for_upper_bound() {
+        let config = test_config();
+        let did = "did:cid:bagaaieratimestamp";
+        let (mut db, _temp_dir) = temp_json_db();
+        db.add_block(
+            "ZEC:mainnet",
+            json!({ "hash": "zec-lower-block", "height": 100, "time": 1000 }),
+        )
+        .expect("lower block should be added");
+        db.add_block(
+            "ZEC:mainnet",
+            json!({ "hash": "zec-upper-block", "height": 101, "time": 1100 }),
+        )
+        .expect("upper block should be added");
+        db.data.dids.insert(
+            "bagaaieratimestamp".to_string(),
+            vec![EventRecord {
+                registry: "ZEC:mainnet".to_string(),
+                time: "2026-04-11T12:00:00Z".to_string(),
+                ordinal: Some(vec![101, 3, 0]),
+                operation: json!({
+                    "type": "create",
+                    "created": "2026-04-11T12:00:00Z",
+                    "blockid": "zec-lower-block",
+                    "publicJwk": {},
+                    "registration": {
+                        "version": 1,
+                        "type": "agent",
+                        "registry": "ZEC:mainnet"
+                    }
+                }),
+                opid: Some("create-op".to_string()),
+                did: Some(did.to_string()),
+                registration: Some(json!({
+                    "height": 101,
+                    "index": 3,
+                    "txid": "zec-txid",
+                    "batch": "did:cid:zec-batch",
+                    "opidx": 0
+                })),
+            }],
+        );
+
+        let resolved = db
+            .resolve_doc(&config, did, ResolveOptions::default())
+            .expect("resolve should succeed");
+        let timestamp = &resolved["didDocumentMetadata"]["timestamp"];
+        assert_eq!(timestamp["chain"], "ZEC:mainnet");
+        assert_eq!(timestamp["lowerBound"]["blockid"], "zec-lower-block");
+        assert_eq!(timestamp["upperBound"]["blockid"], "zec-upper-block");
+        assert_eq!(timestamp["upperBound"]["height"], 101);
+        assert_eq!(timestamp["upperBound"]["txid"], "zec-txid");
+        assert_eq!(timestamp["upperBound"]["txidx"], 3);
+    }
+
     #[test]
     fn resolve_doc_supports_confirm_version_sequence_version_time_and_canonical_id() {
         let config = test_config();
@@ -1074,11 +1152,13 @@ mod tests {
                 },
             )
             .expect("confirmed resolve should succeed");
-        assert_eq!(confirmed["didDocumentMetadata"]["confirmed"], false);
-        assert_eq!(confirmed["didDocumentMetadata"]["versionSequence"], "2");
+        // v2 arrived over hyperswarm and is unconfirmed for a local DID: a
+        // confirmed resolution stops before it, at v1, and says so.
+        assert_eq!(confirmed["didDocumentMetadata"]["confirmed"], true);
+        assert_eq!(confirmed["didDocumentMetadata"]["versionSequence"], "1");
         assert_eq!(
             confirmed["didDocumentData"]["displayName"],
-            Value::String("updated".to_string())
+            Value::String("created".to_string())
         );
 
         let by_sequence = db

@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 
 use common::{
     create_agent_operation, create_asset_operation, create_update_operation,
-    create_update_operation_signed_by, make_event, sign_operation, spawn_json, spawn_service,
+    create_update_operation_signed_by, make_event, spawn_json,
 };
 
 async fn admin_post(service: &common::TestService, path: &str, payload: Value) -> Result<Value> {
@@ -392,173 +392,7 @@ async fn sync_import_from_native_registry_confirms_latest_version() -> Result<()
     Ok(())
 }
 
-#[tokio::test]
-async fn confirm_resolution_uses_configured_fallback_without_recursing() -> Result<()> {
-    let fallback = spawn_json().await?;
-    let primary_data_dir = tempfile::tempdir()?;
-    let primary = spawn_service(
-        "json",
-        primary_data_dir,
-        &[(
-            "ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL",
-            fallback.root_url.clone(),
-        )],
-    )
-    .await?;
 
-    let agent_did = create_did(
-        &primary,
-        create_agent_operation(7, "2026-04-11T12:00:00Z", "hyperswarm"),
-    )
-    .await?;
-    let mut agent_doc = resolve_did(&primary, &agent_did).await?;
-    agent_doc["didDocumentData"] = json!({ "version": 2 });
-    let version_id = agent_doc["didDocumentMetadata"]["versionId"]
-        .as_str()
-        .map(ToString::to_string);
-    let update = create_update_operation(
-        7,
-        &agent_did,
-        version_id.as_deref(),
-        "2026-04-11T12:01:00Z",
-        agent_doc,
-    );
-    let response = primary
-        .client
-        .post(format!("{}/did", primary.base_url))
-        .json(&update)
-        .send()
-        .await?;
-    assert!(
-        response.status().is_success(),
-        "local update should succeed"
-    );
-
-    let local_latest = resolve_did(&primary, &agent_did).await?;
-    assert_eq!(local_latest["didDocumentMetadata"]["versionSequence"], "2");
-    assert_eq!(local_latest["didDocumentMetadata"]["confirmed"], false);
-
-    let mut events = export_did(&primary, &agent_did).await?;
-    for event in &mut events {
-        event["registry"] = Value::String("hyperswarm".to_string());
-    }
-    admin_post(&fallback, "batch/import", json!(events)).await?;
-    let processed = admin_post(&fallback, "events/process", json!(null)).await?;
-    assert_eq!(processed["pending"], 0);
-
-    let response = primary
-        .client
-        .get(format!(
-            "{}/did/{}?confirm=true",
-            primary.base_url, agent_did
-        ))
-        .send()
-        .await?;
-    assert!(
-        response.status().is_success(),
-        "fallback resolve should succeed"
-    );
-    let resolved = response.json::<Value>().await?;
-    assert_eq!(resolved["didDocumentMetadata"]["versionSequence"], "2");
-    assert_eq!(resolved["didDocumentMetadata"]["confirmed"], true);
-
-    let response = primary
-        .client
-        .get(format!(
-            "{}/did/{}?confirm=true",
-            primary.base_url, agent_did
-        ))
-        .header("x-archon-confirm-fallback", "1")
-        .send()
-        .await?;
-    assert!(
-        response.status().is_success(),
-        "guarded resolve should succeed"
-    );
-    let guarded = response.json::<Value>().await?;
-    assert_eq!(guarded["didDocumentMetadata"]["confirmed"], false);
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn sync_create_timestamp_uses_event_registration_for_upper_bound() -> Result<()> {
-    let service = spawn_json().await?;
-    let operation = sign_operation(
-        7,
-        &json!({
-            "type": "create",
-            "created": "2026-04-11T12:00:00Z",
-            "blockid": "zec-lower-block",
-            "registration": {
-                "version": 1,
-                "type": "agent",
-                "registry": "ZEC:mainnet"
-            },
-            "publicJwk": common::public_jwk(7)
-        }),
-        "#key-1",
-        "2026-04-11T12:00:00Z",
-    );
-    let did = admin_post(&service, "did/generate", operation.clone()).await?;
-    let did = did.as_str().unwrap().to_string();
-    let event = json!({
-        "registry": "ZEC:mainnet",
-        "time": "2026-04-11T12:00:00Z",
-        "ordinal": [101, 3, 0],
-        "operation": operation,
-        "height": 101,
-        "registration": {
-            "height": 101,
-            "index": 3,
-            "txid": "zec-txid",
-            "batch": "did:cid:zec-batch",
-            "opidx": 0
-        }
-    });
-
-    admin_get(&service, "db/reset").await?;
-    admin_post(
-        &service,
-        "block/ZEC:mainnet",
-        json!({
-            "hash": "zec-lower-block",
-            "height": 100,
-            "time": 1000
-        }),
-    )
-    .await?;
-    admin_post(
-        &service,
-        "block/ZEC:mainnet",
-        json!({
-            "hash": "zec-upper-block",
-            "height": 101,
-            "time": 1100
-        }),
-    )
-    .await?;
-    let imported = admin_post(&service, "batch/import", json!([event])).await?;
-    assert_eq!(imported["queued"], 1);
-    assert_eq!(imported["rejected"], 0);
-
-    let processed = admin_post(&service, "events/process", json!(null)).await?;
-    assert_eq!(processed["added"], 1);
-    assert_eq!(processed["rejected"], 0);
-
-    let resolved = resolve_did(&service, &did).await?;
-    let timestamp = &resolved["didDocumentMetadata"]["timestamp"];
-    assert_eq!(timestamp["chain"], "ZEC:mainnet");
-    assert_eq!(timestamp["lowerBound"]["blockid"], "zec-lower-block");
-    assert_eq!(timestamp["upperBound"]["blockid"], "zec-upper-block");
-    assert_eq!(timestamp["upperBound"]["height"], 101);
-    assert_eq!(timestamp["upperBound"]["txid"], "zec-txid");
-    assert_eq!(timestamp["upperBound"]["txidx"], 3);
-    assert_eq!(timestamp["upperBound"]["batchid"], "did:cid:zec-batch");
-    assert_eq!(timestamp["upperBound"]["opidx"], 0);
-
-    Ok(())
-}
 
 #[tokio::test]
 async fn sync_import_batch_without_event_dids_processes_cleanly() -> Result<()> {
@@ -731,6 +565,69 @@ async fn sync_export_batch_includes_dids_promoted_off_local() -> Result<()> {
         events[1]["operation"]["doc"]["didDocumentRegistration"]["registry"],
         "hyperswarm"
     );
+
+    Ok(())
+}
+
+// The store resolver answers a plain resolution and the verifying resolver a
+// `verify=true` one. They are two implementations of the same rules, and the
+// confirm-ordering fork (#1145) lived in the gap between them: one stopped
+// before the first unconfirmed event, the other one after. For a DID with a
+// pending unconfirmed update they must report the same confirmed version.
+#[tokio::test]
+async fn confirmed_resolution_agrees_with_and_without_verify() -> Result<()> {
+    let service = spawn_json().await?;
+    let agent_did = create_did(
+        &service,
+        create_agent_operation(7, "2026-04-11T12:00:00.000Z", "hyperswarm"),
+    )
+    .await?;
+    let mut agent_doc = resolve_did(&service, &agent_did).await?;
+    agent_doc["didDocumentData"] = json!({ "version": 2 });
+    let version_id = agent_doc["didDocumentMetadata"]["versionId"]
+        .as_str()
+        .map(ToString::to_string);
+    let update = create_update_operation(
+        7,
+        &agent_did,
+        version_id.as_deref(),
+        "2026-04-11T12:01:00.500Z",
+        agent_doc,
+    );
+    let response = service
+        .client
+        .post(format!("{}/did", service.base_url))
+        .json(&update)
+        .send()
+        .await?;
+    assert!(response.status().is_success(), "local update should succeed");
+
+    let fetch = |query: &str| {
+        let url = format!("{}/did/{}?{}", service.base_url, agent_did, query);
+        let client = service.client.clone();
+        async move {
+            let response = client.get(url).send().await?;
+            assert!(response.status().is_success());
+            let mut doc = response.json::<Value>().await?;
+            doc.as_object_mut().map(|object| object.remove("didResolutionMetadata"));
+            Ok::<Value, anyhow::Error>(doc)
+        }
+    };
+
+    let plain = fetch("confirm=true").await?;
+    let verified = fetch("confirm=true&verify=true").await?;
+    assert_eq!(plain["didDocumentMetadata"]["versionSequence"], "1");
+    assert_eq!(plain["didDocumentMetadata"]["confirmed"], true);
+    assert_eq!(plain["didDocumentMetadata"]["created"], "2026-04-11T12:00:00Z");
+    assert_eq!(plain, verified);
+
+    // And unconfirmed, where the pending update is applied and its stamp
+    // normalized the same way by both.
+    let plain = fetch("").await?;
+    let verified = fetch("verify=true").await?;
+    assert_eq!(plain["didDocumentMetadata"]["versionSequence"], "2");
+    assert_eq!(plain["didDocumentMetadata"]["updated"], "2026-04-11T12:01:00Z");
+    assert_eq!(plain, verified);
 
     Ok(())
 }

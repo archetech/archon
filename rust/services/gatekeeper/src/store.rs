@@ -87,6 +87,16 @@ pub(crate) trait GatekeeperDb {
 pub(crate) struct ResolveOptions {
     pub(crate) version_time: Option<String>,
     pub(crate) version_sequence: Option<usize>,
+    /// A chain position, as (registry, ordinal). Not a resolution mode a
+    /// caller can ask for -- the resolution surface is time- and
+    /// sequence-based and ordinals are registry-internal -- but what
+    /// `controller_at` resolves a controller at. For events on that registry
+    /// only those the chain committed strictly before the ordinal are
+    /// applied, which orders within a block where `version_time` cannot and
+    /// survives a later block carrying an earlier timestamp. Events on any
+    /// other registry fall back to `version_time`, since ordinals do not
+    /// compare across registries.
+    pub(crate) version_ordinal: Option<(String, Vec<u64>)>,
     pub(crate) confirm: bool,
     pub(crate) verify: bool,
 }
@@ -109,6 +119,52 @@ pub(crate) struct ResolvedDoc {
 pub(crate) enum BlockLookup {
     Height(u64),
     Hash(String),
+}
+
+/// A timestamp as the resolved document reports it: UTC, second precision,
+/// `Z`. The TypeScript port normalizes every metadata timestamp this way
+/// (`generateStandardDatetime`); clients stamp operations with millisecond
+/// precision, so echoing the input made every DID's `created`, `updated` and
+/// `deleted` differ between the ports. The accepted input is RFC 3339 with an
+/// optional fraction, either separator case, and `z` or an offset; an
+/// unparseable string is returned as given rather than failing resolution.
+pub(crate) fn standard_datetime(time: &str) -> String {
+    let mut normalized: Vec<char> = time.chars().collect();
+    if let Some(separator) = normalized.get_mut(10) {
+        if *separator == ' ' || *separator == 't' {
+            *separator = 'T';
+        }
+    }
+    if let Some(last) = normalized.last_mut() {
+        if *last == 'z' {
+            *last = 'Z';
+        }
+    }
+    let normalized: String = normalized.into_iter().collect();
+    match chrono::DateTime::parse_from_rfc3339(&normalized) {
+        Ok(parsed) => parsed
+            .with_timezone(&chrono::Utc)
+            .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        Err(_) => time.to_string(),
+    }
+}
+
+/// Whether resolution stops before this event: by ordinal if the event is on
+/// the cutoff's registry, by time otherwise.
+pub(crate) fn past_cutoff(options: &ResolveOptions, event: &EventRecord) -> bool {
+    if let Some((registry, ordinal)) = options.version_ordinal.as_ref() {
+        if event.registry == *registry {
+            return event
+                .ordinal
+                .as_ref()
+                .map(|position| compare_ordinals(Some(position), Some(ordinal)).is_ge())
+                .unwrap_or(false);
+        }
+    }
+    match options.version_time.as_ref() {
+        Some(version_time) => event.time > *version_time,
+        None => false,
+    }
 }
 
 pub(crate) fn compare_ordinals(
@@ -1708,7 +1764,7 @@ impl JsonDb {
                 .cloned()
                 .unwrap_or_else(|| json!({})),
             did_document_registration: Value::Object(registration.clone()),
-            created: created.to_string(),
+            created: standard_datetime(created),
             updated: None,
             deleted: None,
             version_id: anchor
@@ -1733,12 +1789,10 @@ impl JsonDb {
 
         for event in events.iter().skip(1) {
             let operation = &event.operation;
-            let operation_time = event.time.clone();
+            let operation_time = standard_datetime(&event.time);
 
-            if let Some(version_time) = options.version_time.as_ref() {
-                if operation_time > *version_time {
-                    break;
-                }
+            if past_cutoff(&options, event) {
+                break;
             }
 
             if let Some(version_sequence) = options.version_sequence {
@@ -1747,21 +1801,29 @@ impl JsonDb {
                 }
             }
 
-            if options.confirm && !state.confirmed {
-                break;
-            }
-
-            if options.verify {
-                // Signature verification is handled by higher-level resolver paths.
-            }
-
-            state.confirmed = state.confirmed
+            // Whether this event is confirmed is decided before it is applied,
+            // so that a confirmed resolution stops at the last confirmed
+            // version -- and reports that version's flag -- rather than one
+            // past it. That is what the verifying resolver and the TypeScript
+            // port do; judging by the previous event's state applied the first
+            // unconfirmed event and reported the result as unconfirmed.
+            let event_confirmed = state.confirmed
                 && state
                     .did_document_registration
                     .get("registry")
                     .and_then(Value::as_str)
                     .map(|registry| registry == event.registry)
                     .unwrap_or(false);
+
+            if options.confirm && !event_confirmed {
+                break;
+            }
+
+            state.confirmed = event_confirmed;
+
+            if options.verify {
+                // Signature verification is handled by higher-level resolver paths.
+            }
 
             let registry_for_timestamp = state
                 .did_document_registration

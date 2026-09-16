@@ -35,6 +35,7 @@ function createMockGatekeeper() {
         importDIDs: jest.fn<any>().mockResolvedValue({ queued: 1, processed: 0, rejected: 0, total: 1 }),
         exportBatch: jest.fn<any>().mockResolvedValue([{ did: 'did:cid:abc' }]),
         importBatch: jest.fn<any>().mockResolvedValue({ queued: 1, processed: 0, rejected: 0, total: 1 }),
+        importRelayedBatch: jest.fn<any>().mockResolvedValue({ queued: 1, processed: 0, rejected: 0, total: 1 }),
         importBatchByCids: jest.fn<any>().mockResolvedValue({ queued: 1, processed: 0, rejected: 0, total: 1 }),
         getQueue: jest.fn<any>().mockResolvedValue([{ type: 'create' }]),
         clearQueue: jest.fn<any>().mockResolvedValue([]),
@@ -229,7 +230,7 @@ describe('/api/v1 sync routes', () => {
         const imported = await admin(request(app).post('/api/v1/batch/import')).send([{ did: 'did:cid:abc' }]);
         expect(imported.status).toBe(200);
         expect(imported.body).toMatchObject({ queued: 1, total: 1 });
-        expect(gatekeeper.importBatch).toHaveBeenCalledWith([{ did: 'did:cid:abc' }]);
+        expect(gatekeeper.importRelayedBatch).toHaveBeenCalledWith([{ did: 'did:cid:abc' }]);
 
         const byCids = await admin(request(app).post('/api/v1/batch/import/cids'))
             .send({ cids: ['cid-1'], metadata: { source: 'test' } });
@@ -270,7 +271,7 @@ describe('/api/v1 sync routes', () => {
     it('reports gatekeeper failures on sync routes as 500', async () => {
         const { app, gatekeeper } = mount();
         for (const method of [
-            'exportBatch', 'importBatch', 'importBatchByCids', 'getQueue',
+            'exportBatch', 'importRelayedBatch', 'importBatchByCids', 'getQueue',
             'clearQueue', 'listRegistries', 'resetDb', 'verifyDb', 'processEvents',
         ] as const) {
             (gatekeeper as any)[method] = boom();

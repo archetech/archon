@@ -6,7 +6,132 @@ use k256::ecdsa::{signature::hazmat::PrehashVerifier, Signature as K256Signature
 use multihash_codetable::{Code, MultihashDigest};
 use serde_json::Value;
 
-use crate::{is_valid_registry, resolve_local_doc_async, AppState, Config, ResolveOptions};
+use crate::{
+    is_valid_registry, resolve_local_doc_async, AppState, Config, EventRecord, GatekeeperDb,
+    ResolveOptions,
+};
+
+/// Where a chain committed an event, if one has. `registration` is what a
+/// mediator stamps on an event when it anchors it; for such an event `time`
+/// is the block time rather than the signer's `created`, and `ordinal` is its
+/// position, which orders it against other events in the same block.
+#[derive(Clone, Debug)]
+pub(crate) struct OperationAnchor {
+    pub(crate) registry: String,
+    pub(crate) time: Option<String>,
+    pub(crate) ordinal: Option<Vec<u64>>,
+}
+
+pub(crate) fn anchor_of(event: &EventRecord) -> Option<OperationAnchor> {
+    event.registration.as_ref().map(|_| OperationAnchor {
+        registry: event.registry.clone(),
+        time: Some(event.time.clone()),
+        ordinal: event.ordinal.clone(),
+    })
+}
+
+/// The two registries whose events this node stamps itself, so that no event
+/// on them can carry a position a chain assigned: a local event holds the
+/// signer's own `created`, a hyperswarm event the receiving node's clock.
+/// Every other registry is one an outside source might claim confirmation on.
+/// Whether a registry actually anchors its events on a chain is not inferred
+/// from its name -- `pin` does not -- but read from the events (`is_anchored`).
+pub(crate) fn is_unanchored_registry(registry: &str) -> bool {
+    registry == "local" || registry == "hyperswarm"
+}
+
+/// Whether "the document as of a chain position" is a consensus fact for this
+/// DID: it lives on a registry that can anchor, and the events that confirm it
+/// there exist and every one carries the position the chain assigned. A
+/// hyperswarm DID fails the first test; one that migrated to a chain but has
+/// no confirmed event there yet fails the second -- its history is still
+/// hyperswarm events with per-node times; a registry that stamps events
+/// without anchoring them fails the third. Local and hyperswarm events on a
+/// chain DID are unconfirmed there and do not count either way.
+async fn is_anchored(state: &AppState, did: &str, registry: Option<&str>) -> bool {
+    let Some(registry) = registry else {
+        return false;
+    };
+    if is_unanchored_registry(registry) {
+        return false;
+    }
+    let events = {
+        let store = state.store.lock().await;
+        store.get_events(did)
+    };
+    let anchored = events
+        .iter()
+        .filter(|event| !is_unanchored_registry(&event.registry))
+        .collect::<Vec<_>>();
+    !anchored.is_empty() && anchored.iter().all(|event| event.registration.is_some())
+}
+
+/// The controller document that authorizes an operation on an asset.
+///
+/// By default the controller is resolved at `proof.created`, which keeps a
+/// signature valid at the historical time it was made. But `proof.created`
+/// is the signer's own claim: a key rotated out of the controller can name a
+/// `created` from before the rotation and be authorized by the document that
+/// still listed it (#1131). Once a chain has committed the operation it has a
+/// position the signer did not choose -- the anchoring block -- and the
+/// controller is resolved there instead. Only when the controller's own
+/// rotation history is on a chain, though: a hyperswarm controller stamps its
+/// events with each node's clock, and resolving it at a block time forked on
+/// import order (#1134).
+///
+/// Within a block every event shares the block's time, so time cannot order a
+/// rotation against an operation the chain committed earlier in the same
+/// block; the ordinal can, but only among events on the same registry --
+/// ordinals are registry-local, and a controller that migrated registries
+/// carries events from both. So the cutoff is the ordinal for the controller's
+/// events on the operation's registry and the block time for any other.
+async fn controller_at(
+    state: &AppState,
+    controller_did: &str,
+    operation: &Value,
+    anchor: Option<&OperationAnchor>,
+) -> Result<Value> {
+    if let Some(anchor) = anchor {
+        if let Some(time) = anchor.time.as_ref() {
+            let doc = resolve_local_doc_async(
+                state,
+                controller_did,
+                ResolveOptions {
+                    confirm: true,
+                    version_time: Some(time.clone()),
+                    version_ordinal: anchor
+                        .ordinal
+                        .as_ref()
+                        .map(|ordinal| (anchor.registry.clone(), ordinal.clone())),
+                    ..ResolveOptions::default()
+                },
+            )
+            .await?;
+            let registry = doc
+                .get("didDocumentRegistration")
+                .and_then(|value| value.get("registry"))
+                .and_then(Value::as_str);
+            if is_anchored(state, controller_did, registry).await {
+                return Ok(doc);
+            }
+        }
+    }
+
+    resolve_local_doc_async(
+        state,
+        controller_did,
+        ResolveOptions {
+            confirm: true,
+            version_time: operation
+                .get("proof")
+                .and_then(|value| value.get("created"))
+                .and_then(Value::as_str)
+                .map(ToString::to_string),
+            ..ResolveOptions::default()
+        },
+    )
+    .await
+}
 
 /// Validate a `did:<method>:<cid>` DID, mirroring the TypeScript `isValidDID`: the string must
 /// start with `did:`, have at least three `:`-separated segments, and its final segment must parse
@@ -398,6 +523,7 @@ fn bytes_to_hex(bytes: &[u8]) -> String {
 pub(crate) async fn verify_create_operation_impl(
     state: &AppState,
     operation: &Value,
+    anchor: Option<&OperationAnchor>,
 ) -> Result<bool> {
     if operation.is_null() {
         anyhow::bail!("Invalid operation: missing");
@@ -491,19 +617,7 @@ pub(crate) async fn verify_create_operation_impl(
         anyhow::bail!("Invalid operation: signer is not controller");
     }
 
-    let controller_doc = resolve_local_doc_async(
-        state,
-        &controller_did,
-        ResolveOptions {
-            confirm: true,
-            version_time: proof
-                .get("created")
-                .and_then(Value::as_str)
-                .map(ToString::to_string),
-            ..ResolveOptions::default()
-        },
-    )
-    .await?;
+    let controller_doc = controller_at(state, &controller_did, operation, anchor).await?;
 
     if controller_doc
         .get("didDocumentRegistration")
@@ -538,6 +652,7 @@ pub(crate) async fn verify_update_operation_impl(
     state: &AppState,
     operation: &Value,
     doc: &Value,
+    anchor: Option<&OperationAnchor>,
 ) -> Result<bool> {
     if exceeds_json_size(operation, 64 * 1024) {
         anyhow::bail!("Invalid operation: size");
@@ -562,21 +677,8 @@ pub(crate) async fn verify_update_operation_impl(
         .and_then(|value| value.get("controller"))
         .and_then(Value::as_str)
     {
-        let controller_doc = resolve_local_doc_async(
-            state,
-            controller_did,
-            ResolveOptions {
-                confirm: true,
-                version_time: operation
-                    .get("proof")
-                    .and_then(|value| value.get("created"))
-                    .and_then(Value::as_str)
-                    .map(ToString::to_string),
-                ..ResolveOptions::default()
-            },
-        )
-        .await?;
-        return verify_update_operation_impl(state, operation, &controller_doc).await;
+        let controller_doc = controller_at(state, controller_did, operation, anchor).await?;
+        return verify_update_operation_impl(state, operation, &controller_doc, anchor).await;
     }
 
     if doc
@@ -599,16 +701,20 @@ pub(crate) async fn verify_update_operation_impl(
     verify_sig(&msg_hash, proof_value, public_jwk)
 }
 
-pub(crate) async fn verify_operation_impl(state: &AppState, operation: &Value) -> Result<bool> {
+pub(crate) async fn verify_operation_impl(
+    state: &AppState,
+    operation: &Value,
+    anchor: Option<&OperationAnchor>,
+) -> Result<bool> {
     match operation.get("type").and_then(Value::as_str) {
-        Some("create") => verify_create_operation_impl(state, operation).await,
+        Some("create") => verify_create_operation_impl(state, operation, anchor).await,
         Some("update" | "delete") => {
             let did = operation
                 .get("did")
                 .and_then(Value::as_str)
                 .context("Invalid operation: missing operation.did")?;
             let doc = resolve_local_doc_async(state, did, ResolveOptions::default()).await?;
-            verify_update_operation_impl(state, operation, &doc).await
+            verify_update_operation_impl(state, operation, &doc, anchor).await
         }
         _ => Ok(false),
     }

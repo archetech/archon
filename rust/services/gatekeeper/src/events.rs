@@ -7,11 +7,45 @@ use tracing::{info, warn};
 
 use crate::store::compare_ordinals;
 use crate::{
-    ensure_event_opid, event_record_to_value, expected_registry_for_index,
-    generate_did_from_operation, generate_json_cid, infer_event_did, value_to_event_record,
-    update_search_doc, verify_event_shape, verify_operation_impl, AppState, EventRecord,
-    GatekeeperDb, ResolveOptions,
+    anchor_of, ensure_event_opid, event_record_to_value, expected_registry_for_index,
+    generate_did_from_operation, generate_json_cid, infer_event_did, is_unanchored_registry,
+    resolve_local_doc_async, update_search_doc, value_to_event_record,
+    verify_create_operation_impl, verify_event_shape, verify_operation_impl,
+    verify_update_operation_impl, AppState, EventRecord, GatekeeperDb, ResolveOptions,
 };
+
+/// Events handed in from outside the node's own registry mediators: a peer
+/// relaying them, or an operator restoring an export. Such a source cannot
+/// vouch that a chain committed an event, and cannot be relied on to deliver
+/// committed events in the chain's order -- an export is sorted by
+/// `proof.created`, not by ordinal. Chain confirmation is therefore accepted
+/// only from the CID import, which a mediator drives block by block. Anything
+/// here that claims a registry other than the two this node stamps itself is
+/// taken as an unconfirmed hint: the node's own mediator will confirm it, in
+/// order, when its scan reaches that block. Otherwise a controller rotation
+/// could arrive after an operation the chain committed later than it, and the
+/// operation would be judged against a controller history that was not yet
+/// complete (#1131).
+pub(crate) fn relay_hints(batch: &[Value]) -> Vec<Value> {
+    batch
+        .iter()
+        .map(|event| {
+            let Some(object) = event.as_object() else {
+                return event.clone();
+            };
+            let registry = object.get("registry").and_then(Value::as_str);
+            match registry {
+                Some(registry) if !is_unanchored_registry(registry) => {
+                    let mut hint = object.clone();
+                    hint.remove("registration");
+                    hint.insert("registry".to_string(), Value::String("hyperswarm".to_string()));
+                    Value::Object(hint)
+                }
+                _ => event.clone(),
+            }
+        })
+        .collect()
+}
 
 const PIN_QUEUE: &str = "pin";
 
@@ -134,7 +168,7 @@ pub(crate) async fn handle_did_operation(
         .and_then(Value::as_str)
         .ok_or_else(|| "missing operation.type".to_string())?;
 
-    let valid = verify_operation_impl(state, payload)
+    let valid = verify_operation_impl(state, payload, None)
         .await
         .map_err(|error| error.to_string())?;
     if !valid {
@@ -588,6 +622,49 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
                 return ImportStatus::Merged;
             }
             if expected_registry.as_deref() == Some(event.registry.as_str()) {
+                // Confirming is what first gives the event a position the
+                // signer did not choose, so it is where a backdated proof is
+                // caught; replacing unchecked would launder an operation
+                // accepted at its own claimed `created`. It is verified
+                // against the version it chained from, as replay does --
+                // resolving at present would judge a self-update by the
+                // document it produced.
+                let anchor = anchor_of(&event);
+                let verified = if index == 0 {
+                    verify_create_operation_impl(state, &event.operation, anchor.as_ref()).await
+                } else {
+                    match resolve_local_doc_async(
+                        state,
+                        &did,
+                        ResolveOptions {
+                            version_sequence: Some(index),
+                            ..ResolveOptions::default()
+                        },
+                    )
+                    .await
+                    {
+                        Ok(previous) => {
+                            verify_update_operation_impl(
+                                state,
+                                &event.operation,
+                                &previous,
+                                anchor.as_ref(),
+                            )
+                            .await
+                        }
+                        Err(error) => Err(error),
+                    }
+                };
+                if !matches!(verified, Ok(true)) {
+                    if trace {
+                        warn!(
+                            "process_events rejected reason=confirmation_failed_verification did={} opid={}",
+                            did, opid
+                        );
+                    }
+                    return ImportStatus::Rejected;
+                }
+
                 current_events[index] = event.clone();
                 {
                     let mut store = state.store.lock().await;
@@ -635,7 +712,7 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
             return ImportStatus::Rejected;
         }
 
-        let verified = match verify_operation_impl(state, &event.operation).await {
+        let verified = match verify_operation_impl(state, &event.operation, anchor_of(&event).as_ref()).await {
             Ok(verified) => verified,
             Err(error) => {
                 if trace {

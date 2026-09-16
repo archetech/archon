@@ -127,6 +127,8 @@ jobs:
       - name: Start both gatekeepers
         env:
           GIT_COMMIT: ${{ github.sha }}
+          # The backdating phase needs a chain registry both ports accept.
+          ARCHON_GATEKEEPER_REGISTRIES: local,hyperswarm,BTC:signet
         run: |
           docker compose -f docker/compose/gatekeeper-parity.yml up -d --build --wait
 
