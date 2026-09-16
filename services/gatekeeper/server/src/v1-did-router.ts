@@ -527,18 +527,29 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
                 }
             }
     
+            const alreadyFallback = Boolean(req.get(CONFIRM_FALLBACK_HEADER));
+            let latest;
+            if (options.confirm && config.confirmFallbackURL && !alreadyFallback &&
+                !doc.didResolutionMetadata?.error && doc.didDocumentMetadata?.confirmed === true) {
+                // Retain the same historical bounds when checking for a pending successor.
+                latest = await gatekeeper.resolveDID(req.params.did, { ...options, confirm: false });
+            }
+
             if (shouldTryConfirmFallback(
                 doc,
                 options,
                 config.confirmFallbackURL,
-                Boolean(req.get(CONFIRM_FALLBACK_HEADER))
+                alreadyFallback,
+                latest
             )) {
                 try {
                     const resolved = await resolveFromConfirmFallback(
                         req.params.did,
                         options,
                         config.confirmFallbackURL,
-                        config.fallbackTimeout
+                        config.fallbackTimeout,
+                        fetch,
+                        doc
                     );
     
                     if (resolved) {

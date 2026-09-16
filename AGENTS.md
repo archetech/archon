@@ -95,3 +95,5 @@ These rules apply to coding agents working in this repository.
 - Before adding protocol safeguards, demonstrate reachability with real signed operations and the ordinary importer. Mocked failure tests establish containment, not protocol validity; distinguish inputs accepted by permissive implementation code from the documented agent/asset model.
 
 - Public history reads and verification must hold the history lock throughout asynchronous resolution, including status-cache refreshes. GC persistence failures must propagate to callers and preserve pending imports; only successful GC performs queue cleanup. Parity ingress must preserve every fixture ordinal component.
+
+- Confirm-fallback eligibility compares the confirmed prefix with local resolution under the same version/time bounds. Peer replies must match the DID, respect those bounds, and advance existing confirmed state; HTTP delegation must not mutate local history.
