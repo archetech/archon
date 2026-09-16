@@ -481,7 +481,7 @@ Only the registry's own mediator may mark an event confirmed on that registry. A
 
 Mediators visit discovered batches in chain order but skip unavailable batches or operations and continue with later entries. An unavailable reference cannot be distinguished from a nonexistent one, so it must not indefinitely block the registry. Failures remain in mediator storage across restarts and are retried after new batches; retry failures also do not block later retries. Successful retries clear the previous error. A late import retains its original chain time and ordinal, not the retry time.
 
-Skipping does not declare a reference invalid or establish that controller history is complete. Available events can therefore be applied out of chain order. Authorization with delayed controller history remains the separate correctness problem tracked in [#1150](https://github.com/archetech/archon/issues/1150); this availability policy does not claim to resolve it.
+Skipping does not declare a reference invalid or establish that controller history is complete. Available events can therefore be applied out of chain order. An asset update signed by a retired key can be accepted while an earlier controller rotation is unavailable, even within one registry; recovering the rotation currently does not revalidate the dependent asset. Authorization with delayed controller history remains the separate correctness problem tracked in [#1150](https://github.com/archetech/archon/issues/1150); this availability policy does not claim to resolve it.
 
 ### Implementation boundary: event authorization and proof verification
 
