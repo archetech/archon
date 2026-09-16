@@ -130,16 +130,6 @@ function isUnanchoredRegistry(registry: unknown): boolean {
     return registry === 'local' || registry === 'hyperswarm';
 }
 
-// Where a chain committed an event, if one has. `registration` is what a
-// mediator stamps on an event when it anchors it; for such an event `time` is
-// the block time rather than the signer's `created`, and `ordinal` is its
-// position, which orders it against other events in the same block.
-type OperationAnchor = { registry: string, time?: string, ordinal?: number[] };
-
-function anchorOf(event: { registration?: unknown, registry: string, time?: string, ordinal?: number[] }): OperationAnchor | undefined {
-    return event.registration ? { registry: event.registry, time: event.time, ordinal: event.ordinal } : undefined;
-}
-
 enum ImportStatus {
     ADDED = 'added',
     MERGED = 'merged',
@@ -432,17 +422,35 @@ export default class Gatekeeper implements GatekeeperInterface {
         return `${prefix}:${cid}`;
     }
 
-    async verifyOperation(operation: Operation, anchor?: OperationAnchor): Promise<boolean> {
+    // Direct submissions have no trusted chain position. Import and verified
+    // replay pass an event to the shared authorization path instead.
+    async verifyOperation(operation: Operation): Promise<boolean> {
+        return this.authorizeOperation(operation);
+    }
+
+    private async authorizeOperation(operation: Operation, previous?: DidCidDocument, event?: GatekeeperEvent): Promise<boolean> {
         if (operation.type === 'create') {
-            return this.verifyCreateOperation(operation, anchor);
+            return this.authorizeCreateOperation(operation, event);
         }
 
         if (operation.type === 'update' || operation.type === 'delete') {
-            const doc = await this.resolveDID(operation.did);
-            return this.verifyUpdateOperation(operation, doc, anchor);
+            let authority = previous ?? await this.resolveDID(operation.did);
+            // Controller traversal is authorization policy, not cryptography.
+            // Preserve the deactivation check for every document in the chain.
+            while (authority.didDocument?.controller && !authority.didDocumentMetadata?.deactivated && this.verifyProofFormat(operation.proof)) {
+                authority = await this.controllerForEvent(authority.didDocument.controller, operation, event);
+            }
+            return this.verifyUpdateOperation(operation, authority);
         }
 
         return false;
+    }
+
+    private async authorizeCreateOperation(operation: Operation, event?: GatekeeperEvent): Promise<boolean> {
+        const controller = operation?.registration?.type === 'asset' && operation.controller && this.verifyProofFormat(operation.proof)
+            ? await this.controllerForEvent(operation.controller, operation, event)
+            : undefined;
+        return this.verifyCreateOperation(operation, controller);
     }
 
     // The controller document that authorizes an operation on an asset.
@@ -465,10 +473,10 @@ export default class Gatekeeper implements GatekeeperInterface {
     // carries events from both. So the cutoff is the ordinal for the
     // controller's events on the operation's registry and the block time for
     // any other.
-    private async controllerAt(controllerDid: string, operation: Operation, anchor?: OperationAnchor): Promise<DidCidDocument> {
-        if (anchor?.time) {
-            const cutoff = anchor.ordinal ? { registry: anchor.registry, ordinal: anchor.ordinal } : undefined;
-            const doc = await this.resolveDIDAt(controllerDid, { confirm: true, versionTime: anchor.time, versionOrdinal: cutoff });
+    private async controllerForEvent(controllerDid: string, operation: Operation, event?: GatekeeperEvent): Promise<DidCidDocument> {
+        if (event?.registration && event.time) {
+            const cutoff = event.ordinal ? { registry: event.registry, ordinal: event.ordinal } : undefined;
+            const doc = await this.resolveDIDAt(controllerDid, { confirm: true, versionTime: event.time, versionOrdinal: cutoff });
 
             if (await this.isAnchored(controllerDid, doc.didDocumentRegistration?.registry)) {
                 return doc;
@@ -478,15 +486,10 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.resolveDID(controllerDid, { confirm: true, versionTime: operation.proof!.created });
     }
 
-    // Whether "the document as of a chain position" is a consensus fact for
-    // this DID: it lives on a registry that can anchor, and the events that
-    // confirm it there exist and every one carries the position the chain
-    // assigned. A hyperswarm DID fails the first test; one that migrated to a
-    // chain but has no confirmed event there yet fails the second -- its
-    // history is still hyperswarm events with per-node times; a registry that
-    // stamps events without anchoring them fails the third. Local and
-    // hyperswarm events on a chain DID are unconfirmed there and do not count
-    // either way.
+    // Whether stored confirming events carry chain positions. This does not
+    // establish that controller history is complete through a cutoff (#1150).
+    // Local/hyperswarm histories, unanchored registries, and migrations with
+    // no chain event yet retain the historical proof-time fallback.
     private async isAnchored(did: string, registry?: string): Promise<boolean> {
         if (!registry || isUnanchoredRegistry(registry)) {
             return false;
@@ -633,7 +636,8 @@ export default class Gatekeeper implements GatekeeperInterface {
         return !!(proof.proofValue && typeof proof.proofValue === 'string');
     }
 
-    async verifyCreateOperation(operation: Operation, anchor?: OperationAnchor): Promise<boolean> {
+    // Proof verification uses explicit authority and never reads controller history.
+    async verifyCreateOperation(operation: Operation, controllerDoc?: DidCidDocument): Promise<boolean> {
         if (!operation) {
             throw new InvalidOperationError('missing');
         }
@@ -699,7 +703,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 throw new InvalidOperationError('signer is not controller');
             }
 
-            const doc = await this.controllerAt(controllerDid, operation, anchor);
+            const doc = controllerDoc ?? {};
 
             if (doc.didDocumentRegistration && doc.didDocumentRegistration.registry === 'local' && operation.registration.registry !== 'local') {
                 throw new InvalidOperationError(`non-local registry=${operation.registration.registry}`);
@@ -727,7 +731,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         throw new InvalidOperationError(`registration.type=${operation.registration.type}`);
     }
 
-    async verifyUpdateOperation(operation: Operation, doc: DidCidDocument, anchor?: OperationAnchor): Promise<boolean> {
+    async verifyUpdateOperation(operation: Operation, doc: DidCidDocument): Promise<boolean> {
         if (JSON.stringify(operation).length > this.maxOpBytes) {
             throw new InvalidOperationError('size');
         }
@@ -742,12 +746,6 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         if (doc.didDocumentMetadata?.deactivated) {
             throw new InvalidOperationError('DID deactivated');
-        }
-
-        if (doc.didDocument.controller) {
-            // This DID is an asset, verify with controller's keys
-            const controllerDoc = await this.controllerAt(doc.didDocument.controller, operation, anchor);
-            return this.verifyUpdateOperation(operation, controllerDoc, anchor);
         }
 
         if (!doc.didDocument.verificationMethod) {
@@ -800,7 +798,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async createDID(operation: Operation): Promise<string> {
-        const valid = await this.verifyCreateOperation(operation);
+        const valid = await this.authorizeCreateOperation(operation);
         if (!valid) {
             throw new InvalidOperationError('proof')
         }
@@ -936,7 +934,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     // orders within a block where versionTime cannot -- every event in a block
     // shares the block's time -- and survives a later block carrying an earlier
     // timestamp. Events on any other registry fall back to versionTime, since
-    // ordinals do not compare across registries. It exists for controllerAt,
+    // ordinals do not compare across registries. It exists for event authorization,
     // and is not a resolution mode a caller can ask for: ordinals are
     // registry-internal, and the resolution surface is time- and
     // sequence-based.
@@ -986,7 +984,8 @@ export default class Gatekeeper implements GatekeeperInterface {
         let versionNum = 1; // initial version is version 1 by definition
         let confirmed = true; // create event is always confirmed by definition
 
-        for (const { time, ordinal, operation, registry, registration: blockchain } of events) {
+        for (const event of events) {
+            const { time, ordinal, operation, registry, registration: blockchain } = event;
             const versionId = await this.generateCID(operation);
             const updated = generateStandardDatetime(time);
             let timestamp;
@@ -1037,7 +1036,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
             if (operation.type === 'create') {
                 if (verify) {
-                    const valid = await this.verifyCreateOperation(operation, blockchain ? { registry, time, ordinal } : undefined);
+                    const valid = await this.authorizeOperation(operation, undefined, event);
 
                     if (!valid) {
                         throw new InvalidOperationError('proof');
@@ -1075,7 +1074,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
 
             if (verify) {
-                const valid = await this.verifyUpdateOperation(operation, doc, blockchain ? { registry, time, ordinal } : undefined);
+                const valid = await this.authorizeOperation(operation, doc, event);
 
                 if (!valid) {
                     throw new InvalidOperationError('proof');
@@ -1154,7 +1153,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         const doc = await this.resolveDID(operation.did);
-        const updateValid = await this.verifyUpdateOperation(operation, doc);
+        const updateValid = await this.authorizeOperation(operation, doc);
 
         if (!updateValid) {
             return false;
@@ -1345,10 +1344,8 @@ export default class Gatekeeper implements GatekeeperInterface {
                         // verified against the version it chained from, as replay
                         // does -- resolving at present would judge a self-update
                         // by the document it produced.
-                        const anchor = anchorOf(event);
-                        const valid = index === 0
-                            ? await this.verifyCreateOperation(event.operation, anchor)
-                            : await this.verifyUpdateOperation(event.operation, await this.resolveDID(did, { versionSequence: index }), anchor);
+                        const previous = index === 0 ? undefined : await this.resolveDID(did, { versionSequence: index });
+                        const valid = await this.authorizeOperation(event.operation, previous, event);
 
                         if (!valid) {
                             return ImportStatus.REJECTED;
@@ -1367,7 +1364,12 @@ export default class Gatekeeper implements GatekeeperInterface {
                         return ImportStatus.REJECTED;
                     }
 
-                    const ok = await this.verifyOperation(event.operation, anchorOf(event));
+                    const index = currentEvents.findIndex(item => item.opid === event.operation.previd);
+                    if (currentEvents.length > 0 && index < 0) {
+                        return ImportStatus.DEFERRED;
+                    }
+                    const previous = index < 0 ? undefined : await this.resolveDID(did, { versionSequence: index + 1 });
+                    const ok = await this.authorizeOperation(event.operation, previous, event);
                     if (!ok) {
                         return ImportStatus.REJECTED;
                     }
@@ -1376,14 +1378,6 @@ export default class Gatekeeper implements GatekeeperInterface {
                         await this.db.addEvent(did, event);
                         return ImportStatus.ADDED;
                     }
-
-                    const idMatch = currentEvents.find(item => item.opid === event.operation.previd);
-
-                    if (!idMatch) {
-                        return ImportStatus.DEFERRED;
-                    }
-
-                    const index = currentEvents.indexOf(idMatch);
 
                     if (index === currentEvents.length - 1) {
                         await this.db.addEvent(did, event);

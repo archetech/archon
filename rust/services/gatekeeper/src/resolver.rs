@@ -8,8 +8,8 @@ use tracing::info;
 
 use crate::store::ResolvedDoc;
 use crate::{
-    anchor_of, chrono_like_now, generate_json_cid, is_valid_did, past_cutoff,
-    standard_datetime, verify_create_operation_impl, verify_update_operation_impl, AppState,
+    authorize_operation, chrono_like_now, generate_json_cid, is_valid_did, past_cutoff,
+    standard_datetime, AppState,
     EventRecord, GatekeeperDb, ResolveOptions,
 };
 
@@ -212,7 +212,7 @@ pub(crate) async fn resolve_local_doc_async(
     }
 
     let anchor_valid =
-        verify_create_operation_impl(state, anchor_operation, anchor_of(anchor).as_ref()).await?;
+        authorize_operation(state, anchor_operation, None, Some(anchor)).await?;
     if !anchor_valid {
         return Err(invalid_operation("Invalid operation: proof"));
     }
@@ -262,7 +262,7 @@ pub(crate) async fn resolve_local_doc_async(
         });
 
         let valid =
-            verify_update_operation_impl(state, operation, &current_doc, anchor_of(event).as_ref())
+            authorize_operation(state, operation, Some(&current_doc), Some(event))
                 .await?;
         if !valid {
             return Err(invalid_operation("Invalid operation: proof"));
@@ -304,8 +304,8 @@ pub(crate) async fn resolve_local_doc_async(
                     .opid
                     .clone()
                     .unwrap_or_else(|| generate_json_cid(operation).unwrap_or_default());
-                resolved.deleted = Some(operation_time.clone());
-                resolved.updated = Some(operation_time);
+                resolved.deleted = Some(operation_time);
+                resolved.updated = None;
                 resolved.did_document = json!({ "id": did });
                 resolved.did_document_data = json!({});
                 resolved.deactivated = true;

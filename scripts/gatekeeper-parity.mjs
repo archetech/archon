@@ -782,7 +782,67 @@ async function runBackdatingParity() {
         }
     }
 
-    console.log('ok backdating parity: both ports refuse a proof the chain committed after the rotation, accept one committed before it, downgrade relayed claims, and agree whichever order relays arrive in');
+    // Event authorization selects one document. K2 is valid at the anchor,
+    // although proof.created names a time before K2's rotation. Import and
+    // verified replay must not add a second check against the old document.
+    for (const kind of ['create', 'update', 'delete']) {
+        await resetServiceState(tsBaseUrl);
+        await resetServiceState(rustBaseUrl);
+        const { k2, alice, asset, cids } = await setup();
+        await commit([cids.create, cids.asset], 100, T(0));
+        await commit([cids.rotation], 200, T(1));
+        let operation;
+        if (kind === 'create') {
+            operation = { type: 'create', created: T(0), registration: { version: 1, type: 'asset', registry: 'BTC:signet' }, controller: alice, data: { authorized: true } };
+        } else {
+            const current = agree('event authorization: previous asset', await both(get(`/api/v1/did/${asset}`))).body;
+            operation = { type: kind, did: asset, previd: current.didDocumentMetadata.versionId };
+            if (kind === 'update') operation.doc = { didDocumentData: { authorized: true } };
+        }
+        operation.proof = legacyProof(operation, k2, `${alice}#key-1`, T(0));
+        const cid = await pin(operation);
+        const applied = await commit([cid], 300, T(2));
+        if (applied.body.added !== 1 || applied.body.rejected !== 0 || applied.body.pending !== 0) {
+            throw new Error(`event authorization: ${kind} did not accept the chain-selected authority: ${JSON.stringify(applied.body)}`);
+        }
+        const did = kind === 'create' ? `${alice.slice(0, alice.lastIndexOf(':'))}:${cid}` : asset;
+        const plain = agree(`event authorization: ${kind} resolve`, await both(get(`/api/v1/did/${did}?confirm=true`)));
+        const replay = agree(`event authorization: ${kind} replay`, await both(get(`/api/v1/did/${did}?confirm=true&verify=true`)));
+        if (plain.status !== 200 || replay.status !== 200) {
+            throw new Error(`event authorization: ${kind} resolution or replay failed`);
+        }
+        assertEqual(`event authorization: ${kind} replay matches import`, normalizeJson(plain.body), normalizeJson(replay.body));
+        if (kind === 'delete' ? replay.body.didDocumentMetadata?.deactivated !== true : replay.body.didDocumentData?.authorized !== true) {
+            throw new Error(`event authorization: ${kind} resolved the wrong state`);
+        }
+    }
+
+    // A competing agent rotation must verify against its named predecessor,
+    // even when a later rotation with a different key is already installed.
+    await resetServiceState(tsBaseUrl);
+    await resetServiceState(rustBaseUrl);
+    {
+        const { k1, alice, cids } = await setup();
+        await commit([cids.create], 100, T(0));
+        await commit([cids.rotation], 300, T(2));
+        const v1 = agree('event authorization: reorg predecessor', await both(get(`/api/v1/did/${alice}?versionSequence=1`))).body;
+        const k3 = cipher.generateRandomJwk();
+        const replacementDoc = JSON.parse(JSON.stringify(v1.didDocument));
+        replacementDoc.verificationMethod[0].publicKeyJwk = k3.publicJwk;
+        const replacement = { type: 'update', did: alice, previd: v1.didDocumentMetadata.versionId, doc: { didDocument: replacementDoc } };
+        replacement.proof = legacyProof(replacement, k1, `${alice}#key-1`, T(0));
+        const result = await commit([await pin(replacement)], 200, T(1));
+        if (result.body.added !== 1 || result.body.rejected !== 0 || result.body.pending !== 0) {
+            throw new Error(`event authorization: competing rotation did not use its predecessor: ${JSON.stringify(result.body)}`);
+        }
+        const replay = agree('event authorization: reorg replay', await both(get(`/api/v1/did/${alice}?confirm=true&verify=true`)));
+        if (replay.status !== 200 || replay.body.didDocumentMetadata?.versionSequence !== '2') {
+            throw new Error('event authorization: competing rotation replay failed');
+        }
+        assertEqual('event authorization: competing rotation key', normalizeJson(replay.body.didDocument.verificationMethod[0].publicKeyJwk), normalizeJson(k3.publicJwk));
+    }
+
+    console.log('ok backdating parity: both ports refuse a proof the chain committed after the rotation, accept one committed before it, downgrade relayed claims, agree whichever order relays arrive in, and use one authority on import and replay');
 }
 
 await resetServiceState(tsBaseUrl);

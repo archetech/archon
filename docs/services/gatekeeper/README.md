@@ -687,7 +687,7 @@ set to the DID; otherwise it is omitted.
 | `event.operation.type` | Effect |
 | --- | --- |
 | `update` | `versionN++`; `versionId := event.opid || cid(event.operation)`; `updated := event.time`; merge `event.operation.doc.didDocument`, `didDocumentData`, `didDocumentRegistration` into the running doc (any field present in `event.operation.doc` replaces the corresponding field on the running doc); `deactivated := false`. |
-| `delete` | `versionN++`; `versionId := ...`; `deleted := updated := event.time`; `didDocument := { id: did }`; `didDocumentData := {}`; `deactivated := true`. |
+| `delete` | `versionN++`; `versionId := ...`; `deleted := event.time`; remove `updated` (including any earlier update timestamp); `didDocument := { id: did }`; `didDocumentData := {}`; `deactivated := true`. |
 | anything else | ignored |
 
 ### 6.3 Block timestamps
@@ -729,7 +729,7 @@ Before returning, implementations MUST:
 - delete deprecated fields if present: `didDocumentRegistration.opid`,
   `didDocumentRegistration.registration`
 - omit `didDocumentMetadata.deactivated` unless `true`
-- omit `didDocumentMetadata.updated` unless an update occurred
+- omit `didDocumentMetadata.updated` unless an update occurred and the resolved version is not deleted
 - omit `didDocumentMetadata.deleted` unless a delete occurred
 - omit `didDocumentMetadata.canonicalId` unless set
 - always emit `didDocumentMetadata.versionId`, `versionSequence` (string),

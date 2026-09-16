@@ -1858,8 +1858,8 @@ impl JsonDb {
                         .opid
                         .clone()
                         .unwrap_or_else(|| generate_json_cid(operation).unwrap_or_default());
-                    state.deleted = Some(operation_time.clone());
-                    state.updated = Some(operation_time);
+                    state.deleted = Some(operation_time);
+                    state.updated = None;
                     state.did_document = json!({ "id": did });
                     state.did_document_data = json!({});
                     state.deactivated = true;
