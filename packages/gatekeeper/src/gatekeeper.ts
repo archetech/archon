@@ -1151,7 +1151,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     throw new InvalidOperationError('proof');
                 }
 
-                if (!operation.previd || operation.previd !== doc.didDocumentMetadata?.versionId) {
+                if (!operation.previd || await this.canonicalReference(operation.previd) !== doc.didDocumentMetadata?.versionId) {
                     throw new InvalidOperationError('previd');
                 }
             }
@@ -1406,6 +1406,20 @@ export default class Gatekeeper implements GatekeeperInterface {
         return result;
     }
 
+    private async normalizeOperationId(event: GatekeeperEvent): Promise<void> {
+        const cid = await this.generateCID(event.operation);
+        if (event.opid !== cid) await this.generateCID(event.operation, true);
+        event.opid = cid;
+    }
+
+    // CID ingress caches fetched content under its retrieval CID. Preserve signed
+    // predecessor references to those aliases while exposing only canonical IDs.
+    private async canonicalReference(reference?: string): Promise<string | undefined> {
+        if (!reference) return reference;
+        const operation = await this.db.getOperation(reference);
+        return operation ? this.generateCID(operation) : reference;
+    }
+
     private candidateKey(event: GatekeeperEvent): string {
         return JSON.stringify([event.opid, event.registry, event.time, event.ordinal]);
     }
@@ -1433,16 +1447,20 @@ export default class Gatekeeper implements GatekeeperInterface {
                 const currentDid = `${this.didPrefix}:${key}`;
                 if (!candidates[currentDid]) {
                     candidates[currentDid] = await this.db.getEvents(currentDid);
-                    for (const event of candidates[currentDid]) event.opid ??= await this.generateCID(event.operation, true);
+                    for (const event of candidates[currentDid]) await this.normalizeOperationId(event);
                     await this.db.setCandidates(currentDid, candidates[currentDid]);
                 }
             }
-            for (const [key, events] of Object.entries(candidates)) this.indexCandidates(key, events);
+            for (const [key, events] of Object.entries(candidates)) {
+                for (const event of events) await this.normalizeOperationId(event);
+                await this.db.setCandidates(key, events);
+                this.indexCandidates(key, events);
+            }
             this.candidateHistory = candidates;
         }
         const candidates = this.candidateHistory;
         const events = [...(candidates[did] ?? []), ...await this.db.getEvents(did), ...incoming];
-        for (const event of events) event.opid ??= await this.generateCID(event.operation, true);
+        for (const event of events) await this.normalizeOperationId(event);
         const retained = [...new Map(events.map(event => [this.candidateKey(event), event])).values()];
         await this.db.setCandidates(did, retained);
         candidates[did] = retained;
@@ -1539,7 +1557,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         if (!await this.verifyEvent(event)) return ImportStatus.REJECTED;
         event = copyJSON(event);
         event.did ??= event.operation.did ?? await this.generateDID(event.operation);
-        event.opid ??= await this.generateCID(event.operation, true);
+        await this.normalizeOperationId(event);
         return this.withHistoryLock(async () => {
             await this.retainCandidates(event.did!, [event]);
             const status = await this.importEventOnce(event);
@@ -1594,11 +1612,9 @@ export default class Gatekeeper implements GatekeeperInterface {
                     }
                 }
 
-                if (!event.opid) {
-                    event.opid = await this.generateCID(event.operation, true);
-                }
+                await this.normalizeOperationId(event);
 
-                const opMatch = currentEvents.find(item => item.operation.proof?.proofValue === event.operation.proof?.proofValue);
+                const opMatch = currentEvents.find(item => item.opid === event.opid);
 
                 if (opMatch) {
                     const index = currentEvents.indexOf(opMatch);
@@ -1637,7 +1653,8 @@ export default class Gatekeeper implements GatekeeperInterface {
                         return ImportStatus.REJECTED;
                     }
 
-                    const index = currentEvents.findIndex(item => item.opid === event.operation.previd);
+                    const previd = await this.canonicalReference(event.operation.previd);
+                    const index = currentEvents.findIndex(item => item.opid === previd);
                     if (currentEvents.length > 0 && index < 0) {
                         return ImportStatus.DEFERRED;
                     }
@@ -1896,7 +1913,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
             if (ok) {
                 const position = event.registration ? `/${JSON.stringify([event.time, event.ordinal])}` : '';
-                const eventKey = `${event.registry}/${event.operation.proof?.proofValue}${position}`;
+                const eventKey = `${event.registry}/${await this.generateCID(event.operation)}${position}`;
                 if (!this.eventsSeen[eventKey]) {
                     this.eventsSeen[eventKey] = true;
                     this.eventsQueue.push(event);

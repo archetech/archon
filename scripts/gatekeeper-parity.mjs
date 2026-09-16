@@ -950,6 +950,58 @@ async function runHistoryRecoveryParity() {
     console.log('ok history recovery parity: same/cross-registry, both key verdicts, predecessors, successors, migration, controller removal, and GC');
 }
 
+async function runOperationIdentityParity() {
+    const vector = JSON.parse(await fs.readFile(new URL('../tests/gatekeeper/operation-identity-vectors.json', import.meta.url), 'utf8'));
+    const cipher = new CipherNode();
+    const post = (path, body) => ({ method: 'POST', path, body, requiresAdminKey: true, headers: { 'content-type': 'application/json' } });
+    const both = fixture => Promise.all([request(tsBaseUrl, fixture), request(rustBaseUrl, fixture)]);
+    const pin = async (operation, canonical = true) => {
+        const result = await request(tsBaseUrl, post('/api/v1/ipfs/json', canonical ? JSON.parse(cipher.canonicalizeJSON(operation)) : operation));
+        if (result.status !== 200 || typeof result.body !== 'string') throw new Error('identity parity pin failed');
+        return result.body;
+    };
+    const commit = async (cid, height) => {
+        const results = await both(post('/api/v1/batch/import/cids', { cids: [cid], metadata: {
+            registry: 'BTC:signet', time: '2026-04-11T13:00:00Z', ordinal: [height],
+            registration: { height, index: 0, txid: `tx${height}`, batch: `batch${height}` },
+        } }));
+        for (const result of results) {
+            if (result.status !== 200 || result.body.rejected !== 0) throw new Error('identity parity CID import failed');
+        }
+        const processed = await both({ method: 'POST', path: '/api/v1/events/process', requiresAdminKey: true });
+        for (const result of processed) if (result.status !== 200) throw new Error('identity parity processing failed');
+    };
+    const resolve = async () => {
+        const results = await both({ method: 'GET', path: `/api/v1/did/${vector.did}?confirm=true&verify=true`, requiresAdminKey: true });
+        for (const result of results) if (result.status !== 200) throw new Error('identity parity resolve failed');
+        assertEqual('canonical identity documents', normalizeJson(results[0].body), normalizeJson(results[1].body));
+        return results[0].body;
+    };
+    for (const successor of ['successor', 'aliasSuccessor']) {
+        await resetServiceState(tsBaseUrl);
+        await resetServiceState(rustBaseUrl);
+        await commit(await pin(vector.create), 100);
+        const alias = await pin(vector.update, false);
+        assertEqual('noncanonical retrieval CID', alias, vector.aliasCid);
+        await commit(alias, 200);
+        assertEqual('canonical versionId from noncanonical content', (await resolve()).didDocumentMetadata.versionId, vector.updateCid);
+        await commit(await pin(vector[successor]), 300);
+        assertEqual('alias-compatible successor', (await resolve()).didDocumentData, { version: 3 });
+    }
+    for (const variantFirst of [false, true]) {
+        await resetServiceState(tsBaseUrl);
+        await resetServiceState(rustBaseUrl);
+        await commit(await pin(vector.create), 100);
+        const events = [[vector.update, 200], [vector.variant, 300]];
+        if (variantFirst) events.reverse();
+        for (const [operation, height] of events) await commit(await pin(operation), height);
+        await commit(await pin(vector.successor), 400);
+        assertEqual('equal-signature branches retain the correct predecessor', (await resolve()).didDocumentData, { version: 3 });
+    }
+    console.log('ok operation identity parity: canonical IDs, retrieval aliases, signed alias predecessors, and equal-signature branches');
+}
+
 await runHistoryRecoveryParity();
+await runOperationIdentityParity();
 await runMetricsChecks();
 console.log('Gatekeeper parity checks passed');

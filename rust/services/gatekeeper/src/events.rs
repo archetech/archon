@@ -368,11 +368,7 @@ pub(crate) async fn queue_outbound_operation(
 
 fn event_key(event: &Value) -> Option<String> {
     let registry = event.get("registry").and_then(Value::as_str)?;
-    let proof_value = event
-        .get("operation")
-        .and_then(|value| value.get("proof"))
-        .and_then(|value| value.get("proofValue"))
-        .and_then(Value::as_str)?;
+    let opid = generate_json_cid(event.get("operation")?).ok()?;
     let position = if event
         .get("registration")
         .is_some_and(|value| !value.is_null())
@@ -384,7 +380,7 @@ fn event_key(event: &Value) -> Option<String> {
     } else {
         String::new()
     };
-    Some(format!("{registry}/{proof_value}{position}"))
+    Some(format!("{registry}/{opid}{position}"))
 }
 
 pub(crate) async fn import_batch_impl(state: &AppState, batch: &[Value]) -> ImportBatchResult {
@@ -578,9 +574,7 @@ pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) 
         Err(_) => return ImportStatus::Rejected,
     };
     event.did = Some(did.clone());
-    if event.opid.is_none() {
-        event.opid = generate_json_cid(&event.operation).ok();
-    }
+    event.opid = generate_json_cid(&event.operation).ok();
     if let Err(error) = crate::history::retain_candidates(state, &did, Some(event.clone())).await {
         warn!("Failed to retain candidate: {}", error);
         return ImportStatus::Deferred;
@@ -658,20 +652,7 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
             events
         };
 
-        let proof_value = event
-            .operation
-            .get("proof")
-            .and_then(|value| value.get("proofValue"))
-            .and_then(Value::as_str)
-            .unwrap_or("");
-
-        if let Some(index) = current_events.iter().position(|item| {
-            item.operation
-                .get("proof")
-                .and_then(|value| value.get("proofValue"))
-                .and_then(Value::as_str)
-                == Some(proof_value)
-        }) {
+        if let Some(index) = current_events.iter().position(|item| item.opid.as_deref() == Some(&opid)) {
             let expected_registry = expected_registry_for_index(&current_events, index);
             if expected_registry.as_deref() == Some(current_events[index].registry.as_str()) {
                 if trace {
@@ -770,7 +751,8 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
         }
 
         let previd = event.operation.get("previd").and_then(Value::as_str).unwrap_or_default();
-        let index = current_events.iter().position(|item| item.opid.as_deref() == Some(previd));
+        let previd = state.store.lock().await.canonical_reference(previd);
+        let index = current_events.iter().position(|item| item.opid.as_deref() == Some(previd.as_str()));
         if !current_events.is_empty() && index.is_none() {
             return ImportStatus::Deferred;
         }

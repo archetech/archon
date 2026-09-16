@@ -492,6 +492,29 @@ Candidate journals persist across restart, including rejected candidates and rep
 
 This is convergence on available anchored evidence, not proof of complete history. If a relevant rotation never becomes available, the node cannot take it into account. Gossip hints retain their existing arrival-order semantics; this change does not introduce a trusted ordering for unanchored registries.
 
+### Operation identity and retrieval references
+
+An operation's identity is the CID of its complete JCS-canonical JSON, including
+its proof. `versionId`, stored event `opid`, duplicate detection, and candidate
+replay use that identity. Equal signatures do not imply equal operations: legacy
+proof configuration can change without changing the signature. Different anchors
+of the same operation remain distinct occurrences.
+
+A batch may reference another CID that retrieves the same JSON in a different
+key order. That CID is a retrieval reference, not a replacement operation identity.
+CID ingress retains the retrieved operation under that reference and derives its
+canonical identity. New operations should use the canonical `versionId` as
+`previd`. For compatibility, a signed predecessor reference already present in the
+node's operation cache may resolve to the same canonical predecessor; neither the
+signed operation nor its `previd` is rewritten. An unknown reference remains
+unresolved. A peer's claimed `opid` alone does not install a retrieval alias.
+
+Startup reconstruction canonicalizes stored event IDs and candidate IDs while
+retaining cached retrieval aliases. A complete database backup must include the
+operation cache as well as the candidate journal. Accepted-history exports alone
+may omit aliases needed by legacy signed predecessors; restore the full database
+or recover the original CID references from their anchors.
+
 ### Implementation boundary: event authorization and proof verification
 
 Import and verified replay share event authorization: select the target state the operation chains from, select the authorizing controller document under the rules above, then verify the operation against that document. Confirmation replacements and competing events use the predecessor state, not the latest document. Direct submissions have no trusted event position and retain the historical `proof.created` selection.

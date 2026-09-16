@@ -838,8 +838,8 @@ mod tests {
             "operation": vectors["localAgent"]["operation"].clone()
         });
         assert_eq!(
-            ensure_event_opid(&mut with_existing_opid).expect("existing opid should win"),
-            "existing-opid"
+            ensure_event_opid(&mut with_existing_opid).expect("opid should be canonical"),
+            generate_json_cid(&vectors["localAgent"]["operation"]).unwrap()
         );
 
         let mut without_opid = json!({

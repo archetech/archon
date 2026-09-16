@@ -77,6 +77,11 @@ pub(crate) trait GatekeeperDb {
     fn reset_db(&mut self) -> Result<()>;
     fn add_operation(&mut self, opid: &str, operation: Value) -> Result<()>;
     fn get_operation(&self, opid: &str) -> Option<Value>;
+    // Retrieval aliases are retained in the operation cache, not trusted from relay metadata.
+    fn canonical_reference(&self, reference: &str) -> String {
+        self.get_operation(reference).and_then(|operation| generate_json_cid(&operation).ok())
+            .unwrap_or_else(|| reference.to_string())
+    }
     fn queue_operation(&mut self, registry: &str, operation: Value) -> Result<usize>;
     fn get_queue(&self, registry: &str) -> Vec<Value>;
     fn clear_queue(&mut self, registry: &str, operations: &[Value]) -> Result<bool>;
@@ -548,6 +553,8 @@ impl JsonDb {
     }
 
     fn add_followup_event(&mut self, did: &str, event: EventRecord) -> Result<bool> {
+        let canonical_previd = event.operation.get("previd").and_then(Value::as_str)
+            .map(|reference| self.canonical_reference(reference));
         if matches!(self.backend, DbBackend::Redis { .. }) {
             let latest = self.resolve_doc(
                 &Config {
@@ -591,7 +598,7 @@ impl JsonDb {
                 .and_then(Value::as_str)
                 .ok_or_else(|| anyhow::anyhow!("missing current versionId"))?;
 
-            if previd != current_version_id {
+            if previd != current_version_id && canonical_previd.as_deref() != Some(current_version_id) {
                 anyhow::bail!("invalid previd");
             }
 
@@ -659,7 +666,7 @@ impl JsonDb {
                 .and_then(Value::as_str)
                 .ok_or_else(|| anyhow::anyhow!("missing current versionId"))?;
 
-            if previd != current_version_id {
+            if previd != current_version_id && canonical_previd.as_deref() != Some(current_version_id) {
                 anyhow::bail!("invalid previd");
             }
 
@@ -715,7 +722,7 @@ impl JsonDb {
             .and_then(Value::as_str)
             .ok_or_else(|| anyhow::anyhow!("missing current versionId"))?;
 
-        if previd != current_version_id {
+        if previd != current_version_id && canonical_previd.as_deref() != Some(current_version_id) {
             anyhow::bail!("invalid previd");
         }
 

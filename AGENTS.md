@@ -96,6 +96,8 @@ These rules apply to coding agents working in this repository.
 
 - Public history reads and verification must hold the history lock throughout asynchronous resolution, including status-cache refreshes. GC persistence failures must propagate to callers and preserve pending imports; only successful GC performs queue cleanup. Parity ingress must preserve every fixture ordinal component.
 
+- Canonical operation identity includes the complete proof; never deduplicate by signature alone. Retrieval CIDs may alias canonical operations only through cached content, not peer-supplied opid claims. Preserve cached aliases and signed predecessor bytes during startup repair; test canonical and alias predecessors plus real storage restarts.
+
 - Confirm-fallback eligibility compares the confirmed prefix with local resolution under the same version/time bounds. Peer replies must match the DID, respect those bounds, and advance existing confirmed state; HTTP delegation must not mutate local history.
 
 - CID batch ingress derives `registration.opidx` from the original CID-list index in both ports, independently of the batch ordinal prefix; parity coverage must record the anchoring block to exercise timestamp metadata.

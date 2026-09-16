@@ -40,10 +40,6 @@ pub(crate) fn infer_event_did(config: &Config, event: &Value) -> Result<String> 
 }
 
 pub(crate) fn ensure_event_opid(event: &mut Value) -> Result<String> {
-    if let Some(opid) = event.get("opid").and_then(Value::as_str) {
-        return Ok(opid.to_string());
-    }
-
     let operation = event.get("operation").context("missing event.operation")?;
     let opid = generate_json_cid(operation)?;
     event["opid"] = Value::String(opid.clone());
