@@ -82,3 +82,4 @@ These rules apply to coding agents working in this repository.
 - `pin` in Gatekeeper `supportedRegistries` can be both the auxiliary pin queue and a DID registration registry when enabled; do not assume old auxiliary-only rejection semantics still apply.
 
 - Keep chain-position and controller-history selection in Gatekeeper event authorization, shared by imports, confirmation replacements, reorganization, and verified replay. Low-level operation verification takes an explicitly selected authorizing document and does not resolve chain history. Select replacement/reorganization authority from the operation's predecessor, not the latest state.
+- When changing Gatekeeper resolution metadata, update the resolution algorithm and field-omission rules in `docs/services/gatekeeper/README.md` alongside the implementations and parity tests. Deleted documents omit `updated`, including any earlier update timestamp.
