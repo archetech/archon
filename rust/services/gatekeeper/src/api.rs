@@ -1138,6 +1138,18 @@ pub(crate) async fn resolve_did(
         }
     };
 
+    let already_fallback = headers.get("x-archon-confirm-fallback").is_some();
+    let pending_successor = if resolve_options.confirm && !already_fallback
+        && !state.config.confirm_fallback_url.trim().is_empty()
+        && local_doc.pointer("/didResolutionMetadata/error").is_none()
+    {
+        let mut latest_options = resolve_options.clone();
+        latest_options.confirm = false;
+        resolve_local_doc_async(&state, &did, latest_options).await.ok()
+            .is_some_and(|latest| document_sequence(&latest) > document_sequence(&local_doc))
+    } else {
+        false
+    };
     drop(_history_guard);
     let has_resolver_error = local_doc
         .get("didResolutionMetadata")
@@ -1199,7 +1211,6 @@ pub(crate) async fn resolve_did(
         }
     }
 
-    let already_fallback = headers.get("x-archon-confirm-fallback").is_some();
     let local_confirmed = local_doc
         .get("didDocumentMetadata")
         .and_then(|value| value.get("confirmed"))
@@ -1207,9 +1218,9 @@ pub(crate) async fn resolve_did(
         .unwrap_or(false);
 
     if resolve_options.confirm
-        && !has_resolver_error
         && !already_fallback
-        && !local_confirmed
+        && (local_doc.pointer("/didResolutionMetadata/error").and_then(Value::as_str) == Some("notFound")
+            || (!has_resolver_error && (!local_confirmed || pending_successor)))
         && !state.config.confirm_fallback_url.trim().is_empty()
     {
         let url = confirm_fallback_url(&state.config.confirm_fallback_url, &did, &resolve_options);
@@ -1225,13 +1236,7 @@ pub(crate) async fn resolve_did(
             Ok(response) if response.status().is_success() => match response.bytes().await {
                 Ok(body) => match serde_json::from_slice::<Value>(&body) {
                     Ok(resolved) => {
-                        let fallback_confirmed = resolved
-                            .get("didDocumentMetadata")
-                            .and_then(|value| value.get("confirmed"))
-                            .and_then(Value::as_bool)
-                            .unwrap_or(false);
-
-                        if fallback_confirmed {
+                        if confirmed_fallback_improves(&resolved, &local_doc, &did, &resolve_options) {
                             record_metrics(
                                 &state,
                                 "GET",
@@ -2400,6 +2405,36 @@ fn url_encode_component(value: &str) -> String {
         }
     }
     encoded
+}
+
+fn document_sequence(doc: &Value) -> u64 {
+    doc.pointer("/didDocumentMetadata/versionSequence")
+        .and_then(Value::as_str).and_then(|value| value.parse().ok()).unwrap_or(0)
+}
+
+fn confirmed_fallback_improves(peer: &Value, local: &Value, did: &str, options: &ResolveOptions) -> bool {
+    let sequence = document_sequence(peer);
+    if peer.pointer("/didResolutionMetadata/error").is_some()
+        || peer.pointer("/didDocument/id").and_then(Value::as_str) != Some(did)
+        || peer.pointer("/didDocumentMetadata/confirmed").and_then(Value::as_bool) != Some(true)
+        || sequence == 0 || sequence > 9_007_199_254_740_991
+        || options.version_sequence.is_some_and(|limit| sequence > limit as u64)
+        || (local.pointer("/didDocumentMetadata/confirmed").and_then(Value::as_bool) == Some(true)
+            && sequence <= document_sequence(local))
+    {
+        return false;
+    }
+    if let Some(cutoff) = options.version_time.as_deref() {
+        let metadata = &peer["didDocumentMetadata"];
+        let time = metadata.get("deleted").or_else(|| metadata.get("updated"))
+            .or_else(|| metadata.get("created")).and_then(Value::as_str);
+        let parsed = time.and_then(|time| chrono::DateTime::parse_from_rfc3339(time).ok());
+        let cutoff = chrono::DateTime::parse_from_rfc3339(cutoff).ok();
+        if !matches!((parsed, cutoff), (Some(time), Some(cutoff)) if time <= cutoff) {
+            return false;
+        }
+    }
+    true
 }
 
 fn confirm_fallback_url(base_url: &str, did: &str, options: &ResolveOptions) -> String {

@@ -12,7 +12,7 @@ function doc(confirmed?: boolean): DidCidDocument {
     return {
         didResolutionMetadata: {},
         didDocument: { id: DID },
-        didDocumentMetadata: confirmed === undefined ? {} : { confirmed },
+        didDocumentMetadata: confirmed === undefined ? {} : { confirmed, versionSequence: '1', created: '2026-05-13T00:00:00Z' },
     };
 }
 
@@ -35,6 +35,26 @@ describe('confirmed resolution fallback', () => {
 
     it('should try fallback for unconfirmed local DID with confirm requested', () => {
         expect(shouldTryConfirmFallback(doc(false), { confirm: true }, 'https://peer.example')).toBe(true);
+    });
+
+    it('tries missing history and pending successors, but not invalid DIDs', () => {
+        const missing = { didResolutionMetadata: { error: 'notFound' } };
+        expect(shouldTryConfirmFallback(missing, { confirm: true }, 'https://peer.example')).toBe(true);
+        expect(shouldTryConfirmFallback({ didResolutionMetadata: { error: 'invalidDid' } }, { confirm: true }, 'https://peer.example')).toBe(false);
+        const latest = doc(false);
+        latest.didDocumentMetadata!.versionSequence = '2';
+        expect(shouldTryConfirmFallback(doc(true), { confirm: true }, 'https://peer.example', false, latest)).toBe(true);
+    });
+
+    it.each(['wrong-did', 'stale', 'too-new', 'too-late', 'error'] as const)('ignores a %s peer answer', async (kind) => {
+        const peer = doc(true);
+        peer.didDocumentMetadata!.versionSequence = kind === 'stale' ? '1' : kind === 'too-new' ? '3' : '2';
+        if (kind === 'wrong-did') peer.didDocument!.id = 'did:cid:other';
+        if (kind === 'too-late') peer.didDocumentMetadata!.updated = '2026-05-15T00:00:00Z';
+        if (kind === 'error') peer.didResolutionMetadata!.error = 'notFound';
+        const fetchImpl = jest.fn(async () => new Response(JSON.stringify(peer), { status: 200 }));
+        expect(await resolveFromConfirmFallback(DID, { confirm: true, versionSequence: 2, versionTime: '2026-05-14T00:00:00Z' },
+            'https://peer.example', 1000, fetchImpl, doc(true))).toBeNull();
     });
 
     it('should return confirmed fallback documents', async () => {

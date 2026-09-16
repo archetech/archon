@@ -1293,7 +1293,7 @@ registry segments are collapsed.
 | `ARCHON_ADMIN_API_KEY` | empty (**required**) | Admin API key. The service refuses to start without it; admin routes return 403 when unset. A warning is logged if it is shorter than 32 characters. Generate with `openssl rand -hex 32`. |
 | `ARCHON_GATEKEEPER_FALLBACK_URL` | `https://dev.uniresolver.io` | Universal resolver to consult on local notFound. Empty disables. |
 | `ARCHON_GATEKEEPER_FALLBACK_TIMEOUT` | `5000` | Fallback timeout in ms. |
-| `ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL` | empty | Optional Gatekeeper peer to consult when `confirm=true` local resolution is unconfirmed. Empty disables. |
+| `ARCHON_GATEKEEPER_CONFIRM_FALLBACK_URL` | empty | Optional Gatekeeper peer for `confirm=true` requests with missing local history or a pending successor within the requested version/time bounds. Empty disables. |
 | `GIT_COMMIT` | `unknown` | Build commit. |
 
 ### 14.3 Healthcheck
@@ -1429,3 +1429,19 @@ previous operation; it does not rewrite signed `previd` values or trust a relaye
 `opid` as an alias. Startup rebuilds normalize old event IDs and journals. Full
 backups must retain both journals and the operation cache; a histories-only export
 can require a rescan of original CID references to recover legacy aliases.
+
+### Confirmed-resolution peer delegation
+
+The legacy DID HTTP endpoint can consult the configured confirm-fallback peer when
+local history is missing, or when resolution with the same selectors and
+`confirm=false` reaches beyond the local confirmed prefix. A confirmed prefix is
+not evidence that the node has confirmed its pending successor. Invalid DIDs,
+requests without `confirm=true`, and requests bearing `X-Archon-Confirm-Fallback`
+do not trigger this delegation.
+
+Peer answers must identify the requested DID, contain no resolution error, report
+confirmed state, respect the requested version/time bounds, and advance an
+existing local confirmed version. Stale, malformed, unconfirmed, failed, or timed-out
+answers leave the local result unchanged. The request forwards the selectors and
+recursion marker. Delegation does not import events or cache peer documents and
+does not alter core Gatekeeper resolution or authorization.
