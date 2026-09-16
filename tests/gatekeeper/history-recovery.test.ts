@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -330,4 +331,35 @@ it.each(['resolve', 'verify'] as const)('holds the history lock throughout an as
     else expect(result).toEqual(expect.objectContaining({ didDocumentData: 'retired' }));
     await writing;
     expect((await g.resolveDID(vector.asset, { verify: true })).didDocumentData).toBe('original');
+});
+
+
+it('startup verifies each creation once and leaves unchanged candidate journals untouched', async () => {
+    const db = new DbJsonMemory('startup-work');
+    const options = { db, ipfs: new MemoryClient() };
+    const g = new Gatekeeper(options);
+    // Includes both a controller and its asset, in multiple registry histories.
+    for (const vector of vectors) {
+        for (const event of vector.base) await g.importEvent(event);
+    }
+    const before = await db.getCandidates();
+    const writes = jest.spyOn(db, 'setCandidates');
+    const reads = jest.spyOn(db, 'getEvents');
+    const verify = jest.spyOn(Gatekeeper.prototype, 'verifyCreateOperation');
+    try {
+        const restarted = new Gatekeeper(options);
+        await restarted.getDIDs();
+        const creations = Object.values(before).flat().filter(event => event.operation.type === 'create');
+        expect(verify).toHaveBeenCalledTimes(creations.length);
+        expect(writes).not.toHaveBeenCalled();
+        expect(reads).toHaveBeenCalledTimes(Object.keys(before).length);
+        expect(await db.getCandidates()).toEqual(before);
+        for (const [did, events] of Object.entries(before)) {
+            expect(await db.getEvents(did)).toEqual(events);
+        }
+    } finally {
+        verify.mockRestore();
+        writes.mockRestore();
+        reads.mockRestore();
+    }
 });

@@ -43,6 +43,15 @@ pub(crate) async fn retain_candidates(
     did: &str,
     incoming: Option<EventRecord>,
 ) -> Result<()> {
+    retain_candidates_with_histories(state, did, incoming, None).await
+}
+
+async fn retain_candidates_with_histories(
+    state: &AppState,
+    did: &str,
+    incoming: Option<EventRecord>,
+    histories: Option<&HashMap<String, Vec<EventRecord>>>,
+) -> Result<()> {
     let mut cache = state.candidate_history.lock().await;
     let mut dependents = state.dependents.lock().await;
     let mut store = state.store.lock().await;
@@ -50,7 +59,9 @@ pub(crate) async fn retain_candidates(
         let mut candidates = store.get_candidates()?;
         for current in store.list_dids(&state.config.did_prefix, None) {
             if !candidates.contains_key(&current) {
-                let mut events = store.get_events(&current);
+                let mut events = histories
+                    .map(|items| items.get(&current).cloned().unwrap_or_default())
+                    .unwrap_or_else(|| store.get_events(&current));
                 for event in &mut events {
                     event.opid = Some(generate_json_cid(&event.operation)?);
                 }
@@ -59,17 +70,26 @@ pub(crate) async fn retain_candidates(
             }
         }
         for (key, events) in &mut candidates {
+            let mut changed = false;
             for event in events.iter_mut() {
-                event.opid = Some(generate_json_cid(&event.operation)?);
+                let opid = generate_json_cid(&event.operation)?;
+                changed |= event.opid.as_ref() != Some(&opid);
+                event.opid = Some(opid);
             }
-            store.set_candidates(key, events.clone())?;
+            if changed {
+                store.set_candidates(key, events.clone())?;
+            }
             index_candidates(&mut dependents, key, events);
         }
         *cache = Some(candidates);
     }
     let candidates = cache.as_mut().expect("candidate cache initialized");
     let mut events = candidates.get(did).cloned().unwrap_or_default();
-    events.extend(store.get_events(did));
+    events.extend(
+        histories
+            .map(|items| items.get(did).cloned().unwrap_or_default())
+            .unwrap_or_else(|| store.get_events(did)),
+    );
     events.extend(incoming);
     let mut positions = HashMap::new();
     let mut retained = Vec::new();
@@ -84,7 +104,9 @@ pub(crate) async fn retain_candidates(
         }
     }
     let events = retained;
-    store.set_candidates(did, events.clone())?;
+    if candidates.get(did) != Some(&events) {
+        store.set_candidates(did, events.clone())?;
+    }
     index_candidates(&mut dependents, did, &events);
     candidates.insert(did.to_string(), events);
     Ok(())
@@ -135,9 +157,14 @@ pub(crate) async fn ensure_history_ready(state: &AppState) -> Result<()> {
         dids.into_iter().collect()
     };
     dids.sort();
-    for did in dids {
-        reconcile_history(state, &did, true).await?;
+    // Journal all existing projections before rebuilding any of them. A single
+    // startup projection avoids replaying each controller's dependents again
+    // when the outer DID scan reaches them.
+    let histories = state.store.lock().await.get_histories(&dids)?;
+    for did in &dids {
+        retain_candidates_with_histories(state, did, None, Some(&histories)).await?;
     }
+    rebuild_histories(state, dids, Some(&histories)).await?;
     *state.history_ready.lock().await = true;
     Ok(())
 }
@@ -174,7 +201,17 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
     if affected.is_empty() {
         return Ok(());
     }
-    let mut targets: Vec<_> = affected.into_iter().collect();
+    rebuild_histories(state, affected.into_iter().collect(), None).await
+}
+
+async fn rebuild_histories(
+    state: &AppState,
+    mut targets: Vec<String>,
+    histories: Option<&HashMap<String, Vec<EventRecord>>>,
+) -> Result<()> {
+    if targets.is_empty() {
+        return Ok(());
+    }
     targets.sort();
     let candidates: HashMap<_, _> = {
         let cache = state.candidate_history.lock().await;
@@ -199,12 +236,17 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
         // An unrelated DID must not turn every asset import into a DB-wide scan.
         let mut needed: HashSet<_> = targets.iter().cloned().collect();
         let mut pending = targets.clone();
+        let mut references = HashSet::new();
         while let Some(key) = pending.pop() {
-            let events = store.get_events(&key);
+            let events = histories
+                .map(|items| items.get(&key).cloned().unwrap_or_default())
+                .unwrap_or_else(|| store.get_events(&key));
             for event in events.iter().chain(cache.get(&key).into_iter().flatten()) {
                 if let Some(previd) = event.operation.get("previd").and_then(Value::as_str) {
-                    if let Some(operation) = store.get_operation(previd) {
-                        data.ops.insert(previd.to_string(), operation);
+                    if references.insert(previd.to_string()) {
+                        if let Some(operation) = store.get_operation(previd) {
+                            data.ops.insert(previd.to_string(), operation);
+                        }
                     }
                 }
                 for controller in [
@@ -220,14 +262,11 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
                     }
                 }
             }
+            if candidates.contains_key(&key) {
+                original.insert(key.clone(), serde_json::to_string(&events)?);
+            }
             data.dids
                 .insert(key.rsplit(':').next().unwrap_or(&key).to_string(), events);
-        }
-        for target in &targets {
-            original.insert(
-                target.clone(),
-                serde_json::to_string(&store.get_events(target))?,
-            );
         }
     }
     // Start affected projections empty, so replay does not inherit an
@@ -244,41 +283,46 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
     }));
     replay.did_locks = Arc::new(Mutex::new(HashMap::new()));
     replay.search_index = Arc::new(Mutex::new(SearchIndex::default()));
-    loop {
-        let before = snapshot(&replay, &targets).await?;
-        for target in &targets {
-            let mut events = candidates.get(target).cloned().unwrap_or_default();
-            events.sort_by(|a, b| {
-                let a_hint = crate::is_unanchored_registry(&a.registry);
-                let b_hint = crate::is_unanchored_registry(&b.registry);
-                if a_hint && b_hint {
-                    return std::cmp::Ordering::Equal;
-                }
-                let registry = if a_hint != b_hint {
-                    b_hint.cmp(&a_hint)
-                } else {
-                    a.registry.cmp(&b.registry)
-                };
-                registry
-                    .then_with(|| compare_ordinals(a.ordinal.as_ref(), b.ordinal.as_ref()))
-                    .then_with(|| a.time.cmp(&b.time))
-                    .then_with(|| a.opid.cmp(&b.opid))
-            });
-            replay.store.lock().await.set_events(target, Vec::new())?;
-            loop {
-                let previous =
-                    serde_json::to_string(&replay.store.lock().await.get_events(target))?;
-                for event in &events {
-                    import_event_once(&replay, event.clone()).await;
-                }
-                if serde_json::to_string(&replay.store.lock().await.get_events(target))? == previous
-                {
-                    break;
-                }
+    // Only self-controlled agents can authorize another DID. Their histories
+    // therefore have no external dependencies; finish them before any assets.
+    // Invalid controller assignments are still rejected by normal authorization.
+    targets.sort_by_key(|target| {
+        !candidates.get(target).into_iter().flatten().any(|event| {
+            event.operation.get("type").and_then(Value::as_str) == Some("create")
+                && event
+                    .operation
+                    .pointer("/registration/type")
+                    .and_then(Value::as_str)
+                    == Some("agent")
+        })
+    });
+    for target in &targets {
+        let mut events = candidates.get(target).cloned().unwrap_or_default();
+        events.sort_by(|a, b| {
+            let a_hint = crate::is_unanchored_registry(&a.registry);
+            let b_hint = crate::is_unanchored_registry(&b.registry);
+            if a_hint && b_hint {
+                return std::cmp::Ordering::Equal;
             }
-        }
-        if snapshot(&replay, &targets).await? == before {
-            break;
+            let registry = if a_hint != b_hint {
+                b_hint.cmp(&a_hint)
+            } else {
+                a.registry.cmp(&b.registry)
+            };
+            registry
+                .then_with(|| compare_ordinals(a.ordinal.as_ref(), b.ordinal.as_ref()))
+                .then_with(|| a.time.cmp(&b.time))
+                .then_with(|| a.opid.cmp(&b.opid))
+        });
+        replay.store.lock().await.set_events(target, Vec::new())?;
+        loop {
+            let previous = serde_json::to_string(&replay.store.lock().await.get_events(target))?;
+            for event in &events {
+                import_event_once(&replay, event.clone()).await;
+            }
+            if serde_json::to_string(&replay.store.lock().await.get_events(target))? == previous {
+                break;
+            }
         }
     }
     let mut changed = Vec::new();
@@ -305,19 +349,38 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
     Ok(())
 }
 
-async fn snapshot(state: &AppState, targets: &[String]) -> Result<Vec<String>> {
-    let store = state.store.lock().await;
-    targets
-        .iter()
-        .map(|target| Ok(serde_json::to_string(&store.get_events(target))?))
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{resolve_local_doc_async, ResolveOptions};
     use serde_json::Value;
+
+    // Local, isolated benchmark: never connects to the source database.
+    #[tokio::test]
+    #[ignore]
+    async fn benchmark_startup_histories() {
+        let path = std::env::var("ARCHON_BENCHMARK_HISTORIES").unwrap();
+        let candidates: HashMap<String, Vec<EventRecord>> =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let mut data = JsonDbFile::default();
+        for (did, events) in &candidates {
+            data.dids.insert(did.rsplit(':').next().unwrap().to_string(), events.clone());
+            for event in events {
+                data.ops.insert(generate_json_cid(&event.operation).unwrap(), event.operation.clone());
+            }
+        }
+        data.candidates = candidates;
+        let count = data.dids.len();
+        let (state, _dir) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory, data, redis_connection: None,
+        });
+        let started = std::time::Instant::now();
+        ensure_history_ready(&state).await.unwrap();
+        eprintln!("startup histories={count} elapsed={:?}", started.elapsed());
+        let store = state.store.lock().await;
+        let output = std::env::var("ARCHON_BENCHMARK_OUTPUT").unwrap();
+        std::fs::write(output, serde_json::to_vec(&store.data.dids).unwrap()).unwrap();
+    }
 
     fn identity_fixture() -> Value {
         serde_json::from_str(include_str!(
@@ -1097,6 +1160,39 @@ mod tests {
             json!("original")
         );
     }
+    #[tokio::test]
+    async fn canonical_startup_does_not_rewrite_unchanged_storage() {
+        let vectors: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/history-recovery-vectors.json"
+        )).unwrap();
+        let (state, directory) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        for vector in &vectors {
+            for event in vector["base"].as_array().unwrap() {
+                crate::events::import_event_impl(&state, serde_json::from_value(event.clone()).unwrap()).await;
+            }
+        }
+        // Complete one recovery so all persisted events have canonical metadata.
+        *state.history_ready.lock().await = false;
+        *state.candidate_history.lock().await = None;
+        ensure_history_ready(&state).await.unwrap();
+        let before = {
+            let mut store = state.store.lock().await;
+            let before = serde_json::to_value(&store.data).unwrap();
+            // Writing to a directory fails; an unchanged restart must not write.
+            store.backend = DbBackend::JsonFile { path: directory.path().to_path_buf() };
+            before
+        };
+        *state.history_ready.lock().await = false;
+        *state.candidate_history.lock().await = None;
+        state.dependents.lock().await.clear();
+        ensure_history_ready(&state).await.unwrap();
+        assert_eq!(serde_json::to_value(&state.store.lock().await.data).unwrap(), before);
+    }
+
     #[tokio::test]
     async fn upgrades_accepted_histories_without_a_candidate_journal() {
         let vectors: Vec<Value> = serde_json::from_str(include_str!(

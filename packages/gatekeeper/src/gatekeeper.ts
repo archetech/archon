@@ -1396,7 +1396,19 @@ export default class Gatekeeper implements GatekeeperInterface {
             // an interrupted publication cannot leave dependent state stale.
             const dids = new Set(Object.keys(await this.db.getCandidates()));
             for (const key of await this.db.getAllKeys()) dids.add(`${this.didPrefix}:${key}`);
-            for (const did of [...dids].sort()) await this.reconcileHistory(did, true);
+            const targets = [...dids].sort();
+            // Retain every projection before replaying any history. Rebuild
+            // each DID once, rather than once per controller plus once itself.
+            const histories = new Map<string, GatekeeperEvent[]>();
+            // Bound outstanding reads while allowing network backends to serve
+            // a batch without a round trip for every DID in sequence.
+            for (let offset = 0; offset < targets.length; offset += 64) {
+                await Promise.all(targets.slice(offset, offset + 64).map(async did => {
+                    histories.set(did, await this.db.getEvents(did));
+                }));
+            }
+            for (const did of targets) await this.retainCandidates(did, [], histories);
+            await this.rebuildHistories(targets, this.candidateHistory ?? {}, histories);
         }).catch(error => { this.historyReady = undefined; throw error; });
         return this.historyReady;
     }
@@ -1438,7 +1450,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
     }
 
-    private async retainCandidates(did: string, incoming: GatekeeperEvent[] = []): Promise<Record<string, GatekeeperEvent[]>> {
+    private async retainCandidates(did: string, incoming: GatekeeperEvent[] = [], histories?: Map<string, GatekeeperEvent[]>): Promise<Record<string, GatekeeperEvent[]>> {
         if (!this.candidateHistory) {
             const candidates = await this.db.getCandidates();
             // Upgrade existing databases once, not on every import. Subsequent
@@ -1446,23 +1458,26 @@ export default class Gatekeeper implements GatekeeperInterface {
             for (const key of await this.db.getAllKeys()) {
                 const currentDid = `${this.didPrefix}:${key}`;
                 if (!candidates[currentDid]) {
-                    candidates[currentDid] = await this.db.getEvents(currentDid);
+                    candidates[currentDid] = copyJSON(histories?.get(currentDid) ?? await this.db.getEvents(currentDid));
                     for (const event of candidates[currentDid]) await this.normalizeOperationId(event);
                     await this.db.setCandidates(currentDid, candidates[currentDid]);
                 }
             }
             for (const [key, events] of Object.entries(candidates)) {
+                const previous = JSON.stringify(events);
                 for (const event of events) await this.normalizeOperationId(event);
-                await this.db.setCandidates(key, events);
+                if (JSON.stringify(events) !== previous) await this.db.setCandidates(key, events);
                 this.indexCandidates(key, events);
             }
             this.candidateHistory = candidates;
         }
         const candidates = this.candidateHistory;
-        const events = [...(candidates[did] ?? []), ...await this.db.getEvents(did), ...incoming];
+        const events = [...(candidates[did] ?? []), ...copyJSON(histories?.get(did) ?? await this.db.getEvents(did)), ...incoming];
         for (const event of events) await this.normalizeOperationId(event);
         const retained = [...new Map(events.map(event => [this.candidateKey(event), event])).values()];
-        await this.db.setCandidates(did, retained);
+        if (JSON.stringify(candidates[did]) !== JSON.stringify(retained)) {
+            await this.db.setCandidates(did, retained);
+        }
         candidates[did] = retained;
         this.indexCandidates(did, retained);
         return candidates;
@@ -1488,11 +1503,15 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         if (!rebuildSelf) affected.delete(did);
-        if (!affected.size) return;
+        await this.rebuildHistories([...affected], candidates);
+    }
+
+    private async rebuildHistories(targets: string[], candidates: Record<string, GatekeeperEvent[]>, histories?: Map<string, GatekeeperEvent[]>): Promise<void> {
+        if (!targets.length) return;
         const staged = new Map<string, GatekeeperEvent[]>();
         const original = new Map<string, string>();
-        for (const target of affected) {
-            const events = await this.db.getEvents(target);
+        for (const target of targets) {
+            const events = histories?.get(target) ?? await this.db.getEvents(target);
             staged.set(target, []);
             original.set(target, JSON.stringify(events));
         }
@@ -1501,7 +1520,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         const db = this.db;
         const overlay = new Proxy(db, {
             get(target, property) {
-                if (property === 'getEvents') return async (key: string) => copyJSON(staged.get(key) ?? await db.getEvents(key));
+                if (property === 'getEvents') return async (key: string) => copyJSON(staged.get(key) ?? histories?.get(key) ?? await db.getEvents(key));
                 if (property === 'setEvents') return async (key: string, events: GatekeeperEvent[]) => { staged.set(key, copyJSON(events)); };
                 if (property === 'addEvent') return async (key: string, event: GatekeeperEvent) => { staged.set(key, [...(staged.get(key) ?? []), copyJSON(event)]); };
                 const value = Reflect.get(target, property);
@@ -1509,38 +1528,39 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
         });
         const replay = new Gatekeeper({ db: overlay, ipfs: this.ipfs, didPrefix: this.didPrefix, registries: this.supportedRegistries });
-        const targets = [...affected].sort();
-        for (;;) {
-            const before = JSON.stringify(targets.map(target => staged.get(target)));
-            for (const target of targets) {
-                const events = copyJSON(candidates[target] ?? []).sort((a, b) => {
-                    // Registry-local order first; do not compare ordinal values
-                    // across registries. Stable tie-breaking makes replay independent
-                    // of arrival order even when candidates compete for a predecessor.
-                    const aHint = isUnanchoredRegistry(a.registry);
-                    const bHint = isUnanchoredRegistry(b.registry);
-                    // Preserve existing arrival-order semantics for local/gossip
-                    // hints; they have no independently established chain order.
-                    if (aHint && bHint) return 0;
-                    if (aHint !== bHint) return aHint ? -1 : 1;
-                    if (a.registry !== b.registry) return a.registry < b.registry ? -1 : 1;
-                    const ordinal = compareOrdinals(a.ordinal ?? [], b.ordinal ?? []);
-                    if (ordinal) return ordinal;
-                    if (a.time !== b.time) return a.time < b.time ? -1 : 1;
-                    return (a.opid ?? '') < (b.opid ?? '') ? -1 : (a.opid ?? '') > (b.opid ?? '') ? 1 : 0;
-                });
-                staged.set(target, []);
-                // A candidate can precede its predecessor in the sorted input
-                // (notably during migration), so replay to a stable sequence.
-                for (;;) {
-                    const previous = JSON.stringify(staged.get(target));
-                    for (const event of events) {
-                        await replay.importEventOnce(event);
-                    }
-                    if (JSON.stringify(staged.get(target)) === previous) break;
+        // Only self-controlled agents can authorize another DID. Complete
+        // those independent histories first, then replay their assets once.
+        const isAgent = (did: string) => (candidates[did] ?? []).some(({ operation }) =>
+            operation.type === 'create' && operation.registration?.type === 'agent');
+        targets.sort();
+        targets.sort((a, b) => Number(isAgent(b)) - Number(isAgent(a)));
+        for (const target of targets) {
+            const events = copyJSON(candidates[target] ?? []).sort((a, b) => {
+                // Registry-local order first; do not compare ordinal values
+                // across registries. Stable tie-breaking makes replay independent
+                // of arrival order even when candidates compete for a predecessor.
+                const aHint = isUnanchoredRegistry(a.registry);
+                const bHint = isUnanchoredRegistry(b.registry);
+                // Preserve existing arrival-order semantics for local/gossip
+                // hints; they have no independently established chain order.
+                if (aHint && bHint) return 0;
+                if (aHint !== bHint) return aHint ? -1 : 1;
+                if (a.registry !== b.registry) return a.registry < b.registry ? -1 : 1;
+                const ordinal = compareOrdinals(a.ordinal ?? [], b.ordinal ?? []);
+                if (ordinal) return ordinal;
+                if (a.time !== b.time) return a.time < b.time ? -1 : 1;
+                return (a.opid ?? '') < (b.opid ?? '') ? -1 : (a.opid ?? '') > (b.opid ?? '') ? 1 : 0;
+            });
+            staged.set(target, []);
+            // A candidate can precede its predecessor in the sorted input
+            // (notably during migration), so replay to a stable sequence.
+            for (;;) {
+                const previous = JSON.stringify(staged.get(target));
+                for (const event of events) {
+                    await replay.importEventOnce(event);
                 }
+                if (JSON.stringify(staged.get(target)) === previous) break;
             }
-            if (JSON.stringify(targets.map(target => staged.get(target))) === before) break;
         }
         for (const target of targets) {
             if (JSON.stringify(staged.get(target)) !== original.get(target)) {
