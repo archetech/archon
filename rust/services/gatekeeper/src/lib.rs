@@ -1,5 +1,6 @@
 mod api;
 mod app;
+mod authorization;
 mod config;
 mod events;
 mod metrics;
@@ -11,17 +12,19 @@ mod store;
 pub use app::run;
 
 pub(crate) use api::is_valid_registry;
+pub(crate) use authorization::{authorize_operation, is_unanchored_registry};
 pub(crate) use app::AppState;
 pub(crate) use config::Config;
 pub(crate) use events::{
-    handle_did_operation, import_batch_impl, process_events_impl, queue_outbound_operation,
+    handle_did_operation, import_batch_impl, process_events_impl,
     relay_hints,
 };
+#[cfg(test)]
+pub(crate) use events::queue_outbound_operation;
 pub(crate) use metrics::{normalize_path, record_metrics, Metrics};
 pub(crate) use proofs::{
-    anchor_of, ensure_event_opid, generate_did_from_operation, generate_json_cid,
-    infer_event_did, is_unanchored_registry, is_valid_did, verify_create_operation_impl,
-    verify_event_shape, verify_operation_impl, verify_update_operation_impl,
+    ensure_event_opid, generate_did_from_operation, generate_json_cid, infer_event_did,
+    is_valid_did, verify_event_shape,
 };
 pub(crate) use resolver::{
     build_search_index, classify_conformant_error, clear_search_index, delete_search_doc,
@@ -43,7 +46,7 @@ pub(crate) use store::{
 mod tests {
     use super::*;
     use crate::api::{is_operation, resolve_cid_operation};
-    use crate::proofs::{canonical_json, verify_proof_format};
+    use crate::proofs::{canonical_json, verify_proof_format, verify_create_operation_impl};
     use crate::store::{
         compare_ordinals, hydrate_redis_event, redis_event_to_stored_value, DbBackend, JsonDbFile,
     };
@@ -428,13 +431,10 @@ mod tests {
     #[tokio::test]
     async fn verify_create_operation_checks_every_string_valid_until() {
         async fn error_for(valid_until: Value) -> Option<String> {
-            let (db, _temp_dir) = temp_json_db();
-            let (state, _dir) = make_state(db);
             let mut operation = proof_vectors()["agentCreateValid"]["operation"].clone();
             operation["registration"]["validUntil"] = valid_until;
 
-            verify_create_operation_impl(&state, &operation, None)
-                .await
+            verify_create_operation_impl(&operation, None)
                 .err()
                 .map(|error| error.to_string())
         }
@@ -514,12 +514,9 @@ mod tests {
     // fixture only pins the bytes, not that either side agrees about them.
     #[tokio::test]
     async fn verifies_an_operation_proof_signed_by_the_other_port() {
-        let (db, _temp_dir) = temp_json_db();
-        let (state, _dir) = make_state(db);
         let operation = proof_vectors()["agentCreateValidDataIntegrity"]["operation"].clone();
 
-        assert!(verify_create_operation_impl(&state, &operation, None)
-            .await
+        assert!(verify_create_operation_impl(&operation, None)
             .expect("verification should not error"));
 
         // Moving a member the suite binds breaks it, where the legacy payload
@@ -527,8 +524,7 @@ mod tests {
         let mut moved = operation;
         moved["proof"]["created"] = json!("2026-04-12T12:00:00Z");
 
-        assert!(!verify_create_operation_impl(&state, &moved, None)
-            .await
+        assert!(!verify_create_operation_impl(&moved, None)
             .expect("verification should not error"));
     }
 
@@ -640,6 +636,7 @@ mod tests {
         assert_eq!(resolved["didDocumentMetadata"]["versionId"], "delete-op");
         assert_eq!(resolved["didDocumentMetadata"]["versionSequence"], "3");
         assert_eq!(resolved["didDocumentMetadata"]["deactivated"], true);
+        assert!(resolved["didDocumentMetadata"].get("updated").is_none());
         assert_eq!(
             resolved["didDocumentMetadata"]["deleted"],
             "2026-04-11T12:10:00Z"

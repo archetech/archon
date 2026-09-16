@@ -7,11 +7,10 @@ use tracing::{info, warn};
 
 use crate::store::compare_ordinals;
 use crate::{
-    anchor_of, ensure_event_opid, event_record_to_value, expected_registry_for_index,
+    authorize_operation, ensure_event_opid, event_record_to_value, expected_registry_for_index,
     generate_did_from_operation, generate_json_cid, infer_event_did, is_unanchored_registry,
     resolve_local_doc_async, update_search_doc, value_to_event_record,
-    verify_create_operation_impl, verify_event_shape, verify_operation_impl,
-    verify_update_operation_impl, AppState, EventRecord, GatekeeperDb, ResolveOptions,
+    verify_event_shape, AppState, EventRecord, GatekeeperDb, ResolveOptions,
 };
 
 /// Events handed in from outside the node's own registry mediators: a peer
@@ -168,7 +167,7 @@ pub(crate) async fn handle_did_operation(
         .and_then(Value::as_str)
         .ok_or_else(|| "missing operation.type".to_string())?;
 
-    let valid = verify_operation_impl(state, payload, None)
+    let valid = authorize_operation(state, payload, None, None)
         .await
         .map_err(|error| error.to_string())?;
     if !valid {
@@ -629,9 +628,8 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
                 // against the version it chained from, as replay does --
                 // resolving at present would judge a self-update by the
                 // document it produced.
-                let anchor = anchor_of(&event);
                 let verified = if index == 0 {
-                    verify_create_operation_impl(state, &event.operation, anchor.as_ref()).await
+                    authorize_operation(state, &event.operation, None, Some(&event)).await
                 } else {
                     match resolve_local_doc_async(
                         state,
@@ -644,13 +642,8 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
                     .await
                     {
                         Ok(previous) => {
-                            verify_update_operation_impl(
-                                state,
-                                &event.operation,
-                                &previous,
-                                anchor.as_ref(),
-                            )
-                            .await
+                            authorize_operation(state, &event.operation, Some(&previous), Some(&event))
+                                .await
                         }
                         Err(error) => Err(error),
                     }
@@ -712,7 +705,28 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
             return ImportStatus::Rejected;
         }
 
-        let verified = match verify_operation_impl(state, &event.operation, anchor_of(&event).as_ref()).await {
+        let previd = event.operation.get("previd").and_then(Value::as_str).unwrap_or_default();
+        let index = current_events.iter().position(|item| item.opid.as_deref() == Some(previd));
+        if !current_events.is_empty() && index.is_none() {
+            return ImportStatus::Deferred;
+        }
+        let previous = if let Some(index) = index {
+            match resolve_local_doc_async(
+                state,
+                &did,
+                ResolveOptions {
+                    version_sequence: Some(index + 1),
+                    ..ResolveOptions::default()
+                },
+            ).await {
+                Ok(doc) => Some(doc),
+                Err(_) => return ImportStatus::Deferred,
+            }
+        } else {
+            None
+        };
+
+        let verified = match authorize_operation(state, &event.operation, previous.as_ref(), Some(&event)).await {
             Ok(verified) => verified,
             Err(error) => {
                 if trace {
@@ -762,23 +776,7 @@ async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus
             };
         }
 
-        let previd = match event.operation.get("previd").and_then(Value::as_str) {
-            Some(value) => value.to_string(),
-            None => return ImportStatus::Rejected,
-        };
-        let Some(index) = current_events
-            .iter()
-            .position(|item| item.opid.as_deref() == Some(previd.as_str()))
-        else {
-            if trace {
-                info!(
-                    "process_events deferred reason=unknown_previd did={} opid={} previd={} current_events={}",
-                    did,
-                    opid,
-                    previd,
-                    current_events.len()
-                );
-            }
+        let Some(index) = index else {
             return ImportStatus::Deferred;
         };
 

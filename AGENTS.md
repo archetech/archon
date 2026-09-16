@@ -80,3 +80,5 @@ These rules apply to coding agents working in this repository.
 - Optional Docker Compose fragments should remain included from the root `docker-compose.yml` and be toggled with Docker Compose profiles via `COMPOSE_PROFILES`; avoid asking operators to comment include files in and out by hand.
 - Generic auxiliary pinning should target the standard IPFS Pinning Service API from the `pin` queue when possible; reserve per-operation Filecoin/Synapse storage for cases that need Filecoin proofs because small Archon ops are dominated by provider minimums and setup fees.
 - `pin` in Gatekeeper `supportedRegistries` can be both the auxiliary pin queue and a DID registration registry when enabled; do not assume old auxiliary-only rejection semantics still apply.
+
+- Keep chain-position and controller-history selection in Gatekeeper event authorization, shared by imports, confirmation replacements, reorganization, and verified replay. Low-level operation verification takes an explicitly selected authorizing document and does not resolve chain history. Select replacement/reorganization authority from the operation's predecessor, not the latest state.

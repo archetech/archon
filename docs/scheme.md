@@ -467,7 +467,7 @@ Note: While the W3C Data Integrity specification makes `proof.created` optional,
 
 ### Authorizing an operation on a controlled DID
 
-An operation on an asset — its create, or any update — is authorized by a key in its controller's document, and the temporal rule above decides which version of that document: by default, the version as of the operation's `proof.created`.
+An operation on an asset — create, update, or delete — is authorized by a key in its controller's document, and the temporal rule above decides which version of that document: by default, the version as of the operation's `proof.created`.
 
 `proof.created` is the signer's own claim. On its own it cannot distinguish an operation genuinely made in the past from one made later and dated back, so a key the controller has since rotated out could name a `created` from when it was current and be authorized by the document that still listed it. The only thing that can tell the two apart is a record of when the operation appeared that the signer did not write. A registry with a blockchain provides one: once the chain has committed the operation, the node knows its position — block and index — and resolves the controller **at that position** instead of at `proof.created`:
 
@@ -478,6 +478,14 @@ An operation on an asset — its create, or any update — is authorized by a ke
 A proof whose key the controller had retired by the operation's position is rejected. That also rejects an operation genuinely signed before a rotation but committed to the chain after it; the remedy is to sign it again with the current key. An agent's updates to its own document are unaffected: they are verified against its current document.
 
 Only the registry's own mediator, importing each block's batch in order, may mark an event confirmed on that registry. An event received from a relaying peer or restored from an export is taken as an unconfirmed hint whatever it claims, and confirms when the node's own mediator reaches its block — a relay cannot vouch for the chain or for its order, and an operation must not be judged against a controller history the chain committed more of than the node has yet applied. For the same reason a mediator does not advance past a block whose batch it could not retrieve.
+
+### Implementation boundary: event authorization and proof verification
+
+Import and verified replay share event authorization: select the target state the operation chains from, select the authorizing controller document under the rules above, then verify the operation against that document. Confirmation replacements and competing events use the predecessor state, not the latest document. Direct submissions have no trusted event position and retain the historical `proof.created` selection.
+
+Low-level operation verification checks structure, signer, and signature against the selected document; it does not resolve controller history or accept a chain anchor. Do not add a second verification against the `proof.created` document after selecting the chain-position document, since requiring both would change the authorization rule.
+
+This responsibility boundary does not establish that imported controller history is complete. Cross-registry import scheduling and unavailable batch content still require protocol decisions; see [#1150](https://github.com/archetech/archon/issues/1150) and [#1151](https://github.com/archetech/archon/issues/1151).
 
 ### Verification Method Format
 
