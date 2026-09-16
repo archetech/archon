@@ -1433,6 +1433,8 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     private candidateKey(event: GatekeeperEvent): string {
+        // A fresh gossip receipt time is not new authorization evidence.
+        if (isUnanchoredRegistry(event.registry)) return JSON.stringify([event.opid, event.registry]);
         return JSON.stringify([event.opid, event.registry, event.time, event.ordinal]);
     }
 
@@ -1450,7 +1452,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
     }
 
-    private async retainCandidates(did: string, incoming: GatekeeperEvent[] = [], histories?: Map<string, GatekeeperEvent[]>): Promise<Record<string, GatekeeperEvent[]>> {
+    private async retainCandidates(did: string, incoming: GatekeeperEvent[] = [], histories?: Map<string, GatekeeperEvent[]>): Promise<{ candidates: Record<string, GatekeeperEvent[]>; changed: boolean }> {
         if (!this.candidateHistory) {
             const candidates = await this.db.getCandidates();
             // Upgrade existing databases once, not on every import. Subsequent
@@ -1474,13 +1476,19 @@ export default class Gatekeeper implements GatekeeperInterface {
         const candidates = this.candidateHistory;
         const events = [...(candidates[did] ?? []), ...copyJSON(histories?.get(did) ?? await this.db.getEvents(did)), ...incoming];
         for (const event of events) await this.normalizeOperationId(event);
-        const retained = [...new Map(events.map(event => [this.candidateKey(event), event])).values()];
-        if (JSON.stringify(candidates[did]) !== JSON.stringify(retained)) {
-            await this.db.setCandidates(did, retained);
+        const unique = new Map<string, GatekeeperEvent>();
+        for (const event of events) {
+            const key = this.candidateKey(event);
+            // Keep the first hint's local observation time. Anchored metadata
+            // updates still replace the record at the same chain position.
+            if (!unique.has(key) || !isUnanchoredRegistry(event.registry)) unique.set(key, event);
         }
+        const retained = [...unique.values()];
+        const changed = JSON.stringify(candidates[did]) !== JSON.stringify(retained);
+        if (changed) await this.db.setCandidates(did, retained);
         candidates[did] = retained;
         this.indexCandidates(did, retained);
-        return candidates;
+        return { candidates, changed };
     }
 
     private async reconcileHistory(did: string, rebuildSelf = false): Promise<void> {
@@ -1493,7 +1501,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     private async reconcileHistoryOnce(did: string, rebuildSelf: boolean): Promise<void> {
-        const candidates = await this.retainCandidates(did);
+        const { candidates } = await this.retainCandidates(did);
         const affected = new Set([did]);
         // Dependencies include all candidate controller assignments, including
         // branches that are not currently accepted. Rejected candidates can
@@ -1579,8 +1587,12 @@ export default class Gatekeeper implements GatekeeperInterface {
         event.did ??= event.operation.did ?? await this.generateDID(event.operation);
         await this.normalizeOperationId(event);
         return this.withHistoryLock(async () => {
-            await this.retainCandidates(event.did!, [event]);
+            const { changed } = await this.retainCandidates(event.did!, [event]);
             const status = await this.importEventOnce(event);
+            // Recovery and every evidence change already replay dependents.
+            // A merge that changes neither evidence nor accepted state cannot
+            // alter authorization, so duplicate sync needs no reconstruction.
+            if (this.historyReady && !changed && status === ImportStatus.MERGED) return status;
             if (status === ImportStatus.ADDED) delete this.verifiedDIDs[event.did!];
             await this.reconcileHistory(event.did!, true);
             const accepted = (await this.db.getEvents(event.did!))
