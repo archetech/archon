@@ -637,6 +637,9 @@ async function runBackdatingParity() {
     // What a chain mediator does for one block: import the block's operations
     // by CID with the block's position, then apply.
     const commit = async (cids, height, time) => {
+        agree(`CID parity: record block ${height}`, await both(post('/api/v1/block/BTC:signet', {
+            height, hash: `block${height}`, time: Math.floor(Date.parse(time) / 1000),
+        })));
         const imported = agree(`backdating parity: commit block ${height}`, await both(post('/api/v1/batch/import/cids', {
             cids,
             metadata: { registry: 'BTC:signet', time, ordinal: [height], registration: { height, index: 0, txid: `tx${height}`, batch: `b${height}` } },

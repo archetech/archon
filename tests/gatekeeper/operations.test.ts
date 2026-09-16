@@ -332,6 +332,31 @@ describe('importBatchByCids', () => {
         expect(processResult.added).toBe(1);
     });
 
+    it('preserves each batch position in exports and timestamps after restart', async () => {
+        const operations = await Promise.all([0, 1].map(() =>
+            helper.createAgentOp(cipher.generateRandomJwk(), { registry: 'BTC:signet' })));
+        const cids = await Promise.all(operations.map(op => gatekeeper.generateCID(op, true)));
+        const metadata = {
+            registry: 'BTC:signet', time: '2026-09-16T00:00:00Z', ordinal: [100, 2],
+            registration: { height: 100, index: 2, txid: 'tx', batch: 'batch', opidx: 99 },
+        };
+        await gatekeeper.addBlock('BTC:signet', { height: 100, hash: 'block', time: 1789516800 });
+        await gatekeeper.importBatchByCids(cids, metadata);
+        await gatekeeper.processEvents();
+        const restarted = new Gatekeeper({ db, ipfs, console: mockConsole });
+        for (const node of [gatekeeper, restarted]) {
+            for (let i = 0; i < operations.length; i++) {
+                const did = await node.generateDID(operations[i]);
+                const doc = await node.resolveDID(did, { confirm: true, verify: true });
+                expect(doc.didDocumentMetadata?.timestamp?.upperBound?.opidx).toBe(i);
+                const events = await node.exportDID(did);
+                expect(events[0].registration).toEqual({ ...metadata.registration, opidx: i });
+                expect(events[0].ordinal).toEqual([100, 2, i]);
+            }
+        }
+        expect(metadata.registration.opidx).toBe(99);
+    });
+
     it('should store fetched operations in local DB for future lookups', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair, { registry: 'hyperswarm' });
