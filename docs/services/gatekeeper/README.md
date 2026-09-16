@@ -343,7 +343,7 @@ standards-conformant `/1.0/identifiers/:did` surface returns only the
   "didDocument": {
     "@context": ["https://www.w3.org/ns/did/v1"],
     "id": "did:cid:...",
-    "controller": "did:cid:...",              // assets only
+    "controller": "did:cid:...",              // asset owner; agents may only name themselves
     "verificationMethod": [...],              // agents
     "authentication": ["#key-1"],
     "assertionMethod": ["#key-1"],
@@ -790,10 +790,13 @@ dereference resources. Standard document metadata (`created`, `updated`,
    missing or any of `version`, `type`, `registry` is invalid, or `proof`
    format checks fail.
 3. Agent: `proof.verificationMethod == "#key-1"` and `publicJwk` is present.
+   Reject an explicit `operation.controller`; the agent controls itself.
    Verify signature against `publicJwk`.
 4. Asset: `proof.verificationMethod` is `<controller>#key-1`,
    `operation.controller == controller`. Resolve the controller with
-   `confirm: true, versionTime: proof.created`. Reject if the controller's
+   `confirm: true, versionTime: proof.created`. The controller must be an
+   active, self-controlled agent, identified by its immutable creation type.
+   Reject if the controller's
    `registration.registry == "local"` and the new operation's registry is
    non-`local`. Verify against the controller's `verificationMethod[0]
    .publicKeyJwk`.
@@ -808,10 +811,13 @@ dereference resources. Standard document metadata (`created`, `updated`,
 
 1. Reject if total operation byte size exceeds 64 KB.
 2. Reject if `proof` format checks fail.
-3. Resolve the target DID. Reject if the doc is `deactivated` or has no
-   `verificationMethod`.
-4. If the doc has a `controller` (asset), recurse on the controller doc to
-   pick verification key.
+3. Resolve the target DID. Reject if the doc is `deactivated`.
+4. Agents use their own predecessor document. Assets resolve their owner
+   at the authorization cutoff; that owner must be an active, self-controlled
+   agent. There is no recursive traversal through assets or externally controlled agents.
+   Validate the resulting document: agents may omit `controller` or name themselves;
+   assets must retain an agent owner, including on transfer. The previous owner
+   authorizes a transfer. Use the immutable creation type to classify the DID, including after registry-only metadata updates that omit it; reject explicit changes to `didDocumentRegistration.type`.
 5. Verify signature against the resolved key.
 6. Reject if `doc.didDocumentRegistration.registry` is not in
    `supportedRegistries`.
@@ -875,7 +881,7 @@ attempted on the next pass).
 
 Imports first persist the candidate event, then run the insertion algorithm below and replay the affected DID and its transitive dependents. Imports and direct submissions serialize history mutations. Replay uses a separate working view and invokes the same insertion/authorization algorithm; it never trusts a previous authorization verdict merely because it was once accepted.
 
-The dependency index includes controller assignments on retained branches, not just the current document. Replay repeats until histories stop changing, ordering chain candidates by registry, ordinal, time, and operation CID; registry ordinals are never compared across chains. Local/gossip candidates preserve their existing arrival order. Controller traversal detects cycles. If replay does not converge, histories that vary in the cycle remain unresolved while their candidate evidence is retained. Stable histories continue to resolve, and later evidence triggers another attempt; a cyclic candidate cannot prevent startup or block unrelated DIDs.
+The dependency index includes controller assignments on retained branches, not just the current document. Replay repeats until histories stop changing, ordering chain candidates by registry, ordinal, time, and operation CID; registry ordinals are never compared across chains. Local/gossip candidates preserve their existing arrival order. Agents must remain self-controlled and asset owners must be agents. These constraints are checked during creation, direct updates, import, and verified replay, including the new owner of a transfer. Startup repair removes previously accepted violations from the accepted projection while retaining candidate evidence. Replay has no separate oscillation detection or quarantine policy.
 
 Accepted histories, search entries, and verification caches are refreshed when replay changes a DID. Explicit removal and garbage collection also replay dependents before returning. Startup rebuilds from the journal to recover interrupted publication; public status and DID-list reads wait for repair and active replay. An operation accepted through dependent replay may report `MERGED` when its next queue attempt runs, so processing counters describe queue attempts, not every change to derived histories.
 
@@ -1327,7 +1333,7 @@ timestamps and container labels.
 
 ## 16. Test fixtures
 
-Eight shared JSON fixtures drive cross-language conformance:
+Nine shared JSON fixtures drive cross-language conformance:
 
 | File | Purpose |
 | --- | --- |
@@ -1337,7 +1343,8 @@ Eight shared JSON fixtures drive cross-language conformance:
 | [tests/gatekeeper/api-parity-flows.json](../../../tests/gatekeeper/api-parity-flows.json) | Stateful flows (create + resolve + export + import + queue + block + IPFS round-trips). |
 | [tests/gatekeeper/metrics-parity.json](../../../tests/gatekeeper/metrics-parity.json) | Required metric names + route normalization expectations. |
 | [tests/gatekeeper/timestamp-vectors.json](../../../tests/gatekeeper/timestamp-vectors.json) | The RFC 3339 grammar every validated timestamp MUST satisfy — see [§5.6](#56-timestamp-grammar). |
-| [tests/gatekeeper/history-recovery-vectors.json](../../../tests/gatekeeper/history-recovery-vectors.json) | Signed delayed-history cases shared by both ports and live parity: same/cross-registry, creation/update/deletion, delegation, successors, and migration. |
+| [tests/gatekeeper/controller-rules-vectors.json](../../../tests/gatekeeper/controller-rules-vectors.json) | Signed controller constraints and the former cross-registry oscillation reproducer, now rejected at controller assignment; direct/import/startup tests in both ports. |
+| [tests/gatekeeper/history-recovery-vectors.json](../../../tests/gatekeeper/history-recovery-vectors.json) | Signed delayed-history cases shared by both ports and live parity: same/cross-registry, creation/update/deletion, rejected asset delegation, successors, and migration. |
 | [tests/gatekeeper/event-shape-vectors.json](../../../tests/gatekeeper/event-shape-vectors.json) | Event shapes both ports MUST agree to accept or reject, mutation by mutation. |
 
 The script [scripts/gatekeeper-parity.mjs](../../../scripts/gatekeeper-parity.mjs)

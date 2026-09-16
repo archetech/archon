@@ -1,4 +1,3 @@
-import { jest } from '@jest/globals';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -43,6 +42,7 @@ describe.each([DbJsonMemory, DbJson, DbSqlite])('%s authorization recovery', (Da
                 await db.start();
                 g = new Gatekeeper(options());
                 if (!rotationFirst) await g.importEvent(rotation);
+                if (scenario === 'migration') expect((await g.resolveDID(vector.controller)).didDocumentMetadata?.versionSequence).toBe('3');
                 const resolved = await g.resolveDID(target, { confirm: true, verify: true });
                 if (scenario === 'create') {
                     expect(resolved.didResolutionMetadata?.error).toBe('notFound');
@@ -52,7 +52,7 @@ describe.each([DbJsonMemory, DbJson, DbSqlite])('%s authorization recovery', (Da
                 }
                 expect(resolved.didDocumentData).toBe(expected);
                 const events = await g.exportDID(target);
-                expect(events).toHaveLength(scenario === 'new-key' ? 3 : scenario === 'early' || scenario === 'delegation' ? 2 : 1);
+                expect(events).toHaveLength(scenario === 'new-key' ? 3 : scenario === 'early' ? 2 : 1);
                 expect((await db.getCandidates())[target]).toHaveLength(tail.length + (scenario === 'delegation' ? 2 : 1));
                 return resolved.didDocumentMetadata?.versionId;
             }
@@ -175,7 +175,7 @@ it('public status and list reads wait for active publication', async () => {
     expect(await list).toEqual([expect.objectContaining({ didDocumentData: 'original' })]);
 });
 
-it.each([false, true])('controller removal replays transitive dependents before returning (restart=%s)', async (restart) => {
+it.each([false, true])('controller removal replays dependents and leaves rejected delegation rejected before returning (restart=%s)', async (restart) => {
     const vector = vectors[0];
     const db = new DbJsonMemory('remove-controller');
     const options = { db, ipfs: new MemoryClient() };
@@ -185,7 +185,7 @@ it.each([false, true])('controller removal replays transitive dependents before 
     if (restart) g = new Gatekeeper(options);
     await g.removeDIDs([vector.controller]);
     for (const did of [vector.asset, vector.child]) {
-        expect(await db.getEvents(did)).toHaveLength(did === vector.asset ? 0 : 2);
+        expect(await db.getEvents(did)).toHaveLength(did === vector.asset ? 0 : 1);
         const doc = await g.resolveDID(did);
         if (did === vector.asset) expect(doc.didResolutionMetadata?.error).toBe('notFound');
         else expect(doc.didDocumentData).toBe('original');
@@ -195,53 +195,6 @@ it.each([false, true])('controller removal replays transitive dependents before 
     expect((await g.resolveDID(vector.asset)).didResolutionMetadata?.error).toBe('notFound');
     await g.importEvent(vector.base[0]);
     expect((await g.resolveDID(vector.asset)).didDocumentData).toBe('retired');
-});
-
-it.each(['candidate', 'dependency'] as const)('isolates a nonconverging %s history across restart and retries when evidence can resolve', async (cycle) => {
-    const vector = vectors[0];
-    const db = new DbJsonMemory('cycles');
-    const options = { db, ipfs: new MemoryClient() };
-    // Inject oscillating projections at the importer boundary to exercise both
-    // replay guards without coupling this test to a particular signature bug.
-    type ImportStatus = Awaited<ReturnType<Gatekeeper['importEvent']>>;
-    type Replay = { db: DbJsonMemory; importEventOnce(event: GatekeeperEvent): Promise<ImportStatus> };
-    const prototype = Gatekeeper.prototype as unknown as Replay;
-    const original = prototype.importEventOnce;
-    let oscillate = true;
-    const mock = jest.spyOn(prototype, 'importEventOnce').mockImplementation(async function (this: Replay, event) {
-        if (!oscillate || (event.did !== vector.controller && event.did !== vector.asset)) {
-            return original.call(this, event);
-        }
-        const target = event.did!;
-        const events = await this.db.getEvents(target);
-        const controller = await this.db.getEvents(vector.controller);
-        const asset = await this.db.getEvents(vector.asset);
-        const present = cycle === 'candidate' ? events.length === 0
-            : target === vector.controller ? asset.length === 0 : controller.length > 0;
-        await this.db.setEvents(target, present ? [event] : []);
-        return 'added' as ImportStatus;
-    });
-    try {
-        let g = new Gatekeeper(options);
-        // Journal both together, including the reverse edge for the dependency cycle.
-        const controller = structuredClone(vector.base[0]);
-        if (cycle === 'dependency') controller.operation.controller = vector.asset;
-        await db.setCandidates(vector.controller, [controller]);
-        await db.setCandidates(vector.asset, [vector.base[1]]);
-        for (let restart = 0; restart < 2; restart++) {
-            g = new Gatekeeper(options);
-            expect((await g.resolveDID(vector.asset)).didResolutionMetadata?.error).toBe('notFound');
-            await g.importEvent(vectors[1].base[0]);
-            expect((await g.resolveDID(vectors[1].controller)).didResolutionMetadata?.error).toBeUndefined();
-            expect((await db.getCandidates())[vector.asset]).toHaveLength(1);
-        }
-        oscillate = false;
-        // Restore the original valid controller evidence; re-evaluate retained dependents.
-        await g.importEvent(vector.base[0]);
-        expect((await g.resolveDID(vector.asset)).didDocumentData).toBe('original');
-    } finally {
-        mock.mockRestore();
-    }
 });
 
 it.each(['expired', 'invalid'] as const)('GC of an %s controller replays already verified dependents', async (reason) => {
@@ -263,4 +216,62 @@ it.each(['expired', 'invalid'] as const)('GC of an %s controller replays already
     expect((await db.getCandidates())[vector.asset]).toHaveLength(1);
     expect((await db.getCandidates())[vector.controller]).toEqual([]);
     expect((await new Gatekeeper(options).resolveDID(vector.asset)).didResolutionMetadata?.error).toBe('notFound');
+});
+
+const controllerRules: { base: GatekeeperEvent[]; cases: { name: string; accepted: boolean; event: GatekeeperEvent; setup: GatekeeperEvent[] }[];
+    cycle: { dids: string[]; events: GatekeeperEvent[] } } = JSON.parse(readFileSync('tests/gatekeeper/controller-rules-vectors.json', 'utf8'));
+
+it.each(controllerRules.cases)('enforces controller rules for $name in direct submissions, imports, and startup repair', async ({ accepted, event, setup }) => {
+    for (const mode of ['direct', 'import', 'repair']) {
+        const db = new DbJsonMemory('controller-rules');
+        const options = { db, ipfs: new MemoryClient(), registries: ['local', 'hyperswarm', 'BTC:signet'] };
+        let g = new Gatekeeper(options);
+        for (const base of [...controllerRules.base, ...setup]) await g.importEvent(base);
+        const before = (await db.getEvents(event.did!)).length;
+        if (mode === 'direct') {
+            let result: boolean;
+            try {
+                result = event.operation.type === 'create' ? !!await g.createDID(event.operation) : await g.updateDID(event.operation);
+            } catch { result = false; }
+            expect(result).toBe(accepted);
+        } else if (mode === 'import') {
+            expect(await g.importEvent(event)).toBe(accepted ? 'added' : 'rejected');
+        } else {
+            // Legacy accepted state must not preserve an invalid controller assignment.
+            const events = [...await db.getEvents(event.did!), event];
+            await db.setEvents(event.did!, events);
+            await db.setCandidates(event.did!, events);
+            g = new Gatekeeper(options);
+            await g.getDIDs();
+        }
+        expect(await db.getEvents(event.did!)).toHaveLength(before + (accepted ? 1 : 0));
+    }
+});
+
+it('rejects the real signed oscillation case at controller assignment, including legacy repair', async () => {
+    const { events, dids } = controllerRules.cycle;
+    for (const repair of [false, true]) {
+        const db = new DbJsonMemory('signed-cycle');
+        const options = { db, ipfs: new MemoryClient() };
+        const g = new Gatekeeper(options);
+        if (repair) {
+            for (const did of dids) {
+                const history = events.filter(event => event.did === did);
+                await db.setEvents(did, history);
+                await db.setCandidates(did, history);
+            }
+        } else {
+            for (const event of events) {
+                const status = await g.importEvent(event);
+                if (event.operation.doc?.didDocument?.controller) expect(status).toBe('rejected');
+            }
+        }
+        for (const did of dids) {
+            const doc = await g.resolveDID(did, { verify: true });
+            expect(doc.didDocumentMetadata?.versionSequence).toBe('1');
+            expect(doc.didDocument?.controller).toBeUndefined();
+            expect(await db.getEvents(did)).toHaveLength(1);
+            expect((await db.getCandidates())[did]).toHaveLength(3);
+        }
+    }
 });

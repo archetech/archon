@@ -922,6 +922,27 @@ async function runHistoryRecoveryParity() {
             else assertEqual('history removal transitive dependent', docs[0].body.didDocumentData, 'original');
         }
     }
+    const rules = JSON.parse(await fs.readFile(new URL('../tests/gatekeeper/controller-rules-vectors.json', import.meta.url), 'utf8'));
+    for (const fixture of rules.cases) {
+        await resetServiceState(tsBaseUrl);
+        await resetServiceState(rustBaseUrl);
+        await importEvents([...rules.base, ...fixture.setup, fixture.event]);
+        const did = fixture.event.did;
+        const docs = await both({ method: 'GET', path: `/api/v1/did/${did}?verify=true`, requiresAdminKey: true });
+        assertEqual(`controller rules ${fixture.name}`, normalizeJson(docs[0].body), normalizeJson(docs[1].body));
+        const versions = [...rules.base, ...fixture.setup].filter(event => event.did === did).length + Number(fixture.accepted);
+        if (versions) assertEqual(`controller rules version ${fixture.name}`, docs[0].body.didDocumentMetadata?.versionSequence, String(versions));
+        else assertEqual(`controller rules rejection ${fixture.name}`, docs[0].body.didResolutionMetadata?.error, 'notFound');
+    }
+    await resetServiceState(tsBaseUrl);
+    await resetServiceState(rustBaseUrl);
+    await importEvents(rules.cycle.events);
+    for (const did of rules.cycle.dids) {
+        const docs = await both({ method: 'GET', path: `/api/v1/did/${did}?verify=true`, requiresAdminKey: true });
+        assertEqual('signed cycle rejection parity', normalizeJson(docs[0].body), normalizeJson(docs[1].body));
+        assertEqual('signed cycle retains only agent creation', docs[0].body.didDocumentMetadata?.versionSequence, '1');
+    }
+    console.log('ok controller rules parity: self-control, agent-only owners, immutable creation type, and signed cycle rejection');
     console.log('ok history recovery parity: same/cross-registry, both key verdicts, predecessors, successors, migration, controller removal, and GC');
 }
 

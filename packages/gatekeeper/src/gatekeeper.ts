@@ -450,21 +450,50 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.authorizeOperation(operation);
     }
 
+    private async creationType(did?: string): Promise<string | undefined> {
+        return did ? (await this.db.getEvents(did))[0]?.operation.registration?.type : undefined;
+    }
+
+    private async isSelfControlledAgent(doc: DidCidDocument): Promise<boolean> {
+        const id = doc.didDocument?.id;
+        const controller = doc.didDocument?.controller;
+        return await this.creationType(id) === 'agent' && !!id &&
+            (controller === undefined || controller === id) && !doc.didDocumentMetadata?.deactivated;
+    }
+
     private async authorizeOperation(operation: Operation, previous?: DidCidDocument, event?: GatekeeperEvent): Promise<boolean> {
         if (operation.type === 'create') {
             return this.authorizeCreateOperation(operation, event);
         }
 
         if (operation.type === 'update' || operation.type === 'delete') {
-            let authority = previous ?? await this.resolveDIDAt(operation.did);
-            const visited = new Set<string>();
-            // Controller traversal is authorization policy, not cryptography.
-            // Preserve the deactivation check for every document in the chain.
-            while (authority.didDocument?.controller && !authority.didDocumentMetadata?.deactivated && this.verifyProofFormat(operation.proof)) {
-                const controller = authority.didDocument.controller;
-                if (visited.has(controller)) return false;
-                visited.add(controller);
+            const current = previous ?? await this.resolveDIDAt(operation.did);
+            const type = await this.creationType(operation.did);
+            if (!this.verifyProofFormat(operation.proof)) throw new InvalidOperationError('proof');
+            if (!type || current.didDocumentMetadata?.deactivated) return this.verifyUpdateOperation(operation, current);
+            // A DID cannot change kind to bypass the controller constraints.
+            const nextType = operation.doc?.didDocumentRegistration?.type;
+            if (nextType !== undefined && nextType !== type) return false;
+            const next = operation.doc?.didDocument ?? current.didDocument;
+            if (!next || next.id !== operation.did) return false;
+            let authority: DidCidDocument;
+            if (type === 'agent') {
+                if (!await this.isSelfControlledAgent(current) ||
+                    (next.controller !== undefined && next.controller !== operation.did)) return false;
+                authority = current;
+            } else if (type === 'asset') {
+                const controller = current.didDocument?.controller;
+                if (!controller || !next.controller) return false;
                 authority = await this.controllerForEvent(controller, operation, event);
+                if (!authority.didDocumentRegistration) throw new InvalidOperationError('controller not found');
+                if (!await this.isSelfControlledAgent(authority)) return false;
+                if (next.controller !== controller) {
+                    const owner = await this.controllerForEvent(next.controller, operation, event);
+                    if (!owner.didDocumentRegistration) throw new InvalidOperationError('controller not found');
+                    if (!await this.isSelfControlledAgent(owner)) return false;
+                }
+            } else {
+                return false;
             }
             return this.verifyUpdateOperation(operation, authority);
         }
@@ -476,7 +505,11 @@ export default class Gatekeeper implements GatekeeperInterface {
         const controller = operation?.registration?.type === 'asset' && operation.controller && this.verifyProofFormat(operation.proof)
             ? await this.controllerForEvent(operation.controller, operation, event)
             : undefined;
-        return this.verifyCreateOperation(operation, controller);
+        if (controller?.didDocumentRegistration && !await this.isSelfControlledAgent(controller)) return false;
+        const valid = await this.verifyCreateOperation(operation, controller);
+        if (!valid) return false;
+        if (operation.registration?.type === 'agent') return operation.controller === undefined;
+        return !!controller && await this.isSelfControlledAgent(controller);
     }
 
     // The controller document that authorizes an operation on an asset.
@@ -1459,25 +1492,9 @@ export default class Gatekeeper implements GatekeeperInterface {
         });
         const replay = new Gatekeeper({ db: overlay, ipfs: this.ipfs, didPrefix: this.didPrefix, registries: this.supportedRegistries });
         const targets = [...affected].sort();
-        const snapshots: string[][] = [];
-        const unresolved = new Set<string>();
         for (;;) {
-            const state = targets.map(target => JSON.stringify(staged.get(target)));
-            const before = JSON.stringify(state);
-            const cycle = snapshots.findIndex(snapshot => JSON.stringify(snapshot) === before);
-            if (cycle !== -1) {
-                // Only histories that vary in the cycle lose their projection.
-                // Keep their evidence so later information can resolve them.
-                targets.forEach((target, index) => {
-                    if (snapshots.slice(cycle).some(snapshot => snapshot[index] !== state[index])) unresolved.add(target);
-                    staged.set(target, []);
-                });
-                snapshots.length = 0;
-                continue;
-            }
-            snapshots.push(state);
+            const before = JSON.stringify(targets.map(target => staged.get(target)));
             for (const target of targets) {
-                if (unresolved.has(target)) continue;
                 const events = copyJSON(candidates[target] ?? []).sort((a, b) => {
                     // Registry-local order first; do not compare ordinal values
                     // across registries. Stable tie-breaking makes replay independent
@@ -1497,22 +1514,15 @@ export default class Gatekeeper implements GatekeeperInterface {
                 staged.set(target, []);
                 // A candidate can precede its predecessor in the sorted input
                 // (notably during migration), so replay to a stable sequence.
-                const seen = new Set<string>();
                 for (;;) {
                     const previous = JSON.stringify(staged.get(target));
-                    if (seen.has(previous)) {
-                        unresolved.add(target);
-                        staged.set(target, []);
-                        break;
-                    }
-                    seen.add(previous);
                     for (const event of events) {
                         await replay.importEventOnce(event);
                     }
                     if (JSON.stringify(staged.get(target)) === previous) break;
                 }
             }
-            if (JSON.stringify(targets.map(target => JSON.stringify(staged.get(target)))) === before) break;
+            if (JSON.stringify(targets.map(target => staged.get(target))) === before) break;
         }
         for (const target of targets) {
             if (JSON.stringify(staged.get(target)) !== original.get(target)) {

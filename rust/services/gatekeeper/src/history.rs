@@ -123,35 +123,6 @@ pub(crate) async fn remove_histories(state: &AppState, dids: &[String]) -> Resul
     result
 }
 
-// A repeated projection is unresolved evidence, not a node-wide readiness error.
-// Track every state in the cycle so stable neighbors keep their projections.
-#[derive(Default)]
-struct ReplayCycles {
-    snapshots: Vec<Vec<String>>,
-}
-impl ReplayCycles {
-    fn observe(&mut self, state: Vec<String>) -> Option<Vec<usize>> {
-        if let Some(cycle) = self
-            .snapshots
-            .iter()
-            .position(|previous| previous == &state)
-        {
-            let varying = (0..state.len())
-                .filter(|&index| {
-                    self.snapshots[cycle..]
-                        .iter()
-                        .any(|previous| previous[index] != state[index])
-                })
-                .collect();
-            self.snapshots.clear();
-            Some(varying)
-        } else {
-            self.snapshots.push(state);
-            None
-        }
-    }
-}
-
 pub(crate) async fn ensure_history_ready(state: &AppState) -> Result<()> {
     let _guard = state.history_lock.lock().await;
     if *state.history_ready.lock().await {
@@ -268,23 +239,9 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
     }));
     replay.did_locks = Arc::new(Mutex::new(HashMap::new()));
     replay.search_index = Arc::new(Mutex::new(SearchIndex::default()));
-    let mut cycles = ReplayCycles::default();
-    let mut unresolved = HashSet::new();
     loop {
         let before = snapshot(&replay, &targets).await?;
-        if let Some(varying) = cycles.observe(before.clone()) {
-            for index in varying {
-                unresolved.insert(targets[index].clone());
-            }
-            for target in &targets {
-                replay.store.lock().await.set_events(target, Vec::new())?;
-            }
-            continue;
-        }
         for target in &targets {
-            if unresolved.contains(target) {
-                continue;
-            }
             let mut events = candidates.get(target).cloned().unwrap_or_default();
             events.sort_by(|a, b| {
                 let a_hint = crate::is_unanchored_registry(&a.registry);
@@ -303,15 +260,9 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
                     .then_with(|| a.opid.cmp(&b.opid))
             });
             replay.store.lock().await.set_events(target, Vec::new())?;
-            let mut seen = HashSet::new();
             loop {
                 let previous =
                     serde_json::to_string(&replay.store.lock().await.get_events(target))?;
-                if !seen.insert(previous.clone()) {
-                    unresolved.insert(target.clone());
-                    replay.store.lock().await.set_events(target, Vec::new())?;
-                    break;
-                }
                 for event in &events {
                     import_event_once(&replay, event.clone()).await;
                 }
@@ -363,16 +314,142 @@ mod tests {
     use crate::{resolve_local_doc_async, ResolveOptions};
     use serde_json::Value;
 
-    #[test]
-    fn cycles_isolate_only_histories_that_vary_and_can_be_retried() {
-        let mut cycles = ReplayCycles::default();
-        let state = |a: &str, b: &str| vec![a.to_string(), b.to_string(), "stable".to_string()];
-        assert_eq!(cycles.observe(state("empty", "empty")), None);
-        assert_eq!(cycles.observe(state("A", "B")), None);
-        assert_eq!(cycles.observe(state("B", "A")), None);
-        assert_eq!(cycles.observe(state("A", "B")), Some(vec![0, 1]));
-        assert_eq!(cycles.observe(state("empty", "empty")), None);
-        assert_eq!(cycles.observe(state("resolved", "resolved")), None);
+    #[tokio::test]
+    async fn signed_controller_rules_apply_to_submissions_imports_and_repair() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/controller-rules-vectors.json"
+        ))
+        .unwrap();
+        for case in fixture["cases"].as_array().unwrap() {
+            for mode in ["direct", "import", "repair"] {
+                let db = JsonDb {
+                    backend: DbBackend::Memory,
+                    data: JsonDbFile::default(),
+                    redis_connection: None,
+                };
+                let (state, _directory) = crate::tests::make_state(db);
+                *state.supported_registries.lock().await =
+                    vec!["local".into(), "hyperswarm".into(), "BTC:signet".into()];
+                for base in fixture["base"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .chain(case["setup"].as_array().unwrap())
+                {
+                    crate::events::import_event_impl(
+                        &state,
+                        serde_json::from_value(base.clone()).unwrap(),
+                    )
+                    .await;
+                }
+                let event: EventRecord = serde_json::from_value(case["event"].clone()).unwrap();
+                let did = event.did.clone().unwrap();
+                let before = state.store.lock().await.get_events(&did).len();
+                let accepted = case["accepted"].as_bool().unwrap();
+                if mode == "direct" {
+                    let result =
+                        crate::events::handle_did_operation(&state, &event.operation).await;
+                    assert_eq!(result.is_ok(), accepted, "{}: {:?}", case["name"], result);
+                } else if mode == "import" {
+                    let status = crate::events::import_event_impl(&state, event.clone()).await;
+                    assert_eq!(
+                        matches!(status, crate::events::ImportStatus::Added),
+                        accepted,
+                        "{}",
+                        case["name"]
+                    );
+                } else {
+                    let mut store = state.store.lock().await;
+                    let mut events = store.get_events(&did);
+                    events.push(event);
+                    store.set_events(&did, events.clone()).unwrap();
+                    store.set_candidates(&did, events).unwrap();
+                    drop(store);
+                    *state.history_ready.lock().await = false;
+                    *state.candidate_history.lock().await = None;
+                    state.dependents.lock().await.clear();
+                    ensure_history_ready(&state).await.unwrap();
+                }
+                assert_eq!(
+                    state.store.lock().await.get_events(&did).len(),
+                    before + usize::from(accepted),
+                    "{} {}",
+                    case["name"],
+                    mode
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn signed_cycle_is_rejected_at_controller_assignment_including_legacy_repair() {
+        let fixture: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/controller-rules-vectors.json"
+        ))
+        .unwrap();
+        let dids: Vec<String> = serde_json::from_value(fixture["cycle"]["dids"].clone()).unwrap();
+        let events: Vec<EventRecord> =
+            serde_json::from_value(fixture["cycle"]["events"].clone()).unwrap();
+        for repair in [false, true] {
+            let db = JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            };
+            let (state, _directory) = crate::tests::make_state(db);
+            if repair {
+                for did in &dids {
+                    let history: Vec<_> = events
+                        .iter()
+                        .filter(|e| e.did.as_ref() == Some(did))
+                        .cloned()
+                        .collect();
+                    state
+                        .store
+                        .lock()
+                        .await
+                        .set_events(did, history.clone())
+                        .unwrap();
+                    state
+                        .store
+                        .lock()
+                        .await
+                        .set_candidates(did, history)
+                        .unwrap();
+                }
+                ensure_history_ready(&state).await.unwrap();
+            } else {
+                for event in &events {
+                    let status = crate::events::import_event_impl(&state, event.clone()).await;
+                    if event
+                        .operation
+                        .pointer("/doc/didDocument/controller")
+                        .is_some()
+                    {
+                        assert!(matches!(status, crate::events::ImportStatus::Rejected));
+                    }
+                }
+            }
+            for did in &dids {
+                assert_eq!(state.store.lock().await.get_events(did).len(), 1);
+                assert_eq!(
+                    state.store.lock().await.get_candidates().unwrap()[did].len(),
+                    3
+                );
+                let doc = resolve_local_doc_async(
+                    &state,
+                    did,
+                    ResolveOptions {
+                        verify: true,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+                assert_eq!(doc["didDocumentMetadata"]["versionSequence"], json!("1"));
+                assert!(doc["didDocument"].get("controller").is_none());
+            }
+        }
     }
 
     #[tokio::test]
@@ -415,7 +492,7 @@ mod tests {
                 .await
                 .unwrap();
             assert!(state.store.lock().await.get_events(asset).is_empty());
-            assert_eq!(state.store.lock().await.get_events(child).len(), 2);
+            assert_eq!(state.store.lock().await.get_events(child).len(), 1);
             assert_eq!(
                 serde_json::to_value(&state.store.lock().await.get_candidates().unwrap()[asset])
                     .unwrap(),
@@ -631,7 +708,7 @@ mod tests {
                             store.get_events(asset).len(),
                             match scenario {
                                 "new-key" => 3,
-                                "early" | "delegation" => 2,
+                                "early" => 2,
                                 _ => 1,
                             }
                         );

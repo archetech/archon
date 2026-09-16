@@ -50,7 +50,7 @@ The *key concept of this design* is that DID creation is decentralized through I
 
 DIDs are anchored to IPFS prior to any declaration on a registry. This allows DIDs to be created very quickly (less than 10 seconds) and at (virtually) no cost.
 
-The `did:cid` method supports two main types of DID Subject: **agents** and **assets**. Agents have keys and control assets. Assets do not have keys, and are controlled by a single agent (the owner of the asset). The two types have slightly different creation methods.
+The `did:cid` method supports two main types of DID Subject: **agents** and **assets**. Agents have keys and control assets. Agents are self-controlled: an update cannot assign an external controller. Assets do not have keys, and are controlled by a single agent (the owner of the asset); an asset cannot own another asset. The two types have slightly different creation methods.
 
 ### Agents
 
@@ -232,6 +232,7 @@ Example update to rotate keys for an agent DID:
 
 Upon receiving the operation the node must:
 1. Verify the proof is valid for the controller of the DID — for an asset, against the version of the controller's document chosen as described in [Authorizing an operation on a controlled DID](#authorizing-an-operation-on-a-controlled-did).
+1. Validate the resulting controller relationship: agents may omit `didDocument.controller` or name only their own DID; assets must name an existing, active, self-controlled agent. Transfers are signed by the previous owner. The DID kind is fixed by its creation operation. Updates cannot change `type`; registry-only metadata updates may omit it without changing the DID kind.
 1. Verify the previd is identical to the latest version's operation CID.
 1. Record the operation on the DID specified registry (or forward the request to a trusted node that supports the specified registry).
 
@@ -483,7 +484,9 @@ Mediators visit discovered batches in chain order but skip unavailable batches o
 
 Skipping does not declare a reference invalid or establish that controller history is complete. A sovereign node derives its best current state from the evidence it has. `confirmed` means the accepted event sequence is anchored on its expected registries; it does not promise that authorization can never change when previously unavailable history arrives.
 
-Gatekeeper retains imported event candidates separately from accepted DID histories. When an import or direct submission changes controller history, it replays affected histories and their transitive dependents against the currently available evidence. A late rotation can remove an asset creation, update, or deletion authorized by a retired key, together with invalid successors. Conversely, a previously rejected operation can become accepted when its authorizing controller version arrives. Operations ordered before the rotation remain valid. Replay uses original chain positions, never recovery times. Removing controller evidence, explicitly or through garbage collection, also revalidates dependents. Nonconverging histories remain unresolved with their evidence retained for later recovery; unrelated histories remain available.
+Gatekeeper retains imported event candidates separately from accepted DID histories. When an import or direct submission changes controller history, it replays affected histories and their transitive dependents against the currently available evidence. A late rotation can remove an asset creation, update, or deletion authorized by a retired key, together with invalid successors. Conversely, a previously rejected operation can become accepted when its authorizing controller version arrives. Operations ordered before the rotation remain valid. Replay uses original chain positions, never recovery times. Removing controller evidence, explicitly or through garbage collection, also revalidates dependents.
+
+Controller constraints are enforced at the shared authorization boundary for direct submissions, imports, and verified replay. Startup reconstruction rejects historical operations that assigned external agent controllers, assigned asset owners that were not agents, or changed DID type. Their candidate evidence remains retained, but those operations and dependent successors are not accepted. Agent histories authorize themselves, and asset histories depend only on agents; replay has no separate oscillation/quarantine policy.
 
 Candidate journals persist across restart, including rejected candidates and replaced branches. Replay reconstructs accepted state before serving resolution after startup and refreshes dependent search and verification state. Existing databases adopt their stored histories into the journal; operations discarded before this upgrade must be recovered by rescanning their anchors. DID exports continue to contain accepted histories, so a DID export alone is not a backup of the candidate journal.
 
