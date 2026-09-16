@@ -95,3 +95,5 @@ These rules apply to coding agents working in this repository.
 - Before adding protocol safeguards, demonstrate reachability with real signed operations and the ordinary importer. Mocked failure tests establish containment, not protocol validity; distinguish inputs accepted by permissive implementation code from the documented agent/asset model.
 
 - Public history reads and verification must hold the history lock throughout asynchronous resolution, including status-cache refreshes. GC persistence failures must propagate to callers and preserve pending imports; only successful GC performs queue cleanup. Parity ingress must preserve every fixture ordinal component.
+
+- Canonical operation identity includes the complete proof; never deduplicate by signature alone. Retrieval CIDs may alias canonical operations only through cached content, not peer-supplied opid claims. Preserve cached aliases and signed predecessor bytes during startup repair; test canonical and alias predecessors plus real storage restarts.

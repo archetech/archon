@@ -686,7 +686,7 @@ set to the DID; otherwise it is omitted.
 
 | `event.operation.type` | Effect |
 | --- | --- |
-| `update` | `versionN++`; `versionId := event.opid || cid(event.operation)`; `updated := event.time`; merge `event.operation.doc.didDocument`, `didDocumentData`, `didDocumentRegistration` into the running doc (any field present in `event.operation.doc` replaces the corresponding field on the running doc); `deactivated := false`. |
+| `update` | `versionN++`; `versionId := cid(event.operation)`; `updated := event.time`; merge `event.operation.doc.didDocument`, `didDocumentData`, `didDocumentRegistration` into the running doc (any field present in `event.operation.doc` replaces the corresponding field on the running doc); `deactivated := false`. |
 | `delete` | `versionN++`; `versionId := ...`; `deleted := event.time`; remove `updated` (including any earlier update timestamp); `didDocument := { id: did }`; `didDocumentData := {}`; `deactivated := true`. |
 | anything else | ignored |
 
@@ -1413,3 +1413,17 @@ parameterized by `ARCHON_GATEKEEPER_FLAVOR` (`ts` | `rust`, defaults to
 
 For an in-depth audit comparing the two implementations against this spec,
 see [rust/services/gatekeeper/AUDIT_REPORT.md](../../../rust/services/gatekeeper/AUDIT_REPORT.md).
+
+### Canonical operation identity and retrieval aliases
+
+CID import accepts retrievable JSON regardless of its original member order, but
+accepted events and candidates use the complete operation's JCS-canonical CID as
+`opid` and resolution `versionId`. Queue and history duplicate checks use that
+identity, never `proofValue`. Repeated anchors retain their distinct chain positions.
+
+Fetched operations remain cached under their retrieval CID. Predecessor lookup
+may use that durable cache to resolve an existing signed alias to the canonical
+previous operation; it does not rewrite signed `previd` values or trust a relayed
+`opid` as an alias. Startup rebuilds normalize old event IDs and journals. Full
+backups must retain both journals and the operation cache; a histories-only export
+can require a rescan of original CID references to recover legacy aliases.

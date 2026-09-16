@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::Result;
-use serde_json::json;
+use serde_json::{json, Value};
 use tokio::sync::Mutex;
 
 use crate::events::import_event_once;
@@ -52,15 +52,17 @@ pub(crate) async fn retain_candidates(
             if !candidates.contains_key(&current) {
                 let mut events = store.get_events(&current);
                 for event in &mut events {
-                    if event.opid.is_none() {
-                        event.opid = Some(generate_json_cid(&event.operation)?);
-                    }
+                    event.opid = Some(generate_json_cid(&event.operation)?);
                 }
                 store.set_candidates(&current, events.clone())?;
                 candidates.insert(current, events);
             }
         }
-        for (key, events) in &candidates {
+        for (key, events) in &mut candidates {
+            for event in events.iter_mut() {
+                event.opid = Some(generate_json_cid(&event.operation)?);
+            }
+            store.set_candidates(key, events.clone())?;
             index_candidates(&mut dependents, key, events);
         }
         *cache = Some(candidates);
@@ -72,9 +74,7 @@ pub(crate) async fn retain_candidates(
     let mut positions = HashMap::new();
     let mut retained = Vec::new();
     for mut event in events {
-        if event.opid.is_none() {
-            event.opid = Some(generate_json_cid(&event.operation)?);
-        }
+        event.opid = Some(generate_json_cid(&event.operation)?);
         let key = candidate_key(&event);
         if let Some(index) = positions.get(&key) {
             retained[*index] = event;
@@ -202,6 +202,11 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
         while let Some(key) = pending.pop() {
             let events = store.get_events(&key);
             for event in events.iter().chain(cache.get(&key).into_iter().flatten()) {
+                if let Some(previd) = event.operation.get("previd").and_then(Value::as_str) {
+                    if let Some(operation) = store.get_operation(previd) {
+                        data.ops.insert(previd.to_string(), operation);
+                    }
+                }
                 for controller in [
                     event.operation.get("controller"),
                     event.operation.pointer("/doc/didDocument/controller"),
@@ -313,6 +318,131 @@ mod tests {
     use super::*;
     use crate::{resolve_local_doc_async, ResolveOptions};
     use serde_json::Value;
+
+    fn identity_fixture() -> Value {
+        serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/operation-identity-vectors.json"
+        ))
+        .unwrap()
+    }
+
+    fn identity_event(operation: &Value, height: u64) -> EventRecord {
+        crate::value_to_event_record(&json!({
+            "operation": operation, "registry": "BTC:signet", "time": "2026-04-11T13:00:00Z",
+            "ordinal": [height, 0], "registration": {"height": height, "index": 0, "txid": "tx", "batch": "batch"}
+        }))
+    }
+
+    #[tokio::test]
+    async fn operation_identity_distinguishes_equal_signatures_in_both_orders() {
+        let vector = identity_fixture();
+        let did = vector["did"].as_str().unwrap();
+        for variant_first in [false, true] {
+            let (state, _dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            crate::events::import_event_impl(&state, identity_event(&vector["create"], 100)).await;
+            let mut batch = vec![
+                identity_event(&vector["update"], 200),
+                identity_event(&vector["variant"], 300),
+            ];
+            if variant_first {
+                batch.reverse();
+            }
+            let queued = crate::events::import_batch_impl(
+                &state,
+                &batch
+                    .iter()
+                    .map(crate::event_record_to_value)
+                    .collect::<Vec<_>>(),
+            )
+            .await;
+            assert_eq!(queued.queued, 2);
+            crate::process_events_impl(&state).await;
+            crate::events::import_event_impl(&state, identity_event(&vector["successor"], 400))
+                .await;
+            *state.history_ready.lock().await = false;
+            *state.candidate_history.lock().await = None;
+            ensure_history_ready(&state).await.unwrap();
+            let doc = resolve_local_doc_async(
+                &state,
+                did,
+                ResolveOptions {
+                    verify: true,
+                    confirm: true,
+                    ..ResolveOptions::default()
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(doc["didDocumentData"], json!({"version":3}));
+            assert_eq!(
+                state.store.lock().await.get_candidates().unwrap()[did].len(),
+                4
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn operation_identity_preserves_cached_alias_predecessors_and_repairs_legacy_projection()
+    {
+        let vector = identity_fixture();
+        let did = vector["did"].as_str().unwrap();
+        for legacy in [false, true] {
+            for successor in ["successor", "aliasSuccessor"] {
+                let (state, _dir) = crate::tests::make_state(JsonDb {
+                    backend: DbBackend::Memory,
+                    data: JsonDbFile::default(),
+                    redis_connection: None,
+                });
+                let alias = vector["aliasCid"].as_str().unwrap();
+                // CID ingress retains the retrieved bytes under their source CID.
+                state
+                    .store
+                    .lock()
+                    .await
+                    .add_operation(alias, vector["update"].clone())
+                    .unwrap();
+                let mut update = identity_event(&vector["update"], 200);
+                update.opid = Some(alias.to_string());
+                let events = vec![
+                    identity_event(&vector["create"], 100),
+                    update,
+                    identity_event(&vector[successor], 300),
+                ];
+                if legacy {
+                    state.store.lock().await.set_events(did, events).unwrap();
+                } else {
+                    for event in events {
+                        crate::events::import_event_impl(&state, event).await;
+                    }
+                }
+                *state.history_ready.lock().await = false;
+                *state.candidate_history.lock().await = None;
+                ensure_history_ready(&state).await.unwrap();
+                let doc = resolve_local_doc_async(
+                    &state,
+                    did,
+                    ResolveOptions {
+                        verify: true,
+                        ..ResolveOptions::default()
+                    },
+                )
+                .await
+                .unwrap();
+                assert_eq!(
+                    doc["didDocumentData"],
+                    json!({"version":3}),
+                    "{legacy} {successor}"
+                );
+                let events = state.store.lock().await.get_events(did);
+                assert_eq!(events[1].opid.as_deref(), vector["updateCid"].as_str());
+                assert_eq!(events[2].operation["previd"], vector[successor]["previd"]);
+            }
+        }
+    }
 
     async fn read_status_or_list(state: &AppState, status: bool) -> Value {
         let response = if status {
