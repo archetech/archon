@@ -275,3 +275,59 @@ it('rejects the real signed oscillation case at controller assignment, including
         }
     }
 });
+
+it('public verification repairs an interrupted controller projection before authorizing', async () => {
+    const vector = vectors[0];
+    const db = new DbJsonMemory('verify-repair');
+    const options = { db, ipfs: new MemoryClient() };
+    let g = new Gatekeeper(options);
+    for (const event of vector.base) await g.importEvent(event);
+    const operation = { ...vector.old.operation, proof: { ...vector.old.operation.proof!, created: vector.old.time } };
+    expect(await g.verifyOperation(operation)).toBe(true);
+    const journal = await db.getCandidates();
+    await db.setCandidates(vector.controller, [...journal[vector.controller], vector.rotation]);
+    g = new Gatekeeper(options);
+    expect(await g.verifyOperation(operation)).toBe(false);
+    expect(await db.getEvents(vector.controller)).toHaveLength(2);
+});
+
+it.each(['resolve', 'verify'] as const)('holds the history lock throughout an asynchronous %s read', async (mode) => {
+    const vector = vectors[0];
+    let entered!: () => void;
+    let release!: () => void;
+    const reading = new Promise<void>(resolve => { entered = resolve; });
+    const barrier = new Promise<void>(resolve => { release = resolve; });
+    class PausedReadDb extends DbJsonMemory {
+        pause = false;
+        override async getEvents(did: string) {
+            const events = await super.getEvents(did);
+            if (this.pause && did === vector.asset) {
+                this.pause = false;
+                entered();
+                await barrier;
+            }
+            return events;
+        }
+    }
+    const db = new PausedReadDb('read-snapshot');
+    const g = new Gatekeeper({ db, ipfs: new MemoryClient() });
+    for (const event of [...vector.base, vector.old]) await g.importEvent(event);
+    db.pause = true;
+    const operation = { ...vector.old.operation, proof: { ...vector.old.operation.proof!, created: vector.old.time } };
+    const read = mode === 'resolve' ? g.resolveDID(vector.asset, { verify: true }) : g.verifyOperation(operation);
+    await reading;
+    let imported = false;
+    const writing = g.importEvent(vector.rotation).then(() => { imported = true; });
+    try {
+        await new Promise(resolve => setImmediate(resolve));
+        expect(imported).toBe(false);
+        expect(await db.getEvents(vector.controller)).toHaveLength(1);
+    } finally {
+        release();
+    }
+    const result = await read;
+    if (mode === 'verify') expect(result).toBe(true);
+    else expect(result).toEqual(expect.objectContaining({ didDocumentData: 'retired' }));
+    await writing;
+    expect((await g.resolveDID(vector.asset, { verify: true })).didDocumentData).toBe('original');
+});

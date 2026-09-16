@@ -94,7 +94,7 @@ pub async fn run() -> Result<()> {
     let state = build_state(config.clone())?;
     let app = build_router(state.clone());
 
-    refresh_metrics_snapshot(&state).await;
+    refresh_metrics_snapshot(&state).await?;
     log_status_snapshot(&state).await;
 
     info!("Initializing search index...");

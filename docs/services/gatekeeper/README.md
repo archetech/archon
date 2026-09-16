@@ -883,7 +883,7 @@ Imports first persist the candidate event, then run the insertion algorithm belo
 
 The dependency index includes controller assignments on retained branches, not just the current document. Replay repeats until histories stop changing, ordering chain candidates by registry, ordinal, time, and operation CID; registry ordinals are never compared across chains. Local/gossip candidates preserve their existing arrival order. Agents must remain self-controlled and asset owners must be agents. These constraints are checked during creation, direct updates, import, and verified replay, including the new owner of a transfer. Startup repair removes previously accepted violations from the accepted projection while retaining candidate evidence. Replay has no separate oscillation detection or quarantine policy.
 
-Accepted histories, search entries, and verification caches are refreshed when replay changes a DID. Explicit removal and garbage collection also replay dependents before returning. Startup rebuilds from the journal to recover interrupted publication; public status and DID-list reads wait for repair and active replay. An operation accepted through dependent replay may report `MERGED` when its next queue attempt runs, so processing counters describe queue attempts, not every change to derived histories.
+Accepted histories, search entries, and verification caches are refreshed when replay changes a DID. Explicit removal and garbage collection also replay dependents before returning. Startup rebuilds from the journal to recover interrupted publication; public verification, resolution, status, and DID-list reads wait for repair and hold the history lock throughout their asynchronous reads. Status-cache refreshes use the same lock. An operation accepted through dependent replay may report `MERGED` when its next queue attempt runs, so processing counters describe queue attempts, not every change to derived histories.
 
 The following is the insertion algorithm reused during replay:
 
@@ -1189,10 +1189,14 @@ import_queue.clear()
 return { total, verified, expired, invalid }
 ```
 
-`verifyDb` always clears the import queue at the end of the loop, regardless
-of outcome. The `verified` count is seeded from the size of the memoized
+`verifyDb` clears the import queue only after successful removal and dependent replay.
+The `verified` count is seeded from the size of the memoized
 `verifiedDIDs` set, so DIDs verified in prior runs are included in the count
 even though they are skipped this pass.
+
+Storage or replay failures propagate to the caller: `/db/verify` returns HTTP 500,
+pending imports remain queued, and background GC logs the failure instead of a
+successful result. Success-only cleanup and search-index rebuilding are skipped.
 
 `verifyDb` also drives chatty per-DID logs at INFO level: `removing N/T DID
 invalid`, `removing N/T DID expired`, `expiring N/T DID in M minutes`,

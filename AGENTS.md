@@ -93,3 +93,5 @@ These rules apply to coding agents working in this repository.
 - Enforce self-controlled agents and agent-only asset owners at Gatekeeper authorization, including prospective transfers and immutable DID type. Use real signed fixtures to test rejected controller cycles; do not add replay oscillation/quarantine policy for relationships the protocol forbids. Controller removal and garbage collection must replay dependents before returning; public history reads must wait for startup repair and active replay.
 
 - Before adding protocol safeguards, demonstrate reachability with real signed operations and the ordinary importer. Mocked failure tests establish containment, not protocol validity; distinguish inputs accepted by permissive implementation code from the documented agent/asset model.
+
+- Public history reads and verification must hold the history lock throughout asynchronous resolution, including status-cache refreshes. GC persistence failures must propagate to callers and preserve pending imports; only successful GC performs queue cleanup. Parity ingress must preserve every fixture ordinal component.

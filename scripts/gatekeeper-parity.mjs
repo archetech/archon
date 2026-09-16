@@ -862,8 +862,9 @@ async function runHistoryRecoveryParity() {
             const pinned = await request(tsBaseUrl, post('/api/v1/ipfs/json', JSON.parse(cipher.canonicalizeJSON(event.operation))));
             if (pinned.status !== 200) throw new Error('history recovery: failed to pin fixture');
             const { registry, time, registration } = event;
+            // CID ingress appends its batch-local index; preserve every fixture position component.
             const imported = await both(post('/api/v1/batch/import/cids', {
-                cids: [pinned.body], metadata: { registry, time, registration, ordinal: [registration.height] },
+                cids: [pinned.body], metadata: { registry, time, registration, ordinal: event.ordinal },
             }));
             for (const result of imported) {
                 if (result.status !== 200 || result.body.rejected) throw new Error('history recovery: CID ingress failed');

@@ -314,6 +314,208 @@ mod tests {
     use crate::{resolve_local_doc_async, ResolveOptions};
     use serde_json::Value;
 
+    async fn read_status_or_list(state: &AppState, status: bool) -> Value {
+        let response = if status {
+            crate::api::status(axum::extract::State(state.clone())).await
+        } else {
+            crate::api::list_dids(
+                axum::extract::State(state.clone()),
+                bytes::Bytes::from_static(br#"{"resolve":true}"#),
+            )
+            .await
+        };
+        assert_eq!(response.status(), axum::http::StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    fn assert_recovered_read(value: Value, vector: &Value, status: bool) {
+        if status {
+            assert_eq!(value["dids"]["byVersion"]["1"], json!(1));
+            assert_eq!(value["dids"]["byVersion"]["2"], json!(1));
+        } else {
+            let asset = value
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|doc| doc["didDocument"]["id"] == vector["asset"])
+                .unwrap();
+            assert_eq!(asset["didDocumentData"], json!("original"));
+        }
+    }
+
+    #[tokio::test]
+    async fn status_and_list_repair_before_the_first_read() {
+        let vectors: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/history-recovery-vectors.json"
+        ))
+        .unwrap();
+        let vector = &vectors[0];
+        for status in [false, true] {
+            let db = JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            };
+            let (state, _directory) = crate::tests::make_state(db);
+            for event in vector["base"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .chain([&vector["old"]])
+            {
+                crate::events::import_event_impl(
+                    &state,
+                    serde_json::from_value(event.clone()).unwrap(),
+                )
+                .await;
+            }
+            crate::refresh_metrics_snapshot(&state).await.unwrap();
+            let did = vector["controller"].as_str().unwrap();
+            let mut store = state.store.lock().await;
+            let mut journal = store.get_candidates().unwrap()[did].clone();
+            journal.push(serde_json::from_value(vector["rotation"].clone()).unwrap());
+            store.set_candidates(did, journal).unwrap();
+            drop(store);
+            *state.history_ready.lock().await = false;
+            *state.candidate_history.lock().await = None;
+            state.dependents.lock().await.clear();
+            let response = tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                read_status_or_list(&state, status),
+            )
+            .await
+            .unwrap();
+            assert_recovered_read(response, vector, status);
+        }
+    }
+
+    #[tokio::test]
+    async fn status_list_and_background_cache_wait_for_publication() {
+        let vectors: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/history-recovery-vectors.json"
+        ))
+        .unwrap();
+        let vector = &vectors[0];
+        let db = JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        };
+        let (state, _directory) = crate::tests::make_state(db);
+        for event in vector["base"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .chain([&vector["old"]])
+        {
+            crate::events::import_event_impl(
+                &state,
+                serde_json::from_value(event.clone()).unwrap(),
+            )
+            .await;
+        }
+        let guard = state.history_lock.lock().await;
+        let mut readers = Vec::new();
+        for status in [false, true] {
+            let reading_state = state.clone();
+            readers.push(tokio::spawn(async move {
+                read_status_or_list(&reading_state, status).await
+            }));
+        }
+        let background_state = state.clone();
+        let background =
+            tokio::spawn(async move { crate::refresh_metrics_snapshot(&background_state).await });
+        tokio::task::yield_now().await;
+        assert!(readers.iter().all(|reader| !reader.is_finished()));
+        assert!(!background.is_finished());
+        crate::events::import_event_once(
+            &state,
+            serde_json::from_value(vector["rotation"].clone()).unwrap(),
+        )
+        .await;
+        reconcile_history(&state, vector["controller"].as_str().unwrap(), true)
+            .await
+            .unwrap();
+        drop(guard);
+        for (reader, status) in readers.into_iter().zip([false, true]) {
+            let result = tokio::time::timeout(std::time::Duration::from_secs(2), reader)
+                .await
+                .unwrap()
+                .unwrap();
+            assert_recovered_read(result, vector, status);
+        }
+        background.await.unwrap().unwrap();
+        assert_eq!(
+            state
+                .status_snapshot
+                .lock()
+                .await
+                .as_ref()
+                .unwrap()
+                .by_version
+                .get("1"),
+            Some(&1)
+        );
+    }
+
+    #[tokio::test]
+    async fn gc_storage_failure_propagates_to_http_and_preserves_pending_imports() {
+        let vectors: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/history-recovery-vectors.json"
+        ))
+        .unwrap();
+        let vector = &vectors[0]["gc"];
+        let db = JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        };
+        let (mut state, directory) = crate::tests::make_state(db);
+        for event in vector["base"].as_array().unwrap() {
+            crate::events::import_event_impl(
+                &state,
+                serde_json::from_value(event.clone()).unwrap(),
+            )
+            .await;
+        }
+        state
+            .import_queue
+            .lock()
+            .await
+            .push(serde_json::from_value(vector["base"][1].clone()).unwrap());
+        // Reads still work, but attempting to write a JSON file over a directory fails.
+        state.store.lock().await.backend = DbBackend::JsonFile {
+            path: directory.path().to_path_buf(),
+        };
+        assert!(crate::verify_db_impl(&state, false).await.is_err());
+        assert_eq!(state.import_queue.lock().await.len(), 1);
+        state.config.admin_api_key = "gc-test-key".to_string();
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(
+            "x-archon-admin-key",
+            axum::http::HeaderValue::from_static("gc-test-key"),
+        );
+        let response = crate::api::db_verify(axum::extract::State(state.clone()), headers).await;
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR
+        );
+        assert_eq!(state.import_queue.lock().await.len(), 1);
+        state.store.lock().await.backend = DbBackend::Memory;
+        let result = crate::verify_db_impl(&state, false).await.unwrap();
+        assert_eq!(result.expired, 1);
+        assert!(state.import_queue.lock().await.is_empty());
+        assert!(state
+            .store
+            .lock()
+            .await
+            .get_events(vector["asset"].as_str().unwrap())
+            .is_empty());
+    }
+
     #[tokio::test]
     async fn signed_controller_rules_apply_to_submissions_imports_and_repair() {
         let fixture: Value = serde_json::from_str(include_str!(
@@ -554,7 +756,7 @@ mod tests {
                 events[0].operation["proof"]["proofValue"] = json!("invalid");
                 store.set_events(controller, events).unwrap();
             }
-            let result = crate::verify_db_impl(&state, false).await;
+            let result = crate::verify_db_impl(&state, false).await.unwrap();
             assert_eq!(
                 if invalid {
                     result.invalid

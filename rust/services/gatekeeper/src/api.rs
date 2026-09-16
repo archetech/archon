@@ -23,7 +23,7 @@ use crate::{
     build_search_index, chrono_like_now, classify_conformant_error, clear_search_index,
     generate_did_from_operation, handle_did_operation, import_batch_impl,
     relay_hints,
-    normalize_path, process_events_impl, query_docs_impl, record_metrics, refresh_metrics_snapshot,
+    normalize_path, process_events_impl, query_docs_impl, record_metrics,
     is_valid_did, resolve_local_doc_async, search_docs_impl, verify_db_impl, AppState, BlockLookup,
     GatekeeperDb, ResolveOptions,
 };
@@ -68,9 +68,13 @@ pub(crate) async fn version(State(state): State<AppState>) -> impl IntoResponse 
     })
 }
 
-pub(crate) async fn status(State(state): State<AppState>) -> impl IntoResponse {
+pub(crate) async fn status(State(state): State<AppState>) -> Response {
+    if let Err(error) = crate::history::ensure_history_ready(&state).await {
+        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    }
+    let _history_guard = state.history_lock.lock().await;
     if state.status_snapshot.lock().await.is_none() {
-        refresh_metrics_snapshot(&state).await;
+        crate::resolver::refresh_metrics_snapshot_once(&state).await;
     }
     let dids = state
         .status_snapshot
@@ -97,7 +101,7 @@ pub(crate) async fn status(State(state): State<AppState>) -> impl IntoResponse {
     };
 
     record_metrics(&state, "GET", "/status", 200, 0.0);
-    Json(payload)
+    Json(payload).into_response()
 }
 
 fn current_memory_usage() -> MemoryUsage {
@@ -281,6 +285,10 @@ pub(crate) async fn list_dids(
             .collect::<Vec<_>>()
     });
 
+    if let Err(error) = crate::history::ensure_history_ready(&state).await {
+        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    }
+    let _history_guard = state.history_lock.lock().await;
     let dids = {
         let store = state.store.lock().await;
         store.list_dids(&state.config.did_prefix, requested.as_deref())
@@ -903,7 +911,13 @@ pub(crate) async fn db_verify(State(state): State<AppState>, headers: HeaderMap)
         return response;
     }
 
-    let result = verify_db_impl(&state, true).await;
+    let result = match verify_db_impl(&state, true).await {
+        Ok(result) => result,
+        Err(error) => {
+            record_metrics(&state, "GET", "/db/verify", 500, start.elapsed().as_secs_f64());
+            return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+        }
+    };
     build_search_index(&state).await;
     record_metrics(
         &state,

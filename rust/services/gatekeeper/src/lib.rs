@@ -1376,7 +1376,7 @@ mod tests {
             did: Some("did:cid:queued".to_string()),
             registration: None,
         });
-        let result = verify_db_impl(&state, false).await;
+        let result = verify_db_impl(&state, false).await.unwrap();
         assert_eq!(result.total, 3);
         assert_eq!(result.verified, 1);
         assert_eq!(result.expired, 0);
@@ -1388,7 +1388,7 @@ mod tests {
         drop(store);
         assert_eq!(state.import_queue.lock().await.len(), 0);
 
-        let cached = verify_db_impl(&state, false).await;
+        let cached = verify_db_impl(&state, false).await.unwrap();
         assert_eq!(cached.total, 1);
         assert_eq!(cached.verified, 1);
     }

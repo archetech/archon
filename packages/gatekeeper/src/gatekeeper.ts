@@ -447,7 +447,8 @@ export default class Gatekeeper implements GatekeeperInterface {
     // Direct submissions have no trusted chain position. Import and verified
     // replay pass an event to the shared authorization path instead.
     async verifyOperation(operation: Operation): Promise<boolean> {
-        return this.authorizeOperation(operation);
+        await this.ensureHistoryReady();
+        return this.withHistoryLock(() => this.authorizeOperation(operation));
     }
 
     private async creationType(did?: string): Promise<string | undefined> {
@@ -995,8 +996,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         options?: ResolveDIDOptions
     ): Promise<DidCidDocument> {
         await this.ensureHistoryReady();
-        await this.historyLock;
-        return this.resolveDIDAt(did, options);
+        return this.withHistoryLock(() => this.resolveDIDAt(did, options));
     }
 
     // The resolver behind resolveDID, with one cutoff the public options do
