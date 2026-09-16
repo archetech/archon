@@ -490,7 +490,7 @@ Controller constraints are enforced at the shared authorization boundary for dir
 
 Candidate journals persist across restart, including rejected candidates and replaced branches. Replay reconstructs accepted state before serving resolution after startup and refreshes dependent search and verification state. Existing databases adopt their stored histories into the journal; operations discarded before this upgrade must be recovered by rescanning their anchors. DID exports continue to contain accepted histories, so a DID export alone is not a backup of the candidate journal.
 
-This is convergence on available anchored evidence, not proof of complete history. If a relevant rotation never becomes available, the node cannot take it into account. Gossip hints retain their existing arrival-order semantics; this change does not introduce a trusted ordering for unanchored registries.
+This is convergence on available anchored evidence, not proof of complete history. If a relevant rotation never becomes available, the node cannot take it into account. Gossip hints retain their existing arrival-order semantics. Repeated observations of the same complete canonical operation in the same unanchored registry retain the first observation and do not trigger new authorization replay. Distinct blockchain anchors remain separate evidence; this does not introduce a trusted ordering for unanchored registries.
 
 ### Operation identity and retrieval references
 

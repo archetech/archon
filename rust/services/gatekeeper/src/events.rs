@@ -575,12 +575,20 @@ pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) 
     };
     event.did = Some(did.clone());
     event.opid = generate_json_cid(&event.operation).ok();
-    if let Err(error) = crate::history::retain_candidates(state, &did, Some(event.clone())).await {
-        warn!("Failed to retain candidate: {}", error);
-        return ImportStatus::Deferred;
-    }
+    let changed = match crate::history::retain_candidates(state, &did, Some(event.clone())).await {
+        Ok(changed) => changed,
+        Err(error) => {
+            warn!("Failed to retain candidate: {}", error);
+            return ImportStatus::Deferred;
+        }
+    };
     let key = crate::history::candidate_key(&event);
     let status = import_event_once(state, event).await;
+    // Recovery and evidence changes already replay dependents. An unchanged
+    // merge cannot change authorization, so peer-sync duplicates need no replay.
+    if !changed && matches!(status, ImportStatus::Merged) && *state.history_ready.lock().await {
+        return status;
+    }
     if matches!(status, ImportStatus::Added) {
         state.verified_dids.lock().await.remove(&did);
     }

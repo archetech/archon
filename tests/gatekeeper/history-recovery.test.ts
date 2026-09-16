@@ -363,3 +363,41 @@ it('startup verifies each creation once and leaves unchanged candidate journals 
         reads.mockRestore();
     }
 });
+
+it.each(['anchored', 'gossip', 'restamped-gossip'])('merges known %s sync events without reverifying controllers or reading dependent histories', async mode => {
+    const vector = vectors[0];
+    const db = new DbJsonMemory('duplicate-sync');
+    const options = { db, ipfs: new MemoryClient() };
+    let g = new Gatekeeper(options);
+    for (const event of vector.base) {
+        await g.importEvent(mode === 'anchored' ? event : {
+            operation: event.operation, registry: 'hyperswarm', time: event.time, ordinal: event.ordinal,
+        });
+    }
+    g = new Gatekeeper(options);
+    await g.getDIDs();
+    const before = await db.getCandidates();
+    const duplicate = structuredClone(before[vector.controller][0]);
+    if (mode === 'restamped-gossip') {
+        duplicate.time = '2026-09-16T00:00:00.000Z';
+        duplicate.ordinal = [Date.parse(duplicate.time), 42];
+    }
+    const verify = jest.spyOn(Gatekeeper.prototype, 'verifyCreateOperation');
+    const reads = jest.spyOn(db, 'getEvents');
+    const writes = jest.spyOn(db, 'setCandidates');
+    try {
+        expect(await g.importEvent(duplicate)).toBe('merged');
+        expect(verify).not.toHaveBeenCalled();
+        expect(reads.mock.calls.every(([did]) => did === vector.controller)).toBe(true);
+        expect(writes).not.toHaveBeenCalled();
+    } finally {
+        verify.mockRestore();
+        reads.mockRestore();
+        writes.mockRestore();
+    }
+    expect(await db.getCandidates()).toEqual(before);
+    // New controller evidence must still invalidate its dependent history.
+    await g.importEvent(vector.old);
+    await g.importEvent(vector.rotation);
+    expect((await g.resolveDID(vector.asset, { verify: true })).didDocumentData).toBe('original');
+});

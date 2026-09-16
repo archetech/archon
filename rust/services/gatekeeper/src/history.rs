@@ -13,6 +13,10 @@ use crate::{
 };
 
 pub(crate) fn candidate_key(event: &EventRecord) -> String {
+    if crate::is_unanchored_registry(&event.registry) {
+        // A fresh gossip receipt time is not new authorization evidence.
+        return json!([event.opid, event.registry]).to_string();
+    }
     json!([event.opid, event.registry, event.time, event.ordinal]).to_string()
 }
 
@@ -42,7 +46,7 @@ pub(crate) async fn retain_candidates(
     state: &AppState,
     did: &str,
     incoming: Option<EventRecord>,
-) -> Result<()> {
+) -> Result<bool> {
     retain_candidates_with_histories(state, did, incoming, None).await
 }
 
@@ -51,7 +55,7 @@ async fn retain_candidates_with_histories(
     did: &str,
     incoming: Option<EventRecord>,
     histories: Option<&HashMap<String, Vec<EventRecord>>>,
-) -> Result<()> {
+) -> Result<bool> {
     let mut cache = state.candidate_history.lock().await;
     let mut dependents = state.dependents.lock().await;
     let mut store = state.store.lock().await;
@@ -97,19 +101,24 @@ async fn retain_candidates_with_histories(
         event.opid = Some(generate_json_cid(&event.operation)?);
         let key = candidate_key(&event);
         if let Some(index) = positions.get(&key) {
-            retained[*index] = event;
+            // Preserve the first local/gossip observation and its timestamp.
+            // Anchored metadata updates still replace the same chain position.
+            if !crate::is_unanchored_registry(&event.registry) {
+                retained[*index] = event;
+            }
         } else {
             positions.insert(key, retained.len());
             retained.push(event);
         }
     }
     let events = retained;
-    if candidates.get(did) != Some(&events) {
+    let changed = candidates.get(did) != Some(&events);
+    if changed {
         store.set_candidates(did, events.clone())?;
     }
     index_candidates(&mut dependents, did, &events);
     candidates.insert(did.to_string(), events);
-    Ok(())
+    Ok(changed)
 }
 
 // Call with history_lock held. Remove the whole set before replaying dependents.
@@ -354,6 +363,141 @@ mod tests {
     use super::*;
     use crate::{resolve_local_doc_async, ResolveOptions};
     use serde_json::Value;
+
+    #[tokio::test]
+    async fn duplicate_sync_preserves_cached_status_and_replays_new_evidence() {
+        let vectors: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/history-recovery-vectors.json"
+        ))
+        .unwrap();
+        let vector = &vectors[0];
+        let controller = vector["controller"].as_str().unwrap();
+        let asset = vector["asset"].as_str().unwrap();
+        for mode in ["anchored", "gossip", "restamped-gossip", "recovery-pending"] {
+            let (state, _dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            for value in vector["base"].as_array().unwrap() {
+                let mut event: EventRecord = serde_json::from_value(value.clone()).unwrap();
+                if mode.contains("gossip") {
+                    event.registry = "hyperswarm".to_string();
+                    event.registration = None;
+                }
+                crate::events::import_event_impl(&state, event).await;
+            }
+            ensure_history_ready(&state).await.unwrap();
+            crate::refresh_metrics_snapshot(&state).await.unwrap();
+            let before = state.store.lock().await.get_candidates().unwrap();
+            let mut duplicate = before[controller][0].clone();
+            if mode == "restamped-gossip" {
+                duplicate.time = "2026-09-16T00:00:00.000Z".to_string();
+                duplicate.ordinal = Some(vec![1789516800000, 42]);
+            }
+            if mode == "recovery-pending" {
+                *state.history_ready.lock().await = false;
+            }
+            assert!(matches!(
+                crate::events::import_event_impl(&state, duplicate).await,
+                crate::events::ImportStatus::Merged
+            ));
+            assert_eq!(
+                state.status_snapshot.lock().await.is_some(),
+                mode != "recovery-pending"
+            );
+            assert!(state.store.lock().await.get_candidates().unwrap() == before);
+            crate::events::import_event_impl(
+                &state,
+                serde_json::from_value(vector["old"].clone()).unwrap(),
+            )
+            .await;
+            crate::events::import_event_impl(
+                &state,
+                serde_json::from_value(vector["rotation"].clone()).unwrap(),
+            )
+            .await;
+            let doc = resolve_local_doc_async(
+                &state,
+                asset,
+                ResolveOptions {
+                    verify: true,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(doc["didDocumentData"], json!("original"));
+        }
+    }
+
+    #[tokio::test]
+    #[ignore = "requires a local accepted-history snapshot"]
+    async fn benchmark_duplicate_sync() {
+        let path = std::env::var("ARCHON_BENCHMARK_ACCEPTED").unwrap();
+        let dids: HashMap<String, Vec<EventRecord>> =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let mut data = JsonDbFile {
+            dids,
+            ..Default::default()
+        };
+        let mut dependents: HashMap<String, usize> = HashMap::new();
+        for (suffix, events) in &data.dids {
+            data.candidates
+                .insert(format!("did:cid:{suffix}"), events.clone());
+            if let Some(controller) = events
+                .first()
+                .and_then(|event| event.operation.get("controller"))
+                .and_then(Value::as_str)
+            {
+                *dependents.entry(controller.to_string()).or_default() += 1;
+            }
+            for event in events {
+                data.ops.insert(
+                    generate_json_cid(&event.operation).unwrap(),
+                    event.operation.clone(),
+                );
+            }
+        }
+        let (controller, fanout) = dependents
+            .into_iter()
+            .max_by_key(|(_, count)| *count)
+            .unwrap();
+        let mut duplicates = vec![data.candidates[&controller][0].clone()];
+        let mut keys: Vec<_> = data.candidates.keys().cloned().collect();
+        keys.sort();
+        duplicates.extend(
+            keys.iter()
+                .filter(|did| *did != &controller)
+                .filter_map(|did| data.candidates[did].first().cloned())
+                .take(99),
+        );
+        let before = serde_json::to_value(&data.dids).unwrap();
+        let (state, _dir) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data,
+            redis_connection: None,
+        });
+        // The snapshot is already recovered; benchmark sync, excluding startup.
+        retain_candidates(&state, &controller, None).await.unwrap();
+        *state.history_ready.lock().await = true;
+        let started = std::time::Instant::now();
+        for event in &duplicates {
+            assert!(matches!(
+                crate::events::import_event_impl(&state, event.clone()).await,
+                crate::events::ImportStatus::Merged
+            ));
+        }
+        eprintln!(
+            "duplicate sync events={} controller_dependents={fanout} elapsed={:?}",
+            duplicates.len(),
+            started.elapsed()
+        );
+        assert_eq!(
+            serde_json::to_value(&state.store.lock().await.data.dids).unwrap(),
+            before
+        );
+    }
 
     // Local, isolated benchmark: never connects to the source database.
     #[tokio::test]
