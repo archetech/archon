@@ -5,6 +5,7 @@ mod config;
 mod events;
 mod history;
 mod metrics;
+mod progress;
 mod proofs;
 mod resolver;
 mod search_index;

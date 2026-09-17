@@ -103,6 +103,7 @@ These rules apply to coding agents working in this repository.
 - CID batch ingress derives `registration.opidx` from the original CID-list index in both ports, independently of the batch ordinal prefix; parity coverage must record the anchoring block to exercise timestamp metadata.
 
 - Treat startup health timeouts after replay changes as performance regressions to measure, not merely timeout settings to increase. Benchmark populated histories in isolation; agents are self-controlled, so replay their histories before assets without repeatedly rebuilding each controller’s dependents. Finish snapshot comparisons before resetting benchmark storage.
+- Keep Gatekeeper startup phases observable in both implementations with aggregate counts and elapsed time. Throttle progress logs, avoid per-DID identifiers and extra database reads, and report completed work rather than timer-based apparent progress.
 
 - Hyperswarm wraps repeated operations in fresh receipt timestamps and ordinals. Sync optimizations must cover those restamped hints, preserve their first observation per canonical operation/registry, and keep distinct blockchain anchors eligible for authorization replay.
 

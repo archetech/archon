@@ -1333,6 +1333,26 @@ test "$(wget -qO- http://127.0.0.1:4224/api/v1/ready)" = "true"
 loaded, search index initialized, background tasks scheduled, listener
 bound) and `true` thereafter.
 
+To inspect startup progress, run `docker compose logs -f --timestamps gatekeeper`.
+Both implementations announce candidate-journal loading, then report aggregate
+DID counts and elapsed time for history loading, candidate preparation, replay,
+publication, the database status check, and search indexing. For example:
+
+```text
+Gatekeeper history replay: 0/25647 DIDs (0.0s)
+Gatekeeper history replay: 4200/25647 DIDs (5.0s)
+Gatekeeper history replay: 25647/25647 DIDs (31.2s)
+Gatekeeper DB status check: 0/25647 DIDs (0.0s)
+```
+
+Counts describe DIDs processed in the current phase, not valid DIDs or accepted
+operations. Phase boundaries always log; intermediate updates are limited to
+one every five seconds, emitted after a unit of work completes. They are not
+heartbeats: an individual slow storage call or DID replay can delay an update.
+The Rust bulk history read reports its start and completion. Routine imports
+do not emit recovery progress; periodic database status scans report their own
+progress. These logs do not change readiness or healthcheck timeouts.
+
 ### 14.4 Graceful shutdown
 
 On `SIGTERM` or `SIGINT` the server SHOULD stop accepting new connections,
