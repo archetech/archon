@@ -913,6 +913,110 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn registration_v1_acceptance_survives_submission_import_and_restart() {
+        let v: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/registration-transition-v1-vectors.json"
+        ))
+        .unwrap();
+        let did = v["did"].as_str().unwrap();
+        let wrap = |operation: &Value| {
+            crate::value_to_event_record(&json!({
+                "operation": operation, "registry": "hyperswarm", "time": operation["proof"]["created"]
+            }))
+        };
+        for case in v["cases"].as_array().unwrap() {
+            let accepted = case["accepted"].as_bool().unwrap();
+            for direct in [true, false] {
+                let (state, _dir) = crate::tests::make_state(JsonDb {
+                    backend: DbBackend::Memory,
+                    data: JsonDbFile::default(),
+                    redis_connection: None,
+                });
+                ensure_history_ready(&state).await.unwrap();
+                if direct {
+                    crate::events::handle_did_operation(&state, &v["agent"])
+                        .await
+                        .unwrap();
+                    assert_eq!(
+                        crate::events::handle_did_operation(&state, &case["operation"])
+                            .await
+                            .is_ok(),
+                        accepted,
+                        "{}",
+                        case["name"]
+                    );
+                } else {
+                    crate::events::import_event_impl(&state, wrap(&v["agent"])).await;
+                    let status =
+                        crate::events::import_event_impl(&state, wrap(&case["operation"])).await;
+                    assert!(
+                        match status {
+                            crate::events::ImportStatus::Added => accepted,
+                            crate::events::ImportStatus::Rejected => !accepted,
+                            _ => false,
+                        },
+                        "{}",
+                        case["name"]
+                    );
+                }
+                let data: JsonDbFile = serde_json::from_value(
+                    serde_json::to_value(&state.store.lock().await.data).unwrap(),
+                )
+                .unwrap();
+                let (restarted, _restart_dir) = crate::tests::make_state(JsonDb {
+                    backend: DbBackend::Memory,
+                    data,
+                    redis_connection: None,
+                });
+                for current in [&state, &restarted] {
+                    ensure_history_ready(current).await.unwrap();
+                    for verify in [false, true] {
+                        let doc = crate::resolve_local_doc_async(
+                            current,
+                            did,
+                            crate::ResolveOptions {
+                                verify,
+                                ..crate::ResolveOptions::default()
+                            },
+                        )
+                        .await
+                        .unwrap();
+                        assert_eq!(doc["didDocument"]["id"], did);
+                        assert_eq!(
+                            doc["didDocumentRegistration"], case["expectedRegistration"],
+                            "{}",
+                            case["name"]
+                        );
+                        assert_eq!(
+                            doc["didDocumentMetadata"]["versionSequence"],
+                            if accepted { "2" } else { "1" }
+                        );
+                    }
+                }
+            }
+        }
+        let (state, _dir) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        assert!(
+            crate::events::handle_did_operation(&state, &v["unsupportedGenesis"])
+                .await
+                .is_err()
+        );
+        assert!(!crate::verify_event_shape(&crate::event_record_to_value(
+            &wrap(&v["unsupportedGenesis"])
+        )));
+        assert!(state
+            .store
+            .lock()
+            .await
+            .list_dids(&state.config.did_prefix, None)
+            .is_empty());
+    }
+
     fn identity_fixture() -> Value {
         serde_json::from_str(include_str!(
             "../../../../tests/gatekeeper/operation-identity-vectors.json"

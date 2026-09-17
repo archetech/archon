@@ -1,0 +1,305 @@
+{
+  "agent": {
+    "type": "create",
+    "created": "2026-09-17T11:00:00.000Z",
+    "registration": {
+      "version": 1,
+      "type": "agent",
+      "registry": "hyperswarm",
+      "validUntil": "2099-12-31T00:00:00Z"
+    },
+    "publicJwk": {
+      "kty": "EC",
+      "crv": "secp256k1",
+      "x": "I9o4OLoCF-Dz7WvC313IGyADEWkrVirgD2M0GHvCYR8",
+      "y": "TnYS-S8LdarWUSViruA6l73z_mI_VbbLjwe3L10-KOQ"
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2026-09-17T12:00:00.000Z",
+      "verificationMethod": "#key-1",
+      "proofPurpose": "capabilityInvocation",
+      "proofValue": "MDsm9bUfXLVtl6MhUfag1A_Gj8lIS0x83A-26sF5OihEEOLAD5-D_7JcT7gz292pO20Izxrh5-ZmO8VzxmiItQ"
+    }
+  },
+  "did": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+  "unsupportedGenesis": {
+    "type": "create",
+    "created": "2026-09-17T11:00:00.000Z",
+    "registration": {
+      "version": 2,
+      "type": "agent",
+      "registry": "hyperswarm",
+      "validUntil": "2099-12-31T00:00:00Z"
+    },
+    "publicJwk": {
+      "kty": "EC",
+      "crv": "secp256k1",
+      "x": "I9o4OLoCF-Dz7WvC313IGyADEWkrVirgD2M0GHvCYR8",
+      "y": "TnYS-S8LdarWUSViruA6l73z_mI_VbbLjwe3L10-KOQ"
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2026-09-17T12:00:00.000Z",
+      "verificationMethod": "#key-1",
+      "proofPurpose": "capabilityInvocation",
+      "proofValue": "B99_F1pPV_ZJ4vi4SjPrS4VGgd0OfbvMf21AXDIo7AMQMmEvi-ZXVXteXwGwRDk30M2ksdSNBb-9aKAjmnRq5A"
+    }
+  },
+  "cases": [
+    {
+      "name": "omit_registration",
+      "accepted": true,
+      "expectedRegistration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm",
+        "validUntil": "2099-12-31T00:00:00Z"
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "previd": "bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "doc": {
+          "didDocumentData": {
+            "case": "omit_registration"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "hl-gnvmnTeRTu4q7SRAbwmxOcw070qZfYQqfQ7uA2c8a1q5QY_vM9WjbytAcIeFWPuQMtZKEjNR0xjK2_h4Klg"
+        }
+      }
+    },
+    {
+      "name": "replace_registry_only",
+      "accepted": true,
+      "expectedRegistration": {
+        "registry": "hyperswarm"
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "previd": "bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "doc": {
+          "didDocumentData": {
+            "case": "replace_registry_only"
+          },
+          "didDocumentRegistration": {
+            "registry": "hyperswarm"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "atRIIjK6nM5gUK6cA9e4HvU3OM52cfuUNlVFK4kLDukRUnorRHLYeDuMBO8lbeD1_AQpv44ingDg4E_rrSvyng"
+        }
+      }
+    },
+    {
+      "name": "unsupported_version_and_invalid_expiry",
+      "accepted": true,
+      "expectedRegistration": {
+        "registry": "hyperswarm",
+        "version": 999,
+        "validUntil": "not-a-date"
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "previd": "bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "doc": {
+          "didDocumentData": {
+            "case": "unsupported_version_and_invalid_expiry"
+          },
+          "didDocumentRegistration": {
+            "registry": "hyperswarm",
+            "version": 999,
+            "validUntil": "not-a-date"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "94e7O4C33KYagPW_OhsySoWPUkrfaw6fmtio43EAtXksd245kgfzp6L6bW2WfSLQemh3e2DdVaHkM_T1B3WQvQ"
+        }
+      }
+    },
+    {
+      "name": "claim_future_version",
+      "accepted": true,
+      "expectedRegistration": {
+        "registry": "hyperswarm",
+        "version": 2,
+        "type": "agent"
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "previd": "bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "doc": {
+          "didDocumentData": {
+            "case": "claim_future_version"
+          },
+          "didDocumentRegistration": {
+            "registry": "hyperswarm",
+            "version": 2,
+            "type": "agent"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "tnxqMRpd5FYXGTjCXdKBHAlXs8pQJbbBiUZTtfusueUkQo3ui620AeAb90UuMnUZVaYcSMyQav2lNRadEvB_sA"
+        }
+      }
+    },
+    {
+      "name": "string_version_and_null_expiry",
+      "accepted": true,
+      "expectedRegistration": {
+        "registry": "hyperswarm",
+        "version": "1",
+        "validUntil": null
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "previd": "bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "doc": {
+          "didDocumentData": {
+            "case": "string_version_and_null_expiry"
+          },
+          "didDocumentRegistration": {
+            "registry": "hyperswarm",
+            "version": "1",
+            "validUntil": null
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "qhABF_2ISqHsdccyewH8fvNkAYvuVkcEtc7ouf7MhdMSrq7jZYFtMr7wNgU8f35hQA17OTnbGADIAtLZZZbK-w"
+        }
+      }
+    },
+    {
+      "name": "omit_registry",
+      "accepted": true,
+      "expectedRegistration": {
+        "version": 1,
+        "type": "agent"
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "previd": "bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "doc": {
+          "didDocumentData": {
+            "case": "omit_registry"
+          },
+          "didDocumentRegistration": {
+            "version": 1,
+            "type": "agent"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "dAJ4_aF5vsq77YsAh4MWDG4LX0UjddTyjaXQHiTnnW5m25XjrSiqJpDJqZAUolOOLk_xERtYwWDCX3euTbmJAQ"
+        }
+      }
+    },
+    {
+      "name": "change_prefix",
+      "accepted": true,
+      "expectedRegistration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm",
+        "validUntil": "2099-12-31T00:00:00Z",
+        "prefix": "did:example"
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "previd": "bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "doc": {
+          "didDocumentData": {
+            "case": "change_prefix"
+          },
+          "didDocumentRegistration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "hyperswarm",
+            "validUntil": "2099-12-31T00:00:00Z",
+            "prefix": "did:example"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "ZRC2e3Bk_MApsylekBQa1zardUZ5SLfaNrDY-ApVPh53Dw5g4duIBjXDdZpoVcpI7T4Gsiw-GwGKP7pet5qQog"
+        }
+      }
+    },
+    {
+      "name": "change_kind",
+      "accepted": false,
+      "expectedRegistration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm",
+        "validUntil": "2099-12-31T00:00:00Z"
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "previd": "bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "doc": {
+          "didDocumentData": {
+            "case": "change_kind"
+          },
+          "didDocumentRegistration": {
+            "version": 1,
+            "type": "asset",
+            "registry": "hyperswarm",
+            "validUntil": "2099-12-31T00:00:00Z"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "U7HdX2_Tk8MvgYfUN6ReEgcbQXoxmam7cYY-zDzCfBt1K3fWJPPHqRhJg57CuqLipQ0BjaM5pWUeqBoBdIHDWA"
+        }
+      }
+    }
+  ]
+}

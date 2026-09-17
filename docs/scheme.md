@@ -525,6 +525,15 @@ operation cache as well as the candidate journal. Accepted-history exports alone
 may omit aliases needed by legacy signed predecessors; restore the full database
 or recover the original CID references from their anchors.
 
+### Registration hardening status
+
+The stricter registration contract is a [proposal](plans/registration-hardening-1158.md),
+not an active protocol change. Version-1 registration replacements currently accept
+some malformed or omitted fields; shared signed compatibility fixtures record that
+behavior. Supplied registration objects replace the component rather than merging
+individual fields. A future stricter policy must be selected by immutable genesis
+version and must not be enabled by editing `didDocumentRegistration.version`.
+
 ### Implementation boundary: event authorization and proof verification
 
 Import and verified replay share event authorization: select the target state the operation chains from, select the authorizing controller document under the rules above, then verify the operation against that document. Confirmation replacements and competing events use the predecessor state, not the latest document. Direct submissions have no trusted event position and retain the historical `proof.created` selection. Predecessor validation uses the target DID's selected previous version, separately from the agent document selected to verify the signature. Direct updates and deletions must reference the current head before any operation storage or queue write. Import may select an earlier predecessor when considering a competing branch; an unavailable predecessor remains deferred and may become applicable when its history arrives. Verified resolution uses the same predecessor validation. No signed predecessor reference is rewritten.

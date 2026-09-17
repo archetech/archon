@@ -7,7 +7,7 @@ from main for independently reviewable work; do not merge without instruction.
 
 ## Work and acceptance criteria
 
-- [ ] #1158 (in progress): Reproduce current direct-submission behavior; share predecessor and
+- [ ] #1158 (registration rules pending): Reproduce current direct-submission behavior; share predecessor and
   resulting-state validation across direct submission, import, and verified
   replay. Reject invalid direct transitions before storage/queue side effects.
   Preserve candidate predecessor selection, competing branches, cached retrieval
@@ -58,10 +58,26 @@ specified version and tighten it in subsequent patches.
 
 ## First implementation step
 
-A shared predecessor check enforces an existing rule before direct submission
-writes/queues. Signed modern-suite regressions reproduce false success for missing,
-malformed, unknown, and stale predecessors on main. Imports must still retain
-successors whose predecessors are not yet available and reconsider them later.
+Merged #1174 added a shared predecessor check before direct submission writes/queues.
+Signed modern-suite regressions reproduced false success for missing, malformed,
+unknown, and stale predecessors before that fix and now verify their rejection.
+Imports must still retain successors whose predecessors are not yet available and reconsider them later.
 This step does not activate version 2 or close the registration-validation portion
 of #1158. Registration, key permissions, and byte limits belong to the coordinated
 versioned follow-up, with #1160 documenting the complete contract before activation.
+
+## Progress after #1179
+
+- #1174 merged the shared predecessor check before direct submission writes. The
+  historical reproduction in the initial assessment above predates that fix.
+- #1179 merged the narrow Rust repair for TypeScript numeric-key predecessor
+  references. It did not change generated IDs. Broader CID consistency is tracked
+  separately in #1180 and is not a prerequisite for this registration proposal.
+- The remaining #1158 registration investigation is documented in
+  [Registration transition hardening](registration-hardening-1158.md). Shared signed
+  version-1 fixtures pin accepted replacements, omissions, malformed metadata, and
+  rejected kind changes across both ports and restart. Version 2 remains disabled.
+- Next: review the proposed registration contract, then define the #1156 key-policy
+  and #1159 byte-limit portions in the approved order. Activate the coordinated
+  policy only after #1160 states the complete contract; do not add new version-1
+  replay rejections or activate registration checks in isolation.

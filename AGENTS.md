@@ -117,3 +117,5 @@ These rules apply to coding agents working in this repository.
 - Protocol hardening work is tracked in `docs/plans/protocol-hardening-1149.md`. Preserve version 1 historical acceptance; introduce new registration, key-permission, and byte-limit rules only through an explicitly versioned policy. Validate a direct operation's target predecessor before storage/queue writes; keep import's historical predecessor selection and deferred recovery.
 
 - For cross-port interoperability bugs, fix the failing implementation first. Treat changes to generated operation CIDs or genesis identifiers as a separate protocol migration; establish that a localized repair is insufficient before expanding scope.
+
+- Before tightening protocol acceptance, add signed cross-port fixtures for the current behavior across submission, import, and restart. Keep proposed stricter rules explicitly separate from active rules, and select future policy from immutable genesis version rather than mutable registration metadata.
