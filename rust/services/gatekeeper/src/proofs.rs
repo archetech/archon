@@ -582,6 +582,59 @@ pub(crate) fn generate_json_cid(value: &Value) -> Result<String> {
     Ok(cid.to_string())
 }
 
+// JSON.parse(canonical) followed by JSON.stringify enumerates array-index
+// property names first, numerically. Derive the current TS reference from
+// the complete operation; never infer an alias from an event's claimed opid.
+pub(crate) fn typescript_numeric_cid(value: &Value) -> Option<String> {
+    fn index(key: &str) -> Option<u32> {
+        let n = key.parse::<u32>().ok()?;
+        (n < u32::MAX && n.to_string() == key).then_some(n)
+    }
+    fn contains_index(value: &Value) -> bool {
+        match value {
+            Value::Object(map) => map
+                .iter()
+                .any(|(key, value)| index(key).is_some() || contains_index(value)),
+            Value::Array(items) => items.iter().any(contains_index),
+            _ => false,
+        }
+    }
+    fn serialize(value: &Value) -> String {
+        match value {
+            Value::Object(map) => {
+                let mut entries: Vec<_> = map.iter().collect();
+                entries.sort_by(|a, b| match (index(a.0), index(b.0)) {
+                    (Some(a), Some(b)) => a.cmp(&b),
+                    (Some(_), None) => std::cmp::Ordering::Less,
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => a.0.encode_utf16().cmp(b.0.encode_utf16()),
+                });
+                let fields: Vec<_> = entries
+                    .into_iter()
+                    .map(|(key, value)| {
+                        format!(
+                            "{}:{}",
+                            serde_json::to_string(key).unwrap(),
+                            serialize(value)
+                        )
+                    })
+                    .collect();
+                format!("{{{}}}", fields.join(","))
+            }
+            Value::Array(items) => format!(
+                "[{}]",
+                items.iter().map(serialize).collect::<Vec<_>>().join(",")
+            ),
+            _ => canonical_json(value),
+        }
+    }
+    if !contains_index(value) {
+        return None;
+    }
+    let bytes = serialize(value);
+    Some(Cid::new_v1(0x0200, Code::Sha2_256.digest(bytes.as_bytes())).to_string())
+}
+
 pub(crate) fn canonical_json(value: &Value) -> String {
     match value {
         Value::Null => "null".to_string(),

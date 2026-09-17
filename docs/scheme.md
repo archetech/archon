@@ -509,6 +509,16 @@ node's operation cache may resolve to the same canonical predecessor; neither th
 signed operation nor its `previd` is rewritten. An unknown reference remains
 unresolved. A peer's claimed `opid` alone does not install a retrieval alias.
 
+Rust also derives a TypeScript numeric-key retrieval reference from each known
+operation during candidate import and startup preparation (#1176). TypeScript's
+existing CID path parses canonical JSON and serializes the object again, placing
+integer-index keys in numeric order. Caching this content-derived reference lets
+Rust's existing predecessor check connect a successor signed by TypeScript without
+fetching a block or trusting a claimed `opid`. The signed `previd`, both ports'
+CID generation, and genesis identifiers remain unchanged. This localized repair
+does not address the separate cross-port genesis, number-formatting, or Unicode
+canonicalization differences.
+
 Startup reconstruction canonicalizes stored event IDs and candidate IDs while
 retaining cached retrieval aliases. A complete database backup must include the
 operation cache as well as the candidate journal. Accepted-history exports alone

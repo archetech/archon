@@ -13,6 +13,19 @@ use crate::{
     generate_json_cid, update_search_doc, AppState, EventRecord, GatekeeperDb, JsonDb, SearchIndex,
 };
 
+// Derive the TypeScript numeric-key reference from content, never a peer opid.
+// Existing predecessor verification still checks the referenced operation's CID.
+fn normalize_candidate_operation(store: &mut JsonDb, event: &mut EventRecord) -> Result<()> {
+    let canonical = generate_json_cid(&event.operation)?;
+    if let Some(alias) = crate::proofs::typescript_numeric_cid(&event.operation) {
+        if alias != canonical && store.get_operation(&alias).is_none() {
+            store.add_operation(&alias, event.operation.clone())?;
+        }
+    }
+    event.opid = Some(canonical);
+    Ok(())
+}
+
 pub(crate) fn candidate_key(event: &EventRecord) -> String {
     if crate::is_unanchored_registry(&event.registry) {
         // A fresh gossip receipt time is not new authorization evidence.
@@ -68,7 +81,7 @@ async fn retain_candidates_with_histories(
                     .map(|items| items.get(&current).cloned().unwrap_or_default())
                     .unwrap_or_else(|| store.get_events(&current));
                 for event in &mut events {
-                    event.opid = Some(generate_json_cid(&event.operation)?);
+                    normalize_candidate_operation(&mut store, event)?;
                 }
                 store.set_candidates(&current, events.clone())?;
                 candidates.insert(current, events);
@@ -77,9 +90,9 @@ async fn retain_candidates_with_histories(
         for (key, events) in &mut candidates {
             let mut changed = false;
             for event in events.iter_mut() {
-                let opid = generate_json_cid(&event.operation)?;
-                changed |= event.opid.as_ref() != Some(&opid);
-                event.opid = Some(opid);
+                let previous = event.opid.clone();
+                normalize_candidate_operation(&mut store, event)?;
+                changed |= event.opid != previous;
             }
             if changed {
                 store.set_candidates(key, events.clone())?;
@@ -99,7 +112,7 @@ async fn retain_candidates_with_histories(
     let mut positions = HashMap::new();
     let mut retained = Vec::new();
     for mut event in events {
-        event.opid = Some(generate_json_cid(&event.operation)?);
+        normalize_candidate_operation(&mut store, &mut event)?;
         let key = candidate_key(&event);
         if let Some(index) = positions.get(&key) {
             // Preserve the first local/gossip observation and its timestamp.
@@ -788,6 +801,116 @@ mod tests {
             verify: true, ..crate::ResolveOptions::default()
         }).await.unwrap();
         assert_eq!(doc["didDocumentData"], json!({"version": 3}));
+    }
+
+    fn numeric_predecessor_fixture() -> (Value, Vec<EventRecord>) {
+        let v: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/numeric-predecessor-vectors.json"
+        ))
+        .unwrap();
+        let events = ["agent", "update", "successor"].into_iter().map(|name| {
+            assert_eq!(generate_json_cid(&v[name]).unwrap(), v["cids"][name]["rust"]);
+            if let Some(cid) = crate::proofs::typescript_numeric_cid(&v[name]) {
+                assert_eq!(cid, v["cids"][name]["typescript"]);
+            }
+            crate::value_to_event_record(&json!({
+                "operation": v[name], "registry": "hyperswarm", "time": v[name]["proof"]["created"],
+                "did": v["did"], "opid": v["cids"][name]["rust"]
+            }))
+        }).collect();
+        (v, events)
+    }
+
+    #[tokio::test]
+    async fn numeric_predecessor_import_recovers_in_both_orders_and_deduplicates() {
+        let (v, events) = numeric_predecessor_fixture();
+        let did = v["did"].as_str().unwrap();
+        for order in [[0, 1, 2], [0, 2, 1]] {
+            let (state, _dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            for index in order {
+                crate::events::import_event_impl(&state, events[index].clone()).await;
+            }
+            let doc = crate::resolve_local_doc_async(
+                &state,
+                did,
+                crate::ResolveOptions {
+                    verify: true,
+                    ..crate::ResolveOptions::default()
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(doc["didDocumentData"], json!({"recovered": true}));
+            // A claimed opid must never poison another operation's cache entry.
+            let mut duplicate = events[1].clone();
+            duplicate.opid = events[0].opid.clone();
+            assert!(matches!(
+                crate::events::import_event_impl(&state, duplicate).await,
+                crate::events::ImportStatus::Merged
+            ));
+            let store = state.store.lock().await;
+            assert_eq!(store.get_events(did).len(), 3);
+            assert_eq!(
+                store.get_operation(events[0].opid.as_ref().unwrap()),
+                Some(v["agent"].clone())
+            );
+            assert_eq!(
+                store.get_events(did)[2].operation["previd"],
+                v["cids"]["update"]["typescript"]
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn numeric_predecessor_startup_repairs_missing_alias_and_survives_restart() {
+        let (v, events) = numeric_predecessor_fixture();
+        let did = v["did"].as_str().unwrap();
+        let alias = v["cids"]["update"]["typescript"].as_str().unwrap();
+        let mut data = JsonDbFile::default();
+        data.dids.insert(
+            did.rsplit(':').next().unwrap().to_string(),
+            events[..2].to_vec(),
+        );
+        data.candidates.insert(did.to_string(), events.clone());
+        for event in &events[..2] {
+            data.ops
+                .insert(event.opid.clone().unwrap(), event.operation.clone());
+        }
+        assert!(!data.ops.contains_key(alias));
+        let (state, _dir) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data,
+            redis_connection: None,
+        });
+        ensure_history_ready(&state).await.unwrap();
+        let doc = crate::resolve_local_doc_async(
+            &state,
+            did,
+            crate::ResolveOptions {
+                verify: true,
+                ..crate::ResolveOptions::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(doc["didDocumentData"], json!({"recovered": true}));
+        let before = serde_json::to_value(&state.store.lock().await.data).unwrap();
+        let repaired: JsonDbFile = serde_json::from_value(before.clone()).unwrap();
+        assert_eq!(repaired.ops.get(alias), Some(&v["update"]));
+        let (restarted, _restart_dir) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: repaired,
+            redis_connection: None,
+        });
+        ensure_history_ready(&restarted).await.unwrap();
+        assert_eq!(
+            serde_json::to_value(&restarted.store.lock().await.data).unwrap(),
+            before
+        );
     }
 
     fn identity_fixture() -> Value {

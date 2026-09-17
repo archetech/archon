@@ -115,3 +115,5 @@ These rules apply to coding agents working in this repository.
 - Gatekeeper performance checks must include concurrent resolution during TypeScript/Redis status scans and unchanged deferred-event retries, not only successful duplicate imports. Compare accepted histories structurally/canonically because Redis hydration can change object key order; retain missing-evidence recovery while avoiding repeated dependent replay.
 
 - Protocol hardening work is tracked in `docs/plans/protocol-hardening-1149.md`. Preserve version 1 historical acceptance; introduce new registration, key-permission, and byte-limit rules only through an explicitly versioned policy. Validate a direct operation's target predecessor before storage/queue writes; keep import's historical predecessor selection and deferred recovery.
+
+- For cross-port interoperability bugs, fix the failing implementation first. Treat changes to generated operation CIDs or genesis identifiers as a separate protocol migration; establish that a localized repair is insufficient before expanding scope.
