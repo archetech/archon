@@ -1,3 +1,4 @@
+import ZecRpcClient from './rpc.js';
 import type { Block, BlockVerbose, BlockHeader } from 'bitcoin-core';
 import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/clients/gatekeeper';
@@ -27,57 +28,7 @@ const cipher = new CipherNode();
 const gatekeeper = new GatekeeperClient();
 const keymaster = new KeymasterClient();
 
-class ZecRpcClient {
-    private readonly client = axios.create({
-        baseURL: `http://${config.host}:${config.port}`,
-        auth: config.user || config.pass ? {
-            username: config.user || '',
-            password: config.pass || '',
-        } : undefined,
-        headers: { 'content-type': 'application/json' },
-    });
-
-    private async command<T>(method: string, params: unknown[] = []): Promise<T> {
-        const { data } = await this.client.post('/', {
-            jsonrpc: '2.0',
-            id: Date.now(),
-            method,
-            params,
-        });
-
-        if (data?.error) {
-            throw new Error(data.error.message || `Zcash RPC ${method} failed`);
-        }
-
-        return data.result as T;
-    }
-
-    getBlock(hash: string, verbosity?: number): Promise<Block | BlockVerbose | string> {
-        return this.command('getblock', verbosity === undefined ? [hash] : [hash, verbosity]);
-    }
-
-    getBlockHeader(hash: string): Promise<BlockHeader> {
-        return this.command('getblockheader', [hash]);
-    }
-
-    getBlockHash(height: number): Promise<string> {
-        return this.command('getblockhash', [height]);
-    }
-
-    getBlockCount(): Promise<number> {
-        return this.command('getblockcount');
-    }
-
-    getNetworkInfo(): Promise<{ relayfee?: number }> {
-        return this.command('getnetworkinfo');
-    }
-
-    getBlockchainInfo(): Promise<unknown> {
-        return this.command('getblockchaininfo');
-    }
-}
-
-const zecClient = new ZecRpcClient();
+const zecClient = new ZecRpcClient(config);
 
 // Wallet service API helpers
 function walletHeaders(): Record<string, string> {
@@ -177,6 +128,11 @@ const zcashExportLoopRunning = new promClient.Gauge({
 });
 
 // Counters
+const zcashScanErrors = new promClient.Counter({
+    name: 'zcash_scan_errors_total',
+    help: 'Failed chain scan attempts, including skipped checkpoint validation',
+});
+
 const zcashImportErrors = new promClient.Counter({
     name: 'zcash_import_errors_total',
     help: 'Failed import attempts',
@@ -303,6 +259,7 @@ async function resolveScanStart(blockCount: number): Promise<number | null> {
     const decision = await planScanStart(db, config, chain, blockCount);
 
     if (!decision.scan) {
+        zcashScanErrors.inc();
         console.warn(decision.warn);
         return null;
     }
@@ -388,77 +345,79 @@ function updateDiscoveredItems(db: MediatorDb, update: DiscoveredItem): void {
 }
 
 async function fetchBlock(height: number, blockCount: number): Promise<void> {
-    try {
-        const blockHash = await zecClient.getBlockHash(height);
-        const block = await zecClient.getBlock(blockHash, BlockVerbosity.JSON_TX_DATA) as BlockVerbose;
-        const timestamp = new Date(block.time * 1000).toISOString();
+    const blockHash = await zecClient.getBlockHash(height);
+    const block = await zecClient.getBlock(blockHash, BlockVerbosity.JSON_TX_DATA) as BlockVerbose;
+    const timestamp = new Date(block.time * 1000).toISOString();
 
-        for (let i = 0; i < block.tx.length; i++) {
-            const tx = block.tx[i];
-            const txid = tx.txid;
+    for (let i = 0; i < block.tx.length; i++) {
+        const tx = block.tx[i];
+        const txid = tx.txid;
 
-            console.log(height, String(i).padStart(4), txid);
+        console.log(height, String(i).padStart(4), txid);
 
-            for (const vout of tx.vout ?? []) {
-                const asm = vout.scriptPubKey?.asm;
-                if (!asm) {
-                    continue;
+        for (const vout of tx.vout ?? []) {
+            const asm = vout.scriptPubKey?.asm;
+            if (!asm) {
+                continue;
+            }
+
+            const parts = asm.split(' ');
+            if (parts[0] !== 'OP_RETURN' || !parts[1]) {
+                continue;
+            }
+
+            try {
+                const textString = Buffer.from(parts[1], 'hex').toString('utf8');
+                if (textString.startsWith('did:cid:') && isValidDID(textString)) {
+                    await jsonPersister.updateDb((db) => {
+                        const item = { height, index: i, time: timestamp, txid, did: textString };
+                        const itemKey = discoveredKey(item);
+
+                        if (!db.discovered.some(discovered => discoveredKey(discovered) === itemKey)) {
+                            db.discovered.push(item);
+                        }
+                    });
                 }
-
-                const parts = asm.split(' ');
-                if (parts[0] !== 'OP_RETURN' || !parts[1]) {
-                    continue;
-                }
-
-                try {
-                    const textString = Buffer.from(parts[1], 'hex').toString('utf8');
-                    if (textString.startsWith('did:cid:') && isValidDID(textString)) {
-                        await jsonPersister.updateDb((db) => {
-                            const item = { height, index: i, time: timestamp, txid, did: textString };
-                            const itemKey = discoveredKey(item);
-
-                            if (!db.discovered.some(discovered => discoveredKey(discovered) === itemKey)) {
-                                db.discovered.push(item);
-                            }
-                        });
-                    }
-                } catch (error: any) {
-                    console.error('Error decoding OP_RETURN or updating DB:', error);
-                }
+            } catch (error: any) {
+                console.error('Error decoding OP_RETURN or updating DB:', error);
             }
         }
-
-        await jsonPersister.updateDb((db) => {
-            db.height = height;
-            db.hash = blockHash;
-            db.time = timestamp;
-            db.blocksScanned = height - config.startBlock + 1;
-            db.txnsScanned += block.tx.length;
-            db.blockCount = blockCount;
-            db.blocksPending = blockCount - height;
-        });
-        await addBlock(height, blockHash, block.time);
-
-    } catch (error) {
-        console.error(`Error fetching block: ${error}`);
     }
+
+    await jsonPersister.updateDb((db) => {
+        db.height = height;
+        db.hash = blockHash;
+        db.time = timestamp;
+        db.blocksScanned = height - config.startBlock + 1;
+        db.txnsScanned += block.tx.length;
+        db.blockCount = blockCount;
+        db.blocksPending = blockCount - height;
+    });
+    await addBlock(height, blockHash, block.time);
 }
 
 async function scanBlocks(): Promise<void> {
-    let blockCount = await zecClient.getBlockCount();
+    try {
+        let blockCount = await zecClient.getBlockCount();
+        console.log(`current block height: ${blockCount}`);
 
-    console.log(`current block height: ${blockCount}`);
+        // Observe the tip even when checkpoint validation holds the scan position.
+        await jsonPersister.updateDb((db) => {
+            db.blockCount = blockCount;
+            db.blocksPending = Math.max(0, blockCount - db.height);
+        });
+        const start = await resolveScanStart(blockCount);
+        if (start === null) return;
 
-    const start = await resolveScanStart(blockCount);
-
-    if (start === null) {
-        return;
-    }
-
-    for (let height = start; height <= blockCount; height++) {
-        console.log(`${height}/${blockCount} blocks (${formatSyncProgress(height, blockCount)}%)`);
-        await fetchBlock(height, blockCount);
-        blockCount = await zecClient.getBlockCount();
+        for (let height = start; height <= blockCount; height++) {
+            console.log(`${height}/${blockCount} blocks (${formatSyncProgress(height, blockCount)}%)`);
+            // Retry a failed block next pass instead of advancing past its operations.
+            await fetchBlock(height, blockCount);
+            blockCount = await zecClient.getBlockCount();
+        }
+    } catch (error) {
+        zcashScanErrors.inc();
+        console.error(`Error scanning blocks: ${error}`);
     }
 }
 
