@@ -886,7 +886,12 @@ retryable. The busy response provides no completion evidence.
 
 Drains the queue once. For each event, runs `importEvent` and accumulates
 counters. Events returning `DEFERRED` are pushed back onto the queue (to be
-attempted on the next pass).
+attempted on the next pass). If a processing step throws, the failed event,
+the unvisited remainder of the pass, and any already deferred or newly queued
+events are preserved. TypeScript propagates the error to the caller and releases
+the processing flag; it does not return a successful zero-pending result. The
+mediator keeps that batch retryable, and a later pass can resume after storage
+recovers even if repeated imports are suppressed by the in-memory seen set.
 
 ### 8.4 `importEvent(event)` per-event flow
 

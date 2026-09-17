@@ -404,6 +404,43 @@ it.each(['anchored', 'gossip', 'restamped-gossip'])('merges known %s sync events
 
 
 describe('pending batch reporting', () => {
+    it('preserves failed, remaining, deferred, and concurrent events after a journal write failure', async () => {
+        const db = new DbJsonMemory('failed-journal');
+        await db.start();
+        const g = new Gatekeeper({ db, ipfs: new MemoryClient(), registries: ['BTC:signet'] });
+        const vector = vectors[0];
+        // The asset defers, then its controller fails; the rotation is still unvisited.
+        await g.importBatch([vector.base[1], vector.base[0], vector.rotation]);
+        const write = db.setCandidates.bind(db);
+        const writes = jest.spyOn(db, 'setCandidates').mockImplementation(async (did, events) => {
+            if (did === vector.controller) {
+                // Simulate an import arriving while this processing pass is in flight.
+                await g.importBatch([vector.old]);
+                throw new Error('Candidate journal unavailable');
+            }
+            return write(did, events);
+        });
+        try {
+            await expect(g.processEvents()).rejects.toThrow('Candidate journal unavailable');
+        } finally {
+            writes.mockRestore();
+        }
+        const queued = (await g.checkDIDs()).eventsQueue;
+        expect(queued).toHaveLength(4);
+        expect(queued.map(event => event.operation)).toEqual([
+            vector.base[0].operation, vector.rotation.operation,
+            vector.base[1].operation, vector.old.operation,
+        ]);
+        // A mediator reimport is deduplicated; recovery must use the preserved queue.
+        expect(await g.importBatch([vector.base[0], vector.base[1], vector.rotation, vector.old]))
+            .toMatchObject({ queued: 0, processed: 4 });
+        expect(await g.processEvents()).toMatchObject({ pending: 0 });
+        const candidates = await db.getCandidates();
+        expect(candidates[vector.controller]).toHaveLength(2);
+        expect(candidates[vector.asset]).toHaveLength(2);
+        await db.stop();
+    });
+
     it('identifies only batches still pending and clears them when dependencies arrive', async () => {
         const db = new DbJsonMemory('pending-batches');
         await db.start();

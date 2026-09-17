@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import CipherNode from '@didcid/cipher/node';
 import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
@@ -1206,16 +1207,16 @@ describe('processEvents', () => {
         expect(response.busy).toBe(true);
     });
 
-    it('should gracefully handle expections', async () => {
+    it('propagates processing errors and releases the busy flag', async () => {
         const gk = new Gatekeeper({ db, ipfs, console: mockConsole });
-        // @ts-expect-error Testing private state
-        gk.eventsQueue = null;
-        const response = await gk.processEvents();
-
-        expect(response.added).toBe(0);
-        expect(response.merged).toBe(0);
-        expect(response.rejected).toBe(0);
-        expect(response.pending).toBe(0);
+        const failure = new Error('Processing unavailable');
+        const drain = jest.spyOn(gk, 'importEvents').mockRejectedValueOnce(failure);
+        try {
+            await expect(gk.processEvents()).rejects.toBe(failure);
+            expect(await gk.processEvents()).toEqual({ added: 0, merged: 0, rejected: 0, pending: 0 });
+        } finally {
+            drain.mockRestore();
+        }
     });
 });
 
