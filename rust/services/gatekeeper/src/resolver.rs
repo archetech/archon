@@ -267,10 +267,6 @@ pub(crate) async fn resolve_local_doc_async(
         if !valid {
             return Err(invalid_operation("Invalid operation: proof"));
         }
-        let reference = operation.get("previd").and_then(Value::as_str).unwrap_or_default();
-        if reference.is_empty() || state.store.lock().await.canonical_reference(reference) != resolved.version_id {
-            return Err(invalid_operation("Invalid operation: previd"));
-        }
 
         let registry_for_timestamp = resolved
             .did_document_registration

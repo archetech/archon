@@ -494,6 +494,17 @@ export default class Gatekeeper implements GatekeeperInterface {
             (controller === undefined || controller === id) && !doc.didDocumentMetadata?.deactivated;
     }
 
+    // Validate the selected predecessor, independently of the signing authority.
+    // Assets chain from their own document, even though an agent signs them.
+    private async validatePredecessor(operation: Operation, previous: DidCidDocument): Promise<void> {
+        const reference = operation.previd;
+        const versionId = previous.didDocumentMetadata?.versionId;
+        if (!versionId || typeof reference !== 'string' || !reference ||
+            (reference !== versionId && await this.canonicalReference(reference) !== versionId)) {
+            throw new InvalidOperationError('previd');
+        }
+    }
+
     private async authorizeOperation(operation: Operation, previous?: DidCidDocument, event?: GatekeeperEvent): Promise<boolean> {
         if (operation.type === 'create') {
             return this.authorizeCreateOperation(operation, event);
@@ -501,6 +512,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         if (operation.type === 'update' || operation.type === 'delete') {
             const current = previous ?? await this.resolveDIDAt(operation.did);
+            await this.validatePredecessor(operation, current);
             const type = await this.creationType(operation.did);
             if (!this.verifyProofFormat(operation.proof)) throw new InvalidOperationError('proof');
             if (!type || current.didDocumentMetadata?.deactivated) return this.verifyUpdateOperation(operation, current);
@@ -1193,11 +1205,6 @@ export default class Gatekeeper implements GatekeeperInterface {
 
                 if (!valid) {
                     throw new InvalidOperationError('proof');
-                }
-
-                if (!operation.previd || (operation.previd !== doc.didDocumentMetadata?.versionId &&
-                    await this.canonicalReference(operation.previd) !== doc.didDocumentMetadata?.versionId)) {
-                    throw new InvalidOperationError('previd');
                 }
             }
 

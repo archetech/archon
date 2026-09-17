@@ -314,7 +314,8 @@ it.each(['resolve', 'verify'] as const)('holds the history lock throughout an as
     const g = new Gatekeeper({ db, ipfs: new MemoryClient() });
     for (const event of [...vector.base, vector.old]) await g.importEvent(event);
     db.pause = true;
-    const operation = { ...vector.old.operation, proof: { ...vector.old.operation.proof!, created: vector.old.time } };
+    // Verify the next transition from the current head, not an already applied update.
+    const operation = { ...vector.oldNext.operation, proof: { ...vector.oldNext.operation.proof!, created: vector.oldNext.time } };
     const read = mode === 'resolve' ? g.resolveDID(vector.asset, { verify: true }) : g.verifyOperation(operation);
     await reading;
     let imported = false;

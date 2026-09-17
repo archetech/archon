@@ -966,16 +966,21 @@ describe('processEvents', () => {
         const agentDID = await gatekeeper.createDID(agentOp);
         const agentDoc = await gatekeeper.resolveDID(agentDID);
         const updateOp1 = await helper.createUpdateOp(keypair, agentDID, agentDoc, { mockPrevid });
-        await gatekeeper.updateDID(updateOp1);
+        await expect(gatekeeper.updateDID(updateOp1)).rejects.toThrow('previd');
 
         const assetOp = await helper.createAssetOp(agentDID, keypair);
         const assetDID = await gatekeeper.createDID(assetOp);
         const assetDoc = await gatekeeper.resolveDID(assetDID);
         const updateOp2 = await helper.createUpdateOp(keypair, assetDID, assetDoc, { mockPrevid });
-        await gatekeeper.updateDID(updateOp2);
+        await expect(gatekeeper.updateDID(updateOp2)).rejects.toThrow('previd');
 
         const dids = await gatekeeper.exportDIDs();
         const ops = dids.flat();
+        // Remote evidence can reference unavailable history even though direct
+        // submission must reject it before writing an accepted projection.
+        for (const operation of [updateOp1, updateOp2]) {
+            ops.push({ registry: 'local', time: operation.proof!.created, ordinal: [0], operation });
+        }
         await gatekeeper.resetDb();
         await gatekeeper.importBatch(ops);
 
