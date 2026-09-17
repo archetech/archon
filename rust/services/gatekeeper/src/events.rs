@@ -603,15 +603,20 @@ pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) 
     };
     let key = crate::history::candidate_key(&event);
     let status = import_event_once(state, event).await;
-    // Recovery and evidence changes already replay dependents. An unchanged
-    // merge cannot change authorization, so peer-sync duplicates need no replay.
-    if !changed && matches!(status, ImportStatus::Merged) && *state.history_ready.lock().await {
+    // Recovery and evidence changes already replay affected histories. Repeated
+    // merged or deferred evidence needs no further reconstruction.
+    if !changed && matches!(status, ImportStatus::Merged | ImportStatus::Deferred) && *state.history_ready.lock().await {
         return status;
     }
     if matches!(status, ImportStatus::Added) {
         state.verified_dids.lock().await.remove(&did);
     }
-    if let Err(error) = crate::history::reconcile_history(state, &did, true).await {
+    let reconciled = if matches!(status, ImportStatus::Merged) && *state.history_ready.lock().await {
+        crate::history::reconcile_merged_history(state, &did).await
+    } else {
+        crate::history::reconcile_history(state, &did, true).await
+    };
+    if let Err(error) = reconciled {
         warn!("Failed to reconcile authorization history: {}", error);
         *state.history_ready.lock().await = false;
         return ImportStatus::Deferred;

@@ -178,6 +178,22 @@ pub(crate) async fn ensure_history_ready(state: &AppState) -> Result<()> {
     Ok(())
 }
 
+// The insertion merged without changing accepted state. New evidence still
+// needs self-replay, but unchanged authority cannot affect its dependents.
+pub(crate) async fn reconcile_merged_history(state: &AppState, did: &str) -> Result<()> {
+    let result = async {
+        if rebuild_histories(state, vec![did.to_string()], None).await? {
+            reconcile_history(state, did, false).await?;
+        }
+        Ok(())
+    }
+    .await;
+    if result.is_err() {
+        *state.history_ready.lock().await = false;
+    }
+    result
+}
+
 pub(crate) async fn reconcile_history(
     state: &AppState,
     did: &str,
@@ -210,16 +226,18 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
     if affected.is_empty() {
         return Ok(());
     }
-    rebuild_histories(state, affected.into_iter().collect(), None).await
+    rebuild_histories(state, affected.into_iter().collect(), None)
+        .await
+        .map(|_| ())
 }
 
 async fn rebuild_histories(
     state: &AppState,
     mut targets: Vec<String>,
     histories: Option<&HashMap<String, Vec<EventRecord>>>,
-) -> Result<()> {
+) -> Result<bool> {
     if targets.is_empty() {
-        return Ok(());
+        return Ok(false);
     }
     targets.sort();
     let candidates: HashMap<_, _> = {
@@ -306,6 +324,10 @@ async fn rebuild_histories(
         })
     });
     for target in &targets {
+        #[cfg(test)]
+        let _ = tests::REPLAYED_HISTORIES.try_with(|replayed| {
+            replayed.borrow_mut().push(target.clone());
+        });
         let mut events = candidates.get(target).cloned().unwrap_or_default();
         events.sort_by(|a, b| {
             let a_hint = crate::is_unanchored_registry(&a.registry);
@@ -350,12 +372,13 @@ async fn rebuild_histories(
             }
         }
     }
+    let has_changes = !changed.is_empty();
     for target in changed {
         state.verified_dids.lock().await.remove(&target);
         update_search_doc(state, &target).await;
     }
     *state.status_snapshot.lock().await = None;
-    Ok(())
+    Ok(has_changes)
 }
 
 #[cfg(test)]
@@ -363,6 +386,152 @@ mod tests {
     use super::*;
     use crate::{resolve_local_doc_async, ResolveOptions};
     use serde_json::Value;
+
+    tokio::task_local! {
+        // Scoped to one import so concurrent tests cannot contaminate the trace.
+        pub(super) static REPLAYED_HISTORIES: std::cell::RefCell<Vec<String>>;
+    }
+
+    async fn import_with_replay_trace(
+        state: &AppState,
+        event: EventRecord,
+    ) -> (crate::events::ImportStatus, Vec<String>) {
+        REPLAYED_HISTORIES
+            .scope(std::cell::RefCell::new(Vec::new()), async {
+                let status = crate::events::import_event_impl(state, event).await;
+                let replayed = REPLAYED_HISTORIES.with(|items| items.borrow().clone());
+                (status, replayed)
+            })
+            .await
+    }
+
+    #[tokio::test]
+    async fn new_gossip_hint_skips_dependents_until_controller_changes() {
+        let vectors: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/history-recovery-vectors.json"
+        ))
+        .unwrap();
+        let vector = &vectors[0];
+        let controller = vector["controller"].as_str().unwrap();
+        let asset = vector["asset"].as_str().unwrap();
+        let (state, _dir) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        for value in vector["base"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .chain(std::iter::once(&vector["old"]))
+        {
+            assert!(matches!(
+                crate::events::import_event_impl(
+                    &state,
+                    serde_json::from_value(value.clone()).unwrap(),
+                )
+                .await,
+                crate::events::ImportStatus::Added
+            ));
+        }
+        ensure_history_ready(&state).await.unwrap();
+        let before = state.store.lock().await.get_events(controller);
+        let asset_before = state.store.lock().await.get_events(asset);
+        assert_eq!(asset_before.len(), 2);
+        assert_eq!(
+            state.store.lock().await.get_candidates().unwrap()[controller].len(),
+            1
+        );
+
+        let mut hint: EventRecord =
+            serde_json::from_value(vector["base"][0].clone()).unwrap();
+        hint.registry = "hyperswarm".to_string();
+        hint.registration = None;
+        let (status, replayed) = import_with_replay_trace(&state, hint).await;
+        assert!(matches!(status, crate::events::ImportStatus::Merged));
+        // New evidence must replay the controller, but not its unchanged dependents.
+        assert_eq!(replayed, vec![controller.to_string()]);
+        assert!(state.store.lock().await.get_events(controller) == before);
+        assert!(state.store.lock().await.get_events(asset) == asset_before);
+        assert_eq!(
+            state.store.lock().await.get_candidates().unwrap()[controller].len(),
+            2
+        );
+
+        let (status, replayed) = import_with_replay_trace(
+            &state,
+            serde_json::from_value(vector["rotation"].clone()).unwrap(),
+        )
+        .await;
+        assert!(matches!(status, crate::events::ImportStatus::Added));
+        assert!(replayed.contains(&controller.to_string()));
+        assert!(replayed.contains(&asset.to_string()));
+        let doc = resolve_local_doc_async(
+            &state,
+            asset,
+            ResolveOptions {
+                verify: true,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(doc["didDocumentData"], json!("original"));
+        assert_eq!(state.store.lock().await.get_events(asset).len(), 1);
+    }
+
+    #[tokio::test]
+    async fn unchanged_deferred_event_skips_replay_and_recovers_with_its_predecessor() {
+        let vectors: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/history-recovery-vectors.json"
+        ))
+        .unwrap();
+        let vector = &vectors[0];
+        let (state, _dir) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        for value in vector["base"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .chain(std::iter::once(&vector["rotation"]))
+        {
+            crate::events::import_event_impl(
+                &state,
+                serde_json::from_value(value.clone()).unwrap(),
+            )
+            .await;
+        }
+        ensure_history_ready(&state).await.unwrap();
+        let deferred: EventRecord = serde_json::from_value(vector["freshNext"].clone()).unwrap();
+        assert!(matches!(
+            crate::events::import_event_impl(&state, deferred.clone()).await,
+            crate::events::ImportStatus::Deferred
+        ));
+        crate::refresh_metrics_snapshot(&state).await.unwrap();
+        assert!(state.status_snapshot.lock().await.is_some());
+        assert!(matches!(
+            crate::events::import_event_impl(&state, deferred).await,
+            crate::events::ImportStatus::Deferred
+        ));
+        // Replay invalidates this cache; an unchanged retry must preserve it.
+        assert!(state.status_snapshot.lock().await.is_some());
+        crate::events::import_event_impl(
+            &state,
+            serde_json::from_value(vector["fresh"].clone()).unwrap(),
+        )
+        .await;
+        let doc = resolve_local_doc_async(
+            &state,
+            vector["asset"].as_str().unwrap(),
+            ResolveOptions::default(),
+        )
+        .await
+        .unwrap();
+        assert_eq!(doc["didDocumentData"], json!("new-key-successor"));
+    }
 
     #[tokio::test]
     async fn pending_batches_track_only_deferred_chain_events() {

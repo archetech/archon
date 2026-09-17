@@ -321,7 +321,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     async checkDIDs(options?: CheckDIDsOptions): Promise<CheckDIDsResult> {
         await this.ensureHistoryReady();
-        return this.withHistoryLock(() => this.checkDIDsOnce(options));
+        return this.checkDIDsOnce(options);
     }
 
     private async checkDIDsOnce(options?: CheckDIDsOptions): Promise<CheckDIDsResult> {
@@ -329,7 +329,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         let dids = options?.dids;
 
         if (!dids) {
-            dids = await this.getDIDsOnce() as string[];
+            dids = await this.withHistoryLock(() => this.getDIDsOnce()) as string[];
         }
 
         const total = dids.length;
@@ -343,57 +343,70 @@ export default class Gatekeeper implements GatekeeperInterface {
         const byRegistry: Record<string, number> = {}
         const byVersion: Record<number, number> = {}
 
-        for (const did of dids) {
-            n += 1;
-            try {
-                const doc = await this.resolveDIDAt(did);
+        // Each chunk sees fully published histories. Release the lock between
+        // chunks so collecting aggregate metrics cannot block interactive reads
+        // for an entire database scan. Counts may span complete publications.
+        for (let offset = 0; offset < dids.length; offset += 32) {
+            const chunk = dids.slice(offset, offset + 32);
+            const docs = await this.withHistoryLock(() => Promise.all(chunk.map(async did => {
+                try { return await this.resolveDIDAt(did); }
+                catch { return undefined; }
+            })));
+            for (let index = 0; index < chunk.length; index++) {
+                const did = chunk[index];
+                n += 1;
+                try {
+                    const doc = docs[index];
+                    if (!doc) continue;
 
-                if (doc.didResolutionMetadata?.error) {
-                    invalid += 1;
+                    if (doc.didResolutionMetadata?.error) {
+                        invalid += 1;
+                        if (chatty) {
+                            console.log(`can't resolve ${n}/${total} ${did} ${doc.didResolutionMetadata.error}`);
+                        }
+                        continue;
+                    }
+
                     if (chatty) {
-                        console.log(`can't resolve ${n}/${total} ${did} ${doc.didResolutionMetadata.error}`);
+                        console.log(`resolved ${n}/${total} ${did} OK`);
                     }
-                    continue;
-                }
 
-                if (chatty) {
-                    console.log(`resolved ${n}/${total} ${did} OK`);
-                }
+                    if (doc.didDocumentRegistration?.type === 'agent') {
+                        agents += 1;
+                    }
 
-                if (doc.didDocumentRegistration?.type === 'agent') {
-                    agents += 1;
-                }
+                    if (doc.didDocumentRegistration?.type === 'asset') {
+                        assets += 1;
+                    }
 
-                if (doc.didDocumentRegistration?.type === 'asset') {
-                    assets += 1;
-                }
+                    if (doc.didDocumentMetadata?.confirmed) {
+                        confirmed += 1;
+                    }
+                    else {
+                        unconfirmed += 1;
+                    }
 
-                if (doc.didDocumentMetadata?.confirmed) {
-                    confirmed += 1;
-                }
-                else {
-                    unconfirmed += 1;
-                }
+                    if (doc.didDocumentRegistration?.validUntil) {
+                        ephemeral += 1;
+                    }
 
-                if (doc.didDocumentRegistration?.validUntil) {
-                    ephemeral += 1;
-                }
+                    const registry = doc.didDocumentRegistration?.registry;
+                    if (registry) {
+                        byRegistry[registry] = (byRegistry[registry] || 0) + 1;
+                    }
 
-                const registry = doc.didDocumentRegistration?.registry;
-                if (registry) {
-                    byRegistry[registry] = (byRegistry[registry] || 0) + 1;
-                }
-
-                const version = doc.didDocumentMetadata?.versionSequence;
-                if (version != null) {
-                    const versionNum = parseInt(version, 10);
-                    if (!isNaN(versionNum)) {
-                        byVersion[versionNum] = (byVersion[versionNum] || 0) + 1;
+                    const version = doc.didDocumentMetadata?.versionSequence;
+                    if (version != null) {
+                        const versionNum = parseInt(version, 10);
+                        if (!isNaN(versionNum)) {
+                            byVersion[versionNum] = (byVersion[versionNum] || 0) + 1;
+                        }
                     }
                 }
+                catch (error) {
+                }
             }
-            catch (error) {
-            }
+            if (offset + 32 < dids.length) await new Promise(resolve => setTimeout(resolve, 0));
         }
 
         const byType = { agents, assets, confirmed, unconfirmed, ephemeral, invalid };
@@ -1420,7 +1433,9 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     private async normalizeOperationId(event: GatekeeperEvent): Promise<void> {
         const cid = await this.generateCID(event.operation);
-        if (event.opid !== cid) await this.generateCID(event.operation, true);
+        if (event.opid !== cid && !this.candidateHistory?.[event.did ?? '']?.some(known => known.opid === cid)) {
+            await this.generateCID(event.operation, true);
+        }
         event.opid = cid;
     }
 
@@ -1474,6 +1489,11 @@ export default class Gatekeeper implements GatekeeperInterface {
             this.candidateHistory = candidates;
         }
         const candidates = this.candidateHistory;
+        if (incoming.length && incoming.every(event => candidates[did]?.some(known =>
+            this.candidateKey(known) === this.candidateKey(event)
+            && (isUnanchoredRegistry(event.registry) || this.cipher.canonicalizeJSON(known) === this.cipher.canonicalizeJSON(event))))) {
+            return { candidates, changed: false };
+        }
         const events = [...(candidates[did] ?? []), ...copyJSON(histories?.get(did) ?? await this.db.getEvents(did)), ...incoming];
         for (const event of events) await this.normalizeOperationId(event);
         const unique = new Map<string, GatekeeperEvent>();
@@ -1484,24 +1504,31 @@ export default class Gatekeeper implements GatekeeperInterface {
             if (!unique.has(key) || !isUnanchoredRegistry(event.registry)) unique.set(key, event);
         }
         const retained = [...unique.values()];
-        const changed = JSON.stringify(candidates[did]) !== JSON.stringify(retained);
+        const changed = this.cipher.canonicalizeJSON(candidates[did] ?? []) !== this.cipher.canonicalizeJSON(retained);
         if (changed) await this.db.setCandidates(did, retained);
         candidates[did] = retained;
         this.indexCandidates(did, retained);
         return { candidates, changed };
     }
 
-    private async reconcileHistory(did: string, rebuildSelf = false): Promise<void> {
+    private async reconcileHistory(did: string, rebuildSelf = false, projectionUnchanged = false): Promise<void> {
         try {
-            await this.reconcileHistoryOnce(did, rebuildSelf);
+            await this.reconcileHistoryOnce(did, rebuildSelf, projectionUnchanged);
         } catch (error) {
             this.historyReady = undefined;
             throw error;
         }
     }
 
-    private async reconcileHistoryOnce(did: string, rebuildSelf: boolean): Promise<void> {
+    private async reconcileHistoryOnce(did: string, rebuildSelf: boolean, projectionUnchanged: boolean): Promise<void> {
         const { candidates } = await this.retainCandidates(did);
+        // A new hint for an already accepted operation may add evidence without
+        // changing the controller projection. Rebuild it first; dependents only
+        // need replay if the history they authorize against actually changes.
+        if (rebuildSelf && projectionUnchanged) {
+            if (!await this.rebuildHistories([did], candidates)) return;
+            rebuildSelf = false;
+        }
         const affected = new Set([did]);
         // Dependencies include all candidate controller assignments, including
         // branches that are not currently accepted. Rejected candidates can
@@ -1514,14 +1541,14 @@ export default class Gatekeeper implements GatekeeperInterface {
         await this.rebuildHistories([...affected], candidates);
     }
 
-    private async rebuildHistories(targets: string[], candidates: Record<string, GatekeeperEvent[]>, histories?: Map<string, GatekeeperEvent[]>): Promise<void> {
-        if (!targets.length) return;
+    private async rebuildHistories(targets: string[], candidates: Record<string, GatekeeperEvent[]>, histories?: Map<string, GatekeeperEvent[]>): Promise<boolean> {
+        if (!targets.length) return false;
         const staged = new Map<string, GatekeeperEvent[]>();
         const original = new Map<string, string>();
         for (const target of targets) {
             const events = histories?.get(target) ?? await this.db.getEvents(target);
             staged.set(target, []);
-            original.set(target, JSON.stringify(events));
+            original.set(target, this.cipher.canonicalizeJSON(events));
         }
         // Reuse the ordinary event authorization/import algorithm against an
         // isolated view. Readers never observe a DID half way through replay.
@@ -1563,21 +1590,24 @@ export default class Gatekeeper implements GatekeeperInterface {
             // A candidate can precede its predecessor in the sorted input
             // (notably during migration), so replay to a stable sequence.
             for (;;) {
-                const previous = JSON.stringify(staged.get(target));
+                const previous = this.cipher.canonicalizeJSON(staged.get(target));
                 for (const event of events) {
                     await replay.importEventOnce(event);
                 }
-                if (JSON.stringify(staged.get(target)) === previous) break;
+                if (this.cipher.canonicalizeJSON(staged.get(target)) === previous) break;
             }
         }
+        let changed = false;
         for (const target of targets) {
-            if (JSON.stringify(staged.get(target)) !== original.get(target)) {
+            if (this.cipher.canonicalizeJSON(staged.get(target)) !== original.get(target)) {
+                changed = true;
                 if (staged.get(target)!.length) await this.db.setEvents(target, staged.get(target)!);
                 else await this.db.deleteEvents(target);
                 delete this.verifiedDIDs[target];
                 await this.updateSearchIndex(target);
             }
         }
+        return changed;
     }
 
     async importEvent(event: GatekeeperEvent): Promise<ImportStatus> {
@@ -1589,12 +1619,12 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.withHistoryLock(async () => {
             const { changed } = await this.retainCandidates(event.did!, [event]);
             const status = await this.importEventOnce(event);
-            // Recovery and every evidence change already replay dependents.
-            // A merge that changes neither evidence nor accepted state cannot
-            // alter authorization, so duplicate sync needs no reconstruction.
-            if (this.historyReady && !changed && status === ImportStatus.MERGED) return status;
+            // Recovery and evidence changes already replay affected histories.
+            // Repeated merged or deferred evidence needs no further
+            // reconstruction if this insertion did not change accepted state.
+            if (this.historyReady && !changed && (status === ImportStatus.MERGED || status === ImportStatus.DEFERRED)) return status;
             if (status === ImportStatus.ADDED) delete this.verifiedDIDs[event.did!];
-            await this.reconcileHistory(event.did!, true);
+            await this.reconcileHistory(event.did!, true, status === ImportStatus.MERGED);
             const accepted = (await this.db.getEvents(event.did!))
                 .some(current => this.candidateKey(current) === this.candidateKey(event));
             if (accepted && (status === ImportStatus.REJECTED || status === ImportStatus.DEFERRED)) return ImportStatus.ADDED;
@@ -1748,6 +1778,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             while (event) {
                 i += 1;
 
+                event.did ??= event.operation.did ?? await this.generateDID(event.operation);
                 const status = await this.importEvent(event);
 
                 if (status === ImportStatus.ADDED) {
