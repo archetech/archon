@@ -29,6 +29,7 @@ import {
     VerifyDbResult,
 } from './types.js';
 import SearchIndex from './search-index.js';
+import ProgressLogger from './progress.js';
 
 // A well-formed secp256k1 public key, matching the Rust port's
 // public_jwk_to_sec1_bytes: `kty` EC, `crv` secp256k1, and `x`/`y` each 32
@@ -199,6 +200,8 @@ export default class Gatekeeper implements GatekeeperInterface {
     async initSearchIndex(): Promise<void> {
         await this.ensureHistoryReady();
         const dids = await this.getDIDs() as string[];
+        const progress = new ProgressLogger('search indexing', dids.length);
+        let completed = 0;
         // Like status scans, bound concurrent reads without paying one network
         // round trip per DID. Each chunk observes completed history publication.
         for (let offset = 0; offset < dids.length; offset += 32) {
@@ -209,6 +212,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 } catch {
                     // Skip DIDs that can't be resolved
                 }
+                progress.update(++completed);
             })));
             if (offset + 32 < dids.length) await new Promise(resolve => setTimeout(resolve, 0));
         }
@@ -340,6 +344,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         const total = dids.length;
+        const progress = new ProgressLogger('DB status check', total);
         let n = 0;
         let agents = 0;
         let assets = 0;
@@ -413,6 +418,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 catch (error) {
                 }
             }
+            progress.update(n);
             if (offset + 32 < dids.length) await new Promise(resolve => setTimeout(resolve, 0));
         }
 
@@ -1440,6 +1446,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     private historyReady?: Promise<void>;
     private ensureHistoryReady(): Promise<void> {
         this.historyReady ??= this.withHistoryLock(async () => {
+            console.log('Gatekeeper history recovery: loading candidate journal and DID list');
             // A journal write precedes projection writes. Rebuild on startup so
             // an interrupted publication cannot leave dependent state stale.
             const dids = new Set(Object.keys(await this.db.getCandidates()));
@@ -1448,14 +1455,20 @@ export default class Gatekeeper implements GatekeeperInterface {
             // Retain every projection before replaying any history. Rebuild
             // each DID once, rather than once per controller plus once itself.
             const histories = new Map<string, GatekeeperEvent[]>();
+            const loading = new ProgressLogger('history loading', targets.length);
             // Bound outstanding reads while allowing network backends to serve
             // a batch without a round trip for every DID in sequence.
             for (let offset = 0; offset < targets.length; offset += 64) {
                 await Promise.all(targets.slice(offset, offset + 64).map(async did => {
                     histories.set(did, await this.db.getEvents(did));
                 }));
+                loading.update(histories.size);
             }
-            for (const did of targets) await this.retainCandidates(did, [], histories);
+            const preparing = new ProgressLogger('candidate preparation', targets.length);
+            for (const [index, did] of targets.entries()) {
+                await this.retainCandidates(did, [], histories);
+                preparing.update(index + 1);
+            }
             await this.rebuildHistories(targets, this.candidateHistory ?? {}, histories);
         }).catch(error => { this.historyReady = undefined; throw error; });
         return this.historyReady;
@@ -1578,12 +1591,15 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     private async rebuildHistories(targets: string[], candidates: Record<string, GatekeeperEvent[]>, histories?: Map<string, GatekeeperEvent[]>): Promise<boolean> {
         if (!targets.length) return false;
+        // Snapshot-backed replay is startup recovery; runtime imports stay quiet.
+        const snapshot = histories ? new ProgressLogger('replay snapshot', targets.length) : undefined;
         const staged = new Map<string, GatekeeperEvent[]>();
         const original = new Map<string, string>();
-        for (const target of targets) {
+        for (const [index, target] of targets.entries()) {
             const events = histories?.get(target) ?? await this.db.getEvents(target);
             staged.set(target, []);
             original.set(target, this.cipher.canonicalizeJSON(events));
+            snapshot?.update(index + 1);
         }
         // Reuse the ordinary event authorization/import algorithm against an
         // isolated view. Readers never observe a DID half way through replay.
@@ -1609,6 +1625,8 @@ export default class Gatekeeper implements GatekeeperInterface {
             operation.type === 'create' && operation.registration?.type === 'agent');
         targets.sort();
         targets.sort((a, b) => Number(isAgent(b)) - Number(isAgent(a)));
+        const replayProgress = histories ? new ProgressLogger('history replay', targets.length) : undefined;
+        let completed = 0;
         const rebuild = async (target: string) => {
             const events = copyJSON(candidates[target] ?? []).sort((a, b) => {
                 // Registry-local order first; do not compare ordinal values
@@ -1636,6 +1654,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 }
                 if (this.cipher.canonicalizeJSON(staged.get(target)) === previous) break;
             }
+            replayProgress?.update(++completed);
         };
         // Self-controlled agents are independent. Assets only depend on agents,
         // so finish the entire agent phase before overlapping asset work. Native
@@ -1668,7 +1687,8 @@ export default class Gatekeeper implements GatekeeperInterface {
             await flush();
         }
         let changed = false;
-        for (const target of targets) {
+        const publishing = histories ? new ProgressLogger('history publication', targets.length) : undefined;
+        for (const [index, target] of targets.entries()) {
             if (this.cipher.canonicalizeJSON(staged.get(target)) !== original.get(target)) {
                 changed = true;
                 if (staged.get(target)!.length) await this.db.setEvents(target, staged.get(target)!);
@@ -1676,6 +1696,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 delete this.verifiedDIDs[target];
                 await this.updateSearchIndex(target);
             }
+            publishing?.update(index + 1);
         }
         return changed;
     }

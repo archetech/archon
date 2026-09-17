@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use tokio::sync::Mutex;
 
 use crate::events::import_event_once;
+use crate::progress::ProgressLogger;
 use crate::store::{compare_ordinals, DbBackend, JsonDbFile};
 use crate::{
     generate_json_cid, update_search_doc, AppState, EventRecord, GatekeeperDb, JsonDb, SearchIndex,
@@ -159,6 +160,7 @@ pub(crate) async fn ensure_history_ready(state: &AppState) -> Result<()> {
     if *state.history_ready.lock().await {
         return Ok(());
     }
+    tracing::info!("Gatekeeper history recovery: loading candidate journal and DID list");
     let mut dids: Vec<_> = {
         let store = state.store.lock().await;
         let mut dids: HashSet<_> = store.get_candidates()?.into_keys().collect();
@@ -169,9 +171,13 @@ pub(crate) async fn ensure_history_ready(state: &AppState) -> Result<()> {
     // Journal all existing projections before rebuilding any of them. A single
     // startup projection avoids replaying each controller's dependents again
     // when the outer DID scan reaches them.
+    let mut loading = ProgressLogger::new("history loading", dids.len());
     let histories = state.store.lock().await.get_histories(&dids)?;
-    for did in &dids {
+    loading.update(dids.len());
+    let mut preparing = ProgressLogger::new("candidate preparation", dids.len());
+    for (index, did) in dids.iter().enumerate() {
         retain_candidates_with_histories(state, did, None, Some(&histories)).await?;
+        preparing.update(index + 1);
     }
     rebuild_histories(state, dids, Some(&histories)).await?;
     *state.history_ready.lock().await = true;
@@ -239,6 +245,8 @@ async fn rebuild_histories(
     if targets.is_empty() {
         return Ok(false);
     }
+    // Snapshot-backed replay is startup recovery; runtime imports stay quiet.
+    let mut snapshot = histories.map(|_| ProgressLogger::new("replay snapshot", targets.len()));
     targets.sort();
     let candidates: HashMap<_, _> = {
         let cache = state.candidate_history.lock().await;
@@ -291,6 +299,9 @@ async fn rebuild_histories(
             }
             if candidates.contains_key(&key) {
                 original.insert(key.clone(), serde_json::to_string(&events)?);
+                if let Some(progress) = &mut snapshot {
+                    progress.update(original.len());
+                }
             }
             data.dids
                 .insert(key.rsplit(':').next().unwrap_or(&key).to_string(), events);
@@ -323,7 +334,8 @@ async fn rebuild_histories(
                     == Some("agent")
         })
     });
-    for target in &targets {
+    let mut replay_progress = histories.map(|_| ProgressLogger::new("history replay", targets.len()));
+    for (index, target) in targets.iter().enumerate() {
         #[cfg(test)]
         let _ = tests::REPLAYED_HISTORIES.try_with(|replayed| {
             replayed.borrow_mut().push(target.clone());
@@ -355,12 +367,16 @@ async fn rebuild_histories(
                 break;
             }
         }
+        if let Some(progress) = &mut replay_progress {
+            progress.update(index + 1);
+        }
     }
+    let mut publishing = histories.map(|_| ProgressLogger::new("history publication", targets.len()));
     let mut changed = Vec::new();
     {
         let replay_store = replay.store.lock().await;
         let mut store = state.store.lock().await;
-        for target in &targets {
+        for (index, target) in targets.iter().enumerate() {
             let events = replay_store.get_events(target);
             if original.get(target) != Some(&serde_json::to_string(&events)?) {
                 if events.is_empty() {
@@ -370,12 +386,19 @@ async fn rebuild_histories(
                 }
                 changed.push(target.clone());
             }
+            if let Some(progress) = &mut publishing {
+                progress.update(index + 1);
+            }
         }
     }
     let has_changes = !changed.is_empty();
-    for target in changed {
+    let mut refreshing = histories.map(|_| ProgressLogger::new("search cache refresh", changed.len()));
+    for (index, target) in changed.into_iter().enumerate() {
         state.verified_dids.lock().await.remove(&target);
         update_search_doc(state, &target).await;
+        if let Some(progress) = &mut refreshing {
+            progress.update(index + 1);
+        }
     }
     *state.status_snapshot.lock().await = None;
     Ok(has_changes)
