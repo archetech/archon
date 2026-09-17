@@ -121,3 +121,5 @@ These rules apply to coding agents working in this repository.
 - Before tightening protocol acceptance, add signed cross-port fixtures for the current behavior across submission, import, and restart. Keep proposed stricter rules explicitly separate from active rules, and select future policy from immutable genesis version rather than mutable registration metadata.
 
 - Local TypeScript operation validation must treat optional `undefined` members as JSON omission, while still rejecting malformed JSON values such as `null`. Exercise both direct SDK calls and serialized imports when tightening field validation.
+
+- Signed negative protocol fixtures should isolate the invariant under test: keep required fields complete and avoid unrelated invalid controller/document changes. For immutable-kind cases, changing only the registration kind should make the fixture valid if that equality check is removed.

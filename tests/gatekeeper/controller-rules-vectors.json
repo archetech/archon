@@ -662,43 +662,16 @@
       "setup": [],
       "event": {
         "did": "did:cid:bagaaieranzoxmakdkhq7btju5egtby6wfs5dsuradkblkhqukrm5ntij2ivq",
-        "opid": "bagaaieranbkkkxxffdgvionqwqlwdnq3r4jjgg6gz63awmifpbnrq5bs5g5a",
+        "opid": "bagaaieradwjze3p6tvij4kenw2tuxlpcqvrrxj2mzss264k3vgk56ujr7ijq",
         "operation": {
           "type": "update",
           "did": "did:cid:bagaaieranzoxmakdkhq7btju5egtby6wfs5dsuradkblkhqukrm5ntij2ivq",
           "previd": "bagaaieranzoxmakdkhq7btju5egtby6wfs5dsuradkblkhqukrm5ntij2ivq",
           "doc": {
             "didDocumentRegistration": {
-              "type": "asset"
-            },
-            "didDocument": {
-              "@context": [
-                "https://www.w3.org/ns/did/v1"
-              ],
-              "id": "did:cid:bagaaieranzoxmakdkhq7btju5egtby6wfs5dsuradkblkhqukrm5ntij2ivq",
-              "verificationMethod": [
-                {
-                  "id": "#key-1",
-                  "controller": "did:cid:bagaaieranzoxmakdkhq7btju5egtby6wfs5dsuradkblkhqukrm5ntij2ivq",
-                  "type": "EcdsaSecp256k1VerificationKey2019",
-                  "publicKeyJwk": {
-                    "kty": "EC",
-                    "crv": "secp256k1",
-                    "x": "PHKt20_fCa-U8MlNf-kqOGp-cM-KHYWRY4a7JTXHsbE",
-                    "y": "OzBrD-CFZl2PwbKK4Wds061uCOrtoiX-ONDaTeVXA-A"
-                  }
-                }
-              ],
-              "authentication": [
-                "#key-1"
-              ],
-              "assertionMethod": [
-                "#key-1"
-              ],
-              "capabilityInvocation": [
-                "#key-1"
-              ],
-              "controller": "did:cid:bagaaieraqnfphoyskkjwadwjo5su4nirjx3q5c6jkdgziduxqq76ge6vasca"
+              "version": 1,
+              "type": "asset",
+              "registry": "BTC:signet"
             }
           },
           "proof": {
@@ -706,7 +679,7 @@
             "created": "2026-01-01T00:00:00.000Z",
             "verificationMethod": "did:cid:bagaaieranzoxmakdkhq7btju5egtby6wfs5dsuradkblkhqukrm5ntij2ivq#key-1",
             "proofPurpose": "authentication",
-            "proofValue": "1pm2eHf-gPreg3LAKOiVR2DTycR2k72fKUWyalBeh9oOoTmCV45aOnjyWURbwzKcgeNCOUm1712V15cux7yJ_Q"
+            "proofValue": "-xADqbedv80G_nq4OiVGqs1q1hH_ZYX7c1xDR8WGvjwdTtltX4XxphrRIGFXpmYClz7iyt9ZcSZ5nEnyQrITRg"
           }
         },
         "registry": "BTC:signet",
@@ -729,42 +702,16 @@
       "setup": [],
       "event": {
         "did": "did:cid:bagaaieraaqqxo7oz6imvgn4qdcu2ygujqslvsumsupp4rw4o4clxxklcaonq",
-        "opid": "bagaaiera5pcpukqbpjbmmgkpuinc2mdlb656ucxfu4ex7ol3ts56aor3j3ra",
+        "opid": "bagaaiera6qwmwmumvp6qnxaguc5vrldk2xa7o6qn6myhw4i5wwuvlmlouo6a",
         "operation": {
           "type": "update",
           "did": "did:cid:bagaaieraaqqxo7oz6imvgn4qdcu2ygujqslvsumsupp4rw4o4clxxklcaonq",
           "previd": "bagaaieraaqqxo7oz6imvgn4qdcu2ygujqslvsumsupp4rw4o4clxxklcaonq",
           "doc": {
             "didDocumentRegistration": {
-              "type": "agent"
-            },
-            "didDocument": {
-              "@context": [
-                "https://www.w3.org/ns/did/v1"
-              ],
-              "id": "did:cid:bagaaieraaqqxo7oz6imvgn4qdcu2ygujqslvsumsupp4rw4o4clxxklcaonq",
-              "verificationMethod": [
-                {
-                  "id": "#key-1",
-                  "controller": "did:cid:bagaaieranzoxmakdkhq7btju5egtby6wfs5dsuradkblkhqukrm5ntij2ivq",
-                  "type": "EcdsaSecp256k1VerificationKey2019",
-                  "publicKeyJwk": {
-                    "kty": "EC",
-                    "crv": "secp256k1",
-                    "x": "PHKt20_fCa-U8MlNf-kqOGp-cM-KHYWRY4a7JTXHsbE",
-                    "y": "OzBrD-CFZl2PwbKK4Wds061uCOrtoiX-ONDaTeVXA-A"
-                  }
-                }
-              ],
-              "authentication": [
-                "#key-1"
-              ],
-              "assertionMethod": [
-                "#key-1"
-              ],
-              "capabilityInvocation": [
-                "#key-1"
-              ]
+              "version": 1,
+              "type": "agent",
+              "registry": "BTC:signet"
             }
           },
           "proof": {
@@ -772,7 +719,7 @@
             "created": "2026-01-01T00:00:00.000Z",
             "verificationMethod": "did:cid:bagaaieranzoxmakdkhq7btju5egtby6wfs5dsuradkblkhqukrm5ntij2ivq#key-1",
             "proofPurpose": "authentication",
-            "proofValue": "dzkp5eou7wdVqqTGtRhQX9nZfqU6wMW7nklNBhnCHaouiVydH_bhusnNsbCeotHob11WTEKXHSJNFWjD5DyB_Q"
+            "proofValue": "J6splyG4LCu_f7OcrOrgNLnw2PvSi9J5z-tlw-2xmkpNIEb54W0CiMChcPNeILxP6NiSVI4j08nFaFjQqp77zQ"
           }
         },
         "registry": "BTC:signet",
