@@ -174,7 +174,7 @@
     "commander": "^11.1.0",
     "dotenv": "^16.4.5",
     "file-type": "^21.3.2",
-    "image-size": "^2.0.1",
+    "image-size": "^2.0.3",
     "ioredis": "^5.4.1",
     "light-bolt11-decoder": "^3.2.0",
     "mongodb": "^6.5.0",
