@@ -424,15 +424,3 @@ describe('KuboClient peering configuration', () => {
         expect(rpc.config.set).toHaveBeenCalledWith('Peering.Peers', [], { json: true });
     });
 });
-
-it('passes canonical JSON bytes and the JSON CID to Kubo unchanged', async () => {
-    const { client, rpc } = await connected();
-    const bytes = Buffer.from('{"1":"a","10":"b","2":"c"}');
-    const cid = await client.addJSONBytes(bytes);
-    const [stored, options] = rpc.block.put.mock.calls[0] as [Uint8Array, { cid: { code: number; toString(): string } }];
-    expect(Buffer.from(stored)).toEqual(bytes);
-    expect(options.cid.code).toBe(jsonCodec.code);
-    expect(options.cid.toString()).toBe(cid);
-    const { generateJSONCID } = await import('../../packages/ipfs/src/utils.ts');
-    expect(cid).toBe(await generateJSONCID(bytes));
-});

@@ -53,9 +53,3 @@ export async function generateCID(data: any): Promise<string> {
 
     return cid.toString(); // CID v1 default: base32 encoding
 }
-
-// Hash already-serialized JSON without changing property order or codec.
-export async function generateJSONCID(bytes: Uint8Array): Promise<string> {
-    const hash = await sha256.sha256.digest(bytes);
-    return CID.createV1(jsonCodec.code, hash).toString();
-}

@@ -1,0 +1,87 @@
+{
+  "agent": {
+    "type": "create",
+    "created": "2026-09-17T11:00:00.000Z",
+    "registration": {
+      "version": 1,
+      "type": "agent",
+      "registry": "hyperswarm"
+    },
+    "publicJwk": {
+      "kty": "EC",
+      "crv": "secp256k1",
+      "x": "I9o4OLoCF-Dz7WvC313IGyADEWkrVirgD2M0GHvCYR8",
+      "y": "TnYS-S8LdarWUSViruA6l73z_mI_VbbLjwe3L10-KOQ"
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2026-09-17T12:00:00.000Z",
+      "verificationMethod": "#key-1",
+      "proofPurpose": "capabilityInvocation",
+      "proofValue": "QUMqYTs0nXt4srpeBMbIQwAAe4H5CEYaNzxsfmPXRC5R4JAS77k54oWEnW2dvysVy5WfP8_IMi_gPasW91mbMw"
+    }
+  },
+  "update": {
+    "type": "update",
+    "did": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+    "previd": "bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+    "doc": {
+      "didDocumentData": {
+        "1": "a",
+        "2": "c",
+        "10": "b",
+        "4294967294": "index",
+        "nested": [
+          {
+            "3": "x",
+            "11": null
+          }
+        ],
+        "01": "leading",
+        "4294967295": "not index"
+      }
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2026-09-17T12:00:00.000Z",
+      "verificationMethod": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a#key-1",
+      "proofPurpose": "capabilityInvocation",
+      "proofValue": "YnQHai46eyn65zjGPqs01bYMAU2hbxVk81YvvZDeWDd8jiuZhQTXTxY0JdO3KqRyCL1CxioAJIX577HfpAKzXA"
+    }
+  },
+  "successor": {
+    "type": "update",
+    "did": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+    "previd": "bagaaierav2aepeiknvzc2rxk3v44afozyahtuwqwsj7medjtu6ouv625hfjq",
+    "doc": {
+      "didDocumentData": {
+        "recovered": true
+      }
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2026-09-17T12:00:00.000Z",
+      "verificationMethod": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a#key-1",
+      "proofPurpose": "capabilityInvocation",
+      "proofValue": "I8CnQRzScLv06Cf1NYiN9dB0fyreisfP1eltI3nlmXkruWWHahYc5_kf88j2wAGrq23xnAsvm5YHNc3qoH2qOQ"
+    }
+  },
+  "did": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+  "cids": {
+    "agent": {
+      "rust": "bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+      "typescript": "bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a"
+    },
+    "update": {
+      "rust": "bagaaiera3jpbq2ddx5fwzsgjm5jgkyjrmqeouc4tpbsysp323epwxob4shua",
+      "typescript": "bagaaierav2aepeiknvzc2rxk3v44afozyahtuwqwsj7medjtu6ouv625hfjq"
+    },
+    "successor": {
+      "rust": "bagaaieranuoxxx6sfieisqxvunut52f4hz4okefnd4xtcdig3pd3quq77f3a",
+      "typescript": "bagaaieranuoxxx6sfieisqxvunut52f4hz4okefnd4xtcdig3pd3quq77f3a"
+    }
+  }
+}

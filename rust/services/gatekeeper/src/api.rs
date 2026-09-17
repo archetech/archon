@@ -891,7 +891,6 @@ pub(crate) async fn db_reset(State(state): State<AppState>, headers: HeaderMap) 
     state.events_seen.lock().await.clear();
     *state.candidate_history.lock().await = None;
     state.dependents.lock().await.clear();
-    state.genesis_aliases.lock().await.clear();
     *state.history_ready.lock().await = false;
     state.verified_dids.lock().await.clear();
     state.import_queue.lock().await.clear();
@@ -1098,7 +1097,6 @@ pub(crate) async fn resolve_did(
     if let Err(error) = crate::history::ensure_history_ready(&state).await {
         return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
     }
-    crate::history::recover_genesis_alias(&state, &did).await;
     let _history_guard = state.history_lock.lock().await;
     let start = Instant::now();
     let resolve_options = ResolveOptions {
@@ -1286,7 +1284,6 @@ async fn resolve_conformant(
     crate::history::ensure_history_ready(state)
         .await
         .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
-    crate::history::recover_genesis_alias(state, did).await;
     let _history_guard = state.history_lock.lock().await;
     let options = ResolveOptions {
         version_time: query.get("versionTime").cloned(),

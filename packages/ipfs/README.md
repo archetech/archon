@@ -43,13 +43,3 @@ import KuboClient from '@didcid/ipfs/kubo';
 
 const ipfs = await KuboClient.create({ url: 'http://localhost:5001' });
 ```
-
-### Already-serialized JSON
-
-Use `addJSONBytes(bytes)` when the exact JSON encoding determines identity. Both
-clients validate JSON and store the supplied bytes under the JSON multicodec
-(`0x0200`); `generateJSONCID(bytes)` from `@didcid/ipfs/utils` computes the same CID
-without storing it. Custom `IPFSClient` implementations must provide this method.
-It must not parse and reserialize the payload: that can reorder integer-index
-keys. Use `addJSON(value)` when ordinary object serialization is intended, and
-`addData` for non-JSON content.

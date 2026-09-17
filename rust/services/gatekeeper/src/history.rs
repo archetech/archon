@@ -13,9 +13,11 @@ use crate::{
     generate_json_cid, update_search_doc, AppState, EventRecord, GatekeeperDb, JsonDb, SearchIndex,
 };
 
+// Derive the TypeScript numeric-key reference from content, never a peer opid.
+// Existing predecessor verification still checks the referenced operation's CID.
 fn normalize_candidate_operation(store: &mut JsonDb, event: &mut EventRecord) -> Result<()> {
     let canonical = generate_json_cid(&event.operation)?;
-    if let Some(alias) = crate::proofs::legacy_numeric_cid(&event.operation) {
+    if let Some(alias) = crate::proofs::typescript_numeric_cid(&event.operation) {
         if alias != canonical && store.get_operation(&alias).is_none() {
             store.add_operation(&alias, event.operation.clone())?;
         }
@@ -36,41 +38,8 @@ fn index_candidates(
     dependents: &mut HashMap<String, HashSet<String>>,
     did: &str,
     events: &[EventRecord],
-    aliases: &mut HashMap<String, HashMap<String, EventRecord>>,
-    default_prefix: &str,
 ) {
     for event in events {
-        if event.operation.get("type").and_then(Value::as_str) == Some("create") {
-            if let (Some(canonical), Some(legacy)) = (
-                &event.opid,
-                crate::proofs::legacy_numeric_cid(&event.operation),
-            ) {
-                if canonical != &legacy {
-                    let prefix = event
-                        .operation
-                        .pointer("/registration/prefix")
-                        .and_then(Value::as_str)
-                        .unwrap_or(default_prefix);
-                    let identities = [
-                        format!("{prefix}:{canonical}"),
-                        format!("{prefix}:{legacy}"),
-                    ];
-                    if identities.iter().any(|identity| identity == did) {
-                        for target in identities {
-                            if target == did {
-                                continue;
-                            }
-                            let mut seed = event.clone();
-                            seed.did = Some(target.clone());
-                            aliases
-                                .entry(target)
-                                .or_default()
-                                .insert(candidate_key(&seed), seed);
-                        }
-                    }
-                }
-            }
-        }
         for controller in [
             event.operation.get("controller"),
             event.operation.pointer("/doc/didDocument/controller"),
@@ -84,47 +53,6 @@ fn index_candidates(
                 .or_default()
                 .insert(did.to_string());
         }
-    }
-}
-
-// Public entry points call this before taking the history lock. Only the
-// canonical/legacy identifiers derived from a known seed can be recovered.
-pub(crate) async fn recover_genesis_alias(state: &AppState, did: &str) {
-    let seeds = state.genesis_aliases.lock().await.get(did).cloned();
-    let Some(seeds) = seeds else {
-        return;
-    };
-    let present = state
-        .candidate_history
-        .lock()
-        .await
-        .as_ref()
-        .and_then(|candidates| candidates.get(did))
-        .is_some_and(|events| {
-            events
-                .iter()
-                .any(|event| event.operation.get("type").and_then(Value::as_str) == Some("create"))
-        });
-    if present {
-        return;
-    }
-    for seed in seeds.into_values() {
-        Box::pin(crate::events::import_event_impl(state, seed)).await;
-    }
-}
-
-pub(crate) async fn recover_operation_aliases(state: &AppState, operation: &Value) {
-    for did in [
-        operation.get("did"),
-        operation.get("controller"),
-        operation.pointer("/doc/didDocument/controller"),
-        operation.pointer("/proof/verificationMethod"),
-    ]
-    .into_iter()
-    .flatten()
-    .filter_map(Value::as_str)
-    {
-        recover_genesis_alias(state, did.split('#').next().unwrap_or_default()).await;
     }
 }
 
@@ -145,9 +73,7 @@ async fn retain_candidates_with_histories(
     let mut cache = state.candidate_history.lock().await;
     let mut dependents = state.dependents.lock().await;
     let mut store = state.store.lock().await;
-    let mut aliases = state.genesis_aliases.lock().await;
     if cache.is_none() {
-        aliases.clear();
         let mut candidates = store.get_candidates()?;
         for current in store.list_dids(&state.config.did_prefix, None) {
             if !candidates.contains_key(&current) {
@@ -171,13 +97,7 @@ async fn retain_candidates_with_histories(
             if changed {
                 store.set_candidates(key, events.clone())?;
             }
-            index_candidates(
-                &mut dependents,
-                key,
-                events,
-                &mut aliases,
-                &state.config.did_prefix,
-            );
+            index_candidates(&mut dependents, key, events);
         }
         *cache = Some(candidates);
     }
@@ -210,13 +130,7 @@ async fn retain_candidates_with_histories(
     if changed {
         store.set_candidates(did, events.clone())?;
     }
-    index_candidates(
-        &mut dependents,
-        did,
-        &events,
-        &mut aliases,
-        &state.config.did_prefix,
-    );
+    index_candidates(&mut dependents, did, &events);
     candidates.insert(did.to_string(), events);
     Ok(changed)
 }
@@ -229,35 +143,6 @@ pub(crate) async fn remove_histories(state: &AppState, dids: &[String]) -> Resul
     retain_candidates(state, first, None).await?;
     let result = async {
         for did in dids {
-            // Removed evidence must not survive in the derived seed lookup.
-            let events = state
-                .candidate_history
-                .lock()
-                .await
-                .as_ref()
-                .and_then(|candidates| candidates.get(did))
-                .cloned()
-                .unwrap_or_default();
-            {
-                let mut aliases = state.genesis_aliases.lock().await;
-                aliases.remove(did);
-                for event in events {
-                    if event.operation.get("type").and_then(Value::as_str) != Some("create") {
-                        continue;
-                    }
-                    let prefix = event
-                        .operation
-                        .pointer("/registration/prefix")
-                        .and_then(Value::as_str)
-                        .unwrap_or(&state.config.did_prefix);
-                    if let Some(cid) = event.opid {
-                        aliases.remove(&format!("{prefix}:{cid}"));
-                    }
-                    if let Some(cid) = crate::proofs::legacy_numeric_cid(&event.operation) {
-                        aliases.remove(&format!("{prefix}:{cid}"));
-                    }
-                }
-            }
             state.store.lock().await.set_candidates(did, Vec::new())?;
             state
                 .candidate_history
@@ -306,26 +191,6 @@ pub(crate) async fn ensure_history_ready(state: &AppState) -> Result<()> {
     for (index, did) in dids.iter().enumerate() {
         retain_candidates_with_histories(state, did, None, Some(&histories)).await?;
         preparing.update(index + 1);
-    }
-    let aliases = state.genesis_aliases.lock().await.clone();
-    if !aliases.is_empty() {
-        let dependents = state.dependents.lock().await;
-        let mut targets: HashSet<_> = dids.iter().cloned().collect();
-        for did in aliases.keys() {
-            if dependents.get(did).is_some_and(|items| !items.is_empty())
-                && targets.insert(did.clone())
-            {
-                dids.push(did.clone());
-            }
-        }
-    }
-    for did in &dids {
-        if let Some(seeds) = aliases.get(did) {
-            for seed in seeds.values() {
-                retain_candidates_with_histories(state, did, Some(seed.clone()), Some(&histories))
-                    .await?;
-            }
-        }
     }
     rebuild_histories(state, dids, Some(&histories)).await?;
     *state.history_ready.lock().await = true;
@@ -938,63 +803,37 @@ mod tests {
         assert_eq!(doc["didDocumentData"], json!({"version": 3}));
     }
 
-    #[tokio::test]
-    async fn numeric_cids_recover_legacy_references_and_genesis() {
+    fn numeric_predecessor_fixture() -> (Value, Vec<EventRecord>) {
         let v: Value = serde_json::from_str(include_str!(
-            "../../../../tests/gatekeeper/numeric-cid-vectors.json"
+            "../../../../tests/gatekeeper/numeric-predecessor-vectors.json"
         ))
         .unwrap();
-        for name in [
-            "agent",
-            "asset",
-            "update",
-            "successor",
-            "legacyAssetUpdate",
-            "numericAgent",
-            "legacyControlledAsset",
-        ] {
-            assert_eq!(
-                generate_json_cid(&v[name]).unwrap(),
-                v["cids"][name]["canonical"]
-            );
-            if let Some(legacy) = crate::proofs::legacy_numeric_cid(&v[name]) {
-                assert_eq!(legacy, v["cids"][name]["legacy"]);
+        let events = ["agent", "update", "successor"].into_iter().map(|name| {
+            assert_eq!(generate_json_cid(&v[name]).unwrap(), v["cids"][name]["rust"]);
+            if let Some(cid) = crate::proofs::typescript_numeric_cid(&v[name]) {
+                assert_eq!(cid, v["cids"][name]["typescript"]);
             }
-        }
-        let wrap = |op: &Value| {
             crate::value_to_event_record(&json!({
-                "operation": op, "registry": "hyperswarm", "time": op["proof"]["created"]
+                "operation": v[name], "registry": "hyperswarm", "time": v[name]["proof"]["created"],
+                "did": v["did"], "opid": v["cids"][name]["rust"]
             }))
-        };
-        for first in [false, true] {
+        }).collect();
+        (v, events)
+    }
+
+    #[tokio::test]
+    async fn numeric_predecessor_import_recovers_in_both_orders_and_deduplicates() {
+        let (v, events) = numeric_predecessor_fixture();
+        let did = v["did"].as_str().unwrap();
+        for order in [[0, 1, 2], [0, 2, 1]] {
             let (state, _dir) = crate::tests::make_state(JsonDb {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
             });
-            for name in ["agent", "asset", "update", "successor"] {
-                crate::events::import_event_impl(&state, wrap(&v[name])).await;
+            for index in order {
+                crate::events::import_event_impl(&state, events[index].clone()).await;
             }
-            for opid in [
-                &v["cids"]["update"]["legacy"],
-                &v["cids"]["update"]["canonical"],
-                &v["cids"]["agent"]["canonical"],
-            ] {
-                let mut duplicate = wrap(&v["update"]);
-                duplicate.opid = opid.as_str().map(ToString::to_string);
-                assert!(matches!(
-                    crate::events::import_event_impl(&state, duplicate).await,
-                    crate::events::ImportStatus::Merged
-                ));
-            }
-            let alias = v["cids"]["update"]["legacy"].as_str().unwrap();
-            assert_eq!(
-                state.store.lock().await.get_operation(alias),
-                Some(v["update"].clone())
-            );
-            let did = v["assetDid"].as_str().unwrap();
-            *state.history_ready.lock().await = false;
-            ensure_history_ready(&state).await.unwrap();
             let doc = crate::resolve_local_doc_async(
                 &state,
                 did,
@@ -1006,192 +845,72 @@ mod tests {
             .await
             .unwrap();
             assert_eq!(doc["didDocumentData"], json!({"recovered": true}));
-
-            let (state, _dir) = crate::tests::make_state(JsonDb {
-                backend: DbBackend::Memory,
-                data: JsonDbFile::default(),
-                redis_connection: None,
-            });
-            crate::events::import_event_impl(&state, wrap(&v["agent"])).await;
-            if first {
-                crate::events::import_event_impl(&state, wrap(&v["legacyAssetUpdate"])).await;
-            }
-            crate::events::import_event_impl(&state, wrap(&v["asset"])).await;
-            if !first {
-                crate::events::import_event_impl(&state, wrap(&v["legacyAssetUpdate"])).await;
-            }
-            *state.history_ready.lock().await = false;
-            ensure_history_ready(&state).await.unwrap();
-            let did = v["legacyAssetDid"].as_str().unwrap();
-            let doc = crate::resolve_local_doc_async(
-                &state,
-                did,
-                crate::ResolveOptions {
-                    verify: true,
-                    ..crate::ResolveOptions::default()
-                },
-            )
-            .await
-            .unwrap();
-            assert_eq!(doc["didDocument"]["id"], did);
-            assert_eq!(doc["didDocumentData"], json!({"legacyDidPreserved": true}));
-        }
-    }
-
-    #[tokio::test]
-    async fn numeric_cid_startup_repairs_missing_cache_and_preserves_old_target() {
-        let v: Value = serde_json::from_str(include_str!(
-            "../../../../tests/gatekeeper/numeric-cid-vectors.json"
-        ))
-        .unwrap();
-        for legacy_target in [false, true] {
-            let target = v[if legacy_target {
-                "legacyAssetDid"
-            } else {
-                "assetDid"
-            }]
-            .as_str()
-            .unwrap();
-            let mut data = JsonDbFile::default();
-            let names = if legacy_target {
-                vec!["agent", "asset", "legacyAssetUpdate"]
-            } else {
-                vec!["agent", "asset", "update", "successor"]
-            };
-            for name in names {
-                let did = if name == "agent" {
-                    v["agentDid"].as_str().unwrap()
-                } else {
-                    target
-                };
-                let event = crate::value_to_event_record(&json!({
-                    "operation": v[name], "registry": "hyperswarm", "time": v[name]["proof"]["created"],
-                    "did": did, "opid": v["cids"][name]["legacy"]
-                }));
-                data.candidates
-                    .entry(did.to_string())
-                    .or_default()
-                    .push(event.clone());
-                if name != "successor" {
-                    data.dids
-                        .entry(did.rsplit(':').next().unwrap().to_string())
-                        .or_default()
-                        .push(event);
-                }
-                // Rust stores canonical content but the TS reference is absent.
-                data.ops.insert(
-                    v["cids"][name]["canonical"].as_str().unwrap().to_string(),
-                    v[name].clone(),
-                );
-            }
-            let (state, _dir) = crate::tests::make_state(JsonDb {
-                backend: DbBackend::Memory,
-                data,
-                redis_connection: None,
-            });
-            ensure_history_ready(&state).await.unwrap();
-            let doc = crate::resolve_local_doc_async(
-                &state,
-                target,
-                crate::ResolveOptions {
-                    verify: true,
-                    ..crate::ResolveOptions::default()
-                },
-            )
-            .await
-            .unwrap();
-            assert_eq!(doc["didDocument"]["id"], target);
+            // A claimed opid must never poison another operation's cache entry.
+            let mut duplicate = events[1].clone();
+            duplicate.opid = events[0].opid.clone();
+            assert!(matches!(
+                crate::events::import_event_impl(&state, duplicate).await,
+                crate::events::ImportStatus::Merged
+            ));
+            let store = state.store.lock().await;
+            assert_eq!(store.get_events(did).len(), 3);
             assert_eq!(
-                doc["didDocumentData"],
-                if legacy_target {
-                    json!({"legacyDidPreserved": true})
-                } else {
-                    json!({"recovered": true})
-                }
+                store.get_operation(events[0].opid.as_ref().unwrap()),
+                Some(v["agent"].clone())
             );
-            let before = serde_json::to_value(&state.store.lock().await.data).unwrap();
-            *state.candidate_history.lock().await = None;
-            *state.history_ready.lock().await = false;
-            ensure_history_ready(&state).await.unwrap();
             assert_eq!(
-                serde_json::to_value(&state.store.lock().await.data).unwrap(),
-                before
+                store.get_events(did)[2].operation["previd"],
+                v["cids"]["update"]["typescript"]
             );
         }
     }
 
     #[tokio::test]
-    async fn numeric_genesis_recovers_legacy_controller_in_both_orders_and_restart() {
-        let v: Value = serde_json::from_str(include_str!(
-            "../../../../tests/gatekeeper/numeric-cid-vectors.json"
-        ))
-        .unwrap();
-        for mode in 0..3 {
-            let (state, _dir) = crate::tests::make_state(JsonDb {
-                backend: DbBackend::Memory,
-                data: JsonDbFile::default(),
-                redis_connection: None,
-            });
-            let mut names = vec!["numericAgent", "legacyControlledAsset"];
-            if mode == 1 {
-                names.reverse();
-            }
-            for name in names {
-                let event = crate::value_to_event_record(&json!({
-                    "operation": v[name], "registry": "hyperswarm", "time": v[name]["proof"]["created"]
-                }));
-                if mode == 2 {
-                    let did = crate::generate_did_from_operation(&state.config, &v[name]).unwrap();
-                    state
-                        .store
-                        .lock()
-                        .await
-                        .set_candidates(&did, vec![event])
-                        .unwrap();
-                } else {
-                    crate::events::import_event_impl(&state, event).await;
-                }
-            }
-            ensure_history_ready(&state).await.unwrap();
-            let did = v["legacyControlledAssetDid"].as_str().unwrap();
-            let doc = crate::resolve_local_doc_async(
-                &state,
-                did,
-                crate::ResolveOptions {
-                    verify: true,
-                    ..crate::ResolveOptions::default()
-                },
-            )
-            .await
-            .unwrap();
-            assert_eq!(doc["didDocumentData"], json!({"legacyController": true}));
+    async fn numeric_predecessor_startup_repairs_missing_alias_and_survives_restart() {
+        let (v, events) = numeric_predecessor_fixture();
+        let did = v["did"].as_str().unwrap();
+        let alias = v["cids"]["update"]["typescript"].as_str().unwrap();
+        let mut data = JsonDbFile::default();
+        data.dids.insert(
+            did.rsplit(':').next().unwrap().to_string(),
+            events[..2].to_vec(),
+        );
+        data.candidates.insert(did.to_string(), events.clone());
+        for event in &events[..2] {
+            data.ops
+                .insert(event.opid.clone().unwrap(), event.operation.clone());
         }
-    }
-
-    #[tokio::test]
-    async fn removed_numeric_genesis_does_not_survive_in_alias_lookup() {
-        let v: Value = serde_json::from_str(include_str!(
-            "../../../../tests/gatekeeper/numeric-cid-vectors.json"
-        ))
-        .unwrap();
+        assert!(!data.ops.contains_key(alias));
         let (state, _dir) = crate::tests::make_state(JsonDb {
             backend: DbBackend::Memory,
-            data: JsonDbFile::default(),
+            data,
             redis_connection: None,
         });
-        for name in ["agent", "asset"] {
-            crate::events::handle_did_operation(&state, &v[name])
-                .await
-                .unwrap();
-        }
-        let canonical = v["assetDid"].as_str().unwrap();
-        let legacy = v["legacyAssetDid"].as_str().unwrap();
-        assert!(state.genesis_aliases.lock().await.contains_key(legacy));
-        remove_histories(&state, &[canonical.to_string()])
-            .await
-            .unwrap();
-        recover_genesis_alias(&state, legacy).await;
-        assert!(state.store.lock().await.get_events(legacy).is_empty());
+        ensure_history_ready(&state).await.unwrap();
+        let doc = crate::resolve_local_doc_async(
+            &state,
+            did,
+            crate::ResolveOptions {
+                verify: true,
+                ..crate::ResolveOptions::default()
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(doc["didDocumentData"], json!({"recovered": true}));
+        let before = serde_json::to_value(&state.store.lock().await.data).unwrap();
+        let repaired: JsonDbFile = serde_json::from_value(before.clone()).unwrap();
+        assert_eq!(repaired.ops.get(alias), Some(&v["update"]));
+        let (restarted, _restart_dir) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: repaired,
+            redis_connection: None,
+        });
+        ensure_history_ready(&restarted).await.unwrap();
+        assert_eq!(
+            serde_json::to_value(&restarted.store.lock().await.data).unwrap(),
+            before
+        );
     }
 
     fn identity_fixture() -> Value {

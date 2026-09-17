@@ -1,4 +1,3 @@
-import { generateJSONCID } from './utils.js';
 
 import { create, KuboRPCClient } from 'kubo-rpc-client'
 import { CID } from 'multiformats/cid';
@@ -132,14 +131,6 @@ class KuboClient implements IPFSClient {
         await this.ipfs.block.put(buf, { cid });
 
         return cid.toString(); // CID v1 default: base32 encoding
-    }
-
-    async addJSONBytes(bytes: Uint8Array): Promise<string> {
-        const copy = Uint8Array.from(bytes);
-        jsonCodec.decode(copy);
-        const cid = CID.parse(await generateJSONCID(copy));
-        await this.ipfs.block.put(copy, { cid });
-        return cid.toString();
     }
 
     async getJSON(cid: string): Promise<any> {

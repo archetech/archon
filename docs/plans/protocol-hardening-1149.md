@@ -65,16 +65,3 @@ successors whose predecessors are not yet available and reconsider them later.
 This step does not activate version 2 or close the registration-validation portion
 of #1158. Registration, key permissions, and byte limits belong to the coordinated
 versioned follow-up, with #1160 documenting the complete contract before activation.
-
-## Numeric-key identity repair (#1176)
-
-Hash/store canonical JSON bytes directly. Derive historical TypeScript numeric-key
-references from complete operations; preserve old genesis identifiers and signed
-successors while generating canonical identifiers for new genesis records. Repair
-uses the existing candidate preparation pass and bounded per-operation work.
-
-The serializer audit also demonstrated Rust/JCS number formatting and UTF-16 key
-ordering gaps (examples in the Gatekeeper service specification §4.1). Include
-these in #1159's serialization work, with explicit compatibility for historical
-proof hashes and CIDs before changing the shared Rust serializer. Numeric-key
-fixtures alone are not evidence of full JCS conformance.

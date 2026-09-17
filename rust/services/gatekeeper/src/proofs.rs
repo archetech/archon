@@ -583,9 +583,9 @@ pub(crate) fn generate_json_cid(value: &Value) -> Result<String> {
 }
 
 // JSON.parse(canonical) followed by JSON.stringify enumerates array-index
-// property names first, numerically. Derive this historical TS reference from
+// property names first, numerically. Derive the current TS reference from
 // the complete operation; never infer an alias from an event's claimed opid.
-pub(crate) fn legacy_numeric_cid(value: &Value) -> Option<String> {
+pub(crate) fn typescript_numeric_cid(value: &Value) -> Option<String> {
     fn index(key: &str) -> Option<u32> {
         let n = key.parse::<u32>().ok()?;
         (n < u32::MAX && n.to_string() == key).then_some(n)

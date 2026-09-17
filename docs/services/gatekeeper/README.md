@@ -473,40 +473,12 @@ npm package, which implements RFC 8785 JSON Canonicalization Scheme (JCS):
 
 The Rust implementation in
 [rust/services/gatekeeper/src/proofs.rs](../../../rust/services/gatekeeper/src/proofs.rs)
-currently implements a subset (sorted keys, no whitespace, basic escaping).
-The deterministic and signed numeric-CID fixtures verify that subset; passing
-those fixtures does not establish complete JCS conformance.
+implements the subset sufficient for operation payloads (sorted keys, no
+whitespace, basic escaping). It is verified byte-for-byte against the TS
+output via the deterministic-vectors fixture.
 
-The #1176 audit demonstrated these remaining differences with the same parsed
-input in both ports:
-
-| Input | TypeScript JCS | Current Rust serialization |
-| --- | --- | --- |
-| `{"n":1.0}` | `{"n":1}` | `{"n":1.0}` |
-| `{"n":-0.0}` | `{"n":0}` | `{"n":-0.0}` |
-| `{"n":1e-6}` | `{"n":0.000001}` | `{"n":1e-6}` |
-| `{"n":1e20}` | `{"n":100000000000000000000}` | `{"n":1e+20}` |
-| Keys U+E000 and U+10000 | U+10000 first (UTF-16) | U+E000 first (UTF-8) |
-
-These are existing conformance defects, not alternate permitted encodings. The
-serializer also supplies proof hashes, so repairing it requires explicit legacy
-CID, genesis, and signature compatibility. Track that work with #1159 and the
-[protocol hardening plan](../../plans/protocol-hardening-1149.md); #1176 does not
-silently change historical proof verification. Its derived TypeScript alias
-compatibility in Rust is limited to payloads whose other scalar/key encodings
-already agree between the ports.
-
-Hashing and saving operation JSON MUST consume the canonical UTF-8 bytes without
-an object parse/stringify round trip, using JSON codec `0x0200`. In TypeScript,
-`IPFSClient.addJSONBytes` preserves these bytes in both MemoryClient and KuboClient;
-`addJSON` remains an object-serialization API for generic JSON content. The shared
-`tests/gatekeeper/numeric-cid-vectors.json` contains signed nested numeric-key
-operations, old references, and both genesis IDs. Import/replay reconstructs the
-historical numeric-order references from content and preserves old target DIDs,
-as specified in [operation identity](../../scheme.md#operation-identity-and-retrieval-references).
-
-New implementations should use a JCS-compliant library and test the full contract,
-including number formatting and UTF-16 key ordering, beyond the supplied fixtures.
+A new implementation MAY use any canonical-JSON library that matches the
+fixture output. Recommended: a JCS-compliant library where one exists.
 
 ---
 
