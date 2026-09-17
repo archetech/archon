@@ -107,3 +107,5 @@ These rules apply to coding agents working in this repository.
 - Hyperswarm wraps repeated operations in fresh receipt timestamps and ordinals. Sync optimizations must cover those restamped hints, preserve their first observation per canonical operation/registry, and keep distinct blockchain anchors eligible for authorization replay.
 
 - Mediator batch completion must use batch-scoped pending evidence, not Gatekeeper's global pending count. When event processing throws, preserve the active event and remaining queue and propagate failure; never clear work and report zero pending. Preserve retries for the batch's own deferred events, busy/failed processing, and incomplete CID fetches; keep older Gatekeeper responses conservative.
+
+- Gatekeeper performance checks must include concurrent resolution during TypeScript/Redis status scans and unchanged deferred-event retries, not only successful duplicate imports. Compare accepted histories structurally/canonically because Redis hydration can change object key order; retain missing-evidence recovery while avoiding repeated dependent replay.

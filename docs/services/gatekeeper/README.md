@@ -901,7 +901,16 @@ Local/gossip candidates retain the first observation of each canonical operation
 
 The dependency index includes controller assignments on retained branches, not just the current document. Replay completes self-controlled agent histories before asset histories, retrying candidates within each DID until its sequence stops changing and ordering chain candidates by registry, ordinal, time, and operation CID; registry ordinals are never compared across chains. Local/gossip candidates preserve their existing arrival order. Agents must remain self-controlled and asset owners must be agents. These constraints are checked during creation, direct updates, import, and verified replay, including the new owner of a transfer. Startup repair removes previously accepted violations from the accepted projection while retaining candidate evidence. Replay has no separate oscillation detection or quarantine policy.
 
-Accepted histories, search entries, and verification caches are refreshed when replay changes a DID. Search indexing runs on published histories, not intermediate replay views. Explicit removal and garbage collection also replay dependents before returning. Startup rebuilds each DID once from the journal to recover interrupted publication, rather than replaying a controller’s dependents again for each entry in the startup scan. Startup reads accepted histories in bounded batches and reuses that snapshot during reconstruction. Already-canonical, unchanged journals are not rewritten; public verification, resolution, status, and DID-list reads wait for repair and hold the history lock throughout their asynchronous reads. Status-cache refreshes use the same lock. An operation accepted through dependent replay may report `MERGED` when its next queue attempt runs, so processing counters describe queue attempts, not every change to derived histories.
+Accepted histories, search entries, and verification caches are refreshed when replay changes a DID. Search indexing runs on published histories, not intermediate replay views. Explicit removal and garbage collection also replay dependents before returning. Startup rebuilds each DID once from the journal to recover interrupted publication, rather than replaying a controller’s dependents again for each entry in the startup scan. Startup reads accepted histories in bounded batches and reuses that snapshot during reconstruction. Already-canonical, unchanged journals are not rewritten; public verification, resolution, and DID-list reads wait for repair and hold the history lock throughout their asynchronous reads. TypeScript status scans resolve up to 32 DIDs concurrently under that lock, then release it and yield before the next chunk. Each chunk observes complete publication; aggregate status counts can span multiple completed publications and are monitoring data, not a transaction snapshot. An operation accepted through dependent replay may report `MERGED` when its next queue attempt runs, so processing counters describe queue attempts, not every change to derived histories.
+
+Runtime replay avoids work when retained evidence and accepted state are unchanged,
+including repeated deferred events. Deferred events remain pending;
+arrival of their missing predecessor or controller history still triggers recovery.
+A new hint for an accepted operation is retained and its own DID is rebuilt first;
+if that projection stays unchanged, its dependents do not need reconstruction.
+TypeScript compares stored histories canonically so Redis hydration changing object
+key order cannot manufacture a history change. Known canonical content is not
+rewritten to IPFS merely because a gossip wrapper omitted its operation ID.
 
 The following is the insertion algorithm reused during replay:
 
@@ -1461,3 +1470,24 @@ existing local confirmed version. Stale, malformed, unconfirmed, failed, or time
 answers leave the local result unchanged. The request forwards the selectors and
 recursion marker. Delegation does not import events or cache peer documents and
 does not alter core Gatekeeper resolution or authorization.
+
+### Runtime performance reproduction
+
+`scripts/benchmark-gatekeeper-runtime.mjs` measures TypeScript/Redis runtime work
+with concurrent DID resolution. Build the Gatekeeper package first, then set
+`ARCHON_BENCHMARK_HISTORIES` to an accepted-history JSON map (`CID` keys to hydrated
+event arrays) and `ARCHON_BENCHMARK_REDIS_URL` to an isolated Redis server. Run:
+
+```sh
+node scripts/benchmark-gatekeeper-runtime.mjs duplicates
+node scripts/benchmark-gatekeeper-runtime.mjs status
+node scripts/benchmark-gatekeeper-runtime.mjs deferred
+```
+
+Each run seeds its own temporary Redis key prefix, skips startup repair, and
+checks every accepted history for changes before deleting that prefix. The
+`deferred` case inserts synthetic retained evidence with an absent predecessor
+on the agent with the most dependents. IPFS is in memory: this measures core
+processing and Redis costs, not network synchronization or Herald HTTP latency.
+`ARCHON_BENCHMARK_IMPLEMENTATION` can select another built Gatekeeper `dist/esm`
+directory for before/after comparisons using the same harness and snapshot.

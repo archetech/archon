@@ -464,3 +464,97 @@ describe('pending batch reporting', () => {
         await db.stop();
     });
 });
+
+it('does not rewrite known gossip content to IPFS', async () => {
+    const vector = vectors[0];
+    const db = new DbJsonMemory('known-content');
+    const ipfs = new MemoryClient();
+    const g = new Gatekeeper({ db, ipfs });
+    for (const event of vector.base) await g.importEvent(event);
+    const writes = jest.spyOn(ipfs, 'addJSON');
+    try {
+        const event = { ...vector.base[0], registry: 'hyperswarm', registration: undefined, opid: undefined, did: undefined };
+        expect(await g.importEvent(event)).toBe('merged');
+        expect(writes).not.toHaveBeenCalled();
+    } finally { writes.mockRestore(); }
+});
+
+it('does not replay unchanged deferred evidence but recovers when its predecessor arrives', async () => {
+    const vector = vectors[0];
+    const db = new DbJsonMemory('deferred-replay');
+    const g = new Gatekeeper({ db, ipfs: new MemoryClient() });
+    for (const event of [...vector.base, vector.rotation]) await g.importEvent(event);
+    expect(await g.importEvent(vector.freshNext)).toBe('deferred');
+    const verify = jest.spyOn(Gatekeeper.prototype, 'verifyUpdateOperation');
+    try {
+        expect(await g.importEvent(vector.freshNext)).toBe('deferred');
+        expect(verify).not.toHaveBeenCalled();
+    } finally { verify.mockRestore(); }
+    await g.importEvent(vector.fresh);
+    expect((await g.resolveDID(vector.asset, { verify: true })).didDocumentData).toBe('new-key-successor');
+});
+
+it('retains a new gossip hint without replaying dependents of an unchanged controller projection', async () => {
+    const vector = vectors[0];
+    // Redis hydrates stripped records by appending operation, so object key
+    // order can differ from the same event in the candidate journal.
+    class HydratedDb extends DbJsonMemory {
+        override async getEvents(did: string) {
+            return (await super.getEvents(did)).map(({ operation, ...event }) => ({ ...event, operation }));
+        }
+    }
+    const db = new HydratedDb('redundant-hint');
+    const g = new Gatekeeper({ db, ipfs: new MemoryClient() });
+    for (const event of [...vector.base, vector.old]) await g.importEvent(event);
+    const before = await db.getEvents(vector.controller);
+    const reads = jest.spyOn(db, 'getEvents');
+    try {
+        expect(await g.importEvent({ ...vector.base[0], registry: 'hyperswarm', registration: undefined })).toBe('merged');
+        expect(reads.mock.calls.every(([did]) => did === vector.controller)).toBe(true);
+    } finally { reads.mockRestore(); }
+    expect(await db.getEvents(vector.controller)).toEqual(before);
+    expect((await db.getCandidates())[vector.controller]).toHaveLength(2);
+    await g.importEvent(vector.rotation);
+    expect((await g.resolveDID(vector.asset, { verify: true })).didDocumentData).toBe('original');
+});
+
+it('lets interactive resolution finish between status scan chunks', async () => {
+    const vector = vectors[0];
+    let entered!: () => void;
+    let release!: () => void;
+    const reading = new Promise<void>(resolve => { entered = resolve; });
+    const barrier = new Promise<void>(resolve => { release = resolve; });
+    class PausedScanDb extends DbJsonMemory {
+        pause = false;
+        readCount = 0;
+        override async getEvents(did: string) {
+            this.readCount++;
+            const events = await super.getEvents(did);
+            if (this.pause && did === vector.asset) {
+                this.pause = false;
+                entered();
+                await barrier;
+            }
+            return events;
+        }
+    }
+    const db = new PausedScanDb('status-fairness');
+    const g = new Gatekeeper({ db, ipfs: new MemoryClient() });
+    for (const event of vector.base) await g.importEvent(event);
+    db.pause = true;
+    db.readCount = 0;
+    let scanFinished = false;
+    const scan = g.checkDIDs({ dids: Array(65).fill(vector.asset) }).then(result => {
+        scanFinished = true;
+        return result;
+    });
+    await reading;
+    const read = g.resolveDID(vector.controller).then(result => {
+        expect(scanFinished).toBe(false);
+        expect(db.readCount).toBeLessThan(65);
+        return result;
+    });
+    release();
+    expect((await read).didDocument?.id).toBe(vector.controller);
+    expect((await scan).byType.assets).toBe(65);
+});
