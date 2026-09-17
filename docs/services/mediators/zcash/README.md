@@ -155,7 +155,8 @@ The `registration` metadata is what later powers
 
 Every scan cycle, the mediator checks whether the last scanned block hash
 still has `confirmations > 0` via `getblockheader`. If the node reports the
-block as unknown, the chain has moved: the mediator rewinds
+block as unknown (including Zebra RPC code `-5`, "block height not in best chain"),
+the chain has moved: the mediator rewinds
 `ARCHON_ZEC_REORG_DEPTH` blocks (default 6), re-reads them, and subtracts
 their transaction count from `txnsScanned`. Within that depth of the
 configured start block it re-reads the window from its first block instead,
@@ -163,7 +164,14 @@ since there is no earlier block to resume above.
 
 Any other RPC failure is not a reorg. The mediator leaves its position alone
 and skips the pass, so the stored hash is checked again next cycle rather than
-overwritten by a scan that never verified it.
+overwritten by a scan that never verified it. The RPC client preserves numeric
+error codes; transport errors retain their distinct codes. A failure to fetch a
+block stops the pass so the next pass retries it before advancing.
+
+After the initial tip query and whenever the tip changes mid-pass, `blockCount`
+and `blocksPending` are persisted before the next checkpoint or block read. This
+keeps backlog metrics current even if that read fails. `zcash_scan_errors_total` counts skipped
+checkpoint checks and failed scan attempts, separately from batch-import errors.
 
 Reorgs are counted via the `zcash_reorgs_total` metric, once per rewind that is
 committed.
@@ -407,8 +415,8 @@ Gauges (refreshed on every `/metrics` scrape from the persisted DB):
 | Metric | Notes |
 | --- | --- |
 | `zcash_block_height` | last scanned height |
-| `zcash_block_count` | chain tip |
-| `zcash_blocks_pending` | `blockCount - height` |
+| `zcash_block_count` | latest successfully observed chain tip, even when checkpoint validation holds the scan |
+| `zcash_blocks_pending` | `max(0, blockCount - height)` when observing the tip |
 | `zcash_blocks_scanned` | cumulative |
 | `zcash_txns_scanned` | cumulative |
 | `zcash_dids_discovered` | `discovered.length` |
@@ -421,6 +429,7 @@ Counters:
 
 | Metric | Notes |
 | --- | --- |
+| `zcash_scan_errors_total` | failed scan attempts, including skipped checkpoint validation and tip/block read failures |
 | `zcash_import_errors_total` | failed `importBatchByCids` calls |
 | `zcash_reorgs_total` | detected chain reorgs |
 | `zcash_batches_anchored_total` | successful OP_RETURN anchors |

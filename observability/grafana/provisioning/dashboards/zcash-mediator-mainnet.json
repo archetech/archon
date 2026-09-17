@@ -677,9 +677,14 @@
           "expr": "rate(zcash_reorgs_total{job=\"zcash-mainnet-mediator\"}[5m])",
           "legendFormat": "Reorgs",
           "refId": "B"
+        },
+        {
+          "expr": "rate(zcash_scan_errors_total{job=\"zcash-mainnet-mediator\"}[5m])",
+          "legendFormat": "Scan Errors",
+          "refId": "C"
         }
       ],
-      "title": "Import Errors & Reorgs",
+      "title": "Scan / Import Errors & Reorgs",
       "type": "timeseries"
     },
     {
