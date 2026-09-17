@@ -105,3 +105,5 @@ These rules apply to coding agents working in this repository.
 - Treat startup health timeouts after replay changes as performance regressions to measure, not merely timeout settings to increase. Benchmark populated histories in isolation; agents are self-controlled, so replay their histories before assets without repeatedly rebuilding each controller’s dependents. Finish snapshot comparisons before resetting benchmark storage.
 
 - Hyperswarm wraps repeated operations in fresh receipt timestamps and ordinals. Sync optimizations must cover those restamped hints, preserve their first observation per canonical operation/registry, and keep distinct blockchain anchors eligible for authorization replay.
+
+- Mediator batch completion must use batch-scoped pending evidence, not Gatekeeper's global pending count. When event processing throws, preserve the active event and remaining queue and propagate failure; never clear work and report zero pending. Preserve retries for the batch's own deferred events, busy/failed processing, and incomplete CID fetches; keep older Gatekeeper responses conservative.

@@ -69,6 +69,8 @@ pub(crate) struct ProcessEventsResult {
     pub(crate) rejected: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) pending: Option<usize>,
+    #[serde(rename = "pendingBatches", skip_serializing_if = "Option::is_none")]
+    pub(crate) pending_batches: Option<Vec<String>>,
 }
 
 pub(crate) enum ImportStatus {
@@ -452,6 +454,7 @@ pub(crate) async fn process_events_impl(state: &AppState) -> ProcessEventsResult
             merged: None,
             rejected: None,
             pending: None,
+            pending_batches: None,
         };
     }
     {
@@ -464,6 +467,7 @@ pub(crate) async fn process_events_impl(state: &AppState) -> ProcessEventsResult
                 merged: None,
                 rejected: None,
                 pending: None,
+                pending_batches: None,
             };
         }
         *busy = true;
@@ -484,7 +488,21 @@ pub(crate) async fn process_events_impl(state: &AppState) -> ProcessEventsResult
         }
     }
 
-    let pending = state.import_queue.lock().await.len();
+    let (pending, pending_batches) = {
+        let queue = state.import_queue.lock().await;
+        let batches: std::collections::BTreeSet<String> = queue
+            .iter()
+            .filter_map(|event| {
+                event.registration.as_ref()?.get("batch")?.as_str().map(str::to_owned)
+            })
+            .collect();
+        let pending_batches = if queue.is_empty() {
+            None
+        } else {
+            Some(batches.into_iter().collect())
+        };
+        (queue.len(), pending_batches)
+    };
     *state.processing_events.lock().await = false;
 
     let response = ProcessEventsResult {
@@ -493,6 +511,7 @@ pub(crate) async fn process_events_impl(state: &AppState) -> ProcessEventsResult
         merged: Some(merged),
         rejected: Some(rejected),
         pending: Some(pending),
+        pending_batches,
     };
     info!(
         "processEvents: {}",

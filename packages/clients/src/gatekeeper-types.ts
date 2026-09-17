@@ -33,6 +33,8 @@ export interface ProcessEventsResult {
     merged?: number;
     rejected?: number;
     pending?: number;
+    /** Batch DIDs with pending events, from the same queue snapshot as pending. */
+    pendingBatches?: string[];
 }
 
 export interface VerifyDbResult {

@@ -1744,32 +1744,40 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         this.eventsQueue = [];
 
-        while (event) {
-            i += 1;
+        try {
+            while (event) {
+                i += 1;
 
-            const status = await this.importEvent(event);
+                const status = await this.importEvent(event);
 
-            if (status === ImportStatus.ADDED) {
-                added += 1;
-                console.log(`import ${i}/${total}: added event for ${event.did}`);
-                if (event.did) {
-                    await this.updateSearchIndex(event.did);
+                if (status === ImportStatus.ADDED) {
+                    added += 1;
+                    console.log(`import ${i}/${total}: added event for ${event.did}`);
+                    if (event.did) {
+                        await this.updateSearchIndex(event.did);
+                    }
                 }
-            }
-            else if (status === ImportStatus.MERGED) {
-                merged += 1;
-                console.log(`import ${i}/${total}: merged event for ${event.did}`);
-            }
-            else if (status === ImportStatus.REJECTED) {
-                rejected += 1;
-                console.log(`import ${i}/${total}: rejected event for ${event.did}`);
-            }
-            else if (status === ImportStatus.DEFERRED) {
-                this.eventsQueue.push(event);
-                console.log(`import ${i}/${total}: deferred event for ${event.did}`);
-            }
+                else if (status === ImportStatus.MERGED) {
+                    merged += 1;
+                    console.log(`import ${i}/${total}: merged event for ${event.did}`);
+                }
+                else if (status === ImportStatus.REJECTED) {
+                    rejected += 1;
+                    console.log(`import ${i}/${total}: rejected event for ${event.did}`);
+                }
+                else if (status === ImportStatus.DEFERRED) {
+                    this.eventsQueue.push(event);
+                    console.log(`import ${i}/${total}: deferred event for ${event.did}`);
+                }
 
-            event = tempQueue.shift();
+                event = tempQueue.shift();
+            }
+        }
+        catch (error) {
+            // The active event has already been shifted out of the drain queue.
+            // Preserve it and the untouched tail alongside deferred/new arrivals.
+            if (event) this.eventsQueue = [event, ...tempQueue, ...this.eventsQueue];
+            throw error;
         }
 
         return { added, merged, rejected };
@@ -1799,17 +1807,17 @@ export default class Gatekeeper implements GatekeeperInterface {
                 done = (response.added === 0 && response.merged === 0);
             }
         }
-        catch (error) {
-            console.log(error);
-            this.eventsQueue = [];
-        }
         finally {
             this.isProcessingEvents = false;
         }
 
         //console.log(JSON.stringify(eventsQueue, null, 4));
         const pending = this.eventsQueue.length;
-        const response = { added, merged, rejected, pending };
+        const pendingBatches = [...new Set(this.eventsQueue
+            .map(event => event.registration?.batch)
+            .filter((batch): batch is string => typeof batch === 'string'))].sort();
+        const response = { added, merged, rejected, pending,
+            ...(pending > 0 ? { pendingBatches } : {}) };
 
         console.log(`processEvents: ${JSON.stringify(response)}`);
 

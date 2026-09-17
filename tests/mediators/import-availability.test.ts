@@ -7,7 +7,7 @@ import { generateCID } from '@didcid/ipfs/utils';
 
 type Item = {
     did: string; height: number; index: number; txid: string; time: string; batchHash: string;
-    error?: string; imported?: { queued: number }; processed?: { pending: number; busy?: boolean };
+    error?: string; imported?: { queued: number }; processed?: { pending?: number; busy?: boolean; pendingBatches?: string[] };
 };
 type Failure = 'batch' | 'operation' | 'processing';
 const names = ['satoshi', 'zcash', 'ethereum', 'solana'] as const;
@@ -47,12 +47,12 @@ function harness(name: typeof names[number], initial: Item[], failure: Failure) 
             attempts.push(height);
             processingHeight = height;
             if (!available && height === 100 && failure === 'operation') throw new Error('Operation unavailable');
-            return { queued: 1 };
+            return { queued: 1, processed: 0, rejected: 0, total: 1 };
         }),
         processEvents: jest.fn(async () => {
             if (!available && processingHeight === 100 && failure === 'processing') throw new Error('Processing unavailable');
             applied.push(processingHeight);
-            return { pending: 0 };
+            return { pending: 0 } as { pending?: number; busy?: boolean; pendingBatches?: string[] };
         }),
     };
     const source = ts.createSourceFile(`${name}.ts`, readFileSync(`services/mediators/${name}/src/${name}-mediator.ts`, 'utf8'), ts.ScriptTarget.Latest, true);
@@ -84,6 +84,69 @@ function harness(name: typeof names[number], initial: Item[], failure: Failure) 
 }
 
 describe.each(names)('%s unavailable batches', (name) => {
+    it('finishes batches despite unrelated pending work, including after restart', async () => {
+        const h = harness(name, [item(100), item(200)], 'batch');
+        h.recover();
+        h.gatekeeper.processEvents.mockResolvedValue({ pending: 2, pendingBatches: ['other-batch'] });
+        await h.importBatches();
+        for (let pass = 0; pass < 3; pass++) {
+            await h.importBatches();
+            await h.retryFailedImports();
+        }
+        expect(h.attempts).toEqual([100, 200]);
+        const restarted = harness(name, h.snapshot(), 'batch');
+        await restarted.importBatches();
+        await restarted.retryFailedImports();
+        expect(restarted.attempts).toEqual([]);
+    });
+
+    it('retries its own pending batch but leaves completed batches alone', async () => {
+        const h = harness(name, [item(100), item(200)], 'batch');
+        h.recover();
+        h.gatekeeper.processEvents.mockResolvedValue({ pending: 2, pendingBatches: [item(100).did] });
+        await h.importBatches();
+        await h.importBatches();
+        await h.retryFailedImports();
+        expect(h.attempts).toEqual([100, 200, 100]);
+        h.gatekeeper.processEvents.mockResolvedValue({ pending: 1, pendingBatches: ['other-batch'] });
+        await h.importBatches();
+        await h.importBatches();
+        expect(h.attempts).toEqual([100, 200, 100, 100]);
+    });
+
+    it.each([{ busy: true }, { pending: 2 }])('keeps busy or legacy unscoped results retryable: %j', async (result) => {
+        const h = harness(name, [item(100)], 'batch');
+        h.recover();
+        h.gatekeeper.processEvents.mockResolvedValue(result);
+        await h.importBatches();
+        await h.importBatches();
+        expect(h.attempts).toEqual([100, 100]);
+    });
+
+    it('repairs persisted global-stall errors in one retry', async () => {
+        const h = harness(name, [{ ...item(100), error: 'No progress: 2 pending event(s) unresolved',
+            imported: { queued: 0 }, processed: { pending: 2 } }], 'batch');
+        h.recover();
+        h.gatekeeper.processEvents.mockResolvedValue({ pending: 2, pendingBatches: [] });
+        await h.retryFailedImports();
+        await h.importBatches();
+        await h.retryFailedImports();
+        expect(h.attempts).toEqual([100]);
+        expect(h.snapshot()[0].error).toBeUndefined();
+    });
+
+    it('retries incomplete CID fetches even when unrelated pending work is identified', async () => {
+        const h = harness(name, [item(100)], 'batch');
+        h.recover();
+        h.keymaster.resolveAsset.mockResolvedValue({ batch: { version: 1, ops: [cid, 'missing-cid'] } });
+        h.gatekeeper.processEvents.mockResolvedValue({ pending: 2, pendingBatches: [] });
+        await h.importBatches();
+        expect(h.snapshot()[0].error).toMatch(/Incomplete batch: 1\/2/);
+        await h.retryFailedImports();
+        expect(h.attempts).toEqual([100, 100]);
+        expect(h.snapshot()[0].error).toBeTruthy();
+    });
+
     it.each(['batch', 'operation', 'processing'] as const)('continues after a %s failure and retains the gap across restart', async (failure) => {
         const first = harness(name, [item(100), item(200)], failure);
         await first.importBatches();
