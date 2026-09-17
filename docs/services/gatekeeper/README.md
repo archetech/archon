@@ -547,6 +547,17 @@ Then signature verification:
 3. Decode the signing public key (see [§5.3](#53-key-resolution-by-operation-type))
 4. ECDSA-verify the prehash against the signature with that public key
 
+The TypeScript Node service uses OpenSSL verification over the bytes before the
+final SHA-256: canonical unsecured JSON for legacy proofs, or the concatenated
+proof-configuration and document digests for the Archon suite. OpenSSL performs
+that final hash once. This produces the same prehash as §5.1; passing the prehash
+itself to this API would incorrectly hash twice. Compact scalar validation and
+low-S rejection remain explicit, and public keys retain the existing compressed
+point interpretation (x plus y parity). The Node implementation caches at most
+1,024 parsed public keys, never signature results or authorization decisions.
+Verification uses Node's worker pool so bounded replay concurrency can overlap
+cryptographic work without blocking the JavaScript thread for each signature.
+
 ### 5.3 Key resolution by operation type
 
 | Operation | verificationMethod | Key source |
@@ -898,6 +909,26 @@ recovers even if repeated imports are suppressed by the in-memory seen set.
 Imports first persist the candidate event, then run the insertion algorithm below and replay the affected DID and its transitive dependents. Imports and direct submissions serialize history mutations. Replay uses a separate working view and invokes the same insertion/authorization algorithm; it never trusts a previous authorization verdict merely because it was once accepted.
 
 Local/gossip candidates retain the first observation of each canonical operation per registry; fresh peer receipt timestamps and ordinals do not add authorization evidence. Anchored candidates retain their distinct chain positions. After startup recovery, a merged import that changes neither retained candidates nor accepted history skips reconciliation and leaves status and verification caches intact. New evidence and changed anchors still reconcile normally.
+
+Canonical predecessor IDs that already match an accepted event are resolved
+directly from that history. Cached operation content is consulted only for an
+unmatched reference that may be a retrieval-CID alias. Startup recovery still
+revalidates operation signatures and authorization against reconstructed history.
+TypeScript's isolated replay copies event rows while sharing read-only operation
+payloads and memoizing their canonical IDs for that replay only. Resolution
+detaches its result before removing deprecated fields, preserving signed bytes.
+Independent agent histories replay in bounded groups of 32; the agent phase
+finishes before the asset phase. Histories with mixed-type or misaddressed
+retained evidence remain at their original sequential positions instead of
+joining parallel groups. Assets then replay in bounded groups,
+preserving each DID's internal candidate order and publishing
+only after reconstruction completes. This relies on self-controlled agents
+and agent-only asset controllers, which are enforced during authorization.
+Search-index initialization uses bounded groups of 32 concurrent reads, with
+each group protected against partial history publication.
+Ordinary resolution computes the canonical CID and block timestamp bounds only
+for the selected version. Verified resolution still checks every included
+operation and its predecessor; both return the same version metadata.
 
 The dependency index includes controller assignments on retained branches, not just the current document. Replay completes self-controlled agent histories before asset histories, retrying candidates within each DID until its sequence stops changing and ordering chain candidates by registry, ordinal, time, and operation CID; registry ordinals are never compared across chains. Local/gossip candidates preserve their existing arrival order. Agents must remain self-controlled and asset owners must be agents. These constraints are checked during creation, direct updates, import, and verified replay, including the new owner of a transfer. Startup repair removes previously accepted violations from the accepted projection while retaining candidate evidence. Replay has no separate oscillation detection or quarantine policy.
 
@@ -1491,3 +1522,27 @@ on the agent with the most dependents. IPFS is in memory: this measures core
 processing and Redis costs, not network synchronization or Herald HTTP latency.
 `ARCHON_BENCHMARK_IMPLEMENTATION` can select another built Gatekeeper `dist/esm`
 directory for before/after comparisons using the same harness and snapshot.
+
+### Startup replay benchmark
+
+Unlike the runtime benchmark above, `scripts/benchmark-gatekeeper-startup.mjs`
+includes startup recovery, the status scan, and search-index initialization.
+Use a built Gatekeeper and an isolated Redis instance:
+
+```sh
+ARCHON_BENCHMARK_HISTORIES=/path/to/accepted-histories.json \
+ARCHON_BENCHMARK_REDIS_URL=redis://127.0.0.1:16380 \
+ARCHON_BENCHMARK_OUTPUT=/tmp/startup-baseline.json \
+node scripts/benchmark-gatekeeper-startup.mjs
+```
+
+The input maps bare DID CID suffixes to hydrated event arrays with operation IDs.
+Each run seeds and deletes only its own unique key prefix; it never flushes Redis.
+Choose a new output path for each run. Set `ARCHON_BENCHMARK_IMPLEMENTATION` to
+another built Gatekeeper `dist/esm` directory to benchmark it, and set
+`ARCHON_BENCHMARK_REFERENCE` to a previous run's output to assert that every
+accepted history matches after recovery. Compare recovered outputs rather than
+assuming an older snapshot needs no canonical-ID repair. The benchmark reports
+wall time and database method counts; summed method durations include concurrent
+calls and must not be interpreted as additive wall time. It uses in-memory IPFS
+and does not seed blockchain metadata, so production timing can differ.

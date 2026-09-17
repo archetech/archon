@@ -24,6 +24,7 @@ These rules apply to coding agents working in this repository.
 - A keymaster capability should reach both UI surfaces -- the wallets (`packages/wallet-ui` plus the apps that mount it) and the standalone clients (`packages/keymaster-ui` plus theirs) -- or its absence should be recorded, with a reason, in the allowlists in `tests/wallet/ui-capability-parity.test.ts`. The clients are demos and need not carry every wallet feature; the point is that leaving one out is a decision someone wrote down rather than one nobody noticed (#935).
 - For GitHub operations in this repo, use `gh` by default, especially for write actions and PR creation. Do not try the GitHub app first and then fall back to `gh` unless the user explicitly asks for the app or `gh` cannot perform the operation.
 - When generating or updating npm lockfiles, use the repo-pinned npm version from the root `package.json` so lockfiles stay compatible with CI.
+- Run root typechecking after package builds finish; build scripts remove `dist` first, and concurrent typechecking can report missing package exports while declarations are being regenerated.
 - For repo-wide version sweeps, search tracked files with `git ls-files` rather than raw filesystem traversal so local `node_modules`, `data`, and build outputs cannot pollute the bump.
 - For focused Rust Gatekeeper fixes, avoid broad `cargo fmt` churn if the crate has pre-existing formatting drift; format only touched code or trim unrelated rustfmt changes before committing.
 - Internal service-to-service admin auth should use `X-Archon-Admin-Key` consistently. Reserve `Authorization` for user/session/OAuth-style flows unless a file explicitly documents a different scheme.
@@ -103,6 +104,8 @@ These rules apply to coding agents working in this repository.
 - CID batch ingress derives `registration.opidx` from the original CID-list index in both ports, independently of the batch ordinal prefix; parity coverage must record the anchoring block to exercise timestamp metadata.
 
 - Treat startup health timeouts after replay changes as performance regressions to measure, not merely timeout settings to increase. Benchmark populated histories in isolation; agents are self-controlled, so replay their histories before assets without repeatedly rebuilding each controller’s dependents. Finish snapshot comparisons before resetting benchmark storage.
+- When optimizing signature verification, compare acceptance against the existing verifier, including high-S rejection, malformed scalars, and compressed-key interpretation. Native SHA-256 verification must receive the signing bytes before the final hash, not the digest. Compare recovered benchmark outputs because historical snapshots may still need canonical-ID repair.
+- Parallel replay must account for rejected evidence in the candidate journal: mixed-type creates or misaddressed events can invalidate independence assumptions even when accepted histories obey controller rules. Preserve sequential ordering at those boundaries.
 
 - Hyperswarm wraps repeated operations in fresh receipt timestamps and ordinals. Sync optimizations must cover those restamped hints, preserve their first observation per canonical operation/registry, and keep distinct blockchain anchors eligible for authorization replay.
 

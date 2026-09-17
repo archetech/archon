@@ -3,6 +3,7 @@ import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import MemoryClient from '@didcid/ipfs/memory';
 import TestHelper from './helper.ts';
+import { jest } from '@jest/globals';
 
 const mockConsole = {
     log: (): void => { },
@@ -311,6 +312,36 @@ describe('search index lifecycle', () => {
 });
 
 describe('initSearchIndex', () => {
+    it('overlaps storage reads with bounded concurrency and indexes every chunk', async () => {
+        const keypair = cipher.generateRandomJwk();
+        const agentDid = await gatekeeper.createDID(await helper.createAgentOp(keypair));
+        for (let i = 0; i < 64; i++) {
+            await gatekeeper.createDID(await helper.createAssetOp(agentDid, keypair, {
+                data: { title: 'BatchSearch', index: i },
+            }));
+        }
+        const getEvents = db.getEvents.bind(db);
+        let active = 0;
+        let peak = 0;
+        const reads = jest.spyOn(db, 'getEvents').mockImplementation(async did => {
+            peak = Math.max(peak, ++active);
+            try {
+                await new Promise(resolve => setTimeout(resolve, 1));
+                return await getEvents(did);
+            } finally {
+                active--;
+            }
+        });
+        try {
+            await gatekeeper.initSearchIndex();
+        } finally {
+            reads.mockRestore();
+        }
+        expect(peak).toBeGreaterThan(1);
+        expect(peak).toBeLessThan(65);
+        expect(await gatekeeper.searchDocs('BatchSearch')).toHaveLength(64);
+    });
+
     it('should rebuild index from existing DIDs', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
