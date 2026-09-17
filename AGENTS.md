@@ -127,3 +127,5 @@ These rules apply to coding agents working in this repository.
 - Preserve numeric JSON-RPC error codes when wrapping Zebra responses. Reorg tests must exercise the actual HTTP-200 `{error: {code: -5, message: "block height not in best chain"}}` envelope through the RPC client; a message-only mock misses the failure that stalls checkpoint recovery.
 
 - In Zcash scan tests, inject transport failures at the client promise boundary rather than using Nock `replyWithError`, whose mock socket can emit delayed unhandled errors between cases. Keep actual HTTP-envelope coverage for JSON-RPC application errors.
+
+- Mediator backlog metrics must retain newly observed tips before subsequent block reads, including mid-pass tip changes; test a successful block followed by a higher tip and a failed next block. Avoid redundant persistence when the observed tip is unchanged.

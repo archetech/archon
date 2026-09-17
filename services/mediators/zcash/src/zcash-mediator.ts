@@ -396,16 +396,23 @@ async function fetchBlock(height: number, blockCount: number): Promise<void> {
     await addBlock(height, blockHash, block.time);
 }
 
-async function scanBlocks(): Promise<void> {
-    try {
-        let blockCount = await zecClient.getBlockCount();
-        console.log(`current block height: ${blockCount}`);
-
-        // Observe the tip even when checkpoint validation holds the scan position.
+// Persist newly observed tips before any subsequent block read can fail.
+async function observeChainTip(previousTip?: number): Promise<number> {
+    const blockCount = await zecClient.getBlockCount();
+    if (blockCount !== previousTip) {
         await jsonPersister.updateDb((db) => {
             db.blockCount = blockCount;
             db.blocksPending = Math.max(0, blockCount - db.height);
         });
+    }
+    return blockCount;
+}
+
+async function scanBlocks(): Promise<void> {
+    try {
+        let blockCount = await observeChainTip();
+        console.log(`current block height: ${blockCount}`);
+
         const start = await resolveScanStart(blockCount);
         if (start === null) return;
 
@@ -413,7 +420,7 @@ async function scanBlocks(): Promise<void> {
             console.log(`${height}/${blockCount} blocks (${formatSyncProgress(height, blockCount)}%)`);
             // Retry a failed block next pass instead of advancing past its operations.
             await fetchBlock(height, blockCount);
-            blockCount = await zecClient.getBlockCount();
+            blockCount = await observeChainTip(blockCount);
         }
     } catch (error) {
         zcashScanErrors.inc();

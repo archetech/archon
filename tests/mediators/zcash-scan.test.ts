@@ -21,7 +21,7 @@ function harness(db = initial()) {
     const counters = { scan: 0, reorg: 0 };
     const addBlock = jest.fn(async (_height: number, _hash: string, _time: number) => {});
     const source = ts.createSourceFile('zcash.ts', readFileSync('services/mediators/zcash/src/zcash-mediator.ts', 'utf8'), ts.ScriptTarget.Latest, true);
-    const required = ['resolveScanStart', 'discoveredKey', 'fetchBlock', 'scanBlocks', 'updateGauges'];
+    const required = ['resolveScanStart', 'discoveredKey', 'fetchBlock', 'observeChainTip', 'scanBlocks', 'updateGauges'];
     const functions = source.statements.filter(ts.isFunctionDeclaration).filter(fn => required.includes(fn.name?.text ?? ''));
     expect(functions).toHaveLength(required.length);
     const program = functions.map(fn => fn.getText(source)).join('\n') + '\n({ scanBlocks, updateGauges })';
@@ -121,4 +121,23 @@ it('counts a failed tip query without inventing a new tip or moving the checkpoi
     expect(h.db).toEqual(initial());
     expect(h.counters).toEqual({ scan: 1, reorg: 0 });
     expect(h.addBlock).not.toHaveBeenCalled();
+});
+
+it('persists a tip discovered mid-pass before the next block fails', async () => {
+    let tipReads = 0;
+    rpc((method, params) => {
+        if (method === 'getblockcount') return { result: ++tipReads === 1 ? height + 1 : tip };
+        if (method === 'getblock' && params[0] === `canonical-${tip}`) {
+            return { error: { code: -1, message: 'new block temporarily unavailable' } };
+        }
+        return canonical(method, params);
+    });
+    const h = harness({ ...initial(), hash: `canonical-${height}` });
+    await h.scanBlocks();
+    await h.updateGauges();
+    expect(h.db).toMatchObject({ height: height + 1, hash: `canonical-${height + 1}`,
+        blockCount: tip, blocksPending: 1 });
+    expect(h.gauges).toMatchObject({ BlockHeight: height + 1, BlockCount: tip, BlocksPending: 1 });
+    expect(h.counters).toEqual({ scan: 1, reorg: 0 });
+    expect(h.addBlock).toHaveBeenCalledTimes(1);
 });

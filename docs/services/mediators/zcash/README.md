@@ -168,8 +168,9 @@ overwritten by a scan that never verified it. The RPC client preserves numeric
 error codes; transport errors retain their distinct codes. A failure to fetch a
 block stops the pass so the next pass retries it before advancing.
 
-After a successful tip query, `blockCount` and `blocksPending` are refreshed even
-if checkpoint validation skips scanning. `zcash_scan_errors_total` counts skipped
+After the initial tip query and whenever the tip changes mid-pass, `blockCount`
+and `blocksPending` are persisted before the next checkpoint or block read. This
+keeps backlog metrics current even if that read fails. `zcash_scan_errors_total` counts skipped
 checkpoint checks and failed scan attempts, separately from batch-import errors.
 
 Reorgs are counted via the `zcash_reorgs_total` metric, once per rewind that is
