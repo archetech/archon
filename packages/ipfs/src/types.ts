@@ -6,5 +6,6 @@ export interface IPFSClient {
     addDataStream(stream: AsyncIterable<Uint8Array>): Promise<string>;
     getDataStream(cid: string): AsyncIterable<Uint8Array>;
     addJSON(json: any): Promise<string>;
+    addJSONBytes(bytes: Uint8Array): Promise<string>;
     getJSON(cid: string): Promise<any>;
 }

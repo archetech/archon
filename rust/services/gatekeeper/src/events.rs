@@ -161,6 +161,7 @@ pub(crate) async fn handle_did_operation(
     crate::history::ensure_history_ready(state)
         .await
         .map_err(|error| error.to_string())?;
+    crate::history::recover_operation_aliases(state, payload).await;
     let _history_guard = state.history_lock.lock().await;
 
     let op_type = payload
@@ -586,7 +587,55 @@ fn event_log_did(config: &crate::Config, event: &EventRecord) -> String {
     infer_event_did(config, &event_record_to_value(event)).unwrap_or_default()
 }
 
-pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) -> ImportStatus {
+pub(crate) async fn import_event_impl(state: &AppState, event: EventRecord) -> ImportStatus {
+    crate::history::recover_operation_aliases(state, &event.operation).await;
+    let canonical_create = event.operation.get("type").and_then(Value::as_str) == Some("create")
+        && infer_event_did(&state.config, &event_record_to_value(&event)).ok()
+            == generate_did_from_operation(&state.config, &event.operation).ok();
+    let alias = if canonical_create {
+        crate::proofs::legacy_numeric_cid(&event.operation).map(|cid| {
+            let prefix = event
+                .operation
+                .pointer("/registration/prefix")
+                .and_then(Value::as_str)
+                .unwrap_or(&state.config.did_prefix);
+            format!("{prefix}:{cid}")
+        })
+    } else {
+        None
+    };
+    let result = import_event_inner(state, event).await;
+    if let Some(alias) = alias {
+        let active = state
+            .candidate_history
+            .lock()
+            .await
+            .as_ref()
+            .is_some_and(|candidates| candidates.contains_key(&alias));
+        let active = active
+            || state
+                .dependents
+                .lock()
+                .await
+                .get(&alias)
+                .is_some_and(|items| !items.is_empty());
+        if active {
+            let seeds = state
+                .genesis_aliases
+                .lock()
+                .await
+                .get(&alias)
+                .cloned()
+                .unwrap_or_default();
+            for seed in seeds.into_values() {
+                Box::pin(import_event_impl(state, seed)).await;
+            }
+        }
+    }
+    result
+}
+
+async fn import_event_inner(state: &AppState, mut event: EventRecord) -> ImportStatus {
     let _guard = state.history_lock.lock().await;
     let did = match infer_event_did(&state.config, &event_record_to_value(&event)) {
         Ok(did) => did,

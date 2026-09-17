@@ -103,3 +103,15 @@ describe('MemoryClient', () => {
         await expect(ipfs.getText(cid)).rejects.toThrow(BlockNotFoundError);
     });
 });
+
+it('stores canonical JSON bytes without numeric-key reordering or a raw codec', async () => {
+    const client = new MemoryClient();
+    const bytes = Buffer.from('{"1":"a","10":"b","2":"c"}');
+    const original = Buffer.from(bytes);
+    const cid = await client.addJSONBytes(bytes);
+    expect(cid).not.toBe(await client.addJSON(JSON.parse(bytes.toString())));
+    expect(cid).not.toBe(await client.addData(bytes));
+    bytes.fill(0);
+    expect(await client.getData(cid)).toEqual(original);
+    expect(await client.getJSON(cid)).toEqual({ '1': 'a', '10': 'b', '2': 'c' });
+});

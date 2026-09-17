@@ -495,7 +495,10 @@ This is convergence on available anchored evidence, not proof of complete histor
 ### Operation identity and retrieval references
 
 An operation's identity is the CID of its complete JCS-canonical JSON, including
-its proof. `versionId`, stored event `opid`, duplicate detection, and candidate
+its proof. Hash and store the UTF-8 canonical string directly with the JSON
+multicodec (`0x0200`) and SHA-256. Parsing that string back into an object before
+serializing it again is incorrect: JavaScript enumerates integer-index members
+numerically and can change JCS's lexical order. `versionId`, stored event `opid`, duplicate detection, and candidate
 replay use that identity. Equal signatures do not imply equal operations: legacy
 proof configuration can change without changing the signature. Different anchors
 of the same operation remain distinct occurrences.
@@ -509,11 +512,30 @@ node's operation cache may resolve to the same canonical predecessor; neither th
 signed operation nor its `previd` is rewritten. An unknown reference remains
 unresolved. A peer's claimed `opid` alone does not install a retrieval alias.
 
+For the historical TypeScript integer-index ordering bug (#1176), a node also
+derives the old reference from the complete operation: canonicalize it, then apply
+the historical JavaScript parse/stringify ordering. If those bytes differ, cache
+the resulting JSON CID as a reference to the same operation. Import and startup
+repair do this locally, without fetching a block or accepting a peer's claimed
+`opid`. The predecessor still undergoes normal identity and authorization checks.
+
+New genesis identifiers use canonical bytes. Existing legacy genesis identifiers
+remain valid historical targets and are not renamed. A known genesis operation
+can seed either of its two derived identifiers, with the original event metadata
+and normal authorization/replay. Recovery is lazy when an old identifier is
+resolved or referenced; existing pending targets are also recovered during import
+and startup. Each identifier retains its own signed target history: an update to
+one identifier is not applied to the other. No arbitrary claimed DID becomes an
+alias. Removing evidence clears its derived in-memory seed lookups.
+
 Startup reconstruction canonicalizes stored event IDs and candidate IDs while
 retaining cached retrieval aliases. A complete database backup must include the
 operation cache as well as the candidate journal. Accepted-history exports alone
-may omit aliases needed by legacy signed predecessors; restore the full database
-or recover the original CID references from their anchors.
+may omit arbitrary retrieval aliases needed by legacy signed predecessors; restore
+the full database or recover the original CID references from their anchors. The
+specific integer-index aliases above can be reconstructed from complete operations.
+See the [serialization audit](services/gatekeeper/README.md#41-canonical-json)
+for pre-existing Rust number/Unicode gaps outside this ordering repair.
 
 ### Implementation boundary: event authorization and proof verification
 

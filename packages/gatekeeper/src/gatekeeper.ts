@@ -1,6 +1,6 @@
 import CipherNode from '@didcid/cipher/node';
 import { copyJSON, compareOrdinals } from '@didcid/common/utils';
-import { isValidDID, generateCID } from '@didcid/ipfs/utils';
+import { isValidDID, generateJSONCID } from '@didcid/ipfs/utils';
 import {
     InvalidParameterError,
     InvalidOperationError
@@ -451,6 +451,8 @@ export default class Gatekeeper implements GatekeeperInterface {
             delete this.eventsSeen[key];
         }
         this.eventsQueue = [];
+        this.legacyOperationIds.clear();
+        this.genesisAliases.clear();
         return true;
     }
 
@@ -462,10 +464,10 @@ export default class Gatekeeper implements GatekeeperInterface {
         const canonical = this.cipher.canonicalizeJSON(operation);
 
         if (save) {
-            return this.ipfs.addJSON(JSON.parse(canonical));
+            return this.ipfs.addJSONBytes(new TextEncoder().encode(canonical));
         }
 
-        const cid = await generateCID(JSON.parse(canonical));
+        const cid = await generateJSONCID(new TextEncoder().encode(canonical));
         cache?.set(operation as object, cid);
         return cid;
     }
@@ -480,6 +482,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     // replay pass an event to the shared authorization path instead.
     async verifyOperation(operation: Operation): Promise<boolean> {
         await this.ensureHistoryReady();
+        await this.recoverOperationAliases(operation);
         return this.withHistoryLock(() => this.authorizeOperation(operation));
     }
 
@@ -903,6 +906,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     async createDID(operation: Operation): Promise<string> {
         await this.ensureHistoryReady();
+        await this.recoverOperationAliases(operation);
         return this.withHistoryLock(async () => {
             const did = await this.createDIDOnce(operation);
             delete this.verifiedDIDs[did];
@@ -1040,6 +1044,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         options?: ResolveDIDOptions
     ): Promise<DidCidDocument> {
         await this.ensureHistoryReady();
+        await this.recoverGenesisAlias(did);
         return this.withHistoryLock(() => this.resolveDIDAt(did, options));
     }
 
@@ -1281,6 +1286,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     async updateDID(operation: Operation): Promise<boolean> {
         await this.ensureHistoryReady();
+        await this.recoverOperationAliases(operation);
         return this.withHistoryLock(async () => {
             const updated = await this.updateDIDOnce(operation);
             if (updated) {
@@ -1431,7 +1437,16 @@ export default class Gatekeeper implements GatekeeperInterface {
         // Load dependencies before removing evidence, including pre-journal DBs.
         await this.retainCandidates(dids[0]);
         try {
+            // Drop derived seed lookups when their source evidence is removed.
             for (const did of dids) {
+                for (const event of this.candidateHistory![did] ?? []) {
+                    if (event.operation.type !== 'create' || !event.opid) continue;
+                    const prefix = event.operation.registration?.prefix || this.didPrefix;
+                    this.genesisAliases.delete(`${prefix}:${event.opid}`);
+                    const legacy = this.legacyOperationIds.get(event.opid);
+                    if (legacy) this.genesisAliases.delete(`${prefix}:${legacy}`);
+                }
+                this.genesisAliases.delete(did);
                 await this.db.setCandidates(did, []);
                 this.candidateHistory![did] = [];
                 await this.db.deleteEvents(did);
@@ -1476,6 +1491,19 @@ export default class Gatekeeper implements GatekeeperInterface {
                 await this.retainCandidates(did, [], histories);
                 preparing.update(index + 1);
             }
+            // A legacy target may arrive before its operation-only genesis on
+            // gossip. Recover its known seed before the startup replay snapshot.
+            for (const did of this.genesisAliases.keys()) {
+                if (this.dependents.get(did)?.size && !dids.has(did)) {
+                    dids.add(did);
+                    targets.push(did);
+                    histories.set(did, []);
+                }
+            }
+            for (const did of targets) {
+                const seeds = [...(this.genesisAliases.get(did)?.values() ?? [])];
+                if (seeds.length) await this.retainCandidates(did, seeds, histories);
+            }
             await this.rebuildHistories(targets, this.candidateHistory ?? {}, histories);
         }).catch(error => { this.historyReady = undefined; throw error; });
         return this.historyReady;
@@ -1487,7 +1515,19 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     private async normalizeOperationId(event: GatekeeperEvent): Promise<void> {
-        const cid = await this.generateCID(event.operation);
+        const canonical = this.cipher.canonicalizeJSON(event.operation);
+        const cid = await generateJSONCID(new TextEncoder().encode(canonical));
+        // Historical TS CIDs reserialized canonical JSON, enumerating integer
+        // indices numerically. Derive that reference from content, never opid.
+        // Most operations have no index keys and require no extra reads/writes.
+        if (/"(?:0|[1-9][0-9]{0,9})":/.test(canonical)) {
+            const legacy = JSON.stringify(JSON.parse(canonical));
+            if (legacy !== canonical) {
+                const alias = await generateJSONCID(new TextEncoder().encode(legacy));
+                this.legacyOperationIds.set(cid, alias);
+                if (!await this.db.getOperation(alias)) await this.db.addOperation(alias, event.operation);
+            }
+        }
         if (event.opid !== cid && !this.candidateHistory?.[event.did ?? '']?.some(known => known.opid === cid)) {
             await this.generateCID(event.operation, true);
         }
@@ -1508,11 +1548,46 @@ export default class Gatekeeper implements GatekeeperInterface {
         return JSON.stringify([event.opid, event.registry, event.time, event.ordinal]);
     }
 
+    private legacyOperationIds = new Map<string, string>();
+    private genesisAliases = new Map<string, Map<string, GatekeeperEvent>>();
+
+    // Genesis has no signed target DID. Recognize only the two identifiers
+    // derived from its bytes, and retain each identifier's own signed history.
+    private async recoverGenesisAlias(did?: string): Promise<void> {
+        if (typeof did !== 'string' || !did || this.candidateHistory?.[did]?.some(event => event.operation.type === 'create')) return;
+        for (const event of this.genesisAliases.get(did)?.values() ?? []) {
+            await this.importEvent(copyJSON(event));
+        }
+    }
+
+    private async recoverOperationAliases(operation: Operation): Promise<void> {
+        if (!operation) return; // Leave malformed-operation errors to validation.
+        const method = operation.proof?.verificationMethod;
+        for (const did of [operation.did, operation.controller,
+            operation.doc?.didDocument?.controller, typeof method === 'string' ? method.split('#')[0] : undefined]) {
+            await this.recoverGenesisAlias(did);
+        }
+    }
+
     private candidateHistory?: Record<string, GatekeeperEvent[]>;
     private dependents = new Map<string, Set<string>>();
 
     private indexCandidates(did: string, events: GatekeeperEvent[]): void {
-        for (const { operation } of events) {
+        for (const event of events) {
+            const { operation } = event;
+            const legacy = event.opid && this.legacyOperationIds.get(event.opid);
+            if (operation.type === 'create' && legacy) {
+                const prefix = operation.registration?.prefix || this.didPrefix;
+                const identities = [`${prefix}:${event.opid}`, `${prefix}:${legacy}`];
+                if (identities.includes(did)) {
+                    for (const target of identities) {
+                        if (target === did) continue;
+                        if (!this.genesisAliases.has(target)) this.genesisAliases.set(target, new Map());
+                        const copy = { ...event, did: target };
+                        this.genesisAliases.get(target)!.set(this.candidateKey(copy), copy);
+                    }
+                }
+            }
             for (const controller of [operation.controller, operation.doc?.didDocument?.controller]) {
                 if (controller) {
                     if (!this.dependents.has(controller)) this.dependents.set(controller, new Set());
@@ -1711,10 +1786,12 @@ export default class Gatekeeper implements GatekeeperInterface {
     async importEvent(event: GatekeeperEvent): Promise<ImportStatus> {
         await this.ensureHistoryReady();
         if (!await this.verifyEvent(event)) return ImportStatus.REJECTED;
+        if (event.operation.type !== 'create') await this.recoverOperationAliases(event.operation);
+        else await this.recoverGenesisAlias(event.operation.controller);
         event = copyJSON(event);
         event.did ??= event.operation.did ?? await this.generateDID(event.operation);
         await this.normalizeOperationId(event);
-        return this.withHistoryLock(async () => {
+        const result = await this.withHistoryLock(async () => {
             const { changed } = await this.retainCandidates(event.did!, [event]);
             const status = await this.importEventOnce(event);
             // Recovery and evidence changes already replay affected histories.
@@ -1729,6 +1806,14 @@ export default class Gatekeeper implements GatekeeperInterface {
             if (!accepted && status === ImportStatus.ADDED) return ImportStatus.REJECTED;
             return status;
         });
+        if (event.operation.type === 'create' && event.did === await this.generateDID(event.operation)) {
+            const legacy = this.legacyOperationIds.get(event.opid!);
+            const target = legacy && `${event.operation.registration?.prefix || this.didPrefix}:${legacy}`;
+            if (target && (this.candidateHistory?.[target] || this.dependents.get(target)?.size)) {
+                for (const seed of this.genesisAliases.get(target)?.values() ?? []) await this.importEvent(copyJSON(seed));
+            }
+        }
+        return result;
     }
 
     private async importEventOnce(event: GatekeeperEvent): Promise<ImportStatus> {

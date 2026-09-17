@@ -1,0 +1,207 @@
+{
+  "agent": {
+    "type": "create",
+    "created": "2026-09-17T11:00:00.000Z",
+    "registration": {
+      "version": 1,
+      "type": "agent",
+      "registry": "hyperswarm"
+    },
+    "publicJwk": {
+      "kty": "EC",
+      "crv": "secp256k1",
+      "x": "I9o4OLoCF-Dz7WvC313IGyADEWkrVirgD2M0GHvCYR8",
+      "y": "TnYS-S8LdarWUSViruA6l73z_mI_VbbLjwe3L10-KOQ"
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2026-09-17T12:00:00.000Z",
+      "verificationMethod": "#key-1",
+      "proofPurpose": "capabilityInvocation",
+      "proofValue": "QUMqYTs0nXt4srpeBMbIQwAAe4H5CEYaNzxsfmPXRC5R4JAS77k54oWEnW2dvysVy5WfP8_IMi_gPasW91mbMw"
+    }
+  },
+  "agentDid": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+  "asset": {
+    "type": "create",
+    "created": "2026-09-17T12:00:00.000Z",
+    "registration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "hyperswarm"
+    },
+    "controller": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+    "data": {
+      "0": [
+        {
+          "3": false,
+          "20": true
+        }
+      ],
+      "nested": {
+        "1": "one",
+        "2": "two",
+        "10": "ten"
+      }
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2026-09-17T12:00:00.000Z",
+      "verificationMethod": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a#key-1",
+      "proofPurpose": "capabilityInvocation",
+      "proofValue": "hAsm2y6r2dYCE5PK-b6cYLY2OFqKnSNbPv_3_VQYQsoad0FkN8VT74sF38Q0wLVrh5Waja8m9TT1lqAcsNiryg"
+    }
+  },
+  "assetDid": "did:cid:bagaaierathkqk47vtwlo6acbzvmbhp44lr3jmi33tfp6ntwo4g57u7o5gira",
+  "legacyAssetDid": "did:cid:bagaaieragnk7rljfhwzu7lzd2xmje5oyrpx3ksg2pqbj5k3oyih4vgcmvcxq",
+  "update": {
+    "type": "update",
+    "did": "did:cid:bagaaierathkqk47vtwlo6acbzvmbhp44lr3jmi33tfp6ntwo4g57u7o5gira",
+    "previd": "bagaaierathkqk47vtwlo6acbzvmbhp44lr3jmi33tfp6ntwo4g57u7o5gira",
+    "doc": {
+      "didDocumentData": {
+        "1": "a",
+        "2": "c",
+        "10": "b",
+        "nested": [
+          {
+            "3": "x",
+            "11": null
+          }
+        ]
+      }
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2026-09-17T12:00:00.000Z",
+      "verificationMethod": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a#key-1",
+      "proofPurpose": "capabilityInvocation",
+      "proofValue": "jkz5kKsTs6TEfvlxjZBdqgJ9QDDxJ9IUBKaO3EX-JYQH57MQmuhs8td-wye9pSrywdbZn8NteR_jQKjKbWxnpA"
+    }
+  },
+  "successor": {
+    "type": "update",
+    "did": "did:cid:bagaaierathkqk47vtwlo6acbzvmbhp44lr3jmi33tfp6ntwo4g57u7o5gira",
+    "previd": "bagaaieraoctfdwos2s7x2ry25w3kbqikrou7hzsceew5uaijzmxzpi6pcjwq",
+    "doc": {
+      "didDocumentData": {
+        "recovered": true
+      }
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2026-09-17T12:00:00.000Z",
+      "verificationMethod": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a#key-1",
+      "proofPurpose": "capabilityInvocation",
+      "proofValue": "GqHz6mUv5m61yHXvbC5i5DFLpMl_gFZyL54MFQtowL0nYTsh-eGKk1ejTLrmOXOgbDkEveQWHskxRF4sfKABrw"
+    }
+  },
+  "legacyAssetUpdate": {
+    "type": "update",
+    "did": "did:cid:bagaaieragnk7rljfhwzu7lzd2xmje5oyrpx3ksg2pqbj5k3oyih4vgcmvcxq",
+    "previd": "bagaaieragnk7rljfhwzu7lzd2xmje5oyrpx3ksg2pqbj5k3oyih4vgcmvcxq",
+    "doc": {
+      "didDocumentData": {
+        "legacyDidPreserved": true
+      }
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2026-09-17T12:00:00.000Z",
+      "verificationMethod": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a#key-1",
+      "proofPurpose": "capabilityInvocation",
+      "proofValue": "hGcofE8iee1WqT9sMC92ZsVHg3UxW1lxw15isTuIZ4wFCFJ1twR-rk8t5LqYzyB2gmgp1ke7yVLqKKI66Ut5Ag"
+    }
+  },
+  "numericAgent": {
+    "type": "create",
+    "created": "2026-09-17T11:00:00.000Z",
+    "registration": {
+      "version": 1,
+      "type": "agent",
+      "registry": "hyperswarm"
+    },
+    "publicJwk": {
+      "kty": "EC",
+      "crv": "secp256k1",
+      "x": "I9o4OLoCF-Dz7WvC313IGyADEWkrVirgD2M0GHvCYR8",
+      "y": "TnYS-S8LdarWUSViruA6l73z_mI_VbbLjwe3L10-KOQ"
+    },
+    "data": {
+      "1": "one",
+      "2": "two",
+      "10": "ten",
+      "4294967294": "last index",
+      "01": "leading",
+      "4294967295": "not index",
+      "-1": "negative"
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2026-09-17T12:00:00.000Z",
+      "verificationMethod": "#key-1",
+      "proofPurpose": "capabilityInvocation",
+      "proofValue": "67pdJgCiqS9iRqU2-3nYKoOE5EavoJHj3YI3H-IV2RdKc1hqGQPZUgVs7_ofSdAUaC6fpo9Hrybfz1DlOhHRYA"
+    }
+  },
+  "numericAgentDid": "did:cid:bagaaieraqjaptmbs7lp2lkw5zwtlupn2k6zvdz27oyxrt3ny7s33ffpfofvq",
+  "legacyAgentDid": "did:cid:bagaaiera2lb6yytaif34niundq7kjgpc2zba33mqwfktyykqsouutybvwgna",
+  "legacyControlledAsset": {
+    "type": "create",
+    "created": "2026-09-17T12:00:00.000Z",
+    "registration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "hyperswarm"
+    },
+    "controller": "did:cid:bagaaiera2lb6yytaif34niundq7kjgpc2zba33mqwfktyykqsouutybvwgna",
+    "data": {
+      "legacyController": true
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2026-09-17T12:00:00.000Z",
+      "verificationMethod": "did:cid:bagaaiera2lb6yytaif34niundq7kjgpc2zba33mqwfktyykqsouutybvwgna#key-1",
+      "proofPurpose": "capabilityInvocation",
+      "proofValue": "1DAKYcc4BiE4xziXXGxJd6ABRxlZW9UQTwjOrjfSA2tFfux8Ow5f2LyczQd_uYcbzM-rBM18MXxP16CTwIvDEQ"
+    }
+  },
+  "legacyControlledAssetDid": "did:cid:bagaaiera34va4l5hbkmisgbboek6jhfuijldhimjaa57yajwofibq5frreqa",
+  "cids": {
+    "agent": {
+      "canonical": "bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+      "legacy": "bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a"
+    },
+    "asset": {
+      "canonical": "bagaaierathkqk47vtwlo6acbzvmbhp44lr3jmi33tfp6ntwo4g57u7o5gira",
+      "legacy": "bagaaieragnk7rljfhwzu7lzd2xmje5oyrpx3ksg2pqbj5k3oyih4vgcmvcxq"
+    },
+    "update": {
+      "canonical": "bagaaierag5mhpg4cdsrxq62drsmdlhvnboxu27o3jpurqxczj647dootticq",
+      "legacy": "bagaaieraoctfdwos2s7x2ry25w3kbqikrou7hzsceew5uaijzmxzpi6pcjwq"
+    },
+    "successor": {
+      "canonical": "bagaaiera6hafktscfvbyeg24kr4hhaa4dls4ugyksulyq2rkfy4afapq6nqq",
+      "legacy": "bagaaiera6hafktscfvbyeg24kr4hhaa4dls4ugyksulyq2rkfy4afapq6nqq"
+    },
+    "legacyAssetUpdate": {
+      "canonical": "bagaaieraxlawoul537ir37ewotbmdtm3u4gcvov5ns6echhofayrnh2lg6ia",
+      "legacy": "bagaaieraxlawoul537ir37ewotbmdtm3u4gcvov5ns6echhofayrnh2lg6ia"
+    },
+    "numericAgent": {
+      "canonical": "bagaaieraqjaptmbs7lp2lkw5zwtlupn2k6zvdz27oyxrt3ny7s33ffpfofvq",
+      "legacy": "bagaaiera2lb6yytaif34niundq7kjgpc2zba33mqwfktyykqsouutybvwgna"
+    },
+    "legacyControlledAsset": {
+      "canonical": "bagaaiera34va4l5hbkmisgbboek6jhfuijldhimjaa57yajwofibq5frreqa",
+      "legacy": "bagaaiera34va4l5hbkmisgbboek6jhfuijldhimjaa57yajwofibq5frreqa"
+    }
+  }
+}

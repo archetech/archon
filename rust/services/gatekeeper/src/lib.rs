@@ -130,6 +130,7 @@ mod tests {
             search_index: Arc::new(Mutex::new(SearchIndex::default())),
             candidate_history: Arc::new(Mutex::new(None)),
             dependents: Arc::new(Mutex::new(HashMap::new())),
+            genesis_aliases: Arc::new(Mutex::new(HashMap::new())),
             history_lock: Arc::new(Mutex::new(())),
             history_ready: Arc::new(Mutex::new(false)),
             processing_events: Arc::new(Mutex::new(false)),
