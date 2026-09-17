@@ -401,3 +401,29 @@ it.each(['anchored', 'gossip', 'restamped-gossip'])('merges known %s sync events
     await g.importEvent(vector.rotation);
     expect((await g.resolveDID(vector.asset, { verify: true })).didDocumentData).toBe('original');
 });
+
+
+describe('pending batch reporting', () => {
+    it('identifies only batches still pending and clears them when dependencies arrive', async () => {
+        const db = new DbJsonMemory('pending-batches');
+        await db.start();
+        const g = new Gatekeeper({ db, ipfs: new MemoryClient(), registries: ['BTC:signet', 'hyperswarm'] });
+        const vector = vectors[0];
+        const asset = { ...vector.base[1], registration: { ...vector.base[1].registration, batch: 'pending-batch' } };
+        await g.importBatch([asset]);
+        expect(await g.processEvents()).toMatchObject({ pending: 1, pendingBatches: ['pending-batch'] });
+        await g.importBatch([vector.base[0]]);
+        expect(await g.processEvents()).toMatchObject({ pending: 0 });
+        await db.stop();
+    });
+
+    it('reports an empty batch list for deferred gossip', async () => {
+        const db = new DbJsonMemory('pending-batches');
+        await db.start();
+        const g = new Gatekeeper({ db, ipfs: new MemoryClient(), registries: ['hyperswarm'] });
+        const asset = { ...vectors[0].base[1], registry: 'hyperswarm', registration: undefined };
+        await g.importBatch([asset]);
+        expect(await g.processEvents()).toMatchObject({ pending: 1, pendingBatches: [] });
+        await db.stop();
+    });
+});

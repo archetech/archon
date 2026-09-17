@@ -1809,7 +1809,11 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         //console.log(JSON.stringify(eventsQueue, null, 4));
         const pending = this.eventsQueue.length;
-        const response = { added, merged, rejected, pending };
+        const pendingBatches = [...new Set(this.eventsQueue
+            .map(event => event.registration?.batch)
+            .filter((batch): batch is string => typeof batch === 'string'))].sort();
+        const response = { added, merged, rejected, pending,
+            ...(pending > 0 ? { pendingBatches } : {}) };
 
         console.log(`processEvents: ${JSON.stringify(response)}`);
 

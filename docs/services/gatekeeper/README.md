@@ -873,6 +873,15 @@ isProcessing = false
 return { added, merged, rejected, pending: import_queue.length }
 ```
 
+When `pending > 0`, the response also includes `pendingBatches`: sorted,
+distinct `registration.batch` DIDs from the same queue snapshot. An empty list
+means only events without batch registration remain. This lets mediators finish
+unrelated batches while retaining retries for their own deferred events, including
+candidate persistence failures. Older servers may omit this field; consumers must
+then fall back to the global count. Batch DIDs are conservative identifiers: if
+multiple anchors reference the same batch, any pending anchor keeps that batch
+retryable. The busy response provides no completion evidence.
+
 ### 8.3 `importEvents()` (single pass)
 
 Drains the queue once. For each event, runs `importEvent` and accumulates

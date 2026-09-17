@@ -557,7 +557,10 @@ function discoveredKey(item: Pick<DiscoveredItem, 'height' | 'index' | 'txid' | 
 }
 
 function isFullyProcessed(item: DiscoveredItem): boolean {
-    return !!item.imported && !!item.processed && !item.processed.busy && (item.processed.pending ?? 0) === 0;
+    // Older Gatekeepers omit pendingBatches; keep their conservative retry behavior.
+    return !item.error && !!item.imported && !!item.processed && !item.processed.busy
+        && ((item.processed.pending ?? 0) === 0
+            || (Array.isArray(item.processed.pendingBatches) && !item.processed.pendingBatches.includes(item.did)));
 }
 
 function preferDiscoveredItem(current: DiscoveredItem, candidate: DiscoveredItem): DiscoveredItem {
@@ -719,7 +722,6 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
         } as DidRegistration,
     };
 
-    const previousPending = item.processed?.pending;
     let update: DiscoveredItem = { ...item };
     delete update.error;
     delete update.processed;
@@ -729,10 +731,9 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
         update.imported = await gatekeeper.importBatchByCids(cids, metadata);
         update.processed = await gatekeeper.processEvents();
 
-        // Record stalled pending work for the retry pass.
-        const newPending = update.processed?.pending ?? 0;
-        if (!retry && newPending > 0 && previousPending !== undefined && newPending >= previousPending) {
-            update.error = `No progress: ${newPending} pending event(s) unresolved`;
+        const accounted = update.imported.queued + update.imported.processed + update.imported.rejected;
+        if (accounted !== batch.ops.length) {
+            update.error = `Incomplete batch: ${accounted}/${batch.ops.length} operation(s) accounted for`;
         }
     } catch (error) {
         satoshiImportErrors.inc();

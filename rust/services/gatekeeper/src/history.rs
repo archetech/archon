@@ -365,6 +365,39 @@ mod tests {
     use serde_json::Value;
 
     #[tokio::test]
+    async fn pending_batches_track_only_deferred_chain_events() {
+        let vectors: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/history-recovery-vectors.json"
+        ))
+        .unwrap();
+        for gossip in [false, true] {
+            let (state, _dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            let mut asset = vectors[0]["base"][1].clone();
+            if gossip {
+                asset["registry"] = json!("hyperswarm");
+                asset.as_object_mut().unwrap().remove("registration");
+            } else {
+                asset["registration"]["batch"] = json!("pending-batch");
+            }
+            crate::import_batch_impl(&state, &[asset]).await;
+            let response = crate::process_events_impl(&state).await;
+            assert_eq!(response.pending, Some(1));
+            assert_eq!(
+                response.pending_batches,
+                Some(if gossip { vec![] } else { vec!["pending-batch".to_string()] })
+            );
+            crate::import_batch_impl(&state, &[vectors[0]["base"][0].clone()]).await;
+            let response = crate::process_events_impl(&state).await;
+            assert_eq!(response.pending, Some(0));
+            assert_eq!(response.pending_batches, None);
+        }
+    }
+
+    #[tokio::test]
     async fn duplicate_sync_preserves_cached_status_and_replays_new_evidence() {
         let vectors: Vec<Value> = serde_json::from_str(include_str!(
             "../../../../tests/gatekeeper/history-recovery-vectors.json"

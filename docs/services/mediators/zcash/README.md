@@ -488,3 +488,18 @@ A conformant third implementation MUST:
   scanned block.
 - Treat `/wallet/bump-fee` as unavailable (`501`) and wait out
   pending anchors rather than attempting RBF.
+
+
+### Batch completion and pending events
+
+Gatekeeper's `processEvents().pending` is a global queue count. When nonzero,
+`pendingBatches` identifies the batch DIDs still represented in that queue.
+After importing every CID, the mediator completes a batch only after a non-busy
+processing result that has no pending events for that batch. Unrelated pending
+events do not trigger reimports. This records processing completion, not final
+authorization; retained history can still be replayed when missing evidence arrives.
+
+Unavailable content, incomplete CID results, processing failures, and batches
+with their own pending events remain retryable. Older Gatekeepers that omit
+`pendingBatches` retain the conservative global-pending behavior. Persisted
+“No progress” errors recover through the normal retry pass without database edits.

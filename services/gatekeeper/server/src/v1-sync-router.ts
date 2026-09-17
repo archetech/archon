@@ -549,6 +549,11 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
      *                     pending:
      *                       type: integer
      *                       description: Number of events still left in the queue after processing.
+     *                     pendingBatches:
+     *                       type: array
+     *                       items:
+     *                         type: string
+     *                       description: Distinct batch DIDs with pending events, from the same queue snapshot as pending. Present when pending is nonzero; an empty list means only events without batch registration remain. Older servers may omit this field.
      *       500:
      *         description: Internal Server Error.
      *         content:
