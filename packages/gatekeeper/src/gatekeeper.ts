@@ -29,6 +29,7 @@ import {
     VerifyDbResult,
 } from './types.js';
 import SearchIndex from './search-index.js';
+import ProgressLogger from './progress.js';
 
 // A well-formed secp256k1 public key, matching the Rust port's
 // public_jwk_to_sec1_bytes: `kty` EC, `crv` secp256k1, and `x`/`y` each 32
@@ -152,6 +153,8 @@ export default class Gatekeeper implements GatekeeperInterface {
     supportedRegistries: string[];
     private didLocks = new Map<string, Promise<void>>();
     private searchIndex: SearchIndex;
+    // Used only by an isolated replay whose operation objects are immutable.
+    private replayOperationIds?: WeakMap<object, string>;
 
     constructor(options: GatekeeperOptions) {
         if (!options || !options.db) {
@@ -197,13 +200,21 @@ export default class Gatekeeper implements GatekeeperInterface {
     async initSearchIndex(): Promise<void> {
         await this.ensureHistoryReady();
         const dids = await this.getDIDs() as string[];
-        for (const did of dids) {
-            try {
-                const doc = await this.resolveDIDAt(did);
-                this.searchIndex.store(did, doc);
-            } catch {
-                // Skip DIDs that can't be resolved
-            }
+        const progress = new ProgressLogger('search indexing', dids.length);
+        let completed = 0;
+        // Like status scans, bound concurrent reads without paying one network
+        // round trip per DID. Each chunk observes completed history publication.
+        for (let offset = 0; offset < dids.length; offset += 32) {
+            await this.withHistoryLock(() => Promise.all(dids.slice(offset, offset + 32).map(async did => {
+                try {
+                    const doc = await this.resolveDIDAt(did);
+                    this.searchIndex.store(did, doc);
+                } catch {
+                    // Skip DIDs that can't be resolved
+                }
+                progress.update(++completed);
+            })));
+            if (offset + 32 < dids.length) await new Promise(resolve => setTimeout(resolve, 0));
         }
         console.log(`Search index initialized with ${this.searchIndex.size} DIDs`);
     }
@@ -333,6 +344,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         const total = dids.length;
+        const progress = new ProgressLogger('DB status check', total);
         let n = 0;
         let agents = 0;
         let assets = 0;
@@ -406,6 +418,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 catch (error) {
                 }
             }
+            progress.update(n);
             if (offset + 32 < dids.length) await new Promise(resolve => setTimeout(resolve, 0));
         }
 
@@ -442,13 +455,19 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async generateCID(operation: unknown, save: boolean = false): Promise<string> {
+        const cache = !save && operation !== null && typeof operation === 'object'
+            ? this.replayOperationIds : undefined;
+        const cached = cache?.get(operation as object);
+        if (cached) return cached;
         const canonical = this.cipher.canonicalizeJSON(operation);
 
         if (save) {
             return this.ipfs.addJSON(JSON.parse(canonical));
         }
 
-        return generateCID(JSON.parse(canonical));
+        const cid = await generateCID(JSON.parse(canonical));
+        cache?.set(operation as object, cid);
+        return cid;
     }
 
     async generateDID(operation: Operation): Promise<string> {
@@ -582,21 +601,21 @@ export default class Gatekeeper implements GatekeeperInterface {
     // it (#1087). The Archon suite signs the proof configuration alongside the
     // operation, concatenating the two digests and hashing once more because
     // ECDSA signs a 32-byte digest where Ed25519 takes the message.
-    private operationMessageHash(operation: Operation): string {
+    private operationSigningBytes(operation: Operation): string | Uint8Array {
         const unsecured = copyJSON(operation);
         delete unsecured.proof;
 
         const proof = operation.proof!;
 
         if (proof.type === LEGACY_PROOF_TYPE) {
-            return this.cipher.hashJSON(unsecured);
+            return this.cipher.canonicalizeJSON(unsecured);
         }
 
         const { proofValue, ...config } = proof;
         void proofValue;
         const digests = this.cipher.hashJSON(config) + this.cipher.hashJSON(unsecured);
 
-        return this.cipher.hashMessage(Uint8Array.from(Buffer.from(digests, 'hex')));
+        return Uint8Array.from(Buffer.from(digests, 'hex'));
     }
 
     // The key the proof names, which is not always the first one. Rotation
@@ -764,9 +783,9 @@ export default class Gatekeeper implements GatekeeperInterface {
                 throw new InvalidOperationError('publicJwk');
             }
 
-            const msgHash = this.operationMessageHash(operation);
+            const message = this.operationSigningBytes(operation);
             const signatureHex = base64urlToHex(operation.proof!.proofValue);
-            return this.cipher.verifySig(msgHash, signatureHex, operation.publicJwk);
+            return this.cipher.verifyMessage(message, signatureHex, operation.publicJwk);
         }
 
         if (operation.registration.type === 'asset') {
@@ -782,7 +801,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 throw new InvalidOperationError(`non-local registry=${operation.registration.registry}`);
             }
 
-            const msgHash = this.operationMessageHash(operation);
+            const message = this.operationSigningBytes(operation);
 
             // Absent means the controller has not been imported yet, which the
             // import state machine defers on. An empty array is a document
@@ -798,7 +817,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
 
             const signatureHex = base64urlToHex(operation.proof!.proofValue);
-            return this.cipher.verifySig(msgHash, signatureHex, publicJwk);
+            return this.cipher.verifyMessage(message, signatureHex, publicJwk);
         }
 
         throw new InvalidOperationError(`registration.type=${operation.registration.type}`);
@@ -826,7 +845,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         const proof = operation.proof!;
-        const msgHash = this.operationMessageHash(operation);
+        const message = this.operationSigningBytes(operation);
 
         const publicJwk = this.operationKey(doc, proof);
 
@@ -835,7 +854,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         const signatureHex = base64urlToHex(proof.proofValue);
-        return this.cipher.verifySig(msgHash, signatureHex, publicJwk);
+        return this.cipher.verifyMessage(message, signatureHex, publicJwk);
     }
 
     async queueOperation(registry: string, operation: Operation, options: { skipPin?: boolean } = {}) {
@@ -1068,18 +1087,17 @@ export default class Gatekeeper implements GatekeeperInterface {
         let versionNum = 1; // initial version is version 1 by definition
         let confirmed = true; // create event is always confirmed by definition
 
-        for (const event of events) {
-            const { time, ordinal, operation, registry, registration: blockchain } = event;
+        const metadataFor = async (event: GatekeeperEvent, registry?: string) => {
+            const { operation, registration: blockchain } = event;
             const versionId = await this.generateCID(operation);
-            const updated = generateStandardDatetime(time);
             let timestamp;
 
-            if (doc.didDocumentRegistration?.registry) {
+            if (registry) {
                 let lowerBound;
                 let upperBound;
 
                 if (operation.blockid) {
-                    const lowerBlock = await this.db.getBlock(doc.didDocumentRegistration.registry, operation.blockid);
+                    const lowerBlock = await this.db.getBlock(registry, operation.blockid);
 
                     if (lowerBlock) {
                         lowerBound = {
@@ -1092,7 +1110,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 }
 
                 if (blockchain) {
-                    const upperBlock = await this.db.getBlock(doc.didDocumentRegistration.registry, blockchain.height);
+                    const upperBlock = await this.db.getBlock(registry, blockchain.height);
 
                     if (upperBlock) {
                         upperBound = {
@@ -1110,13 +1128,25 @@ export default class Gatekeeper implements GatekeeperInterface {
 
                 if (lowerBound || upperBound) {
                     timestamp = {
-                        chain: doc.didDocumentRegistration.registry,
+                        chain: registry,
                         opid: versionId,
                         lowerBound,
                         upperBound,
                     };
                 }
             }
+
+            return { versionId, timestamp };
+        };
+        let selected: { event: GatekeeperEvent; registry?: string } | undefined;
+
+        for (const event of events) {
+            const { time, ordinal, operation, registry } = event;
+            const updated = generateStandardDatetime(time);
+            const projectionRegistry = doc.didDocumentRegistration?.registry;
+            // Verification needs each predecessor's metadata. Ordinary resolution
+            // needs the CID and block bounds only for the version it returns.
+            const { versionId, timestamp } = verify ? await metadataFor(event, projectionRegistry) : {};
 
             if (operation.type === 'create') {
                 if (verify) {
@@ -1134,7 +1164,8 @@ export default class Gatekeeper implements GatekeeperInterface {
                     versionSequence: versionNum.toString(),
                     confirmed,
                     timestamp,
-                }
+                };
+                selected = { event, registry: projectionRegistry };
                 continue;
             }
 
@@ -1164,7 +1195,8 @@ export default class Gatekeeper implements GatekeeperInterface {
                     throw new InvalidOperationError('proof');
                 }
 
-                if (!operation.previd || await this.canonicalReference(operation.previd) !== doc.didDocumentMetadata?.versionId) {
+                if (!operation.previd || (operation.previd !== doc.didDocumentMetadata?.versionId &&
+                    await this.canonicalReference(operation.previd) !== doc.didDocumentMetadata?.versionId)) {
                     throw new InvalidOperationError('previd');
                 }
             }
@@ -1193,7 +1225,8 @@ export default class Gatekeeper implements GatekeeperInterface {
                     versionSequence: versionNum.toString(),
                     confirmed,
                     timestamp,
-                }
+                };
+                selected = { event, registry: projectionRegistry };
                 continue;
             }
 
@@ -1211,8 +1244,13 @@ export default class Gatekeeper implements GatekeeperInterface {
                     versionSequence: versionNum.toString(),
                     confirmed,
                     timestamp,
-                }
+                };
+                selected = { event, registry: projectionRegistry };
             }
+        }
+
+        if (!verify && selected && doc.didDocumentMetadata) {
+            Object.assign(doc.didDocumentMetadata, await metadataFor(selected.event, selected.registry));
         }
 
         doc.didResolutionMetadata = {
@@ -1220,6 +1258,9 @@ export default class Gatekeeper implements GatekeeperInterface {
             retrieved: new Date().toISOString(),
         };
 
+        // Detach before removing deprecated fields: replay reads share immutable
+        // operation payloads, and resolution must never alter signed bytes.
+        doc = copyJSON(doc);
         // Remove deprecated fields
         delete (doc as any)['@context'];
 
@@ -1228,7 +1269,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             delete doc.didDocumentRegistration.registration // Replaced by didDocumentMetadata.timestamp
         }
 
-        return copyJSON(doc);
+        return doc;
     }
 
     async updateDID(operation: Operation): Promise<boolean> {
@@ -1405,6 +1446,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     private historyReady?: Promise<void>;
     private ensureHistoryReady(): Promise<void> {
         this.historyReady ??= this.withHistoryLock(async () => {
+            console.log('Gatekeeper history recovery: loading candidate journal and DID list');
             // A journal write precedes projection writes. Rebuild on startup so
             // an interrupted publication cannot leave dependent state stale.
             const dids = new Set(Object.keys(await this.db.getCandidates()));
@@ -1413,14 +1455,20 @@ export default class Gatekeeper implements GatekeeperInterface {
             // Retain every projection before replaying any history. Rebuild
             // each DID once, rather than once per controller plus once itself.
             const histories = new Map<string, GatekeeperEvent[]>();
+            const loading = new ProgressLogger('history loading', targets.length);
             // Bound outstanding reads while allowing network backends to serve
             // a batch without a round trip for every DID in sequence.
             for (let offset = 0; offset < targets.length; offset += 64) {
                 await Promise.all(targets.slice(offset, offset + 64).map(async did => {
                     histories.set(did, await this.db.getEvents(did));
                 }));
+                loading.update(histories.size);
             }
-            for (const did of targets) await this.retainCandidates(did, [], histories);
+            const preparing = new ProgressLogger('candidate preparation', targets.length);
+            for (const [index, did] of targets.entries()) {
+                await this.retainCandidates(did, [], histories);
+                preparing.update(index + 1);
+            }
             await this.rebuildHistories(targets, this.candidateHistory ?? {}, histories);
         }).catch(error => { this.historyReady = undefined; throw error; });
         return this.historyReady;
@@ -1543,19 +1591,26 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     private async rebuildHistories(targets: string[], candidates: Record<string, GatekeeperEvent[]>, histories?: Map<string, GatekeeperEvent[]>): Promise<boolean> {
         if (!targets.length) return false;
+        // Snapshot-backed replay is startup recovery; runtime imports stay quiet.
+        const snapshot = histories ? new ProgressLogger('replay snapshot', targets.length) : undefined;
         const staged = new Map<string, GatekeeperEvent[]>();
         const original = new Map<string, string>();
-        for (const target of targets) {
+        for (const [index, target] of targets.entries()) {
             const events = histories?.get(target) ?? await this.db.getEvents(target);
             staged.set(target, []);
             original.set(target, this.cipher.canonicalizeJSON(events));
+            snapshot?.update(index + 1);
         }
         // Reuse the ordinary event authorization/import algorithm against an
         // isolated view. Readers never observe a DID half way through replay.
         const db = this.db;
         const overlay = new Proxy(db, {
             get(target, property) {
-                if (property === 'getEvents') return async (key: string) => copyJSON(staged.get(key) ?? histories?.get(key) ?? await db.getEvents(key));
+                // Import may replace rows or fill their opids, but operation
+                // payloads are read-only. Avoid cloning whole controller histories
+                // on every authorization lookup; writes still take deep copies.
+                if (property === 'getEvents') return async (key: string) =>
+                    (staged.get(key) ?? histories?.get(key) ?? await db.getEvents(key)).map(event => ({ ...event }));
                 if (property === 'setEvents') return async (key: string, events: GatekeeperEvent[]) => { staged.set(key, copyJSON(events)); };
                 if (property === 'addEvent') return async (key: string, event: GatekeeperEvent) => { staged.set(key, [...(staged.get(key) ?? []), copyJSON(event)]); };
                 const value = Reflect.get(target, property);
@@ -1563,13 +1618,16 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
         });
         const replay = new Gatekeeper({ db: overlay, ipfs: this.ipfs, didPrefix: this.didPrefix, registries: this.supportedRegistries });
+        replay.replayOperationIds = new WeakMap();
         // Only self-controlled agents can authorize another DID. Complete
         // those independent histories first, then replay their assets once.
         const isAgent = (did: string) => (candidates[did] ?? []).some(({ operation }) =>
             operation.type === 'create' && operation.registration?.type === 'agent');
         targets.sort();
         targets.sort((a, b) => Number(isAgent(b)) - Number(isAgent(a)));
-        for (const target of targets) {
+        const replayProgress = histories ? new ProgressLogger('history replay', targets.length) : undefined;
+        let completed = 0;
+        const rebuild = async (target: string) => {
             const events = copyJSON(candidates[target] ?? []).sort((a, b) => {
                 // Registry-local order first; do not compare ordinal values
                 // across registries. Stable tie-breaking makes replay independent
@@ -1596,9 +1654,41 @@ export default class Gatekeeper implements GatekeeperInterface {
                 }
                 if (this.cipher.canonicalizeJSON(staged.get(target)) === previous) break;
             }
+            replayProgress?.update(++completed);
+        };
+        // Self-controlled agents are independent. Assets only depend on agents,
+        // so finish the entire agent phase before overlapping asset work. Native
+        // proof verification runs in Node's worker pool; bound outstanding work.
+        const independent = (target: string) => (candidates[target] ?? []).every(event => {
+            const operation = event.operation;
+            if (event.did && event.did !== target) return false;
+            if (operation.did && operation.did !== target) return false;
+            if (operation.type !== 'create') return true;
+            if (isAgent(target) && operation.registration?.type !== 'agent') return false;
+            return target === `${operation.registration?.prefix || this.didPrefix}:${event.opid}`;
+        });
+        for (const phase of [targets.filter(isAgent), targets.filter(target => !isAgent(target))]) {
+            let pending: string[] = [];
+            const flush = async () => {
+                await Promise.all(pending.map(rebuild));
+                pending = [];
+            };
+            for (const target of phase) {
+                // Rejected mixed-type or misaddressed evidence is still durable.
+                // Keep the original sequential order at ambiguous boundaries.
+                if (!independent(target)) {
+                    await flush();
+                    await rebuild(target);
+                } else {
+                    pending.push(target);
+                    if (pending.length === 32) await flush();
+                }
+            }
+            await flush();
         }
         let changed = false;
-        for (const target of targets) {
+        const publishing = histories ? new ProgressLogger('history publication', targets.length) : undefined;
+        for (const [index, target] of targets.entries()) {
             if (this.cipher.canonicalizeJSON(staged.get(target)) !== original.get(target)) {
                 changed = true;
                 if (staged.get(target)!.length) await this.db.setEvents(target, staged.get(target)!);
@@ -1606,6 +1696,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 delete this.verifiedDIDs[target];
                 await this.updateSearchIndex(target);
             }
+            publishing?.update(index + 1);
         }
         return changed;
     }
@@ -1715,8 +1806,13 @@ export default class Gatekeeper implements GatekeeperInterface {
                         return ImportStatus.REJECTED;
                     }
 
-                    const previd = await this.canonicalReference(event.operation.previd);
-                    const index = currentEvents.findIndex(item => item.opid === previd);
+                    // Canonical predecessors already identify an accepted event.
+                    // Fetch content only when an alias still needs normalization.
+                    let index = currentEvents.findIndex(item => item.opid === event.operation.previd);
+                    if (index < 0 && event.operation.previd) {
+                        const previd = await this.canonicalReference(event.operation.previd);
+                        index = currentEvents.findIndex(item => item.opid === previd);
+                    }
                     if (currentEvents.length > 0 && index < 0) {
                         return ImportStatus.DEFERRED;
                     }

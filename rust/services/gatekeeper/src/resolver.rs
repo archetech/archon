@@ -382,10 +382,12 @@ pub(crate) async fn build_search_index(state: &AppState) {
     };
 
     let mut next_index = crate::SearchIndex::default();
-    for did in dids {
+    let mut progress = crate::progress::ProgressLogger::new("search indexing", dids.len());
+    for (index, did) in dids.into_iter().enumerate() {
         if let Ok(doc) = resolve_local_doc_async(state, &did, ResolveOptions::default()).await {
             next_index.store(&did, &doc);
         }
+        progress.update(index + 1);
     }
 
     let size = next_index.size();
@@ -504,11 +506,13 @@ pub(crate) async fn check_dids_impl(
     let mut by_registry = HashMap::new();
     let mut by_version = HashMap::new();
 
-    for did in &dids {
+    let mut progress = crate::progress::ProgressLogger::new("DB status check", dids.len());
+    for (index, did) in dids.iter().enumerate() {
         let doc = {
             let store = state.store.lock().await;
             store.resolve_doc(&state.config, did, ResolveOptions::default())
         };
+        progress.update(index + 1);
         let Ok(doc) = doc else {
             by_type.invalid += 1;
             continue;
