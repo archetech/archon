@@ -41,7 +41,7 @@ function harness(db = initial()) {
         isValidDID: (value: string) => value === did, formatSyncProgress: () => '0',
         importRunning: false, exportRunning: false, ...metrics,
     }) as { scanBlocks(): Promise<void>; updateGauges(): Promise<void> };
-    return { ...api, db, counters, gauges, addBlock };
+    return { ...api, db, counters, gauges, addBlock, zecClient };
 }
 
 function rpc(reply: (method: string, params: unknown[]) => unknown) {
@@ -85,11 +85,12 @@ it('recovers the production orphaned checkpoint through HTTP-200 RPC decoding, s
 });
 
 it.each(['ECONNREFUSED', 'ETIMEDOUT'])('holds the checkpoint on %s while exposing fresh backlog and a scan error', async code => {
-    // Put the header failure first, before the general interceptor.
-    nock('http://zcash-rpc.test:8232').post('/', body => body.method === 'getblockheader')
-        .replyWithError(Object.assign(new Error(code), { code }));
     rpc(canonical);
     const h = harness();
+    // Nock's replyWithError can emit a second socket error after rejection.
+    // Inject transport rejection at the client boundary; RPC-envelope decoding
+    // remains covered by the HTTP-200 orphaned-checkpoint regression above.
+    jest.spyOn(h.zecClient, 'getBlockHeader').mockRejectedValue(Object.assign(new Error(code), { code }));
     await h.scanBlocks();
     await h.updateGauges();
     expect(h.db).toMatchObject({ height, hash: 'orphan', blockCount: tip, blocksPending: 2 });

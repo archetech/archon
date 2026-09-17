@@ -125,3 +125,5 @@ These rules apply to coding agents working in this repository.
 - Signed negative protocol fixtures should isolate the invariant under test: keep required fields complete and avoid unrelated invalid controller/document changes. For immutable-kind cases, changing only the registration kind should make the fixture valid if that equality check is removed.
 
 - Preserve numeric JSON-RPC error codes when wrapping Zebra responses. Reorg tests must exercise the actual HTTP-200 `{error: {code: -5, message: "block height not in best chain"}}` envelope through the RPC client; a message-only mock misses the failure that stalls checkpoint recovery.
+
+- In Zcash scan tests, inject transport failures at the client promise boundary rather than using Nock `replyWithError`, whose mock socket can emit delayed unhandled errors between cases. Keep actual HTTP-envelope coverage for JSON-RPC application errors.
