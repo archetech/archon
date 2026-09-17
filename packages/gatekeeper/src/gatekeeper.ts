@@ -483,8 +483,26 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.withHistoryLock(() => this.authorizeOperation(operation));
     }
 
+    private async creationRegistration(did?: string) {
+        return did ? (await this.db.getEvents(did))[0]?.operation.registration : undefined;
+    }
+
     private async creationType(did?: string): Promise<string | undefined> {
-        return did ? (await this.db.getEvents(did))[0]?.operation.registration?.type : undefined;
+        return (await this.creationRegistration(did))?.type;
+    }
+
+    // Registration is a whole component replacement; omitted fields are not merged.
+    private validRegistration(value: unknown, genesis?: Operation['registration']): boolean {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+        const registration = value as Record<string, unknown>;
+        if (registration.version !== 1 ||
+            !['agent', 'asset'].includes(registration.type as string) ||
+            !isValidRegistryName(registration.registry)) return false;
+        // Undefined optional members disappear on the JSON wire (including in local SDK calls).
+        if (registration.validUntil !== undefined &&
+            (typeof registration.validUntil !== 'string' || !this.verifyDateFormat(registration.validUntil))) return false;
+        return !genesis || (registration.version === genesis.version && registration.type === genesis.type &&
+            registration.prefix === genesis.prefix);
     }
 
     private async isSelfControlledAgent(doc: DidCidDocument): Promise<boolean> {
@@ -513,12 +531,12 @@ export default class Gatekeeper implements GatekeeperInterface {
         if (operation.type === 'update' || operation.type === 'delete') {
             const current = previous ?? await this.resolveDIDAt(operation.did);
             await this.validatePredecessor(operation, current);
-            const type = await this.creationType(operation.did);
+            const genesis = await this.creationRegistration(operation.did);
+            const type = genesis?.type;
             if (!this.verifyProofFormat(operation.proof)) throw new InvalidOperationError('proof');
             if (!type || current.didDocumentMetadata?.deactivated) return this.verifyUpdateOperation(operation, current);
-            // A DID cannot change kind to bypass the controller constraints.
-            const nextType = operation.doc?.didDocumentRegistration?.type;
-            if (nextType !== undefined && nextType !== type) return false;
+            if (operation.doc?.didDocumentRegistration !== undefined &&
+                !this.validRegistration(operation.doc.didDocumentRegistration, genesis)) return false;
             const next = operation.doc?.didDocument ?? current.didDocument;
             if (!next || next.id !== operation.did) return false;
             let authority: DidCidDocument;
@@ -552,7 +570,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             : undefined;
         if (controller?.didDocumentRegistration && !await this.isSelfControlledAgent(controller)) return false;
         const valid = await this.verifyCreateOperation(operation, controller);
-        if (!valid) return false;
+        if (!valid || !this.validRegistration(operation.registration)) return false;
         if (operation.registration?.type === 'agent') return operation.controller === undefined;
         return !!controller && await this.isSelfControlledAgent(controller);
     }

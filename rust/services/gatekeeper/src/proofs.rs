@@ -172,7 +172,7 @@ fn exceeds_json_size(value: &Value, limit: usize) -> bool {
     serde_json::to_writer(&mut writer, value).is_err()
 }
 
-fn verify_date_format(time: Option<&str>) -> bool {
+pub(crate) fn verify_date_format(time: Option<&str>) -> bool {
     time.and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
         .is_some()
 }

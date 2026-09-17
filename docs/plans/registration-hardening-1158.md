@@ -1,99 +1,78 @@
 # Registration transition hardening (#1158)
 
-Status: proposal for the reserved stricter protocol version. This document does
-not activate version 2 or change version-1 acceptance. It completes the
-registration investigation following the predecessor fix merged in #1174.
+Status: implemented for version 1 in PR #1181, following the predecessor fix in
+#1174. Version 2 remains disabled. This supersedes the earlier versioned-only
+registration proposal with the user's approval after auditing production history.
+Key permissions (#1156), byte limits (#1159), CID consistency (#1180), receipt-clock
+ordering (#1149), and retry classification (#1178) remain separate work.
 
-## Verified version-1 behavior
+## Compatibility decision
 
-The shared signed fixture `tests/gatekeeper/registration-transition-v1-vectors.json`
-covers direct submission, import, ordinary/verified resolution, and startup replay
-in TypeScript and Rust. Each case starts from an agent genesis with version 1,
-registry `hyperswarm`, and a valid future expiry. These are synthetic cases; they
-do not establish that every accepted shape exists in anchored production history.
+The read-only production audit on 2026-09-17 found 25,593 accepted DIDs, 40,107
+accepted events, and 14,418 updates, including 289 registration replacements.
+There were no malformed genesis or update registrations under the rules below.
+The candidate journal contained four unique candidate-only updates, including two
+registration replacements; none violated these rules either. All operations were
+available, and repeated reads detected no changed, added, or removed histories.
+The user confirmed that the other production nodes share this database and approved
+version-1 enforcement. Previously permissive cases were synthetic test inputs.
 
-| Update | Existing outcome |
+Malformed registration histories that were previously accepted are now rejected
+on replay. No such history was found in the audited production database. This is
+an explicit registration-only compatibility decision, not a general authorization
+to tighten key permissions or byte limits without their own compatibility policy.
+
+## Enforced registration rules
+
+| Field or component | Version-1 rule |
 | --- | --- |
-| Omit `didDocumentRegistration` | Retain the previous registration, including expiry. |
-| Supply only `{ "registry": "hyperswarm" }` | Replace the entire registration; omit version, kind, and expiry from the resulting component. |
-| Supply version `999` and expiry `"not-a-date"` with a supported registry | Accept and retain both values. |
-| Supply version `2` on a version-1 DID | Accept that metadata value; it does not create a version-2 genesis or enable a new protocol. |
-| Supply string version `"1"` and `null` expiry | Accept and retain those values. |
-| Omit registry from the supplied component | Accept the replacement; the resulting registration has no registry. |
-| Supply a different prefix | Accept the metadata change; the DID identifier stays unchanged. |
-| Change kind from agent to asset | Reject; authorization already derives kind from genesis. |
+| Registration component | Genesis requires an object. An update may omit it to retain the previous component; if supplied, it must be an object and replaces the entire component. Null, arrays, and scalar replacements are invalid. |
+| `version` | Required integer `1`; every replacement must match immutable genesis. Editing metadata cannot activate another protocol version. |
+| `type` | Required `agent` or `asset`, matching immutable genesis. Existing self-control and agent-owner rules continue to apply. |
+| `registry` | Required string of 1–128 characters matching `[A-Za-z0-9][A-Za-z0-9:_-]*`. May change under existing registry-migration rules. This is not a chain allowlist. |
+| `prefix` | Optional at creation. Replacements preserve its genesis presence and value. No additional creation-prefix grammar is introduced. |
+| `validUntil` | Optional string using the shared RFC 3339 timestamp grammar. Null, numbers, empty strings, and malformed timestamps are invalid. Omission in a complete replacement removes expiry; a valid value may change. |
+| Extension members | Allowed; this change adds no restriction on unknown members. |
 
-A new genesis with version 2 is rejected in both ports. The fixtures preserve that
-boundary. Unsupported-version metadata in an update must never become an implicit
-activation mechanism for future rules.
+JavaScript optional members set to `undefined` serialize as omission. Local SDK
+calls retain that behavior for optional expiry, prefix, and registration components. Registration omission is distinct
+from a partial replacement: `{ "registry": "hyperswarm" }` drops required fields
+and is invalid.
 
-A supplied registration **replaces the component**; omission preserves the
-component. It is not a field-level merge. An omitted registry can consequently
-leave a DID without the registry needed by later direct submission. Fixing those
-shapes by newly rejecting version-1 replay would violate the approved historical
-compatibility policy.
+Configured registry support remains a local submission/distribution constraint;
+imports may use well-formed registry names that the node does not support locally.
+Migration authorization and confirmation ordering are unchanged. Expiry syntax
+validation adds no wall-clock, proof-time, or anchor-time enforcement and does not
+redefine garbage collection.
 
-## Proposed stricter registration rules
+## Validation placement and evidence
 
-Apply these rules only after a cohesive version-2 contract is agreed and implemented.
-For an existing DID, select policy from the accepted genesis operation's version,
-never from a mutable resolved registration field, the controller's version, local
-receipt time, or node configuration. Creation selects policy from its own signed
-registration. A version-1 update claiming version 2 continues to use version-1 rules.
+Validation runs at the shared operation/event authorization boundary before
+acceptance, using the existing genesis lookup for immutable version, kind, and
+prefix. Direct malformed updates fail before operation storage or queue writes.
+Import and startup recovery keep candidate evidence and use the same validation;
+missing predecessor recovery and competing-branch selection remain intact.
+Cryptographic proof verification gains no history lookup responsibilities.
 
-| Field or component | Proposed version-2 rule |
-| --- | --- |
-| Registration component | Genesis requires an object. An update may omit it to retain the previous component; if supplied, it must be an object and replaces the entire component. Reject null, arrays, and scalar replacements. |
-| `version` | Required integer `2`; cannot change or disappear in a replacement. This describes the immutable genesis-selected protocol, not an upgrade request. |
-| `type` | Required `agent` or `asset`; every replacement must match the genesis kind. Existing self-control and agent-owner rules continue to apply. |
-| `registry` | Required string satisfying the shared registry-name grammar. It may change under the existing registry-migration rules. It is not a closed chain allowlist. |
-| `prefix` | Optional at creation. A replacement must preserve its genesis presence and value; registration edits cannot change the DID namespace. Specify any additional creation-prefix grammar separately rather than inventing it here. |
-| `validUntil` | Optional RFC 3339 string, using the shared timestamp grammar. Reject nonstrings and malformed timestamps. Omission in a replacement removes the expiry; a valid value can change. No monotonic-expiry restriction is proposed. |
-| Extension members | No new restriction proposed here. Additional constraints require an explicit rule; do not infer them from this table. |
+Shared signed fixtures cover omission, complete replacement, expiry removal and
+syntax, invalid field types, version/kind/prefix changes, extension members, and
+registry migration. Both ports exercise direct submission, import, verified and
+ordinary resolution, restart, and repair of pre-existing malformed projections.
+Rejected direct submissions are checked for database side effects. Older migration
+and controller fixtures now supply complete registrations; deterministic synthetic
+fixture generators are checked in so future updates can be reproduced.
 
-The prefix rule prevents replacement metadata from claiming a namespace different
-from the one used to generate the immutable DID; the version-1 fixture demonstrates
-that those values can currently disagree. This is a proposed new-version constraint,
-not a reason to reject that existing version-1 history.
+Production replay uses a read-only exported copy and isolated storage, comparing
+accepted histories before and after enforcement in each port. No live-node writes
+or restart are needed for this check.
 
-Registry support configured on a node remains a local submission/distribution
-constraint. It must not make an otherwise valid imported registration invalid.
-A migration is authorized against the selected predecessor and follows the existing
-confirmation ordering; this proposal does not change which chain confirms it.
-
-Expiry syntax is distinct from expiry enforcement. This step introduces no new
-rejection based on the current wall clock, proof time, or anchor time, and does not
-redefine garbage collection. Those semantics must be stated in the coordinated
-#1160 contract before activation.
-
-## Validation placement
-
-Validate the resulting registration at the shared operation/event authorization
-boundary, after selecting the predecessor and before accepting the transition.
-Direct submission supplies its current head and must reject a malformed new-version
-transition before operation storage or queue writes. Import/replay supplies the
-candidate predecessor; missing evidence remains deferred and candidates remain
-available for later revalidation. Proof verification continues to receive an
-explicit authority and must not gain history lookup responsibilities.
-
-A valid replacement must be checked as a whole. Checking only fields present in
-the operation would accept a replacement that drops a required field. Omission of
-the entire component, in contrast, retains the validated predecessor component.
-
-## Activation and review gates
-
-1. Review the proposed required fields, prefix immutability, replacement semantics,
-   and editable expiry. Keep the existing version-1 fixtures passing.
-2. Complete the companion version-2 key-permission (#1156) and byte-limit (#1159)
-   contracts and consolidate transitions in #1160. Define cross-version authority
-   behavior there; this registration-only proposal does not settle it.
-3. Implement the selected policy in both ports with signed positive/negative cases
-   for submission, import, restart, and competing predecessors. Cover registration
-   omission, complete replacement, invalid field types, version/kind/prefix changes,
-   registry migration, and expiry syntax. Verify rejection precedes direct writes.
-4. Enable version 2 only with the complete contract, cross-port tests, and bounded
-   startup/sync validation. Do not progressively tighten a partially enabled version.
-
-CID generation/alignment (#1180), receipt-clock ordering (#1149), and retry
-classification (#1178) remain separate work. This proposal does not change their
-policies or require a CID migration.
+The 2026-09-17 before/after runs produced identical accepted histories for all
+25,593 DIDs and 40,107 events in each port. TypeScript's isolated Redis DB check
+was 45.2s before and 45.7s after with identical storage-call counts; Rust's
+unoptimized startup test was 281.4s before and 268.4s after. These local timings
+are observational, not deployment-time guarantees. The TypeScript Gatekeeper
+suite passed 681 tests; the Rust library suite passed 67 tests (three benchmarks
+ignored). Build, root typecheck, and focused lint passed; lint retains one existing
+startup-loop warning. Two tests exceeded their default five-second timeout during
+concurrent benchmarking; the complete TypeScript rerun with a 20-second allowance
+passed without changing repository timeout configuration.

@@ -525,14 +525,26 @@ operation cache as well as the candidate journal. Accepted-history exports alone
 may omit aliases needed by legacy signed predecessors; restore the full database
 or recover the original CID references from their anchors.
 
-### Registration hardening status
+### Registration validation
 
-The stricter registration contract is a [proposal](plans/registration-hardening-1158.md),
-not an active protocol change. Version-1 registration replacements currently accept
-some malformed or omitted fields; shared signed compatibility fixtures record that
-behavior. Supplied registration objects replace the component rather than merging
-individual fields. A future stricter policy must be selected by immutable genesis
-version and must not be enabled by editing `didDocumentRegistration.version`.
+Version 1 requires registration objects with `version: 1`, `type: "agent"` or
+`"asset"`, and a registry name of 1–128 characters matching
+`[A-Za-z0-9][A-Za-z0-9:_-]*`. On update, omitting `didDocumentRegistration` retains
+it; supplying it replaces the entire component and must include all required
+fields. Null, array, scalar, and partial replacements are invalid.
+
+Every replacement preserves genesis version, kind, and prefix presence/value.
+A valid registry may change under existing migration rules. Optional `validUntil`
+must use the shared RFC 3339 string grammar; a complete replacement may change or
+omit expiry. Unknown extension fields remain allowed. These checks introduce no
+new expiry enforcement or creation-prefix grammar. Imports validate registry name
+shape independently of the node's locally supported registries.
+
+Both ports enforce this at shared event authorization, including startup recovery.
+The [registration hardening record](plans/registration-hardening-1158.md) documents
+the production audit and approved version-1 compatibility decision. Malformed
+registrations previously accepted by older implementations are rejected on replay;
+none were found in the audited production history. Version 2 remains disabled.
 
 ### Implementation boundary: event authorization and proof verification
 

@@ -5,7 +5,7 @@ use async_recursion::async_recursion;
 use serde_json::Value;
 
 use crate::proofs::{
-    verify_create_operation_impl, verify_proof_format, verify_update_operation_impl,
+    verify_create_operation_impl, verify_date_format, verify_proof_format, verify_update_operation_impl,
 };
 use crate::{resolve_local_doc_async, AppState, EventRecord, GatekeeperDb, ResolveOptions};
 
@@ -106,16 +106,52 @@ async fn controller_for_event(
     .await
 }
 
-async fn creation_type(state: &AppState, did: &str) -> Option<String> {
+async fn creation_registration(state: &AppState, did: &str) -> Option<Value> {
     state
         .store
         .lock()
         .await
         .get_events(did)
         .first()
-        .and_then(|event| event.operation.pointer("/registration/type"))
-        .and_then(Value::as_str)
+        .and_then(|event| event.operation.get("registration"))
+        .cloned()
+}
+
+async fn creation_type(state: &AppState, did: &str) -> Option<String> {
+    creation_registration(state, did)
+        .await?
+        .get("type")?
+        .as_str()
         .map(str::to_owned)
+}
+
+// Registration replaces the whole component; omission is handled by the caller.
+fn valid_registration(value: &Value, genesis: Option<&Value>) -> bool {
+    let Some(registration) = value.as_object() else {
+        return false;
+    };
+    if registration.get("version").and_then(Value::as_i64) != Some(1)
+        || !matches!(
+            registration.get("type").and_then(Value::as_str),
+            Some("agent" | "asset")
+        )
+        || !registration
+            .get("registry")
+            .and_then(Value::as_str)
+            .is_some_and(crate::is_valid_registry)
+    {
+        return false;
+    }
+    if let Some(expiry) = registration.get("validUntil") {
+        if !verify_date_format(expiry.as_str()) {
+            return false;
+        }
+    }
+    genesis.is_none_or(|genesis| {
+        registration.get("version") == genesis.get("version")
+            && registration.get("type") == genesis.get("type")
+            && registration.get("prefix") == genesis.get("prefix")
+    })
 }
 
 async fn self_controlled_agent(state: &AppState, doc: &Value) -> bool {
@@ -185,7 +221,10 @@ pub(crate) async fn authorize_operation(
                     return Ok(false);
                 }
             }
-            verify_create_operation_impl(operation, controller.as_ref())
+            Ok(
+                verify_create_operation_impl(operation, controller.as_ref())?
+                    && valid_registration(&operation["registration"], None),
+            )
         }
         Some("update" | "delete") => {
             let did = operation
@@ -197,8 +236,11 @@ pub(crate) async fn authorize_operation(
                 None => resolve_local_doc_async(state, did, ResolveOptions::default()).await?,
             };
             validate_predecessor(state, operation, &current).await?;
-            let creation_kind = creation_type(state, did).await;
-            let kind = creation_kind.as_deref();
+            let genesis = creation_registration(state, did).await;
+            let kind = genesis
+                .as_ref()
+                .and_then(|value| value.get("type"))
+                .and_then(Value::as_str);
             if current
                 .pointer("/didDocumentMetadata/deactivated")
                 .and_then(Value::as_bool)
@@ -207,8 +249,8 @@ pub(crate) async fn authorize_operation(
             {
                 return Ok(false);
             }
-            if let Some(next_kind) = operation.pointer("/doc/didDocumentRegistration/type") {
-                if next_kind.as_str() != kind {
+            if let Some(registration) = operation.pointer("/doc/didDocumentRegistration") {
+                if !valid_registration(registration, genesis.as_ref()) {
                     return Ok(false);
                 }
             }

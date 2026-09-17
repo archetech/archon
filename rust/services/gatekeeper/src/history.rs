@@ -914,30 +914,39 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn registration_v1_acceptance_survives_submission_import_and_restart() {
+    async fn registration_v1_validation_covers_submission_import_and_restart() {
         let v: Value = serde_json::from_str(include_str!(
             "../../../../tests/gatekeeper/registration-transition-v1-vectors.json"
         ))
         .unwrap();
-        let did = v["did"].as_str().unwrap();
         let wrap = |operation: &Value| {
             crate::value_to_event_record(&json!({
                 "operation": operation, "registry": "hyperswarm", "time": operation["proof"]["created"]
             }))
         };
         for case in v["cases"].as_array().unwrap() {
+            let agent = case.get("agent").unwrap_or(&v["agent"]);
+            let did = case.get("did").unwrap_or(&v["did"]).as_str().unwrap();
             let accepted = case["accepted"].as_bool().unwrap();
-            for direct in [true, false] {
+            for mode in ["direct", "import", "replay"] {
                 let (state, _dir) = crate::tests::make_state(JsonDb {
                     backend: DbBackend::Memory,
                     data: JsonDbFile::default(),
                     redis_connection: None,
                 });
+                if mode == "direct" {
+                    state
+                        .supported_registries
+                        .lock()
+                        .await
+                        .push("BTC:signet".to_string());
+                }
                 ensure_history_ready(&state).await.unwrap();
-                if direct {
-                    crate::events::handle_did_operation(&state, &v["agent"])
+                if mode == "direct" {
+                    crate::events::handle_did_operation(&state, agent)
                         .await
                         .unwrap();
+                    let before = serde_json::to_value(&state.store.lock().await.data).unwrap();
                     assert_eq!(
                         crate::events::handle_did_operation(&state, &case["operation"])
                             .await
@@ -946,8 +955,14 @@ mod tests {
                         "{}",
                         case["name"]
                     );
-                } else {
-                    crate::events::import_event_impl(&state, wrap(&v["agent"])).await;
+                    if !accepted {
+                        assert_eq!(
+                            serde_json::to_value(&state.store.lock().await.data).unwrap(),
+                            before
+                        );
+                    }
+                } else if mode == "import" {
+                    crate::events::import_event_impl(&state, wrap(agent)).await;
                     let status =
                         crate::events::import_event_impl(&state, wrap(&case["operation"])).await;
                     assert!(
@@ -960,6 +975,22 @@ mod tests {
                         case["name"]
                     );
                 }
+                if mode == "replay" {
+                    let events: Vec<_> = [agent, &case["operation"]]
+                        .into_iter()
+                        .map(|op| {
+                            let mut event = wrap(op);
+                            event.opid = Some(generate_json_cid(op).unwrap());
+                            event
+                        })
+                        .collect();
+                    let mut store = state.store.lock().await;
+                    store
+                        .data
+                        .dids
+                        .insert(did.rsplit(':').next().unwrap().to_string(), events.clone());
+                    store.data.candidates.insert(did.to_string(), events);
+                }
                 let data: JsonDbFile = serde_json::from_value(
                     serde_json::to_value(&state.store.lock().await.data).unwrap(),
                 )
@@ -969,7 +1000,12 @@ mod tests {
                     data,
                     redis_connection: None,
                 });
-                for current in [&state, &restarted] {
+                let states = if mode == "replay" {
+                    vec![&restarted]
+                } else {
+                    vec![&state, &restarted]
+                };
+                for current in states {
                     ensure_history_ready(current).await.unwrap();
                     for verify in [false, true] {
                         let doc = crate::resolve_local_doc_async(
@@ -995,6 +1031,29 @@ mod tests {
                     }
                 }
             }
+        }
+        for operation in v["invalidGenesis"].as_array().unwrap() {
+            let (state, _dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            ensure_history_ready(&state).await.unwrap();
+            let before = serde_json::to_value(&state.store.lock().await.data).unwrap();
+            assert!(crate::events::handle_did_operation(&state, operation)
+                .await
+                .is_err());
+            assert_eq!(
+                serde_json::to_value(&state.store.lock().await.data).unwrap(),
+                before
+            );
+            let status = crate::events::import_event_impl(&state, wrap(operation)).await;
+            // Malformed-string exceptions retain existing retry classification (#1178).
+            assert!(matches!(
+                status,
+                crate::events::ImportStatus::Rejected | crate::events::ImportStatus::Deferred
+            ));
+            assert!(state.store.lock().await.data.dids.is_empty());
         }
         let (state, _dir) = crate::tests::make_state(JsonDb {
             backend: DbBackend::Memory,
