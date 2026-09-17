@@ -132,6 +132,28 @@ async fn self_controlled_agent(state: &AppState, doc: &Value) -> bool {
             != Some(true)
 }
 
+// The target's predecessor is distinct from the agent selected to authorize it.
+async fn validate_predecessor(state: &AppState, operation: &Value, previous: &Value) -> Result<()> {
+    let reference = operation
+        .get("previd")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let version_id = previous
+        .pointer("/didDocumentMetadata/versionId")
+        .and_then(Value::as_str);
+    let valid = match version_id {
+        Some(version_id) if !reference.is_empty() => {
+            reference == version_id
+                || state.store.lock().await.canonical_reference(reference) == version_id
+        }
+        _ => false,
+    };
+    if !valid {
+        anyhow::bail!("Invalid operation: previd");
+    }
+    Ok(())
+}
+
 /// Select authority once, then verify the operation against that document.
 /// Agents authorize themselves; assets have exactly one agent as their owner.
 #[async_recursion]
@@ -174,6 +196,7 @@ pub(crate) async fn authorize_operation(
                 Some(doc) => doc.clone(),
                 None => resolve_local_doc_async(state, did, ResolveOptions::default()).await?,
             };
+            validate_predecessor(state, operation, &current).await?;
             let creation_kind = creation_type(state, did).await;
             let kind = creation_kind.as_deref();
             if current

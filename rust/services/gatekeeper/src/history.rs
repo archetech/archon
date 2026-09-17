@@ -751,6 +751,45 @@ mod tests {
         std::fs::write(output, serde_json::to_vec(&store.data.dids).unwrap()).unwrap();
     }
 
+    #[tokio::test]
+    async fn shared_predecessor_validation_precedes_direct_writes_and_preserves_recovery() {
+        let vector: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/transition-predecessor-vectors.json"
+        )).unwrap();
+        let did = vector["did"].as_str().unwrap();
+        let (state, _dir) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None,
+        });
+        crate::events::handle_did_operation(&state, &vector["create"]).await.unwrap();
+        let before = serde_json::to_value(&state.store.lock().await.data).unwrap();
+        for case in vector["cases"].as_array().unwrap() {
+            let error = crate::events::handle_did_operation(&state, &case["operation"])
+                .await.unwrap_err();
+            assert!(error.contains("previd"), "{}: {error}", case["name"]);
+            assert_eq!(serde_json::to_value(&state.store.lock().await.data).unwrap(), before);
+        }
+        crate::events::handle_did_operation(&state, &vector["valid"]).await.unwrap();
+        assert!(crate::events::handle_did_operation(&state, &vector["valid"])
+            .await.unwrap_err().contains("previd"));
+
+        let (state, _dir) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None,
+        });
+        for name in ["create", "successor", "valid"] {
+            let event = crate::value_to_event_record(&json!({
+                "operation": vector[name], "registry": "hyperswarm",
+                "time": vector[name]["proof"]["created"],
+            }));
+            crate::events::import_event_impl(&state, event).await;
+        }
+        *state.history_ready.lock().await = false;
+        ensure_history_ready(&state).await.unwrap();
+        let doc = crate::resolve_local_doc_async(&state, did, crate::ResolveOptions {
+            verify: true, ..crate::ResolveOptions::default()
+        }).await.unwrap();
+        assert_eq!(doc["didDocumentData"], json!({"version": 3}));
+    }
+
     fn identity_fixture() -> Value {
         serde_json::from_str(include_str!(
             "../../../../tests/gatekeeper/operation-identity-vectors.json"
