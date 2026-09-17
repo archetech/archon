@@ -114,6 +114,12 @@ These rules apply to coding agents working in this repository.
 
 - Gatekeeper performance checks must include concurrent resolution during TypeScript/Redis status scans and unchanged deferred-event retries, not only successful duplicate imports. Compare accepted histories structurally/canonically because Redis hydration can change object key order; retain missing-evidence recovery while avoiding repeated dependent replay.
 
-- Protocol hardening work is tracked in `docs/plans/protocol-hardening-1149.md`. Preserve version 1 historical acceptance; introduce new registration, key-permission, and byte-limit rules only through an explicitly versioned policy. Validate a direct operation's target predecessor before storage/queue writes; keep import's historical predecessor selection and deferred recovery.
+- Protocol hardening work is tracked in `docs/plans/protocol-hardening-1149.md`. Registration validation may be enforced in version 1 per the 2026-09-17 user decision after a clean production-history audit and confirmation that other nodes share the database (see `docs/plans/registration-hardening-1158.md`). Preserve historical acceptance for key-permission and byte-limit changes unless their separate compatibility policy is explicitly revised. Validate a direct operation's target predecessor before storage/queue writes; keep import's historical predecessor selection and deferred recovery.
 
 - For cross-port interoperability bugs, fix the failing implementation first. Treat changes to generated operation CIDs or genesis identifiers as a separate protocol migration; establish that a localized repair is insufficient before expanding scope.
+
+- Before tightening protocol acceptance, add signed cross-port fixtures for the current behavior across submission, import, and restart. Keep proposed stricter rules explicitly separate from active rules, and select future policy from immutable genesis version rather than mutable registration metadata.
+
+- Local TypeScript operation validation must treat optional `undefined` members as JSON omission, while still rejecting malformed JSON values such as `null`. Exercise both direct SDK calls and serialized imports when tightening field validation.
+
+- Signed negative protocol fixtures should isolate the invariant under test: keep required fields complete and avoid unrelated invalid controller/document changes. For immutable-kind cases, changing only the registration kind should make the fixture valid if that equality check is removed.

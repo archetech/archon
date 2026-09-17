@@ -525,6 +525,27 @@ operation cache as well as the candidate journal. Accepted-history exports alone
 may omit aliases needed by legacy signed predecessors; restore the full database
 or recover the original CID references from their anchors.
 
+### Registration validation
+
+Version 1 requires registration objects with `version: 1`, `type: "agent"` or
+`"asset"`, and a registry name of 1–128 characters matching
+`[A-Za-z0-9][A-Za-z0-9:_-]*`. On update, omitting `didDocumentRegistration` retains
+it; supplying it replaces the entire component and must include all required
+fields. Null, array, scalar, and partial replacements are invalid.
+
+Every replacement preserves genesis version, kind, and prefix presence/value.
+A valid registry may change under existing migration rules. Optional `validUntil`
+must use the shared RFC 3339 string grammar; a complete replacement may change or
+omit expiry. Unknown extension fields remain allowed. These checks introduce no
+new expiry enforcement or creation-prefix grammar. Imports validate registry name
+shape independently of the node's locally supported registries.
+
+Both ports enforce this at shared event authorization, including startup recovery.
+The [registration hardening record](plans/registration-hardening-1158.md) documents
+the production audit and approved version-1 compatibility decision. Malformed
+registrations previously accepted by older implementations are rejected on replay;
+none were found in the audited production history. Version 2 remains disabled.
+
 ### Implementation boundary: event authorization and proof verification
 
 Import and verified replay share event authorization: select the target state the operation chains from, select the authorizing controller document under the rules above, then verify the operation against that document. Confirmation replacements and competing events use the predecessor state, not the latest document. Direct submissions have no trusted event position and retain the historical `proof.created` selection. Predecessor validation uses the target DID's selected previous version, separately from the agent document selected to verify the signature. Direct updates and deletions must reference the current head before any operation storage or queue write. Import may select an earlier predecessor when considering a competing branch; an unavailable predecessor remains deferred and may become applicable when its history arrives. Verified resolution uses the same predecessor validation. No signed predecessor reference is rewritten.

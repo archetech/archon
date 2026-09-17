@@ -1,13 +1,13 @@
 [
   {
     "registry": "BTC:signet",
-    "controller": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
-    "asset": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-    "child": "did:cid:bagaaierarhzbttbhhv63v6ybc2i5cqvdkeqrs456ag5a4ooiedxygxm3vmza",
+    "controller": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
+    "asset": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+    "child": "did:cid:bagaaierailfzjwlkkx3lzepaugkgbp6jibhyx5pysvngz54bxt6cmcty5yka",
     "delegation": [
       {
-        "did": "did:cid:bagaaierayc5hkgfqc645parsnn44fkp2muqehwf57rbxgz2mmdosake6pcua",
-        "opid": "bagaaierayc5hkgfqc645parsnn44fkp2muqehwf57rbxgz2mmdosake6pcua",
+        "did": "did:cid:bagaaiera2dkb6e6dxforcqkimvmpnjzqqw5crgngqp2vcbqf7cby5j5cuggq",
+        "opid": "bagaaiera2dkb6e6dxforcqkimvmpnjzqqw5crgngqp2vcbqf7cby5j5cuggq",
         "operation": {
           "type": "create",
           "created": "2026-01-01T00:00:00.000Z",
@@ -19,15 +19,15 @@
           "publicJwk": {
             "kty": "EC",
             "crv": "secp256k1",
-            "x": "den_xuV2BBY1wEFsg-pyfL5_OiMzMtbVDC-tgS17Qg4",
-            "y": "VAmlsIgLRDlG2JMnY6qehj5BkVY6vd_NKtKmK4cCbg8"
+            "x": "j1ME4jc-Vu59d0y4np8a_s8O5-PjdX8YmQjwadqjbGA",
+            "y": "NN2UokQs_4X44yxT1mHNDKmU6vp0Lz41N1BaD2qerio"
           },
           "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "created": "2026-01-01T00:00:00.000Z",
             "verificationMethod": "#key-1",
             "proofPurpose": "authentication",
-            "proofValue": "TEVyCyhau0HH22jdw4_2kSsRvzB7NQTO-jQ_hVQ6ZhlRzjyRvsu30Z9veZWraIjGMFxUzf2GmcRsiqij1a-Wmg"
+            "proofValue": "M2k_I2c7dutCVpQP7iMQrNAy6OGfEQW3FUGFZaRAiRFuEc-rtT_xHM_vyNep0mIO_qnyQKY5koGNtL-y3UWx9w"
           }
         },
         "registry": "BTC:signet",
@@ -44,8 +44,8 @@
         }
       },
       {
-        "did": "did:cid:bagaaierarhzbttbhhv63v6ybc2i5cqvdkeqrs456ag5a4ooiedxygxm3vmza",
-        "opid": "bagaaierarhzbttbhhv63v6ybc2i5cqvdkeqrs456ag5a4ooiedxygxm3vmza",
+        "did": "did:cid:bagaaierailfzjwlkkx3lzepaugkgbp6jibhyx5pysvngz54bxt6cmcty5yka",
+        "opid": "bagaaierailfzjwlkkx3lzepaugkgbp6jibhyx5pysvngz54bxt6cmcty5yka",
         "operation": {
           "type": "create",
           "created": "2026-01-01T00:00:00.000Z",
@@ -54,14 +54,14 @@
             "type": "asset",
             "registry": "BTC:signet"
           },
-          "controller": "did:cid:bagaaierayc5hkgfqc645parsnn44fkp2muqehwf57rbxgz2mmdosake6pcua",
+          "controller": "did:cid:bagaaiera2dkb6e6dxforcqkimvmpnjzqqw5crgngqp2vcbqf7cby5j5cuggq",
           "data": "original",
           "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "created": "2026-01-01T00:00:00.000Z",
-            "verificationMethod": "did:cid:bagaaierayc5hkgfqc645parsnn44fkp2muqehwf57rbxgz2mmdosake6pcua#key-1",
+            "verificationMethod": "did:cid:bagaaiera2dkb6e6dxforcqkimvmpnjzqqw5crgngqp2vcbqf7cby5j5cuggq#key-1",
             "proofPurpose": "authentication",
-            "proofValue": "bn22gSjiPE3-Lgd1gvaeOqpxF7FIF2mwEEl14wi-2nElRbm4TSxXDSfH7poB83_NbkChYuxiiOmdonQcQ4mz3A"
+            "proofValue": "swN-RlP_6J8Piu5VMiGTQnj9OfcLzeAyVApybqPC3_Ir6LJMM12l2mDUgsSGN1Sipor9kPdyC2O5vKqzh1F0fg"
           }
         },
         "registry": "BTC:signet",
@@ -78,27 +78,27 @@
         }
       },
       {
-        "did": "did:cid:bagaaierarhzbttbhhv63v6ybc2i5cqvdkeqrs456ag5a4ooiedxygxm3vmza",
-        "opid": "bagaaierakjcwgqpj4evtl36hhw73fvkzsgvvdw4nwfinxmnpiandq4zcuysa",
+        "did": "did:cid:bagaaierailfzjwlkkx3lzepaugkgbp6jibhyx5pysvngz54bxt6cmcty5yka",
+        "opid": "bagaaierak6sgtu2zb2rnwqckg4zm2dzyv4kzkk3cbiljyo6pih5koigeqdvq",
         "operation": {
           "type": "update",
-          "did": "did:cid:bagaaierarhzbttbhhv63v6ybc2i5cqvdkeqrs456ag5a4ooiedxygxm3vmza",
-          "previd": "bagaaierarhzbttbhhv63v6ybc2i5cqvdkeqrs456ag5a4ooiedxygxm3vmza",
+          "did": "did:cid:bagaaierailfzjwlkkx3lzepaugkgbp6jibhyx5pysvngz54bxt6cmcty5yka",
+          "previd": "bagaaierailfzjwlkkx3lzepaugkgbp6jibhyx5pysvngz54bxt6cmcty5yka",
           "doc": {
             "didDocument": {
               "@context": [
                 "https://www.w3.org/ns/did/v1"
               ],
-              "id": "did:cid:bagaaierarhzbttbhhv63v6ybc2i5cqvdkeqrs456ag5a4ooiedxygxm3vmza",
-              "controller": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua"
+              "id": "did:cid:bagaaierailfzjwlkkx3lzepaugkgbp6jibhyx5pysvngz54bxt6cmcty5yka",
+              "controller": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq"
             }
           },
           "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "created": "2026-01-01T00:00:00.000Z",
-            "verificationMethod": "did:cid:bagaaierayc5hkgfqc645parsnn44fkp2muqehwf57rbxgz2mmdosake6pcua#key-1",
+            "verificationMethod": "did:cid:bagaaiera2dkb6e6dxforcqkimvmpnjzqqw5crgngqp2vcbqf7cby5j5cuggq#key-1",
             "proofPurpose": "authentication",
-            "proofValue": "DOWjsHocOPtkcPA-VWskbl9e3CkCVY6iOLWg6lIqf58Viv0qMexYOhAPVV_lHZTBlOvwprLTVm7gYf0eMYGmoQ"
+            "proofValue": "400hXTXkauZt4zCWlEjotaD1eGWOiNt2TRyLYZIuYRkJKcAhLmWYgc-eMhrWY7i7rPy_Cx9aqMtLnZ6NiKlm2A"
           }
         },
         "registry": "BTC:signet",
@@ -116,21 +116,21 @@
       }
     ],
     "delegated": {
-      "did": "did:cid:bagaaierarhzbttbhhv63v6ybc2i5cqvdkeqrs456ag5a4ooiedxygxm3vmza",
-      "opid": "bagaaieraprxhjpy3rktfla3sv2p6a3evx5llzpa4zmmo2rceaxaughpusgsa",
+      "did": "did:cid:bagaaierailfzjwlkkx3lzepaugkgbp6jibhyx5pysvngz54bxt6cmcty5yka",
+      "opid": "bagaaieraqc7p72am4x5gf6xdnlmsszw5utbg76p7qtowhydmgp7q52l4rsga",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaierarhzbttbhhv63v6ybc2i5cqvdkeqrs456ag5a4ooiedxygxm3vmza",
-        "previd": "bagaaierakjcwgqpj4evtl36hhw73fvkzsgvvdw4nwfinxmnpiandq4zcuysa",
+        "did": "did:cid:bagaaierailfzjwlkkx3lzepaugkgbp6jibhyx5pysvngz54bxt6cmcty5yka",
+        "previd": "bagaaierak6sgtu2zb2rnwqckg4zm2dzyv4kzkk3cbiljyo6pih5koigeqdvq",
         "doc": {
           "didDocumentData": "retired-delegate"
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq#key-1",
+          "verificationMethod": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "ECbtmNgpHV6Vxuv2lu5gpVZABBs4233owMipC1zTgz1i0AaBE53YZ6xgIEGaW4RG20UQeq7L7KQAzqbkShzRCQ"
+          "proofValue": "vgU2F6-fRwYVZsJAdPvmHPbQomPsecHDifseU1O7LpASzVGIyIXYJyAsPH36EbarZ6jE0dC0LuoE4TXiHSxVbA"
         }
       },
       "registry": "BTC:signet",
@@ -147,18 +147,18 @@
       }
     },
     "deletion": {
-      "did": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-      "opid": "bagaaieraq5bf5i4uxra3tqut2ser3erxzryv5nlldjv2fg6kwvbbpbovccsa",
+      "did": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+      "opid": "bagaaierag77x3r7vj6th7j7ksg5us3oibxgsurjere2iwjgouget5gnernzq",
       "operation": {
         "type": "delete",
-        "did": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-        "previd": "bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
+        "did": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+        "previd": "bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq#key-1",
+          "verificationMethod": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "tUOEPYjpBwYMvoVNoVpzPwQXIfYZqkPLR-9SH2EmEuRjCZF7R5KIP6hz-8GIeCPwDn3pdOJUlpyKPUypvCxWKg"
+          "proofValue": "D6h8NqMmW5SHG6H4e9OUUE4nqktZ3Bo3E9xP2h1bIYUtKVonwR35vPYbi1G0StE9Yv8-ilCLB_sBS2dHyRl5YA"
         }
       },
       "registry": "BTC:signet",
@@ -176,8 +176,8 @@
     },
     "base": [
       {
-        "did": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
-        "opid": "bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
+        "did": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
+        "opid": "bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
         "operation": {
           "type": "create",
           "created": "2026-01-01T00:00:00.000Z",
@@ -189,15 +189,15 @@
           "publicJwk": {
             "kty": "EC",
             "crv": "secp256k1",
-            "x": "cryqEOAC4goMECMD3lrgZDFMcajQaKS6iRBbCwJQY5E",
-            "y": "yddHdSvJIwoVYuvI_JTLN6kgpjiQgqJRxxxI2L9nXh0"
+            "x": "XE4N7HIV4mgzk4cw5eUFqmJQTahbpXEGpGtaJAT8nY4",
+            "y": "C2Y9_RBGlhnBx27LFuD6UheYly1fL0_-cVa_0VcR1m0"
           },
           "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "created": "2026-01-01T00:00:00.000Z",
             "verificationMethod": "#key-1",
             "proofPurpose": "authentication",
-            "proofValue": "RsWkdHU2u98jGSzwIC-NZaKmlk1llqSHperU4Gf4BDYGw9KTuA2HhNuyMe6iXaYEpRM-Fagbd4Lx6k39nCdJZA"
+            "proofValue": "h_tFTqZJoT0xgVIj9h-c_2-nF1YqXr7TM8eERwFlSqZTVSxd1zYlb8U164WiD4p_Y0GluTIMUFd225wGaybCzg"
           }
         },
         "registry": "BTC:signet",
@@ -214,8 +214,8 @@
         }
       },
       {
-        "did": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-        "opid": "bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
+        "did": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+        "opid": "bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
         "operation": {
           "type": "create",
           "created": "2026-01-01T00:00:00.000Z",
@@ -224,14 +224,14 @@
             "type": "asset",
             "registry": "BTC:signet"
           },
-          "controller": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
+          "controller": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
           "data": "original",
           "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "created": "2026-01-01T00:00:00.000Z",
-            "verificationMethod": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq#key-1",
+            "verificationMethod": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda#key-1",
             "proofPurpose": "authentication",
-            "proofValue": "cUY7GVOk_PmmWz2SUNeLedxDLiXPGxSLhDA---QjPa4FClOS93Rl2-8V7japH6UwmH9ijXMruQs5PCJb5tuPaw"
+            "proofValue": "g6El0hgnl_8pQE4ptT7COHCHMzA2YZHPO9Y5M0EKlx08j8kk2PNzFw7a8RkvzxZgdMoiXgOwXPsescU1uEUMCQ"
           }
         },
         "registry": "BTC:signet",
@@ -249,28 +249,28 @@
       }
     ],
     "rotation": {
-      "did": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
-      "opid": "bagaaieraiaedajq7vwq4oldaucvoewnfu6nlifqj5o7od6qpioyzedju6lfq",
+      "did": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
+      "opid": "bagaaierac3xhq3vm7wmknapkvaivsdaba74e343be7rpgeqlalsu2lw5bthq",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
-        "previd": "bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
+        "did": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
+        "previd": "bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
         "doc": {
           "didDocument": {
             "@context": [
               "https://www.w3.org/ns/did/v1"
             ],
-            "id": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
+            "id": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
             "verificationMethod": [
               {
                 "id": "#key-1",
-                "controller": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
+                "controller": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
                 "type": "EcdsaSecp256k1VerificationKey2019",
                 "publicKeyJwk": {
                   "kty": "EC",
                   "crv": "secp256k1",
-                  "x": "izKQHWCY-ydvCcwlDMupjbooe_rI7PcG0OkOTgJKx9U",
-                  "y": "WCDXmtHJw4HvUkGMQToN1d4QinACkfnSzqjL59Wx-aQ"
+                  "x": "W-XpR4IJZ0qW5g8fA39hdlQP0AH6HWRpR3DFancJxCw",
+                  "y": "A1qIw4Q9v4sQ1SzHHibM4XHhqh4y-OGTyfamvY8HuL8"
                 }
               }
             ],
@@ -288,9 +288,9 @@
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq#key-1",
+          "verificationMethod": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "-8Ifw8J4ivinQ5Ra3lgsBO-hZPkg2eooITWEeB94gwsfc-F3lqGRdiq34Cliwzxc-w0ssZy0guMVpdPunCEM4w"
+          "proofValue": "6EqDYJkaJ8H9pzzx4YGVymgNzgBEM5xAzwvSWommcfVPNyUm6pZxyXvpJLLtBEcsyO6Yo4zTL_7XHCsYiLNbFQ"
         }
       },
       "registry": "BTC:signet",
@@ -307,21 +307,21 @@
       }
     },
     "old": {
-      "did": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-      "opid": "bagaaierarnwdcdbhso4jaoy7j2z2gxa4shfna4ejyp7opnqexy4fmrsachza",
+      "did": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+      "opid": "bagaaierabvqwa3ootxpuvas42f3bn3tgvr4gq35rlzsgwyc2ka2xre2lpeuq",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-        "previd": "bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
+        "did": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+        "previd": "bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
         "doc": {
           "didDocumentData": "retired"
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq#key-1",
+          "verificationMethod": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "vAr9YhfKLS5zcdYT7Gs68_ipGyOfnR5Ws06kmm1RMOs1fA1UMW-rhQEp90EirAR_-JNS3BK8mfRAYTaItikhuw"
+          "proofValue": "bime-LiFhEYsOucLIEDhX9Lz20UIkB6CxNE4C0weLH8a9gAa7Npn141TYPgs3_kGrYrOTQ8F17sDJ5C2hZPHkQ"
         }
       },
       "registry": "BTC:signet",
@@ -338,21 +338,21 @@
       }
     },
     "oldNext": {
-      "did": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-      "opid": "bagaaierawvwz2b6jg5sd3cudkspsnh5ybe42uszab4zux5uay4so5pct7rlq",
+      "did": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+      "opid": "bagaaiera6wsa2q7vxhjmj36xqlikdibwadi5ikf3hmwd4hikktsg7x6lvqhq",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-        "previd": "bagaaierarnwdcdbhso4jaoy7j2z2gxa4shfna4ejyp7opnqexy4fmrsachza",
+        "did": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+        "previd": "bagaaierabvqwa3ootxpuvas42f3bn3tgvr4gq35rlzsgwyc2ka2xre2lpeuq",
         "doc": {
           "didDocumentData": "retired-successor"
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq#key-1",
+          "verificationMethod": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "pXZ9Oh5MpeHCKcwpsaTucqFuIo2McBd_If1R8NjaS1pv7bcSWwf9rkn-awwObmcb442rphzRoLs3QLxwKYKzGA"
+          "proofValue": "_KpWiIdVx6s4bd4MystZ5UBwdzjkf6gUViN4IGQ49kBM19JCxhRdpzSomEov1D-8MeQZW3LdroO8leHhBWhHjA"
         }
       },
       "registry": "BTC:signet",
@@ -369,21 +369,21 @@
       }
     },
     "fresh": {
-      "did": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-      "opid": "bagaaieraw5vmbsfbaxmo44oj4itnqptxszv7f624qxpy2pyw3baw5aknt4aq",
+      "did": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+      "opid": "bagaaieraaxyi2clqiascqrlnizruhlxph4sfvmy556ttnnkzlbtftaknn3pq",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-        "previd": "bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
+        "did": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+        "previd": "bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
         "doc": {
           "didDocumentData": "new-key"
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq#key-1",
+          "verificationMethod": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "-teUXI339cb5qOIf1_DUL62c7u3z3DZdoh9T-AxJRgoa7acVagyjMe59USA29sFJwfnooUVDUDSTmPhqQ9PHFA"
+          "proofValue": "ErszJjutHs7Tfg0pgH7HRJxaG3vWG4uqgKD5om3ZTOQypUaqta_v-TqqdZBIhk8RluxXeEAJ5ZITXbgtYboFgQ"
         }
       },
       "registry": "BTC:signet",
@@ -400,21 +400,21 @@
       }
     },
     "freshNext": {
-      "did": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-      "opid": "bagaaiera7zrxzb3lchby345c3q2fe6phlwkw6p62rusavljjghtjglqf32ta",
+      "did": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+      "opid": "bagaaierabnvjaoyahba2xzinxn5q6bw4etz2y3d4afdydvfa77nwfii5hc3q",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-        "previd": "bagaaieraw5vmbsfbaxmo44oj4itnqptxszv7f624qxpy2pyw3baw5aknt4aq",
+        "did": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+        "previd": "bagaaieraaxyi2clqiascqrlnizruhlxph4sfvmy556ttnnkzlbtftaknn3pq",
         "doc": {
           "didDocumentData": "new-key-successor"
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq#key-1",
+          "verificationMethod": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "EyRS7esJnWtWl7ShDCNWYi-Neqg8R7Okd2YoGp5-hvUKLSXWTex_-f8_tco9uEszHyRtjkO6bfRIZSL5gOBxvA"
+          "proofValue": "tls0AdZmK6jkiEeK3NyxZbrTg0ZL3TFLZTbIIDg6JqEurg5f47ALvyRfXhYvins73kP3zxMX73jBLzuv2urvRQ"
         }
       },
       "registry": "BTC:signet",
@@ -431,21 +431,21 @@
       }
     },
     "early": {
-      "did": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-      "opid": "bagaaieraykfkcrewyygpj63mxz3sqfdybwuan7v23idypjgyeztv6iu45xfa",
+      "did": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+      "opid": "bagaaierafak4hcvn7xxphyjky6mhqpz5kz2lzejiq26t7iynj23qxk2n56sa",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
-        "previd": "bagaaierag6j7wwidjiqfv6256inn6ldxutt252xn5sis77ofigwlolh4znua",
+        "did": "did:cid:bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
+        "previd": "bagaaiera3yz6kreqsppqldlpwgbqnwukhmsxbxxctr2aensudckaws2gqvbq",
         "doc": {
           "didDocumentData": "before-rotation"
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq#key-1",
+          "verificationMethod": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "7WHlcmYFEx-k0ohkuYj1GecLgxpEcnl_efPmr39RN7p02vtl07deyzy-IrJ4eKqtCH8JYq0G48Qj2RBordnLWw"
+          "proofValue": "Oa7uRRbLmJpAMV8AeF3DN13TqFRhYiSOzhTUnW05cgEPjAtmMmD_7V6dEse_FCjVO81B9PTG5H3AXx7E1m8JWg"
         }
       },
       "registry": "BTC:signet",
@@ -462,28 +462,28 @@
       }
     },
     "migration": {
-      "did": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
-      "opid": "bagaaierabhlskfiddolvelqauyqc2vafedgtutvxwkhweuuabvlbaqrrrrra",
+      "did": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
+      "opid": "bagaaiera6dfjxcqqlhlzrbr2ef6misbbtmchtga7epmwb4obh4ddlcfy4qeq",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
-        "previd": "bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
+        "did": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
+        "previd": "bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
         "doc": {
           "didDocument": {
             "@context": [
               "https://www.w3.org/ns/did/v1"
             ],
-            "id": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
+            "id": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
             "verificationMethod": [
               {
                 "id": "#key-1",
-                "controller": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
+                "controller": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
                 "type": "EcdsaSecp256k1VerificationKey2019",
                 "publicKeyJwk": {
                   "kty": "EC",
                   "crv": "secp256k1",
-                  "x": "izKQHWCY-ydvCcwlDMupjbooe_rI7PcG0OkOTgJKx9U",
-                  "y": "WCDXmtHJw4HvUkGMQToN1d4QinACkfnSzqjL59Wx-aQ"
+                  "x": "W-XpR4IJZ0qW5g8fA39hdlQP0AH6HWRpR3DFancJxCw",
+                  "y": "A1qIw4Q9v4sQ1SzHHibM4XHhqh4y-OGTyfamvY8HuL8"
                 }
               }
             ],
@@ -498,15 +498,17 @@
             ]
           },
           "didDocumentRegistration": {
+            "version": 1,
+            "type": "agent",
             "registry": "BTC:signet"
           }
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq#key-1",
+          "verificationMethod": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "mq7OlWguqTtLrZCgv2bDUk-oTBU7BgPb5SZPrdynsZ9vTvrP1C-uiey73doGMT6HDPAE-XBJ0pSk1KNpp-Qi9A"
+          "proofValue": "nOneT-NoD_Ufs19v6Fnvz4xVZ1Yx3jn62MRQ24mQM2Vct6zP1vJl0niKodgBb9xStrDKmf7_-xLeoEx9_GITag"
         }
       },
       "registry": "BTC:signet",
@@ -523,28 +525,28 @@
       }
     },
     "migrationRotation": {
-      "did": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
-      "opid": "bagaaieraulde3v4o6rpvs4xuvucd4cstj4khn5t4y4v6lrpb5qlb7kh2iwea",
+      "did": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
+      "opid": "bagaaieraun7f6525i3c355mc73rysvgqw26zwiwgs2qd7jxmxajay4g7fcta",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
-        "previd": "bagaaierabhlskfiddolvelqauyqc2vafedgtutvxwkhweuuabvlbaqrrrrra",
+        "did": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
+        "previd": "bagaaiera6dfjxcqqlhlzrbr2ef6misbbtmchtga7epmwb4obh4ddlcfy4qeq",
         "doc": {
           "didDocument": {
             "@context": [
               "https://www.w3.org/ns/did/v1"
             ],
-            "id": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
+            "id": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
             "verificationMethod": [
               {
                 "id": "#key-1",
-                "controller": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq",
+                "controller": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda",
                 "type": "EcdsaSecp256k1VerificationKey2019",
                 "publicKeyJwk": {
                   "kty": "EC",
                   "crv": "secp256k1",
-                  "x": "lF1TcI2csEJXrsLGGUMVV8-n_1Sdnfs3Ni4ePSy8iNI",
-                  "y": "tZOHRYeP17Lvf4ISlqhk45hoY1aZRSV_KF5NzNpdazw"
+                  "x": "u1i1_spQXHTtwADYKC_FVuUaECT8jn1-Vsb4h8XI1fI",
+                  "y": "AvdvUIpXrCSRrxnI5n5VEz-OHNP57iNQBxSXCF9zVvg"
                 }
               }
             ],
@@ -562,9 +564,9 @@
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraiqoeghz7nsbpqsebggdncuussx2hqe52befzmxeyuy2dn7dhg3wq#key-1",
+          "verificationMethod": "did:cid:bagaaieranhd2la5x45oyhxqyfgfsj3wyqmqit4rnly74unshyzzjvd6jbdda#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "YRXhQb_YKCqGqfIRymwhhQFMdVXQIFAMfZ2LcYHX40lB4To_DE9Msv5srPdgWwxHAx_PraNIHWqAfOyg0RELSQ"
+          "proofValue": "ikYeVLR_sf3Q9H9OviuU-ZHzQSht6loGxvYV4yojJcAI6UHZqoKLAs8-xS9jvcVa4ZdRzLA3HbmSUwvozkBsug"
         }
       },
       "registry": "BTC:signet",
@@ -662,13 +664,13 @@
   },
   {
     "registry": "ETH:sepolia",
-    "controller": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
-    "asset": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-    "child": "did:cid:bagaaierahhgqa3xtvroykhrpys56pvf7y4qp2fnljtos2aamoajeghyjpema",
+    "controller": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
+    "asset": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+    "child": "did:cid:bagaaierany7ezcqbif3wmhzemdwxpy2gdt6iedzu3zz35stujo7qf73c4d2q",
     "delegation": [
       {
-        "did": "did:cid:bagaaieraxo4qgswpbo5dd3nqhiwmz423yzhfxdsxnbt24j43ltq7tcywi4ia",
-        "opid": "bagaaieraxo4qgswpbo5dd3nqhiwmz423yzhfxdsxnbt24j43ltq7tcywi4ia",
+        "did": "did:cid:bagaaieraf35bhqrwka2pgpzxhwsd4j4a7rqdkid6dun22olud3vcf2v2khpa",
+        "opid": "bagaaieraf35bhqrwka2pgpzxhwsd4j4a7rqdkid6dun22olud3vcf2v2khpa",
         "operation": {
           "type": "create",
           "created": "2026-01-01T00:00:00.000Z",
@@ -680,15 +682,15 @@
           "publicJwk": {
             "kty": "EC",
             "crv": "secp256k1",
-            "x": "Gl1UdQUDVKPEzDWseXw1RRgS5ElN1sOXbrtyZRKmXGg",
-            "y": "jRyxXz_wNIU_PL_HZbCWbqz4xKBwSvMrb3iYPVSEvOw"
+            "x": "LtVX9a0zazGkmFfk6WZJVKwzOFqiCpPi1kv-fwj1Enc",
+            "y": "vLJ8Eln4AqUu0-p6yTkEPwzIZOJ0AClL8SHyOHeZWFI"
           },
           "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "created": "2026-01-01T00:00:00.000Z",
             "verificationMethod": "#key-1",
             "proofPurpose": "authentication",
-            "proofValue": "_quWnizXzqK9QewGcr-C6bz3lzEpYh1Jl_WXlLXeCctljyPd74vViDmH9udo2n4t7wOQ6ena8awIZpvBoLFzHA"
+            "proofValue": "nvvBnweVuW0TMXlkKfFF8jJKymGy_lSNu12SAN9BS5lTxtZ60XGIVS-jKQE-sQge9N3W-NYsr9IVYQDlQXLOfw"
           }
         },
         "registry": "BTC:signet",
@@ -705,8 +707,8 @@
         }
       },
       {
-        "did": "did:cid:bagaaierahhgqa3xtvroykhrpys56pvf7y4qp2fnljtos2aamoajeghyjpema",
-        "opid": "bagaaierahhgqa3xtvroykhrpys56pvf7y4qp2fnljtos2aamoajeghyjpema",
+        "did": "did:cid:bagaaierany7ezcqbif3wmhzemdwxpy2gdt6iedzu3zz35stujo7qf73c4d2q",
+        "opid": "bagaaierany7ezcqbif3wmhzemdwxpy2gdt6iedzu3zz35stujo7qf73c4d2q",
         "operation": {
           "type": "create",
           "created": "2026-01-01T00:00:00.000Z",
@@ -715,14 +717,14 @@
             "type": "asset",
             "registry": "BTC:signet"
           },
-          "controller": "did:cid:bagaaieraxo4qgswpbo5dd3nqhiwmz423yzhfxdsxnbt24j43ltq7tcywi4ia",
+          "controller": "did:cid:bagaaieraf35bhqrwka2pgpzxhwsd4j4a7rqdkid6dun22olud3vcf2v2khpa",
           "data": "original",
           "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "created": "2026-01-01T00:00:00.000Z",
-            "verificationMethod": "did:cid:bagaaieraxo4qgswpbo5dd3nqhiwmz423yzhfxdsxnbt24j43ltq7tcywi4ia#key-1",
+            "verificationMethod": "did:cid:bagaaieraf35bhqrwka2pgpzxhwsd4j4a7rqdkid6dun22olud3vcf2v2khpa#key-1",
             "proofPurpose": "authentication",
-            "proofValue": "dGVys3v_tFzDDcy8yhASmfA4M6plHdHnOkg3tuRI8jNWe0Te4Lq8zgGu1L_70AFbPPb93hdezHsoJQ-KVNfqUw"
+            "proofValue": "GiFk0XmY0-PBZcaK-nzC_oSvs0XnxRHTrSsW5JTL_PkGm7jDMUigAC9B_hUKPBrNoBGdg8urVv7I2fKSKjriMA"
           }
         },
         "registry": "BTC:signet",
@@ -739,27 +741,27 @@
         }
       },
       {
-        "did": "did:cid:bagaaierahhgqa3xtvroykhrpys56pvf7y4qp2fnljtos2aamoajeghyjpema",
-        "opid": "bagaaieragnzwkdvthoozzch4eue34tqrld4ezwgnp4modivhlhbl5fxldo6q",
+        "did": "did:cid:bagaaierany7ezcqbif3wmhzemdwxpy2gdt6iedzu3zz35stujo7qf73c4d2q",
+        "opid": "bagaaierazfhcixcblstmaurhjyh4jvk42kt4p4ip3yuwg7hxwmbpcmrej5gq",
         "operation": {
           "type": "update",
-          "did": "did:cid:bagaaierahhgqa3xtvroykhrpys56pvf7y4qp2fnljtos2aamoajeghyjpema",
-          "previd": "bagaaierahhgqa3xtvroykhrpys56pvf7y4qp2fnljtos2aamoajeghyjpema",
+          "did": "did:cid:bagaaierany7ezcqbif3wmhzemdwxpy2gdt6iedzu3zz35stujo7qf73c4d2q",
+          "previd": "bagaaierany7ezcqbif3wmhzemdwxpy2gdt6iedzu3zz35stujo7qf73c4d2q",
           "doc": {
             "didDocument": {
               "@context": [
                 "https://www.w3.org/ns/did/v1"
               ],
-              "id": "did:cid:bagaaierahhgqa3xtvroykhrpys56pvf7y4qp2fnljtos2aamoajeghyjpema",
-              "controller": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq"
+              "id": "did:cid:bagaaierany7ezcqbif3wmhzemdwxpy2gdt6iedzu3zz35stujo7qf73c4d2q",
+              "controller": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq"
             }
           },
           "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "created": "2026-01-01T00:00:00.000Z",
-            "verificationMethod": "did:cid:bagaaieraxo4qgswpbo5dd3nqhiwmz423yzhfxdsxnbt24j43ltq7tcywi4ia#key-1",
+            "verificationMethod": "did:cid:bagaaieraf35bhqrwka2pgpzxhwsd4j4a7rqdkid6dun22olud3vcf2v2khpa#key-1",
             "proofPurpose": "authentication",
-            "proofValue": "TzF5-VM8vvITZyQZreHi3JCbe3-FlP7GXlmIFUMIdjNKgShpzyZuToghxDwhm2KIwSrzJ_sX4ZKHOa2KxKl_3Q"
+            "proofValue": "I9PgYl0OHaoIu4KV_07jErCCh0oQom7k8_syxVQkSowCYjZQJ5bww_2EcxKxOXrV_PfrMvQ8YylyFd-lWV6lvw"
           }
         },
         "registry": "BTC:signet",
@@ -777,21 +779,21 @@
       }
     ],
     "delegated": {
-      "did": "did:cid:bagaaierahhgqa3xtvroykhrpys56pvf7y4qp2fnljtos2aamoajeghyjpema",
-      "opid": "bagaaieracuqudug527qomzx5pjg52754df3uu3di5gtrk4kttligelttla3q",
+      "did": "did:cid:bagaaierany7ezcqbif3wmhzemdwxpy2gdt6iedzu3zz35stujo7qf73c4d2q",
+      "opid": "bagaaiera2qrpgcgapeg4q3drzxhpk7x7ewjlmly356hol24sridiyc6cyswq",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaierahhgqa3xtvroykhrpys56pvf7y4qp2fnljtos2aamoajeghyjpema",
-        "previd": "bagaaieragnzwkdvthoozzch4eue34tqrld4ezwgnp4modivhlhbl5fxldo6q",
+        "did": "did:cid:bagaaierany7ezcqbif3wmhzemdwxpy2gdt6iedzu3zz35stujo7qf73c4d2q",
+        "previd": "bagaaierazfhcixcblstmaurhjyh4jvk42kt4p4ip3yuwg7hxwmbpcmrej5gq",
         "doc": {
           "didDocumentData": "retired-delegate"
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa#key-1",
+          "verificationMethod": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "c01Rk5V-tZEvfDVjYOOz1RX_ZmgC3zG73LYkxV1xVt4WOgNs_vwUroq_U0W7bioZM5WsP8aDUYVKkDtrkjKLNw"
+          "proofValue": "C6oSYwNHhZ_y_MxpFOgPR_JYpY_l3zdeIaBKnrAW8jYoUFqCN2MIumJ_jLfW-3xB3oZwV4AU-s1uYqwelhYF1w"
         }
       },
       "registry": "BTC:signet",
@@ -808,18 +810,18 @@
       }
     },
     "deletion": {
-      "did": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-      "opid": "bagaaierar5j6bz753w52skhauwpmmj4udn3qcwfl3muk2dxj4uy3rglofcma",
+      "did": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+      "opid": "bagaaierazjsbtthgpedvijdn66cqj5q3szgbhj72nanr7hjgilkkipagpqvq",
       "operation": {
         "type": "delete",
-        "did": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-        "previd": "bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
+        "did": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+        "previd": "bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa#key-1",
+          "verificationMethod": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "ZSrXTLmBUA6M_QZMRSXslb2nsjmxmZ7aKGE08JcKR2pSbIJ5EbfeCA2OB3P2FhrKOFWeVPD_ZuvLkyXF00dPig"
+          "proofValue": "ggXYMNvzl7ulofGXZN5BtfBsSPRRnbBIEYEKxlKYDM4npqF7LupLB2TA8oOd9vUF6X2WWrxTEfCfNsvwV2dHDQ"
         }
       },
       "registry": "BTC:signet",
@@ -837,8 +839,8 @@
     },
     "base": [
       {
-        "did": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
-        "opid": "bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
+        "did": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
+        "opid": "bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
         "operation": {
           "type": "create",
           "created": "2026-01-01T00:00:00.000Z",
@@ -850,15 +852,15 @@
           "publicJwk": {
             "kty": "EC",
             "crv": "secp256k1",
-            "x": "t492v49P9P3V8SOHsWVkBh46DGPixNfzgTB7Fq01Dwk",
-            "y": "wY5JpVVoZuAZRvKTQMt3mAqXR6c4c0Sj4MTQ9pxpC_w"
+            "x": "lItT2pf99nTAh3MVrLzIdhqjuaWCtDmYL7r6yZ-XIQ8",
+            "y": "EpAFlik0I3EhorCn4Tzm_ms5h4POW_PNGHdWxYcOx-c"
           },
           "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "created": "2026-01-01T00:00:00.000Z",
             "verificationMethod": "#key-1",
             "proofPurpose": "authentication",
-            "proofValue": "YDylsy1fh7F69sC0UpHHt0dDgCG5NHFxNKGiBjmnxuZ7R1lwHL4wFeFpdkeXvquOVXyjMQBenu9QKZGtHS3RkQ"
+            "proofValue": "sPRNeYz9jy89gBxQRPYORsP-XSaOIDWBumHufEX5hXF8MYkyJgTSv5_QDQFhd-N-1mlirEQRRRcw4BmVFkhMRA"
           }
         },
         "registry": "ETH:sepolia",
@@ -875,8 +877,8 @@
         }
       },
       {
-        "did": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-        "opid": "bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
+        "did": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+        "opid": "bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
         "operation": {
           "type": "create",
           "created": "2026-01-01T00:00:00.000Z",
@@ -885,14 +887,14 @@
             "type": "asset",
             "registry": "BTC:signet"
           },
-          "controller": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
+          "controller": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
           "data": "original",
           "proof": {
             "type": "EcdsaSecp256k1Signature2019",
             "created": "2026-01-01T00:00:00.000Z",
-            "verificationMethod": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa#key-1",
+            "verificationMethod": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa#key-1",
             "proofPurpose": "authentication",
-            "proofValue": "O3eAX5gJ1TLPhHUXwZvzmA9xydDyaB8XaPYNXfd84hF5YweS3Yg43v8znyLrJMdS1Jz4qKm9NIqX_2o2LD-ZBg"
+            "proofValue": "D5fH0RegX3KdQe4SY1LA01-OOCzzksr6ddZXHJSkbjtURq65eYKj2b5at9LucK7D33NiuwF_kPXLvhQA16lXUw"
           }
         },
         "registry": "BTC:signet",
@@ -910,28 +912,28 @@
       }
     ],
     "rotation": {
-      "did": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
-      "opid": "bagaaierak6cjz6ktcbnzth4yn5ar63ckllth4xca4glnwclzbol6w5fqxb6q",
+      "did": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
+      "opid": "bagaaierafnjishfxdwms3g623i56j62powtpq3svj2ur3xyzhbuklkcywbpq",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
-        "previd": "bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
+        "did": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
+        "previd": "bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
         "doc": {
           "didDocument": {
             "@context": [
               "https://www.w3.org/ns/did/v1"
             ],
-            "id": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
+            "id": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
             "verificationMethod": [
               {
                 "id": "#key-1",
-                "controller": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
+                "controller": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
                 "type": "EcdsaSecp256k1VerificationKey2019",
                 "publicKeyJwk": {
                   "kty": "EC",
                   "crv": "secp256k1",
-                  "x": "0U2H5aYy1STRIMQ4FhtPs-CMHxznC1Nr_8UEBEBb33c",
-                  "y": "r_ebOPnL6gkrg_xILIIzdBXbnabqOn5ro2kYJx3ZwoA"
+                  "x": "2Yp972foNwEY9jZiDQvgjtYzRN9oCCtPLxhE585gFIM",
+                  "y": "wkUTrfEGaRy_JZ-rfdjqenA0i1TkqHyUxNE-Vy8xyok"
                 }
               }
             ],
@@ -949,9 +951,9 @@
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa#key-1",
+          "verificationMethod": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "lisMLhsr0LMNWzDu8ylgUX5lj6ac4lkCFUwP-IufjcJCH85JU1a_4nhhkssJbPyG1c1Pa4j_gBtjm2AkKyxUpw"
+          "proofValue": "xJ4GXW_Av-W_uEZ4AwmGD5mBFNdUUWG015nVr8kEqq4__Ui6JLDIcyKQV8-_WVgqF-Tk5jQjsXLvNXora3thYQ"
         }
       },
       "registry": "ETH:sepolia",
@@ -968,21 +970,21 @@
       }
     },
     "old": {
-      "did": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-      "opid": "bagaaieraa4zs2wcrx7gdjuwlhf6iksml7hjwp4noizrrumntancwlrne5xra",
+      "did": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+      "opid": "bagaaieraykkjmet5tshui2zx2ezooyysoyrwdo3n5alpfylrchlbsmpapbka",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-        "previd": "bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
+        "did": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+        "previd": "bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
         "doc": {
           "didDocumentData": "retired"
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa#key-1",
+          "verificationMethod": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "OkA52CaEYNop9UuyaNKhNy1Jo33vwn3gn7_ZYRGqK1pY2WX-G_LrQ1YKHiRAFmdDiIw7CC8mjnKukmPNTfudVg"
+          "proofValue": "lrQ7OKX_t5r6E_ZFoZYT7BJN1xHEApkYmCQJXpDpFOxbo9jLHHMhdqkvYbzDjNbykgFSP5wFq0KwMI3PFig9TQ"
         }
       },
       "registry": "BTC:signet",
@@ -999,21 +1001,21 @@
       }
     },
     "oldNext": {
-      "did": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-      "opid": "bagaaiera3fjofsrwzf5fycknnyh7w2mixe46prirl47rvhaahwfcieesj2xq",
+      "did": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+      "opid": "bagaaieraapr3txfirzjf5bswg3pt5az3nsbcqmn3s63bpqbpdser6mkjr7jq",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-        "previd": "bagaaieraa4zs2wcrx7gdjuwlhf6iksml7hjwp4noizrrumntancwlrne5xra",
+        "did": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+        "previd": "bagaaieraykkjmet5tshui2zx2ezooyysoyrwdo3n5alpfylrchlbsmpapbka",
         "doc": {
           "didDocumentData": "retired-successor"
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa#key-1",
+          "verificationMethod": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "BWwil1WXD-vl1H7KQOVtAZgx7Wox6mIMXyzK0uo_8gMl-3J6_VfgVTxp0wm8wHn5yVepN6EHd8Lcp2F2cCkZFA"
+          "proofValue": "pgP3ou5oyj5pNix5xBY_JZ2ypL2BhkTm_GtOYXoWpZoB7mUaM7pQM9uiE7eS9h5zJY1j0uYKkdx1DHx4PkmKaQ"
         }
       },
       "registry": "BTC:signet",
@@ -1030,21 +1032,21 @@
       }
     },
     "fresh": {
-      "did": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-      "opid": "bagaaierag6lki63bmhfu3hnbukaq3j4ewlahyjrofbgqmwvv4tntjtk3vfmq",
+      "did": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+      "opid": "bagaaiera4hsdryismdzwouc2rezuloxkywvaen2o3cwzwi7tlek4mlgmcjuq",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-        "previd": "bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
+        "did": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+        "previd": "bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
         "doc": {
           "didDocumentData": "new-key"
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa#key-1",
+          "verificationMethod": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "1VpVTrnpBviRULFe0aWqNayr98P8bPPPErRFYCD3yBYppR_Ii2SFTgTbODuUgmlvBvYv6p2BjdmWhaiIYMFUlA"
+          "proofValue": "gMn2LL20DDVjqHLhV46YdJ85VOfbFnYckKkmOP2QV0IBnJeT4NtM1VU6sE9C2TbAo3u0yqk8EOFrd3K9gY-cRA"
         }
       },
       "registry": "BTC:signet",
@@ -1061,21 +1063,21 @@
       }
     },
     "freshNext": {
-      "did": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-      "opid": "bagaaiera66a7rlxt7c7dd5kcmtnrzblt3epsxcukiwxjnx5x7uze563yiorq",
+      "did": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+      "opid": "bagaaieralbptpast7yxdj275siochdkhtm5snvo5wplrpytvj5vkfqkoyb5a",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-        "previd": "bagaaierag6lki63bmhfu3hnbukaq3j4ewlahyjrofbgqmwvv4tntjtk3vfmq",
+        "did": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+        "previd": "bagaaiera4hsdryismdzwouc2rezuloxkywvaen2o3cwzwi7tlek4mlgmcjuq",
         "doc": {
           "didDocumentData": "new-key-successor"
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa#key-1",
+          "verificationMethod": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "7Mch7FTEx4bcKwl-9FNLeqHbFjuX97-N-Li-F-0uIhQftHTE_LSr9ZkuderHeq5ZETe4t2i0ys3ZAHlUxekWOg"
+          "proofValue": "w10hj08rhCRUjEKmiFLZ_YucJzxXR8h0DAfZa32g3jRsZABBOzU_ei5VAgrN-sw2HpMI3EERkfnOp3HwqfOJcA"
         }
       },
       "registry": "BTC:signet",
@@ -1092,21 +1094,21 @@
       }
     },
     "early": {
-      "did": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-      "opid": "bagaaierauhe5txflttaqbxjudlc746d3ac22rmdesquhjljbhwjtyncyfavq",
+      "did": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+      "opid": "bagaaierabbibatnyhx344f2c72efqwml7h4zk63lnxqifeyfaisn3w2yiokq",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
-        "previd": "bagaaieraptyxfc3zhmnw4coc3ib37asq6usfwaeu76ki22xhetl2gpwuqpxq",
+        "did": "did:cid:bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
+        "previd": "bagaaierajvdpjpdh76myqocdaa4v4soznm5hz63myyug452yzkuytyugkigq",
         "doc": {
           "didDocumentData": "before-rotation"
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa#key-1",
+          "verificationMethod": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "HEzB5Ert6wrK6yCFXtzTXo-I-m5QV9Zz9L35V4_ZB7l6hQg6Ls8cOsRudW8HTb_6l3F7GZ-b4OPq3SxQuL9PEg"
+          "proofValue": "ZKW4XAfnBlDv_Kkw_1jP-2Gjul5L6U6mV8yPfk-I8aFAuc2YPGK8-9NaNUwQDDJjEFAVc3B8u-6NUdChOdgtmA"
         }
       },
       "registry": "BTC:signet",
@@ -1123,28 +1125,28 @@
       }
     },
     "migration": {
-      "did": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
-      "opid": "bagaaiera3ceyfoedlawb35byhzwmveylwhmoc5zafahgvzgjqs6ophecwdaa",
+      "did": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
+      "opid": "bagaaierashnags6f5n7e56v43zvzhy6dymegd5qhuc7ef6arzvaouzeupova",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
-        "previd": "bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
+        "did": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
+        "previd": "bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
         "doc": {
           "didDocument": {
             "@context": [
               "https://www.w3.org/ns/did/v1"
             ],
-            "id": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
+            "id": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
             "verificationMethod": [
               {
                 "id": "#key-1",
-                "controller": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
+                "controller": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
                 "type": "EcdsaSecp256k1VerificationKey2019",
                 "publicKeyJwk": {
                   "kty": "EC",
                   "crv": "secp256k1",
-                  "x": "0U2H5aYy1STRIMQ4FhtPs-CMHxznC1Nr_8UEBEBb33c",
-                  "y": "r_ebOPnL6gkrg_xILIIzdBXbnabqOn5ro2kYJx3ZwoA"
+                  "x": "2Yp972foNwEY9jZiDQvgjtYzRN9oCCtPLxhE585gFIM",
+                  "y": "wkUTrfEGaRy_JZ-rfdjqenA0i1TkqHyUxNE-Vy8xyok"
                 }
               }
             ],
@@ -1159,15 +1161,17 @@
             ]
           },
           "didDocumentRegistration": {
+            "version": 1,
+            "type": "agent",
             "registry": "BTC:signet"
           }
         },
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa#key-1",
+          "verificationMethod": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "JzWSDXrnz6rTpMA7DjB4eyrFpQd-FPXo3SWX2k2vuvMf4GlhwWaJic4c854728qE5MPNxn7LCVsOHYd7puWrPQ"
+          "proofValue": "foN551RrEUKLlAmSfDJ7pHTFyK8VeZK8EA7N3kEDPBQUAXQSZuIcRT6ftPau9ba8aRgvJkS_QVNw9bIsBG2sSQ"
         }
       },
       "registry": "ETH:sepolia",
@@ -1184,28 +1188,28 @@
       }
     },
     "migrationRotation": {
-      "did": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
-      "opid": "bagaaierat4gennnz6522l3j43oitzuckm3knudjaed22pabddf4yyixeixyq",
+      "did": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
+      "opid": "bagaaierad4szowmowmtxbm7u2usugh3qznocko4eav2fm2orlzrrx6d3yh5a",
       "operation": {
         "type": "update",
-        "did": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
-        "previd": "bagaaiera3ceyfoedlawb35byhzwmveylwhmoc5zafahgvzgjqs6ophecwdaa",
+        "did": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
+        "previd": "bagaaierashnags6f5n7e56v43zvzhy6dymegd5qhuc7ef6arzvaouzeupova",
         "doc": {
           "didDocument": {
             "@context": [
               "https://www.w3.org/ns/did/v1"
             ],
-            "id": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
+            "id": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
             "verificationMethod": [
               {
                 "id": "#key-1",
-                "controller": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa",
+                "controller": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa",
                 "type": "EcdsaSecp256k1VerificationKey2019",
                 "publicKeyJwk": {
                   "kty": "EC",
                   "crv": "secp256k1",
-                  "x": "F6ToQrawObjbuVPJ-ukY2iz_xXSRvX9_yb8vke49lSY",
-                  "y": "C98p-NhCNEqI4v9NqV0Tt39L9-8sGxSI061NqCtdzn4"
+                  "x": "K9pos6oCOdOC8YXKLYwxzmBMwmIgzvPrZSI_R6AIjYc",
+                  "y": "wbsf2_Bu-4q4s-U5YzrFE-ReF5rhZgR9qxZxhUrsybA"
                 }
               }
             ],
@@ -1223,9 +1227,9 @@
         "proof": {
           "type": "EcdsaSecp256k1Signature2019",
           "created": "2026-01-01T00:00:00.000Z",
-          "verificationMethod": "did:cid:bagaaieraxfpktx24jk6lqughdar6ns7ubzincdzb4ph3ap5ncxamyfxozrxa#key-1",
+          "verificationMethod": "did:cid:bagaaierae4pfh4riu7vnloqabsir3lsrb2cozkjdl3n3eoq2ns2gzhdmjaoa#key-1",
           "proofPurpose": "authentication",
-          "proofValue": "hTYt9hTK9kgElMxrnlGKm76RZsksQqhMYObS-S_ptO4wHhFGfwdp54Eb9AmFrjgZT2bHNZ6hUth3DKBVRHb2iA"
+          "proofValue": "TSM3fxOQHRp1KeRPeR24f0krj3vBDvF5WXmlT_lbTb94Vlq7ogIQzyIDwd0B9HgJtR7y0l2OfAQ6IKM4EuYj4A"
         }
       },
       "registry": "BTC:signet",
