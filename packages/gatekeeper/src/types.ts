@@ -42,9 +42,6 @@ export interface GatekeeperOptions {
     ipfs: IPFSClient;
     console?: typeof console;
     didPrefix?: string;
-    /** Legacy name: optional local submission cap in JSON UTF-16 code units.
-     * Does not change protocol validation, imports, or historical replay.
-     */
     maxOpBytes?: number;
     maxQueueSize?: number;
     registries?: string[];

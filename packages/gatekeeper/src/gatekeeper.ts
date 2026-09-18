@@ -70,8 +70,6 @@ const ARCHON_SECP256K1_CRYPTOSUITE = 'archon-ecdsa-secp256k1-jcs-2026';
 const LEGACY_PROOF_TYPE = 'EcdsaSecp256k1Signature2019';
 
 const OPERATION_PROOF_PURPOSES = ['capabilityInvocation', 'authentication', 'assertionMethod'];
-// Legacy v1 JSON.stringify length, including proof; this is not a byte limit.
-const MAX_OPERATION_CODE_UNITS = 65_536;
 const ValidVersions = [1];
 const ValidTypes = ['agent', 'asset'];
 const PIN_QUEUE = 'pin';
@@ -178,7 +176,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         this.ipfs = options.ipfs;
         this.cipher = new CipherNode();
         this.didPrefix = options.didPrefix || 'did:cid';
-        this.maxOpBytes = options.maxOpBytes || MAX_OPERATION_CODE_UNITS; // Local submission cap only.
+        this.maxOpBytes = options.maxOpBytes || 64 * 1024; // 64KB
         this.maxQueueSize = options.maxQueueSize || 100;
 
         // Only DIDs registered on supported registries will be created by this node
@@ -766,7 +764,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidOperationError('missing');
         }
 
-        if (JSON.stringify(operation).length > MAX_OPERATION_CODE_UNITS) {
+        if (JSON.stringify(operation).length > this.maxOpBytes) {
             throw new InvalidOperationError('size');
         }
 
@@ -856,7 +854,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async verifyUpdateOperation(operation: Operation, doc: DidCidDocument): Promise<boolean> {
-        if (JSON.stringify(operation).length > MAX_OPERATION_CODE_UNITS) {
+        if (JSON.stringify(operation).length > this.maxOpBytes) {
             throw new InvalidOperationError('size');
         }
 
@@ -921,15 +919,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
     }
 
-    private checkSubmissionSize(operation: Operation): void {
-        if (this.maxOpBytes < MAX_OPERATION_CODE_UNITS && operation &&
-            JSON.stringify(operation).length > this.maxOpBytes) {
-            throw new InvalidOperationError('size');
-        }
-    }
-
     async createDID(operation: Operation): Promise<string> {
-        this.checkSubmissionSize(operation);
         await this.ensureHistoryReady();
         return this.withHistoryLock(async () => {
             const did = await this.createDIDOnce(operation);
@@ -1308,7 +1298,6 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async updateDID(operation: Operation): Promise<boolean> {
-        this.checkSubmissionSize(operation);
         await this.ensureHistoryReady();
         return this.withHistoryLock(async () => {
             const updated = await this.updateDIDOnce(operation);
@@ -2000,7 +1989,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         const operation = event.operation;
 
-        if (JSON.stringify(operation).length > MAX_OPERATION_CODE_UNITS) {
+        if (JSON.stringify(operation).length > this.maxOpBytes) {
             return false;
         }
 

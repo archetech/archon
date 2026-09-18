@@ -59,24 +59,3 @@ it.each(cases)('preserves v1 $name across submission, import, and replay', async
         }
     }
 });
-
-it('keeps a local submission cap out of import, verification, and restart', async () => {
-    const db = new Db('local-size-cap');
-    const ipfs = new MemoryClient();
-    let g = new Gatekeeper({ db, ipfs, maxOpBytes: 100 });
-    await expect(g.createDID(vectors.agent)).rejects.toThrow('size');
-    expect(await g.importEvent(event(vectors.agent))).toBe('added');
-    const operation = cases.find(c => c.name === 'legacy_40000_bmp')!.operation;
-    await expect(g.updateDID(operation)).rejects.toThrow('size');
-    expect(await g.importEvent(event(operation))).toBe('added');
-    g = new Gatekeeper({ db, ipfs, maxOpBytes: 100 });
-    expect((await g.resolveDID(vectors.did, { verify: true })).didDocumentMetadata?.versionSequence).toBe('2');
-});
-
-it('cannot raise protocol acceptance by increasing the local cap', async () => {
-    const g = new Gatekeeper({ db: new Db('raised-size-cap'), ipfs: new MemoryClient(), maxOpBytes: 1_000_000 });
-    await g.createDID(vectors.agent);
-    const operation = cases.find(c => c.name === 'bmp_65537')!.operation;
-    await expect(g.updateDID(operation)).rejects.toThrow('size');
-    expect(await g.importEvent(event(operation))).toBe('rejected');
-});

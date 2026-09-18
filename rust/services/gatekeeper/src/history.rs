@@ -974,16 +974,12 @@ mod tests {
                     if !create {
                         crate::events::import_event_impl(&state, wrap(agent)).await;
                     }
-                    let status = crate::events::import_event_impl(&state, wrap(&operation)).await;
-                    assert!(
-                        match status {
-                            crate::events::ImportStatus::Added => accepted,
-                            crate::events::ImportStatus::Rejected => !accepted,
-                            _ => false,
-                        },
-                        "{}",
-                        case["name"]
-                    );
+                    let batch = vec![crate::event_record_to_value(&wrap(&operation))];
+                    let result = crate::events::import_batch_impl(&state, &batch).await;
+                    assert_eq!(result.queued, usize::from(accepted), "{}", case["name"]);
+                    assert_eq!(result.rejected, usize::from(!accepted), "{}", case["name"]);
+                    let processed = crate::events::process_events_impl(&state).await;
+                    assert_eq!(processed.added.unwrap_or(0), usize::from(accepted));
                 }
                 if mode == "replay" {
                     let operations = if create {

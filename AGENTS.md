@@ -129,5 +129,3 @@ These rules apply to coding agents working in this repository.
 - In Zcash scan tests, inject transport failures at the client promise boundary rather than using Nock `replyWithError`, whose mock socket can emit delayed unhandled errors between cases. Keep actual HTTP-envelope coverage for JSON-RPC application errors.
 
 - Mediator backlog metrics must retain newly observed tips before subsequent block reads, including mid-pass tip changes; test a successful block followed by a higher tip and a failed next block. Avoid redundant persistence when the observed tip is unchanged.
-
-- Gatekeeper version-1 operation sizes use `JSON.stringify(operation).length` (UTF-16 code units, including proof), not UTF-8 bytes. Preserve this in both ports; local submission/transport caps must not change import or replay validity. Stricter UTF-8 enforcement requires a separately approved protocol version (#1159).

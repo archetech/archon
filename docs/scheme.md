@@ -38,21 +38,6 @@ did-url = did-cid path-abempty [ "?" query ] [ "#" fragment ]
 
 > **Note (DID Core 1.0):** Earlier drafts of the DID specification allowed a `;`-delimited service matrix parameter (`did:cid:<cid>;service=…`). DID Core 1.0 removed this form; service selection, where supported, uses the registered `service` and `relativeRef` **query** parameters. The `did:cid` method does not use the `;service` matrix-parameter form.
 
-## Version-1 operation size
-
-The complete operation, including its proof and extension members, MUST serialize
-within **65,536 UTF-16 code units** using compact ECMAScript `JSON.stringify`
-semantics. This legacy limit applies equally to creation, update, and deletion,
-including imported and replayed operations. It is not a UTF-8 byte limit: non-ASCII
-operations may occupy more than 65,536 bytes while remaining valid. Whitespace
-and escape choices in the incoming JSON do not affect the count after parsing.
-
-Operators may impose separate transport or local-submission limits, but these
-must not alter historical validity. A stricter UTF-8 limit is reserved for a
-future, explicitly specified protocol version; this change does not enable one.
-See [Gatekeeper size validation](services/gatekeeper/README.md#54-operation-size-limit)
-for exact counting and resource-limit rules.
-
 ## DID Lifecycle
 
 ![](./did-lifecycle.png)

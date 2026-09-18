@@ -7,7 +7,7 @@ from main for independently reviewable work; do not merge without instruction.
 
 ## Work and acceptance criteria
 
-- [x] #1158 (merged in PR #1181): Reproduce current direct-submission behavior; share predecessor and
+- [ ] #1158 (implemented in PR #1181; awaiting merge): Reproduce current direct-submission behavior; share predecessor and
   resulting-state validation across direct submission, import, and verified
   replay. Reject invalid direct transitions before storage/queue side effects.
   Preserve candidate predecessor selection, competing branches, cached retrieval
@@ -16,11 +16,10 @@ from main for independently reviewable work; do not merge without instruction.
 - [ ] #1156: Enforce operation-key authorization relationships in both ports;
   distinguish key publication from permission to control a DID. Specify legacy
   proof/document compatibility and cover encryption-only and signing-only keys.
-- [ ] #1159 (implementation ready for review): Preserve the version-1 UTF-16
-  count including proof and align Rust; separate protocol validity from configurable
-  submission/transport limits. Shared tests cover ASCII, multibyte, supplementary,
-  escaped, exact-limit and over-limit cases. Stricter UTF-8 enforcement is deferred
-  to a future version under the explicit compatibility decision.
+- [ ] #1159: Specify a common serialization and UTF-8 byte limit including proof;
+  separate protocol validity from configurable transport/resource limits. Cover
+  ASCII, multibyte, supplementary, escaped, exact-limit and over-limit vectors.
+  Decide replay compatibility for previously accepted oversized operations.
 - [ ] #1160: Consolidate normative transition rules as the implementations settle:
   identity/predecessor, immutable fields, component replacement/omission,
   authorization, migration, deletion/revalidation, protocol version and expiry.
@@ -84,9 +83,5 @@ Key permissions and byte limits remain separate, with #1160 documenting the cont
 - Shared signed fixtures cover submission, import, resolution, restart, and repair
   of malformed old projections. Production-copy replay checks accepted histories
   before/after enforcement. Version 2 remains disabled.
-- #1156 is paused at the user's request while authorization/migration alternatives
-  are considered. No permission enforcement or protocol-version activation is approved.
-- #1159 proceeds independently under the explicit decision to preserve version 1:
-  align Rust with TypeScript's historical UTF-16 count, separate local limits from
-  protocol validity, and leave strict UTF-8 enforcement for a future version. See
-  [the size decision](operation-size-1159.md). Keep CID alignment separate.
+- Next: define #1156 key permissions, then #1159 byte limits with their compatibility
+  decisions and corresponding #1160 documentation. Keep CID alignment separate.

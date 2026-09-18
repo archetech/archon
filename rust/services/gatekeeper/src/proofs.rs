@@ -153,7 +153,7 @@ fn verify_did_format(did: &str) -> bool {
 // the serialized operation, and stop as soon as the fixed budget is exhausted.
 const MAX_OPERATION_CODE_UNITS: usize = 65_536;
 
-pub(crate) fn exceeds_operation_size(operation: &Value) -> bool {
+fn exceeds_operation_size(operation: &Value) -> bool {
     exceeds_json_size(operation, MAX_OPERATION_CODE_UNITS)
 }
 
