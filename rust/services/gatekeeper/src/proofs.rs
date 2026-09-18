@@ -621,7 +621,7 @@ pub(crate) fn generate_json_cid(value: &Value) -> Result<String> {
 }
 
 // JSON.parse(canonical) followed by JSON.stringify enumerates array-index
-// property names first, numerically. Derive the current TS reference from
+// property names first, numerically. Derive the former TS reference from
 // the complete operation; never infer an alias from an event's claimed opid.
 pub(crate) fn typescript_numeric_cid(value: &Value) -> Option<String> {
     fn index(key: &str) -> Option<u32> {
@@ -674,38 +674,9 @@ pub(crate) fn typescript_numeric_cid(value: &Value) -> Option<String> {
 }
 
 pub(crate) fn canonical_json(value: &Value) -> String {
-    match value {
-        Value::Null => "null".to_string(),
-        Value::Bool(boolean) => boolean.to_string(),
-        Value::Number(number) => number.to_string(),
-        Value::String(string) => {
-            serde_json::to_string(string).unwrap_or_else(|_| "\"\"".to_string())
-        }
-        Value::Array(items) => {
-            let joined = items
-                .iter()
-                .map(canonical_json)
-                .collect::<Vec<_>>()
-                .join(",");
-            format!("[{joined}]")
-        }
-        Value::Object(map) => {
-            let mut entries = map.iter().collect::<Vec<_>>();
-            entries.sort_by(|a, b| a.0.cmp(b.0));
-            let joined = entries
-                .into_iter()
-                .map(|(key, value)| {
-                    format!(
-                        "{}:{}",
-                        serde_json::to_string(key).unwrap_or_else(|_| "\"\"".to_string()),
-                        canonical_json(value)
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(",");
-            format!("{{{joined}}}")
-        }
-    }
+    // Value already contains valid Unicode and finite JSON numbers. The JCS
+    // library supplies UTF-16 ordering and ECMAScript number serialization.
+    serde_json_canonicalizer::to_string(value).expect("valid JSON value serializes as JCS")
 }
 
 
@@ -984,4 +955,21 @@ pub(crate) fn expand_size_vector(case: &Value) -> Value {
             + &"a".repeat(padding["ascii"].as_u64().unwrap() as usize),
     );
     operation
+}
+
+#[cfg(test)]
+mod canonicalization_vectors {
+    use super::*;
+
+    #[test]
+    fn rfc8785_bytes_and_cids() {
+        let vectors: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/canonicalization-vectors.json"
+        )).unwrap();
+        for case in vectors["bytes"].as_array().unwrap() {
+            let value: Value = serde_json::from_str(case["input"].as_str().unwrap()).unwrap();
+            assert_eq!(canonical_json(&value), case["canonical"].as_str().unwrap(), "{}", case["name"]);
+            assert_eq!(generate_json_cid(&value).unwrap(), case["cid"]);
+        }
+    }
 }
