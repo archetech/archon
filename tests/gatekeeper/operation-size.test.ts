@@ -14,6 +14,7 @@ class Db extends DbMemory {
 }
 const vectors = JSON.parse(readFileSync('tests/gatekeeper/operation-size-v1-vectors.json', 'utf8')) as {
     agent: Operation; did: string;
+    numericBoundaries: { json: string; repeat: number; units: number }[];
     cases: { name: string; accepted: boolean; units: number; bytes: number; padding: { character: string; repeat: number; ascii: number }; operation: Operation }[];
 };
 const cases = vectors.cases.map(v => ({ ...v, operation: { ...v.operation,
@@ -59,4 +60,10 @@ it.each(cases)('preserves v1 $name across submission, import, and replay', async
             }
         }
     }
+});
+
+it.each(vectors.numericBoundaries)('counts decimal expansion of $json at the real limit', ({ json, repeat, units }) => {
+    const value = { values: Array(repeat).fill(JSON.parse(json)) };
+    expect(JSON.stringify(value).length).toBe(units);
+    expect(units).toBeGreaterThan(65_536);
 });

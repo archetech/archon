@@ -949,6 +949,20 @@ mod operation_size_vectors {
                 case["accepted"].as_bool().unwrap()
             );
         }
+        // Match TypeScript even where the old Rust serializer used shorter
+        // exponent notation. A fallback to the old byte count would reintroduce
+        // the cross-port disagreement this repair is intended to remove.
+        for case in vectors["numericBoundaries"].as_array().unwrap() {
+            let number: Value = serde_json::from_str(case["json"].as_str().unwrap()).unwrap();
+            let value = serde_json::json!({
+                "values": vec![number; case["repeat"].as_u64().unwrap() as usize]
+            });
+            let units = case["units"].as_u64().unwrap() as usize;
+            assert!(serde_json::to_vec(&value).unwrap().len() < MAX_OPERATION_CODE_UNITS);
+            assert!(exceeds_operation_size(&value));
+            assert!(!exceeds_json_size(&value, units));
+            assert!(exceeds_json_size(&value, units - 1));
+        }
         for case in vectors["measurements"].as_array().unwrap() {
             let value: Value = serde_json::from_str(case["json"].as_str().unwrap()).unwrap();
             let units = case["units"].as_u64().unwrap() as usize;

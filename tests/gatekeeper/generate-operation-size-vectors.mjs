@@ -33,4 +33,10 @@ function add(name, type, character, limit, fixedRepeat) {
 }
 // Raw JSON covers number spellings that serde_json and ECMAScript serialize differently.
 const measurements = ['null', 'true', 'false', '[]', '{}', '{"é":["😀","\\u0000","\\n","\\\"","\\\\"]}', '1.0', '-0.0', '1e-6', '1e-7', '1e20', '1e21', '9007199254740993', '{"n":1.2345678901234567}'].map(json => ({ json, units: JSON.stringify(JSON.parse(json)).length }));
-writeFileSync('tests/gatekeeper/operation-size-v1-vectors.json', JSON.stringify({ agent, did, cases, measurements }, null, 2) + '\n');
+// Old Rust serialized these numeric arrays below 64 KiB; TypeScript rejects
+// their expanded decimal representation. Matching TypeScript must not add an
+// old-Rust fallback that would preserve cross-port disagreement.
+const numericBoundaries = [['1e-6', 7500], ['1e20', 3000]].map(([json, repeat]) => ({
+    json, repeat, units: JSON.stringify({ values: Array(repeat).fill(JSON.parse(json)) }).length,
+}));
+writeFileSync('tests/gatekeeper/operation-size-v1-vectors.json', JSON.stringify({ agent, did, cases, measurements, numericBoundaries }, null, 2) + '\n');

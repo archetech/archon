@@ -592,5 +592,17 @@
       "json": "{\"n\":1.2345678901234567}",
       "units": 24
     }
+  ],
+  "numericBoundaries": [
+    {
+      "json": "1e-6",
+      "repeat": 7500,
+      "units": 67512
+    },
+    {
+      "json": "1e20",
+      "repeat": 3000,
+      "units": 66012
+    }
   ]
 }
