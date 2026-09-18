@@ -73,6 +73,14 @@ const OPERATION_PROOF_PURPOSES = ['capabilityInvocation', 'authentication', 'ass
 const ValidVersions = [1];
 const ValidTypes = ['agent', 'asset'];
 const PIN_QUEUE = 'pin';
+
+// RFC 3339 proofs may contain :60, which Date does not parse. Match chrono's
+// millisecond instant when comparing event times and historical cutoffs.
+const LEAP_SECOND = /:60(?=[.Zz+-])/;
+function timestampMillis(time: string): number {
+    return Date.parse(time.replace(LEAP_SECOND, ':59')) + (LEAP_SECOND.test(time) ? 1000 : 0);
+}
+
 const MONTH_LENGTHS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 // Proleptic Gregorian, computed rather than taken from `Date`, whose two-digit
@@ -123,7 +131,7 @@ function isValidRegistryName(registry: unknown): registry is string {
 
 // The two registries whose events this node stamps itself, so that no event on
 // them can carry a position a chain assigned: a local event holds the signer's
-// own `created`, a hyperswarm event the receiving node's clock. Every other
+// own `created`, a hyperswarm event its operation's proof time. Every other
 // registry is one an outside source might claim confirmation on. Whether a
 // registry actually anchors its events on a chain is not inferred from its
 // name -- `pin` does not -- but read from the events themselves (`isAnchored`).
@@ -1107,6 +1115,9 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         function generateStandardDatetime(time: any): string {
+            if (LEAP_SECOND.test(time)) {
+                return generateStandardDatetime(time.replace(LEAP_SECOND, ':59')).replace(/:59Z$/, ':60Z');
+            }
             const date = new Date(time);
             // Remove milliseconds for standardization
             return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
@@ -1204,7 +1215,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     break;
                 }
             }
-            else if (versionTime && new Date(time) > new Date(versionTime)) {
+            else if (versionTime && timestampMillis(time) > timestampMillis(versionTime)) {
                 break;
             }
 
@@ -1504,7 +1515,12 @@ export default class Gatekeeper implements GatekeeperInterface {
         return result;
     }
 
-    private async normalizeOperationId(event: GatekeeperEvent): Promise<void> {
+    private async normalizeEvent(event: GatekeeperEvent): Promise<void> {
+        // Normalize envelopes at import/recovery, including older mediator and
+        // restored events. Resolution consumes the stored event time uniformly.
+        if (event.registry === 'hyperswarm' && event.operation.proof) {
+            event.time = event.operation.proof.created;
+        }
         const cid = await this.generateCID(event.operation);
         if (event.opid !== cid && !this.candidateHistory?.[event.did ?? '']?.some(known => known.opid === cid)) {
             await this.generateCID(event.operation, true);
@@ -1549,13 +1565,13 @@ export default class Gatekeeper implements GatekeeperInterface {
                 const currentDid = `${this.didPrefix}:${key}`;
                 if (!candidates[currentDid]) {
                     candidates[currentDid] = copyJSON(histories?.get(currentDid) ?? await this.db.getEvents(currentDid));
-                    for (const event of candidates[currentDid]) await this.normalizeOperationId(event);
+                    for (const event of candidates[currentDid]) await this.normalizeEvent(event);
                     await this.db.setCandidates(currentDid, candidates[currentDid]);
                 }
             }
             for (const [key, events] of Object.entries(candidates)) {
                 const previous = JSON.stringify(events);
-                for (const event of events) await this.normalizeOperationId(event);
+                for (const event of events) await this.normalizeEvent(event);
                 if (JSON.stringify(events) !== previous) await this.db.setCandidates(key, events);
                 this.indexCandidates(key, events);
             }
@@ -1568,11 +1584,11 @@ export default class Gatekeeper implements GatekeeperInterface {
             return { candidates, changed: false };
         }
         const events = [...(candidates[did] ?? []), ...copyJSON(histories?.get(did) ?? await this.db.getEvents(did)), ...incoming];
-        for (const event of events) await this.normalizeOperationId(event);
+        for (const event of events) await this.normalizeEvent(event);
         const unique = new Map<string, GatekeeperEvent>();
         for (const event of events) {
             const key = this.candidateKey(event);
-            // Keep the first hint's local observation time. Anchored metadata
+            // Keep the first hint's position. Anchored metadata
             // updates still replace the record at the same chain position.
             if (!unique.has(key) || !isUnanchoredRegistry(event.registry)) unique.set(key, event);
         }
@@ -1731,7 +1747,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         if (!await this.verifyEvent(event)) return ImportStatus.REJECTED;
         event = copyJSON(event);
         event.did ??= event.operation.did ?? await this.generateDID(event.operation);
-        await this.normalizeOperationId(event);
+        await this.normalizeEvent(event);
         return this.withHistoryLock(async () => {
             const { changed } = await this.retainCandidates(event.did!, [event]);
             const status = await this.importEventOnce(event);
@@ -1790,7 +1806,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     }
                 }
 
-                await this.normalizeOperationId(event);
+                await this.normalizeEvent(event);
 
                 const opMatch = currentEvents.find(item => item.opid === event.opid);
 

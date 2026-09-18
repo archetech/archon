@@ -586,7 +586,18 @@ fn event_log_did(config: &crate::Config, event: &EventRecord) -> String {
     infer_event_did(config, &event_record_to_value(event)).unwrap_or_default()
 }
 
+// Old mediators and HTTP history imports can supply receipt/chain timestamps.
+// Correct the envelope before storage; never rewrite the operation itself.
+pub(crate) fn normalize_event_time(event: &mut EventRecord) {
+    if event.registry == "hyperswarm" {
+        if let Some(time) = event.operation.pointer("/proof/created").and_then(Value::as_str) {
+            event.time = time.to_string();
+        }
+    }
+}
+
 pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) -> ImportStatus {
+    normalize_event_time(&mut event);
     let _guard = state.history_lock.lock().await;
     let did = match infer_event_did(&state.config, &event_record_to_value(&event)) {
         Ok(did) => did,

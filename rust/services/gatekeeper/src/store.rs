@@ -170,7 +170,14 @@ pub(crate) fn past_cutoff(options: &ResolveOptions, event: &EventRecord) -> bool
         }
     }
     match options.version_time.as_ref() {
-        Some(version_time) => event.time > *version_time,
+        Some(version_time) => {
+            // Compare instants, including offsets and subsecond precision,
+            // consistently with TypeScript's Date comparison.
+            chrono::DateTime::parse_from_rfc3339(&event.time)
+                .ok()
+                .zip(chrono::DateTime::parse_from_rfc3339(version_time).ok())
+                .is_some_and(|(time, cutoff)| time.timestamp_millis() > cutoff.timestamp_millis())
+        }
         None => false,
     }
 }
@@ -2364,5 +2371,34 @@ mod startup_read_tests {
         );
         let _: usize = conn.del(keys)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod event_time_tests {
+    use super::*;
+
+    #[test]
+    fn cutoff_compares_event_instants_and_preserves_ordinal_precedence() {
+        let mut event = value_to_event_record(&serde_json::json!({
+            "registry": "hyperswarm", "time": "2026-09-04T00:51:32.807000001Z",
+            "ordinal": [42], "operation": { "proof": { "created": "2026-09-17T00:00:00Z" } }
+        }));
+        let mut options = ResolveOptions {
+            version_time: Some("2026-09-03T20:51:32.807-04:00".to_string()),
+            ..Default::default()
+        };
+        assert!(!past_cutoff(&options, &event));
+        options.version_time = Some("2026-09-04T00:51:32.806Z".to_string());
+        assert!(past_cutoff(&options, &event));
+        for registry in ["local", "BTC:signet"] {
+            event.registry = registry.to_string();
+            event.time = "2026-09-17T17:53:05.466Z".to_string();
+            options.version_time = Some("2026-09-04T00:51:33Z".to_string());
+            assert!(past_cutoff(&options, &event));
+        }
+        // Chain ordering still takes precedence over the time cutoff.
+        options.version_ordinal = Some(("BTC:signet".to_string(), vec![43]));
+        assert!(!past_cutoff(&options, &event));
     }
 }

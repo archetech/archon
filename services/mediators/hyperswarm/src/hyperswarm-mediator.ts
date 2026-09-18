@@ -15,6 +15,7 @@ import { Operation } from '@didcid/gatekeeper/types';
 import CipherNode from '@didcid/cipher/node';
 import { installProcessGuards } from '@didcid/common/process-guards';
 import config from './config.js';
+import { createEvents } from './events.js';
 import { exit } from 'process';
 
 interface HyperMessage {
@@ -425,19 +426,7 @@ async function importBatch(batch: Operation[]): Promise<void> {
     const end = mediatorImportBatchDuration.startTimer();
     try {
         const hash = cipher.hashJSON(batch);
-        const events = [];
-        const now = new Date();
-        const isoTime = now.toISOString();
-        const ordTime = now.getTime();
-
-        for (let i = 0; i < batch.length; i++) {
-            events.push({
-                registry: REGISTRY,
-                time: isoTime,
-                ordinal: [ordTime, i],
-                operation: batch[i],
-            })
-        }
+        const events = createEvents(batch);
 
         console.log(`importBatch: ${shortName(hash)} merging ${events.length} events...`);
         console.time('importBatch');

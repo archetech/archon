@@ -1,33 +1,34 @@
 # Protocol hardening after #1173
 
-Approved implementation order: #1158, then #1156, then #1159. Update the relevant
-#1160 transition documentation with each change. Investigate #1149 separately
-before proposing new unanchored-history semantics. Use separate branches/PRs
-from main for independently reviewable work; do not merge without instruction.
+Current status (2026-09-18): #1158 and #1159 are complete. #1156 is paused at
+the maintainer's request. #1149 proceeds as a narrow Hyperswarm proof-time fix;
+#1185 controller-version references are optional and not a prerequisite. Keep
+independent work in separate PRs from main; do not merge without instruction.
 
 ## Work and acceptance criteria
 
-- [ ] #1158 (implemented in PR #1181; awaiting merge): Reproduce current direct-submission behavior; share predecessor and
-  resulting-state validation across direct submission, import, and verified
-  replay. Reject invalid direct transitions before storage/queue side effects.
-  Preserve candidate predecessor selection, competing branches, cached retrieval
-  aliases, self-controlled agents, agent-owned assets, and registry migration.
-  Decide historical compatibility before adding new registration restrictions.
-- [ ] #1156: Enforce operation-key authorization relationships in both ports;
-  distinguish key publication from permission to control a DID. Specify legacy
-  proof/document compatibility and cover encryption-only and signing-only keys.
-- [ ] #1159: Specify a common serialization and UTF-8 byte limit including proof;
-  separate protocol validity from configurable transport/resource limits. Cover
-  ASCII, multibyte, supplementary, escaped, exact-limit and over-limit vectors.
-  Decide replay compatibility for previously accepted oversized operations.
-- [ ] #1160: Consolidate normative transition rules as the implementations settle:
-  identity/predecessor, immutable fields, component replacement/omission,
-  authorization, migration, deletion/revalidation, protocol version and expiry.
-  Do not invent restrictions just to reconcile old prose.
-- [ ] #1149: Reproduce historical hyperswarm resolution divergence on current
-  code with identical operations and differing node receipt clocks. Evaluate
-  explicit unanchored-history policies; signed time alone cannot prevent
-  backdating by a retired key. Do not silently choose a protocol change.
+- [x] #1158: Shared predecessor and registration validation merged in #1174 and
+  #1181. Production audit supported the approved version-1 registration checks.
+- [x] #1159: Rust size counting aligned with existing TypeScript in #1184; issue
+  closed. Preserve the legacy UTF-16 code-unit rule. TypeScript `maxOpBytes`,
+  transport settings, and protocol-version activation were explicitly left alone.
+- [ ] #1156: Paused after the key-permission audit. 276 active agents lacked
+  `capabilityInvocation`; migration/enforcement remains undecided. Do not resume
+  implementation or activate a new protocol version without instruction.
+- [ ] #1149 (implementation under review): Use each Hyperswarm operation's
+  `proof.created` for historical cutoffs and update/deletion metadata, keeping
+  `previd` ordering, operation bytes, and ordinals. Correct event envelopes in
+  the mediator and Gatekeeper import/recovery, keeping resolution registry-neutral. Cover controller rotation/deletion,
+  asset genesis and successors, arrival order, restart, and both proof formats in
+  both ports. Keep chain/local behavior unchanged; add no speculative safeguards.
+  See [the decision and production replay results](hyperswarm-time-1149.md).
+- [ ] #1160: Consolidate established transition rules. Update relevant timing
+  documentation with #1149, without inventing additional acceptance restrictions.
+- [ ] #1180 (separate): Investigate broader TypeScript/Rust CID serialization
+  alignment; the earlier Rust predecessor repair did not align generated IDs.
+- [ ] #1185 (optional design): Explicit controller-version references. Proof time
+  already selects a controller version indirectly; this proposal is not needed
+  to remove the node-local timestamp dependency in #1149.
 
 ## Validation and constraints
 
@@ -42,7 +43,7 @@ per-operation path. User confirmed #1173 DB check at 37.607 seconds on Redis.
 
 ## Initial assessment (2026-09-17)
 
-Five issues remain open: #1149, #1156, #1158, #1159, #1160. #1158's original
+At the initial assessment, five issues were open: #1149, #1156, #1158, #1159, #1160. #1158's original
 accepted-until-restart description needs refreshing: direct updates now trigger
 immediate reconciliation, but still append/queue before predecessor validation.
 Closed #1150–#1152, #1157, #1164, #1166, #1168 and #1170 are covered by merged work.
@@ -57,6 +58,12 @@ remains reserved and disabled until its contract is complete.
 Registration is the approved exception: on 2026-09-17, the user authorized version-1
 checks after a clean production audit and confirmed that other nodes share the same
 database. See the [registration decision](registration-hardening-1158.md).
+
+The 2026-09-18 Hyperswarm decision separately changes historical time selection
+under version 1: replay uses proof times and may revise accepted asset history.
+The [#1149 replay report](hyperswarm-time-1149.md) records the observed additions
+and invalidated deletions. This does not authorize stricter key permissions,
+new size limits, or a controller-version protocol change.
 
 ## First implementation step
 
@@ -83,5 +90,9 @@ Key permissions and byte limits remain separate, with #1160 documenting the cont
 - Shared signed fixtures cover submission, import, resolution, restart, and repair
   of malformed old projections. Production-copy replay checks accepted histories
   before/after enforcement. Version 2 remains disabled.
-- Next: define #1156 key permissions, then #1159 byte limits with their compatibility
-  decisions and corresponding #1160 documentation. Keep CID alignment separate.
+- Subsequently, #1156 was paused and #1159 closed through the narrow Rust parity
+  repair in #1184. No new protocol version was enabled.
+- On 2026-09-18 the maintainer selected proof-time resolution for Hyperswarm
+  (#1149), retaining predecessor order. #1185 records that explicit controller
+  references are a separate option. Legacy unsigned proof times remain accepted;
+  this is a shared historical-selection rule, not a new trusted chronology claim.
