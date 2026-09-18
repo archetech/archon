@@ -276,6 +276,16 @@ async fn rebuild_histories(
             .collect()
     };
     let mut data = JsonDbFile::default();
+    if histories.is_some() {
+        // Startup retained and canonicalized every candidate before replay.
+        // Reuse that content for canonical predecessors instead of reading it
+        // back one operation at a time. Retrieval aliases still require the DB.
+        for event in candidates.values().flatten() {
+            if let Some(opid) = &event.opid {
+                data.ops.insert(opid.clone(), event.operation.clone());
+            }
+        }
+    }
     let mut original = HashMap::new();
     {
         let cache = state.candidate_history.lock().await;
@@ -292,7 +302,7 @@ async fn rebuild_histories(
                 .unwrap_or_else(|| store.get_events(&key));
             for event in events.iter().chain(cache.get(&key).into_iter().flatten()) {
                 if let Some(previd) = event.operation.get("previd").and_then(Value::as_str) {
-                    if references.insert(previd.to_string()) {
+                    if references.insert(previd.to_string()) && !data.ops.contains_key(previd) {
                         if let Some(operation) = store.get_operation(previd) {
                             data.ops.insert(previd.to_string(), operation);
                         }
@@ -406,15 +416,30 @@ async fn rebuild_histories(
         }
     }
     let has_changes = !changed.is_empty();
-    let mut refreshing = histories.map(|_| ProgressLogger::new("search cache refresh", changed.len()));
-    for (index, target) in changed.into_iter().enumerate() {
-        state.verified_dids.lock().await.remove(&target);
-        update_search_doc(state, &target).await;
-        if let Some(progress) = &mut refreshing {
-            progress.update(index + 1);
-        }
+    for target in &changed {
+        state.verified_dids.lock().await.remove(target);
     }
-    *state.status_snapshot.lock().await = None;
+    if histories.is_some() {
+        // The replay store contains every accepted startup history. Empty
+        // candidates were removed from durable storage during publication and
+        // must not be counted as invalid DIDs in the derived views.
+        replay
+            .store
+            .lock()
+            .await
+            .data
+            .dids
+            .retain(|_, events| !events.is_empty());
+        crate::resolver::build_startup_views(&replay).await;
+        *state.search_index.lock().await = std::mem::take(&mut *replay.search_index.lock().await);
+        // status_snapshot and metrics are shared by the replay state clone.
+    } else {
+        // Runtime reconciliation only replaces affected search documents.
+        for target in changed {
+            update_search_doc(state, &target).await;
+        }
+        *state.status_snapshot.lock().await = None;
+    }
     Ok(has_changes)
 }
 
@@ -2366,6 +2391,90 @@ mod tests {
             json!("original")
         );
     }
+    #[tokio::test]
+    async fn startup_views_match_published_histories_and_runtime_updates() {
+        let vectors: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/hyperswarm-time-vectors.json"
+        ))
+        .unwrap();
+        let v = &vectors[0]; // Legacy proof timestamps can be changed without resigning.
+        let controller = v["controller"].as_str().unwrap();
+        let asset = v["asset"].as_str().unwrap();
+        let (state, _dir) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        ensure_history_ready(&state).await.unwrap();
+        for name in ["agent", "assetCreate", "assetUpdate", "controllerDelete"] {
+            crate::events::import_event_impl(&state, crate::value_to_event_record(&json!({
+                "operation": v[name], "registry": "hyperswarm", "time": v[name]["proof"]["created"]
+            }))).await;
+        }
+        // A real signed create after controller deletion remains candidate-only.
+        let mut rejected = v["assetCreate"].clone();
+        rejected["proof"]["created"] = json!("2026-09-05T00:00:00Z");
+        crate::events::import_event_impl(&state, crate::value_to_event_record(&json!({
+            "operation": rejected, "registry": "hyperswarm", "time": rejected["proof"]["created"]
+        }))).await;
+        assert_eq!(state.store.lock().await.get_candidates().unwrap().len(), 3);
+        // Only the controller needs envelope repair; unchanged asset data must
+        // still appear in the complete startup index.
+        {
+            let mut store = state.store.lock().await;
+            let mut candidates = store.get_candidates().unwrap()[controller].clone();
+            for event in &mut candidates {
+                event.time = "2026-09-17T00:00:00Z".to_string();
+            }
+            store
+                .set_candidates(controller, candidates.clone())
+                .unwrap();
+            store.set_events(controller, candidates).unwrap();
+        }
+        for _ in 0..2 {
+            *state.history_ready.lock().await = false;
+            *state.candidate_history.lock().await = None;
+            state.dependents.lock().await.clear();
+            state.search_index.lock().await.clear();
+            ensure_history_ready(&state).await.unwrap();
+            let cached = state.status_snapshot.lock().await.clone().unwrap();
+            assert_eq!(cached.total, 2);
+            assert_eq!(cached.by_type.invalid, 0);
+            let actual = crate::resolver::check_dids_impl(&state, None, false).await;
+            assert_eq!(
+                serde_json::to_value(cached).unwrap(),
+                serde_json::to_value(actual).unwrap()
+            );
+            assert_eq!(state.search_index.lock().await.size(), 2);
+            let query = json!({"state": {"$in": ["updated"]}});
+            assert_eq!(
+                crate::query_docs_impl(&state, &query).await.unwrap(),
+                vec![asset.to_string()]
+            );
+            let before = state.search_index.lock().await.search_docs("updated");
+            crate::build_search_index(&state).await;
+            assert_eq!(
+                before,
+                state.search_index.lock().await.search_docs("updated")
+            );
+        }
+        // Import-time reconciliation still removes stale searchable content.
+        crate::events::import_event_impl(&state, crate::value_to_event_record(&json!({
+            "operation": v["assetDelete"], "registry": "hyperswarm", "time": v["assetDelete"]["proof"]["created"]
+        }))).await;
+        assert!(state
+            .search_index
+            .lock()
+            .await
+            .search_docs("updated")
+            .is_empty());
+        assert!(state.status_snapshot.lock().await.is_none());
+        remove_histories(&state, &[controller.to_string()])
+            .await
+            .unwrap();
+        assert_eq!(state.search_index.lock().await.size(), 0);
+    }
+
     #[tokio::test]
     async fn canonical_startup_does_not_rewrite_unchanged_storage() {
         let vectors: Vec<Value> = serde_json::from_str(include_str!(

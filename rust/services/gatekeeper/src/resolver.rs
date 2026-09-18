@@ -488,10 +488,30 @@ pub(crate) async fn update_metrics_from_check(state: &AppState, did_check: &Chec
     }
 }
 
+// Startup recovery owns a complete accepted in-memory projection. Build both
+// derived views in one pass before releasing history_lock, without Redis reads.
+pub(crate) async fn build_startup_views(state: &AppState) {
+    let mut index = crate::SearchIndex::default();
+    let status = scan_dids(state, None, Some(&mut index)).await;
+    let size = index.size();
+    *state.search_index.lock().await = index;
+    *state.status_snapshot.lock().await = Some(status.clone());
+    update_metrics_from_check(state, &status).await;
+    info!("Search index initialized with {} DIDs", size);
+}
+
 pub(crate) async fn check_dids_impl(
     state: &AppState,
     dids: Option<Vec<String>>,
     _chatty: bool,
+) -> CheckDidsResult {
+    scan_dids(state, dids, None).await
+}
+
+async fn scan_dids(
+    state: &AppState,
+    dids: Option<Vec<String>>,
+    mut search_index: Option<&mut crate::SearchIndex>,
 ) -> CheckDidsResult {
     let dids = {
         let store = state.store.lock().await;
@@ -502,7 +522,12 @@ pub(crate) async fn check_dids_impl(
     let mut by_registry = HashMap::new();
     let mut by_version = HashMap::new();
 
-    let mut progress = crate::progress::ProgressLogger::new("DB status check", dids.len());
+    let phase = if search_index.is_some() {
+        "startup search/status views"
+    } else {
+        "DB status check"
+    };
+    let mut progress = crate::progress::ProgressLogger::new(phase, dids.len());
     for (index, did) in dids.iter().enumerate() {
         let doc = {
             let store = state.store.lock().await;
@@ -513,6 +538,10 @@ pub(crate) async fn check_dids_impl(
             by_type.invalid += 1;
             continue;
         };
+
+        if let Some(index) = search_index.as_deref_mut() {
+            index.store(did, &doc);
+        }
 
         match doc
             .get("didDocumentRegistration")
