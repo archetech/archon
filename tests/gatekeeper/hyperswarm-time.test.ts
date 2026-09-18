@@ -142,3 +142,45 @@ it('imports existing microsecond proof timestamps and compares equivalent instan
         expect((await g.resolveDID(v.controller, { versionTime: cutoff })).didDocumentMetadata?.versionSequence).toBe(sequence);
     }
 });
+
+it('initializes complete search/status views from accepted replay and keeps runtime views current', async () => {
+    const v = vectors.find(v => v.legacy)!;
+    const db = new DbMemory('startup-views');
+    const options = { db, ipfs: new MemoryClient() };
+    let g = new Gatekeeper(options);
+    for (const op of [v.agent, v.assetCreate, v.assetUpdate, v.controllerDelete]) {
+        await g.importEvent(event(op, receipts[0]));
+    }
+    // This legacy signed create is after the controller deletion: real rejected
+    // evidence must survive recovery without entering status/search views.
+    const rejected = structuredClone(v.assetCreate);
+    rejected.proof!.created = '2026-09-05T00:00:00Z';
+    await g.importEvent(event(rejected, receipts[1]));
+    expect(Object.keys(await db.getCandidates())).toHaveLength(3);
+    const journal = await db.getCandidates();
+    for (const e of journal[v.controller]) e.time = receipts[1];
+    await db.setCandidates(v.controller, journal[v.controller]);
+    await db.setEvents(v.controller, journal[v.controller]);
+    for (let run = 0; run < 2; run++) {
+        g = new Gatekeeper(options);
+        const status = await g.initialize();
+        expect(status.total).toBe(2);
+        expect(status.byType.invalid).toBe(0);
+        expect(status).toEqual(await g.checkDIDs());
+        expect(await g.queryDocs({ state: { $in: ['updated'] } })).toEqual([v.asset]);
+        const indexed = await g.searchDocs('updated');
+        await g.initSearchIndex();
+        expect(await g.searchDocs('updated')).toEqual(indexed);
+    }
+    await g.importBatch([event(v.assetDelete, receipts[1])]);
+    await g.processEvents();
+    expect(await g.searchDocs('updated')).toEqual([]);
+    await g.removeDIDs([v.controller]);
+    expect(await g.searchDocs('')).toEqual([]);
+    // Reinitializing an already active instance cannot reuse startup counters.
+    expect((await g.initialize()).total).toBe(0);
+    expect(await g.initialize()).toEqual(await g.checkDIDs());
+    const empty = new Gatekeeper({ db: new DbMemory('empty-startup'), ipfs: options.ipfs });
+    expect((await empty.initialize()).total).toBe(0);
+    expect(await empty.searchDocs('')).toEqual([]);
+});

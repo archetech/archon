@@ -216,9 +216,9 @@ export function createGatekeeperApp(options: CreateGatekeeperAppOptions) {
         eventsQueue: [],
     };
 
-    async function checkDids() {
+    async function checkDids(initialStatus?: CheckDIDsResult) {
         console.time('checkDIDs');
-        didCheck = await gatekeeper.checkDIDs();
+        didCheck = initialStatus ?? await gatekeeper.checkDIDs();
         console.timeEnd('checkDIDs');
 
         // Update events queue metrics - reset first to clear stale data
@@ -260,8 +260,8 @@ export function createGatekeeperApp(options: CreateGatekeeperAppOptions) {
         };
     }
 
-    async function reportStatus() {
-        await checkDids();
+    async function reportStatus(initialStatus?: CheckDIDsResult) {
+        await checkDids(initialStatus);
         const status = await getStatus();
 
         console.log('Status -----------------------------');
@@ -444,10 +444,7 @@ async function main(startupComplete: () => void) {
     const api = createGatekeeperApp({ gatekeeper, config, logger: defaultLogger });
 
     console.log(`Starting Archon Gatekeeper v${pkg.version} (${commit}) with a db (${config.db}) check...`);
-    await api.reportStatus();
-
-    console.log('Initializing search index...');
-    await gatekeeper.initSearchIndex();
+    await api.reportStatus(await gatekeeper.initialize());
 
     if (config.statusInterval > 0) {
         console.log(`Starting status update every ${config.statusInterval} minutes`);

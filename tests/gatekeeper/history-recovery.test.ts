@@ -559,3 +559,48 @@ it('lets interactive resolution finish between status scan chunks', async () => 
     expect((await read).didDocument?.id).toBe(vector.controller);
     expect((await scan).byType.assets).toBe(65);
 });
+
+it('drains startup publication writes before releasing the history lock after a failure', async () => {
+    const vector = vectors[0];
+    let release!: () => void;
+    let failed!: () => void;
+    const barrier = new Promise<void>(resolve => { release = resolve; });
+    const failure = new Promise<void>(resolve => { failed = resolve; });
+    class FailingPublicationDb extends DbJsonMemory {
+        failPublication = false;
+        override async setEvents(did: string, events: GatekeeperEvent[]) {
+            if (this.failPublication) {
+                if (did === vector.controller) await barrier;
+                if (did === vector.asset) {
+                    this.failPublication = false;
+                    failed();
+                    throw new Error('publication failed');
+                }
+            }
+            return super.setEvents(did, events);
+        }
+    }
+    const db = new FailingPublicationDb('startup-publication');
+    const options = { db, ipfs: new MemoryClient() };
+    let g = new Gatekeeper(options);
+    for (const event of vector.base) await g.importEvent(event);
+    // Durable evidence remains; both projections need repair after interruption.
+    await db.deleteEvents(vector.controller);
+    await db.deleteEvents(vector.asset);
+    db.failPublication = true;
+    g = new Gatekeeper(options);
+    let finished = false;
+    const startup = g.initialize().catch(error => { finished = true; return error; });
+    await failure;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(finished).toBe(false);
+    let readFinished = false;
+    const read = g.resolveDID(vector.controller).catch(error => error).finally(() => { readFinished = true; });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(readFinished).toBe(false);
+    release();
+    expect((await startup).message).toBe('publication failed');
+    expect((await read).message).toBe('publication failed');
+    expect((await g.initialize()).total).toBe(2);
+    expect((await g.resolveDID(vector.asset)).didDocument?.id).toBe(vector.asset);
+});

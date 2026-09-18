@@ -32,7 +32,7 @@ use crate::{
         ipfs_get_stream, ipfs_get_text, list_dids, not_found, process_events_route, query_docs,
         ready, registries, remove_dids, resolve_did, search_docs, status, version,
     },
-    build_search_index, log_status_snapshot, refresh_metrics_snapshot, start_background_tasks,
+    log_status_snapshot, refresh_metrics_snapshot, start_background_tasks,
     CheckDidsResult, Config, EventRecord, JsonDb, Metrics, SearchIndex,
 };
 
@@ -94,12 +94,14 @@ pub async fn run() -> Result<()> {
     let state = build_state(config.clone())?;
     let app = build_router(state.clone());
 
-    refresh_metrics_snapshot(&state).await?;
-    log_status_snapshot(&state).await;
-
-    info!("Initializing search index...");
     crate::history::ensure_history_ready(&state).await?;
-    build_search_index(&state).await;
+    // Nonempty recovery already builds search and status from its snapshot.
+    // An empty database has no replay snapshot and needs only empty counters.
+    let needs_status = state.status_snapshot.lock().await.is_none();
+    if needs_status {
+        refresh_metrics_snapshot(&state).await?;
+    }
+    log_status_snapshot(&state).await;
 
     if config.status_interval_minutes > 0 {
         info!(

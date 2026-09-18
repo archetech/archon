@@ -205,6 +205,14 @@ export default class Gatekeeper implements GatekeeperInterface {
         this.searchIndex = new SearchIndex();
     }
 
+    // Service startup consumes the views made during recovery. Later calls scan
+    // current histories instead of returning the old recovery counters.
+    async initialize(): Promise<CheckDIDsResult> {
+        const recovering = !this.historyReady;
+        const status = await this.ensureHistoryReady();
+        return recovering && status ? { ...status, eventsQueue: this.eventsQueue } : this.checkDIDsOnce();
+    }
+
     async initSearchIndex(): Promise<void> {
         await this.ensureHistoryReady();
         const dids = await this.getDIDs() as string[];
@@ -343,7 +351,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.checkDIDsOnce(options);
     }
 
-    private async checkDIDsOnce(options?: CheckDIDsOptions): Promise<CheckDIDsResult> {
+    private async checkDIDsOnce(options?: CheckDIDsOptions, searchIndex?: SearchIndex): Promise<CheckDIDsResult> {
         const chatty = options?.chatty ?? false;
         let dids = options?.dids;
 
@@ -352,7 +360,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         const total = dids.length;
-        const progress = new ProgressLogger('DB status check', total);
+        const progress = new ProgressLogger(searchIndex ? 'startup search/status views' : 'DB status check', total);
         let n = 0;
         let agents = 0;
         let assets = 0;
@@ -386,6 +394,8 @@ export default class Gatekeeper implements GatekeeperInterface {
                         }
                         continue;
                     }
+
+                    searchIndex?.store(did, doc);
 
                     if (chatty) {
                         console.log(`resolved ${n}/${total} ${did} OK`);
@@ -1479,8 +1489,8 @@ export default class Gatekeeper implements GatekeeperInterface {
     // Candidate history is durable evidence; accepted history is a revisable view.
     // Serialize imports so a controller change and dependent replay cannot race.
     private historyLock: Promise<void> = Promise.resolve();
-    private historyReady?: Promise<void>;
-    private ensureHistoryReady(): Promise<void> {
+    private historyReady?: Promise<CheckDIDsResult | undefined>;
+    private ensureHistoryReady(): Promise<CheckDIDsResult | undefined> {
         this.historyReady ??= this.withHistoryLock(async () => {
             console.log('Gatekeeper history recovery: loading candidate journal and DID list');
             // A journal write precedes projection writes. Rebuild on startup so
@@ -1505,7 +1515,8 @@ export default class Gatekeeper implements GatekeeperInterface {
                 await this.retainCandidates(did, [], histories);
                 preparing.update(index + 1);
             }
-            await this.rebuildHistories(targets, this.candidateHistory ?? {}, histories);
+            const result = await this.rebuildHistories(targets, this.candidateHistory ?? {}, histories);
+            return result.status;
         }).catch(error => { this.historyReady = undefined; throw error; });
         return this.historyReady;
     }
@@ -1615,7 +1626,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         // changing the controller projection. Rebuild it first; dependents only
         // need replay if the history they authorize against actually changes.
         if (rebuildSelf && projectionUnchanged) {
-            if (!await this.rebuildHistories([did], candidates)) return;
+            if (!(await this.rebuildHistories([did], candidates)).changed) return;
             rebuildSelf = false;
         }
         const affected = new Set([did]);
@@ -1630,8 +1641,8 @@ export default class Gatekeeper implements GatekeeperInterface {
         await this.rebuildHistories([...affected], candidates);
     }
 
-    private async rebuildHistories(targets: string[], candidates: Record<string, GatekeeperEvent[]>, histories?: Map<string, GatekeeperEvent[]>): Promise<boolean> {
-        if (!targets.length) return false;
+    private async rebuildHistories(targets: string[], candidates: Record<string, GatekeeperEvent[]>, histories?: Map<string, GatekeeperEvent[]>): Promise<{ changed: boolean; status?: CheckDIDsResult }> {
+        if (!targets.length && !histories) return { changed: false };
         // Snapshot-backed replay is startup recovery; runtime imports stay quiet.
         const snapshot = histories ? new ProgressLogger('replay snapshot', targets.length) : undefined;
         const staged = new Map<string, GatekeeperEvent[]>();
@@ -1729,17 +1740,39 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
         let changed = false;
         const publishing = histories ? new ProgressLogger('history publication', targets.length) : undefined;
-        for (const [index, target] of targets.entries()) {
+        let published = 0;
+        const publish = async (target: string) => {
             if (this.cipher.canonicalizeJSON(staged.get(target)) !== original.get(target)) {
                 changed = true;
                 if (staged.get(target)!.length) await this.db.setEvents(target, staged.get(target)!);
                 else await this.db.deleteEvents(target);
                 delete this.verifiedDIDs[target];
-                await this.updateSearchIndex(target);
+                if (!histories) await this.updateSearchIndex(target);
             }
-            publishing?.update(index + 1);
+            publishing?.update(++published);
+        };
+        if (histories) {
+            for (let offset = 0; offset < targets.length; offset += 32) {
+                // Accepted projections are independent writes under the history
+                // lock. Drain every started write before propagating a failure.
+                const results = await Promise.allSettled(targets.slice(offset, offset + 32).map(publish));
+                const failed = results.find(result => result.status === 'rejected');
+                if (failed?.status === 'rejected') throw failed.reason;
+            }
+        } else {
+            for (const target of targets) await publish(target);
         }
-        return changed;
+        if (histories) {
+            // Read the complete accepted snapshot only after durable publication.
+            // Journal-only/rejected DIDs must not enter the index or counters.
+            const accepted = targets.filter(target => staged.get(target)!.length > 0);
+            const index = new SearchIndex();
+            const status = await replay.checkDIDsOnce({ dids: accepted }, index);
+            this.searchIndex = index;
+            console.log(`Search index initialized with ${index.size} DIDs`);
+            return { changed, status };
+        }
+        return { changed };
     }
 
     async importEvent(event: GatekeeperEvent): Promise<ImportStatus> {
