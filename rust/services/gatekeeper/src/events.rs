@@ -297,7 +297,9 @@ pub(crate) async fn handle_did_operation(
     update_search_doc(state, &did).await;
     state.verified_dids.lock().await.remove(&did);
 
-    crate::history::reconcile_history(state, &did, false)
+    let reconsider_rejected = state.rejected_operations.lock().await.get(&did)
+        .is_some_and(|opids| !opids.is_empty());
+    crate::history::reconcile_history(state, &did, reconsider_rejected)
         .await
         .map_err(|error| error.to_string())?;
     Ok(result)
@@ -483,7 +485,8 @@ pub(crate) async fn process_events_impl(state: &AppState) -> ProcessEventsResult
         merged += result.merged;
         rejected += result.rejected;
 
-        if result.added == 0 && result.merged == 0 {
+        // Rejection can settle an item visited earlier in this queue pass.
+        if result.added == 0 && result.merged == 0 && result.rejected == 0 {
             break;
         }
     }
@@ -613,11 +616,16 @@ pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) 
         }
     };
     let key = crate::history::candidate_key(&event);
+    let opid = event.opid.clone().unwrap_or_default();
+    if !changed && *state.history_ready.lock().await
+        && state.rejected_operations.lock().await.get(&did).is_some_and(|ids| ids.contains(&opid)) {
+        return ImportStatus::Rejected;
+    }
     let status = import_event_once(state, event).await;
     // Recovery and evidence changes already replay affected histories. Repeated
     // merged or deferred evidence needs no further reconstruction.
     if !changed && matches!(status, ImportStatus::Merged | ImportStatus::Deferred) && *state.history_ready.lock().await {
-        return status;
+        return classify_import_status(state, &did, &opid, status).await;
     }
     if matches!(status, ImportStatus::Added) {
         state.verified_dids.lock().await.remove(&did);
@@ -651,7 +659,27 @@ pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) 
     if !accepted && matches!(status, ImportStatus::Added) {
         return ImportStatus::Rejected;
     }
-    status
+    classify_import_status(state, &did, &opid, status).await
+}
+
+async fn classify_import_status(
+    state: &AppState,
+    did: &str,
+    opid: &str,
+    status: ImportStatus,
+) -> ImportStatus {
+    if matches!(status, ImportStatus::Deferred)
+        && state
+            .rejected_operations
+            .lock()
+            .await
+            .get(did)
+            .is_some_and(|ids| ids.contains(opid))
+    {
+        ImportStatus::Rejected
+    } else {
+        status
+    }
 }
 
 pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> ImportStatus {

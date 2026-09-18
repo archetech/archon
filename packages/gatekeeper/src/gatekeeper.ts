@@ -458,6 +458,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         await this.db.resetDb();
         this.candidateHistory = undefined;
         this.dependents.clear();
+        this.rejectedOperations.clear();
         this.historyReady = undefined;
         this.verifiedDIDs = {};
         this.searchIndex.clear();
@@ -940,7 +941,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.withHistoryLock(async () => {
             const did = await this.createDIDOnce(operation);
             delete this.verifiedDIDs[did];
-            await this.reconcileHistory(did);
+            await this.reconcileHistory(did, Boolean(this.rejectedOperations.get(did)?.size));
             return did;
         });
     }
@@ -1322,7 +1323,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             const updated = await this.updateDIDOnce(operation);
             if (updated) {
                 delete this.verifiedDIDs[operation.did!];
-                await this.reconcileHistory(operation.did!);
+                await this.reconcileHistory(operation.did!, Boolean(this.rejectedOperations.get(operation.did!)?.size));
             }
             return updated;
         });
@@ -1472,6 +1473,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 await this.db.setCandidates(did, []);
                 this.candidateHistory![did] = [];
                 await this.db.deleteEvents(did);
+                this.rejectedOperations.delete(did);
                 delete this.verifiedDIDs[did];
                 this.searchIndex.delete(did);
             }
@@ -1487,6 +1489,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     // Candidate history is durable evidence; accepted history is a revisable view.
     // Serialize imports so a controller change and dependent replay cannot race.
     private historyLock: Promise<void> = Promise.resolve();
+    private rejectedOperations = new Map<string, Set<string>>();
     private historyReady?: Promise<CheckDIDsResult | undefined>;
     private ensureHistoryReady(): Promise<CheckDIDsResult | undefined> {
         this.historyReady ??= this.withHistoryLock(async () => {
@@ -1653,6 +1656,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         // Snapshot-backed replay is startup recovery; runtime imports stay quiet.
         const snapshot = histories ? new ProgressLogger('replay snapshot', targets.length) : undefined;
         const staged = new Map<string, GatekeeperEvent[]>();
+        const rejected = new Map<string, Set<string>>();
         const original = new Map<string, string>();
         for (const [index, target] of targets.entries()) {
             const events = histories?.get(target) ?? await this.db.getEvents(target);
@@ -1706,13 +1710,16 @@ export default class Gatekeeper implements GatekeeperInterface {
             staged.set(target, []);
             // A candidate can precede its predecessor in the sorted input
             // (notably during migration), so replay to a stable sequence.
+            let outcomes: ImportStatus[] = [];
             for (;;) {
+                outcomes = [];
                 const previous = this.cipher.canonicalizeJSON(staged.get(target));
                 for (const event of events) {
-                    await replay.importEventOnce(event);
+                    outcomes.push(await replay.importEventOnce(event));
                 }
                 if (this.cipher.canonicalizeJSON(staged.get(target)) === previous) break;
             }
+            rejected.set(target, await replay.classifyRejectedOperations(events, outcomes, staged.get(target)!));
             replayProgress?.update(++completed);
         };
         // Self-controlled agents are independent. Assets only depend on agents,
@@ -1769,6 +1776,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         } else {
             for (const target of targets) await publish(target);
         }
+        for (const [target, opids] of rejected) this.rejectedOperations.set(target, opids);
         if (histories) {
             // Read the complete accepted snapshot only after durable publication.
             // Journal-only/rejected DIDs must not enter the index or counters.
@@ -1782,6 +1790,42 @@ export default class Gatekeeper implements GatekeeperInterface {
         return { changed };
     }
 
+    // Derived from the final stable replay pass, never journal membership alone.
+    // Any accepted anchor wins; any unresolved anchor keeps an operation pending
+    // unless its predecessor is itself known rejected. Propagate once per edge.
+    private async classifyRejectedOperations(events: GatekeeperEvent[], outcomes: ImportStatus[], accepted: GatekeeperEvent[]): Promise<Set<string>> {
+        const acceptedIds = new Set(accepted.map(event => event.opid));
+        const groups = new Map<string, { deferred: boolean; previd?: string }>();
+        events.forEach((event, index) => {
+            if (!event.opid || acceptedIds.has(event.opid)) return;
+            const previous = groups.get(event.opid);
+            groups.set(event.opid, {
+                deferred: previous?.deferred === true || outcomes[index] === ImportStatus.DEFERRED,
+                previd: event.operation.previd,
+            });
+        });
+        const rejected = new Set<string>();
+        const children = new Map<string, string[]>();
+        for (const [opid, group] of groups) {
+            if (!group.deferred) rejected.add(opid);
+            else if (group.previd) {
+                const parent = groups.has(group.previd) || acceptedIds.has(group.previd)
+                    ? group.previd : await this.canonicalReference(group.previd) ?? group.previd;
+                if (!children.has(parent)) children.set(parent, []);
+                children.get(parent)!.push(opid);
+            }
+        }
+        for (const parent of rejected) {
+            for (const child of children.get(parent) ?? []) rejected.add(child);
+        }
+        return rejected;
+    }
+
+    private classifyImportStatus(event: GatekeeperEvent, status: ImportStatus): ImportStatus {
+        return status === ImportStatus.DEFERRED && this.rejectedOperations.get(event.did!)?.has(event.opid!)
+            ? ImportStatus.REJECTED : status;
+    }
+
     async importEvent(event: GatekeeperEvent): Promise<ImportStatus> {
         await this.ensureHistoryReady();
         if (!await this.verifyEvent(event)) return ImportStatus.REJECTED;
@@ -1790,18 +1834,19 @@ export default class Gatekeeper implements GatekeeperInterface {
         await this.normalizeEvent(event);
         return this.withHistoryLock(async () => {
             const { changed } = await this.retainCandidates(event.did!, [event]);
+            if (!changed && this.rejectedOperations.get(event.did!)?.has(event.opid!)) return ImportStatus.REJECTED;
             const status = await this.importEventOnce(event);
             // Recovery and evidence changes already replay affected histories.
             // Repeated merged or deferred evidence needs no further
             // reconstruction if this insertion did not change accepted state.
-            if (this.historyReady && !changed && (status === ImportStatus.MERGED || status === ImportStatus.DEFERRED)) return status;
+            if (this.historyReady && !changed && (status === ImportStatus.MERGED || status === ImportStatus.DEFERRED)) return this.classifyImportStatus(event, status);
             if (status === ImportStatus.ADDED) delete this.verifiedDIDs[event.did!];
             await this.reconcileHistory(event.did!, true, status === ImportStatus.MERGED);
             const accepted = (await this.db.getEvents(event.did!))
                 .some(current => this.candidateKey(current) === this.candidateKey(event));
             if (accepted && (status === ImportStatus.REJECTED || status === ImportStatus.DEFERRED)) return ImportStatus.ADDED;
             if (!accepted && status === ImportStatus.ADDED) return ImportStatus.REJECTED;
-            return status;
+            return this.classifyImportStatus(event, status);
         });
     }
 
@@ -2012,7 +2057,8 @@ export default class Gatekeeper implements GatekeeperInterface {
                 merged += response.merged;
                 rejected += response.rejected;
 
-                done = (response.added === 0 && response.merged === 0);
+                // A rejected predecessor can retire an earlier deferred queue item.
+                done = (response.added === 0 && response.merged === 0 && response.rejected === 0);
             }
         }
         finally {

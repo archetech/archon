@@ -142,3 +142,5 @@ These rules apply to coding agents working in this repository.
 - Before opening a code PR, run the root lint check as well as relevant builds/tests; fixture-generator scripts are linted by CI even when they are not executed by the test suite.
 
 - Preserve canonicalizer return types: a missing JSON serialization must be rejected before encoding/hashing/storage, while optional undefined object members retain normal JSON omission semantics.
+
+- Classify rejected predecessor branches from settled replay outcomes across all anchors, never from candidate-journal membership alone. Retain successors durably, keep unseen intermediates/controller evidence pending, and rebuild the rejection index after evidence changes and restart. Direct submissions that accept a formerly rejected predecessor must replay its retained descendants too.

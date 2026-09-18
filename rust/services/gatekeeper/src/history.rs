@@ -6,7 +6,7 @@ use anyhow::Result;
 use serde_json::{json, Value};
 use tokio::sync::Mutex;
 
-use crate::events::import_event_once;
+use crate::events::{import_event_once, ImportStatus};
 use crate::progress::ProgressLogger;
 use crate::store::{compare_ordinals, DbBackend, JsonDbFile};
 use crate::{
@@ -153,6 +153,7 @@ pub(crate) async fn remove_histories(state: &AppState, dids: &[String]) -> Resul
                 .unwrap()
                 .insert(did.clone(), Vec::new());
             state.store.lock().await.delete_events(did)?;
+            state.rejected_operations.lock().await.remove(did);
             state.verified_dids.lock().await.remove(did);
             crate::delete_search_doc(state, did).await;
         }
@@ -249,6 +250,60 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
     rebuild_histories(state, affected.into_iter().collect(), None)
         .await
         .map(|_| ())
+}
+
+// Classify only after replay settles. Group anchors by complete operation ID;
+// an accepted anchor wins, and an unresolved anchor blocks rejection unless its
+// predecessor is already rejected. This index is rebuilt from durable evidence.
+fn classify_rejected_operations(
+    store: &JsonDb,
+    events: &[EventRecord],
+    outcomes: &[ImportStatus],
+    accepted: &[EventRecord],
+) -> HashSet<String> {
+    let accepted_ids: HashSet<_> = accepted
+        .iter()
+        .filter_map(|event| event.opid.as_ref())
+        .collect();
+    let mut groups: HashMap<String, (bool, Option<String>)> = HashMap::new();
+    for (event, status) in events.iter().zip(outcomes) {
+        let Some(opid) = &event.opid else { continue };
+        if accepted_ids.contains(opid) {
+            continue;
+        }
+        let group = groups.entry(opid.clone()).or_insert_with(|| {
+            (
+                false,
+                event
+                    .operation
+                    .get("previd")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
+            )
+        });
+        group.0 |= matches!(status, ImportStatus::Deferred);
+    }
+    let mut rejected = HashSet::new();
+    let mut children: HashMap<String, Vec<String>> = HashMap::new();
+    for (opid, (deferred, previd)) in groups {
+        if !deferred {
+            rejected.insert(opid);
+        } else if let Some(previd) = previd {
+            children
+                .entry(store.canonical_reference(&previd))
+                .or_default()
+                .push(opid);
+        }
+    }
+    let mut pending: Vec<_> = rejected.iter().cloned().collect();
+    while let Some(parent) = pending.pop() {
+        for child in children.get(&parent).into_iter().flatten() {
+            if rejected.insert(child.clone()) {
+                pending.push(child.clone());
+            }
+        }
+    }
+    rejected
 }
 
 async fn rebuild_histories(
@@ -358,6 +413,7 @@ async fn rebuild_histories(
                     == Some("agent")
         })
     });
+    let mut rejected = HashMap::new();
     let mut replay_progress = histories.map(|_| ProgressLogger::new("history replay", targets.len()));
     for (index, target) in targets.iter().enumerate() {
         #[cfg(test)]
@@ -382,15 +438,20 @@ async fn rebuild_histories(
                 .then_with(|| a.opid.cmp(&b.opid))
         });
         replay.store.lock().await.set_events(target, Vec::new())?;
+        let mut outcomes = Vec::new();
         loop {
+            outcomes.clear();
             let previous = serde_json::to_string(&replay.store.lock().await.get_events(target))?;
             for event in &events {
-                import_event_once(&replay, event.clone()).await;
+                outcomes.push(import_event_once(&replay, event.clone()).await);
             }
             if serde_json::to_string(&replay.store.lock().await.get_events(target))? == previous {
                 break;
             }
         }
+        let store = replay.store.lock().await;
+        rejected.insert(target.clone(), classify_rejected_operations(&store, &events, &outcomes, &store.get_events(target)));
+        drop(store);
         if let Some(progress) = &mut replay_progress {
             progress.update(index + 1);
         }
@@ -415,6 +476,7 @@ async fn rebuild_histories(
             }
         }
     }
+    state.rejected_operations.lock().await.extend(rejected);
     let has_changes = !changed.is_empty();
     for target in &changed {
         state.verified_dids.lock().await.remove(target);
@@ -593,6 +655,214 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(doc["didDocumentData"], json!("new-key-successor"));
+    }
+
+    #[tokio::test]
+    async fn rejected_branch_retries_and_recovery() {
+        let vectors: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/rejected-branch-vectors.json"
+        ))
+        .unwrap();
+        for v in vectors {
+            let folder = tempfile::tempdir().unwrap();
+            let path = folder.path().join("history.json");
+            let (mut state, _dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::JsonFile { path: path.clone() },
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            ensure_history_ready(&state).await.unwrap();
+            let event = |name: &str| serde_json::from_value::<EventRecord>(v[name].clone()).unwrap();
+            for base in v["base"].as_array().unwrap() {
+                crate::events::import_event_impl(&state, serde_json::from_value(base.clone()).unwrap())
+                    .await;
+            }
+            crate::events::import_event_impl(&state, event("competitor")).await;
+            assert!(matches!(
+                crate::events::import_event_impl(&state, event("rejected")).await,
+                ImportStatus::Rejected
+            ));
+            crate::import_batch_impl(&state, &[v["descendant"].clone()]).await;
+            let pending = crate::process_events_impl(&state).await;
+            assert_eq!(pending.pending, Some(1));
+            assert_eq!(pending.pending_batches, Some(vec!["batch500".to_string()]));
+            crate::import_batch_impl(&state, &[v["successor"].clone()]).await;
+            let settled = crate::process_events_impl(&state).await;
+            assert_eq!(settled.pending, Some(0));
+            assert_eq!(settled.rejected, Some(2));
+            for _ in 0..3 {
+                let (status, replayed) = import_with_replay_trace(&state, event("descendant")).await;
+                assert!(matches!(status, ImportStatus::Rejected));
+                assert!(replayed.is_empty());
+            }
+            let disk: JsonDbFile = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            assert_eq!(disk.candidates[v["asset"].as_str().unwrap()].len(), 5);
+            let (restarted, _restart_dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::JsonFile { path: path.clone() },
+                data: disk,
+                redis_connection: None,
+            });
+            state = restarted;
+            ensure_history_ready(&state).await.unwrap();
+            assert!(matches!(
+                crate::events::import_event_impl(&state, event("descendant")).await,
+                ImportStatus::Rejected
+            ));
+            assert!(matches!(
+                crate::events::import_event_impl(&state, event("earlier")).await,
+                ImportStatus::Added
+            ));
+            let doc = resolve_local_doc_async(
+                &state,
+                v["asset"].as_str().unwrap(),
+                ResolveOptions {
+                    verify: true,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(doc["didDocumentData"], "recovered-descendant");
+            assert!(matches!(
+                crate::events::import_event_impl(&state, event("descendant")).await,
+                ImportStatus::Merged
+            ));
+            let disk: JsonDbFile = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+            let (restarted, _dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::JsonFile { path },
+                data: disk,
+                redis_connection: None,
+            });
+            ensure_history_ready(&restarted).await.unwrap();
+            let doc = resolve_local_doc_async(
+                &restarted,
+                v["asset"].as_str().unwrap(),
+                ResolveOptions {
+                    verify: true,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(doc["didDocumentData"], "recovered-descendant");
+        }
+    }
+
+    #[tokio::test]
+    async fn unresolved_controller_is_not_a_rejected_branch() {
+        let vectors: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/rejected-branch-vectors.json"
+        ))
+        .unwrap();
+        for v in vectors {
+            let (state, _dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            let event = |name: &str| serde_json::from_value::<EventRecord>(v[name].clone()).unwrap();
+            crate::import_batch_impl(
+                &state,
+                &[
+                    v["base"][1].clone(),
+                    v["rejected"].clone(),
+                    v["successor"].clone(),
+                    v["descendant"].clone(),
+                ],
+            )
+            .await;
+            assert_eq!(crate::process_events_impl(&state).await.pending, Some(4));
+            crate::events::import_event_impl(
+                &state,
+                serde_json::from_value(v["base"][0].clone()).unwrap(),
+            )
+            .await;
+            assert_eq!(crate::process_events_impl(&state).await.pending, Some(0));
+            crate::events::import_event_impl(&state, event("rotation")).await;
+            assert!(matches!(
+                crate::events::import_event_impl(&state, event("successor")).await,
+                ImportStatus::Rejected
+            ));
+            assert!(matches!(
+                crate::events::import_event_impl(&state, event("descendant")).await,
+                ImportStatus::Rejected
+            ));
+            remove_histories(&state, &[v["controller"].as_str().unwrap().to_string()])
+                .await
+                .unwrap();
+            assert!(matches!(
+                crate::events::import_event_impl(&state, event("descendant")).await,
+                ImportStatus::Deferred
+            ));
+            crate::events::import_event_impl(
+                &state,
+                serde_json::from_value(v["base"][0].clone()).unwrap(),
+            )
+            .await;
+            let doc = resolve_local_doc_async(
+                &state,
+                v["asset"].as_str().unwrap(),
+                ResolveOptions {
+                    verify: true,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(doc["didDocumentData"], "recovered-descendant");
+        }
+    }
+
+    #[tokio::test]
+    async fn direct_submission_reconsiders_rejected_descendants() {
+        let vectors: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/rejected-branch-vectors.json"
+        ))
+        .unwrap();
+        for v in vectors {
+            let (state, _dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            ensure_history_ready(&state).await.unwrap();
+            state
+                .supported_registries
+                .lock()
+                .await
+                .push("BTC:signet".to_string());
+            for base in v["base"].as_array().unwrap().iter().chain([&v["rotation"]]) {
+                crate::events::import_event_impl(&state, serde_json::from_value(base.clone()).unwrap())
+                    .await;
+            }
+            for name in ["directRejected", "directSuccessor"] {
+                assert!(matches!(
+                    crate::events::import_event_impl(
+                        &state,
+                        serde_json::from_value(v[name].clone()).unwrap()
+                    )
+                    .await,
+                    ImportStatus::Rejected
+                ));
+            }
+            assert_eq!(
+                crate::events::handle_did_operation(&state, &v["direct"]["operation"])
+                    .await
+                    .unwrap(),
+                json!(true)
+            );
+            let doc = resolve_local_doc_async(
+                &state,
+                v["asset"].as_str().unwrap(),
+                ResolveOptions {
+                    verify: true,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(doc["didDocumentData"], "new-key-successor");
+        }
     }
 
     #[tokio::test]

@@ -1035,6 +1035,61 @@ async function runCanonicalizationParity() {
     console.log('ok RFC 8785 parity: signed genesis/update, both proof suites, and fresh-node legacy predecessor recovery');
 }
 
+async function runRejectedBranchParity() {
+    const vectors = JSON.parse(await fs.readFile(new URL('../tests/gatekeeper/rejected-branch-vectors.json', import.meta.url), 'utf8'));
+    const both = fixture => Promise.all([request(tsBaseUrl, fixture), request(rustBaseUrl, fixture)]);
+    const post = (path, body) => ({ method: 'POST', path, body, requiresAdminKey: true, headers: { 'content-type': 'application/json' } });
+    const process = async pending => {
+        const results = await both(post('/api/v1/events/process'));
+        assertEqual('rejected branch queue parity', normalizeJson(results[0].body), normalizeJson(results[1].body));
+        assertEqual('rejected branch HTTP status parity', results[0].status, results[1].status);
+        assertEqual('rejected branch queue status', results[0].status, 200);
+        assertEqual('rejected branch pending count', results[0].body.pending, pending);
+        return results[0].body;
+    };
+    for (const v of vectors) {
+        await resetServiceState(tsBaseUrl);
+        await resetServiceState(rustBaseUrl);
+        const commit = async event => {
+            const pinned = await request(tsBaseUrl, post('/api/v1/ipfs/json', event.operation));
+            assertEqual('rejected branch pin', pinned.status, 200);
+            for (const result of await both(post(`/api/v1/block/${event.registry}`, {
+                height: event.registration.height, hash: `block${event.registration.height}`, time: Date.parse(event.time) / 1000,
+            }))) assertEqual('rejected branch block', result.status, 200);
+            const { registry, time, ordinal, registration } = event;
+            for (const result of await both(post('/api/v1/batch/import/cids', {
+                cids: [pinned.body], metadata: { registry, time, ordinal, registration },
+            }))) assertEqual('rejected branch import', result.status, 200);
+        };
+        for (const event of [...v.base, v.competitor, v.rejected]) { await commit(event); await process(0); }
+        await commit(v.descendant);
+        assertEqual('unseen intermediate batch remains pending', (await process(1)).pendingBatches, ['batch500']);
+        await commit(v.successor);
+        await process(0);
+        await process(0);
+        await commit(v.earlier);
+        await process(0);
+        const docs = await both({ method: 'GET', path: `/api/v1/did/${v.asset}?verify=true`, requiresAdminKey: true });
+        assertEqual('recovered branch parity', normalizeJson(docs[0].body), normalizeJson(docs[1].body));
+        assertEqual('recovered branch data', docs[0].body.didDocumentData, 'recovered-descendant');
+        await resetServiceState(tsBaseUrl);
+        await resetServiceState(rustBaseUrl);
+        for (const event of [...v.base, v.rotation, v.directRejected, v.directSuccessor]) {
+            await commit(event); await process(0);
+        }
+        for (const result of await both(post('/api/v1/did', v.direct.operation))) {
+            assertEqual('direct branch recovery status', result.status, 200);
+            assertEqual('direct branch recovery accepted', result.body, true);
+        }
+        for (const result of await both({ method: 'GET', path: `/api/v1/did/${v.asset}?verify=true`, requiresAdminKey: true })) {
+            assertEqual('direct branch descendant recovered', result.body.didDocumentData, 'new-key-successor');
+        }
+
+    }
+    console.log('ok rejected branch parity: missing intermediates, batch completion, and changed-anchor recovery');
+}
+
+await runRejectedBranchParity();
 await runCanonicalizationParity();
 await runHistoryRecoveryParity();
 await runOperationIdentityParity();

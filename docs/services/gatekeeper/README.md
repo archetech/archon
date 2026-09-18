@@ -945,6 +945,26 @@ Imports first persist the candidate event, then run the insertion algorithm belo
 
 Local/gossip candidates retain the first observation of each canonical operation per registry; fresh peer receipt timestamps and ordinals do not add authorization evidence. Anchored candidates retain their distinct chain positions. After startup recovery, a merged import that changes neither retained candidates nor accepted history skips reconciliation and leaves status and verification caches intact. New evidence and changed anchors still reconcile normally.
 
+Active pending work is distinct from retained candidate evidence. After replay
+settles, both Gatekeepers derive an in-memory index of currently rejected
+operations, considering all known anchors of each complete operation. An accepted
+anchor takes precedence. An unresolved candidate is not rejected merely because
+it is absent from accepted history. A successor is currently rejected only when
+its known predecessor branch is rejected; an unseen intermediate remains pending.
+Rejection propagates through known descendants once per dependency edge during
+replay, not by walking histories on each queue retry.
+
+These descendants return `rejected` and leave the active event queue and
+`pendingBatches`, allowing mediators to complete those batches. Their original
+operations, signed predecessors, and anchor metadata remain in the durable
+candidate journal. Relevant target/controller history changes replay that journal
+and may accept the branch without a mediator resubmission. Startup reconstructs
+the classification from evidence; it is not permanent invalidity or a new durable
+protocol state. Repeated unchanged retries consult the cached classification.
+Direct submissions also replay the target when it has known rejected candidates.
+See [the #1178 design and validation](../../plans/rejected-branches-1178.md).
+
+
 Canonical predecessor IDs that already match an accepted event are resolved
 directly from that history. Cached operation content is consulted only for an
 unmatched reference that may be a retrieval-CID alias. Startup recovery still

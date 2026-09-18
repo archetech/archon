@@ -132,6 +132,7 @@ mod tests {
             dependents: Arc::new(Mutex::new(HashMap::new())),
             history_lock: Arc::new(Mutex::new(())),
             history_ready: Arc::new(Mutex::new(false)),
+            rejected_operations: Arc::new(Mutex::new(HashMap::new())),
             processing_events: Arc::new(Mutex::new(false)),
             ready: Arc::new(AtomicBool::new(false)),
             started_at: Instant::now(),

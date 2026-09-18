@@ -891,6 +891,7 @@ pub(crate) async fn db_reset(State(state): State<AppState>, headers: HeaderMap) 
     state.events_seen.lock().await.clear();
     *state.candidate_history.lock().await = None;
     state.dependents.lock().await.clear();
+    state.rejected_operations.lock().await.clear();
     *state.history_ready.lock().await = false;
     state.verified_dids.lock().await.clear();
     state.import_queue.lock().await.clear();
