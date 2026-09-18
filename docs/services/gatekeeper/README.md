@@ -1399,6 +1399,29 @@ test "$(wget -qO- http://127.0.0.1:4224/api/v1/ready)" = "true"
 loaded, search index initialized, background tasks scheduled, listener
 bound) and `true` thereafter.
 
+Compose gives both Gatekeeper implementations a `120s` startup grace period,
+configurable with `ARCHON_GATEKEEPER_START_PERIOD` (for example `5m` for a larger
+history). This is a Compose setting, not a Gatekeeper process environment variable.
+The parity stack uses the same setting. A successful readiness probe marks the
+container healthy immediately, including during the grace period; dependents do
+not wait for the entire period. Startup probe failures do not count toward the
+retry limit until the grace period ends. After the first success, normal failure
+counting applies. Deployment probes retain their 10-second interval, 5-second
+timeout, and six retries; the parity stack retains its twelve retries.
+
+The grace period is not the total startup deadline: consecutive failed probes
+can also consume the retry window. Increasing it delays detection of a startup
+that never becomes ready; it does not fix slow replay. Continue comparing
+populated-history startup benchmarks when changing recovery code.
+
+Measure total startup from the container's `State.StartedAt` to its first
+successful readiness probe, including DB/IPFS connection and all recovery phases.
+Capture `docker compose ps` and `docker inspect --format '{{json .State}}'
+"$(docker compose ps -q gatekeeper)"` as soon as readiness is reached; Docker only
+retains recent health probe results. Use timestamped startup logs to locate slow
+phases. The TypeScript `checkDIDs` line alone is not a total startup measurement:
+initialization runs before the startup status report's timer.
+
 To inspect startup progress, run `docker compose logs -f --timestamps gatekeeper`.
 Both implementations announce candidate-journal loading, then report aggregate
 DID counts and elapsed time for history loading, candidate preparation, replay,
