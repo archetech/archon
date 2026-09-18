@@ -1,0 +1,596 @@
+{
+  "agent": {
+    "type": "create",
+    "created": "2026-09-17T11:00:00.000Z",
+    "registration": {
+      "version": 1,
+      "type": "agent",
+      "registry": "hyperswarm"
+    },
+    "publicJwk": {
+      "kty": "EC",
+      "crv": "secp256k1",
+      "x": "GLtYbcEJrfSf-0LgrCk9Kill5JoKSQDCvndrQmt8v94",
+      "y": "P51FwccR6ZN-Lky13HqHbcHZeXgUTNcWD1r2E55bcRQ"
+    },
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2026-09-17T12:00:00.000Z",
+      "verificationMethod": "#key-1",
+      "proofPurpose": "capabilityInvocation",
+      "proofValue": "mDTGqIxmws9otMIMZmqoZNTUyXNIGN9uL0V-JP7piJBQDjqKXDoxGmnUE7VQ5wUu6oU__NqYRZKs_LnRJE4Xyg"
+    }
+  },
+  "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+  "cases": [
+    {
+      "name": "ascii_65536",
+      "accepted": true,
+      "units": 65536,
+      "bytes": 65536,
+      "padding": {
+        "character": "a",
+        "repeat": 64947,
+        "ascii": 0
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "doc": {
+          "didDocumentData": {
+            "test": "size"
+          }
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "jGTRvpq74zumIp8CbvbHaLQQNZoXC7GSVWrj4Cap5VQgQqjTNMD-mVeMbE7QUcvb-Q1jaX9LK5jmqh5UeSxmJA"
+        }
+      }
+    },
+    {
+      "name": "ascii_65537",
+      "accepted": false,
+      "units": 65537,
+      "bytes": 65537,
+      "padding": {
+        "character": "a",
+        "repeat": 64948,
+        "ascii": 0
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "doc": {
+          "didDocumentData": {
+            "test": "size"
+          }
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "NsXn6Mwpoew9AVN_TUOSawny71Qb5F4iVsMMXrgIXA8MQsn_f4m6eGTPzDMao9oX0xOvMXeQ5Y1wSzLY-xGQEA"
+        }
+      }
+    },
+    {
+      "name": "bmp_65536",
+      "accepted": true,
+      "units": 65536,
+      "bytes": 130483,
+      "padding": {
+        "character": "é",
+        "repeat": 64947,
+        "ascii": 0
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "doc": {
+          "didDocumentData": {
+            "test": "size"
+          }
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "oRUJWbGYGQ_9tbND9JFD7IJtxcDbCrn9zx_YeODslwRPn6pULMLZWtMBWQSPavGp4Rd-yXdji9jRlEuOWNmnGQ"
+        }
+      }
+    },
+    {
+      "name": "bmp_65537",
+      "accepted": false,
+      "units": 65537,
+      "bytes": 130485,
+      "padding": {
+        "character": "é",
+        "repeat": 64948,
+        "ascii": 0
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "doc": {
+          "didDocumentData": {
+            "test": "size"
+          }
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "3F4ToyXhCPWm7DWI3lL75PnY35rwiCeNyc_sBMsneockXiPEe-5Bq52O_U3m9qo4TpOOB0QurmfrvQpoLzOfIg"
+        }
+      }
+    },
+    {
+      "name": "supplementary_65536",
+      "accepted": true,
+      "units": 65536,
+      "bytes": 130482,
+      "padding": {
+        "character": "😀",
+        "repeat": 32473,
+        "ascii": 1
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "doc": {
+          "didDocumentData": {
+            "test": "size"
+          }
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "dkvazfal2V6h4npKcdCCr9OvgbGqExlV6r741hReuWNsvZXSefYwjGE-zF3UHXR7GoYDkFPnxqOZRDzWVgwEEQ"
+        }
+      }
+    },
+    {
+      "name": "supplementary_65537",
+      "accepted": false,
+      "units": 65537,
+      "bytes": 130485,
+      "padding": {
+        "character": "😀",
+        "repeat": 32474,
+        "ascii": 0
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "doc": {
+          "didDocumentData": {
+            "test": "size"
+          }
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "RFr8LMcav4_3DatHzi9btMBgz8uly8sQ71MyKVMrle978iXJNrMJMmFMgYNR5zb8yVWx8O4YBr6enKAF1qaiHw"
+        }
+      }
+    },
+    {
+      "name": "short_escape_65536",
+      "accepted": true,
+      "units": 65536,
+      "bytes": 65536,
+      "padding": {
+        "character": "\n",
+        "repeat": 32473,
+        "ascii": 1
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "doc": {
+          "didDocumentData": {
+            "test": "size"
+          }
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "82JUkHBT7PfNGkTXXS4Zklu7n5enybYpIZhnhHUl5Lpaj2rgRCGuyaz4_krCWYKVgwKU77BApWgYiQd5i8YgUA"
+        }
+      }
+    },
+    {
+      "name": "short_escape_65537",
+      "accepted": false,
+      "units": 65537,
+      "bytes": 65537,
+      "padding": {
+        "character": "\n",
+        "repeat": 32474,
+        "ascii": 0
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "doc": {
+          "didDocumentData": {
+            "test": "size"
+          }
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "fbatGu-ZtSC3tWms6hg6kOFkAghiT-HQ6WQyCOd6iXB21d17Q0EnQ48KFfs3LsC6jZco0kYgE4VwabqfuTJtjw"
+        }
+      }
+    },
+    {
+      "name": "long_escape_65536",
+      "accepted": true,
+      "units": 65536,
+      "bytes": 65536,
+      "padding": {
+        "character": "\u0000",
+        "repeat": 10824,
+        "ascii": 3
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "doc": {
+          "didDocumentData": {
+            "test": "size"
+          }
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "WBrh-vHyTpkGoZSHbty4hkRO_PyAAV2L2ad1dRTAqlQlSv8JT1VbOA9nf2fSIOoUahr6QKIiEF6WDav6A73oeg"
+        }
+      }
+    },
+    {
+      "name": "long_escape_65537",
+      "accepted": false,
+      "units": 65537,
+      "bytes": 65537,
+      "padding": {
+        "character": "\u0000",
+        "repeat": 10824,
+        "ascii": 4
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "doc": {
+          "didDocumentData": {
+            "test": "size"
+          }
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "65SQpSxqtlXnDzDwFr0LVhAr1LsFBDG5ey0mz4i7aHgmRQptfxaLJOvdl8K45mrQidsroJ7P_A_2gZf3m0SVSg"
+        }
+      }
+    },
+    {
+      "name": "quote_backslash_65536",
+      "accepted": true,
+      "units": 65536,
+      "bytes": 65536,
+      "padding": {
+        "character": "\"\\",
+        "repeat": 16236,
+        "ascii": 3
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "doc": {
+          "didDocumentData": {
+            "test": "size"
+          }
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "m_Fxm2qqgeBXY6dtxKCNz_DraF0JjyeAdNNa7aR3i1E_0D-vmAKrSgYThedefjV49QN2iwwOQEpEHltngqR_eA"
+        }
+      }
+    },
+    {
+      "name": "quote_backslash_65537",
+      "accepted": false,
+      "units": 65537,
+      "bytes": 65537,
+      "padding": {
+        "character": "\"\\",
+        "repeat": 16237,
+        "ascii": 0
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "doc": {
+          "didDocumentData": {
+            "test": "size"
+          }
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "opIBKeI9VdsuI1oPWP-AGQCQkqeMBG45fCyDTQgww5V4ITUjRzQZt3sRUHjWIG4SZ1bYEtzyhm-_l_KOkB7FOA"
+        }
+      }
+    },
+    {
+      "name": "create_65536",
+      "accepted": true,
+      "units": 65536,
+      "bytes": 130497,
+      "padding": {
+        "character": "é",
+        "repeat": 64961,
+        "ascii": 0
+      },
+      "operation": {
+        "type": "create",
+        "created": "2026-09-17T11:00:00.000Z",
+        "registration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "hyperswarm"
+        },
+        "publicJwk": {
+          "kty": "EC",
+          "crv": "secp256k1",
+          "x": "GLtYbcEJrfSf-0LgrCk9Kill5JoKSQDCvndrQmt8v94",
+          "y": "P51FwccR6ZN-Lky13HqHbcHZeXgUTNcWD1r2E55bcRQ"
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "eJtWFVgoiMI4W_Au-Jbo-tBZ87YmCyemrLgwS6CnsUssb_4uVvZz4jBOZ6-7L49qI65sg8hAOriunq3b8uTwOA"
+        }
+      }
+    },
+    {
+      "name": "create_65537",
+      "accepted": false,
+      "units": 65537,
+      "bytes": 130499,
+      "padding": {
+        "character": "é",
+        "repeat": 64962,
+        "ascii": 0
+      },
+      "operation": {
+        "type": "create",
+        "created": "2026-09-17T11:00:00.000Z",
+        "registration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "hyperswarm"
+        },
+        "publicJwk": {
+          "kty": "EC",
+          "crv": "secp256k1",
+          "x": "GLtYbcEJrfSf-0LgrCk9Kill5JoKSQDCvndrQmt8v94",
+          "y": "P51FwccR6ZN-Lky13HqHbcHZeXgUTNcWD1r2E55bcRQ"
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "8WcAUlIO1DWG9QnIEWbhvoD6Wq7ucL4hV2eNAGMgViU6a5UV1eX9e7YriGzaMVOndZgQg0BXMGutBmHjGE1UoQ"
+        }
+      }
+    },
+    {
+      "name": "delete_65536",
+      "accepted": true,
+      "units": 65536,
+      "bytes": 130525,
+      "padding": {
+        "character": "é",
+        "repeat": 64989,
+        "ascii": 0
+      },
+      "operation": {
+        "type": "delete",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "WDw2h6WN-W7SqYZ8twWE81TJZDAMOkdUOskDGFH2LpUuAJXy1yi7ii_-lfXtrXsDhovRCPW-8IKWJJ4aDQpSLw"
+        }
+      }
+    },
+    {
+      "name": "delete_65537",
+      "accepted": false,
+      "units": 65537,
+      "bytes": 130527,
+      "padding": {
+        "character": "é",
+        "repeat": 64990,
+        "ascii": 0
+      },
+      "operation": {
+        "type": "delete",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "H9--r8zqLfLUBWiA4m7W7Vh7RY790EX8ylIje6yOi-QLk5byJwZqykQ0P8KaWMImTa8Tw0nl5KH5reWQ-cr9lQ"
+        }
+      }
+    },
+    {
+      "name": "legacy_40000_bmp",
+      "accepted": true,
+      "units": 40589,
+      "bytes": 80589,
+      "padding": {
+        "character": "é",
+        "repeat": 40000,
+        "ascii": 0
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "previd": "bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta",
+        "doc": {
+          "didDocumentData": {
+            "test": "size"
+          }
+        },
+        "sizePadding": "",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera7xco5jrj3etzn7b5srqe3sjohudkmhl6muld62sg57vckl5gdlta#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "FVWcCbyR-fXqGJKkiRq_c7M5Swk2yEviy1DIKRSnIE8MhqMDWBHSSjuo1hh7KZ5WuQJtTINihLAMJvwSsLeeTw"
+        }
+      }
+    }
+  ],
+  "measurements": [
+    {
+      "json": "null",
+      "units": 4
+    },
+    {
+      "json": "true",
+      "units": 4
+    },
+    {
+      "json": "false",
+      "units": 5
+    },
+    {
+      "json": "[]",
+      "units": 2
+    },
+    {
+      "json": "{}",
+      "units": 2
+    },
+    {
+      "json": "{\"é\":[\"😀\",\"\\u0000\",\"\\n\",\"\\\"\",\"\\\\\"]}",
+      "units": 36
+    },
+    {
+      "json": "1.0",
+      "units": 1
+    },
+    {
+      "json": "-0.0",
+      "units": 1
+    },
+    {
+      "json": "1e-6",
+      "units": 8
+    },
+    {
+      "json": "1e-7",
+      "units": 4
+    },
+    {
+      "json": "1e20",
+      "units": 21
+    },
+    {
+      "json": "1e21",
+      "units": 5
+    },
+    {
+      "json": "9007199254740993",
+      "units": 16
+    },
+    {
+      "json": "{\"n\":1.2345678901234567}",
+      "units": 24
+    }
+  ]
+}

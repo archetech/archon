@@ -587,6 +587,11 @@ fn event_log_did(config: &crate::Config, event: &EventRecord) -> String {
 }
 
 pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) -> ImportStatus {
+    // Oversize operations cannot become valid when missing history arrives.
+    // Reject before retaining a candidate, matching batch shape validation.
+    if crate::proofs::exceeds_operation_size(&event.operation) {
+        return ImportStatus::Rejected;
+    }
     let _guard = state.history_lock.lock().await;
     let did = match infer_event_did(&state.config, &event_record_to_value(&event)) {
         Ok(did) => did,

@@ -580,11 +580,30 @@ a controller that has not been imported yet looks like.
 
 ### 5.4 Operation size limit
 
-`JSON.stringify(operation).length <= 64 * 1024` (character count, not byte
-count, so non-ASCII content may diverge between implementations). Operations
-exceeding this MUST be rejected (HTTP 500 from create/update; counted as
-`rejected` in `importBatch`). Implementations SHOULD avoid full JSON
-serialization for the size check (e.g. counting writer with early abort).
+Version 1 MUST accept size exactly up to **65,536 UTF-16 code units** in
+`JSON.stringify(operation)`, including the complete proof and all extension
+members. Larger operations MUST fail size validation at submission, import, and
+verified replay. This preserves TypeScript's historical rule; it is **not** a
+65,536-byte UTF-8 limit.
+
+Measure compact ECMAScript JSON serialization of the parsed operation, not its
+incoming wire representation or the event/batch envelope. Count member names,
+JSON punctuation, quotes, and escapes. Ordinary BMP characters count as one unit;
+supplementary characters count as two; short escapes such as `\n` count as two;
+`\u0000` counts as six. Numbers use ECMAScript binary64 formatting. Member order
+does not affect length. Rust counts these units with an early-exit traversal;
+it need not allocate the complete serialized operation. CID and signature
+serialization are separate and unchanged by this size rule.
+
+The TypeScript SDK's legacy-named `maxOpBytes` option limits **local submissions**
+in these same code units. It cannot raise the protocol maximum or change import,
+verification, or replay acceptance. HTTP request-body limits are separate resource
+limits (section 2.4); rejecting a request for transport size is not a declaration
+that its operations are protocol-invalid.
+
+A stricter UTF-8 byte limit requires an explicitly specified future protocol
+version. Version 2 remains disabled. See the
+[size compatibility decision](../../plans/operation-size-1159.md).
 
 ### 5.5 JWK encoding
 
@@ -798,7 +817,7 @@ dereference resources. Standard document metadata (`created`, `updated`,
 
 ### 7.1 `create`
 
-1. Reject if total operation byte size exceeds 64 KB.
+1. Reject if the complete operation exceeds the version-1 size limit (section 5.4).
 2. Reject if `type != "create"`, `created` is malformed, `registration` is
    missing or any of `version`, `type`, `registry` is invalid, or `proof`
    format checks fail.
@@ -822,7 +841,7 @@ dereference resources. Standard document metadata (`created`, `updated`,
 
 ### 7.2 `update` / `delete`
 
-1. Reject if total operation byte size exceeds 64 KB.
+1. Reject if the complete operation exceeds the version-1 size limit (section 5.4).
 2. Reject if `proof` format checks fail.
 3. Resolve the target DID. Reject if the doc is `deactivated`.
 4. Agents use their own predecessor document. Assets resolve their owner
@@ -986,7 +1005,7 @@ re-registers it.
 ```
 event.registry is a valid registry name (`[A-Za-z0-9][A-Za-z0-9:_-]*`, max 128 chars)
 event.time parses as RFC 3339
-event.operation present, canonical-bytes <= 64 KB
+event.operation present, JSON.stringify(operation).length <= 65,536 UTF-16 units
 proof format valid (§5.2)
 operation.type ∈ { create, update, delete }
   - create: created, registration.{version=1, type, registry}, type-specific fields
