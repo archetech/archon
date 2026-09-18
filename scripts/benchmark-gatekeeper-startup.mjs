@@ -58,10 +58,14 @@ try {
     await flush();
     const gatekeeper = new Gatekeeper({db,ipfs:new MemoryClient(),registries:['hyperswarm','BTC:mainnet','BTC:signet']});
     const started = performance.now();
-    await gatekeeper.checkDIDs();
-    const dbCheckMs = performance.now() - started;
-    await gatekeeper.initSearchIndex();
-    console.log(JSON.stringify({dids:histories.length,db_check_ms:dbCheckMs,elapsed_ms:performance.now()-started,calls,times}));
+    if (typeof gatekeeper.initialize === 'function') {
+        await gatekeeper.initialize();
+    } else {
+        // Baseline implementations predate the combined startup initializer.
+        await gatekeeper.checkDIDs();
+        await gatekeeper.initSearchIndex();
+    }
+    console.log(JSON.stringify({dids:histories.length,elapsed_ms:performance.now()-started,calls,times}));
     const accepted = {};
     for (let offset = 0; offset < histories.length; offset += 64) {
         await Promise.all(histories.slice(offset, offset + 64).map(async ([key]) => {

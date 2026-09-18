@@ -135,3 +135,4 @@ These rules apply to coding agents working in this repository.
 - Before implementing protocol fixes, trace event production, transport, imports, durable evidence, and replay; establish ownership of the faulty value before adding resolver exceptions.
 
 - Validate Rust startup optimizations against an isolated production-scale Redis copy with matching persistence settings, including timestamp-repair and unchanged startups. Build startup search/status views from the complete accepted replay snapshot after publication; exclude candidate-only histories, preserve runtime cache refreshes, and compare canonical histories, counters, and search/query results.
+- When fixing Gatekeeper startup performance, trace both TypeScript and Rust service initialization. Both must consume replay-derived search/status views without immediately repeating full database scans; keep startup benchmark harnesses aligned with the actual service entry points.

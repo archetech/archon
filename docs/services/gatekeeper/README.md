@@ -949,7 +949,7 @@ operation and its predecessor; both return the same version metadata.
 
 The dependency index includes controller assignments on retained branches, not just the current document. Replay completes self-controlled agent histories before asset histories, retrying candidates within each DID until its sequence stops changing and ordering chain candidates by registry, ordinal, time, and operation CID; registry ordinals are never compared across chains. Local/gossip candidates preserve their existing arrival order. Agents must remain self-controlled and asset owners must be agents. These constraints are checked during creation, direct updates, import, and verified replay, including the new owner of a transfer. Startup repair removes previously accepted violations from the accepted projection while retaining candidate evidence. Replay has no separate oscillation detection or quarantine policy.
 
-Accepted histories, search entries, and verification caches are refreshed when replay changes a DID. Search indexing runs on published histories, not intermediate replay views. Explicit removal and garbage collection also replay dependents before returning. Startup rebuilds each DID once from the journal to recover interrupted publication, rather than replaying a controller’s dependents again for each entry in the startup scan. Startup reads accepted histories in bounded batches and reuses that snapshot during reconstruction. Rust startup builds the complete search index and status counts together from the accepted in-memory replay snapshot, after durable publication and before releasing the history lock. It excludes rejected candidate-only histories from those views and avoids separate Redis search-refresh, status, and full-index scans. Runtime reconciliation still refreshes affected search documents and invalidates cached status. Already-canonical, unchanged journals are not rewritten; public verification, resolution, and DID-list reads wait for repair and hold the history lock throughout their asynchronous reads. TypeScript status scans resolve up to 32 DIDs concurrently under that lock, then release it and yield before the next chunk. Each chunk observes complete publication; aggregate status counts can span multiple completed publications and are monitoring data, not a transaction snapshot. An operation accepted through dependent replay may report `MERGED` when its next queue attempt runs, so processing counters describe queue attempts, not every change to derived histories.
+Accepted histories, search entries, and verification caches are refreshed when replay changes a DID. Search indexing runs on published histories, not intermediate replay views. Explicit removal and garbage collection also replay dependents before returning. Startup rebuilds each DID once from the journal to recover interrupted publication, rather than replaying a controller’s dependents again for each entry in the startup scan. Startup reads accepted histories in bounded batches and reuses that snapshot during reconstruction. Both implementations build the complete startup search index and status counts together from the accepted in-memory replay snapshot, after durable publication and before releasing the history lock. TypeScript publishes startup histories in bounded groups, waiting for all started writes before propagating any failure or releasing the lock. Startup excludes rejected candidate-only histories from those views and avoids separate Redis search-refresh, status, and full-index scans. Runtime reconciliation still refreshes affected search documents. Rust invalidates cached status; subsequent TypeScript status checks scan current histories. Already-canonical, unchanged journals are not rewritten; public verification, resolution, and DID-list reads wait for repair and hold the history lock throughout their asynchronous reads. TypeScript status scans resolve up to 32 DIDs concurrently under that lock, then release it and yield before the next chunk. Each chunk observes complete publication; aggregate status counts can span multiple completed publications and are monitoring data, not a transaction snapshot. An operation accepted through dependent replay may report `MERGED` when its next queue attempt runs, so processing counters describe queue attempts, not every change to derived histories.
 
 Runtime replay avoids work when retained evidence and accepted state are unchanged,
 including repeated deferred events. Deferred events remain pending;
@@ -1384,13 +1384,13 @@ bound) and `true` thereafter.
 To inspect startup progress, run `docker compose logs -f --timestamps gatekeeper`.
 Both implementations announce candidate-journal loading, then report aggregate
 DID counts and elapsed time for history loading, candidate preparation, replay,
-publication, the database status check, and search indexing. For example:
+publication, and the combined startup search/status view. For example:
 
 ```text
 Gatekeeper history replay: 0/25647 DIDs (0.0s)
 Gatekeeper history replay: 4200/25647 DIDs (5.0s)
 Gatekeeper history replay: 25647/25647 DIDs (31.2s)
-Gatekeeper DB status check: 0/25647 DIDs (0.0s)
+Gatekeeper startup search/status views: 0/25647 DIDs (0.0s)
 ```
 
 Counts describe DIDs processed in the current phase, not valid DIDs or accepted
@@ -1563,7 +1563,7 @@ directory for before/after comparisons using the same harness and snapshot.
 ### Startup replay benchmark
 
 Unlike the runtime benchmark above, `scripts/benchmark-gatekeeper-startup.mjs`
-includes startup recovery, the status scan, and search-index initialization.
+includes startup recovery and status/search initialization, using the same combined initializer as the TypeScript service (or separate scans for older baseline builds).
 Use a built Gatekeeper and an isolated Redis instance:
 
 ```sh
