@@ -143,3 +143,7 @@ These rules apply to coding agents working in this repository.
 - Before opening a code PR, run the root lint check as well as relevant builds/tests; fixture-generator scripts are linted by CI even when they are not executed by the test suite.
 
 - Preserve canonicalizer return types: a missing JSON serialization must be rejected before encoding/hashing/storage, while optional undefined object members retain normal JSON omission semantics.
+
+- Protocol documentation must distinguish whole-component replacement from field merging, predecessor-registry confirmation from a migration's resulting registry, and accepted-branch deletion from later evidence revalidation. Cross-check both Gatekeepers before turning explanatory prose into acceptance requirements.
+
+- When consolidating protocol rules, search procedural checklists and pseudocode for superseded wording too; a new normative table does not correct contradictory identity, size-limit, or registry-selection instructions elsewhere.

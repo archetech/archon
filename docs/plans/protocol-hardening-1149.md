@@ -2,7 +2,9 @@
 
 Current status (2026-09-18): #1158 and #1159 are complete. #1156 is paused at
 the maintainer's request. #1149 is complete through #1186. #1185 controller-version references were
-closed as not planned; #1180 RFC 8785 alignment is in progress. Keep
+closed as not planned; #1180 RFC 8785 alignment merged in #1191. #1178 was
+closed as not planned and #1193 withdrawn after reviewing GC and ingress
+deduplication. #1160 documentation consolidation is complete in #1194. Keep
 independent work in separate PRs from main; do not merge without instruction.
 
 ## Work and acceptance criteria
@@ -22,9 +24,9 @@ independent work in separate PRs from main; do not merge without instruction.
   asset genesis and successors, arrival order, restart, and both proof formats in
   both ports. Keep chain/local behavior unchanged; add no speculative safeguards.
   See [the decision and production replay results](hyperswarm-time-1149.md).
-- [ ] #1160: Consolidate established transition rules. Update relevant timing
-  documentation with #1149, without inventing additional acceptance restrictions.
-- [ ] #1180 (implementation in progress): RFC 8785 in both ports, including
+- [x] #1160: Consolidated established transition rules in #1194, including #1149
+  timing documentation, without introducing additional acceptance restrictions.
+- [x] #1180 (merged in #1191): RFC 8785 in both ports, including
   UTF-16 code-unit ordering. Production audit found no affected genesis or
   signing bytes, and three numeric-key updates on two assets. Preserve existing
   content-backed aliases and test fresh-node import. See [audit and validation](canonicalization-1180.md).
@@ -97,3 +99,28 @@ Key permissions and byte limits remain separate, with #1160 documenting the cont
   (#1149), retaining predecessor order. #1185 records that explicit controller
   references are a separate option. Legacy unsigned proof times remain accepted;
   this is a shared historical-selection rule, not a new trusted chronology claim.
+
+## Documentation consolidation — #1160
+
+The scheme now centralizes established version-1 behavior in a transition table:
+whole-component replacement, immutable genesis fields, prior-owner transfers,
+old-registry confirmation of migrations, and terminal deletion on an accepted
+branch. The resolution narrative follows predecessor-linked available history,
+including Hyperswarm proof-time cutoffs and later revalidation. Asset key
+publication does not grant independent signing authority. The service contract
+links to the table and corrects stale key-selection and byte-count descriptions.
+
+Source review covered TypeScript `authorizeOperation`, `resolveDIDAt`,
+`updateDIDOnce`, `importEventOnce`, and `verifyDbOnce`, plus Rust
+`authorization.rs`, `events.rs`, `resolver.rs`, and `history.rs`. Existing signed
+fixtures in `transition-predecessor`, `registration-transition`,
+`history-recovery`, `hyperswarm-time`, and `operation-size` record those contracts.
+This documentation work introduces no acceptance changes. #1156 remains paused;
+#1128's worked proof examples remain separate. RFC 8785 compatibility wording now
+reflects merged #1191 instead of the intermediate Rust-only repair.
+
+#1178/#1193 were closed without rejected-branch classification: successful GC
+clears active pending work but retains batch-ingress deduplication in that process,
+while durable candidates for retained DIDs remain replayable. Restart and disabled
+or failed GC qualify that lifecycle. No live missing intermediate was recovered
+by closing the issue, and no new rejection policy was adopted.

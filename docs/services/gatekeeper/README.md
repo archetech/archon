@@ -831,23 +831,28 @@ dereference resources. Standard document metadata (`created`, `updated`,
 
 ## 7. DID create / update / delete validation
 
+The normative version-1 [transition table](../../scheme.md#transition-table)
+connects these submission rules to imports and verified replay. Supplied document
+components replace whole components; omitted components carry forward. The
+[version and retention rules](../../scheme.md#version-validity-and-local-retention)
+distinguish local GC from signed deletion and identify paused policy changes.
+
 ### 7.1 `create`
 
-1. Reject if total operation byte size exceeds 64 KB.
+1. Reject if compact JSON serialization exceeds 65,536 UTF-16 code units (the version-1 limit, not UTF-8 bytes).
 2. Reject if `type != "create"`, `created` is malformed, `registration` is
    missing or any of `version`, `type`, `registry` is invalid, or `proof`
    format checks fail.
 3. Agent: `proof.verificationMethod == "#key-1"` and `publicJwk` is present.
    Reject an explicit `operation.controller`; the agent controls itself.
    Verify signature against `publicJwk`.
-4. Asset: `proof.verificationMethod` is `<controller>#key-1`,
+4. Asset: `proof.verificationMethod` names a key in the controller document, such as `<controller>#key-1`,
    `operation.controller == controller`. Resolve the controller with
    `confirm: true, versionTime: proof.created`. The controller must be an
    active, self-controlled agent, identified by its immutable creation type.
    Reject if the controller's
    `registration.registry == "local"` and the new operation's registry is
-   non-`local`. Verify against the controller's `verificationMethod[0]
-   .publicKeyJwk`.
+   non-`local`. Verify against the named controller verification method's `publicKeyJwk`, not necessarily the first key.
 5. Reject if `registration.registry` is not in the server's
    `supportedRegistries`.
 6. Append the event with `registry: "local"`, `ordinal: [0]`, `time:
@@ -857,22 +862,22 @@ dereference resources. Standard document metadata (`created`, `updated`,
 
 ### 7.2 `update` / `delete`
 
-1. Reject if total operation byte size exceeds 64 KB.
+1. Reject if compact JSON serialization exceeds 65,536 UTF-16 code units (the version-1 limit, not UTF-8 bytes).
 2. Reject if `proof` format checks fail.
-3. Resolve the target DID. Reject if the doc is `deactivated`.
+3. Resolve the target DID. Reject if the doc is `deactivated`. Validate `previd` against the current accepted head (including cached content-backed aliases) before any operation storage or queue write.
 4. Agents use their own predecessor document. Assets resolve their owner
    at the authorization cutoff; that owner must be an active, self-controlled
    agent. There is no recursive traversal through assets or externally controlled agents.
    Validate the resulting document: agents may omit `controller` or name themselves;
    assets must retain an agent owner, including on transfer. The previous owner
-   authorizes a transfer. Use the immutable creation type to classify the DID, including after registry-only metadata updates that omit it; reject explicit changes to `didDocumentRegistration.type`.
+   authorizes a transfer. Use the immutable creation type to classify the DID, even when the registration component is omitted. A supplied registration replaces the whole component and must retain genesis version, type, and prefix while providing a valid registry.
 5. Verify signature against the resolved key.
 6. Reject if `doc.didDocumentRegistration.registry` is not in
    `supportedRegistries`.
 7. For `update`: reject if `operation.doc.didDocumentRegistration.registry`
    exists and refers to an unsupported registry.
 8. Append with `registry: "local"`, `ordinal: [0]`, `time: proof.created`.
-9. Queue for outbound distribution if the target registry is non-`local`.
+9. Queue on the predecessor registry if it is non-`local`. A migration is confirmed there; its successors use the new registry.
 
 Concurrency: per-DID operations MUST be serialized. The implementation
 MUST guarantee that two concurrent `POST /did` calls for the same DID see
@@ -892,7 +897,7 @@ for event in events:
     if !verify_event_shape(event):           // §8.4
         rejected += 1; continue
 
-    key := event.registry + "/" + event.operation.proof.proofValue
+    key := event.registry + "/" + canonicalOperationCID(event.operation)
     if event.registration: key += "/" + JSON([event.time, event.ordinal])
     if seen[key]:
         processed += 1; continue
@@ -981,22 +986,27 @@ rewritten to IPFS merely because a gossip wrapper omitted its operation ID.
 The following is the insertion algorithm reused during replay:
 
 ```
-1. ensure event.did and event.opid are set (compute via DID generation if missing)
+1. normalize event.did and canonical event.opid from the operation
 2. acquire per-DID lock
-3. current = store.get_events(did)
-4. if any current event has identical proof.proofValue:
+3. current = store.get_events(did); derive any missing canonical operation IDs
+4. if any current event has opid == event.opid:
        expectedRegistry = expected_registry_for_index(current, index_of_match)
        if current[match].registry == expectedRegistry: return MERGED
        elif event.registry == expectedRegistry:
+           previous = selected predecessor document, or none for creation
+           authorize_operation(event.operation, previous, event)
+           // same failure handling as step 7; do not replace an unauthorized anchor
            replace current[match] := event; setEvents(did, current); return ADDED
        else: return MERGED
 5. if current is non-empty and event.operation.previd is missing: return REJECTED
-6. valid = verify_operation(event.operation)        // §5.2 + §7
-   if Err("Invalid operation"-class): return DEFERRED   (the controller may not be imported yet)
+6. find prev by canonical operation ID, accepting a cached content-backed previd alias
+   if current is non-empty and no prev: return DEFERRED
+   previous = resolve through prev, or none when current is empty
+7. valid = authorize_operation(event.operation, previous, event)   // §5.2 + §7
+   if Err("Invalid operation"-class): return DEFERRED   (evidence may be unavailable)
    if !valid: return REJECTED
-7. if current is empty: addEvent(did, event); return ADDED
-8. find prev = event whose opid == event.operation.previd
-   if !prev: return DEFERRED
+   other errors: return REJECTED
+8. if current is empty: addEvent(did, event); return ADDED
 9. let i = index_of(prev)
    if i == current.length - 1:
        addEvent(did, event); return ADDED
@@ -1004,7 +1014,7 @@ The following is the insertion algorithm reused during replay:
    if event.registry == expectedRegistry:
        next = current[i+1]
        if next.registry != event.registry
-          or compare_ordinals(event.ordinal, next.ordinal) < 0:
+          or (both ordinals exist and compare_ordinals(event.ordinal, next.ordinal) < 0):
            // reorg: replace the rest of the chain
            setEvents(did, current[..=i] + [event])
            return ADDED
@@ -1021,7 +1031,8 @@ re-registers it.
 ```
 event.registry is a valid registry name (`[A-Za-z0-9][A-Za-z0-9:_-]*`, max 128 chars)
 event.time parses as RFC 3339
-event.operation present, canonical-bytes <= 64 KB
+event.operation present; compact JSON.stringify-style serialization <= 65,536 UTF-16 code units
+    // version-1 size rule, not canonical UTF-8 byte length
 proof format valid (§5.2)
 operation.type ∈ { create, update, delete }
   - create: created, registration.{version=1, type, registry}, type-specific fields
