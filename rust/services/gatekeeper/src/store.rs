@@ -157,6 +157,21 @@ pub(crate) fn standard_datetime(time: &str) -> String {
     }
 }
 
+/// Hyperswarm receipt times are node-local. Validated operations supply their
+/// own proof time; this selects a prefix without reordering predecessors.
+pub(crate) fn resolution_time(event: &EventRecord) -> &str {
+    if event.registry == "hyperswarm" {
+        event
+            .operation
+            .get("proof")
+            .and_then(|proof| proof.get("created"))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+    } else {
+        &event.time
+    }
+}
+
 /// Whether resolution stops before this event: by ordinal if the event is on
 /// the cutoff's registry, by time otherwise.
 pub(crate) fn past_cutoff(options: &ResolveOptions, event: &EventRecord) -> bool {
@@ -170,6 +185,14 @@ pub(crate) fn past_cutoff(options: &ResolveOptions, event: &EventRecord) -> bool
         }
     }
     match options.version_time.as_ref() {
+        Some(version_time) if event.registry == "hyperswarm" => {
+            // Compare instants, including offsets and subsecond precision,
+            // consistently with TypeScript's Date comparison.
+            chrono::DateTime::parse_from_rfc3339(resolution_time(event))
+                .ok()
+                .zip(chrono::DateTime::parse_from_rfc3339(version_time).ok())
+                .is_some_and(|(time, cutoff)| time.timestamp_millis() > cutoff.timestamp_millis())
+        }
         Some(version_time) => event.time > *version_time,
         None => false,
     }
@@ -1953,7 +1976,7 @@ impl JsonDb {
 
         for event in events.iter().skip(1) {
             let operation = &event.operation;
-            let operation_time = standard_datetime(&event.time);
+            let operation_time = standard_datetime(resolution_time(event));
 
             if past_cutoff(&options, event) {
                 break;
@@ -2364,5 +2387,34 @@ mod startup_read_tests {
         );
         let _: usize = conn.del(keys)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod hyperswarm_time_tests {
+    use super::*;
+
+    #[test]
+    fn hyperswarm_cutoff_uses_proof_instant_without_changing_other_registries() {
+        let mut event = value_to_event_record(&serde_json::json!({
+            "registry": "hyperswarm", "time": "2026-09-17T17:53:05.466Z",
+            "ordinal": [42], "operation": { "proof": { "created": "2026-09-04T00:51:32.807000001Z" } }
+        }));
+        let mut options = ResolveOptions {
+            version_time: Some("2026-09-03T20:51:32.807-04:00".to_string()),
+            ..Default::default()
+        };
+        assert!(!past_cutoff(&options, &event));
+        options.version_time = Some("2026-09-04T00:51:32.806Z".to_string());
+        assert!(past_cutoff(&options, &event));
+        for registry in ["local", "BTC:signet"] {
+            event.registry = registry.to_string();
+            options.version_time = Some("2026-09-04T00:51:33Z".to_string());
+            assert!(past_cutoff(&options, &event));
+            assert_eq!(resolution_time(&event), event.time);
+        }
+        // Chain ordering still takes precedence over the time cutoff.
+        options.version_ordinal = Some(("BTC:signet".to_string(), vec![43]));
+        assert!(!past_cutoff(&options, &event));
     }
 }

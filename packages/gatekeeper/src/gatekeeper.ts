@@ -73,6 +73,14 @@ const OPERATION_PROOF_PURPOSES = ['capabilityInvocation', 'authentication', 'ass
 const ValidVersions = [1];
 const ValidTypes = ['agent', 'asset'];
 const PIN_QUEUE = 'pin';
+
+// RFC 3339 proofs may contain :60, which Date does not parse. Match chrono's
+// millisecond instant for Hyperswarm cutoffs without changing other registries.
+const LEAP_SECOND = /:60(?=[.Zz+-])/;
+function proofTimeMillis(time: string): number {
+    return Date.parse(time.replace(LEAP_SECOND, ':59')) + (LEAP_SECOND.test(time) ? 1000 : 0);
+}
+
 const MONTH_LENGTHS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 // Proleptic Gregorian, computed rather than taken from `Date`, whose two-digit
@@ -1171,8 +1179,13 @@ export default class Gatekeeper implements GatekeeperInterface {
         let selected: { event: GatekeeperEvent; registry?: string } | undefined;
 
         for (const event of events) {
-            const { time, ordinal, operation, registry } = event;
-            const updated = generateStandardDatetime(time);
+            const { ordinal, operation, registry } = event;
+            // Hyperswarm has no shared receipt clock. Use the operation's proof
+            // time for historical selection and metadata; retain predecessor order.
+            const time = registry === 'hyperswarm' ? operation.proof!.created : event.time;
+            const updated = registry === 'hyperswarm' && LEAP_SECOND.test(time)
+                ? generateStandardDatetime(time.replace(LEAP_SECOND, ':59')).replace(/:59Z$/, ':60Z')
+                : generateStandardDatetime(time);
             const projectionRegistry = doc.didDocumentRegistration?.registry;
             // Verification needs each predecessor's metadata. Ordinary resolution
             // needs the CID and block bounds only for the version it returns.
@@ -1204,7 +1217,9 @@ export default class Gatekeeper implements GatekeeperInterface {
                     break;
                 }
             }
-            else if (versionTime && new Date(time) > new Date(versionTime)) {
+            else if (versionTime && (registry === 'hyperswarm'
+                ? proofTimeMillis(time) > proofTimeMillis(versionTime)
+                : new Date(time) > new Date(versionTime))) {
                 break;
             }
 

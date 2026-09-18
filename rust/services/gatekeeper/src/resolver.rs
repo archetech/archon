@@ -219,7 +219,7 @@ pub(crate) async fn resolve_local_doc_async(
 
     for event in events.iter().skip(1) {
         let operation = &event.operation;
-        let operation_time = standard_datetime(&event.time);
+        let operation_time = standard_datetime(crate::store::resolution_time(event));
 
         if past_cutoff(&options, event) {
             break;

@@ -129,3 +129,5 @@ These rules apply to coding agents working in this repository.
 - In Zcash scan tests, inject transport failures at the client promise boundary rather than using Nock `replyWithError`, whose mock socket can emit delayed unhandled errors between cases. Keep actual HTTP-envelope coverage for JSON-RPC application errors.
 
 - Mediator backlog metrics must retain newly observed tips before subsequent block reads, including mid-pass tip changes; test a successful block followed by a higher tip and a failed next block. Avoid redundant persistence when the observed tip is unchanged.
+
+- Hyperswarm historical cutoffs and resolved update/deletion dates use operation `proof.created`, not node receipt time. Preserve predecessor order and stored event evidence; do not extend this rule to local or anchored registries or introduce backdating safeguards without an explicit protocol decision (#1149).

@@ -1116,6 +1116,7 @@ mod tests {
                         "type": "update",
                         "did": did,
                         "previd": "create-op",
+                        "proof": { "created": "2026-04-11T12:05:00Z" },
                         "doc": {
                             "didDocumentData": {
                                 "displayName": "updated"

@@ -914,6 +914,267 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn hyperswarm_proof_time_is_independent_of_receipts_and_arrival_order() {
+        let vectors: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/hyperswarm-time-vectors.json"
+        ))
+        .unwrap();
+        for v in vectors.as_array().unwrap() {
+            for scenario in ["deletion", "rotation", "late-deletion"] {
+                for time in ["2026-09-04T00:51:32.083Z", "2026-09-17T17:53:05.466Z"] {
+                    for order in ["controller-first", "asset-first", "reverse", "direct"] {
+                        let wrap = |op: &Value| {
+                            crate::value_to_event_record(&json!({
+                                "operation": op, "registry": "hyperswarm", "time": time
+                            }))
+                        };
+                        let (state, _dir) = crate::tests::make_state(JsonDb {
+                            backend: DbBackend::Memory,
+                            data: JsonDbFile::default(),
+                            redis_connection: None,
+                        });
+                        ensure_history_ready(&state).await.unwrap();
+                        let controllers = vec![
+                            &v["agent"],
+                            &v[if scenario == "rotation" {
+                                "controllerRotation"
+                            } else {
+                                "controllerDelete"
+                            }],
+                        ];
+                        let assets = vec![
+                            &v["assetCreate"],
+                            &v["assetUpdate"],
+                            &v[if scenario == "deletion" {
+                                "assetDelete"
+                            } else if scenario == "rotation" {
+                                "afterRotation"
+                            } else {
+                                "lateAssetDelete"
+                            }],
+                        ];
+                        if order == "direct" {
+                            for op in controllers {
+                                crate::events::import_event_impl(&state, wrap(op)).await;
+                            }
+                            for op in &assets {
+                                assert_eq!(
+                                    crate::events::handle_did_operation(&state, op)
+                                        .await
+                                        .is_ok(),
+                                    *op != &v["lateAssetDelete"]
+                                );
+                            }
+                            for op in assets {
+                                crate::events::import_event_impl(&state, wrap(op)).await;
+                            }
+                        } else {
+                            let mut ops = if order == "asset-first" {
+                                [assets, controllers].concat()
+                            } else {
+                                [controllers, assets].concat()
+                            };
+                            if order == "reverse" {
+                                ops.reverse();
+                            }
+                            for op in ops {
+                                crate::events::import_event_impl(&state, wrap(op)).await;
+                            }
+                        }
+                        let data: JsonDbFile = serde_json::from_value(
+                            serde_json::to_value(&state.store.lock().await.data).unwrap(),
+                        )
+                        .unwrap();
+                        let (restarted, _restart_dir) = crate::tests::make_state(JsonDb {
+                            backend: DbBackend::Memory,
+                            data,
+                            redis_connection: None,
+                        });
+                        let controller = v["controller"].as_str().unwrap();
+                        let asset = v["asset"].as_str().unwrap();
+                        for current in [&state, &restarted] {
+                            ensure_history_ready(current).await.unwrap();
+                            for verify in [false, true] {
+                                for (cutoff, sequence) in [
+                                    ("2026-09-04T00:51:32.806Z", "1"),
+                                    ("2026-09-04T00:51:32.807Z", "2"),
+                                    ("2026-09-03T20:51:32.807-04:00", "2"),
+                                ] {
+                                    let doc = crate::resolve_local_doc_async(
+                                        current,
+                                        controller,
+                                        crate::ResolveOptions {
+                                            version_time: Some(cutoff.to_string()),
+                                            confirm: true,
+                                            verify,
+                                            ..Default::default()
+                                        },
+                                    )
+                                    .await
+                                    .unwrap();
+                                    assert_eq!(
+                                        doc["didDocumentMetadata"]["versionSequence"], sequence,
+                                        "{scenario}/{order}/{time}"
+                                    );
+                                    assert_eq!(
+                                        doc["didDocumentMetadata"]["deactivated"]
+                                            .as_bool()
+                                            .unwrap_or(false),
+                                        sequence == "2" && scenario != "rotation"
+                                    );
+                                }
+                                let doc = crate::resolve_local_doc_async(
+                                    current,
+                                    asset,
+                                    crate::ResolveOptions {
+                                        version_time: Some("2026-09-04T00:51:32.400Z".to_string()),
+                                        confirm: true,
+                                        verify,
+                                        ..Default::default()
+                                    },
+                                )
+                                .await
+                                .unwrap();
+                                assert_eq!(doc["didDocumentMetadata"]["versionSequence"], "2");
+                                assert_eq!(
+                                    doc["didDocumentMetadata"]["updated"],
+                                    "2026-09-04T00:51:32Z"
+                                );
+                                let latest = crate::resolve_local_doc_async(
+                                    current,
+                                    asset,
+                                    crate::ResolveOptions {
+                                        confirm: true,
+                                        verify,
+                                        ..Default::default()
+                                    },
+                                )
+                                .await
+                                .unwrap();
+                                assert_eq!(
+                                    latest["didDocumentMetadata"]["versionSequence"],
+                                    if scenario == "late-deletion" {
+                                        "2"
+                                    } else {
+                                        "3"
+                                    }
+                                );
+                                assert_eq!(
+                                    latest["didDocumentMetadata"]["deactivated"]
+                                        .as_bool()
+                                        .unwrap_or(false),
+                                    scenario == "deletion"
+                                );
+                                if scenario == "deletion" {
+                                    assert_eq!(
+                                        latest["didDocumentMetadata"]["deleted"],
+                                        "2026-09-04T00:51:32Z"
+                                    );
+                                } else {
+                                    assert_eq!(
+                                        latest["didDocumentData"],
+                                        json!({"state": if scenario == "rotation" { "rotated" } else { "updated" }})
+                                    );
+                                }
+                            }
+                        }
+                        let store = state.store.lock().await;
+                        for event in &store.data.dids[controller.rsplit(':').next().unwrap()] {
+                            assert_eq!(event.time, time);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn hyperswarm_proof_time_accepts_existing_leap_second_grammar() {
+        let vectors: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/hyperswarm-time-vectors.json"
+        ))
+        .unwrap();
+        for v in vectors.as_array().unwrap() {
+            let (state, _dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            ensure_history_ready(&state).await.unwrap();
+            for name in ["agent", "leapRotation"] {
+                crate::events::import_event_impl(&state, crate::value_to_event_record(&json!({
+                        "operation": v[name], "registry": "hyperswarm", "time": "2026-09-17T17:53:05.466Z"
+                    }))).await;
+            }
+            for verify in [false, true] {
+                for (cutoff, sequence) in [
+                    ("2026-09-04T00:51:59.999Z", "1"),
+                    ("2026-09-04T00:52:00Z", "2"),
+                ] {
+                    let doc = crate::resolve_local_doc_async(
+                        &state,
+                        v["controller"].as_str().unwrap(),
+                        crate::ResolveOptions {
+                            version_time: Some(cutoff.to_string()),
+                            verify,
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .unwrap();
+                    assert_eq!(doc["didDocumentMetadata"]["versionSequence"], sequence);
+                    if sequence == "2" {
+                        assert_eq!(
+                            doc["didDocumentMetadata"]["updated"],
+                            "2026-09-04T00:51:60Z"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn hyperswarm_proof_time_preserves_predecessor_prefix() {
+        let vectors: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/hyperswarm-time-vectors.json"
+        ))
+        .unwrap();
+        for v in vectors.as_array().unwrap() {
+            let (state, _dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            ensure_history_ready(&state).await.unwrap();
+            for name in ["backdatedSuccessor", "controllerRotation", "agent"] {
+                crate::events::import_event_impl(&state, crate::value_to_event_record(&json!({
+                        "operation": v[name], "registry": "hyperswarm", "time": "2026-09-04T00:51:32.083Z"
+                    }))).await;
+            }
+            for verify in [false, true] {
+                for (cutoff, sequence) in [
+                    ("2026-09-04T00:51:32.600Z", "1"),
+                    ("2026-09-04T00:51:32.807Z", "3"),
+                ] {
+                    let doc = crate::resolve_local_doc_async(
+                        &state,
+                        v["controller"].as_str().unwrap(),
+                        crate::ResolveOptions {
+                            version_time: Some(cutoff.to_string()),
+                            verify,
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .unwrap();
+                    assert_eq!(doc["didDocumentMetadata"]["versionSequence"], sequence);
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn operation_size_v1_covers_submission_import_and_restart() {
         let v: Value = serde_json::from_str(include_str!(
             "../../../../tests/gatekeeper/operation-size-v1-vectors.json"

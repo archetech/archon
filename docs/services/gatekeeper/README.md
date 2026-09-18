@@ -378,7 +378,7 @@ standards-conformant `/1.0/identifiers/:did` surface returns only the
 
 ```jsonc
 {
-  "versionTime": "<RFC 3339>",                 // stop replay when event time > versionTime
+  "versionTime": "<RFC 3339>",                 // stop when resolution time > versionTime (§6)
   "versionSequence": <int>,                    // stop replay when versionSequence reached
   "confirm": true | false,                     // stop on first unconfirmed event
   "verify": true | false                       // re-verify every signature during resolution
@@ -642,7 +642,8 @@ versionN := 1
 confirmed := true                                   // create is always confirmed by definition
 
 for event in events[1:]:
-    if options.versionTime  and event.time  > options.versionTime:  break
+    resolutionTime := event.operation.proof.created if event.registry == "hyperswarm" else event.time
+    if options.versionTime and resolutionTime > options.versionTime: break
     if options.versionSequence and versionN == options.versionSequence: break
 
     confirmed := confirmed && (event.registry == doc.registration.registry)
@@ -697,9 +698,22 @@ set to the DID; otherwise it is omitted.
 
 | `event.operation.type` | Effect |
 | --- | --- |
-| `update` | `versionN++`; `versionId := cid(event.operation)`; `updated := event.time`; merge `event.operation.doc.didDocument`, `didDocumentData`, `didDocumentRegistration` into the running doc (any field present in `event.operation.doc` replaces the corresponding field on the running doc); `deactivated := false`. |
-| `delete` | `versionN++`; `versionId := ...`; `deleted := event.time`; remove `updated` (including any earlier update timestamp); `didDocument := { id: did }`; `didDocumentData := {}`; `deactivated := true`. |
+| `update` | `versionN++`; `versionId := cid(event.operation)`; `updated := resolutionTime`; merge `event.operation.doc.didDocument`, `didDocumentData`, `didDocumentRegistration` into the running doc (any field present in `event.operation.doc` replaces the corresponding field on the running doc); `deactivated := false`. |
+| `delete` | `versionN++`; `versionId := ...`; `deleted := resolutionTime`; remove `updated` (including any earlier update timestamp); `didDocument := { id: did }`; `didDocumentData := {}`; `deactivated := true`. |
 | anything else | ignored |
+
+For Hyperswarm, `resolutionTime` is the operation's `proof.created`, compared as
+an instant at JavaScript millisecond precision (including offsets). It is used by
+both ordinary and verified resolution, including historical controller selection
+for asset authorization. The event's stored receipt timestamp remains unchanged.
+Other registries keep their existing event-time semantics; chain ordinals retain
+precedence for same-registry anchored authorization.
+
+`previd` establishes predecessor order. The time cutoff selects a prefix, even
+when proof times decrease; it does not reorder history. This applies to both
+legacy and modern proofs without imposing a new timestamp-signing requirement.
+It removes dependence on Hyperswarm receipt clocks, not competing-branch or
+missing-evidence differences. Genesis creation-time behavior is unchanged.
 
 ### 6.3 Block timestamps
 

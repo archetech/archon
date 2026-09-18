@@ -474,7 +474,21 @@ An operation on an asset — create, update, or delete — is authorized by a ke
 
 - For the controller's events on the operation's registry, the cutoff is the **ordinal**: only events the chain committed strictly before the operation's are applied. Every event in a block shares the block's time, so time cannot order a rotation against an operation committed earlier in the same block, and a later block may carry an earlier timestamp; the ordinal is the chain's order.
 - For the controller's events on any other registry, the cutoff is the operation's **block time**, since ordinals do not compare across registries.
-- This applies only when the controller's own confirmed history is chain-anchored — every event confirming it on its registry carries the position the chain assigned. A controller on `hyperswarm` or `local`, or one that migrated to a chain but has no confirmed event there yet, stamps its events with each node's clock and has no consensus timeline at a block time; it keeps the `proof.created` rule, and so does every operation on a registry without a blockchain, where no such record exists.
+- This applies only when the controller's own confirmed history is chain-anchored — every event confirming it on its registry carries the position the chain assigned. Otherwise, controller selection uses the asset operation's `proof.created` cutoff. For controller events on `hyperswarm`, compare that cutoff with each controller operation's own `proof.created`, never its node-local receipt time. Events on other registries retain their existing event-time/chain-position rules.
+
+Hyperswarm historical resolution selects a predecessor-linked prefix: stop at the
+first operation whose proof time exceeds the cutoff. Do not sort operations by
+proof time or skip an excluded predecessor to apply a successor with an earlier
+claimed time. The same proof time supplies Hyperswarm `updated` and `deleted`
+metadata; genesis `created` continues to come from the creation operation.
+Stored receipt times are retained as event evidence and are not rewritten.
+
+This rule applies to both accepted proof formats, including legacy proofs whose
+`created` is unsigned. It defines reproducible time selection for the same accepted
+history, not consensus chronology or a new backdating restriction. Missing history
+can still revise authorization, and competing-branch selection is unchanged.
+An explicit controller-version field (#1185) is not required for this correction
+(#1149).
 
 A proof whose key the controller had retired by the operation's position is rejected. That also rejects an operation genuinely signed before a rotation but committed to the chain after it; the remedy is to sign it again with the current key. An agent's updates to its own document are unaffected: they are verified against its current document.
 
