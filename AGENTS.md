@@ -138,3 +138,8 @@ These rules apply to coding agents working in this repository.
 - When fixing Gatekeeper startup performance, trace both TypeScript and Rust service initialization. Both must consume replay-derived search/status views without immediately repeating full database scans; keep startup benchmark harnesses aligned with the actual service entry points.
 
 - Gatekeeper Compose startup grace is configured by ARCHON_GATEKEEPER_START_PERIOD consistently across both runtime flavors and parity. Measure container-start-to-readiness time separately from individual phase/status timers; a longer grace period is not a replay performance fix.
+- For standards-defined serialization such as RFC 8785, evaluate established libraries before extending a custom serializer. Test raw decimal parsing as well as output formatting; preserve canonical bytes through hashing and storage instead of parsing and re-encoding them.
+
+- Before opening a code PR, run the root lint check as well as relevant builds/tests; fixture-generator scripts are linted by CI even when they are not executed by the test suite.
+
+- Preserve canonicalizer return types: a missing JSON serialization must be rejected before encoding/hashing/storage, while optional undefined object members retain normal JSON omission semantics.

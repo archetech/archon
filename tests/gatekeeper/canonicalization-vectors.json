@@ -1,0 +1,464 @@
+{
+  "bytes": [
+    {
+      "name": "nested indexes",
+      "input": "{\"z\":[{\"2\":\"b\",\"10\":\"a\",\"1\":\"c\"}],\"a\":true}",
+      "canonical": "{\"a\":true,\"z\":[{\"1\":\"c\",\"10\":\"a\",\"2\":\"b\"}]}",
+      "cid": "bagaaierahbulvzbsxfgzywqy3hn4lfijz5tlohdyv2yzct72uuwb6hu7zgoq"
+    },
+    {
+      "name": "index boundaries",
+      "input": "{\"4294967295\":0,\"4294967294\":1,\"01\":2,\"0\":3,\"-1\":4,\"a\":5}",
+      "canonical": "{\"-1\":4,\"0\":3,\"01\":2,\"4294967294\":1,\"4294967295\":0,\"a\":5}",
+      "cid": "bagaaierauyrywrxlp5lz2xooyugvoa7a65esfgsv7ese43ndq7uoaaulyh5q"
+    },
+    {
+      "name": "unicode order",
+      "input": "{\"\\ue000\":1,\"\\ud800\\udc00\":2,\"\\r\":3,\"1\":4,\"\\u20ac\":5,\"\\ud83d\\ude00\":6}",
+      "canonical": "{\"\\r\":3,\"1\":4,\"€\":5,\"𐀀\":2,\"😀\":6,\"\":1}",
+      "cid": "bagaaiera7wgyypdxrpszcr7rb2ntapdoo3difrb5acbvmsoqplaxyadla4iq"
+    },
+    {
+      "name": "numbers",
+      "input": "{\"n\":[1.0,-0.0,1e-6,1e-7,1e20,1e21,333333333.33333329,4.50,2e-3,1e-27,5e-324,1.7976931348623157e308]}",
+      "canonical": "{\"n\":[1,0,0.000001,1e-7,100000000000000000000,1e+21,333333333.3333333,4.5,0.002,1e-27,5e-324,1.7976931348623157e+308]}",
+      "cid": "bagaaieradtnkrv7sbit55ahgwwhh7h5supwe6hdbx6cued5osd3sgl4dksbq"
+    },
+    {
+      "name": "binary64 integers",
+      "input": "{\"n\":[9007199254740993,18446744073709551615,-9223372036854775808]}",
+      "canonical": "{\"n\":[9007199254740992,18446744073709552000,-9223372036854776000]}",
+      "cid": "bagaaiera3vqvxeoexau4l36eho4hfoj4ceushph3rouawgutufcpt3rl6r5a"
+    },
+    {
+      "name": "escaping",
+      "input": "{\"s\":\"\\u0000\\b\\f\\n\\r\\t\\\"\\\\/é😀\"}",
+      "canonical": "{\"s\":\"\\u0000\\b\\f\\n\\r\\t\\\"\\\\/é😀\"}",
+      "cid": "bagaaiera6w6hs5jm7niseid3zmnlg2xgverivr6mmo5dwaamumr5kmc5nyrq"
+    },
+    {
+      "name": "order one",
+      "input": "{\"b\":2,\"a\":1}",
+      "canonical": "{\"a\":1,\"b\":2}",
+      "cid": "bagaaieraimsyz73yh7tqg3mkimbt7ayk37da5qbxhashgveky5blrcbje53q"
+    },
+    {
+      "name": "order two",
+      "input": "{\"a\":1,\"b\":2}",
+      "canonical": "{\"a\":1,\"b\":2}",
+      "cid": "bagaaieraimsyz73yh7tqg3mkimbt7ayk37da5qbxhashgveky5blrcbje53q"
+    }
+  ],
+  "signed": [
+    {
+      "modern": false,
+      "controller": "did:cid:bagaaierahsw6jnl4tig4tzyk6dx7mwakqxv6by2swb6irikgi5pi3didk2vq",
+      "did": "did:cid:bagaaierarzj5buxy6ox6ijr3h6fudcymado7kogmmiuemplwkkbqzy562sjq",
+      "operations": [
+        {
+          "type": "create",
+          "created": "2026-01-02T00:00:00Z",
+          "registration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "hyperswarm"
+          },
+          "publicJwk": {
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "HPN-tWH4ACIpOFWGD0cSICXAkpoF9vCMUD7X8jJcr9U",
+            "y": "8EVbh5iu_NdN4tZ5hrkjrxS4bO1xkJDpzn5zBVb3cuM"
+          },
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-01-02T00:00:00Z",
+            "verificationMethod": "#key-1",
+            "proofPurpose": "authentication",
+            "proofValue": "8oaeYoUdfiygC07Bbx1z6-JpbZNCN7cGG0LUCEjwdkYwH-8oC2fj3JE0EKyPBwPQq8bFJPDD7owe_yjoKHXvKg"
+          }
+        },
+        {
+          "type": "create",
+          "created": "2026-01-02T00:00:00Z",
+          "registration": {
+            "version": 1,
+            "type": "asset",
+            "registry": "hyperswarm"
+          },
+          "controller": "did:cid:bagaaierahsw6jnl4tig4tzyk6dx7mwakqxv6by2swb6irikgi5pi3didk2vq",
+          "data": {
+            "nested indexes": {
+              "z": [
+                {
+                  "1": "c",
+                  "2": "b",
+                  "10": "a"
+                }
+              ],
+              "a": true
+            },
+            "index boundaries": {
+              "0": 3,
+              "4294967294": 1,
+              "4294967295": 0,
+              "01": 2,
+              "-1": 4,
+              "a": 5
+            },
+            "unicode order": {
+              "1": 4,
+              "": 1,
+              "𐀀": 2,
+              "\r": 3,
+              "€": 5,
+              "😀": 6
+            },
+            "numbers": {
+              "n": [
+                1,
+                0,
+                0.000001,
+                1e-7,
+                100000000000000000000,
+                1e+21,
+                333333333.3333333,
+                4.5,
+                0.002,
+                1e-27,
+                5e-324,
+                1.7976931348623157e+308
+              ]
+            },
+            "binary64 integers": {
+              "n": [
+                9007199254740992,
+                18446744073709552000,
+                -9223372036854776000
+              ]
+            },
+            "escaping": {
+              "s": "\u0000\b\f\n\r\t\"\\/é😀"
+            },
+            "order one": {
+              "b": 2,
+              "a": 1
+            },
+            "order two": {
+              "a": 1,
+              "b": 2
+            }
+          },
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-01-02T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaierahsw6jnl4tig4tzyk6dx7mwakqxv6by2swb6irikgi5pi3didk2vq#key-1",
+            "proofPurpose": "authentication",
+            "proofValue": "62RvPqo1WW1zdhydRIgS3WfUi93c8ju-lXk65GhjzD4e7a_qvlxaSsNtWjFbQ1GwXeULbmOFh3lAtbSv3ChFWA"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierarzj5buxy6ox6ijr3h6fudcymado7kogmmiuemplwkkbqzy562sjq",
+          "previd": "bagaaierarzj5buxy6ox6ijr3h6fudcymado7kogmmiuemplwkkbqzy562sjq",
+          "doc": {
+            "didDocumentData": {
+              "nested indexes": {
+                "z": [
+                  {
+                    "1": "c",
+                    "2": "b",
+                    "10": "a"
+                  }
+                ],
+                "a": true
+              },
+              "index boundaries": {
+                "0": 3,
+                "4294967294": 1,
+                "4294967295": 0,
+                "01": 2,
+                "-1": 4,
+                "a": 5
+              },
+              "unicode order": {
+                "1": 4,
+                "": 1,
+                "𐀀": 2,
+                "\r": 3,
+                "€": 5,
+                "😀": 6
+              },
+              "numbers": {
+                "n": [
+                  1,
+                  0,
+                  0.000001,
+                  1e-7,
+                  100000000000000000000,
+                  1e+21,
+                  333333333.3333333,
+                  4.5,
+                  0.002,
+                  1e-27,
+                  5e-324,
+                  1.7976931348623157e+308
+                ]
+              },
+              "binary64 integers": {
+                "n": [
+                  9007199254740992,
+                  18446744073709552000,
+                  -9223372036854776000
+                ]
+              },
+              "escaping": {
+                "s": "\u0000\b\f\n\r\t\"\\/é😀"
+              },
+              "order one": {
+                "b": 2,
+                "a": 1
+              },
+              "order two": {
+                "a": 1,
+                "b": 2
+              },
+              "state": "updated"
+            }
+          },
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-01-02T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaierahsw6jnl4tig4tzyk6dx7mwakqxv6by2swb6irikgi5pi3didk2vq#key-1",
+            "proofPurpose": "authentication",
+            "proofValue": "60sUd0F3o4S-auXIQTI0WzNCG-pTSsjT7_fyZZMX-bpNoQVFIQA-ETH6rwdeFBQuBFViOno0Ggy-Uo9TTQJlfQ"
+          }
+        },
+        {
+          "type": "delete",
+          "did": "did:cid:bagaaierarzj5buxy6ox6ijr3h6fudcymado7kogmmiuemplwkkbqzy562sjq",
+          "previd": "bagaaierain7o25dsrsflb4cv6blbxgq4hmnkxn7xukbbpfi3xdsa24ap4oiq",
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-01-02T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaierahsw6jnl4tig4tzyk6dx7mwakqxv6by2swb6irikgi5pi3didk2vq#key-1",
+            "proofPurpose": "authentication",
+            "proofValue": "6KRq5d37BwYlg9mxj7zjLsXPwlO5LupRnCS9_X-MKG894KbAPI0AybVejReftIMdvdVeGVSN_RgXw-iaEr6Pwg"
+          }
+        }
+      ],
+      "cids": [
+        "bagaaierahsw6jnl4tig4tzyk6dx7mwakqxv6by2swb6irikgi5pi3didk2vq",
+        "bagaaierarzj5buxy6ox6ijr3h6fudcymado7kogmmiuemplwkkbqzy562sjq",
+        "bagaaierain7o25dsrsflb4cv6blbxgq4hmnkxn7xukbbpfi3xdsa24ap4oiq",
+        "bagaaiera2ka2kz52zbsgntze5u3v7wtsrizqz3spnasc5qibxp65igfuo3gq"
+      ]
+    },
+    {
+      "modern": true,
+      "controller": "did:cid:bagaaieraayki7eaq27ge7qgunfjfooy7ikz22rquo33vzh53oweutkdvbyyq",
+      "did": "did:cid:bagaaierao67uejig3aq242ncswxphovf6gpffxsb6cq4cwxe5hiatomd26hq",
+      "operations": [
+        {
+          "type": "create",
+          "created": "2026-01-02T00:00:00Z",
+          "registration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "hyperswarm"
+          },
+          "publicJwk": {
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "OSd_CMNPrDPDsV5YoWajZol2ZUGeXD8hR3XubkcWcX4",
+            "y": "yBLNwQllxyR5Omgo9b7LmJEfd1pGNiZZqzgqafZ4Qcs"
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-01-02T00:00:00Z",
+            "verificationMethod": "#key-1",
+            "proofPurpose": "assertionMethod",
+            "proofValue": "rXSuV0hVcXnQIgqTSc60yNdvILcNYzBk3OC_K6S91LMZk95GjeCnnERfphZx2TARAcEqrrB4B0WOjAHstQwJ7Q"
+          }
+        },
+        {
+          "type": "create",
+          "created": "2026-01-02T00:00:00Z",
+          "registration": {
+            "version": 1,
+            "type": "asset",
+            "registry": "hyperswarm"
+          },
+          "controller": "did:cid:bagaaieraayki7eaq27ge7qgunfjfooy7ikz22rquo33vzh53oweutkdvbyyq",
+          "data": {
+            "nested indexes": {
+              "z": [
+                {
+                  "1": "c",
+                  "2": "b",
+                  "10": "a"
+                }
+              ],
+              "a": true
+            },
+            "index boundaries": {
+              "0": 3,
+              "4294967294": 1,
+              "4294967295": 0,
+              "01": 2,
+              "-1": 4,
+              "a": 5
+            },
+            "unicode order": {
+              "1": 4,
+              "": 1,
+              "𐀀": 2,
+              "\r": 3,
+              "€": 5,
+              "😀": 6
+            },
+            "numbers": {
+              "n": [
+                1,
+                0,
+                0.000001,
+                1e-7,
+                100000000000000000000,
+                1e+21,
+                333333333.3333333,
+                4.5,
+                0.002,
+                1e-27,
+                5e-324,
+                1.7976931348623157e+308
+              ]
+            },
+            "binary64 integers": {
+              "n": [
+                9007199254740992,
+                18446744073709552000,
+                -9223372036854776000
+              ]
+            },
+            "escaping": {
+              "s": "\u0000\b\f\n\r\t\"\\/é😀"
+            },
+            "order one": {
+              "b": 2,
+              "a": 1
+            },
+            "order two": {
+              "a": 1,
+              "b": 2
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-01-02T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaieraayki7eaq27ge7qgunfjfooy7ikz22rquo33vzh53oweutkdvbyyq#key-1",
+            "proofPurpose": "assertionMethod",
+            "proofValue": "jJ4WSonpyTnm-5GtcBAlGLWLjdx49GGCzGppNfBqQB8z7q5w9U0vNVBy8t-zWb0Ie2ZQI7qZoMlq3X5efvmZtg"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierao67uejig3aq242ncswxphovf6gpffxsb6cq4cwxe5hiatomd26hq",
+          "previd": "bagaaierao67uejig3aq242ncswxphovf6gpffxsb6cq4cwxe5hiatomd26hq",
+          "doc": {
+            "didDocumentData": {
+              "nested indexes": {
+                "z": [
+                  {
+                    "1": "c",
+                    "2": "b",
+                    "10": "a"
+                  }
+                ],
+                "a": true
+              },
+              "index boundaries": {
+                "0": 3,
+                "4294967294": 1,
+                "4294967295": 0,
+                "01": 2,
+                "-1": 4,
+                "a": 5
+              },
+              "unicode order": {
+                "1": 4,
+                "": 1,
+                "𐀀": 2,
+                "\r": 3,
+                "€": 5,
+                "😀": 6
+              },
+              "numbers": {
+                "n": [
+                  1,
+                  0,
+                  0.000001,
+                  1e-7,
+                  100000000000000000000,
+                  1e+21,
+                  333333333.3333333,
+                  4.5,
+                  0.002,
+                  1e-27,
+                  5e-324,
+                  1.7976931348623157e+308
+                ]
+              },
+              "binary64 integers": {
+                "n": [
+                  9007199254740992,
+                  18446744073709552000,
+                  -9223372036854776000
+                ]
+              },
+              "escaping": {
+                "s": "\u0000\b\f\n\r\t\"\\/é😀"
+              },
+              "order one": {
+                "b": 2,
+                "a": 1
+              },
+              "order two": {
+                "a": 1,
+                "b": 2
+              },
+              "state": "updated"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-01-02T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaieraayki7eaq27ge7qgunfjfooy7ikz22rquo33vzh53oweutkdvbyyq#key-1",
+            "proofPurpose": "assertionMethod",
+            "proofValue": "kjE0bgecKIeOh6RjGqjfDKop1-7pajQwlBulXrumoCZ_AU0ZWY_CIK1Uxa2E9O7yzwrpsonM47jE0jEAQnJmYg"
+          }
+        },
+        {
+          "type": "delete",
+          "did": "did:cid:bagaaierao67uejig3aq242ncswxphovf6gpffxsb6cq4cwxe5hiatomd26hq",
+          "previd": "bagaaierafrwduqjvsxrt4v4hvnjvkllgnffa5zclk34dwl2rnkz23jrah3va",
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-01-02T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaieraayki7eaq27ge7qgunfjfooy7ikz22rquo33vzh53oweutkdvbyyq#key-1",
+            "proofPurpose": "assertionMethod",
+            "proofValue": "AnwIxbmsv2uGmuas0HL4zL9QcsIMSG_xMlB7a93bsCRMplTO2iC9p2JCw7HgKMqQHMiD6VsKHABHm3ko4d_iFA"
+          }
+        }
+      ],
+      "cids": [
+        "bagaaieraayki7eaq27ge7qgunfjfooy7ikz22rquo33vzh53oweutkdvbyyq",
+        "bagaaierao67uejig3aq242ncswxphovf6gpffxsb6cq4cwxe5hiatomd26hq",
+        "bagaaierafrwduqjvsxrt4v4hvnjvkllgnffa5zclk34dwl2rnkz23jrah3va",
+        "bagaaiera5nbhn2zj452yvec3t33w7a3ysz2qejqld522dktcrmkobzaxp2xq"
+      ]
+    }
+  ]
+}

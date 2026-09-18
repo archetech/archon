@@ -288,7 +288,7 @@ async function runDeterministicVectorChecks() {
             throw new Error(`${name}: canonical JSON mismatch\nexpected: ${vector.canonical}\nactual:   ${canonical}`);
         }
 
-        const cid = await generateCID(JSON.parse(canonical));
+        const cid = await generateCID(vector.operation, { canonical: true });
         if (cid !== vector.cid) {
             throw new Error(`${name}: CID mismatch\nexpected: ${vector.cid}\nactual:   ${cid}`);
         }
@@ -1001,6 +1001,41 @@ async function runOperationIdentityParity() {
     console.log('ok operation identity parity: canonical IDs, retrieval aliases, signed alias predecessors, and equal-signature branches');
 }
 
+async function runCanonicalizationParity() {
+    const vectors = JSON.parse(await fs.readFile(new URL('../tests/gatekeeper/canonicalization-vectors.json', import.meta.url), 'utf8'));
+    const legacy = JSON.parse(await fs.readFile(new URL('../tests/gatekeeper/numeric-predecessor-vectors.json', import.meta.url), 'utf8'));
+    const both = fixture => Promise.all([request(tsBaseUrl, fixture), request(rustBaseUrl, fixture)]);
+    const post = (path, body) => ({ method: 'POST', path, body, requiresAdminKey: true, headers: { 'content-type': 'application/json' } });
+    for (const v of vectors.signed) {
+        await resetServiceState(tsBaseUrl);
+        await resetServiceState(rustBaseUrl);
+        for (let i = 0; i < 2; i++) {
+            const responses = await both(post('/api/v1/did/generate', v.operations[i]));
+            for (const response of responses) {
+                assertEqual('JCS generation status', response.status, 200);
+                assertEqual('JCS genesis DID', response.body, 'did:cid:' + v.cids[i]);
+            }
+        }
+        const events = [2, 1, 0].map(i => ({ operation: v.operations[i], registry: 'hyperswarm', time: v.operations[i].proof.created }));
+        for (const response of await both(post('/api/v1/batch/import', events))) assertEqual('JCS import status', response.status, 200);
+        for (const response of await both(post('/api/v1/events/process'))) assertEqual('JCS process status', response.status, 200);
+        const responses = await both({ method: 'GET', path: `/api/v1/did/${v.did}?verify=true`, requiresAdminKey: true });
+        assertEqual('JCS signed resolution parity', normalizeJson(responses[0].body), normalizeJson(responses[1].body));
+        assertEqual('JCS successor version', responses[0].body.didDocumentMetadata?.versionId, v.cids[2]);
+        assertEqual('JCS successor payload', responses[0].body.didDocumentData, v.operations[2].doc.didDocumentData);
+    }
+    await resetServiceState(tsBaseUrl);
+    await resetServiceState(rustBaseUrl);
+    const events = ['successor', 'update', 'agent'].map(name => ({ operation: legacy[name], registry: 'hyperswarm', time: legacy[name].proof.created }));
+    await both(post('/api/v1/batch/import', events));
+    await both(post('/api/v1/events/process'));
+    const docs = await both({ method: 'GET', path: `/api/v1/did/${legacy.did}?verify=true`, requiresAdminKey: true });
+    assertEqual('fresh-node legacy predecessor parity', normalizeJson(docs[0].body), normalizeJson(docs[1].body));
+    assertEqual('fresh-node legacy predecessor recovery', docs[0].body.didDocumentData, { recovered: true });
+    console.log('ok RFC 8785 parity: signed genesis/update, both proof suites, and fresh-node legacy predecessor recovery');
+}
+
+await runCanonicalizationParity();
 await runHistoryRecoveryParity();
 await runOperationIdentityParity();
 await runMetricsChecks();

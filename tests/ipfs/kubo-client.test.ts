@@ -424,3 +424,24 @@ describe('KuboClient peering configuration', () => {
         expect(rpc.config.set).toHaveBeenCalledWith('Peering.Peers', [], { json: true });
     });
 });
+
+
+it('stores RFC 8785 bytes without reordering numeric object keys', async () => {
+    const { client, rpc } = await connected();
+    const value = { '2': 'b', '10': 'a', '1': 'c' };
+    const cid = await client.addJSON(value, { canonical: true });
+    const [buf, options] = rpc.block.put.mock.calls[0] as unknown as [Uint8Array, { cid: { toString(): string } }];
+    expect(new TextDecoder().decode(buf)).toBe('{"1":"c","10":"a","2":"b"}');
+    const { generateCID } = await import('@didcid/ipfs/utils');
+    expect(cid).toBe(await generateCID(value, { canonical: true }));
+    expect(options.cid.toString()).toBe(cid);
+    expect(await client.addJSON(value)).not.toBe(cid);
+});
+
+it('rejects missing canonical serialization before writing a block', async () => {
+    const { client, rpc } = await connected();
+    for (const value of [undefined, () => {}, Symbol('invalid')]) {
+        await expect(client.addJSON(value, { canonical: true })).rejects.toThrow('Value has no JSON serialization');
+    }
+    expect(rpc.block.put).not.toHaveBeenCalled();
+});
