@@ -3,10 +3,11 @@ import Gatekeeper from '@didcid/gatekeeper';
 import DbMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import { generateCID as rawCID } from '@didcid/ipfs/utils';
 import Cipher from '@didcid/cipher/node';
-const cipher = new Cipher();
-const generateCID = (operation: Operation) => rawCID(JSON.parse(cipher.canonicalizeJSON(operation)));
 import MemoryClient from '@didcid/ipfs/memory';
 import type { Operation, GatekeeperEvent } from '@didcid/gatekeeper/types';
+
+const cipher = new Cipher();
+const generateCID = (operation: Operation) => rawCID(JSON.parse(cipher.canonicalizeJSON(operation)));
 
 class Db extends DbMemory {
     snapshot() { return this.loadDb(); }
