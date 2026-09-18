@@ -145,3 +145,5 @@ These rules apply to coding agents working in this repository.
 - Preserve canonicalizer return types: a missing JSON serialization must be rejected before encoding/hashing/storage, while optional undefined object members retain normal JSON omission semantics.
 
 - Protocol documentation must distinguish whole-component replacement from field merging, predecessor-registry confirmation from a migration's resulting registry, and accepted-branch deletion from later evidence revalidation. Cross-check both Gatekeepers before turning explanatory prose into acceptance requirements.
+
+- When consolidating protocol rules, search procedural checklists and pseudocode for superseded wording too; a new normative table does not correct contradictory identity, size-limit, or registry-selection instructions elsewhere.

@@ -4,7 +4,7 @@ Current status (2026-09-18): #1158 and #1159 are complete. #1156 is paused at
 the maintainer's request. #1149 is complete through #1186. #1185 controller-version references were
 closed as not planned; #1180 RFC 8785 alignment merged in #1191. #1178 was
 closed as not planned and #1193 withdrawn after reviewing GC and ingress
-deduplication. #1160 documentation consolidation is in progress. Keep
+deduplication. #1160 documentation consolidation is complete in #1194. Keep
 independent work in separate PRs from main; do not merge without instruction.
 
 ## Work and acceptance criteria
@@ -24,8 +24,8 @@ independent work in separate PRs from main; do not merge without instruction.
   asset genesis and successors, arrival order, restart, and both proof formats in
   both ports. Keep chain/local behavior unchanged; add no speculative safeguards.
   See [the decision and production replay results](hyperswarm-time-1149.md).
-- [ ] #1160 (documentation PR in progress): Consolidate established transition rules. Update relevant timing
-  documentation with #1149, without inventing additional acceptance restrictions.
+- [x] #1160: Consolidated established transition rules in #1194, including #1149
+  timing documentation, without introducing additional acceptance restrictions.
 - [x] #1180 (merged in #1191): RFC 8785 in both ports, including
   UTF-16 code-unit ordering. Production audit found no affected genesis or
   signing bytes, and three numeric-key updates on two assets. Preserve existing

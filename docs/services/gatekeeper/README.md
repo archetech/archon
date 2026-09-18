@@ -986,22 +986,27 @@ rewritten to IPFS merely because a gossip wrapper omitted its operation ID.
 The following is the insertion algorithm reused during replay:
 
 ```
-1. ensure event.did and event.opid are set (compute via DID generation if missing)
+1. normalize event.did and canonical event.opid from the operation
 2. acquire per-DID lock
-3. current = store.get_events(did)
-4. if any current event has identical proof.proofValue:
+3. current = store.get_events(did); derive any missing canonical operation IDs
+4. if any current event has opid == event.opid:
        expectedRegistry = expected_registry_for_index(current, index_of_match)
        if current[match].registry == expectedRegistry: return MERGED
        elif event.registry == expectedRegistry:
+           previous = selected predecessor document, or none for creation
+           authorize_operation(event.operation, previous, event)
+           // same failure handling as step 7; do not replace an unauthorized anchor
            replace current[match] := event; setEvents(did, current); return ADDED
        else: return MERGED
 5. if current is non-empty and event.operation.previd is missing: return REJECTED
-6. valid = verify_operation(event.operation)        // §5.2 + §7
-   if Err("Invalid operation"-class): return DEFERRED   (the controller may not be imported yet)
+6. find prev by canonical operation ID, accepting a cached content-backed previd alias
+   if current is non-empty and no prev: return DEFERRED
+   previous = resolve through prev, or none when current is empty
+7. valid = authorize_operation(event.operation, previous, event)   // §5.2 + §7
+   if Err("Invalid operation"-class): return DEFERRED   (evidence may be unavailable)
    if !valid: return REJECTED
-7. if current is empty: addEvent(did, event); return ADDED
-8. find prev = event whose opid == event.operation.previd
-   if !prev: return DEFERRED
+   other errors: return REJECTED
+8. if current is empty: addEvent(did, event); return ADDED
 9. let i = index_of(prev)
    if i == current.length - 1:
        addEvent(did, event); return ADDED
@@ -1009,7 +1014,7 @@ The following is the insertion algorithm reused during replay:
    if event.registry == expectedRegistry:
        next = current[i+1]
        if next.registry != event.registry
-          or compare_ordinals(event.ordinal, next.ordinal) < 0:
+          or (both ordinals exist and compare_ordinals(event.ordinal, next.ordinal) < 0):
            // reorg: replace the rest of the chain
            setEvents(did, current[..=i] + [event])
            return ADDED
@@ -1026,7 +1031,8 @@ re-registers it.
 ```
 event.registry is a valid registry name (`[A-Za-z0-9][A-Za-z0-9:_-]*`, max 128 chars)
 event.time parses as RFC 3339
-event.operation present, canonical-bytes <= 64 KB
+event.operation present; compact JSON.stringify-style serialization <= 65,536 UTF-16 code units
+    // version-1 size rule, not canonical UTF-8 byte length
 proof format valid (§5.2)
 operation.type ∈ { create, update, delete }
   - create: created, registration.{version=1, type, registry}, type-specific fields

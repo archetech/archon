@@ -310,8 +310,8 @@ Example update to rotate keys for an agent DID:
 Upon receiving the operation the node must:
 1. Verify the proof is valid for the controller of the DID — for an asset, against the version of the controller's document chosen as described in [Authorizing an operation on a controlled DID](#authorizing-an-operation-on-a-controlled-did).
 1. Validate the resulting controller relationship: agents may omit `didDocument.controller` or name only their own DID; assets must name an existing, active, self-controlled agent. Transfers are signed by the previous owner. The DID kind is fixed by its creation operation. Updates cannot change `type`; omitting the registration component preserves it, while supplying a replacement requires its version, type, and registry.
-1. Verify the previd is identical to the latest version's operation CID.
-1. Record the operation on the DID specified registry (or forward the request to a trusted node that supports the specified registry).
+1. Validate `previd` against the current accepted head's canonical operation CID, accepting a cached content-backed alias under the [operation identity rules](#operation-identity-and-retrieval-references). Do this before storage or queue writes; imported competing branches use their selected predecessor instead.
+1. Queue the operation for the registry in the accepted predecessor state (or forward the submission to a trusted node that supports it). For a migration, this is the old registry; the replacement registry applies to successors.
 
 For registries such as BTC with non-trivial transaction costs, it is expected that update operations will be placed in a queue, then registered periodically in a batch in order to balance costs and latency of updates. If the registry has trivial transaction costs, the update operation may be distributed individually and immediately. This method defers this tradeoff between cost, speed, and security to the node operators.
 
@@ -348,8 +348,8 @@ Example deletion operation:
 
 Upon receiving the operation the node must:
 1. Verify the proof is valid for the controller of the DID.
-1. Verify the previd is identical to the latest version's operation CID.
-1. Record the operation on the DID specified registry (or forward the request to a trusted node that supports the specified registry).
+1. Validate `previd` against the current accepted head's canonical operation CID, accepting a cached content-backed alias under the [operation identity rules](#operation-identity-and-retrieval-references). Do this before storage or queue writes; imported competing branches use their selected predecessor instead.
+1. Queue the operation for the registry in the accepted predecessor state (or forward the submission to a trusted node that supports it). For a migration, this is the old registry; the replacement registry applies to successors.
 
 After revocation is confirmed on the DID's registry, resolving the DID returns a result like this:
 ```json
