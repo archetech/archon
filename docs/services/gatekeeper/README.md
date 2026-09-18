@@ -642,7 +642,7 @@ versionN := 1
 confirmed := true                                   // create is always confirmed by definition
 
 for event in events[1:]:
-    resolutionTime := event.operation.proof.created if event.registry == "hyperswarm" else event.time
+    resolutionTime := event.time
     if options.versionTime and resolutionTime > options.versionTime: break
     if options.versionSequence and versionN == options.versionSequence: break
 
@@ -702,12 +702,15 @@ set to the DID; otherwise it is omitted.
 | `delete` | `versionN++`; `versionId := ...`; `deleted := resolutionTime`; remove `updated` (including any earlier update timestamp); `didDocument := { id: did }`; `didDocumentData := {}`; `deactivated := true`. |
 | anything else | ignored |
 
-For Hyperswarm, `resolutionTime` is the operation's `proof.created`, compared as
-an instant at JavaScript millisecond precision (including offsets). It is used by
-both ordinary and verified resolution, including historical controller selection
-for asset authorization. The event's stored receipt timestamp remains unchanged.
-Other registries keep their existing event-time semantics; chain ordinals retain
-precedence for same-registry anchored authorization.
+The resolver uses stored `event.time`, comparing instants at JavaScript
+millisecond precision (including offsets). The Hyperswarm mediator sets this
+field to the operation's `proof.created`. Gatekeeper normalizes Hyperswarm
+envelopes on import and during candidate recovery, covering older mediators,
+HTTP history imports, and existing databases. It corrects envelope timestamps
+without changing operation bytes, IDs, or ordinals. Both ordinary and verified
+resolution consume these corrected events. Local and anchored event timestamps
+retain their sources; chain ordinals retain precedence for same-registry
+anchored authorization.
 
 `previd` establishes predecessor order. The time cutoff selects a prefix, even
 when proof times decrease; it does not reorder history. This applies to both

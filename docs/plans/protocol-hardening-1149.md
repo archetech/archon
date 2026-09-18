@@ -17,7 +17,8 @@ independent work in separate PRs from main; do not merge without instruction.
   implementation or activate a new protocol version without instruction.
 - [ ] #1149 (implementation under review): Use each Hyperswarm operation's
   `proof.created` for historical cutoffs and update/deletion metadata, keeping
-  `previd` ordering and stored receipt evidence. Cover controller rotation/deletion,
+  `previd` ordering, operation bytes, and ordinals. Correct event envelopes in
+  the mediator and Gatekeeper import/recovery, keeping resolution registry-neutral. Cover controller rotation/deletion,
   asset genesis and successors, arrival order, restart, and both proof formats in
   both ports. Keep chain/local behavior unchanged; add no speculative safeguards.
   See [the decision and production replay results](hyperswarm-time-1149.md).

@@ -15,7 +15,8 @@ use crate::{
 
 // Derive the TypeScript numeric-key reference from content, never a peer opid.
 // Existing predecessor verification still checks the referenced operation's CID.
-fn normalize_candidate_operation(store: &mut JsonDb, event: &mut EventRecord) -> Result<()> {
+fn normalize_candidate_event(store: &mut JsonDb, event: &mut EventRecord) -> Result<()> {
+    crate::events::normalize_event_time(event);
     let canonical = generate_json_cid(&event.operation)?;
     if let Some(alias) = crate::proofs::typescript_numeric_cid(&event.operation) {
         if alias != canonical && store.get_operation(&alias).is_none() {
@@ -81,7 +82,7 @@ async fn retain_candidates_with_histories(
                     .map(|items| items.get(&current).cloned().unwrap_or_default())
                     .unwrap_or_else(|| store.get_events(&current));
                 for event in &mut events {
-                    normalize_candidate_operation(&mut store, event)?;
+                    normalize_candidate_event(&mut store, event)?;
                 }
                 store.set_candidates(&current, events.clone())?;
                 candidates.insert(current, events);
@@ -90,9 +91,9 @@ async fn retain_candidates_with_histories(
         for (key, events) in &mut candidates {
             let mut changed = false;
             for event in events.iter_mut() {
-                let previous = event.opid.clone();
-                normalize_candidate_operation(&mut store, event)?;
-                changed |= event.opid != previous;
+                let previous = (event.opid.clone(), event.time.clone());
+                normalize_candidate_event(&mut store, event)?;
+                changed |= event.opid != previous.0 || event.time != previous.1;
             }
             if changed {
                 store.set_candidates(key, events.clone())?;
@@ -112,10 +113,10 @@ async fn retain_candidates_with_histories(
     let mut positions = HashMap::new();
     let mut retained = Vec::new();
     for mut event in events {
-        normalize_candidate_operation(&mut store, &mut event)?;
+        normalize_candidate_event(&mut store, &mut event)?;
         let key = candidate_key(&event);
         if let Some(index) = positions.get(&key) {
-            // Preserve the first local/gossip observation and its timestamp.
+            // Preserve the first local/gossip position.
             // Anchored metadata updates still replace the same chain position.
             if !crate::is_unanchored_registry(&event.registry) {
                 retained[*index] = event;
@@ -914,6 +915,118 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn hyperswarm_imports_microsecond_proof_times() {
+        let vectors: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/hyperswarm-time-vectors.json"
+        ))
+        .unwrap();
+        let v = vectors
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["legacy"] == true)
+            .unwrap();
+        let mut rotation = v["controllerRotation"].clone();
+        rotation["proof"]["created"] = json!("2026-09-04T00:51:32.807411Z");
+        let (state, _dir) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        ensure_history_ready(&state).await.unwrap();
+        for operation in [&v["agent"], &rotation] {
+            let status = crate::events::import_event_impl(&state, crate::value_to_event_record(&json!({
+                "operation": operation, "registry": "hyperswarm", "time": "2026-09-04T00:51:32.083Z"
+            }))).await;
+            assert!(matches!(status, crate::events::ImportStatus::Added));
+        }
+        for (cutoff, sequence) in [
+            ("2026-09-04T00:51:32.806999Z", "1"),
+            ("2026-09-04T00:51:32.807Z", "2"),
+            ("2026-09-03T20:51:32.807-04:00", "2"),
+        ] {
+            let doc = crate::resolve_local_doc_async(
+                &state,
+                v["controller"].as_str().unwrap(),
+                crate::ResolveOptions {
+                    version_time: Some(cutoff.to_string()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+            assert_eq!(doc["didDocumentMetadata"]["versionSequence"], sequence);
+        }
+    }
+
+    #[tokio::test]
+    async fn hyperswarm_recovery_repairs_candidates_and_old_http_envelopes() {
+        let vectors: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/hyperswarm-time-vectors.json"
+        ))
+        .unwrap();
+        for v in vectors.as_array().unwrap() {
+            let controller = v["controller"].as_str().unwrap();
+            let asset = v["asset"].as_str().unwrap();
+            let old: Vec<EventRecord> = ["agent", "controllerDelete"]
+                .iter()
+                .map(|name| {
+                    crate::value_to_event_record(&json!({
+                        "operation": v[name], "did": controller, "registry": "hyperswarm",
+                        "opid": generate_json_cid(&v[name]).unwrap(),
+                        "time": "2026-09-04T00:51:32.083Z", "ordinal": [42]
+                    }))
+                })
+                .collect();
+            let mut db = JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            };
+            db.set_events(controller, old.clone()).unwrap();
+            db.set_candidates(controller, old.clone()).unwrap();
+            let (state, _dir) = crate::tests::make_state(db);
+            ensure_history_ready(&state).await.unwrap();
+            let incoming: Vec<Value> = ["assetCreate", "assetUpdate", "assetDelete"].iter().map(|name| json!({
+                "operation": v[name], "registry": "BTC:signet", "registration": { "height": 42 },
+                "time": "2026-09-17T17:53:05.466Z"
+            })).collect();
+            crate::events::import_batch_impl(&state, &crate::events::relay_hints(&incoming)).await;
+            crate::events::process_events_impl(&state).await;
+            let doc = crate::resolve_local_doc_async(&state, asset, Default::default())
+                .await
+                .unwrap();
+            assert_eq!(doc["didDocumentMetadata"]["deactivated"], true);
+            for event in old {
+                crate::events::import_event_impl(&state, event).await;
+            }
+            let repaired: JsonDbFile = serde_json::from_value(
+                serde_json::to_value(&state.store.lock().await.data).unwrap(),
+            )
+            .unwrap();
+            let (restarted, _dir2) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: repaired,
+                redis_connection: None,
+            });
+            ensure_history_ready(&restarted).await.unwrap();
+            let store = restarted.store.lock().await;
+            let candidates = store.get_candidates().unwrap();
+            assert_eq!(candidates[controller].len(), 2);
+            for event in candidates[controller]
+                .iter()
+                .chain(store.get_events(controller).iter())
+            {
+                assert_eq!(
+                    event.time,
+                    event.operation["proof"]["created"].as_str().unwrap()
+                );
+                assert_eq!(event.ordinal, Some(vec![42]));
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn hyperswarm_proof_time_is_independent_of_receipts_and_arrival_order() {
         let vectors: Value = serde_json::from_str(include_str!(
             "../../../../tests/gatekeeper/hyperswarm-time-vectors.json"
@@ -1080,7 +1193,7 @@ mod tests {
                         }
                         let store = state.store.lock().await;
                         for event in &store.data.dids[controller.rsplit(':').next().unwrap()] {
-                            assert_eq!(event.time, time);
+                            assert_eq!(event.time, event.operation["proof"]["created"].as_str().unwrap());
                         }
                     }
                 }

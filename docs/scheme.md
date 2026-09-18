@@ -481,7 +481,10 @@ first operation whose proof time exceeds the cutoff. Do not sort operations by
 proof time or skip an excluded predecessor to apply a successor with an earlier
 claimed time. The same proof time supplies Hyperswarm `updated` and `deleted`
 metadata; genesis `created` continues to come from the creation operation.
-Stored receipt times are retained as event evidence and are not rewritten.
+The Hyperswarm mediator assigns proof time to `event.time`. Gatekeeper normalizes
+older/imported Hyperswarm envelopes and stored candidates before replay; the
+resolver uses `event.time` uniformly. This corrects envelope timestamps without
+rewriting signed operations, operation IDs, or ordinals.
 
 This rule applies to both accepted proof formats, including legacy proofs whose
 `created` is unsigned. It defines reproducible time selection for the same accepted

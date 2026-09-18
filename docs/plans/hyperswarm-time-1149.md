@@ -8,16 +8,18 @@ without introducing controller-version fields, consensus, timestamp-signing
 requirements, backdating safeguards, or a new protocol version. #1185 remains an
 optional design proposal; #1156 remains paused.
 
-For each event whose registry is `hyperswarm`, use `operation.proof.created` for
-`versionTime` comparison and resolved `updated`/`deleted` metadata. Keep creation
+The Hyperswarm mediator sets event time from `operation.proof.created`.
+Gatekeeper normalizes the same field at import and during stored candidate
+recovery, so ordinary event-time resolution supplies `versionTime` selection
+and resolved `updated`/`deleted` metadata. Keep creation
 metadata, local events, and anchored registry timestamps/ordinal rules unchanged.
 Proof timestamps are compared at millisecond precision with offsets accounted for;
 the existing accepted RFC 3339 leap-second grammar is supported in both ports.
 
 `previd` still determines predecessor order. Historical resolution stops at the
 first operation past the cutoff and never applies a successor while omitting its
-predecessor. It does not sort by proof time. Stored event timestamps and signed
-operation bytes are not rewritten. Existing candidate recovery revises projections;
+predecessor. It does not sort by proof time. Hyperswarm envelope timestamps are
+corrected; signed operation bytes, IDs, and ordinals are not rewritten. Existing candidate recovery revises projections;
 there is no additional full-history pass or new per-operation history scan.
 
 This applies to legacy and modern proofs. Legacy proof times remain unsigned.
@@ -61,3 +63,14 @@ that resolution follows a predecessor prefix rather than sorting timestamps.
 
 Temporarily restoring receipt-time selection makes the authorization regressions
 fail. Isolated live TypeScript/Rust HTTP services agree on all 24 timing scenarios.
+
+## Architecture revision
+
+The initial resolver override was replaced after tracing the full event lifecycle;
+see [the architecture review](hyperswarm-time-1149-architecture-review.md).
+Correcting the producer alone cannot repair existing nodes: duplicate imports
+keep their first envelope, and candidate replay would restore old timestamps.
+Import/recovery normalization addresses these concrete paths without another
+startup replay pass. Rust now compares event and cutoff instants at millisecond
+precision, matching TypeScript, instead of comparing timestamp strings. This
+covers existing microsecond proof timestamps and equivalent timezone offsets.
