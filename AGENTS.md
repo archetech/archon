@@ -136,3 +136,9 @@ These rules apply to coding agents working in this repository.
 
 - Validate Rust startup optimizations against an isolated production-scale Redis copy with matching persistence settings, including timestamp-repair and unchanged startups. Build startup search/status views from the complete accepted replay snapshot after publication; exclude candidate-only histories, preserve runtime cache refreshes, and compare canonical histories, counters, and search/query results.
 - When fixing Gatekeeper startup performance, trace both TypeScript and Rust service initialization. Both must consume replay-derived search/status views without immediately repeating full database scans; keep startup benchmark harnesses aligned with the actual service entry points.
+
+- For standards-defined serialization such as RFC 8785, evaluate established libraries before extending a custom serializer. Test raw decimal parsing as well as output formatting; preserve canonical bytes through hashing and storage instead of parsing and re-encoding them.
+
+- Before opening a code PR, run the root lint check as well as relevant builds/tests; fixture-generator scripts are linted by CI even when they are not executed by the test suite.
+
+- Preserve canonicalizer return types: a missing JSON serialization must be rejected before encoding/hashing/storage, while optional undefined object members retain normal JSON omission semantics.

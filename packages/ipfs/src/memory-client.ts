@@ -1,7 +1,7 @@
 import * as jsonCodec from 'multiformats/codecs/json';
 import { ArchonError } from '@didcid/common/errors';
-import { IPFSClient } from './types.js';
-import { generateCID } from './utils.js';
+import { IPFSClient, JSONEncodingOptions } from './types.js';
+import { generateCID, encodeJSON } from './utils.js';
 
 export class BlockNotFoundError extends ArchonError {
     static type = 'Block not found';
@@ -90,8 +90,10 @@ export default class MemoryClient implements IPFSClient {
         yield Uint8Array.from(this.require(cid));
     }
 
-    async addJSON(json: any): Promise<string> {
-        return this.put(jsonCodec.encode(json), json);
+    async addJSON(json: any, options?: JSONEncodingOptions): Promise<string> {
+        const cid = await generateCID(json, options);
+        this.blocks.set(cid, encodeJSON(json, options));
+        return cid;
     }
 
     async getJSON(cid: string): Promise<any> {

@@ -1,8 +1,8 @@
 # Protocol hardening after #1173
 
 Current status (2026-09-18): #1158 and #1159 are complete. #1156 is paused at
-the maintainer's request. #1149 proceeds as a narrow Hyperswarm proof-time fix;
-#1185 controller-version references are optional and not a prerequisite. Keep
+the maintainer's request. #1149 is complete through #1186. #1185 controller-version references were
+closed as not planned; #1180 RFC 8785 alignment is in progress. Keep
 independent work in separate PRs from main; do not merge without instruction.
 
 ## Work and acceptance criteria
@@ -15,7 +15,7 @@ independent work in separate PRs from main; do not merge without instruction.
 - [ ] #1156: Paused after the key-permission audit. 276 active agents lacked
   `capabilityInvocation`; migration/enforcement remains undecided. Do not resume
   implementation or activate a new protocol version without instruction.
-- [ ] #1149 (implementation under review): Use each Hyperswarm operation's
+- [x] #1149 (merged in #1186): Use each Hyperswarm operation's
   `proof.created` for historical cutoffs and update/deletion metadata, keeping
   `previd` ordering, operation bytes, and ordinals. Correct event envelopes in
   the mediator and Gatekeeper import/recovery, keeping resolution registry-neutral. Cover controller rotation/deletion,
@@ -24,11 +24,12 @@ independent work in separate PRs from main; do not merge without instruction.
   See [the decision and production replay results](hyperswarm-time-1149.md).
 - [ ] #1160: Consolidate established transition rules. Update relevant timing
   documentation with #1149, without inventing additional acceptance restrictions.
-- [ ] #1180 (separate): Investigate broader TypeScript/Rust CID serialization
-  alignment; the earlier Rust predecessor repair did not align generated IDs.
-- [ ] #1185 (optional design): Explicit controller-version references. Proof time
-  already selects a controller version indirectly; this proposal is not needed
-  to remove the node-local timestamp dependency in #1149.
+- [ ] #1180 (implementation in progress): RFC 8785 in both ports, including
+  UTF-16 code-unit ordering. Production audit found no affected genesis or
+  signing bytes, and three numeric-key updates on two assets. Preserve existing
+  content-backed aliases and test fresh-node import. See [audit and validation](canonicalization-1180.md).
+- [x] #1185: Closed as not planned after #1186 addressed the motivating defect.
+  Explicit controller-version references can be reconsidered for a concrete need.
 
 ## Validation and constraints
 

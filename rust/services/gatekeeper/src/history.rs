@@ -2556,4 +2556,49 @@ mod tests {
             2
         );
     }
+    #[tokio::test]
+    async fn signed_jcs_generation_import_and_restart() {
+        let vectors: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/canonicalization-vectors.json"
+        )).unwrap();
+        for v in vectors["signed"].as_array().unwrap() {
+            let operations = v["operations"].as_array().unwrap();
+            let did = v["did"].as_str().unwrap();
+            for (index, operation) in operations.iter().enumerate() {
+                assert_eq!(generate_json_cid(operation).unwrap(), v["cids"][index]);
+            }
+            let (direct, _dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None,
+            });
+            for op in operations {
+                crate::events::handle_did_operation(&direct, op).await.unwrap();
+            }
+            let (state, _dir) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None,
+            });
+            for index in [2, 1, 0] {
+                let op = &operations[index];
+                crate::events::import_event_impl(&state, crate::value_to_event_record(&json!({
+                    "operation": op, "registry": "hyperswarm", "time": op["proof"]["created"]
+                }))).await;
+            }
+            *state.history_ready.lock().await = false;
+            *state.candidate_history.lock().await = None;
+            ensure_history_ready(&state).await.unwrap();
+            let doc = crate::resolve_local_doc_async(&state, did, crate::ResolveOptions {
+                verify: true, ..Default::default()
+            }).await.unwrap();
+            assert_eq!(doc["didDocumentData"], operations[2]["doc"]["didDocumentData"]);
+            assert_eq!(doc["didDocumentMetadata"]["versionId"], v["cids"][2]);
+            let op = &operations[3];
+            crate::events::import_event_impl(&state, crate::value_to_event_record(&json!({
+                "operation": op, "registry": "hyperswarm", "time": op["proof"]["created"]
+            }))).await;
+            let doc = crate::resolve_local_doc_async(&state, did, crate::ResolveOptions {
+                verify: true, ..Default::default()
+            }).await.unwrap();
+            assert_eq!(doc["didDocumentMetadata"]["deactivated"], true);
+        }
+    }
+
 }

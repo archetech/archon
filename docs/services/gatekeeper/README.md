@@ -473,9 +473,27 @@ npm package, which implements RFC 8785 JSON Canonicalization Scheme (JCS):
 
 The Rust implementation in
 [rust/services/gatekeeper/src/proofs.rs](../../../rust/services/gatekeeper/src/proofs.rs)
-implements the subset sufficient for operation payloads (sorted keys, no
-whitespace, basic escaping). It is verified byte-for-byte against the TS
-output via the deterministic-vectors fixture.
+uses [`serde_json_canonicalizer`](https://docs.rs/serde_json_canonicalizer/)
+for RFC 8785 serialization, with `serde_json`'s `float_roundtrip` parser feature.
+Both implementations use UTF-16 code-unit key ordering and binary64/ECMAScript
+number formatting. Shared `canonicalization-vectors.json` fixtures cover byte
+encoding, operation CIDs, signed genesis and successors, and both proof suites.
+
+Operation CIDs hash the UTF-8 canonical bytes directly, including the complete
+proof, using SHA-256 and JSON multicodec `0x0200`. The canonical string MUST NOT
+be parsed and re-serialized by an ordinary JSON codec before hashing or storage:
+JavaScript would reorder integer-index property names. TS requests canonical
+encoding for operation blocks explicitly; generic JSON/IPFS uploads retain their
+existing encoding behavior. Canonical input must contain well-formed Unicode
+and finite numbers.
+
+Previously generated TS numeric-key operation references remain supported through
+the existing content-backed predecessor alias cache. Both ports derive that old
+reference from the complete operation when retaining evidence, so a fresh node
+can recover signed legacy predecessors without trusting a peer's claimed `opid`.
+Signed fields are not rewritten. No legacy-genesis naming mode or old Rust
+signature-serialization fallback is introduced; the production audit found no
+such exposure. See [the #1180 audit and validation](../../plans/canonicalization-1180.md).
 
 A new implementation MAY use any canonical-JSON library that matches the
 fixture output. Recommended: a JCS-compliant library where one exists.

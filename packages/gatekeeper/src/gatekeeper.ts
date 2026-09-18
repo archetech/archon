@@ -477,13 +477,11 @@ export default class Gatekeeper implements GatekeeperInterface {
             ? this.replayOperationIds : undefined;
         const cached = cache?.get(operation as object);
         if (cached) return cached;
-        const canonical = this.cipher.canonicalizeJSON(operation);
-
         if (save) {
-            return this.ipfs.addJSON(JSON.parse(canonical));
+            return this.ipfs.addJSON(operation, { canonical: true });
         }
 
-        const cid = await generateCID(JSON.parse(canonical));
+        const cid = await generateCID(operation, { canonical: true });
         cache?.set(operation as object, cid);
         return cid;
     }
@@ -1535,6 +1533,15 @@ export default class Gatekeeper implements GatekeeperInterface {
         const cid = await this.generateCID(event.operation);
         if (event.opid !== cid && !this.candidateHistory?.[event.did ?? '']?.some(known => known.opid === cid)) {
             await this.generateCID(event.operation, true);
+        }
+        // Keep the existing content-backed predecessor alias mechanism usable
+        // on a fresh node too. Derive the former TS CID from the complete proof
+        // and operation, never from an untrusted envelope's claimed opid.
+        const canonical = this.cipher.canonicalizeJSON(event.operation);
+        const legacy = JSON.parse(canonical);
+        if (JSON.stringify(legacy) !== canonical) {
+            const alias = await generateCID(legacy);
+            if (!await this.db.getOperation(alias)) await this.db.addOperation(alias, event.operation);
         }
         event.opid = cid;
     }

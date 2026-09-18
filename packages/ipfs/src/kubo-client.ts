@@ -4,7 +4,8 @@ import { CID } from 'multiformats/cid';
 import * as jsonCodec from 'multiformats/codecs/json';
 import * as sha256 from 'multiformats/hashes/sha2';
 import ip from 'ip';
-import { IPFSClient } from './types.js';
+import { encodeJSON } from './utils.js';
+import { IPFSClient, JSONEncodingOptions } from './types.js';
 
 interface KuboClientConfig {
     url: string;
@@ -121,9 +122,9 @@ class KuboClient implements IPFSClient {
         return this.ipfs.cat(cid);
     }
 
-    async addJSON(json: any): Promise<string> {
+    async addJSON(json: any, options?: JSONEncodingOptions): Promise<string> {
         // Encode the JSON data using jsonCodec
-        const buf = jsonCodec.encode(json);
+        const buf = encodeJSON(json, options);
         const hash = await sha256.sha256.digest(buf);
         const cid = CID.createV1(jsonCodec.code, hash);
 
