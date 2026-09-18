@@ -5,7 +5,7 @@ import * as jsonCodec from 'multiformats/codecs/json';
 import * as rawCodec from 'multiformats/codecs/raw';
 import * as sha256 from 'multiformats/hashes/sha2';
 
-const canonicalize = canonicalizeModule as unknown as (input: unknown) => string;
+const canonicalize = canonicalizeModule as unknown as (input: unknown) => string | undefined;
 
 export function isValidCID(cid: any): boolean {
     try {
@@ -51,7 +51,11 @@ export function encodeJSON(data: any, options?: JSONEncodingOptions): Uint8Array
         }
     }
     validateUnicode(data);
-    return new TextEncoder().encode(canonicalize(data));
+    const canonical = canonicalize(data);
+    if (canonical === undefined) {
+        throw new Error('Value has no JSON serialization');
+    }
+    return new TextEncoder().encode(canonical);
 }
 
 export async function generateCID(data: any, options?: JSONEncodingOptions): Promise<string> {

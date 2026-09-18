@@ -112,3 +112,14 @@ it('rejects non-I-JSON strings and numbers on the canonical JSON path', async ()
     }
     await expect(ipfs.addJSON({ text: '😀' }, { canonical: true })).resolves.toMatch(/^bagaaie/);
 });
+
+it('rejects missing canonical serialization but preserves JSON null and field omission', async () => {
+    const ipfs = new MemoryClient();
+    for (const value of [undefined, () => {}, Symbol('invalid')]) {
+        await expect(ipfs.addJSON(value, { canonical: true })).rejects.toThrow('Value has no JSON serialization');
+    }
+    for (const [value, expected] of [[null, null], [{ optional: undefined }, {}]]) {
+        const cid = await ipfs.addJSON(value, { canonical: true });
+        expect(await ipfs.getJSON(cid)).toEqual(expected);
+    }
+});

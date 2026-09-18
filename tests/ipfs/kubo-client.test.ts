@@ -437,3 +437,11 @@ it('stores RFC 8785 bytes without reordering numeric object keys', async () => {
     expect(options.cid.toString()).toBe(cid);
     expect(await client.addJSON(value)).not.toBe(cid);
 });
+
+it('rejects missing canonical serialization before writing a block', async () => {
+    const { client, rpc } = await connected();
+    for (const value of [undefined, () => {}, Symbol('invalid')]) {
+        await expect(client.addJSON(value, { canonical: true })).rejects.toThrow('Value has no JSON serialization');
+    }
+    expect(rpc.block.put).not.toHaveBeenCalled();
+});
