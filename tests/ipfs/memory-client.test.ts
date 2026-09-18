@@ -107,7 +107,7 @@ describe('MemoryClient', () => {
 
 it('rejects non-I-JSON strings and numbers on the canonical JSON path', async () => {
     const ipfs = new MemoryClient();
-    for (const value of [{ text: '\ud800' }, { ['\udfff']: true }, { n: NaN }, { n: Infinity }]) {
+    for (const value of [{ text: '\ud800' }, { '\udfff': true }, { n: NaN }, { n: Infinity }]) {
         await expect(ipfs.addJSON(value, { canonical: true })).rejects.toThrow();
     }
     await expect(ipfs.addJSON({ text: '😀' }, { canonical: true })).resolves.toMatch(/^bagaaie/);

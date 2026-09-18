@@ -138,3 +138,5 @@ These rules apply to coding agents working in this repository.
 - When fixing Gatekeeper startup performance, trace both TypeScript and Rust service initialization. Both must consume replay-derived search/status views without immediately repeating full database scans; keep startup benchmark harnesses aligned with the actual service entry points.
 
 - For standards-defined serialization such as RFC 8785, evaluate established libraries before extending a custom serializer. Test raw decimal parsing as well as output formatting; preserve canonical bytes through hashing and storage instead of parsing and re-encoding them.
+
+- Before opening a code PR, run the root lint check as well as relevant builds/tests; fixture-generator scripts are linted by CI even when they are not executed by the test suite.
