@@ -64,7 +64,7 @@ pub(crate) fn verify_event_shape(event: &Value) -> bool {
     let Some(operation) = event.get("operation") else {
         return false;
     };
-    if exceeds_json_size(operation, 64 * 1024) {
+    if exceeds_operation_size(operation) {
         return false;
     }
     if !verify_proof_format(operation.get("proof")) {
@@ -148,28 +148,66 @@ fn verify_did_format(did: &str) -> bool {
     did.starts_with("did:")
 }
 
+// Version 1 measures JSON.stringify(operation).length, including the proof:
+// UTF-16 code units after JSON escaping, not UTF-8 bytes. Count without building
+// the serialized operation, and stop as soon as the fixed budget is exhausted.
+const MAX_OPERATION_CODE_UNITS: usize = 65_536;
+
+fn exceeds_operation_size(operation: &Value) -> bool {
+    exceeds_json_size(operation, MAX_OPERATION_CODE_UNITS)
+}
+
 fn exceeds_json_size(value: &Value, limit: usize) -> bool {
-    struct LimitWriter {
-        count: usize,
-        limit: usize,
-    }
-
-    impl std::io::Write for LimitWriter {
-        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-            self.count = self.count.saturating_add(buf.len());
-            if self.count > self.limit {
-                return Err(std::io::Error::other("json size limit exceeded"));
+    fn take(remaining: &mut usize, count: usize) -> bool {
+        match remaining.checked_sub(count) {
+            Some(next) => {
+                *remaining = next;
+                true
             }
-            Ok(buf.len())
-        }
-
-        fn flush(&mut self) -> std::io::Result<()> {
-            Ok(())
+            None => false,
         }
     }
 
-    let mut writer = LimitWriter { count: 0, limit };
-    serde_json::to_writer(&mut writer, value).is_err()
+    fn string(value: &str, remaining: &mut usize) -> bool {
+        take(remaining, 2)
+            && value.chars().all(|ch| {
+                let count = match ch {
+                    '\"' | '\\' | '\u{0008}' | '\u{000c}' | '\n' | '\r' | '\t' => 2,
+                    '\u{0000}'..='\u{001f}' => 6,
+                    _ => ch.len_utf16(),
+                };
+                take(remaining, count)
+            })
+    }
+
+    fn visit(value: &Value, remaining: &mut usize) -> bool {
+        match value {
+            Value::Null => take(remaining, 4),
+            Value::Bool(v) => take(remaining, if *v { 4 } else { 5 }),
+            // JSON.parse uses binary64 numbers, and JSON.stringify uses
+            // ECMAScript number formatting (e.g. 1.0 -> 1, 1e-6 -> 0.000001).
+            // This affects size only; operation CID/signature rules are unchanged.
+            Value::Number(v) => {
+                let mut buffer = ryu_js::Buffer::new();
+                take(remaining, buffer.format(v.as_f64().unwrap()).len())
+            }
+            Value::String(v) => string(v, remaining),
+            Value::Array(items) => {
+                take(remaining, 2 + items.len().saturating_sub(1))
+                    && items.iter().all(|v| visit(v, remaining))
+            }
+            Value::Object(map) => {
+                // Member order changes no lengths. Include commas and colons.
+                take(remaining, 2 + map.len().saturating_sub(1) + map.len())
+                    && map
+                        .iter()
+                        .all(|(k, v)| string(k, remaining) && visit(v, remaining))
+            }
+        }
+    }
+
+    let mut remaining = limit;
+    !visit(value, &mut remaining)
 }
 
 pub(crate) fn verify_date_format(time: Option<&str>) -> bool {
@@ -398,7 +436,7 @@ pub(crate) fn verify_create_operation_impl(
     if operation.is_null() {
         anyhow::bail!("Invalid operation: missing");
     }
-    if exceeds_json_size(operation, 64 * 1024) {
+    if exceeds_operation_size(operation) {
         anyhow::bail!("Invalid operation: size");
     }
     if operation.get("type").and_then(Value::as_str) != Some("create") {
@@ -521,7 +559,7 @@ pub(crate) fn verify_update_operation_impl(
     operation: &Value,
     doc: &Value,
 ) -> Result<bool> {
-    if exceeds_json_size(operation, 64 * 1024) {
+    if exceeds_operation_size(operation) {
         anyhow::bail!("Invalid operation: size");
     }
     if !verify_proof_format(operation.get("proof")) {
@@ -889,4 +927,61 @@ mod operation_proofs {
             operation_message_hash(&legacy_moved).expect("hash")
         );
     }
+}
+
+#[cfg(test)]
+mod operation_size_vectors {
+    use super::*;
+
+    #[test]
+    fn v1_size_matches_javascript_boundaries_and_serialization() {
+        let vectors: Value = serde_json::from_str(include_str!(
+            "../../../../tests/gatekeeper/operation-size-v1-vectors.json"
+        ))
+        .unwrap();
+        for case in vectors["cases"].as_array().unwrap() {
+            let operation = expand_size_vector(case);
+            let units = case["units"].as_u64().unwrap() as usize;
+            assert!(!exceeds_json_size(&operation, units), "{}", case["name"]);
+            assert!(exceeds_json_size(&operation, units - 1), "{}", case["name"]);
+            assert_eq!(
+                !exceeds_json_size(&operation, MAX_OPERATION_CODE_UNITS),
+                case["accepted"].as_bool().unwrap()
+            );
+        }
+        // Match TypeScript even where the old Rust serializer used shorter
+        // exponent notation. A fallback to the old byte count would reintroduce
+        // the cross-port disagreement this repair is intended to remove.
+        for case in vectors["numericBoundaries"].as_array().unwrap() {
+            let number: Value = serde_json::from_str(case["json"].as_str().unwrap()).unwrap();
+            let value = serde_json::json!({
+                "values": vec![number; case["repeat"].as_u64().unwrap() as usize]
+            });
+            let units = case["units"].as_u64().unwrap() as usize;
+            assert!(serde_json::to_vec(&value).unwrap().len() < MAX_OPERATION_CODE_UNITS);
+            assert!(exceeds_operation_size(&value));
+            assert!(!exceeds_json_size(&value, units));
+            assert!(exceeds_json_size(&value, units - 1));
+        }
+        for case in vectors["measurements"].as_array().unwrap() {
+            let value: Value = serde_json::from_str(case["json"].as_str().unwrap()).unwrap();
+            let units = case["units"].as_u64().unwrap() as usize;
+            assert!(!exceeds_json_size(&value, units), "{}", case["json"]);
+            assert!(exceeds_json_size(&value, units - 1), "{}", case["json"]);
+        }
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn expand_size_vector(case: &Value) -> Value {
+    let mut operation = case["operation"].clone();
+    let padding = &case["padding"];
+    operation["sizePadding"] = Value::String(
+        padding["character"]
+            .as_str()
+            .unwrap()
+            .repeat(padding["repeat"].as_u64().unwrap() as usize)
+            + &"a".repeat(padding["ascii"].as_u64().unwrap() as usize),
+    );
+    operation
 }
