@@ -42,15 +42,92 @@ did-url = did-cid path-abempty [ "?" query ] [ "#" fragment ]
 
 ![](./did-lifecycle.png)
 
-All `did:cid` DIDs begin life anchored to IPFS. Once created they can be used immediately by any application or service connected to a node. Subsequent updates to the DID (meaning that a document associated with the DID changes) are registered on a registry such as a blockchain (BTC, ETH, etc) or a decentralized database (e.g. hyperswarm). The registry is specified at DID creation so that nodes can determine which single source of truth to check for updates.
+All `did:cid` DIDs begin life anchored to IPFS. Once created they can be used immediately by any application or service connected to a node. Subsequent updates to the DID (meaning that a document associated with the DID changes) are registered on a registry such as a blockchain (BTC, ETH, etc) or a decentralized database (e.g. hyperswarm). Creation selects the initial registry. An authorized registry-migration update changes the registry for subsequent operations; the migration itself is confirmed on the previous registry. Nodes derive their best current history from available evidence, as specified in [DID state transitions](#did-state-transitions).
 
-The *key concept of this design* is that DID creation is decentralized through IPFS, and DID updates are decentralized through the registry specified in the DID creation. The DID is decentralized for its whole lifecycle, which is a hard requirement of DIDs.
+The *key concept of this design* is that DID creation is decentralized through IPFS, and DID updates are decentralized through the registry selected by the accepted predecessor state. The DID is decentralized for its whole lifecycle, which is a hard requirement of DIDs.
+
+## DID State Transitions
+
+This section defines the current version-1 transition contract shared by creation,
+update, deletion, and resolution. It consolidates existing behavior; it does not
+activate a new protocol version or the proposed key-permission policy in #1156.
+The detailed [authorization cutoff rules](#authorizing-an-operation-on-a-controlled-did)
+and [registration validation](#registration-validation) apply to every transition.
+
+### Transition table
+
+| Transition | Predecessor and authority | Result | Registry for confirmation |
+| --- | --- | --- | --- |
+| Create agent | No predecessor state. Verify the creation proof with `publicJwk`; the proof names `#key-1`. An explicit creation `controller` is invalid. | Derive the DID from the complete canonical creation operation; initialize an agent document with its key. The agent controls itself. | Initial `registration.registry`. Genesis is resolvable from its seed before registry publication. |
+| Create asset | No predecessor state. The named controller must resolve to an active, self-controlled agent at the authorization cutoff; its named key signs the creation. A local-only controller cannot create a non-local asset. | Derive the DID from the complete canonical creation operation; initialize its owner and data. | Initial `registration.registry`, with the same seed availability rule. |
+| Update agent | `previd` identifies the selected target predecessor. Verify with the named key in that predecessor's agent document. | Apply supplied components as whole replacements. The resulting document must keep its DID and may omit `controller` or name only itself. | Registry in the predecessor's registration. |
+| Update asset / transfer ownership | `previd` identifies the asset predecessor. Its previous owner signs, using the controller document selected at the authorization cutoff. A different new owner must also be an active, self-controlled agent at that cutoff; no new-owner countersignature is required. | Apply supplied components as whole replacements. The resulting document must keep its DID and name one agent owner. | Registry in the asset predecessor's registration. |
+| Migrate registry | An update subject to the same agent/asset authorization and predecessor checks, supplying a complete replacement registration. | Change the registry used by subsequent operations; preserve genesis version, kind, and prefix. | The **old** registry confirms the migration; the **new** registry confirms its successors. |
+| Delete agent or asset | `previd` identifies an active predecessor; the same authority selection as an update applies. | Set `deactivated: true`, reduce `didDocument` to `{ id }`, clear data to `{}`, retain registration, and omit `updated`. No valid successor can extend this deletion. | Registry in the predecessor's registration. |
+
+`previd` identifies the previous **operation**, including its proof, not a hash of
+the resolved document set. The [operation identity rules](#operation-identity-and-retrieval-references)
+define canonical CIDs and content-backed legacy aliases. Direct updates/deletions
+must reference the current accepted head before storage or queue writes. Imports
+may consider an earlier predecessor and replace a competing branch under the
+existing registry/ordinal selection rules; an unavailable predecessor remains
+pending. A signature alone does not establish that its branch wins.
+
+### Component replacement and immutable fields
+
+An update supplies one or more of `didDocument`, `didDocumentData`, and
+`didDocumentRegistration`. An omitted component retains its predecessor value;
+a supplied component replaces that entire component. There is no recursive or
+field-level merge. For example, replacing `didDocument` without its previous
+`service` member removes those services, whereas a data-only update preserves
+the entire DID document. Resolver-generated metadata is not a writable component.
+
+The DID and genesis operation remain fixed. Every resulting DID document retains
+its `id`; every replacement registration retains genesis `version`, `type`, and
+prefix presence/value. A registration replacement must contain all required
+fields: omitting the whole component is allowed, but omitting `type` inside a
+supplied replacement is not. Registry, expiry, and extension fields can change
+through a valid complete registration replacement.
+
+Current validation accepts an owner-signed update that places public keys in an
+asset DID document's `verificationMethod` field. Gatekeeper does not use those
+asset keys to authorize changes to the asset: it uses the owning agent's document.
+This describes accepted document content, not a recommendation or a new asset
+signing capability. Assets cannot own assets, and agents cannot
+assign external controllers. "Assets do not have keys" is not a prohibition on
+publishing key material.
+
+### Version, validity, and local retention
+
+Only registration version 1 is currently accepted. Replacement registration
+cannot opt an existing DID into another version. Stricter operation-key
+relationships remain a separate, paused compatibility decision (#1156): current
+operation verification selects the named key from `verificationMethod` and does
+not require membership in `capabilityInvocation`. Credential proof-purpose checks
+are separate. Likewise, the version-1 size rule remains the existing limit of
+65,536 UTF-16 code units in the compact JSON serialization, not a newly imposed
+UTF-8 byte limit (#1159).
+
+`validUntil`, when supplied, must have the accepted RFC 3339 string form. A valid
+registration replacement can change or omit it. Current Gatekeepers use expiry
+for node garbage collection; they do not add a wall-clock expiry check to each
+operation's authorization or resolution. GC removal is local retention behavior,
+not a signed deletion or a consensus transition. Successful GC also clears the
+active deferred queue while preserving batch-ingress deduplication for that
+process. Candidate evidence for DIDs that are not removed remains available for
+replay. GC timing must not be interpreted as proof that an operation is invalid.
+
+Deletion is terminal **on the accepted branch**. Newly available controller or
+anchor evidence can invalidate that branch, including its deletion, and replay
+may then resolve an active version. This is revalidation of evidence, not an
+operation that revives a validly deleted DID. `confirmed` records registry
+confirmation under the current accepted history, not irrevocable authorization.
 
 ## DID Creation
 
 DIDs are anchored to IPFS prior to any declaration on a registry. This allows DIDs to be created very quickly (less than 10 seconds) and at (virtually) no cost.
 
-The `did:cid` method supports two main types of DID Subject: **agents** and **assets**. Agents have keys and control assets. Agents are self-controlled: an update cannot assign an external controller. Assets do not have keys, and are controlled by a single agent (the owner of the asset); an asset cannot own another asset. The two types have slightly different creation methods.
+The `did:cid` method supports two main types of DID Subject: **agents** and **assets**. Agents have keys and control assets. Agents are self-controlled: an update cannot assign an external controller. Assets are controlled by a single agent (the owner of the asset); publishing keys on an asset does not grant it independent authority, and an asset cannot own another asset. The [transition table](#transition-table) defines both creation paths. The two types have slightly different creation methods.
 
 ### Agents
 
@@ -65,7 +142,7 @@ To create an agent DID, the client must sign and submit a "create" operation to 
     1. `registration` metadata includes:
         1. `version`  number, e.g. 1
         1. `type`  must be "agent"
-        1. `registry`  (from a list of valid registries, e.g. "BTC", "hyperswarm", etc.)
+        1. `registry`  (a valid registry name, e.g. "BTC:mainnet" or "hyperswarm"; see [registration validation](#registration-validation))
     1. `publicJwk` is the public key in JWK format. It must be a secp256k1 key:
        `kty` is `"EC"`, `crv` is `"secp256k1"`, and `x` and `y` are each the
        base64url encoding of a 32-byte coordinate. A node rejects the operation
@@ -126,7 +203,7 @@ To create an asset DID, the client must sign and submit a `create` operation to 
     1. `registration` metadata includes:
         1. `version`  number, e.g. 1
         1. `type`  must be "asset"
-        1. `registry`  (from a list of valid registries, e.g. "BTC", "hyperswarm", etc.)
+        1. `registry`  (a valid registry name, e.g. "BTC:mainnet" or "hyperswarm"; see [registration validation](#registration-validation))
     1. `controller` specifies the DID of the owner/controller of the new DID
     1. `data` can contain any data in JSON format, as long as it is not empty
     1. `created` time in ISO format
@@ -171,7 +248,7 @@ For example, the operation above that specifies an empty Credential asset corres
 
 ## DID Update
 
-A DID Update is a change to any of the documents associated with the DID. To initiate an update the client must sign an operation that includes the following fields:
+A DID Update applies the [transition table](#transition-table) and [component replacement rules](#component-replacement-and-immutable-fields) to the documents associated with the DID. To initiate an update the client must sign an operation that includes the following fields:
 
 1. Create an operation object with these fields in any order:
     1. `type` must be set to "update"
@@ -232,7 +309,7 @@ Example update to rotate keys for an agent DID:
 
 Upon receiving the operation the node must:
 1. Verify the proof is valid for the controller of the DID — for an asset, against the version of the controller's document chosen as described in [Authorizing an operation on a controlled DID](#authorizing-an-operation-on-a-controlled-did).
-1. Validate the resulting controller relationship: agents may omit `didDocument.controller` or name only their own DID; assets must name an existing, active, self-controlled agent. Transfers are signed by the previous owner. The DID kind is fixed by its creation operation. Updates cannot change `type`; registry-only metadata updates may omit it without changing the DID kind.
+1. Validate the resulting controller relationship: agents may omit `didDocument.controller` or name only their own DID; assets must name an existing, active, self-controlled agent. Transfers are signed by the previous owner. The DID kind is fixed by its creation operation. Updates cannot change `type`; omitting the registration component preserves it, while supplying a replacement requires its version, type, and registry.
 1. Verify the previd is identical to the latest version's operation CID.
 1. Record the operation on the DID specified registry (or forward the request to a trusted node that supports the specified registry).
 
@@ -240,7 +317,7 @@ For registries such as BTC with non-trivial transaction costs, it is expected th
 
 ## DID Revocation
 
-Revoking a DID is a special kind of Update that results in the termination of the DID. Revoked DIDs cannot be updated because they have no current controller, therefore they cannot be recovered once revoked. Revoked DIDs can be resolved without error, but resolvers will return a result with the `didDocumentMetadata.deactivated` property set to `true`. The `didDocument` is reduced to just its `id`, and the DID's data resource (dereferenced at `/data`) is empty.
+Revoking a DID applies the delete row of the [transition table](#transition-table). A valid deletion terminates its accepted branch: no update may extend it. Later evidence may invalidate that branch and its deletion, as described under [validity and local retention](#version-validity-and-local-retention). Revoked DIDs can be resolved without error, but resolvers will return a result with the `didDocumentMetadata.deactivated` property set to `true`. The `didDocument` is reduced to just its `id`, and the DID's data resource (dereferenced at `/data`) is empty.
 
 To revoke a DID, the client must sign and submit a `delete` operation to a node.
 
@@ -299,44 +376,47 @@ The metadata has a `deactivated` field set to `true` to conform to the [W3C spec
 
 Resolution is the operation of returning a DID Document and its metadata for a given DID. It is distinct from *dereferencing*, which returns a resource identified by a DID URL (see [DID URL Dereferencing](#did-url-dereferencing)).
 
-Given a DID and an optional resolution time, the resolver retrieves the associated document seed from IPFS using the DID suffix as the CID, parsing it as plaintext JSON.
-If the data cannot be retrieved, then the resolver should delegate the resolution request to a fallback node.
-Otherwise, if the data can be retrieved but is not a valid seed document, an error is returned immediately.
-Once returned and validated, the resolver then evaluates the JSON to determine whether it is a known type (an agent or an asset). If it is not a known type an error is returned.
+Resolution reads the accepted predecessor-linked history reconstructed from
+available candidates. It generates the initial document from the creation seed,
+then applies the [transition table](#transition-table) in predecessor order.
+Registry migration is part of that history; resolution is not restricted to the
+registry named at creation, and ordinals from different registries are not a
+global ordering. The node's supported-registry list limits local submission and
+queueing, not the registry names it may validate in imported history.
 
-If we get this far, the resolver then looks up the DID's specified registry in its document seed. If the node does not support the registry (meaning the node is not actively monitoring the registry for updates), then it must forward the resolution request to a trusted node that does support the registry. If the node is not configured with any trusted nodes for the specified registry, then it must forward the request to a trusted fallback node to handle unknown registries.
+With verification requested, the resolver checks each selected operation's
+predecessor, resulting controller/registration constraints, and signature against
+the selected authority. A failed verification returns an error; it does not
+silently skip an invalid operation and apply its successors. This is the shared
+event-authorization contract, not a claim of general DID-document schema validation.
 
-If the node does support the specified registry, the resolver retrieves all update records from its local database that are keyed to the DID, and ordered by each update's ordinal key. The ordinal key is a set of values that can be used to sort the updates into chronological order. For example, the ordinal key for the BTC registry will be a tuple `{block index, transaction index, batch index}`.
+`versionSequence` and `versionTime` select a prefix of accepted history. Historical
+updates use event time, with Hyperswarm envelopes normalized to `proof.created`;
+controller authorization additionally uses the registry-local ordinal cutoff
+where applicable. Stop at the first excluded successor; do not sort by claimed
+proof times. Genesis `created` comes from the creation operation. Confirmed
+resolution stops before an update/deletion not confirmed on its predecessor's
+registry. See the [Gatekeeper resolution algorithm](services/gatekeeper/README.md#6-did-resolution-algorithm)
+for exact cutoff and metadata rules.
 
-The document is then generated by creating an initial version of the document from the document seed, then applying valid updates. In the case of an agent DID, a new DID document is created that includes the public key and the DID as the initial controller. In the case of the asset, a new DID document is created that references the controller and includes the asset data in `didDocumentData`.
-
-If verification is requested, each update operation is validated by:
-
-1. verifying that the proof was created by the controller of the DID at the time the update was recorded,
-1. verifying that `previd` identifies the previous operation's canonical CID (including the cached retrieval-alias compatibility rule below),
-1. verifying the new version is a valid DID document (schema validation).
-
-If invalid, resolution fails with an error; otherwise the update is applied to the previous document in sequence up to the specified resolution time (if specified) or to the end of the sequence (if no resolution time is specified). The resulting DID document is returned to the requestor.
+Peer fallback, when configured, is an HTTP-layer resolution policy. It does not
+import the peer's events or change local accepted history, and an unsupported
+local registry alone does not require delegating core resolution.
 
 In pseudo-code:
 
 ```
-function resolveDid(did, versionTime=now):
-    get suffix from did
-    use suffix as CID to retrieve document seed from IPFS
-    if fail to retrieve the document seed
-        forward request to a trusted node
-        return
-    look up did's registry in its document seed
-    if did's registry is not supported by this node
-        forward request to a trusted node
-        return
-    generate initial document from anchor
-    retrieve all update operations from did's registry
-    for all updates until versionTime:
-        if verification was not requested or proof and update are valid:
-            apply update to DID document
-    return DID document
+function resolveDid(did, bounds, confirm, verify):
+    wait for startup repair and active history replay
+    read accepted history for did
+    generate initial document from its creation seed
+    if verify: authorize the creation
+    for each successor in predecessor order:
+        if outside bounds: break
+        if confirm and not confirmed on predecessor registry: break
+        if verify and event authorization fails: return an error
+        apply the transition table and generate resolution metadata
+    return the selected document and metadata
 ```
 
 ### Resolution Result
@@ -413,7 +493,7 @@ Dereferencing a `did:cid` DID URL returns a *resource* associated with the DID, 
 
 This method defines two dereferenceable resources, selected by the DID URL path:
 
-- **`/data`** — `did:cid:<cid>/data` dereferences to the DID's data resource: the bare `didDocumentData` object from the internal document set. Agent DIDs have an empty data resource (`{}`); asset DIDs return their attached data. A revoked DID's data resource is empty.
+- **`/data`** — `did:cid:<cid>/data` dereferences to the DID's data resource: the bare `didDocumentData` object from the internal document set. Agent DIDs start with an empty data resource (`{}`); updates may replace it. Asset DIDs start with their creation data. A revoked DID's data resource is empty.
 - **`/registration`** — `did:cid:<cid>/registration` dereferences to the DID's registration/anchoring provenance: the `didDocumentRegistration` object (registry, type, validity, version), plus the anchoring state `confirmed` and, where the registry anchors to a blockchain, `timestamp`. This is method-specific provenance, not W3C DID document metadata, which is why it is dereferenced rather than embedded in `didDocumentMetadata`.
 
 ```json
@@ -493,7 +573,7 @@ can still revise authorization, and competing-branch selection is unchanged.
 An explicit controller-version field (#1185) is not required for this correction
 (#1149).
 
-A proof whose key the controller had retired by the operation's position is rejected. That also rejects an operation genuinely signed before a rotation but committed to the chain after it; the remedy is to sign it again with the current key. An agent's updates to its own document are unaffected: they are verified against its current document.
+A proof whose key the controller had retired by the operation's position is rejected. That also rejects an operation genuinely signed before a rotation but committed to the chain after it; the remedy is to sign it again with the current key. An agent's updates to its own document are verified against the selected predecessor document, including when evaluating competing branches.
 
 Only the registry's own mediator may mark an event confirmed on that registry. An event received from a relaying peer or restored from an export is taken as an unconfirmed hint whatever it claims, and confirms when the node's own mediator imports its chain record. Non-local operations and batch assets are distributed through gossip; a chain reference alone does not guarantee their availability.
 
@@ -526,15 +606,14 @@ node's operation cache may resolve to the same canonical predecessor; neither th
 signed operation nor its `previd` is rewritten. An unknown reference remains
 unresolved. A peer's claimed `opid` alone does not install a retrieval alias.
 
-Rust also derives a TypeScript numeric-key retrieval reference from each known
-operation during candidate import and startup preparation (#1176). TypeScript's
-existing CID path parses canonical JSON and serializes the object again, placing
-integer-index keys in numeric order. Caching this content-derived reference lets
-Rust's existing predecessor check connect a successor signed by TypeScript without
-fetching a block or trusting a claimed `opid`. The signed `previd`, both ports'
-CID generation, and genesis identifiers remain unchanged. This localized repair
-does not address the separate cross-port genesis, number-formatting, or Unicode
-canonicalization differences.
+Both ports now use RFC 8785 canonicalization for operation identity and preserve
+those bytes through hashing and storage (#1180, merged in #1191). They also derive
+the historical TypeScript numeric-key reference from known operation content so
+legacy signed predecessors remain resolvable, including on fresh imports. This
+compatibility reference does not change new canonical IDs or rewrite signed
+operations. The [canonicalization audit](plans/canonicalization-1180.md) found no
+production genesis or signing-byte changes and three operation-ID changes on two
+assets; it does not establish compatibility for every hypothetical legacy seed.
 
 Startup reconstruction canonicalizes stored event IDs and candidate IDs while
 retaining cached retrieval aliases. A complete database backup must include the
