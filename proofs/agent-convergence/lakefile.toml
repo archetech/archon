@@ -1,9 +1,12 @@
 name = "archonAgentConvergence"
 version = "0.1.0"
-defaultTargets = ["AgentConvergence", "Fixtures"]
+defaultTargets = ["AgentConvergence", "Fixtures", "AxiomAudit"]
 
 [[lean_lib]]
 name = "AgentConvergence"
 
 [[lean_lib]]
 name = "Fixtures"
+
+[[lean_lib]]
+name = "AxiomAudit"

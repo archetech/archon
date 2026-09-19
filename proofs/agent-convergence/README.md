@@ -61,10 +61,13 @@ metadata become identical.
 `suffix_complete` proves that the explicit level assumption prevents this bound
 from hiding further eligible successors. `Complete` itself has no fuel parameter.
 
-The printed axiom audit for the main theorems contains only `propext` and
-`Quot.sound`, standard Lean logical axioms. There are no project axioms, admitted
-proofs, or `native_decide` shortcuts. Both modules treat warnings as errors, so
-unfinished proofs fail the build. Concrete examples use kernel-checked `decide`.
+The main theorems depend only on `propext` and `Quot.sound`, standard Lean logical
+axioms. `AxiomAudit.lean` is a default build target: it uses Lean's transitive
+axiom collector to reject any dependency outside that allowlist. The audit is
+therefore enforced by `lake build`, not just printed for manual inspection.
+There are no project axioms, admitted proofs, or `native_decide` shortcuts. All
+Lean modules treat warnings as errors, so unfinished proofs fail the build.
+Concrete examples use kernel-checked `decide`.
 
 ## Relationship to Gatekeeper
 
@@ -85,10 +88,12 @@ this same bounded domain, before claiming either implementation formally verifie
 `generate-fixtures.mjs` bridges the existing
 [shared signed fixtures](../../tests/convergence/vectors.json) into Lean:
 
-1. Sort complete canonical CIDs in ASCII order and assign numeric ranks.
-2. Translate predecessors and derive a finite depth witness from the graph.
-3. Generate a checked acyclicity proof for every fixture model.
-4. Generate 420 concrete history equalities for the eligible delivery traces,
+1. Require exactly one genesis, locate its operation index, and require every
+   successor document to contain exactly `didDocumentData`.
+2. Sort complete canonical CIDs in ASCII order and assign numeric ranks.
+3. Translate predecessors and derive a finite depth witness from the graph.
+4. Generate a checked acyclicity proof for every fixture model.
+5. Generate 420 concrete history equalities for the eligible delivery traces,
    using the expected histories already checked by both Gatekeepers.
 
 The bridge excludes chain/foreign-anchor scenarios and controller-fork fixtures.
@@ -109,9 +114,32 @@ cd proofs/agent-convergence
 lake build
 ```
 
-No npm installation or package build is needed. To update the concrete examples
-after changing shared fixtures, run the generator without `--check`, inspect the
-diff, then rebuild. CI checks both fixture freshness and the Lean proof build.
+Those commands check the committed inputs without an npm installation or package
+build. To check the full source-to-proof chain, use the root-pinned npm version
+and regenerate the signed source vectors first:
+
+```sh
+npm ci
+npm run build -w @didcid/common
+npm run build -w @didcid/cipher
+npm run build -w @didcid/ipfs
+node tests/convergence/generate-vectors.mjs
+git diff --exit-code -- tests/convergence/vectors.json
+node --test proofs/agent-convergence/generate-fixtures.test.mjs
+node proofs/agent-convergence/generate-fixtures.mjs --check
+```
+
+Run that block from the repository root. CI performs it before building Lean and
+triggers on the model, generator, input vectors, and package sources. Bridge tests
+cover empty update documents, missing/multiple genesis, and an operation-table
+reordering that must preserve the generated model and every expected history.
+To update concrete examples intentionally, regenerate source vectors, run the
+bridge without `--check`, inspect both diffs, then rebuild.
+
+CI installs Elan 4.2.4 only after checking the archive against the committed
+`elan-v4.2.4-linux-x86_64.sha256`. That digest was matched against the upstream
+GitHub release asset digest and the downloaded archive. An installer-version
+update must also update and verify the committed checksum.
 
 ## Follow-up proof work
 

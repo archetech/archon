@@ -155,3 +155,5 @@ These rules apply to coding agents working in this repository.
 - For provisional sibling ordering, `pin` supplies no chain priority even though it is a supported DID registry. Keep this distinct from the local/Hyperswarm helper used for receipt deduplication; cover pin-only and mixed pin/local imports with signed convergence fixtures.
 
 - Formal convergence work must distinguish a unique canonical projection from proof that the production insertion/replay loop computes it. State graph, authorization, evidence-retention, and CID-abstraction assumptions explicitly; keep a checked bridge to shared signed fixtures, and audit theorem axioms without treating finite examples as a universal implementation proof.
+
+- Proof CI must enforce the documented theorem-axiom allowlist and regenerate signed source vectors before checking the Lean bridge. Validate the bridge’s genesis and update-shape assumptions; do not rely on a fixed operation-table index for genesis.

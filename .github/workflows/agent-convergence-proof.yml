@@ -4,13 +4,25 @@ on:
   pull_request:
     paths:
       - 'proofs/agent-convergence/**'
-      - 'tests/convergence/vectors.json'
+      - 'tests/convergence/**'
+      - 'tests/gatekeeper/hyperswarm-time-vectors.json'
+      - 'packages/common/**'
+      - 'packages/cipher/**'
+      - 'packages/ipfs/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/agent-convergence-proof.yml'
   push:
     branches: [main]
     paths:
       - 'proofs/agent-convergence/**'
-      - 'tests/convergence/vectors.json'
+      - 'tests/convergence/**'
+      - 'tests/gatekeeper/hyperswarm-time-vectors.json'
+      - 'packages/common/**'
+      - 'packages/cipher/**'
+      - 'packages/ipfs/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/agent-convergence-proof.yml'
   workflow_dispatch:
 
@@ -32,11 +44,23 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/archon-elan"
           gh release download v4.2.4 --repo leanprover/elan --pattern elan-x86_64-unknown-linux-gnu.tar.gz --dir "$RUNNER_TEMP/archon-elan"
+          (cd "$RUNNER_TEMP/archon-elan" && sha256sum --check "$GITHUB_WORKSPACE/proofs/agent-convergence/elan-v4.2.4-linux-x86_64.sha256")
           tar -xzf "$RUNNER_TEMP/archon-elan/elan-x86_64-unknown-linux-gnu.tar.gz" -C "$RUNNER_TEMP/archon-elan"
           "$RUNNER_TEMP/archon-elan/elan-init" -y --no-modify-path --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Regenerate signed source vectors
+        run: |
+          npm install --global npm@10.9.2
+          npm ci
+          npm run build -w @didcid/common
+          npm run build -w @didcid/cipher
+          npm run build -w @didcid/ipfs
+          node tests/convergence/generate-vectors.mjs
+          git diff --exit-code -- tests/convergence/vectors.json
       - name: Check shared fixture bridge
-        run: node proofs/agent-convergence/generate-fixtures.mjs --check
+        run: |
+          node --test proofs/agent-convergence/generate-fixtures.test.mjs
+          node proofs/agent-convergence/generate-fixtures.mjs --check
       - name: Check proofs and concrete histories
         working-directory: proofs/agent-convergence
         run: lake build
