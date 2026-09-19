@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { isDeepStrictEqual } from 'node:util';
+import Cipher from '@didcid/cipher/node';
 import Gatekeeper from '@didcid/gatekeeper';
 import DbMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import MemoryClient from '@didcid/ipfs/memory';
@@ -86,7 +88,7 @@ it.each(fixture.controllerForks)('replays asset authorization after a preferred 
 // The same signed operations, with distinct receipts for a single canonical ID.
 type RecordCase = { name: string;
     events: { operation: number; registry: string; ordinal: number[] }[];
-    initial: number[]; expected: number[] };
+    initial: number[]; expected: number[]; replayPasses: number[][] };
 const recordCases: { registry: string; cases: RecordCase[]; replayCases: RecordCase[] } = JSON.parse(readFileSync('tests/convergence/record-cases.json', 'utf8'));
 
 it.each([...recordCases.cases, ...recordCases.replayCases])('settles full event records: $name', async c => {
@@ -113,4 +115,48 @@ it.each([...recordCases.cases, ...recordCases.replayCases])('settles full event 
     g = new Gatekeeper({ db, ipfs });
     await g.resolveDID(v.did, { verify: true });
     expect(await db.getEvents(v.did)).toEqual(expected);
+});
+
+const passCases = [...recordCases.cases, ...recordCases.replayCases].flatMap(c => [
+    { ...c, phase: 'cold', seed: [], passes: c.replayPasses },
+    ...(recordCases.cases.includes(c) ? [{ ...c, phase: 'warm', seed: c.initial, passes: [c.expected] }] : []),
+]);
+
+it.each(passCases)('matches Lean-checked replay passes and serialized stopping: $name ($phase)', async c => {
+    const v = fixture.histories.find(h => h.registry === recordCases.registry)!;
+    const db = new DbMemory('replay-pass-bridge');
+    const g = new Gatekeeper({ db, ipfs: new MemoryClient() });
+    const cipher = new Cipher();
+    await g.getDIDs();
+    const events: GatekeeperEvent[] = c.events.map(e => ({
+        operation: v.operations[e.operation], registry: e.registry, ordinal: e.ordinal,
+        time: v.operations[e.operation].proof!.created, opid: v.ids[e.operation], did: v.did,
+    }));
+    // Call the exact routine used inside rebuildHistories, without adding ingress
+    // reconciliation between candidates. The public import/restart tests remain above.
+    const replay = g as unknown as { importEventOnce(event: GatekeeperEvent): Promise<unknown> };
+    for (const index of c.seed) await replay.importEventOnce(structuredClone(events[index]));
+    expect(await db.getEvents(v.did)).toEqual(c.seed.map(i => events[i]));
+    // Compare JSON values, not JavaScript prototypes (structuredClone crosses
+    // Jest VM realms); undefined omission is part of the wire representation.
+    const snapshot = async (): Promise<GatekeeperEvent[]> => JSON.parse(JSON.stringify(await db.getEvents(v.did)));
+    let stopped = false;
+    for (const expected of [...c.passes, c.expected]) {
+        const before = await snapshot();
+        const previous = cipher.canonicalizeJSON(before);
+        expect(JSON.parse(previous)).toEqual(before);
+        for (const event of events) await replay.importEventOnce(structuredClone(event));
+        const after = await snapshot();
+        expect(after).toEqual(expected.map(i => events[i]));
+        const serialized = cipher.canonicalizeJSON(after);
+        expect(JSON.parse(serialized)).toEqual(after);
+        // Check both false early stops and failure to notice a full-record fixed point.
+        expect(serialized === previous).toBe(isDeepStrictEqual(after, before));
+        if (serialized === previous) {
+            stopped = true;
+            break;
+        }
+    }
+    expect(stopped).toBe(true);
+    expect(await db.getEvents(v.did)).toEqual(c.expected.map(i => events[i]));
 });

@@ -163,3 +163,5 @@ These rules apply to coding agents working in this repository.
 - Convergence proofs must distinguish operation-path agreement from event-record stability: duplicate expected-registry receipts retain the first representation. Prove phase composition before applying an operation-ID pass bound to full-record replay; separate phase theorems do not establish the combined runtime loop.
 
 - When extending Lean replay proofs, prove the event-to-ID projection and complete-path phase boundary before reusing path/metadata bounds. Keep synthetic receipt projection examples distinct from full signed-record bridge cases, and retain the existing transitive axiom allowlist.
+
+- Replay proof bridges should compare the actual per-event replay importers against Lean-checked intermediate pass states and the final serialized stopping decision, while retaining public ingress/restart coverage. Codec round-trip assumptions apply to normalized JSON/model values, not arbitrary JavaScript object identity; finite bridge traces do not prove general serializer or executable refinement.

@@ -1,4 +1,4 @@
-# Provisional agent-history convergence (#1199, #1201, #1203, #1205)
+# Provisional agent-history convergence (#1199, #1201, #1203, #1205, #1207)
 
 This Lean project proves a bounded specification and an operational replay
 model of Archon's canonical-CID successor rule. It changes no runtime code. It uses Lean's standard library only;
@@ -13,6 +13,8 @@ The main result is:
 > history, including when genesis or another predecessor arrives late.
 > The combined event model also terminates when equality compares all record
 > fields, with metadata promotion and branch replacement in the same passes.
+> This result transfers to serialized equality when the modeled codec has a
+> decoder round trip; that codec premise remains explicit.
 
 The result quantifies over arbitrary finite models and evidence lists. It is not
 limited to the four-operation test graphs.
@@ -245,11 +247,58 @@ expected pass states let the kernel check one scan at a time instead of repeated
 expanding nested scans. These states are checked equalities, not
 assumptions. This adds no axioms or assumptions about payload equality.
 
-Runtime serialized equality remains an explicit boundary: structural equality
-implies equal output for a deterministic serializer, but the proof does not
-establish that either runtime's serialization, normalization, or mutable storage
-behavior implements this model. Those obligations and expanded authorization
-remain before claiming a full Archon implementation proof.
+Runtime serialization and implementation refinement remain explicit boundaries.
+The next result below formalizes the required codec condition and strengthens the
+runtime pass bridge without claiming to verify either JSON implementation.
+
+## Serialized stopping and runtime pass bridge — #1207
+
+`SerializedReplay.lean` proves the serialized stopping check equivalent to
+structural stopping when equality of encodings implies equality of modeled
+states. A partial decoder round trip is sufficient to establish this property.
+The proof also removes the separate-first-pass wrapper: a single loop starts
+empty, performs the initial equality check, and reaches the same canonical
+history within `level(root) + 3` passes.
+
+| Declaration | Result |
+| --- | --- |
+| `encode_reflects_of_roundtrip` | A decoder that recovers every modeled state from its encoding establishes equality reflection. |
+| `encoded_stop_eq`, `encoded_stop_eq_on_orbit` | Faithful encoded comparison and structural comparison have the same result at every fuel bound; the latter needs reflection only between adjacent states of this replay. |
+| `full_cold_loop_converges` | One structural stopping loop, starting empty and including its first comparison, terminates with canonical IDs and fixed full records. |
+| `history_wire_roundtrip` | The empty/root-first array representation preserves the modeled optional genesis/suffix state exactly. |
+| `serialized_array_converges` | Array serialization with a decoder round trip along the replay preserves the full cold convergence bound and result. |
+
+`historyWire` maps `none` to an empty array and an accepted history to its genesis
+followed by successors. This layout conversion is proved lossless. The subsequent
+serializer/parser round trip is a **premise on reachable replay states**, not
+a proved fact about JavaScript, RFC 8785, or serde. No codec law is required for
+arbitrary records with inconsistent derived fields or non-JSON payloads. In particular, arbitrary
+JavaScript objects, prototypes, `undefined`, and alternate JSON text formatting
+must not be silently treated as distinct modeled states that JSON preserves.
+The TypeScript bridge compares JSON values after omission/normalization, not
+JavaScript object identity or prototypes.
+
+The shared signed record cases now drive ten per-pass traces in each port:
+six cold traces and four warm metadata-only traces. Tests call the exact
+`importEventOnce` / `import_event_once` routines invoked inside production replay,
+scan the fixed fixture order, and compare complete histories with the pass states
+already checked by Lean. They check the final unchanged pass using the actual
+TypeScript `canonicalizeJSON` and Rust `serde_json::to_string` calls, verify decoder
+round trips for observed states, and compare each serialization stop decision
+with record equality. Warm promotion exercises a change in metadata while IDs
+remain unchanged; late genesis exercises multiple changed scans before stopping.
+
+These tests establish correspondence for those traces. They do not prove the
+codec premise for every possible record, extract either runtime into Lean, or
+exercise the production candidate sorter/overlay in isolation. The existing
+public import, reverse-duplicate, and restart tests continue to cover that outer
+path. The formal model permits arbitrary fixed scan order. Canonical identity,
+authorization, normalization of all possible candidates, storage, and concurrency
+remain explicit implementation obligations.
+
+CI runs the TypeScript pass bridge alongside the proofs and runs Rust convergence
+unit tests with the production Rust 1.90.0 toolchain. The workflow now also triggers
+on Gatekeeper implementation and bridge-test changes. Runtime code is unchanged.
 
 ## Reproduce
 
@@ -295,11 +344,12 @@ update must also update and verify the committed checksum.
 
 ## Follow-up proof work
 
-1. Connect the combined full-event model to runtime serialization, normalization,
-   and the actual importer/replay implementations. Model-level phase composition
-   and full-record termination are now proved.
-2. Extend agent authorization to key rotation and deletion, preserving the
-   predecessor-selected authorizing document.
+1. Extend agent authorization to key rotation and deletion, preserving the
+   predecessor-selected authorizing document. This is the next protocol-model
+   extension beyond the fixed-key domain.
+2. Establish the concrete codec/normalization domain and general executable
+   refinement. Serialized stopping transfer and signed per-pass correspondence
+   are now proved/tested respectively; neither is a proof of the runtimes.
 3. Add expected-chain evidence, repeated anchors, and registry migrations.
 4. Extend to assets, ownership transfers, and controller-dependent replay.
 5. Model retention, restart, and garbage collection, then strengthen the bridge

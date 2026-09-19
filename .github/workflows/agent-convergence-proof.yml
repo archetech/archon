@@ -9,6 +9,9 @@ on:
       - 'packages/common/**'
       - 'packages/cipher/**'
       - 'packages/ipfs/**'
+      - 'packages/gatekeeper/**'
+      - 'tests/gatekeeper/convergence.test.ts'
+      - 'rust/services/gatekeeper/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/agent-convergence-proof.yml'
@@ -21,6 +24,9 @@ on:
       - 'packages/common/**'
       - 'packages/cipher/**'
       - 'packages/ipfs/**'
+      - 'packages/gatekeeper/**'
+      - 'tests/gatekeeper/convergence.test.ts'
+      - 'rust/services/gatekeeper/**'
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/agent-convergence-proof.yml'
@@ -62,6 +68,21 @@ jobs:
           node --test proofs/agent-convergence/generate-fixtures.test.mjs
           node proofs/agent-convergence/generate-fixtures.mjs --check
           node proofs/agent-convergence/generate-record-fixtures.mjs --check
+      - name: Check TypeScript replay pass bridge
+        run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/convergence.test.ts --runInBand --coverage=false -t 'Lean-checked'
       - name: Check proofs and concrete histories
         working-directory: proofs/agent-convergence
         run: lake build
+
+  rust-replay-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - name: Install production Rust toolchain
+        run: rustup toolchain install 1.90.0 --profile minimal --no-self-update
+      - name: Check Rust signed convergence and replay pass bridge
+        run: |
+          cargo +1.90.0 test --locked --manifest-path rust/services/gatekeeper/Cargo.toml --lib convergence::

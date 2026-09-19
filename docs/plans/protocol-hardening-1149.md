@@ -194,3 +194,24 @@ This closes the model-level composition obligation from #1203. Runtime
 serialization/normalization and executable refinement remain open, alongside
 key rotation, deletion, chain priority, controller-dependent assets, and retention.
 See [the combined theorem and boundaries](../../proofs/agent-convergence/README.md#combined-full-event-replay--1205).
+
+## Serialized replay and runtime pass correspondence — #1207
+
+The Lean proof now covers a single cold loop including the first comparison from
+empty state. Flattening optional genesis/suffix state to the runtime-shaped array
+is proved lossless. A serialized stopping check preserves the convergence result
+when its codec reflects equality; a decoder round trip along reachable replay
+states is a sufficient, explicit premise. The proof does not establish that premise for every runtime JSON value.
+
+Ten signed traces per port check actual replay importer routines against the
+Lean-checked cold/warm pass states, through the first unchanged scan. They verify
+observed serialization round trips and stopping decisions, including metadata
+promotion without ID changes and late genesis. CI runs the TypeScript bridge and
+Rust convergence tests and triggers on implementation changes. Runtime behavior
+is unchanged.
+
+General codec/normalization and executable refinement remain open; finite trace
+checks are implementation evidence, not source verification. Key rotation,
+deletion, chain priority, controller-dependent assets, and retention remain
+separate extensions, with fixed-agent key rotation/deletion the next model step.
+See the [serialized stopping contract](../../proofs/agent-convergence/README.md#serialized-stopping-and-runtime-pass-bridge--1207).
