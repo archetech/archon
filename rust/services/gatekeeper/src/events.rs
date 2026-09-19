@@ -902,29 +902,37 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
         }
 
         let expected_registry = expected_registry_for_index(&current_events, index + 1);
-        if expected_registry.as_deref() == Some(event.registry.as_str()) {
-            let next_event = &current_events[index + 1];
-            if next_event.registry != event.registry
-                || compare_ordinals(event.ordinal.as_ref(), next_event.ordinal.as_ref()).is_lt()
+        let next_event = &current_events[index + 1];
+        let expected_chain = expected_registry
+            .as_deref()
+            .filter(|registry| !is_unanchored_registry(registry));
+        let incoming_confirmed = expected_chain == Some(event.registry.as_str());
+        let current_confirmed = expected_chain == Some(next_event.registry.as_str());
+        let preferred = if incoming_confirmed || current_confirmed {
+            incoming_confirmed
+                && (!current_confirmed
+                    || compare_ordinals(event.ordinal.as_ref(), next_event.ordinal.as_ref()).is_lt())
+        } else {
+            event.opid < next_event.opid
+        };
+        if preferred {
+            let mut new_sequence = current_events[..=index].to_vec();
+            new_sequence.push(event.clone());
             {
-                let mut new_sequence = current_events[..=index].to_vec();
-                new_sequence.push(event.clone());
-                {
-                    let mut store = state.store.lock().await;
-                    let _ = store.set_events(&did, new_sequence);
-                }
-                if trace {
-                    info!(
-                        "process_events added reason=insert_reorg did={} opid={} previd={} next_registry={} expected_registry={}",
-                        did,
-                        opid,
-                        previd,
-                        next_event.registry,
-                        expected_registry.as_deref().unwrap_or("-")
-                    );
-                }
-                return ImportStatus::Added;
+                let mut store = state.store.lock().await;
+                let _ = store.set_events(&did, new_sequence);
             }
+            if trace {
+                info!(
+                    "process_events added reason=insert_preferred_branch did={} opid={} previd={} next_registry={} expected_registry={}",
+                    did,
+                    opid,
+                    previd,
+                    next_event.registry,
+                    expected_registry.as_deref().unwrap_or("-")
+                );
+            }
+            return ImportStatus::Added;
         }
 
         if trace {

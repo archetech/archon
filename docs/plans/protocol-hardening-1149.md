@@ -124,3 +124,12 @@ clears active pending work but retains batch-ingress deduplication in that proce
 while durable candidates for retained DIDs remain replayable. Restart and disabled
 or failed GC qualify that lifecycle. No live missing intermediate was recovered
 by closing the issue, and no new rejection policy was adopted.
+
+## Canonical unanchored branch ordering — #1197
+
+On 2026-09-19 the maintainer selected canonical-CID priority for competing
+unanchored successors. The earlier #1149 decision only changed historical time
+selection; this separately replaces receipt-order fork selection. Apply the same
+preference in import and replay, preserve chain ordering and signed bytes, and
+audit production evidence before rollout. See the [implementation and validation
+record](canonical-order-1197.md). #1156 remains paused.

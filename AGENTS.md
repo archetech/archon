@@ -89,7 +89,7 @@ These rules apply to coding agents working in this repository.
 
 - When a maintainer changes an issue’s scope or splits acceptance criteria into a follow-up, synchronize the issue bodies and PR description. Explicitly retain unresolved correctness requirements in the follow-up; resolving a review thread as tracked elsewhere does not mean the defect is fixed.
 
-- Archon nodes derive their best current authorization state from available evidence. Keep imported candidates durably separate from accepted histories; controller-history changes must reconsider rejected candidates and replay dependent histories at the import layer. `confirmed` records anchoring, not irrevocable authorization. Preserve original chain positions, distinguish repeated anchors of the same operation during deduplication, and retain existing arrival-order semantics for unanchored gossip.
+- Archon nodes derive their best current authorization state from available evidence. Keep imported candidates durably separate from accepted histories; controller-history changes must reconsider rejected candidates and replay dependent histories at the import layer. `confirmed` records anchoring, not irrevocable authorization. Preserve original chain positions, distinguish repeated anchors of the same operation during deduplication, and rank competing unanchored successors by the lexicographically smallest canonical CID (ASCII order of canonical base32 strings). Apply the preference during insertion and replay; receipt order and ordinals cannot decide unanchored forks.
 
 - Enforce self-controlled agents and agent-only asset owners at Gatekeeper authorization, including prospective transfers and immutable DID type. Use real signed fixtures to test rejected controller cycles; do not add replay oscillation/quarantine policy for relationships the protocol forbids. Controller removal and garbage collection must replay dependents before returning; public history reads must wait for startup repair and active replay.
 
@@ -147,3 +147,7 @@ These rules apply to coding agents working in this repository.
 - Protocol documentation must distinguish whole-component replacement from field merging, predecessor-registry confirmation from a migration's resulting registry, and accepted-branch deletion from later evidence revalidation. Cross-check both Gatekeepers before turning explanatory prose into acceptance requirements.
 
 - When consolidating protocol rules, search procedural checklists and pseudocode for superseded wording too; a new normative table does not correct contradictory identity, size-limit, or registry-selection instructions elsewhere.
+
+- Convergence work must exercise ordinary signed imports with tied receipts, late predecessors, mixed local/gossip hints, chain confirmation, and controller-dependent replay. Distinguish finite permutation coverage from a formal proof, and audit retained production evidence before claiming existing forks.
+
+- Choose provisional competing successors in the shared importer by canonical CID; do not globally CID-sort replay traversal. Preserve efficient predecessor-first processing and benchmark populated histories before changing replay ordering. An anchor outside the predecessor’s expected chain registry remains provisional for sibling preference.

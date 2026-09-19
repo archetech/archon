@@ -970,7 +970,7 @@ Ordinary resolution computes the canonical CID and block timestamp bounds only
 for the selected version. Verified resolution still checks every included
 operation and its predecessor; both return the same version metadata.
 
-The dependency index includes controller assignments on retained branches, not just the current document. Replay completes self-controlled agent histories before asset histories, retrying candidates within each DID until its sequence stops changing and ordering chain candidates by registry, ordinal, time, and operation CID; registry ordinals are never compared across chains. Local/gossip candidates preserve their existing arrival order. Agents must remain self-controlled and asset owners must be agents. These constraints are checked during creation, direct updates, import, and verified replay, including the new owner of a transfer. Startup repair removes previously accepted violations from the accepted projection while retaining candidate evidence. Replay has no separate oscillation detection or quarantine policy.
+The dependency index includes controller assignments on retained branches, not just the current document. Replay completes self-controlled agent histories before asset histories, retrying candidates within each DID until its sequence stops changing and ordering chain candidates by registry, ordinal, time, and operation CID; registry ordinals are never compared across chains. Local/gossip candidates keep their existing traversal order for efficient processing of predecessor chains. The shared importer chooses competing unanchored siblings by canonical CID during both live import and replay; traversal order does not decide the winner. Agents must remain self-controlled and asset owners must be agents. These constraints are checked during creation, direct updates, import, and verified replay, including the new owner of a transfer. Startup repair removes previously accepted violations from the accepted projection while retaining candidate evidence. Replay has no separate oscillation detection or quarantine policy.
 
 Accepted histories, search entries, and verification caches are refreshed when replay changes a DID. Search indexing runs on published histories, not intermediate replay views. Explicit removal and garbage collection also replay dependents before returning. Startup rebuilds each DID once from the journal to recover interrupted publication, rather than replaying a controller’s dependents again for each entry in the startup scan. Startup reads accepted histories in bounded batches and reuses that snapshot during reconstruction. Both implementations build the complete startup search index and status counts together from the accepted in-memory replay snapshot, after durable publication and before releasing the history lock. TypeScript publishes startup histories in bounded groups, waiting for all started writes before propagating any failure or releasing the lock. Startup excludes rejected candidate-only histories from those views and avoids separate Redis search-refresh, status, and full-index scans. Runtime reconciliation still refreshes affected search documents. Rust invalidates cached status; subsequent TypeScript status checks scan current histories. Already-canonical, unchanged journals are not rewritten; public verification, resolution, and DID-list reads wait for repair and hold the history lock throughout their asynchronous reads. TypeScript status scans resolve up to 32 DIDs concurrently under that lock, then release it and yield before the next chunk. Each chunk observes complete publication; aggregate status counts can span multiple completed publications and are monitoring data, not a transaction snapshot. An operation accepted through dependent replay may report `MERGED` when its next queue attempt runs, so processing counters describe queue attempts, not every change to derived histories.
 
@@ -1011,13 +1011,17 @@ The following is the insertion algorithm reused during replay:
    if i == current.length - 1:
        addEvent(did, event); return ADDED
    expectedRegistry = expected_registry_for_index(current, i + 1)
-   if event.registry == expectedRegistry:
-       next = current[i+1]
-       if next.registry != event.registry
-          or (both ordinals exist and compare_ordinals(event.ordinal, next.ordinal) < 0):
-           // reorg: replace the rest of the chain
-           setEvents(did, current[..=i] + [event])
-           return ADDED
+   next = current[i+1]
+   incomingConfirmed = expectedRegistry is a chain registry and event.registry == expectedRegistry
+   currentConfirmed = expectedRegistry is a chain registry and next.registry == expectedRegistry
+   if incomingConfirmed or currentConfirmed:
+       preferred = incomingConfirmed and (not currentConfirmed or
+           (both ordinals exist and compare_ordinals(event.ordinal, next.ordinal) < 0))
+   else:
+       preferred = event.opid < next.opid    // canonical base32 strings, ASCII order
+   if preferred:
+       setEvents(did, current[..=i] + [event]) // replace the displaced branch
+       return ADDED
 10. return REJECTED
 ```
 
@@ -1025,6 +1029,11 @@ The following is the insertion algorithm reused during replay:
 starting from `events[0].operation.registration.registry`, switching to
 `event.operation.doc.didDocumentRegistration.registry` whenever an `update`
 re-registers it.
+
+The [unanchored successor rule](../../scheme.md#competing-unanchored-successors)
+is a sibling preference, not a timestamp cutoff or a replacement for chain
+ordering. Reconciliation publishes the recovered branch and revalidates its
+dependents; retaining a losing candidate does not make its receipt order authoritative.
 
 ### 8.5 Event shape validation
 

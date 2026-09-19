@@ -1035,6 +1035,65 @@ async function runCanonicalizationParity() {
     console.log('ok RFC 8785 parity: signed genesis/update, both proof suites, and fresh-node legacy predecessor recovery');
 }
 
+async function runConvergenceParity() {
+    const fixture = JSON.parse(await fs.readFile(new URL('../tests/convergence/vectors.json', import.meta.url), 'utf8'));
+    const post = (path, body) => ({ method: 'POST', path, body, requiresAdminKey: true, headers: { 'content-type': 'application/json' } });
+    const both = async requestFixture => {
+        const responses = await Promise.all([request(tsBaseUrl, requestFixture), request(rustBaseUrl, requestFixture)]);
+        for (const response of responses) assertEqual('convergence HTTP status', response.status, 200);
+        return responses;
+    };
+    const resolve = async (did, opid) => {
+        const responses = await both({ method: 'GET', path: `/api/v1/did/${did}?verify=true`, requiresAdminKey: true });
+        assertEqual('convergence resolution parity', normalizeJson(responses[0].body), normalizeJson(responses[1].body));
+        assertEqual('convergence selected operation', responses[0].body.didDocumentMetadata?.versionId, opid);
+    };
+    for (const scenario of fixture.scenarios.filter(s => s.name.endsWith('/fork'))) {
+        const v = { ...fixture.histories.find(h => h.registry === scenario.registry), ...scenario };
+        // Include root-last and the tied-ordinal counterexample with a delayed root.
+        for (const order of [[0, 1, 2, 3], [3, 2, 1, 0], [1, 0, 2, 3]]) {
+            await resetServiceState(tsBaseUrl);
+            await resetServiceState(rustBaseUrl);
+            for (const [receipt, index] of order.entries()) {
+                const operation = v.operations[index];
+                if (v.transport === 'BTC:signet' || (v.transport === 'foreign-anchor' && index === 2)) {
+                    const pinned = await request(tsBaseUrl, post('/api/v1/ipfs/json', operation));
+                    assertEqual('convergence pin status', pinned.status, 200);
+                    const height = 1000 + index;
+                    const time = operation.proof.created;
+                    await both(post('/api/v1/block/BTC:signet', { height, hash: `block${height}`, time: Math.floor(Date.parse(time) / 1000) }));
+                    await both(post('/api/v1/batch/import/cids', { cids: [pinned.body], metadata: {
+                        registry: 'BTC:signet', time, ordinal: [height],
+                        registration: { height, index: 0, txid: `tx${height}`, batch: `batch${height}` },
+                    } }));
+                } else {
+                    const registry = v.transport === 'foreign-anchor' ? 'local' : v.transport === 'mixed' ? (index % 2 ? 'hyperswarm' : 'local') : v.transport;
+                    const ordinal = [1000 + (v.receipts === 'fresh' ? receipt : 0), 0];
+                    await both(post('/api/v1/batch/import', [{ operation, registry, time: operation.proof.created, ordinal }]));
+                }
+                await both(post('/api/v1/events/process'));
+            }
+            const expected = v.cases.find(c => JSON.stringify(c.order) === JSON.stringify(order)).expected;
+            await resolve(v.did, v.ids[expected.at(-1)]);
+        }
+    }
+    for (const v of fixture.controllerForks) {
+        for (const order of v.orders) {
+            await resetServiceState(tsBaseUrl);
+            await resetServiceState(rustBaseUrl);
+            for (const [receipt, index] of order.entries()) {
+                const operation = v.operations[index];
+                await both(post('/api/v1/batch/import', [{ operation, registry: 'hyperswarm', time: operation.proof.created, ordinal: [receipt, 0] }]));
+                await both(post('/api/v1/events/process'));
+            }
+            await resolve(v.controller, v.ids[v.controllerPath.at(-1)]);
+            await resolve(v.asset, v.ids[v.assetPath.at(-1)]);
+        }
+    }
+    console.log('ok convergence parity: canonical hint forks, tied receipts, mixed hints, chain CID ingress, and controller-dependent recovery');
+}
+
+await runConvergenceParity();
 await runCanonicalizationParity();
 await runHistoryRecoveryParity();
 await runOperationIdentityParity();
