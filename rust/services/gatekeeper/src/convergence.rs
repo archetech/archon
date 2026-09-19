@@ -264,7 +264,12 @@ async fn convergence_full_event_records_settle() {
         .find(|h| h["registry"] == cases["registry"])
         .unwrap();
     let did = vector["did"].as_str().unwrap();
-    for case in cases["cases"].as_array().unwrap() {
+    for case in cases["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .chain(cases["replayCases"].as_array().unwrap())
+    {
         let (state, _directory) = crate::tests::make_state(JsonDb {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),

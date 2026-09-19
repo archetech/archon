@@ -59,3 +59,11 @@ test('representation bridge rejects branch changes and broken initial paths', ()
     broken.cases[0].events[2].operation = 2;
     assert.throws(() => generateRecordFixtures(fixture, broken), /predecessor linked/);
 });
+
+test('full-record cold bridge requires genesis evidence', () => {
+    const input = structuredClone(recordCases);
+    const c = input.replayCases[1];
+    c.events = c.events.filter(e => e.operation !== 0);
+    c.expected = [0];
+    assert.throws(() => generateRecordFixtures(fixture, input), /cold replay requires genesis evidence/);
+});
