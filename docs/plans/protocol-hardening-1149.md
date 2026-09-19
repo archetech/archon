@@ -174,3 +174,23 @@ compose branch-changing passes, genesis initialization, and metadata replacement
 then connect structural equality to runtime serialization. Key rotation, deletion,
 chain priority, assets, and executable refinement remain open. Runtime code and
 protocol acceptance are unchanged. See the [proof boundaries](../../proofs/agent-convergence/README.md#full-event-records-after-path-selection--1203).
+
+## Combined full-event replay proof — #1205
+
+The Lean importer now combines metadata promotion with predecessor lookup,
+append, and canonical-CID branch truncation. Its ID projection is proved equal
+to the earlier importer. Completeness proves that later scans only change
+metadata, composing the path and record results without assuming the boundary.
+Full-record equality replay terminates within `level(root) + 2` warm passes or
+`level(root) + 3` cold passes, including late genesis. Different receipts may
+produce different metadata; equal operation evidence still gives equal ID paths.
+
+The bridge adds 840 full-event ID projections with synthetic metadata and six
+full signed-record cold examples, including displaced promoted branches and
+reverse predecessors. Both Gatekeepers exercise the shared signed cases through
+imports, duplicate delivery, and restart. Runtime code is unchanged.
+
+This closes the model-level composition obligation from #1203. Runtime
+serialization/normalization and executable refinement remain open, alongside
+key rotation, deletion, chain priority, controller-dependent assets, and retention.
+See [the combined theorem and boundaries](../../proofs/agent-convergence/README.md#combined-full-event-replay--1205).

@@ -161,3 +161,5 @@ These rules apply to coding agents working in this repository.
 - Operational replay proofs must model late genesis, missing predecessors, duplicate identity, suffix truncation, and the actual stop-on-unchanged condition. Distinguish operation-ID path equality from the runtime’s serialized event-record equality; a path-level pass bound is not automatically a bound on all metadata transitions.
 
 - Convergence proofs must distinguish operation-path agreement from event-record stability: duplicate expected-registry receipts retain the first representation. Prove phase composition before applying an operation-ID pass bound to full-record replay; separate phase theorems do not establish the combined runtime loop.
+
+- When extending Lean replay proofs, prove the event-to-ID projection and complete-path phase boundary before reusing path/metadata bounds. Keep synthetic receipt projection examples distinct from full signed-record bridge cases, and retain the existing transitive axiom allowlist.

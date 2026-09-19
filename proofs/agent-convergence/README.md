@@ -1,4 +1,4 @@
-# Provisional agent-history convergence (#1199, #1201, #1203)
+# Provisional agent-history convergence (#1199, #1201, #1203, #1205)
 
 This Lean project proves a bounded specification and an operational replay
 model of Archon's canonical-CID successor rule. It changes no runtime code. It uses Lean's standard library only;
@@ -11,6 +11,8 @@ The main result is:
 > canonical history, regardless of delivery order or duplicate deliveries.
 > The modeled insertion/repeated-pass replay loop terminates with that complete
 > history, including when genesis or another predecessor arrives late.
+> The combined event model also terminates when equality compares all record
+> fields, with metadata promotion and branch replacement in the same passes.
 
 The result quantifies over arbitrary finite models and evidence lists. It is not
 limited to the four-operation test graphs.
@@ -43,9 +45,10 @@ limited to the four-operation test graphs.
   evidence; its candidate stays deferred. Garbage collection, network delivery
   guarantees, storage failures, and concurrent publication are outside the model.
 
-The output is the accepted operation-ID path, including genesis. The theorem
+The cross-node invariant is the accepted operation-ID path, including genesis.
+The combined model also proves full-record stability within each replay, but
 makes no claim that receipt timestamps, queues, counters, or all resolution
-metadata become identical.
+metadata become identical across nodes.
 
 ## What Lean checks
 
@@ -76,7 +79,8 @@ axiom collector to reject any dependency outside that allowlist. The audit is
 therefore enforced by `lake build`, not just printed for manual inspection.
 There are no project axioms, admitted proofs, or `native_decide` shortcuts. All
 Lean modules treat warnings as errors, so unfinished proofs fail the build.
-Concrete examples use kernel-checked `decide`.
+Concrete examples use kernel-checked `decide`, reduction, and the proved
+iteration-to-fixed-point theorem.
 
 ## Relationship to Gatekeeper
 
@@ -111,15 +115,13 @@ history. `untilStable` returns `none` on bound exhaustion, rather than a
 successful truncated path. Cold replay also returns `none` when genesis is
 absent; the cold convergence theorem requires genesis in retained evidence.
 
-**This proves refinement between two Lean models, not verification of the actual
-TypeScript or Rust executables.** Their duplicate paths can replace event
-representations, and their loop compares serialized event records, while this
-model compares operation-ID paths. Registry/receipt metadata is handled separately
-by the settled-path result below; queues, caches, I/O failures, and concurrent
-publication are not modeled. The proven pass bound
-therefore applies to the Lean operation-path model, not every runtime event-row
-transition. Source inspection and shared signed fixtures connect these models
-to Gatekeeper behavior, but are not a formal compiler/source refinement proof.
+**This proves refinement between Lean models, not verification of the actual
+TypeScript or Rust executables.** `OperationalReplay` compares operation-ID
+paths; `FullReplay` below extends the result to structural equality of full
+records. Runtime serialization, queues, caches, I/O failures, and concurrent
+publication are outside these proofs. The pass bounds apply to these Lean models.
+Source inspection and shared signed fixtures connect them to Gatekeeper behavior,
+but are not a formal compiler/source refinement proof.
 
 The same complete finite evidence list is scanned on every pass. The theorem
 allows any ordering and duplicates in that list; it assumes processing completes,
@@ -138,6 +140,11 @@ covered only when a reconciliation has its complete retained snapshot.
    operational cold replay, and cold replay with the evidence repeated in reverse
    order against the expected history already checked by both Gatekeepers. This
    gives 1,260 kernel-checked history equalities.
+6. Check the full-event cold replay's ID projection twice for each trace: once
+   with opaque nonpreferred receipts, and once with reversed preferred duplicates
+   appended. These are synthetic metadata stress cases, not translations of the
+   runtime receipts; they add 840 checked projections (2,100 total). The separate
+   record bridge below checks actual complete signed event payloads.
 
 The bridge excludes chain/foreign-anchor scenarios and controller-fork fixtures.
 It does not recheck signatures: the existing TypeScript/Rust tests do that. The
@@ -173,9 +180,9 @@ its map then updates the same single record as the duplicate lookup. It assumes
 all modeled promotions pass authorization, fixed registry expectations, and no
 candidate can append, replace a sibling, or remove a selected operation. Events
 outside the selected path are inert in this phase. It does not establish these
-conditions for the combined runtime replay loop. In particular, the earlier
-operation-path theorem cannot simply be reused as a theorem about full events
-without proving the projection and phase-composition obligations.
+conditions for the combined runtime replay loop. `FullReplay` now proves the
+projection and composition for its bounded Lean importer, as described below;
+that additional proof is necessary before combining the two phase bounds.
 
 The shared `tests/convergence/record-cases.json` references real signed operations
 from `vectors.json`. Both ports check complete records after ordinary imports,
@@ -190,6 +197,59 @@ Two cases deliver the same local receipts in different orders. Their operation
 paths agree, but their retained ordinals differ: the first expected-registry
 receipt wins. Thus stability within one replay must not be described as identical
 metadata across nodes. This result introduces no new protocol behavior.
+
+## Combined full-event replay — #1205
+
+`FullReplay.lean` executes duplicate promotion, predecessor lookup, append, and
+smaller-CID suffix truncation in the same scan. It never calls the canonical
+projector. A warm history contains a genesis record and a successor list; cold
+replay starts at `none` and accepts the unique valid genesis only on its arrival.
+The stopping loop compares the entire history structurally, including arbitrary
+payloads, rather than comparing operation IDs.
+
+| Declaration | Result |
+| --- | --- |
+| `event_import_ids`, `event_pass_ids` | Projecting the full-event importer and scans to IDs gives exactly the earlier operational importer and scans. |
+| `event_pass_complete` | A complete canonical path admits only metadata changes, so its event scan equals the already-proved record scan. |
+| `valid_path_nodup`, `history_step_genesis` | Valid acyclic paths have unique IDs; a duplicate genesis can promote its own record but cannot change successors. |
+| `full_warm_converges` | From a valid retained successor path, the full-record loop terminates within `level(root) + 2` passes with canonical successors, unchanged genesis ID, and a fixed full history. |
+| `full_cold_converges` | With genesis retained, cold replay terminates within `level(root) + 3` passes, with the complete canonical ID history and fixed full records. |
+| `full_cold_same_operations` | Equal operation-ID evidence membership gives equal final ID paths, despite different receipt order, multiplicity, or representations. |
+
+The proof first lifts the old path bound through the exact projection lemma.
+After at most `level(root)` warm scans, the selected path is complete. The
+complete-path lemma proves that only metadata can change from then on. One scan
+settles those records, and one unchanged scan detects the fixed point. The
+stopping-loop proof also rules out stopping early at a different fixed point.
+Cold replay adds the initial genesis-loading scan. These are upper bounds, not
+new runtime iteration limits, and no oscillation safeguards are introduced.
+
+This composes the previously separate phase results. The fixed-authorization,
+provisional-only, fixed-registry, finite-evidence and acyclic-edge assumptions
+remain. Signature validity, receipt-dependent authorization, and canonical CID
+identity are still supplied by the model rather than proved. Incoming and stored
+records carry the fixed expected-registry classification; the model does not
+compute registration policy or implement chain confirmation priority. Warm
+canonical-genesis interpretation requires the supplied genesis record to have
+the root ID; cold replay establishes that condition itself.
+
+The record bridge now checks full cold replay against six signed receipt cases,
+including promotion followed by branch truncation and reversed predecessors with
+late genesis. Both ports check their complete records through imports, duplicate
+delivery, and restart. The six additional cold equalities plus the original 12
+settled-path equalities give 18 full-record examples. They use the checked
+iteration-to-fixed-point theorem and kernel reduction. Complete JSON strings
+are defined as opaque payload constants: the proof preserves those exact values
+without reducing their bytes during concrete stopping-loop elaboration. Named
+expected pass states let the kernel check one scan at a time instead of repeatedly
+expanding nested scans. These states are checked equalities, not
+assumptions. This adds no axioms or assumptions about payload equality.
+
+Runtime serialized equality remains an explicit boundary: structural equality
+implies equal output for a deterministic serializer, but the proof does not
+establish that either runtime's serialization, normalization, or mutable storage
+behavior implements this model. Those obligations and expanded authorization
+remain before claiming a full Archon implementation proof.
 
 ## Reproduce
 
@@ -235,10 +295,9 @@ update must also update and verify the committed checksum.
 
 ## Follow-up proof work
 
-1. Compose the operation-path replay and settled-path record results into one
-   event importer, including branch truncation, late genesis, and representation
-   replacement in the same passes. Then connect structural record equality to
-   each runtime serializer. Separate phase theorems do not prove that composition.
+1. Connect the combined full-event model to runtime serialization, normalization,
+   and the actual importer/replay implementations. Model-level phase composition
+   and full-record termination are now proved.
 2. Extend agent authorization to key rotation and deletion, preserving the
    predecessor-selected authorizing document.
 3. Add expected-chain evidence, repeated anchors, and registry migrations.
@@ -247,6 +306,6 @@ update must also update and verify the committed checksum.
    between the specification and both runtime implementations.
 
 The full Archon convergence theorem remains open. The canonical projection and
-its bounded operational refinement are proved; expanded authorization/chain
+its bounded full-event operational refinement are proved; expanded authorization/chain
 semantics and the connection to the runtime implementations remain explicit
 obligations.

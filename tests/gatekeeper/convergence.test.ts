@@ -84,11 +84,12 @@ it.each(fixture.controllerForks)('replays asset authorization after a preferred 
 }, 30000);
 
 // The same signed operations, with distinct receipts for a single canonical ID.
-const recordCases: { registry: string; cases: { name: string;
+type RecordCase = { name: string;
     events: { operation: number; registry: string; ordinal: number[] }[];
-    initial: number[]; expected: number[] }[] } = JSON.parse(readFileSync('tests/convergence/record-cases.json', 'utf8'));
+    initial: number[]; expected: number[] };
+const recordCases: { registry: string; cases: RecordCase[]; replayCases: RecordCase[] } = JSON.parse(readFileSync('tests/convergence/record-cases.json', 'utf8'));
 
-it.each(recordCases.cases)('settles full event records: $name', async c => {
+it.each([...recordCases.cases, ...recordCases.replayCases])('settles full event records: $name', async c => {
     const v = fixture.histories.find(h => h.registry === recordCases.registry)!;
     const db = new DbMemory('record-convergence');
     const ipfs = new MemoryClient();

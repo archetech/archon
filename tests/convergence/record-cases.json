@@ -78,6 +78,13 @@
         7,
         4,
         2
+      ],
+      "replayPasses": [
+        [
+          7,
+          4,
+          2
+        ]
       ]
     },
     {
@@ -125,6 +132,13 @@
         0,
         1,
         2
+      ],
+      "replayPasses": [
+        [
+          0,
+          1,
+          2
+        ]
       ]
     },
     {
@@ -172,6 +186,13 @@
         0,
         1,
         2
+      ],
+      "replayPasses": [
+        [
+          0,
+          1,
+          2
+        ]
       ]
     },
     {
@@ -219,6 +240,164 @@
         0,
         1,
         2
+      ],
+      "replayPasses": [
+        [
+          0,
+          1,
+          2
+        ]
+      ]
+    }
+  ],
+  "replayCases": [
+    {
+      "name": "promote then truncate a displaced branch and promote its replacement",
+      "events": [
+        {
+          "operation": 0,
+          "registry": "pin",
+          "ordinal": [
+            200,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "pin",
+          "ordinal": [
+            201,
+            0
+          ]
+        },
+        {
+          "operation": 3,
+          "registry": "pin",
+          "ordinal": [
+            202,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "local",
+          "ordinal": [
+            203,
+            0
+          ]
+        },
+        {
+          "operation": 2,
+          "registry": "pin",
+          "ordinal": [
+            204,
+            0
+          ]
+        },
+        {
+          "operation": 2,
+          "registry": "local",
+          "ordinal": [
+            205,
+            0
+          ]
+        },
+        {
+          "operation": 0,
+          "registry": "local",
+          "ordinal": [
+            206,
+            0
+          ]
+        }
+      ],
+      "initial": [
+        0,
+        1,
+        2
+      ],
+      "expected": [
+        6,
+        5
+      ],
+      "replayPasses": [
+        [
+          6,
+          5
+        ]
+      ]
+    },
+    {
+      "name": "recover reverse predecessors after late genesis with metadata promotions",
+      "events": [
+        {
+          "operation": 3,
+          "registry": "pin",
+          "ordinal": [
+            200,
+            0
+          ]
+        },
+        {
+          "operation": 3,
+          "registry": "local",
+          "ordinal": [
+            201,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "pin",
+          "ordinal": [
+            202,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "local",
+          "ordinal": [
+            203,
+            0
+          ]
+        },
+        {
+          "operation": 0,
+          "registry": "pin",
+          "ordinal": [
+            204,
+            0
+          ]
+        },
+        {
+          "operation": 0,
+          "registry": "local",
+          "ordinal": [
+            205,
+            0
+          ]
+        }
+      ],
+      "initial": [],
+      "expected": [
+        5,
+        3,
+        1
+      ],
+      "replayPasses": [
+        [
+          5
+        ],
+        [
+          5,
+          3
+        ],
+        [
+          5,
+          3,
+          1
+        ]
       ]
     }
   ]
