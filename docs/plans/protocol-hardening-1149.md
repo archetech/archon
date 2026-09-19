@@ -143,3 +143,18 @@ covers arbitrary delivery permutations and duplicates, with a checked bridge to
 the optimized TypeScript/Rust replay loops. The next obligation is to refine
 those loops to this specification before expanding authorization and chain
 semantics. See [the theorem, assumptions, and reproduction instructions](../../proofs/agent-convergence/README.md).
+
+## Operational replay refinement — #1201
+
+The bounded Lean insertion model now refines the canonical projection: duplicate
+checks, predecessor deferral, append, and smaller-CID suffix replacement converge
+under repeated full passes. Warm replay reaches a stable canonical suffix within
+`level(root) + 1` passes; cold replay adds a genesis-loading pass and handles
+late genesis. The proof covers arbitrary finite retained evidence with fixed
+authorization and acyclic predecessor edges, not only the fixtures. The bridge
+checks canonical, cold-replay, and duplicate-replay outcomes for 420 signed traces.
+
+This proves refinement between Lean models. Actual Gatekeeper loops compare full
+event records, while the model compares canonical operation-ID paths; event
+representation, metadata, I/O, and source/compiler refinement remain outside the
+proof. Runtime code is unchanged. See [the operational model and proof boundaries](../../proofs/agent-convergence/README.md).

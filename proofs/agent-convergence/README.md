@@ -1,7 +1,7 @@
-# Provisional agent-history convergence (#1199)
+# Provisional agent-history convergence (#1199, #1201)
 
-This Lean project proves a bounded specification of Archon's canonical-CID
-successor rule. It changes no runtime code. It uses Lean's standard library only;
+This Lean project proves a bounded specification and an operational replay
+model of Archon's canonical-CID successor rule. It changes no runtime code. It uses Lean's standard library only;
 there is no Mathlib dependency.
 
 The main result is:
@@ -9,16 +9,19 @@ The main result is:
 > For one fixed agent model with finite, acyclic authorized predecessor edges,
 > the same retained operation evidence determines the same unique complete
 > canonical history, regardless of delivery order or duplicate deliveries.
-> The abstract replay function terminates with that complete history.
+> The modeled insertion/repeated-pass replay loop terminates with that complete
+> history, including when genesis or another predecessor arrives late.
 
 The result quantifies over arbitrary finite models and evidence lists. It is not
 limited to the four-operation test graphs.
 
 ## Assumptions and exact meaning
 
-- Both nodes know the same valid genesis/root and use the same model. The theorem
-  describes final evidence after genesis is available, including deliveries in
-  which genesis arrived last; it does not model intermediate unknown-DID replies.
+- Both nodes agree on the same unique valid genesis/root ID and use the same
+  model. The root has no predecessor and is eventually included in retained
+  evidence. Cold replay starts without an accepted genesis and installs it only
+  when its candidate is processed. Genesis signature/type validation is assumed;
+  HTTP unknown-DID replies are not modeled.
 - Each distinct canonical operation CID is represented by its rank in ASCII CID
   order, from zero to `size - 1`. This mapping is injective and order preserving.
   `size` is a sentinel, never an operation. Canonicalization, hashing, signatures,
@@ -36,7 +39,8 @@ limited to the four-operation test graphs.
   confirmations, registry migrations, key changes, deletions, asset controllers,
   time-bounded queries, or representation-dependent authorization decisions.
 - Evidence is retained. The two lists need the same membership, not the same
-  order or multiplicities. Missing evidence, garbage collection, network delivery
+  order or multiplicities. An unavailable predecessor can be absent from that
+  evidence; its candidate stays deferred. Garbage collection, network delivery
   guarantees, storage failures, and concurrent publication are outside the model.
 
 The output is the accepted operation-ID path, including genesis. The theorem
@@ -55,6 +59,11 @@ metadata become identical.
 | `complete_unique` | There is only one complete canonical successor path for a given root and evidence. |
 | `terminal_histories_agree` | Any complete canonical selections from the same evidence agree, not just two executions of one function. |
 | `convergence` | Abstract reconciliation gives equal complete histories from the same evidence, regardless of the previous projection. |
+| `import_eq_insert` | Duplicate-checking, early-return predecessor lookup agrees with the simpler path-scanning insertion used by the proof. |
+| `rounds_eq_suffix` | From any retained valid path, full replay passes reach the canonical suffix within the graph-level bound. |
+| `operational_replay_converges` | Warm replay's stop-on-unchanged loop terminates within `level(root) + 1` complete passes and returns the canonical suffix. |
+| `cold_replay_converges` | Cold replay, including late genesis, returns the canonical history within `level(root) + 2` passes. |
+| `cold_replay_same_evidence` | Operational cold replay agrees for any two evidence lists with the same membership, including different orders and multiplicities. |
 
 `winner` folds over the actual evidence list, taking the minimum eligible ID.
 `suffix` repeatedly selects a child. Its recursion terminates on a depth bound;
@@ -77,13 +86,44 @@ The specification models the decision in
 provisional siblings, keep the smallest canonical CID. It also models retained
 candidates and reconstructing the accepted projection from that evidence.
 
-**It does not prove the production replay loop implements this specification.**
-TypeScript and Rust incrementally insert candidates, replace branches, and repeat
-passes until unchanged. The abstract `reconcile` function directly computes the
-canonical projection and ignores its stale input. Its convergence theorem does
-not establish termination, fairness, pass bounds, or correctness of those
-optimized insertion loops. That refinement proof is the next gap to close in
-this same bounded domain, before claiming either implementation formally verified.
+`OperationalReplay.lean` models the importer separately from the canonical
+projection. Its executable insertion/replay functions never call `winner`,
+`suffix`, or `history`. They perform duplicate detection, predecessor lookup,
+append, smaller-CID sibling replacement with suffix truncation, and repeated
+complete scans with the stop-on-unchanged check.
+
+| Implementation behavior | Operational model |
+| --- | --- |
+| Duplicate operation ID leaves the selected operation path unchanged | `importCandidate` membership check |
+| No accepted predecessor defers the candidate | `lookupInsert` reaches the end without a matching predecessor and leaves the path unchanged |
+| A successor of the current tip appends | `lookupInsert` matching leaf |
+| A preferred sibling discards the displaced suffix | `lookupInsert` smaller-ID branch |
+| Startup starts with an empty accepted history | `coldPass` starts at `none`; only the root candidate creates a history |
+| A whole candidate pass repeats until the history is unchanged | `untilStable`; cold replay accounts separately for the first genesis-loading pass |
+
+The proof first relates an easier path-scanning insertion to early-return
+predecessor lookup on valid acyclic paths. A full pass installs the minimum
+retained eligible child. Once installed, that child cannot be displaced, so
+subsequent passes work on its suffix. Induction on the explicit graph level
+proves a pass bound. Reaching the canonical path also makes the next pass
+unchanged, so the stopping loop cannot exhaust its bound or stop on a different
+history. `untilStable` returns `none` on bound exhaustion, rather than a
+successful truncated path. Cold replay also returns `none` when genesis is
+absent; the cold convergence theorem requires genesis in retained evidence.
+
+**This proves refinement between two Lean models, not verification of the actual
+TypeScript or Rust executables.** Their duplicate paths can replace event
+representations, and their loop compares serialized event records, while this
+model compares operation-ID paths. Registry/receipt metadata, queues, caches,
+I/O failures, and concurrent publication are not modeled. The proven pass bound
+therefore applies to the Lean operation-path model, not every runtime event-row
+transition. Source inspection and shared signed fixtures connect these models
+to Gatekeeper behavior, but are not a formal compiler/source refinement proof.
+
+The same complete finite evidence list is scanned on every pass. The theorem
+allows any ordering and duplicates in that list; it assumes processing completes,
+without interleaved evidence mutation. Runtime partial/incremental evidence is
+covered only when a reconciliation has its complete retained snapshot.
 
 `generate-fixtures.mjs` bridges the existing
 [shared signed fixtures](../../tests/convergence/vectors.json) into Lean:
@@ -93,8 +133,10 @@ this same bounded domain, before claiming either implementation formally verifie
 2. Sort complete canonical CIDs in ASCII order and assign numeric ranks.
 3. Translate predecessors and derive a finite depth witness from the graph.
 4. Generate a checked acyclicity proof for every fixture model.
-5. Generate 420 concrete history equalities for the eligible delivery traces,
-   using the expected histories already checked by both Gatekeepers.
+5. For each of 420 eligible delivery traces, check the canonical projection,
+   operational cold replay, and cold replay with the evidence repeated in reverse
+   order against the expected history already checked by both Gatekeepers. This
+   gives 1,260 kernel-checked history equalities.
 
 The bridge excludes chain/foreign-anchor scenarios and controller-fork fixtures.
 It does not recheck signatures: the existing TypeScript/Rust tests do that. The
@@ -143,9 +185,9 @@ update must also update and verify the committed checksum.
 
 ## Follow-up proof work
 
-1. Relate ordinary insertion and repeated replay passes to this unique complete
-   projection, proving termination and recovery of late predecessors in the
-   bounded fixed-authorization domain.
+1. Strengthen the connection from the checked operational model to each runtime,
+   including event representations and the serialized-history stopping condition.
+   The operation-path insertion/replay refinement itself is now proved.
 2. Extend agent authorization to key rotation and deletion, preserving the
    predecessor-selected authorizing document.
 3. Add expected-chain evidence, repeated anchors, and registry migrations.
@@ -153,6 +195,7 @@ update must also update and verify the committed checksum.
 5. Model retention, restart, and garbage collection, then strengthen the bridge
    between the specification and both runtime implementations.
 
-The full Archon convergence theorem remains open. This project proves its first
-bounded mathematical component and makes the remaining implementation obligation
-explicit.
+The full Archon convergence theorem remains open. The canonical projection and
+its bounded operational refinement are proved; expanded authorization/chain
+semantics and the connection to the runtime implementations remain explicit
+obligations.
