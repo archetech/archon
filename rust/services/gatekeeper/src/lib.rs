@@ -2,6 +2,8 @@ mod api;
 mod app;
 mod authorization;
 mod config;
+#[cfg(test)]
+mod convergence;
 mod events;
 mod history;
 mod metrics;

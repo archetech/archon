@@ -147,3 +147,5 @@ These rules apply to coding agents working in this repository.
 - Protocol documentation must distinguish whole-component replacement from field merging, predecessor-registry confirmation from a migration's resulting registry, and accepted-branch deletion from later evidence revalidation. Cross-check both Gatekeepers before turning explanatory prose into acceptance requirements.
 
 - When consolidating protocol rules, search procedural checklists and pseudocode for superseded wording too; a new normative table does not correct contradictory identity, size-limit, or registry-selection instructions elsewhere.
+
+- Convergence investigations must distinguish identical signed operations from identical event evidence: Hyperswarm receipt ordinals can differ across nodes or tie across batches. Reproduce competing signed branches through ordinary importers; proof-time cutoffs alone do not establish branch-order independence. Keep restricted models and finite permutation tests separate from universal convergence claims.
