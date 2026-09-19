@@ -1,6 +1,6 @@
 name = "archonAgentConvergence"
 version = "0.1.0"
-defaultTargets = ["AgentConvergence", "OperationalReplay", "Fixtures", "AxiomAudit", "EventRecords", "RecordFixtures", "FullReplay", "SerializedReplay"]
+defaultTargets = ["AgentConvergence", "OperationalReplay", "Fixtures", "AxiomAudit", "EventRecords", "RecordFixtures", "FullReplay", "SerializedReplay", "AgentAuthorization", "AgentFixtures"]
 
 [[lean_lib]]
 name = "AgentConvergence"
@@ -25,3 +25,9 @@ name = "FullReplay"
 
 [[lean_lib]]
 name = "SerializedReplay"
+
+[[lean_lib]]
+name = "AgentAuthorization"
+
+[[lean_lib]]
+name = "AgentFixtures"

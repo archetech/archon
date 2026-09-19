@@ -1,4 +1,5 @@
 import SerializedReplay
+import AgentAuthorization
 import Lean.Util.CollectAxioms
 import Lean.Elab.Command
 
@@ -21,7 +22,9 @@ run_cmd do
       ``Archon.encode_reflects_of_roundtrip, ``Archon.encoded_stop_eq,
       ``Archon.encoded_stop_eq_on_orbit,
       ``Archon.full_cold_loop_converges, ``Archon.serialized_cold_converges,
-      ``Archon.history_wire_roundtrip, ``Archon.serialized_array_converges] do
+      ``Archon.agent_authorization_matches, ``Archon.agent_deleted_terminal,
+      ``Archon.agent_rotation_uses_previous_key, ``Archon.rotating_agent_converges,
+      ``Archon.rotating_agent_same_evidence, ``Archon.history_wire_roundtrip, ``Archon.serialized_array_converges] do
     let dependencies ← Lean.collectAxioms theoremName
     for dependency in dependencies do
       unless allowed.contains dependency do

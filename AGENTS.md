@@ -165,3 +165,5 @@ These rules apply to coding agents working in this repository.
 - When extending Lean replay proofs, prove the event-to-ID projection and complete-path phase boundary before reusing path/metadata bounds. Keep synthetic receipt projection examples distinct from full signed-record bridge cases, and retain the existing transitive axiom allowlist.
 
 - Replay proof bridges should compare the actual per-event replay importers against Lean-checked intermediate pass states and the final serialized stopping decision, while retaining public ingress/restart coverage. Codec round-trip assumptions apply to normalized JSON/model values, not arbitrary JavaScript object identity; finite bridge traces do not prove general serializer or executable refinement.
+
+- In convergence models, derive an agent operation's signing authority from its signed predecessor chain. Deletion makes that predecessor terminal; it does not prevent a preferred sibling from replacing a deleted branch through an earlier live predecessor. Keep signature-oracle assumptions distinct from executable verification claims.
