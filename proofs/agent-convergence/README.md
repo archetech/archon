@@ -1,4 +1,4 @@
-# Provisional agent-history convergence (#1199, #1201)
+# Provisional agent-history convergence (#1199, #1201, #1203)
 
 This Lean project proves a bounded specification and an operational replay
 model of Archon's canonical-CID successor rule. It changes no runtime code. It uses Lean's standard library only;
@@ -114,8 +114,9 @@ absent; the cold convergence theorem requires genesis in retained evidence.
 **This proves refinement between two Lean models, not verification of the actual
 TypeScript or Rust executables.** Their duplicate paths can replace event
 representations, and their loop compares serialized event records, while this
-model compares operation-ID paths. Registry/receipt metadata, queues, caches,
-I/O failures, and concurrent publication are not modeled. The proven pass bound
+model compares operation-ID paths. Registry/receipt metadata is handled separately
+by the settled-path result below; queues, caches, I/O failures, and concurrent
+publication are not modeled. The proven pass bound
 therefore applies to the Lean operation-path model, not every runtime event-row
 transition. Source inspection and shared signed fixtures connect these models
 to Gatekeeper behavior, but are not a formal compiler/source refinement proof.
@@ -143,6 +144,53 @@ It does not recheck signatures: the existing TypeScript/Rust tests do that. The
 bridge is test evidence connecting the model to implementations, not a formal
 proof of the generator, CID-ranking abstraction, or either runtime.
 
+## Full event records after path selection — #1203
+
+`EventRecords.lean` proves the duplicate-replacement phase separately. For an
+already settled operation path and fixed authorization/registry expectations,
+a complete journal scan settles every representation. A second scan leaves the
+**entire record** unchanged. The stop-on-record-equality loop therefore returns
+within two scans. Once settled, any subset, permutation, or repetition of the
+same evidence is inert.
+
+`EventRecord` contains an operation ID, a Boolean indicating equality to the
+expected registry, and an arbitrary payload representing all other event fields.
+An expected-registry record stays unchanged; otherwise a matching, authorized
+expected-registry receipt replaces it. A different operation ID cannot replace
+that record. Expected registry does not mean blockchain confirmation: `local`,
+Hyperswarm, and `pin` can be the expected registry too.
+
+| Declaration | Result |
+| --- | --- |
+| `settled_scan_unchanged` | After one complete per-record scan, any further scan of retained evidence is inert. |
+| `record_pass_eq_map` | Scanning events over a fixed history equals independently settling each record. |
+| `record_pass_preserves_path` | Representation changes preserve every selected operation ID. |
+| `record_pass_idempotent` | A second complete scan preserves all record fields. |
+| `record_loop_terminates` | The full-record equality loop terminates within two passes in this phase. |
+
+The model assumes unique operation IDs in the accepted path, as in Gatekeeper;
+its map then updates the same single record as the duplicate lookup. It assumes
+all modeled promotions pass authorization, fixed registry expectations, and no
+candidate can append, replace a sibling, or remove a selected operation. Events
+outside the selected path are inert in this phase. It does not establish these
+conditions for the combined runtime replay loop. In particular, the earlier
+operation-path theorem cannot simply be reused as a theorem about full events
+without proving the projection and phase-composition obligations.
+
+The shared `tests/convergence/record-cases.json` references real signed operations
+from `vectors.json`. Both ports check complete records after ordinary imports,
+reverse duplicate delivery, and startup recovery. The cases cover promotion of
+both genesis and an update, nonpreferred receipts, and competing receipts from
+the expected registry. The generator maps those complete JSON event payloads to
+Lean strings and checks 12 full-record equalities across four cases. JSON strings
+are opaque payloads here; their generation and equivalence to either runtime's
+serialization are tested abstraction boundaries, not formally proved ones.
+
+Two cases deliver the same local receipts in different orders. Their operation
+paths agree, but their retained ordinals differ: the first expected-registry
+receipt wins. Thus stability within one replay must not be described as identical
+metadata across nodes. This result introduces no new protocol behavior.
+
 ## Reproduce
 
 Install Elan using the [official Lean instructions](https://lean-lang.org/install/manual/).
@@ -152,6 +200,7 @@ From the repository root:
 
 ```sh
 node proofs/agent-convergence/generate-fixtures.mjs --check
+node proofs/agent-convergence/generate-record-fixtures.mjs --check
 cd proofs/agent-convergence
 lake build
 ```
@@ -169,6 +218,7 @@ node tests/convergence/generate-vectors.mjs
 git diff --exit-code -- tests/convergence/vectors.json
 node --test proofs/agent-convergence/generate-fixtures.test.mjs
 node proofs/agent-convergence/generate-fixtures.mjs --check
+node proofs/agent-convergence/generate-record-fixtures.mjs --check
 ```
 
 Run that block from the repository root. CI performs it before building Lean and
@@ -185,9 +235,10 @@ update must also update and verify the committed checksum.
 
 ## Follow-up proof work
 
-1. Strengthen the connection from the checked operational model to each runtime,
-   including event representations and the serialized-history stopping condition.
-   The operation-path insertion/replay refinement itself is now proved.
+1. Compose the operation-path replay and settled-path record results into one
+   event importer, including branch truncation, late genesis, and representation
+   replacement in the same passes. Then connect structural record equality to
+   each runtime serializer. Separate phase theorems do not prove that composition.
 2. Extend agent authorization to key rotation and deletion, preserving the
    predecessor-selected authorizing document.
 3. Add expected-chain evidence, repeated anchors, and registry migrations.

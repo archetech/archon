@@ -158,3 +158,19 @@ This proves refinement between Lean models. Actual Gatekeeper loops compare full
 event records, while the model compares canonical operation-ID paths; event
 representation, metadata, I/O, and source/compiler refinement remain outside the
 proof. Runtime code is unchanged. See [the operational model and proof boundaries](../../proofs/agent-convergence/README.md).
+
+## Settled-path event representation proof — #1203
+
+The next bounded Lean result covers duplicate representations on an already
+settled operation path. One complete journal scan settles every event record;
+the next scan is unchanged, including opaque metadata. Four shared signed cases
+check full event records in both Gatekeepers through imports, duplicates, and
+startup recovery, with 12 corresponding Lean equalities. First expected-registry
+receipts can differ across delivery orders even when operation paths agree.
+
+This is a separate phase theorem, not yet a proof of the combined full-event
+replay loop. The next obligation is to prove its operation-ID projection and
+compose branch-changing passes, genesis initialization, and metadata replacement,
+then connect structural equality to runtime serialization. Key rotation, deletion,
+chain priority, assets, and executable refinement remain open. Runtime code and
+protocol acceptance are unchanged. See the [proof boundaries](../../proofs/agent-convergence/README.md#full-event-records-after-path-selection--1203).

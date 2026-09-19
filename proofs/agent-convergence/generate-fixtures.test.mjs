@@ -42,3 +42,20 @@ test('reordering the operation table preserves the model, root, and every trace'
     }
     assert.equal(generateFixtures(input).result, generateFixtures(fixture).result);
 });
+
+// Representation cases use complete event payloads and the same signed operation table.
+const recordCases = JSON.parse(readFileSync(new URL('../../tests/convergence/record-cases.json', import.meta.url), 'utf8'));
+const { generateRecordFixtures } = await import('./generate-record-fixtures.mjs');
+
+test('signed representation cases reproduce the committed full-record examples', () => {
+    assert.equal(generateRecordFixtures(fixture, recordCases), readFileSync(new URL('./RecordFixtures.lean', import.meta.url), 'utf8'));
+});
+
+test('representation bridge rejects branch changes and broken initial paths', () => {
+    const outside = structuredClone(recordCases);
+    outside.cases[0].events.at(-1).operation = 2;
+    assert.throws(() => generateRecordFixtures(fixture, outside), /only duplicates of the settled path/);
+    const broken = structuredClone(recordCases);
+    broken.cases[0].events[2].operation = 2;
+    assert.throws(() => generateRecordFixtures(fixture, broken), /predecessor linked/);
+});

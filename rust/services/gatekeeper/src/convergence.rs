@@ -248,3 +248,94 @@ async fn convergence_controller_fork_replays_asset_authorization() {
         }
     }
 }
+
+#[tokio::test]
+async fn convergence_full_event_records_settle() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../../../tests/convergence/vectors.json")).unwrap();
+    let cases: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/record-cases.json"
+    ))
+    .unwrap();
+    let vector = fixture["histories"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|h| h["registry"] == cases["registry"])
+        .unwrap();
+    let did = vector["did"].as_str().unwrap();
+    for case in cases["cases"].as_array().unwrap() {
+        let (state, _directory) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        let events: Vec<Value> = case["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                let index = e["operation"].as_u64().unwrap() as usize;
+                json!({ "operation": vector["operations"][index], "opid": vector["ids"][index],
+                "registry": e["registry"], "ordinal": e["ordinal"], "did": did,
+                "time": vector["operations"][index]["proof"]["created"] })
+            })
+            .collect();
+        let select = |field: &str| -> Vec<crate::EventRecord> {
+            case[field]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|i| {
+                    serde_json::from_value(events[i.as_u64().unwrap() as usize].clone()).unwrap()
+                })
+                .collect()
+        };
+        let initial = serde_json::to_value(select("initial")).unwrap();
+        let expected = serde_json::to_value(select("expected")).unwrap();
+        for (index, event) in events.iter().enumerate() {
+            crate::import_batch_impl(&state, &[event.clone()]).await;
+            crate::process_events_impl(&state).await;
+            if index + 1 == case["initial"].as_array().unwrap().len() {
+                assert_eq!(
+                    serde_json::to_value(state.store.lock().await.get_events(did)).unwrap(),
+                    initial,
+                    "{} initial",
+                    case["name"]
+                );
+            }
+        }
+        assert_eq!(
+            serde_json::to_value(state.store.lock().await.get_events(did)).unwrap(),
+            expected,
+            "{} imported",
+            case["name"]
+        );
+        let reversed: Vec<_> = events.iter().rev().cloned().collect();
+        crate::import_batch_impl(&state, &reversed).await;
+        crate::process_events_impl(&state).await;
+        assert_eq!(
+            serde_json::to_value(state.store.lock().await.get_events(did)).unwrap(),
+            expected,
+            "{} repeated",
+            case["name"]
+        );
+        let data =
+            serde_json::from_value(serde_json::to_value(&state.store.lock().await.data).unwrap())
+                .unwrap();
+        let (restarted, _restart_directory) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data,
+            redis_connection: None,
+        });
+        crate::history::ensure_history_ready(&restarted)
+            .await
+            .unwrap();
+        assert_eq!(
+            serde_json::to_value(restarted.store.lock().await.get_events(did)).unwrap(),
+            expected,
+            "{} restarted",
+            case["name"]
+        );
+    }
+}

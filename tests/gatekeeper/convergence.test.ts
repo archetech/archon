@@ -82,3 +82,34 @@ it.each(fixture.controllerForks)('replays asset authorization after a preferred 
         }
     }
 }, 30000);
+
+// The same signed operations, with distinct receipts for a single canonical ID.
+const recordCases: { registry: string; cases: { name: string;
+    events: { operation: number; registry: string; ordinal: number[] }[];
+    initial: number[]; expected: number[] }[] } = JSON.parse(readFileSync('tests/convergence/record-cases.json', 'utf8'));
+
+it.each(recordCases.cases)('settles full event records: $name', async c => {
+    const v = fixture.histories.find(h => h.registry === recordCases.registry)!;
+    const db = new DbMemory('record-convergence');
+    const ipfs = new MemoryClient();
+    let g = new Gatekeeper({ db, ipfs });
+    const events: GatekeeperEvent[] = c.events.map(e => ({
+        operation: v.operations[e.operation], registry: e.registry, ordinal: e.ordinal,
+        time: v.operations[e.operation].proof!.created, opid: v.ids[e.operation], did: v.did,
+    }));
+    for (const [index, event] of events.entries()) {
+        await g.importBatch([structuredClone(event)]);
+        await g.processEvents();
+        if (index === c.initial.length - 1) {
+            expect(await db.getEvents(v.did)).toEqual(c.initial.map(i => events[i]));
+        }
+    }
+    const expected = c.expected.map(i => events[i]);
+    expect(await db.getEvents(v.did)).toEqual(expected);
+    await g.importBatch(structuredClone(events).reverse());
+    await g.processEvents();
+    expect(await db.getEvents(v.did)).toEqual(expected);
+    g = new Gatekeeper({ db, ipfs });
+    await g.resolveDID(v.did, { verify: true });
+    expect(await db.getEvents(v.did)).toEqual(expected);
+});

@@ -61,6 +61,7 @@ jobs:
         run: |
           node --test proofs/agent-convergence/generate-fixtures.test.mjs
           node proofs/agent-convergence/generate-fixtures.mjs --check
+          node proofs/agent-convergence/generate-record-fixtures.mjs --check
       - name: Check proofs and concrete histories
         working-directory: proofs/agent-convergence
         run: lake build
