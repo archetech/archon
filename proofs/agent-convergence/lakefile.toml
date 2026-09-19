@@ -1,0 +1,9 @@
+name = "archonAgentConvergence"
+version = "0.1.0"
+defaultTargets = ["AgentConvergence", "Fixtures"]
+
+[[lean_lib]]
+name = "AgentConvergence"
+
+[[lean_lib]]
+name = "Fixtures"

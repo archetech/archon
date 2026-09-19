@@ -133,3 +133,13 @@ selection; this separately replaces receipt-order fork selection. Apply the same
 preference in import and replay, preserve chain ordering and signed bytes, and
 audit production evidence before rollout. See the [implementation and validation
 record](canonical-order-1197.md). #1156 remains paused.
+
+## Bounded formal convergence proof — #1199
+
+The first Lean specification proves unique complete provisional histories for
+one fixed-authorization agent with finite acyclic predecessor evidence. It
+covers arbitrary delivery permutations and duplicates, with a checked bridge to
+420 existing signed traces. This proves the abstract canonical projection, not
+the optimized TypeScript/Rust replay loops. The next obligation is to refine
+those loops to this specification before expanding authorization and chain
+semantics. See [the theorem, assumptions, and reproduction instructions](../../proofs/agent-convergence/README.md).
