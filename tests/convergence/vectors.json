@@ -1,0 +1,1559 @@
+{
+  "histories": [
+    {
+      "registry": "hyperswarm",
+      "did": "did:cid:bagaaieran2cpfeatvqcitr3oy2gfli5xhqo266ra635wgbhgbzmcnlhyctea",
+      "operations": [
+        {
+          "type": "create",
+          "created": "2026-09-01T00:00:00Z",
+          "registration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "hyperswarm"
+          },
+          "publicJwk": {
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "HPN-tWH4ACIpOFWGD0cSICXAkpoF9vCMUD7X8jJcr9U",
+            "y": "8EVbh5iu_NdN4tZ5hrkjrxS4bO1xkJDpzn5zBVb3cuM"
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:00Z",
+            "verificationMethod": "#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "H9gLZuBZTV3psukY4c-cVTnLG-3YKhlcTt3mp0xaRjU0g1p4aR8FNyKhAbhqwwU4I0LPmEIfBvO9A_UgmNNH4Q"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaieran2cpfeatvqcitr3oy2gfli5xhqo266ra635wgbhgbzmcnlhyctea",
+          "previd": "bagaaieran2cpfeatvqcitr3oy2gfli5xhqo266ra635wgbhgbzmcnlhyctea",
+          "doc": {
+            "didDocumentData": {
+              "state": "left"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:01Z",
+            "verificationMethod": "did:cid:bagaaieran2cpfeatvqcitr3oy2gfli5xhqo266ra635wgbhgbzmcnlhyctea#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "NZklFHM_SXFnQVKnLTagsFG9jzbJ-CAT8GNXspKiysQQz311wAmVS7f9s31N6L8c_1r0nYKIXAub8mnJq94jGQ"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaieran2cpfeatvqcitr3oy2gfli5xhqo266ra635wgbhgbzmcnlhyctea",
+          "previd": "bagaaieran2cpfeatvqcitr3oy2gfli5xhqo266ra635wgbhgbzmcnlhyctea",
+          "doc": {
+            "didDocumentData": {
+              "state": "right"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:02Z",
+            "verificationMethod": "did:cid:bagaaieran2cpfeatvqcitr3oy2gfli5xhqo266ra635wgbhgbzmcnlhyctea#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "D04_tgs95ax8KtWdDv_7BHuJkD-M6tzmVqp4z8meuFh8njHFAsB8yY7Uiex8Fu-JT4W55s2KNGdO9KferSJcKQ"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaieran2cpfeatvqcitr3oy2gfli5xhqo266ra635wgbhgbzmcnlhyctea",
+          "previd": "bagaaieras5x7sxw25znduxoan5ycvwwedxfnua2r2tfnkpsuon5nsj7trgla",
+          "doc": {
+            "didDocumentData": {
+              "state": "left-child"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:03Z",
+            "verificationMethod": "did:cid:bagaaieran2cpfeatvqcitr3oy2gfli5xhqo266ra635wgbhgbzmcnlhyctea#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "hLelD9VmGgnXGFjZOTbFUSoJjN4iG0LMOlDDfBFC8CNWb0LY8SEHOLMV-W95Zsanq0pLaHs5C3WB9aU4Nfn7Bw"
+          }
+        }
+      ],
+      "ids": [
+        "bagaaieran2cpfeatvqcitr3oy2gfli5xhqo266ra635wgbhgbzmcnlhyctea",
+        "bagaaieras5x7sxw25znduxoan5ycvwwedxfnua2r2tfnkpsuon5nsj7trgla",
+        "bagaaieraqocflmc7x5xnzjm4bzr2f3guydmub6snwgk5lzlbmkjrlheylfaa",
+        "bagaaieraw6y7stm5nryos26rrj4u34rtt7unjvq3jxxmfcnvmypj2gkavftq"
+      ]
+    },
+    {
+      "registry": "local",
+      "did": "did:cid:bagaaierae6kl5h2opsnxoobtdwy43kbl3bxiquktltnhazsmjpnh5cpdptya",
+      "operations": [
+        {
+          "type": "create",
+          "created": "2026-09-01T00:00:00Z",
+          "registration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "local"
+          },
+          "publicJwk": {
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "HPN-tWH4ACIpOFWGD0cSICXAkpoF9vCMUD7X8jJcr9U",
+            "y": "8EVbh5iu_NdN4tZ5hrkjrxS4bO1xkJDpzn5zBVb3cuM"
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:00Z",
+            "verificationMethod": "#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "GdZdFiMVSo0DKX1sJSuAqjp9hLbKme6e8pxZBUWjDkQa862t5xAxChKYki_CMKvZQdtmiJz0R0491ypbg7uPyw"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierae6kl5h2opsnxoobtdwy43kbl3bxiquktltnhazsmjpnh5cpdptya",
+          "previd": "bagaaierae6kl5h2opsnxoobtdwy43kbl3bxiquktltnhazsmjpnh5cpdptya",
+          "doc": {
+            "didDocumentData": {
+              "state": "left"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:01Z",
+            "verificationMethod": "did:cid:bagaaierae6kl5h2opsnxoobtdwy43kbl3bxiquktltnhazsmjpnh5cpdptya#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "cfP6yVoqnP9CN_KUhUqpQU1wwoNzLaQ58cEP8TgdhmRQyg9wiAoswH60LPMjP8ai63BkWFjfrEBmUKNif-VshQ"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierae6kl5h2opsnxoobtdwy43kbl3bxiquktltnhazsmjpnh5cpdptya",
+          "previd": "bagaaierae6kl5h2opsnxoobtdwy43kbl3bxiquktltnhazsmjpnh5cpdptya",
+          "doc": {
+            "didDocumentData": {
+              "state": "right"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:02Z",
+            "verificationMethod": "did:cid:bagaaierae6kl5h2opsnxoobtdwy43kbl3bxiquktltnhazsmjpnh5cpdptya#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "2reiJU96TPeDW8KSSR3jqGjcoXpHZbZNxFhpqp8VXuoO_ewQ3zHL2bo1Z7n8dOVeYo1gJTjAHjy2uucJWl_9pQ"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierae6kl5h2opsnxoobtdwy43kbl3bxiquktltnhazsmjpnh5cpdptya",
+          "previd": "bagaaierazygzkztucinmvgy73jty2brpjmc4bqvbgvxmtj7nsfrq3d4rjzta",
+          "doc": {
+            "didDocumentData": {
+              "state": "left-child"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:03Z",
+            "verificationMethod": "did:cid:bagaaierae6kl5h2opsnxoobtdwy43kbl3bxiquktltnhazsmjpnh5cpdptya#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "iLhSgr_8qTREhDQN7EaELIEGVlFy_QmMTwQ1DnYAKOdkAOQfZ7On9O6SMppUZZLRpGHXG2wRYCUxPJawEQs2Iw"
+          }
+        }
+      ],
+      "ids": [
+        "bagaaierae6kl5h2opsnxoobtdwy43kbl3bxiquktltnhazsmjpnh5cpdptya",
+        "bagaaierazygzkztucinmvgy73jty2brpjmc4bqvbgvxmtj7nsfrq3d4rjzta",
+        "bagaaieragdydpt525nx3dclifcxrlwfhr3mrq2l4c75yl636imb4e777pv5q",
+        "bagaaiera3xa2toevlmdelo6vdwfrl5xredsnttsojhjpaccequlyc2yff6xq"
+      ]
+    },
+    {
+      "registry": "pin",
+      "did": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+      "operations": [
+        {
+          "type": "create",
+          "created": "2026-09-01T00:00:00Z",
+          "registration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "pin"
+          },
+          "publicJwk": {
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "HPN-tWH4ACIpOFWGD0cSICXAkpoF9vCMUD7X8jJcr9U",
+            "y": "8EVbh5iu_NdN4tZ5hrkjrxS4bO1xkJDpzn5zBVb3cuM"
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:00Z",
+            "verificationMethod": "#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "9LQSw19tdwl-Y2PdRcTPtYlqYm0js5vAy4WMwK8z9q16yyYsk7Wvh9NFsejww3-qMomNr7740vm1D0gjHLct5A"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+          "previd": "bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+          "doc": {
+            "didDocumentData": {
+              "state": "left"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:01Z",
+            "verificationMethod": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "Rtdo6jzrYKfy8mcU9hvrpVaivUt00AjxwWsclheWoydbI2J7ZoWNtLmnlAjxAnyUmLPBCzVTvncdj3RKqkJ4tw"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+          "previd": "bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+          "doc": {
+            "didDocumentData": {
+              "state": "right"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:02Z",
+            "verificationMethod": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "PqANSvUp08swXbBjffmMh54j6qCerlg_AtB37yzwqEk0XmFF4NMDAWRAKynIbAbGMmFi5WKwg1g5kUiPesjeqw"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+          "previd": "bagaaieraoaximfcskakeaq6sz3v7t55mwebtvvld4myo3bxg7p43mkyb5p2q",
+          "doc": {
+            "didDocumentData": {
+              "state": "left-child"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:03Z",
+            "verificationMethod": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "KnCJcC-zGFQ21Mo01iiu1GT_3d1PMmZvDHc3mcnAdi8QQ2aWGwgU8AOAnpnm_lTxwRCQNFZralSDYJwZpU7X1A"
+          }
+        }
+      ],
+      "ids": [
+        "bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+        "bagaaieraoaximfcskakeaq6sz3v7t55mwebtvvld4myo3bxg7p43mkyb5p2q",
+        "bagaaieraeilqajvj6arddqjxc75flktlbbrywueagmxjsxc3k3s3fkizohkq",
+        "bagaaiera3puyr573c4hdbnjep2tzhoclrvxtmpswgrpiq7brua4yodohbqia"
+      ]
+    },
+    {
+      "registry": "BTC:signet",
+      "did": "did:cid:bagaaierabpcwh67vfmrqndvpyr4xl3edrvu7bhhouldul3b6zcjogn7fcyoq",
+      "operations": [
+        {
+          "type": "create",
+          "created": "2026-09-01T00:00:00Z",
+          "registration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "BTC:signet"
+          },
+          "publicJwk": {
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "HPN-tWH4ACIpOFWGD0cSICXAkpoF9vCMUD7X8jJcr9U",
+            "y": "8EVbh5iu_NdN4tZ5hrkjrxS4bO1xkJDpzn5zBVb3cuM"
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:00Z",
+            "verificationMethod": "#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "tkpggoVkj5u4BnKZDy1aGl_fN9R5cR07zyk3WJp_QGs-raV_d_Xanvy-5R3-ImV5oWqkIToa9nrJyGet2i3MPw"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierabpcwh67vfmrqndvpyr4xl3edrvu7bhhouldul3b6zcjogn7fcyoq",
+          "previd": "bagaaierabpcwh67vfmrqndvpyr4xl3edrvu7bhhouldul3b6zcjogn7fcyoq",
+          "doc": {
+            "didDocumentData": {
+              "state": "left"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:01Z",
+            "verificationMethod": "did:cid:bagaaierabpcwh67vfmrqndvpyr4xl3edrvu7bhhouldul3b6zcjogn7fcyoq#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "pe_j60aSV-ZVa4qv31GlqZ6uDt6WNlmVqBTd5YYxTbF1pezB5OtKW0rGq82eC2nGYEMGUr2yW2ld5Crbv0BmRQ"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierabpcwh67vfmrqndvpyr4xl3edrvu7bhhouldul3b6zcjogn7fcyoq",
+          "previd": "bagaaierabpcwh67vfmrqndvpyr4xl3edrvu7bhhouldul3b6zcjogn7fcyoq",
+          "doc": {
+            "didDocumentData": {
+              "state": "right"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:02Z",
+            "verificationMethod": "did:cid:bagaaierabpcwh67vfmrqndvpyr4xl3edrvu7bhhouldul3b6zcjogn7fcyoq#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "Fz02AJ-3ZA6UB-ZvDkonCuE4DB7A0KaxOtonPUpE0AI-apfi6YI2duc93yMLwjftXrVUlu6LWQy9usYxeqpPnQ"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierabpcwh67vfmrqndvpyr4xl3edrvu7bhhouldul3b6zcjogn7fcyoq",
+          "previd": "bagaaierapdy76t4yn2ruayjqxhekw3kyfqxbv6x5e7njjd4nvnff2alcntkq",
+          "doc": {
+            "didDocumentData": {
+              "state": "left-child"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:03Z",
+            "verificationMethod": "did:cid:bagaaierabpcwh67vfmrqndvpyr4xl3edrvu7bhhouldul3b6zcjogn7fcyoq#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "C5K1poNaflOqoAecTKEHiVSUGfxhlxcSoDx_G6pJMpJn2BAF6iXg-vQxf6QoX_66nII6nQZIw3ggBqzgZHEYmw"
+          }
+        }
+      ],
+      "ids": [
+        "bagaaierabpcwh67vfmrqndvpyr4xl3edrvu7bhhouldul3b6zcjogn7fcyoq",
+        "bagaaierapdy76t4yn2ruayjqxhekw3kyfqxbv6x5e7njjd4nvnff2alcntkq",
+        "bagaaieraza5gtffmfmkgs6m77dzhnax5kmmeridq32q34artjxb7bqx3wema",
+        "bagaaieraql5kuudqo2jvcgab6q5jmeajg4dpgjnn6j3rgth6mlbxlsukzxia"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "hyperswarm/hyperswarm/fresh/linear",
+      "registry": "hyperswarm",
+      "transport": "hyperswarm",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "hyperswarm/hyperswarm/fresh/fork",
+      "registry": "hyperswarm",
+      "transport": "hyperswarm",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "hyperswarm/hyperswarm/tied/linear",
+      "registry": "hyperswarm",
+      "transport": "hyperswarm",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "hyperswarm/hyperswarm/tied/fork",
+      "registry": "hyperswarm",
+      "transport": "hyperswarm",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "hyperswarm/mixed/fresh/linear",
+      "registry": "hyperswarm",
+      "transport": "mixed",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "hyperswarm/mixed/fresh/fork",
+      "registry": "hyperswarm",
+      "transport": "mixed",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "hyperswarm/mixed/tied/linear",
+      "registry": "hyperswarm",
+      "transport": "mixed",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "hyperswarm/mixed/tied/fork",
+      "registry": "hyperswarm",
+      "transport": "mixed",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "hyperswarm/foreign-anchor/fresh/linear",
+      "registry": "hyperswarm",
+      "transport": "foreign-anchor",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "hyperswarm/foreign-anchor/fresh/fork",
+      "registry": "hyperswarm",
+      "transport": "foreign-anchor",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "hyperswarm/foreign-anchor/tied/linear",
+      "registry": "hyperswarm",
+      "transport": "foreign-anchor",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "hyperswarm/foreign-anchor/tied/fork",
+      "registry": "hyperswarm",
+      "transport": "foreign-anchor",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "local/local/fresh/linear",
+      "registry": "local",
+      "transport": "local",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "local/local/fresh/fork",
+      "registry": "local",
+      "transport": "local",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "local/local/tied/linear",
+      "registry": "local",
+      "transport": "local",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "local/local/tied/fork",
+      "registry": "local",
+      "transport": "local",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "pin/pin/fresh/linear",
+      "registry": "pin",
+      "transport": "pin",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "pin/pin/fresh/fork",
+      "registry": "pin",
+      "transport": "pin",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "pin/pin/tied/linear",
+      "registry": "pin",
+      "transport": "pin",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "pin/pin/tied/fork",
+      "registry": "pin",
+      "transport": "pin",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "pin/pin-mixed/fresh/linear",
+      "registry": "pin",
+      "transport": "pin-mixed",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "pin/pin-mixed/fresh/fork",
+      "registry": "pin",
+      "transport": "pin-mixed",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "pin/pin-mixed/tied/linear",
+      "registry": "pin",
+      "transport": "pin-mixed",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "pin/pin-mixed/tied/fork",
+      "registry": "pin",
+      "transport": "pin-mixed",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "BTC:signet/BTC:signet/fixed/linear",
+      "registry": "BTC:signet",
+      "transport": "BTC:signet",
+      "receipts": "fixed",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "BTC:signet/BTC:signet/fixed/fork",
+      "registry": "BTC:signet",
+      "transport": "BTC:signet",
+      "receipts": "fixed",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,1,3]},
+        {"order":[0,1,3,2],"expected":[0,1,3]},
+        {"order":[0,2,1,3],"expected":[0,1,3]},
+        {"order":[0,2,3,1],"expected":[0,1,3]},
+        {"order":[0,3,1,2],"expected":[0,1,3]},
+        {"order":[0,3,2,1],"expected":[0,1,3]},
+        {"order":[1,0,2,3],"expected":[0,1,3]},
+        {"order":[1,0,3,2],"expected":[0,1,3]},
+        {"order":[1,2,0,3],"expected":[0,1,3]},
+        {"order":[1,2,3,0],"expected":[0,1,3]},
+        {"order":[1,3,0,2],"expected":[0,1,3]},
+        {"order":[1,3,2,0],"expected":[0,1,3]},
+        {"order":[2,0,1,3],"expected":[0,1,3]},
+        {"order":[2,0,3,1],"expected":[0,1,3]},
+        {"order":[2,1,0,3],"expected":[0,1,3]},
+        {"order":[2,1,3,0],"expected":[0,1,3]},
+        {"order":[2,3,0,1],"expected":[0,1,3]},
+        {"order":[2,3,1,0],"expected":[0,1,3]},
+        {"order":[3,0,1,2],"expected":[0,1,3]},
+        {"order":[3,0,2,1],"expected":[0,1,3]},
+        {"order":[3,1,0,2],"expected":[0,1,3]},
+        {"order":[3,1,2,0],"expected":[0,1,3]},
+        {"order":[3,2,0,1],"expected":[0,1,3]},
+        {"order":[3,2,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "BTC:signet/hyperswarm/fresh/linear",
+      "registry": "BTC:signet",
+      "transport": "hyperswarm",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "BTC:signet/hyperswarm/fresh/fork",
+      "registry": "BTC:signet",
+      "transport": "hyperswarm",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,1,3]},
+        {"order":[0,1,3,2],"expected":[0,1,3]},
+        {"order":[0,2,1,3],"expected":[0,1,3]},
+        {"order":[0,2,3,1],"expected":[0,1,3]},
+        {"order":[0,3,1,2],"expected":[0,1,3]},
+        {"order":[0,3,2,1],"expected":[0,1,3]},
+        {"order":[1,0,2,3],"expected":[0,1,3]},
+        {"order":[1,0,3,2],"expected":[0,1,3]},
+        {"order":[1,2,0,3],"expected":[0,1,3]},
+        {"order":[1,2,3,0],"expected":[0,1,3]},
+        {"order":[1,3,0,2],"expected":[0,1,3]},
+        {"order":[1,3,2,0],"expected":[0,1,3]},
+        {"order":[2,0,1,3],"expected":[0,1,3]},
+        {"order":[2,0,3,1],"expected":[0,1,3]},
+        {"order":[2,1,0,3],"expected":[0,1,3]},
+        {"order":[2,1,3,0],"expected":[0,1,3]},
+        {"order":[2,3,0,1],"expected":[0,1,3]},
+        {"order":[2,3,1,0],"expected":[0,1,3]},
+        {"order":[3,0,1,2],"expected":[0,1,3]},
+        {"order":[3,0,2,1],"expected":[0,1,3]},
+        {"order":[3,1,0,2],"expected":[0,1,3]},
+        {"order":[3,1,2,0],"expected":[0,1,3]},
+        {"order":[3,2,0,1],"expected":[0,1,3]},
+        {"order":[3,2,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "BTC:signet/hyperswarm/tied/linear",
+      "registry": "BTC:signet",
+      "transport": "hyperswarm",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "BTC:signet/hyperswarm/tied/fork",
+      "registry": "BTC:signet",
+      "transport": "hyperswarm",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,1,3]},
+        {"order":[0,1,3,2],"expected":[0,1,3]},
+        {"order":[0,2,1,3],"expected":[0,1,3]},
+        {"order":[0,2,3,1],"expected":[0,1,3]},
+        {"order":[0,3,1,2],"expected":[0,1,3]},
+        {"order":[0,3,2,1],"expected":[0,1,3]},
+        {"order":[1,0,2,3],"expected":[0,1,3]},
+        {"order":[1,0,3,2],"expected":[0,1,3]},
+        {"order":[1,2,0,3],"expected":[0,1,3]},
+        {"order":[1,2,3,0],"expected":[0,1,3]},
+        {"order":[1,3,0,2],"expected":[0,1,3]},
+        {"order":[1,3,2,0],"expected":[0,1,3]},
+        {"order":[2,0,1,3],"expected":[0,1,3]},
+        {"order":[2,0,3,1],"expected":[0,1,3]},
+        {"order":[2,1,0,3],"expected":[0,1,3]},
+        {"order":[2,1,3,0],"expected":[0,1,3]},
+        {"order":[2,3,0,1],"expected":[0,1,3]},
+        {"order":[2,3,1,0],"expected":[0,1,3]},
+        {"order":[3,0,1,2],"expected":[0,1,3]},
+        {"order":[3,0,2,1],"expected":[0,1,3]},
+        {"order":[3,1,0,2],"expected":[0,1,3]},
+        {"order":[3,1,2,0],"expected":[0,1,3]},
+        {"order":[3,2,0,1],"expected":[0,1,3]},
+        {"order":[3,2,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "BTC:signet/mixed/fresh/linear",
+      "registry": "BTC:signet",
+      "transport": "mixed",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "BTC:signet/mixed/fresh/fork",
+      "registry": "BTC:signet",
+      "transport": "mixed",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,1,3]},
+        {"order":[0,1,3,2],"expected":[0,1,3]},
+        {"order":[0,2,1,3],"expected":[0,1,3]},
+        {"order":[0,2,3,1],"expected":[0,1,3]},
+        {"order":[0,3,1,2],"expected":[0,1,3]},
+        {"order":[0,3,2,1],"expected":[0,1,3]},
+        {"order":[1,0,2,3],"expected":[0,1,3]},
+        {"order":[1,0,3,2],"expected":[0,1,3]},
+        {"order":[1,2,0,3],"expected":[0,1,3]},
+        {"order":[1,2,3,0],"expected":[0,1,3]},
+        {"order":[1,3,0,2],"expected":[0,1,3]},
+        {"order":[1,3,2,0],"expected":[0,1,3]},
+        {"order":[2,0,1,3],"expected":[0,1,3]},
+        {"order":[2,0,3,1],"expected":[0,1,3]},
+        {"order":[2,1,0,3],"expected":[0,1,3]},
+        {"order":[2,1,3,0],"expected":[0,1,3]},
+        {"order":[2,3,0,1],"expected":[0,1,3]},
+        {"order":[2,3,1,0],"expected":[0,1,3]},
+        {"order":[3,0,1,2],"expected":[0,1,3]},
+        {"order":[3,0,2,1],"expected":[0,1,3]},
+        {"order":[3,1,0,2],"expected":[0,1,3]},
+        {"order":[3,1,2,0],"expected":[0,1,3]},
+        {"order":[3,2,0,1],"expected":[0,1,3]},
+        {"order":[3,2,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "BTC:signet/mixed/tied/linear",
+      "registry": "BTC:signet",
+      "transport": "mixed",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "BTC:signet/mixed/tied/fork",
+      "registry": "BTC:signet",
+      "transport": "mixed",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,1,3]},
+        {"order":[0,1,3,2],"expected":[0,1,3]},
+        {"order":[0,2,1,3],"expected":[0,1,3]},
+        {"order":[0,2,3,1],"expected":[0,1,3]},
+        {"order":[0,3,1,2],"expected":[0,1,3]},
+        {"order":[0,3,2,1],"expected":[0,1,3]},
+        {"order":[1,0,2,3],"expected":[0,1,3]},
+        {"order":[1,0,3,2],"expected":[0,1,3]},
+        {"order":[1,2,0,3],"expected":[0,1,3]},
+        {"order":[1,2,3,0],"expected":[0,1,3]},
+        {"order":[1,3,0,2],"expected":[0,1,3]},
+        {"order":[1,3,2,0],"expected":[0,1,3]},
+        {"order":[2,0,1,3],"expected":[0,1,3]},
+        {"order":[2,0,3,1],"expected":[0,1,3]},
+        {"order":[2,1,0,3],"expected":[0,1,3]},
+        {"order":[2,1,3,0],"expected":[0,1,3]},
+        {"order":[2,3,0,1],"expected":[0,1,3]},
+        {"order":[2,3,1,0],"expected":[0,1,3]},
+        {"order":[3,0,1,2],"expected":[0,1,3]},
+        {"order":[3,0,2,1],"expected":[0,1,3]},
+        {"order":[3,1,0,2],"expected":[0,1,3]},
+        {"order":[3,1,2,0],"expected":[0,1,3]},
+        {"order":[3,2,0,1],"expected":[0,1,3]},
+        {"order":[3,2,1,0],"expected":[0,1,3]}
+      ]
+    }
+  ],
+  "controllerForks": [
+    {
+      "legacy": true,
+      "controller": "did:cid:bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a",
+      "asset": "did:cid:bagaaierax2rgddedib6ss6ylgifdxt4mudivc4e76khxwc7kuvyrxfvvsy6a",
+      "operations": [
+        {
+          "type": "create",
+          "created": "2026-09-04T00:51:32.000Z",
+          "registration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "hyperswarm"
+          },
+          "publicJwk": {
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "K76DuhryMNwGqWAgeqy-TLUBcgWOfVHR_NWJoYoa0bA",
+            "y": "pI6NEwYJoCODIauDlw6GOtCa0pFsGH8ywcnNdwSM7UY"
+          },
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-09-04T00:51:32.000Z",
+            "verificationMethod": "#key-1",
+            "proofPurpose": "authentication",
+            "proofValue": "nmpvkOUXN4QV3lAx1JVeNaF7UXgZU5sJs6ibYAiyw3l1oyVWEyDfx5QE7JcuyZJYItFbaxuY8ziDn3Zp3i9eYw"
+          }
+        },
+        {
+          "type": "create",
+          "created": "2026-09-04T00:51:32.120Z",
+          "registration": {
+            "version": 1,
+            "type": "asset",
+            "registry": "hyperswarm"
+          },
+          "controller": "did:cid:bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a",
+          "data": {
+            "state": "created"
+          },
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-09-04T00:51:32.120Z",
+            "verificationMethod": "did:cid:bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a#key-1",
+            "proofPurpose": "authentication",
+            "proofValue": "pXx2TSV3PxwgHSbzcLwscfVXbF0y4KJ9F5ieSTRyk3NUQLZbw1SAFbU3jEOhIudahYcyRThSH_j5-ugEpGF_wQ"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierax2rgddedib6ss6ylgifdxt4mudivc4e76khxwc7kuvyrxfvvsy6a",
+          "previd": "bagaaierax2rgddedib6ss6ylgifdxt4mudivc4e76khxwc7kuvyrxfvvsy6a",
+          "doc": {
+            "didDocumentData": {
+              "state": "updated"
+            }
+          },
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-09-04T00:51:32.400Z",
+            "verificationMethod": "did:cid:bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a#key-1",
+            "proofPurpose": "authentication",
+            "proofValue": "n4NjRcvCFc3xHhb9pJCDSBStfNoerrYQfPvNRaZW6lZJv_-w-6INSc9yDdfj-D7F-xw0RcN4p9IvMaN_3oiA9Q"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a",
+          "previd": "bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a",
+          "doc": {
+            "didDocument": {
+              "@context": [
+                "https://www.w3.org/ns/did/v1"
+              ],
+              "id": "did:cid:bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a",
+              "verificationMethod": [
+                {
+                  "id": "#key-2",
+                  "controller": "did:cid:bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a",
+                  "type": "EcdsaSecp256k1VerificationKey2019",
+                  "publicKeyJwk": {
+                    "kty": "EC",
+                    "crv": "secp256k1",
+                    "x": "yH3_sn1Dabzy_Dx1zwsblTNI8fBBdAsI7OL0QI2qEYs",
+                    "y": "fQwRXfnQdGQp_bvGC_auOwxL_rUHrQZ3qbeY7rqBZBY"
+                  }
+                }
+              ],
+              "authentication": [
+                "#key-2"
+              ],
+              "assertionMethod": [
+                "#key-2"
+              ],
+              "capabilityInvocation": [
+                "#key-2"
+              ]
+            }
+          },
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-09-04T00:51:32.807Z",
+            "verificationMethod": "did:cid:bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a#key-1",
+            "proofPurpose": "authentication",
+            "proofValue": "mY1dBLQGMrCGBa0hzS7fsFNs7_8bp4Vu80KSM9Yvx38spoNTgxN2RzTNU7hHNKhwB0aE1NvQh3GJ5pKUIOEgTQ"
+          }
+        },
+        {
+          "type": "delete",
+          "did": "did:cid:bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a",
+          "previd": "bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a",
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-09-04T00:51:32.807Z",
+            "verificationMethod": "did:cid:bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a#key-1",
+            "proofPurpose": "authentication",
+            "proofValue": "7qqRqEcRcCS9llOMTLTJVqCFNRht5FFFcvkh3xuqvURSbsyJBYWFJat6vx8DdxA98OzB-CD7R_HPy-sY_jL3mA"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierax2rgddedib6ss6ylgifdxt4mudivc4e76khxwc7kuvyrxfvvsy6a",
+          "previd": "bagaaiera6bgo3prodoqjg6ignzzagdidbhirczip72twtni76kt7wfhs2y5a",
+          "doc": {
+            "didDocumentData": {
+              "state": "rotated"
+            }
+          },
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-09-04T00:51:32.900Z",
+            "verificationMethod": "did:cid:bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a#key-2",
+            "proofPurpose": "authentication",
+            "proofValue": "2jVWSruyWcfC3c_GMJlHym7Irsr6aeXfgOzx_-Ons-huZy-guEZocaQGvAc9qcLn-HpRl7OsTKzGAPYzLbW9Rg"
+          }
+        }
+      ],
+      "ids": [
+        "bagaaiera6jswvfjcnwhvnok7cgbsuwum22cc3ylqikeyohhqxg3l4azyom7a",
+        "bagaaierax2rgddedib6ss6ylgifdxt4mudivc4e76khxwc7kuvyrxfvvsy6a",
+        "bagaaiera6bgo3prodoqjg6ignzzagdidbhirczip72twtni76kt7wfhs2y5a",
+        "bagaaiera4ezn7zu3734iilokp7intqa6oxsfbxk3no4icrza6nqgkkjv3lra",
+        "bagaaierad2jjadcunwb3jlzcmeyd74scdneq2wlj5bi555z55656ex6h5mla",
+        "bagaaieraxxe7hib25hqgvcnn6swmsmmbliwdrdssakafnoybzrdzurulwv7q"
+      ],
+      "orders": [
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        [
+          5,
+          4,
+          3,
+          2,
+          1,
+          0
+        ],
+        [
+          1,
+          2,
+          5,
+          0,
+          3,
+          4
+        ],
+        [
+          0,
+          3,
+          4,
+          1,
+          2,
+          5
+        ],
+        [
+          3,
+          4,
+          5,
+          2,
+          1,
+          0
+        ],
+        [
+          0,
+          1,
+          2,
+          4,
+          5,
+          3
+        ]
+      ],
+      "controllerPath": [
+        0,
+        3
+      ],
+      "assetPath": [
+        1,
+        2,
+        5
+      ]
+    },
+    {
+      "legacy": false,
+      "controller": "did:cid:bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa",
+      "asset": "did:cid:bagaaierahyujlve34slwdfjgjlfw3bbaxrwnowyim47d4zhw2o7jkze2l7oa",
+      "operations": [
+        {
+          "type": "create",
+          "created": "2026-09-04T00:51:32.000Z",
+          "registration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "hyperswarm"
+          },
+          "publicJwk": {
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "K76DuhryMNwGqWAgeqy-TLUBcgWOfVHR_NWJoYoa0bA",
+            "y": "pI6NEwYJoCODIauDlw6GOtCa0pFsGH8ywcnNdwSM7UY"
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-04T00:51:32.000Z",
+            "verificationMethod": "#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "578RN7DsVVZQTr87Z7XmB6pbNnr08ghstk7eLHIB0ngsLrdHzEMxTuY77SAZirsApvsw0Pk4iAYDJ0G2oyisZw"
+          }
+        },
+        {
+          "type": "create",
+          "created": "2026-09-04T00:51:32.120Z",
+          "registration": {
+            "version": 1,
+            "type": "asset",
+            "registry": "hyperswarm"
+          },
+          "controller": "did:cid:bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa",
+          "data": {
+            "state": "created"
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-04T00:51:32.120Z",
+            "verificationMethod": "did:cid:bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "xnHvNVxxcwZ7psq5nmD_xl_ecWCB4inWNnADsTt3j7QojvFn8pmxoteY1nOa-HZZECwq1bMJWz5Zwemp3moMKg"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierahyujlve34slwdfjgjlfw3bbaxrwnowyim47d4zhw2o7jkze2l7oa",
+          "previd": "bagaaierahyujlve34slwdfjgjlfw3bbaxrwnowyim47d4zhw2o7jkze2l7oa",
+          "doc": {
+            "didDocumentData": {
+              "state": "updated"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-04T00:51:32.400Z",
+            "verificationMethod": "did:cid:bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "HVOXOaifMFrLpz_HLjNWLURo1WxwpB8LVwEA2pA3ZPs1NDwd2yt0gQQAXl6AfEmFk2bf8Y7I6b6QTFsWch6tKw"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa",
+          "previd": "bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa",
+          "doc": {
+            "didDocument": {
+              "@context": [
+                "https://www.w3.org/ns/did/v1"
+              ],
+              "id": "did:cid:bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa",
+              "verificationMethod": [
+                {
+                  "id": "#key-2",
+                  "controller": "did:cid:bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa",
+                  "type": "EcdsaSecp256k1VerificationKey2019",
+                  "publicKeyJwk": {
+                    "kty": "EC",
+                    "crv": "secp256k1",
+                    "x": "yH3_sn1Dabzy_Dx1zwsblTNI8fBBdAsI7OL0QI2qEYs",
+                    "y": "fQwRXfnQdGQp_bvGC_auOwxL_rUHrQZ3qbeY7rqBZBY"
+                  }
+                }
+              ],
+              "authentication": [
+                "#key-2"
+              ],
+              "assertionMethod": [
+                "#key-2"
+              ],
+              "capabilityInvocation": [
+                "#key-2"
+              ]
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-04T00:51:32.807Z",
+            "verificationMethod": "did:cid:bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "d9viAAlMRNfoytJ58GTSgk0R8PGYB-1p-ra8170rV0lv_iuHximJfLzp-How5vBqqqefQIDhcsK3LQraJAz6Mw"
+          }
+        },
+        {
+          "type": "delete",
+          "did": "did:cid:bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa",
+          "previd": "bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa",
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-04T00:51:32.807Z",
+            "verificationMethod": "did:cid:bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "J0cCFZu6sKfJlRPJKTBT4o7-kkmn07-lbU7x5AcZij820fIKB1BiZgqojHXSsB0DWKVdVdvuFJ_v9NVfQ7kdfA"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierahyujlve34slwdfjgjlfw3bbaxrwnowyim47d4zhw2o7jkze2l7oa",
+          "previd": "bagaaierapwjvzdbijpo3ofd2en4laglqey7dqx2d4dnykmyxtzldrwdwmesq",
+          "doc": {
+            "didDocumentData": {
+              "state": "rotated"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-04T00:51:32.900Z",
+            "verificationMethod": "did:cid:bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa#key-2",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "Wdg8xdtnsC6VNmHpGMQSStU3hEcJQMkAqgNTlO9s021Ije0IJ_wZJmF3jdr5pA7M2C0uIJzJSNEKAJQXA-fTeQ"
+          }
+        }
+      ],
+      "ids": [
+        "bagaaieramh75jbi7bl56faitzxi5mooqmgdi6ippe2bpmn3f7nhcnpk2e3aa",
+        "bagaaierahyujlve34slwdfjgjlfw3bbaxrwnowyim47d4zhw2o7jkze2l7oa",
+        "bagaaierapwjvzdbijpo3ofd2en4laglqey7dqx2d4dnykmyxtzldrwdwmesq",
+        "bagaaieranlw6rxswmdqlvanx6nbqdxhucbgwgkktl4lx3ob6sxua5geixf4a",
+        "bagaaiera2thbjcui77adznujifbikhisru4bc7lomtugcx2cps4pjlbkgw7a",
+        "bagaaieranraxkpszgrzvfvwdd7f4vbxfyqcp6m4g53ephczsaruwqcmrkfxa"
+      ],
+      "orders": [
+        [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        [
+          5,
+          4,
+          3,
+          2,
+          1,
+          0
+        ],
+        [
+          1,
+          2,
+          5,
+          0,
+          3,
+          4
+        ],
+        [
+          0,
+          3,
+          4,
+          1,
+          2,
+          5
+        ],
+        [
+          3,
+          4,
+          5,
+          2,
+          1,
+          0
+        ],
+        [
+          0,
+          1,
+          2,
+          3,
+          5,
+          4
+        ]
+      ],
+      "controllerPath": [
+        0,
+        4
+      ],
+      "assetPath": [
+        1,
+        2
+      ]
+    }
+  ]
+}

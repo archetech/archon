@@ -587,7 +587,42 @@ Controller constraints are enforced at the shared authorization boundary for dir
 
 Candidate journals persist across restart, including rejected candidates and replaced branches. Replay reconstructs accepted state before serving resolution after startup and refreshes dependent search and verification state. Existing databases adopt their stored histories into the journal; operations discarded before this upgrade must be recovered by rescanning their anchors. DID exports continue to contain accepted histories, so a DID export alone is not a backup of the candidate journal.
 
-This is convergence on available anchored evidence, not proof of complete history. If a relevant rotation never becomes available, the node cannot take it into account. Gossip hints retain their existing arrival-order semantics. Repeated observations of the same complete canonical operation in the same unanchored registry retain the first observation and do not trigger new authorization replay. Distinct blockchain anchors remain separate evidence; this does not introduce a trusted ordering for unanchored registries.
+This is convergence on available anchored evidence, not proof of complete history. If a relevant rotation never becomes available, the node cannot take it into account. Competing unanchored successors use the canonical-CID rule below, independently of receipt order. Repeated observations of the same complete canonical operation in the same unanchored registry retain the first observation and do not trigger new authorization replay. Distinct blockchain anchors remain separate evidence; CID priority is a deterministic conflict rule, not evidence of real-world chronology.
+
+### Competing unanchored successors
+
+Among valid competing successors of the same predecessor, when neither event
+confirms on the predecessor’s expected chain registry, the lexicographically
+smallest canonical operation CID wins. Compare the canonical lowercase base32 CID strings using
+ASCII ordering, including the complete proof in operation identity. This applies
+to hints for chain-registered DIDs as well as DIDs registered on Hyperswarm or
+local. The `pin` registry has no chain ordering and also uses CID priority,
+even when an event is labeled `pin`. An anchor on another registry is also
+provisional for this comparison.
+Receipt times, receipt ordinals, proof times, and batch delivery order do not
+choose between those siblings. `previd` still orders a successor after its
+predecessor; CID order is not a global sequence of all operations.
+
+A later preferred sibling replaces the previously accepted branch, and dependent
+histories are replayed. Candidate evidence for displaced branches remains
+retained. The same preference applies during ordinary import and reconstruction,
+including when a successor arrives before its predecessor. A valid confirmation
+on the predecessor's expected chain registry still takes precedence over hints;
+competition between chain events retains existing registry/ordinal rules.
+
+Replay retains the existing hint traversal order to avoid repeatedly processing
+long predecessor chains in arbitrary CID order. The shared importer applies CID
+priority when siblings compete, including on subsequent replay passes. Thus
+traversal order is not the branch-selection rule. Per-operation/per-registry
+deduplication still retains the first observation, but its receipt ordinal no
+longer chooses a competing unanchored branch. Historical time selection and
+same-operation confirmation behavior remain unchanged.
+
+This is the version-1 ordering decision in #1197. The [convergence report](plans/canonical-order-1197.md)
+records the production audit and tested boundaries. Both implementations must be
+upgraded together to apply this rule consistently; old nodes can still choose a
+different branch for a newly encountered fork. No operation bytes, signatures,
+genesis identifiers, or registry anchor positions are rewritten.
 
 ### Operation identity and retrieval references
 

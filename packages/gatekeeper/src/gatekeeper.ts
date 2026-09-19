@@ -1693,8 +1693,9 @@ export default class Gatekeeper implements GatekeeperInterface {
                 // of arrival order even when candidates compete for a predecessor.
                 const aHint = isUnanchoredRegistry(a.registry);
                 const bHint = isUnanchoredRegistry(b.registry);
-                // Preserve existing arrival-order semantics for local/gossip
-                // hints; they have no independently established chain order.
+                // Preserve the usually predecessor-first traversal of hints.
+                // importEventOnce selects competing siblings by canonical CID,
+                // so traversal order does not decide the unanchored winner.
                 if (aHint && bHint) return 0;
                 if (aHint !== bHint) return aHint ? -1 : 1;
                 if (a.registry !== b.registry) return a.registry < b.registry ? -1 : 1;
@@ -1915,16 +1916,20 @@ export default class Gatekeeper implements GatekeeperInterface {
 
                     const expectedRegistry = expectedRegistryForIndex(currentEvents, index + 1);
 
-                    if (expectedRegistry && event.registry === expectedRegistry) {
-                        const nextEvent = currentEvents[index + 1];
-
-                        if (nextEvent.registry !== event.registry ||
-                            (event.ordinal && nextEvent.ordinal && compareOrdinals(event.ordinal, nextEvent.ordinal) < 0)) {
-                            // reorg event, discard the rest of the operation sequence and replace with this event
-                            const newSequence = [...currentEvents.slice(0, index + 1), event];
-                            await this.db.setEvents(did, newSequence);
-                            return ImportStatus.ADDED;
-                        }
+                    const nextEvent = currentEvents[index + 1];
+                    const expectedChain = expectedRegistry && expectedRegistry !== PIN_QUEUE && !isUnanchoredRegistry(expectedRegistry);
+                    const incomingConfirmed = expectedChain && event.registry === expectedRegistry;
+                    const currentConfirmed = expectedChain && nextEvent.registry === expectedRegistry;
+                    const preferred = incomingConfirmed || currentConfirmed
+                        ? incomingConfirmed && (!currentConfirmed ||
+                            (event.ordinal && nextEvent.ordinal && compareOrdinals(event.ordinal, nextEvent.ordinal) < 0))
+                        : event.opid! < nextEvent.opid!;
+                    if (preferred) {
+                        // A preferred sibling replaces the branch, including when
+                        // it arrives before its predecessor and becomes applicable later.
+                        const newSequence = [...currentEvents.slice(0, index + 1), event];
+                        await this.db.setEvents(did, newSequence);
+                        return ImportStatus.ADDED;
                     }
                 }
 

@@ -369,6 +369,8 @@ async fn rebuild_histories(
             let a_hint = crate::is_unanchored_registry(&a.registry);
             let b_hint = crate::is_unanchored_registry(&b.registry);
             if a_hint && b_hint {
+                // Keep the usual predecessor-first traversal. The shared importer
+                // selects competing unanchored siblings by canonical CID.
                 return std::cmp::Ordering::Equal;
             }
             let registry = if a_hint != b_hint {

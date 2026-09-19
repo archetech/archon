@@ -1015,7 +1015,7 @@ describe('processEvents', () => {
         expect(response.rejected).toBe(1);  // Update without previd rejected
     });
 
-    it('should reject events with duplicate previd property', async () => {
+    it('should select the smallest canonical CID among competing local successors', async () => {
         const keypair = cipher.generateRandomJwk();
         const agentOp = await helper.createAgentOp(keypair);
         const agentDID = await gatekeeper.createDID(agentOp);
@@ -1054,8 +1054,11 @@ describe('processEvents', () => {
 
         await gatekeeper.importBatch(ops);
         const response = await gatekeeper.processEvents();
-        expect(response.added).toBe(1);
-        expect(response.rejected).toBe(2);
+        expect((response.added ?? 0) + (response.rejected ?? 0)).toBe(3);
+        expect(response.pending).toBe(0);
+        const ids = await Promise.all([updateOp1, updateOp2, updateOp3].map(op => gatekeeper.generateCID(op)));
+        const doc = await gatekeeper.resolveDID(agentDID, { verify: true });
+        expect(doc.didDocumentMetadata?.versionId).toBe(ids.sort()[0]);
     });
 
     it('should handle a reorg event', async () => {
@@ -1065,7 +1068,7 @@ describe('processEvents', () => {
         const agentDoc1 = await gatekeeper.resolveDID(agentDID);
 
         // Simulate a double-spend scenario where a bad actor creates a pair of inconsistent operations
-        // Only one of the pair can be confirmed and it depends on the order of operations
+        // Hints choose canonical CID; the chain subsequently chooses its own position order.
         const update1 = copyJSON(agentDoc1);
         update1.didDocumentData = { mock: 1 };
         const updateOp1 = await helper.createUpdateOp(keypair, agentDID, update1);
@@ -1090,12 +1093,13 @@ describe('processEvents', () => {
         // Simulate receiving events in reverse order from hyperswarm
         await gatekeeper.importBatch([event2, event1]);
         const response = await gatekeeper.processEvents();
-        expect(response.added).toBe(1);
-        expect(response.rejected).toBe(1);
+        expect((response.added ?? 0) + (response.rejected ?? 0)).toBe(2);
+        expect(response.pending).toBe(0);
 
         const agentDoc2 = await gatekeeper.resolveDID(agentDID);
-        // @ts-expect-error Testing invalid usage
-        expect(agentDoc2.didDocumentData.mock).toBe(2);
+        const cid1 = await gatekeeper.generateCID(updateOp1);
+        const cid2 = await gatekeeper.generateCID(updateOp2);
+        expect(agentDoc2.didDocumentData).toEqual({ mock: cid1 < cid2 ? 1 : 2 });
 
         const event3 = {
             registry: 'BTC:signet',
