@@ -14,7 +14,7 @@ function sign(op, method, second) {
     return { ...op, proof: { ...config, proofValue: Buffer.from(cipher.signHash(hash, key.privateJwk), 'hex').toString('base64url') } };
 }
 const vectors = [];
-for (const registry of ['hyperswarm', 'local', 'BTC:signet']) {
+for (const registry of ['hyperswarm', 'local', 'pin', 'BTC:signet']) {
     const create = sign({ type: 'create', created: time(0), registration: { version: 1, type: 'agent', registry }, publicJwk: key.publicJwk }, '#key-1', 0);
     const did = 'did:cid:' + await cid(create);
     const update = async (prev, state, second) => sign({ type: 'update', did, previd: await cid(prev), doc: { didDocumentData: { state } } }, did + '#key-1', second);
@@ -24,7 +24,7 @@ for (const registry of ['hyperswarm', 'local', 'BTC:signet']) {
     const operations = [create, left, right, child];
     const ids = await Promise.all(operations.map(cid));
     const graph = operations.map((op, index) => ({ type: op.type, parent: index === 0 ? undefined : ids.indexOf(op.previd) }));
-    const transports = registry === 'local' ? ['local'] : registry === 'hyperswarm' ? ['hyperswarm', 'mixed', 'foreign-anchor'] : ['BTC:signet', 'hyperswarm', 'mixed'];
+    const transports = registry === 'pin' ? ['pin', 'pin-mixed'] : registry === 'local' ? ['local'] : registry === 'hyperswarm' ? ['hyperswarm', 'mixed', 'foreign-anchor'] : ['BTC:signet', 'hyperswarm', 'mixed'];
     for (const transport of transports) {
         const anchored = transport === 'BTC:signet';
         for (const receipts of anchored ? ['fixed'] : ['fresh', 'tied']) {

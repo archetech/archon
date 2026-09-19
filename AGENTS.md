@@ -151,3 +151,5 @@ These rules apply to coding agents working in this repository.
 - Convergence work must exercise ordinary signed imports with tied receipts, late predecessors, mixed local/gossip hints, chain confirmation, and controller-dependent replay. Distinguish finite permutation coverage from a formal proof, and audit retained production evidence before claiming existing forks.
 
 - Choose provisional competing successors in the shared importer by canonical CID; do not globally CID-sort replay traversal. Preserve efficient predecessor-first processing and benchmark populated histories before changing replay ordering. An anchor outside the predecessor’s expected chain registry remains provisional for sibling preference.
+
+- For provisional sibling ordering, `pin` supplies no chain priority even though it is a supported DID registry. Keep this distinct from the local/Hyperswarm helper used for receipt deduplication; cover pin-only and mixed pin/local imports with signed convergence fixtures.

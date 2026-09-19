@@ -1917,7 +1917,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     const expectedRegistry = expectedRegistryForIndex(currentEvents, index + 1);
 
                     const nextEvent = currentEvents[index + 1];
-                    const expectedChain = expectedRegistry && !isUnanchoredRegistry(expectedRegistry);
+                    const expectedChain = expectedRegistry && expectedRegistry !== PIN_QUEUE && !isUnanchoredRegistry(expectedRegistry);
                     const incomingConfirmed = expectedChain && event.registry === expectedRegistry;
                     const currentConfirmed = expectedChain && nextEvent.registry === expectedRegistry;
                     const preferred = incomingConfirmed || currentConfirmed

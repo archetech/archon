@@ -53,9 +53,13 @@ async fn assert_projection(state: &AppState, vector: &Value, case: &Value) -> St
     for &index in path.iter().skip(1) {
         let registry = if vector["transport"] == "foreign-anchor" {
             json!(if index == 2 { "BTC:signet" } else { "local" })
-        } else if vector["transport"] == "mixed" {
+        } else if vector["transport"] == "mixed" || vector["transport"] == "pin-mixed" {
             json!(if index % 2 == 1 {
-                "hyperswarm"
+                if vector["transport"] == "pin-mixed" {
+                    "pin"
+                } else {
+                    "hyperswarm"
+                }
             } else {
                 "local"
             })
@@ -121,8 +125,10 @@ async fn convergence_delivery_permutations_match_restricted_model() {
                     let operation = &vector["operations"][index];
                     let registry = if vector["transport"] == "foreign-anchor" {
                         json!(if index == 2 { "BTC:signet" } else { "local" })
-                    } else if vector["transport"] == "mixed" {
-                        json!(if index % 2 == 1 { "hyperswarm" } else { "local" })
+                    } else if vector["transport"] == "mixed" || vector["transport"] == "pin-mixed" {
+                        json!(if index % 2 == 1 {
+                            if vector["transport"] == "pin-mixed" { "pin" } else { "hyperswarm" }
+                        } else { "local" })
                     } else {
                         vector["transport"].clone()
                     };

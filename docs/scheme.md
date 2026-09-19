@@ -596,7 +596,9 @@ confirms on the predecessor’s expected chain registry, the lexicographically
 smallest canonical operation CID wins. Compare the canonical lowercase base32 CID strings using
 ASCII ordering, including the complete proof in operation identity. This applies
 to hints for chain-registered DIDs as well as DIDs registered on Hyperswarm or
-local. An anchor on another registry is also provisional for this comparison.
+local. The `pin` registry has no chain ordering and also uses CID priority,
+even when an event is labeled `pin`. An anchor on another registry is also
+provisional for this comparison.
 Receipt times, receipt ordinals, proof times, and batch delivery order do not
 choose between those siblings. `previd` still orders a successor after its
 predecessor; CID order is not a global sequence of all operations.

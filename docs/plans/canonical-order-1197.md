@@ -63,7 +63,7 @@ chain evidence, controller authorization, migrations, duplicate representations,
 garbage collection, and a refinement argument connecting that model to both
 implementations. Receipt metadata itself is not promised to converge.
 
-## Validation results
+## Initial validation and benchmark results
 
 - TypeScript: 760 tests passed across the full Gatekeeper run and a separate
   recovery-suite rerun. Seven disk-recovery tests initially exceeded their
@@ -89,3 +89,18 @@ implementations. Receipt metadata itself is not promised to converge.
 These are single serial runs on a shared host, not a statistical performance
 claim. The same snapshot and persistence configuration were restored for each
 run, and recovered outputs were captured before resetting benchmark storage.
+
+## PR review: pin registry
+
+Review found that the local/Hyperswarm receipt helper is not a chain-registry
+predicate: `pin` is a supported DID registry but has no chain ordering. Four
+signed permutation scenarios failed before the correction. The sibling comparison
+now excludes `pin` from chain priority in both ports, without changing receipt
+deduplication or pinning queue behavior. The shared matrix adds 120 delivery
+traces for pin-only and mixed pin/local events, including fresh/tied receipts,
+late predecessors, repeated batches, and reconstruction.
+
+Follow-up validation: 124 focused TypeScript tests and both Rust convergence
+tests passed, covering all 522 shared delivery traces. Builds, root typecheck,
+lint (the same two existing warnings), and deterministic fixture regeneration
+also passed. The full HTTP parity suite passed again with the new pin cases.

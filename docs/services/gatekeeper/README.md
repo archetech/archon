@@ -1012,6 +1012,7 @@ The following is the insertion algorithm reused during replay:
        addEvent(did, event); return ADDED
    expectedRegistry = expected_registry_for_index(current, i + 1)
    next = current[i+1]
+   // local, hyperswarm, and pin do not supply chain priority
    incomingConfirmed = expectedRegistry is a chain registry and event.registry == expectedRegistry
    currentConfirmed = expectedRegistry is a chain registry and next.registry == expectedRegistry
    if incomingConfirmed or currentConfirmed:

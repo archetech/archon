@@ -905,7 +905,7 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
         let next_event = &current_events[index + 1];
         let expected_chain = expected_registry
             .as_deref()
-            .filter(|registry| !is_unanchored_registry(registry));
+            .filter(|registry| *registry != PIN_QUEUE && !is_unanchored_registry(registry));
         let incoming_confirmed = expected_chain == Some(event.registry.as_str());
         let current_confirmed = expected_chain == Some(next_event.registry.as_str());
         let preferred = if incoming_confirmed || current_confirmed {

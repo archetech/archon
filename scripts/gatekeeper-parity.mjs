@@ -1067,7 +1067,7 @@ async function runConvergenceParity() {
                         registration: { height, index: 0, txid: `tx${height}`, batch: `batch${height}` },
                     } }));
                 } else {
-                    const registry = v.transport === 'foreign-anchor' ? 'local' : v.transport === 'mixed' ? (index % 2 ? 'hyperswarm' : 'local') : v.transport;
+                    const registry = v.transport === 'foreign-anchor' ? 'local' : ['mixed', 'pin-mixed'].includes(v.transport) ? (index % 2 ? (v.transport === 'pin-mixed' ? 'pin' : 'hyperswarm') : 'local') : v.transport;
                     const ordinal = [1000 + (v.receipts === 'fresh' ? receipt : 0), 0];
                     await both(post('/api/v1/batch/import', [{ operation, registry, time: operation.proof.created, ordinal }]));
                 }

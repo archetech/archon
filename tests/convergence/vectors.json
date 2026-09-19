@@ -179,6 +179,95 @@
       ]
     },
     {
+      "registry": "pin",
+      "did": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+      "operations": [
+        {
+          "type": "create",
+          "created": "2026-09-01T00:00:00Z",
+          "registration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "pin"
+          },
+          "publicJwk": {
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "HPN-tWH4ACIpOFWGD0cSICXAkpoF9vCMUD7X8jJcr9U",
+            "y": "8EVbh5iu_NdN4tZ5hrkjrxS4bO1xkJDpzn5zBVb3cuM"
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:00Z",
+            "verificationMethod": "#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "9LQSw19tdwl-Y2PdRcTPtYlqYm0js5vAy4WMwK8z9q16yyYsk7Wvh9NFsejww3-qMomNr7740vm1D0gjHLct5A"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+          "previd": "bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+          "doc": {
+            "didDocumentData": {
+              "state": "left"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:01Z",
+            "verificationMethod": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "Rtdo6jzrYKfy8mcU9hvrpVaivUt00AjxwWsclheWoydbI2J7ZoWNtLmnlAjxAnyUmLPBCzVTvncdj3RKqkJ4tw"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+          "previd": "bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+          "doc": {
+            "didDocumentData": {
+              "state": "right"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:02Z",
+            "verificationMethod": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "PqANSvUp08swXbBjffmMh54j6qCerlg_AtB37yzwqEk0XmFF4NMDAWRAKynIbAbGMmFi5WKwg1g5kUiPesjeqw"
+          }
+        },
+        {
+          "type": "update",
+          "did": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+          "previd": "bagaaieraoaximfcskakeaq6sz3v7t55mwebtvvld4myo3bxg7p43mkyb5p2q",
+          "doc": {
+            "didDocumentData": {
+              "state": "left-child"
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:03Z",
+            "verificationMethod": "did:cid:bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "KnCJcC-zGFQ21Mo01iiu1GT_3d1PMmZvDHc3mcnAdi8QQ2aWGwgU8AOAnpnm_lTxwRCQNFZralSDYJwZpU7X1A"
+          }
+        }
+      ],
+      "ids": [
+        "bagaaierawogibragjij7jv4inixctiycpux5pnh35bo2uewa5zltkylhodiq",
+        "bagaaieraoaximfcskakeaq6sz3v7t55mwebtvvld4myo3bxg7p43mkyb5p2q",
+        "bagaaieraeilqajvj6arddqjxc75flktlbbrywueagmxjsxc3k3s3fkizohkq",
+        "bagaaiera3puyr573c4hdbnjep2tzhoclrvxtmpswgrpiq7brua4yodohbqia"
+      ]
+    },
+    {
       "registry": "BTC:signet",
       "did": "did:cid:bagaaierabpcwh67vfmrqndvpyr4xl3edrvu7bhhouldul3b6zcjogn7fcyoq",
       "operations": [
@@ -609,6 +698,190 @@
       "name": "local/local/tied/fork",
       "registry": "local",
       "transport": "local",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "pin/pin/fresh/linear",
+      "registry": "pin",
+      "transport": "pin",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "pin/pin/fresh/fork",
+      "registry": "pin",
+      "transport": "pin",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "pin/pin/tied/linear",
+      "registry": "pin",
+      "transport": "pin",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "pin/pin/tied/fork",
+      "registry": "pin",
+      "transport": "pin",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "pin/pin-mixed/fresh/linear",
+      "registry": "pin",
+      "transport": "pin-mixed",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "pin/pin-mixed/fresh/fork",
+      "registry": "pin",
+      "transport": "pin-mixed",
+      "receipts": "fresh",
+      "cases": [
+        {"order":[0,1,2,3],"expected":[0,2]},
+        {"order":[0,1,3,2],"expected":[0,2]},
+        {"order":[0,2,1,3],"expected":[0,2]},
+        {"order":[0,2,3,1],"expected":[0,2]},
+        {"order":[0,3,1,2],"expected":[0,2]},
+        {"order":[0,3,2,1],"expected":[0,2]},
+        {"order":[1,0,2,3],"expected":[0,2]},
+        {"order":[1,0,3,2],"expected":[0,2]},
+        {"order":[1,2,0,3],"expected":[0,2]},
+        {"order":[1,2,3,0],"expected":[0,2]},
+        {"order":[1,3,0,2],"expected":[0,2]},
+        {"order":[1,3,2,0],"expected":[0,2]},
+        {"order":[2,0,1,3],"expected":[0,2]},
+        {"order":[2,0,3,1],"expected":[0,2]},
+        {"order":[2,1,0,3],"expected":[0,2]},
+        {"order":[2,1,3,0],"expected":[0,2]},
+        {"order":[2,3,0,1],"expected":[0,2]},
+        {"order":[2,3,1,0],"expected":[0,2]},
+        {"order":[3,0,1,2],"expected":[0,2]},
+        {"order":[3,0,2,1],"expected":[0,2]},
+        {"order":[3,1,0,2],"expected":[0,2]},
+        {"order":[3,1,2,0],"expected":[0,2]},
+        {"order":[3,2,0,1],"expected":[0,2]},
+        {"order":[3,2,1,0],"expected":[0,2]}
+      ]
+    },
+    {
+      "name": "pin/pin-mixed/tied/linear",
+      "registry": "pin",
+      "transport": "pin-mixed",
+      "receipts": "tied",
+      "cases": [
+        {"order":[0,1,3],"expected":[0,1,3]},
+        {"order":[0,3,1],"expected":[0,1,3]},
+        {"order":[1,0,3],"expected":[0,1,3]},
+        {"order":[1,3,0],"expected":[0,1,3]},
+        {"order":[3,0,1],"expected":[0,1,3]},
+        {"order":[3,1,0],"expected":[0,1,3]}
+      ]
+    },
+    {
+      "name": "pin/pin-mixed/tied/fork",
+      "registry": "pin",
+      "transport": "pin-mixed",
       "receipts": "tied",
       "cases": [
         {"order":[0,1,2,3],"expected":[0,2]},
