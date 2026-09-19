@@ -1,0 +1,225 @@
+{
+  "registry": "local",
+  "cases": [
+    {
+      "name": "promote expected registry without changing the path",
+      "events": [
+        {
+          "operation": 0,
+          "registry": "pin",
+          "ordinal": [
+            100,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "pin",
+          "ordinal": [
+            101,
+            0
+          ]
+        },
+        {
+          "operation": 3,
+          "registry": "pin",
+          "ordinal": [
+            102,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "hyperswarm",
+          "ordinal": [
+            103,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "local",
+          "ordinal": [
+            104,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "local",
+          "ordinal": [
+            105,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "pin",
+          "ordinal": [
+            106,
+            0
+          ]
+        },
+        {
+          "operation": 0,
+          "registry": "local",
+          "ordinal": [
+            107,
+            0
+          ]
+        }
+      ],
+      "initial": [
+        0,
+        1,
+        2
+      ],
+      "expected": [
+        7,
+        4,
+        2
+      ]
+    },
+    {
+      "name": "retain first receipt without an expected representation",
+      "events": [
+        {
+          "operation": 0,
+          "registry": "pin",
+          "ordinal": [
+            100,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "pin",
+          "ordinal": [
+            101,
+            0
+          ]
+        },
+        {
+          "operation": 3,
+          "registry": "pin",
+          "ordinal": [
+            102,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "hyperswarm",
+          "ordinal": [
+            103,
+            0
+          ]
+        }
+      ],
+      "initial": [
+        0,
+        1,
+        2
+      ],
+      "expected": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "name": "retain first expected receipt even when another has a lower ordinal",
+      "events": [
+        {
+          "operation": 0,
+          "registry": "local",
+          "ordinal": [
+            100,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "local",
+          "ordinal": [
+            105,
+            0
+          ]
+        },
+        {
+          "operation": 3,
+          "registry": "local",
+          "ordinal": [
+            102,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "local",
+          "ordinal": [
+            104,
+            0
+          ]
+        }
+      ],
+      "initial": [
+        0,
+        1,
+        2
+      ],
+      "expected": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "name": "same operation path with the other expected receipt arriving first",
+      "events": [
+        {
+          "operation": 0,
+          "registry": "local",
+          "ordinal": [
+            100,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "local",
+          "ordinal": [
+            104,
+            0
+          ]
+        },
+        {
+          "operation": 3,
+          "registry": "local",
+          "ordinal": [
+            102,
+            0
+          ]
+        },
+        {
+          "operation": 1,
+          "registry": "local",
+          "ordinal": [
+            105,
+            0
+          ]
+        }
+      ],
+      "initial": [
+        0,
+        1,
+        2
+      ],
+      "expected": [
+        0,
+        1,
+        2
+      ]
+    }
+  ]
+}
