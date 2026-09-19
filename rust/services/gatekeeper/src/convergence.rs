@@ -344,3 +344,106 @@ async fn convergence_full_event_records_settle() {
         );
     }
 }
+
+#[tokio::test]
+async fn convergence_runtime_passes_match_lean_and_serialized_stopping() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../../../tests/convergence/vectors.json")).unwrap();
+    let cases: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/record-cases.json"
+    ))
+    .unwrap();
+    let vector = fixture["histories"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|h| h["registry"] == cases["registry"])
+        .unwrap();
+    let did = vector["did"].as_str().unwrap();
+    let settled = cases["cases"].as_array().unwrap();
+    for (case_index, case) in settled
+        .iter()
+        .chain(cases["replayCases"].as_array().unwrap())
+        .enumerate()
+    {
+        let events: Vec<crate::EventRecord> = case["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| {
+                let index = e["operation"].as_u64().unwrap() as usize;
+                serde_json::from_value(json!({ "operation": vector["operations"][index],
+                "opid": vector["ids"][index], "did": did, "registry": e["registry"],
+                "ordinal": e["ordinal"], "time": vector["operations"][index]["proof"]["created"] }))
+                .unwrap()
+            })
+            .collect();
+        let select = |indices: &Value| -> Vec<crate::EventRecord> {
+            indices
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|i| events[i.as_u64().unwrap() as usize].clone())
+                .collect()
+        };
+        for warm in [false, true] {
+            if warm && case_index >= settled.len() {
+                continue;
+            }
+            let (state, _directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            crate::history::ensure_history_ready(&state).await.unwrap();
+            let seed = if warm {
+                select(&case["initial"])
+            } else {
+                Vec::new()
+            };
+            // Exercise the exact routine used by history replay, with no ingress
+            // reconciliation between candidates; public imports are checked separately.
+            for event in &seed {
+                crate::events::import_event_once(&state, event.clone()).await;
+            }
+            assert!(state.store.lock().await.get_events(did) == seed);
+            let passes = if warm {
+                vec![case["expected"].clone()]
+            } else {
+                case["replayPasses"].as_array().unwrap().clone()
+            };
+            let mut stopped = false;
+            for expected in passes.iter().chain(std::iter::once(&case["expected"])) {
+                let before = state.store.lock().await.get_events(did);
+                let previous = serde_json::to_string(&before).unwrap();
+                let decoded: Vec<crate::EventRecord> = serde_json::from_str(&previous).unwrap();
+                assert!(decoded == before);
+                for event in &events {
+                    crate::events::import_event_once(&state, event.clone()).await;
+                }
+                let after = state.store.lock().await.get_events(did);
+                assert_eq!(
+                    serde_json::to_value(&after).unwrap(),
+                    serde_json::to_value(select(expected)).unwrap(),
+                    "{} warm={warm}",
+                    case["name"]
+                );
+                let serialized = serde_json::to_string(&after).unwrap();
+                let decoded: Vec<crate::EventRecord> = serde_json::from_str(&serialized).unwrap();
+                assert!(decoded == after);
+                assert_eq!(
+                    serialized == previous,
+                    after == before,
+                    "{} warm={warm} stopping",
+                    case["name"]
+                );
+                if serialized == previous {
+                    stopped = true;
+                    break;
+                }
+            }
+            assert!(stopped, "{} warm={warm} did not stop", case["name"]);
+            assert!(state.store.lock().await.get_events(did) == select(&case["expected"]));
+        }
+    }
+}

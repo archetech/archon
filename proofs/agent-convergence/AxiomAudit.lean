@@ -1,4 +1,4 @@
-import FullReplay
+import SerializedReplay
 import Lean.Util.CollectAxioms
 import Lean.Elab.Command
 
@@ -17,7 +17,11 @@ run_cmd do
       ``Archon.record_loop_terminates, ``Archon.event_import_ids,
       ``Archon.event_pass_complete, ``Archon.full_warm_converges,
       ``Archon.full_cold_converges, ``Archon.full_cold_same_operations,
-      ``Archon.valid_path_nodup, ``Archon.history_step_genesis] do
+      ``Archon.valid_path_nodup, ``Archon.history_step_genesis,
+      ``Archon.encode_reflects_of_roundtrip, ``Archon.encoded_stop_eq,
+      ``Archon.encoded_stop_eq_on_orbit,
+      ``Archon.full_cold_loop_converges, ``Archon.serialized_cold_converges,
+      ``Archon.history_wire_roundtrip, ``Archon.serialized_array_converges] do
     let dependencies ← Lean.collectAxioms theoremName
     for dependency in dependencies do
       unless allowed.contains dependency do
