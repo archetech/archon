@@ -23,8 +23,8 @@ example : chainReplay ops0 anchors0 [0] 1 [1, 4, 0, 3, 2, 1] = some [1, 2, 0] :=
 example : chainReplay ops0 anchors0 [0] 1 [4, 0, 3, 2, 1, 1] = some [1, 2, 0] := by
   rw [← chain_successors_same_evidence ops0 anchors0 [0] [0] [0, 1, 2, 3, 4] [4, 0, 3, 2, 1, 1] 1 (bounded_membership_agrees 1 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic0 (by decide) (by decide)]
   exact settled0
-example : chainReplay ops0 anchors0 [0] 1 [1, 4, 0, 3, 2, 1] = some [1, 2, 0] := by
-  rw [← chain_successors_same_evidence ops0 anchors0 [0] [0] [0, 1, 2, 3, 4] [1, 4, 0, 3, 2, 1] 1 (bounded_membership_agrees 1 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic0 (by decide) (by decide)]
+example : chainReplay ops0 anchors0 [0] 1 [1, 0, 2, 4, 3, 1] = some [1, 2, 0] := by
+  rw [← chain_successors_same_evidence ops0 anchors0 [0] [0] [0, 1, 2, 3, 4] [1, 0, 2, 4, 3, 1] 1 (bounded_membership_agrees 1 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic0 (by decide) (by decide)]
   exact settled0
 example : chainReplay ops0 anchors0 [0] 1 [3, 4, 1, 2, 0, 1] = some [1, 2, 0] := by
   rw [← chain_successors_same_evidence ops0 anchors0 [0] [0] [0, 1, 2, 3, 4] [3, 4, 1, 2, 0, 1] 1 (bounded_membership_agrees 1 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic0 (by decide) (by decide)]
@@ -53,8 +53,8 @@ example : chainReplay ops1 anchors1 [0, 2, 1] 1 [3, 2, 1, 4, 0, 3, 2, 1] = some 
 example : chainReplay ops1 anchors1 [1, 2, 0] 1 [4, 0, 3, 2, 1, 1, 2, 3] = some [1, 3, 4] := by
   rw [← chain_successors_same_evidence ops1 anchors1 [0, 1, 2] [1, 2, 0] [0, 1, 2, 3, 4] [4, 0, 3, 2, 1, 1, 2, 3] 1 (bounded_membership_agrees 3 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic1 (by decide) (by decide)]
   exact settled1
-example : chainReplay ops1 anchors1 [1, 2, 0] 1 [1, 2, 3, 4, 0, 3, 2, 1] = some [1, 3, 4] := by
-  rw [← chain_successors_same_evidence ops1 anchors1 [0, 1, 2] [1, 2, 0] [0, 1, 2, 3, 4] [1, 2, 3, 4, 0, 3, 2, 1] 1 (bounded_membership_agrees 3 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic1 (by decide) (by decide)]
+example : chainReplay ops1 anchors1 [1, 2, 0] 1 [1, 2, 3, 0, 2, 4, 3, 1] = some [1, 3, 4] := by
+  rw [← chain_successors_same_evidence ops1 anchors1 [0, 1, 2] [1, 2, 0] [0, 1, 2, 3, 4] [1, 2, 3, 0, 2, 4, 3, 1] 1 (bounded_membership_agrees 3 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic1 (by decide) (by decide)]
   exact settled1
 example : chainReplay ops1 anchors1 [0, 2, 1] 1 [3, 4, 1, 2, 0, 3, 2, 1] = some [1, 3, 4] := by
   rw [← chain_successors_same_evidence ops1 anchors1 [0, 1, 2] [0, 2, 1] [0, 1, 2, 3, 4] [3, 4, 1, 2, 0, 3, 2, 1] 1 (bounded_membership_agrees 3 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic1 (by decide) (by decide)]
@@ -83,8 +83,8 @@ example : chainReplay ops2 anchors2 [0, 1, 3, 2] 1 [2, 3, 2, 1, 4, 0, 3, 2, 1] =
 example : chainReplay ops2 anchors2 [2, 3, 1, 0] 1 [4, 0, 3, 2, 1, 1, 2, 3, 2] = some [1, 2, 0] := by
   rw [← chain_successors_same_evidence ops2 anchors2 [0, 1, 2, 3] [2, 3, 1, 0] [0, 1, 2, 3, 4] [4, 0, 3, 2, 1, 1, 2, 3, 2] 1 (bounded_membership_agrees 4 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic2 (by decide) (by decide)]
   exact settled2
-example : chainReplay ops2 anchors2 [2, 3, 1, 0] 1 [1, 2, 3, 2, 4, 0, 3, 2, 1] = some [1, 2, 0] := by
-  rw [← chain_successors_same_evidence ops2 anchors2 [0, 1, 2, 3] [2, 3, 1, 0] [0, 1, 2, 3, 4] [1, 2, 3, 2, 4, 0, 3, 2, 1] 1 (bounded_membership_agrees 4 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic2 (by decide) (by decide)]
+example : chainReplay ops2 anchors2 [2, 3, 1, 0] 1 [1, 2, 3, 2, 0, 2, 4, 3, 1] = some [1, 2, 0] := by
+  rw [← chain_successors_same_evidence ops2 anchors2 [0, 1, 2, 3] [2, 3, 1, 0] [0, 1, 2, 3, 4] [1, 2, 3, 2, 0, 2, 4, 3, 1] 1 (bounded_membership_agrees 4 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic2 (by decide) (by decide)]
   exact settled2
 example : chainReplay ops2 anchors2 [0, 1, 3, 2] 1 [3, 4, 1, 2, 0, 2, 3, 2, 1] = some [1, 2, 0] := by
   rw [← chain_successors_same_evidence ops2 anchors2 [0, 1, 2, 3] [0, 1, 3, 2] [0, 1, 2, 3, 4] [3, 4, 1, 2, 0, 2, 3, 2, 1] 1 (bounded_membership_agrees 4 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic2 (by decide) (by decide)]
@@ -113,8 +113,8 @@ example : chainReplay ops3 anchors3 [0] 4 [4, 2, 0, 3, 1, 4] = some [4, 1, 0] :=
 example : chainReplay ops3 anchors3 [0] 4 [2, 0, 3, 1, 4, 4] = some [4, 1, 0] := by
   rw [← chain_successors_same_evidence ops3 anchors3 [0] [0] [0, 1, 2, 3, 4] [2, 0, 3, 1, 4, 4] 4 (bounded_membership_agrees 1 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic3 (by decide) (by decide)]
   exact settled3
-example : chainReplay ops3 anchors3 [0] 4 [4, 2, 0, 3, 1, 4] = some [4, 1, 0] := by
-  rw [← chain_successors_same_evidence ops3 anchors3 [0] [0] [0, 1, 2, 3, 4] [4, 2, 0, 3, 1, 4] 4 (bounded_membership_agrees 1 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic3 (by decide) (by decide)]
+example : chainReplay ops3 anchors3 [0] 4 [4, 0, 1, 2, 3, 4] = some [4, 1, 0] := by
+  rw [← chain_successors_same_evidence ops3 anchors3 [0] [0] [0, 1, 2, 3, 4] [4, 0, 1, 2, 3, 4] 4 (bounded_membership_agrees 1 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic3 (by decide) (by decide)]
   exact settled3
 example : chainReplay ops3 anchors3 [0] 4 [3, 2, 4, 1, 0, 4] = some [4, 1, 0] := by
   rw [← chain_successors_same_evidence ops3 anchors3 [0] [0] [0, 1, 2, 3, 4] [3, 2, 4, 1, 0, 4] 4 (bounded_membership_agrees 1 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic3 (by decide) (by decide)]
@@ -143,8 +143,8 @@ example : chainReplay ops4 anchors4 [0, 2, 1] 4 [3, 1, 4, 2, 0, 3, 1, 4] = some 
 example : chainReplay ops4 anchors4 [1, 2, 0] 4 [2, 0, 3, 1, 4, 4, 1, 3] = some [4, 3, 2] := by
   rw [← chain_successors_same_evidence ops4 anchors4 [0, 1, 2] [1, 2, 0] [0, 1, 2, 3, 4] [2, 0, 3, 1, 4, 4, 1, 3] 4 (bounded_membership_agrees 3 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic4 (by decide) (by decide)]
   exact settled4
-example : chainReplay ops4 anchors4 [1, 2, 0] 4 [4, 1, 3, 2, 0, 3, 1, 4] = some [4, 3, 2] := by
-  rw [← chain_successors_same_evidence ops4 anchors4 [0, 1, 2] [1, 2, 0] [0, 1, 2, 3, 4] [4, 1, 3, 2, 0, 3, 1, 4] 4 (bounded_membership_agrees 3 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic4 (by decide) (by decide)]
+example : chainReplay ops4 anchors4 [1, 2, 0] 4 [4, 1, 3, 0, 1, 2, 3, 4] = some [4, 3, 2] := by
+  rw [← chain_successors_same_evidence ops4 anchors4 [0, 1, 2] [1, 2, 0] [0, 1, 2, 3, 4] [4, 1, 3, 0, 1, 2, 3, 4] 4 (bounded_membership_agrees 3 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic4 (by decide) (by decide)]
   exact settled4
 example : chainReplay ops4 anchors4 [0, 2, 1] 4 [3, 2, 4, 1, 0, 3, 1, 4] = some [4, 3, 2] := by
   rw [← chain_successors_same_evidence ops4 anchors4 [0, 1, 2] [0, 2, 1] [0, 1, 2, 3, 4] [3, 2, 4, 1, 0, 3, 1, 4] 4 (bounded_membership_agrees 3 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic4 (by decide) (by decide)]
@@ -173,8 +173,8 @@ example : chainReplay ops5 anchors5 [0, 1, 3, 2] 4 [1, 3, 1, 4, 2, 0, 3, 1, 4] =
 example : chainReplay ops5 anchors5 [2, 3, 1, 0] 4 [2, 0, 3, 1, 4, 4, 1, 3, 1] = some [4, 1, 0] := by
   rw [← chain_successors_same_evidence ops5 anchors5 [0, 1, 2, 3] [2, 3, 1, 0] [0, 1, 2, 3, 4] [2, 0, 3, 1, 4, 4, 1, 3, 1] 4 (bounded_membership_agrees 4 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic5 (by decide) (by decide)]
   exact settled5
-example : chainReplay ops5 anchors5 [2, 3, 1, 0] 4 [4, 1, 3, 1, 2, 0, 3, 1, 4] = some [4, 1, 0] := by
-  rw [← chain_successors_same_evidence ops5 anchors5 [0, 1, 2, 3] [2, 3, 1, 0] [0, 1, 2, 3, 4] [4, 1, 3, 1, 2, 0, 3, 1, 4] 4 (bounded_membership_agrees 4 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic5 (by decide) (by decide)]
+example : chainReplay ops5 anchors5 [2, 3, 1, 0] 4 [4, 1, 3, 1, 0, 1, 2, 3, 4] = some [4, 1, 0] := by
+  rw [← chain_successors_same_evidence ops5 anchors5 [0, 1, 2, 3] [2, 3, 1, 0] [0, 1, 2, 3, 4] [4, 1, 3, 1, 0, 1, 2, 3, 4] 4 (bounded_membership_agrees 4 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic5 (by decide) (by decide)]
   exact settled5
 example : chainReplay ops5 anchors5 [0, 1, 3, 2] 4 [3, 2, 4, 1, 0, 1, 3, 1, 4] = some [4, 1, 0] := by
   rw [← chain_successors_same_evidence ops5 anchors5 [0, 1, 2, 3] [0, 1, 3, 2] [0, 1, 2, 3, 4] [3, 2, 4, 1, 0, 1, 3, 1, 4] 4 (bounded_membership_agrees 4 _ _ (by decide) (by decide) (by decide)) (bounded_membership_agrees 5 _ _ (by decide) (by decide) (by decide)) acyclic5 (by decide) (by decide)]

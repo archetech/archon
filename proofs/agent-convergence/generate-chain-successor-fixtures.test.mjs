@@ -46,3 +46,22 @@ test('rejects absent/tied positions and partial scans', () => {
         assert.throws(() => generateChainSuccessorFixtures(input));
     }
 });
+
+test('rejects a changed signing method in matched table and event operations', () => {
+    for (const original of vectors) {
+        const v = structuredClone(original);
+        for (const op of [...v.operations, ...v.events.map(e => e.operation)]) {
+            if (op.type === 'update') op.proof.verificationMethod = v.did + '#key-2';
+        }
+        assert.throws(() => generateChainSuccessorFixtures([v]), /fixed key required/);
+    }
+});
+test('every scenario supplies six distinct complete delivery permutations', () => {
+    for (const v of vectors) {
+        assert.equal(v.orders.length, 6);
+        assert.equal(new Set(v.orders.map(order => JSON.stringify(order))).size, 6);
+        for (const order of v.orders) {
+            assert.deepEqual([...order].sort((a, b) => a - b), v.events.map((_, i) => i));
+        }
+    }
+});

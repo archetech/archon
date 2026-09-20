@@ -183,3 +183,5 @@ These rules apply to coding agents working in this repository.
 - Chain-anchor fixture bridges must derive settled paths from signed predecessor IDs using paired operation/ID tables. Reordering source events (with remapped deliveries) or paired operation tables must preserve generated proofs; use stable ordinal descriptions rather than source offsets in generated annotations.
 
 - When composing chain anchor priorities with successor replay, state the settled-anchor phase boundary explicitly. Preserve operation identity under priority encoding and instantiate the composed theorem from signed competing branches; passing finite runtime traces does not prove the interleaved replay loop reaches that boundary.
+
+- Count distinct delivery permutations when reporting fixture coverage, and test uniqueness for each scenario size. Negative bridge tests must mutate the exact field guarded by the claimed invariant in both operation tables and matching event records.

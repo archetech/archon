@@ -31,7 +31,7 @@ for (const legacy of [false, true]) {
         if (mode === 'earlier-repeat') events.push(chain(a, 10));
         const all = events.map((_, i) => i);
         const orders = [all, all.slice().reverse(), [4, 3, 2, 1, 0, ...all.slice(5)],
-            [...all.slice(5), 4, 3, 2, 1, 0], [2, 4, 0, 1, 3, ...all.slice(5).reverse()],
+            [...all.slice(5), 3, 1, 4, 2, 0], [2, 4, 0, 1, 3, ...all.slice(5).reverse()],
             [1, 3, 0, 2, 4, ...all.slice(5)]];
         const expected = mode === 'chain-priority' ? [0, 2, 4] : [0, 1, 3];
         vectors.push({ legacy, mode, did, operations, ids, events, orders, expected,
