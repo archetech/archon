@@ -108,10 +108,10 @@ roadmap stages.
   General statements remain Lean proofs; these tests validate the translation.
 
 A1 is **complete** at the model-integration boundary:
-`AgentRegistry.component_anchor_from_history` derives predecessor components and
-matching-anchor eligibility; `AgentEventProjection.component_event_projection`
+`Archon.component_anchor_from_history` in `AgentRegistry.lean` derives predecessor components and
+matching-anchor eligibility; `Archon.component_event_projection` in `AgentEventProjection.lean`
 proves the local representation contract from receipt ownership and normalization;
-`component_interleaved_replay` composes that contract with document authorization,
+`Archon.component_interleaved_replay` composes that contract with document authorization,
 interleaved/compiled ordering, and complete component execution. Methods decode
 from the same full-document values returned by the component model. No equal
 accepted-operation set or final authorizing document is assumed.

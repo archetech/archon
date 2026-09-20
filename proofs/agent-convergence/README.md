@@ -928,7 +928,7 @@ runtime correspondence remain open. No production behavior changes.
 
 ## Integrated component and registry eligibility — A1, #1215
 
-`AgentRegistry.lean` advances A1 in the [fixed completion contract](../../docs/plans/protocol-convergence-completion.md).
+`AgentRegistry.lean` supplies the first part of A1 in the [fixed completion contract](../../docs/plans/protocol-convergence-completion.md).
 `componentRegistry` derives ancestry and registration changes from the same
 `DocumentGraph` and `ComponentPatch` used by component execution. The general
 step/fold proofs establish that this registry reconstruction equals the executed
@@ -958,9 +958,9 @@ return migration, deletion, post-deletion rejection, misleading registry receipt
 repeated anchors, and rejection of retired/proposed-key signatures. It instantiates
 the general prefix theorem using methods decoded from full document values.
 These are hand-written abstract Lean examples, not signed cross-port fixtures;
-A4 remains open. The new modules run in the default CI build, and all six general
-theorems are checked against the existing axiom allowlist. A1 remains in progress
-until the integrated predicate is connected to the raw-event projection/replay.
+A4 remains open. These modules run in the default CI build, and all six general theorems in
+`AgentRegistry.lean` are checked against the existing axiom allowlist. The next
+section completes A1 with the event projection and seven additional audited lemmas.
 
 
 ## Derived event projection and integrated agent replay — A1

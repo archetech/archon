@@ -214,3 +214,5 @@ These rules apply to coding agents working in this repository.
 - Integrated agent proofs must derive registry changes and document authorization from the same component tables. Prove registry-fold/component agreement, including deletion carry-forward, and distinguish abstract Lean examples from the signed cross-port bridge required by A4.
 
 - When composing agent replay proofs, derive local priority projection from normalized receipt ownership and preferred-rank selection. Synthetic provisional representatives establish ordering only; keep stored receipt metadata and the source-to-rank bridge as explicit separate obligations.
+
+- Proof documentation must distinguish Lean module filenames from qualified theorem names (`Archon.*`) and update earlier status paragraphs when a criterion is completed; keep per-module axiom counts unambiguous.
