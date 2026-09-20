@@ -447,3 +447,98 @@ async fn convergence_runtime_passes_match_lean_and_serialized_stopping() {
         }
     }
 }
+
+#[tokio::test]
+async fn convergence_agent_rotation_and_deletion() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/agent-vectors.json"
+    ))
+    .unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let did = vector["did"].as_str().unwrap();
+        for scenario in vector["scenarios"].as_array().unwrap() {
+            for order in scenario["orders"].as_array().unwrap() {
+                let (mut state, _directory) = crate::tests::make_state(JsonDb {
+                    backend: DbBackend::Memory,
+                    data: JsonDbFile::default(),
+                    redis_connection: None,
+                });
+                let events: Vec<Value> = order.as_array().unwrap().iter().enumerate().map(|(receipt, index)| {
+                    let operation = &vector["operations"][index.as_u64().unwrap() as usize];
+                    json!({ "operation": operation, "registry": "hyperswarm", "time": operation["proof"]["created"], "ordinal": [receipt, 0] })
+                }).collect();
+                for event in &events {
+                    crate::import_batch_impl(&state, &[event.clone()]).await;
+                    crate::process_events_impl(&state).await;
+                }
+                let mut restart_directory = None;
+                for phase in 0..3 {
+                    if phase == 1 {
+                        crate::import_batch_impl(
+                            &state,
+                            &events.iter().rev().cloned().collect::<Vec<_>>(),
+                        )
+                        .await;
+                        crate::process_events_impl(&state).await;
+                    }
+                    if phase == 2 {
+                        let data = serde_json::from_value(
+                            serde_json::to_value(&state.store.lock().await.data).unwrap(),
+                        )
+                        .unwrap();
+                        let (restarted, directory) = crate::tests::make_state(JsonDb {
+                            backend: DbBackend::Memory,
+                            data,
+                            redis_connection: None,
+                        });
+                        state = restarted;
+                        restart_directory = Some(directory);
+                    }
+                    crate::history::ensure_history_ready(&state).await.unwrap();
+                    let doc = crate::resolve_local_doc_async(
+                        &state,
+                        did,
+                        ResolveOptions {
+                            verify: true,
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .unwrap();
+                    let ids = vector["ids"].as_array().unwrap();
+                    let path: Vec<usize> = state
+                        .store
+                        .lock()
+                        .await
+                        .get_events(did)
+                        .iter()
+                        .map(|event| {
+                            ids.iter()
+                                .position(|id| id.as_str() == event.opid.as_deref())
+                                .unwrap()
+                        })
+                        .collect();
+                    assert_eq!(
+                        json!(path),
+                        scenario["expected"],
+                        "{} {order} phase {phase}",
+                        scenario["name"]
+                    );
+                    assert_eq!(
+                        doc["didDocumentMetadata"]["versionId"],
+                        ids[*path.last().unwrap()]
+                    );
+                    if scenario["finalState"] == "deleted" {
+                        assert_eq!(doc["didDocumentMetadata"]["deactivated"], true);
+                    } else {
+                        assert_eq!(
+                            doc["didDocument"]["verificationMethod"][0]["publicKeyJwk"],
+                            vector["keys"][scenario["finalState"].as_u64().unwrap() as usize]
+                        );
+                    }
+                }
+                drop(restart_directory);
+            }
+        }
+    }
+}

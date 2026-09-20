@@ -1,0 +1,1408 @@
+[
+  {
+    "legacy": true,
+    "did": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+    "operations": [
+      {
+        "type": "create",
+        "created": "2026-09-01T00:00:00.000Z",
+        "registration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "hyperswarm"
+        },
+        "publicJwk": {
+          "kty": "EC",
+          "crv": "secp256k1",
+          "x": "uvdonAo1WPtgRYkDao0eS2hdkJ9uDixgGKFASa5k7CY",
+          "y": "bObdbau_JE8AyoXwIJks8OmsHE8rgP7_PViD8DTam8U"
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:00.000Z",
+          "verificationMethod": "#key-1",
+          "proofPurpose": "authentication",
+          "proofValue": "0GgO_n7nSgKy-i2yulUCaYFIVitURYLHBUL2KxYTDAw3Ir_HY5Ucyqgbsxz6zBZ96RIS6VZULzwsb43Lw876rQ"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "previd": "bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "doc": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1"
+            ],
+            "id": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+            "verificationMethod": [
+              {
+                "id": "#key-2",
+                "controller": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+                "type": "EcdsaSecp256k1VerificationKey2019",
+                "publicKeyJwk": {
+                  "kty": "EC",
+                  "crv": "secp256k1",
+                  "x": "nB9YWqgHYvn0RY9oBpeLe--0bHtor4LTmWMHk_8aK1A",
+                  "y": "3DQZTU526LT_AvSCR00txrA03zzK75FZtQwo6snMStY"
+                }
+              }
+            ],
+            "authentication": [
+              "#key-2"
+            ],
+            "assertionMethod": [
+              "#key-2"
+            ],
+            "capabilityInvocation": [
+              "#key-2"
+            ]
+          }
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:01.000Z",
+          "verificationMethod": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa#key-1",
+          "proofPurpose": "authentication",
+          "proofValue": "Fd-ZjNmPGBZp49XDeaRD2gcGIMoQCAkC501EA84efeg8-aHuY4GJZXkQo0qBJ8nw8oFqHTJuU3g244KnXAp4bw"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "previd": "bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "doc": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1"
+            ],
+            "id": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+            "verificationMethod": [
+              {
+                "id": "#key-3",
+                "controller": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+                "type": "EcdsaSecp256k1VerificationKey2019",
+                "publicKeyJwk": {
+                  "kty": "EC",
+                  "crv": "secp256k1",
+                  "x": "FCjzo1Mv9PHKxw9ykr-tBtEDf4AO6IObVuu6kXoi6QA",
+                  "y": "rFh5KVUgrlaQq2aPV_j99tBuQQ594GS2ds6FYexib1c"
+                }
+              }
+            ],
+            "authentication": [
+              "#key-3"
+            ],
+            "assertionMethod": [
+              "#key-3"
+            ],
+            "capabilityInvocation": [
+              "#key-3"
+            ]
+          }
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:02.000Z",
+          "verificationMethod": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa#key-1",
+          "proofPurpose": "authentication",
+          "proofValue": "XPZCVNdtEcajoEPHX7QrQLRbK8nFfRvrIaVdMSMy87sYKgAolN2RF3pd0ls5E7XoEq8YfLn71GArvYRBTBEffw"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "previd": "bagaaierasfnspdgbwakhg7s5j3o2m6oe3yrq72xh5pr7xt36jvxlkcgbyr6q",
+        "doc": {
+          "didDocumentData": {
+            "state": "after-A"
+          }
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:03.000Z",
+          "verificationMethod": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa#key-2",
+          "proofPurpose": "authentication",
+          "proofValue": "lqX3-cs2tLif4wx6TrUwL07a6QNpYLKn0ztaLEizTa52ac3EU2z82auZasJU48N558wQ_XPRvX6Wz4Hn23XFnw"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "previd": "bagaaierarud3i24ctejutdhoq7hb7s7747enuib3sbmfzzumw3d7ibusv5ja",
+        "doc": {
+          "didDocumentData": {
+            "state": "after-B"
+          }
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:04.000Z",
+          "verificationMethod": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa#key-3",
+          "proofPurpose": "authentication",
+          "proofValue": "1xLuFA_hGUOQ6S8KzUyjShvyFfynvqJKT40969fawz1rxwMx7H-grt8uQ4T1NZYcgEkZms6KmoxHMPTfpNRliA"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "previd": "bagaaierasfnspdgbwakhg7s5j3o2m6oe3yrq72xh5pr7xt36jvxlkcgbyr6q",
+        "doc": {
+          "didDocumentData": {
+            "state": "stale-key"
+          }
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:05.000Z",
+          "verificationMethod": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa#key-1",
+          "proofPurpose": "authentication",
+          "proofValue": "Kd8JlolYbWbo5N-Ed_sR91duitK-rHUp-Np7CQ9w7_xEOaPpthxaTXr7QIuBXlcidyVUI0rwieaVfjligli1eA"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "previd": "bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "doc": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1"
+            ],
+            "id": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+            "verificationMethod": [
+              {
+                "id": "#key-2",
+                "controller": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+                "type": "EcdsaSecp256k1VerificationKey2019",
+                "publicKeyJwk": {
+                  "kty": "EC",
+                  "crv": "secp256k1",
+                  "x": "nB9YWqgHYvn0RY9oBpeLe--0bHtor4LTmWMHk_8aK1A",
+                  "y": "3DQZTU526LT_AvSCR00txrA03zzK75FZtQwo6snMStY"
+                }
+              }
+            ],
+            "authentication": [
+              "#key-2"
+            ],
+            "assertionMethod": [
+              "#key-2"
+            ],
+            "capabilityInvocation": [
+              "#key-2"
+            ]
+          }
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:06.000Z",
+          "verificationMethod": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa#key-2",
+          "proofPurpose": "authentication",
+          "proofValue": "Ju5cC8anboMtpfFvfsUNIbKTpLZRVmE1TKetKWwrLXM5pvvv586k39RfTfHDwDQ0h3sbLPUqivxBdcObRE5xMg"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "previd": "bagaaierabgteezyimyynybrygpjeaqs4j26ziy657uwzdpzxqrs7rsl5qcka",
+        "doc": {
+          "didDocumentData": {
+            "state": "invalid-ancestor"
+          }
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:07.000Z",
+          "verificationMethod": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa#key-2",
+          "proofPurpose": "authentication",
+          "proofValue": "AwUPPBXHz7Rhv0AragasMJ2_dQZAhVuNdrEgF8jmsWYhmCQGux-kk3Nj7pm51wtjN9N8nGnigup9FOiLvXluzg"
+        }
+      },
+      {
+        "type": "delete",
+        "did": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "previd": "bagaaierasfnspdgbwakhg7s5j3o2m6oe3yrq72xh5pr7xt36jvxlkcgbyr6q",
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:20.000Z",
+          "verificationMethod": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa#key-2",
+          "proofPurpose": "authentication",
+          "proofValue": "IXgOdtN7YP-FVyzVRxbWlfjW_WbKxXaFsPZQVz_tHQ5g4R65-CYP7xcliQC44wzaDPDk82P95d597MsFAnCmJw"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "previd": "bagaaierajf7bmdknak2nyg3zcrpnqgblowt2pjgqrljyhyvk4flwdziylbya",
+        "doc": {
+          "didDocumentData": {
+            "state": "after-deletion"
+          }
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:10.000Z",
+          "verificationMethod": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa#key-2",
+          "proofPurpose": "authentication",
+          "proofValue": "U9_Q_c-lEgWgVcbhjlf3nTAaQbC2ekUMmnZhEOqt54BNzbxbLquu_tSg-WD8QhL1Su4YCE-C2XaRMBic4JyItQ"
+        }
+      },
+      {
+        "type": "delete",
+        "did": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "previd": "bagaaierasfnspdgbwakhg7s5j3o2m6oe3yrq72xh5pr7xt36jvxlkcgbyr6q",
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:11.000Z",
+          "verificationMethod": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa#key-1",
+          "proofPurpose": "authentication",
+          "proofValue": "K9atF0vPvn6eTe90vUhwdYQ-z86jbvhmW2TjNmGrlTU8hk2M37xsNePDU-a8DqU81BDCTvspd4GBtnrubGJ2IQ"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+        "previd": "bagaaierarud3i24ctejutdhoq7hb7s7747enuib3sbmfzzumw3d7ibusv5ja",
+        "doc": {
+          "didDocumentData": {
+            "state": "wrong-branch-key"
+          }
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:12.000Z",
+          "verificationMethod": "did:cid:bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa#key-2",
+          "proofPurpose": "authentication",
+          "proofValue": "HRheM3gnsy_r44ps9oNldNj7KqZmCqPty_JuyzW9i41gpUjeXTpFgCw_MADCF03XnOLuYd2CLVyJa1wT30COsg"
+        }
+      }
+    ],
+    "keys": [
+      {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "uvdonAo1WPtgRYkDao0eS2hdkJ9uDixgGKFASa5k7CY",
+        "y": "bObdbau_JE8AyoXwIJks8OmsHE8rgP7_PViD8DTam8U"
+      },
+      {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "nB9YWqgHYvn0RY9oBpeLe--0bHtor4LTmWMHk_8aK1A",
+        "y": "3DQZTU526LT_AvSCR00txrA03zzK75FZtQwo6snMStY"
+      },
+      {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "FCjzo1Mv9PHKxw9ykr-tBtEDf4AO6IObVuu6kXoi6QA",
+        "y": "rFh5KVUgrlaQq2aPV_j99tBuQQ594GS2ds6FYexib1c"
+      }
+    ],
+    "ids": [
+      "bagaaieraw2htc566eoxocfrkgdpspdywbb3hkzzk5oqujkqgevmsuxo5vjpa",
+      "bagaaierasfnspdgbwakhg7s5j3o2m6oe3yrq72xh5pr7xt36jvxlkcgbyr6q",
+      "bagaaierarud3i24ctejutdhoq7hb7s7747enuib3sbmfzzumw3d7ibusv5ja",
+      "bagaaieraamlp2m6xm5p7ey4lydnbjdukc32nmxvr5bvix45svds2ca6xumxq",
+      "bagaaieravg6kq3kjc2ncbzycc43rvbnfnaazgaigor3omz34u23slas3f3da",
+      "bagaaieraffi6hjnpjsc32r6gr5kovhdivo24p5xrfdionbs6xqyitxtpgw2q",
+      "bagaaierabgteezyimyynybrygpjeaqs4j26ziy657uwzdpzxqrs7rsl5qcka",
+      "bagaaieramntmyogcie5tg6ahicn7w4br5hjo4jmz3miv2zvhph4payt5eacq",
+      "bagaaierajf7bmdknak2nyg3zcrpnqgblowt2pjgqrljyhyvk4flwdziylbya",
+      "bagaaieraxwm3pb4xy2hdomhqo6zj2thmhmugxwj5lilmqd5iplmj7i2pss6a",
+      "bagaaierarqcorrjmnlsxluclykq4ybve2brs6elsvtip2uwx3lsirtyhpuha",
+      "bagaaieraeffeeoitufv2j7djye4skpbcutl7dfbpfqtfode7ppzphqij7eea"
+    ],
+    "parents": [
+      null,
+      0,
+      0,
+      1,
+      2,
+      1,
+      0,
+      6,
+      1,
+      8,
+      1,
+      2
+    ],
+    "actions": [
+      "keep",
+      1,
+      2,
+      "keep",
+      "keep",
+      "keep",
+      1,
+      "keep",
+      "delete",
+      "keep",
+      "delete",
+      "keep"
+    ],
+    "validBy": [
+      [
+        true,
+        false,
+        false
+      ],
+      [
+        true,
+        false,
+        false
+      ],
+      [
+        true,
+        false,
+        false
+      ],
+      [
+        false,
+        true,
+        false
+      ],
+      [
+        false,
+        false,
+        true
+      ],
+      [
+        true,
+        false,
+        false
+      ],
+      [
+        false,
+        true,
+        false
+      ],
+      [
+        false,
+        true,
+        false
+      ],
+      [
+        false,
+        true,
+        false
+      ],
+      [
+        false,
+        true,
+        false
+      ],
+      [
+        true,
+        false,
+        false
+      ],
+      [
+        false,
+        true,
+        false
+      ]
+    ],
+    "states": [
+      0,
+      1,
+      2,
+      1,
+      2,
+      null,
+      null,
+      null,
+      "deleted",
+      null,
+      null,
+      null
+    ],
+    "scenarios": [
+      {
+        "name": "competing-key-branches",
+        "orders": [
+          [0,1,2,3,4],
+          [0,1,2,4,3],
+          [0,1,3,2,4],
+          [0,1,3,4,2],
+          [0,1,4,2,3],
+          [0,1,4,3,2],
+          [0,2,1,3,4],
+          [0,2,1,4,3],
+          [0,2,3,1,4],
+          [0,2,3,4,1],
+          [0,2,4,1,3],
+          [0,2,4,3,1],
+          [0,3,1,2,4],
+          [0,3,1,4,2],
+          [0,3,2,1,4],
+          [0,3,2,4,1],
+          [0,3,4,1,2],
+          [0,3,4,2,1],
+          [0,4,1,2,3],
+          [0,4,1,3,2],
+          [0,4,2,1,3],
+          [0,4,2,3,1],
+          [0,4,3,1,2],
+          [0,4,3,2,1],
+          [1,0,2,3,4],
+          [1,0,2,4,3],
+          [1,0,3,2,4],
+          [1,0,3,4,2],
+          [1,0,4,2,3],
+          [1,0,4,3,2],
+          [1,2,0,3,4],
+          [1,2,0,4,3],
+          [1,2,3,0,4],
+          [1,2,3,4,0],
+          [1,2,4,0,3],
+          [1,2,4,3,0],
+          [1,3,0,2,4],
+          [1,3,0,4,2],
+          [1,3,2,0,4],
+          [1,3,2,4,0],
+          [1,3,4,0,2],
+          [1,3,4,2,0],
+          [1,4,0,2,3],
+          [1,4,0,3,2],
+          [1,4,2,0,3],
+          [1,4,2,3,0],
+          [1,4,3,0,2],
+          [1,4,3,2,0],
+          [2,0,1,3,4],
+          [2,0,1,4,3],
+          [2,0,3,1,4],
+          [2,0,3,4,1],
+          [2,0,4,1,3],
+          [2,0,4,3,1],
+          [2,1,0,3,4],
+          [2,1,0,4,3],
+          [2,1,3,0,4],
+          [2,1,3,4,0],
+          [2,1,4,0,3],
+          [2,1,4,3,0],
+          [2,3,0,1,4],
+          [2,3,0,4,1],
+          [2,3,1,0,4],
+          [2,3,1,4,0],
+          [2,3,4,0,1],
+          [2,3,4,1,0],
+          [2,4,0,1,3],
+          [2,4,0,3,1],
+          [2,4,1,0,3],
+          [2,4,1,3,0],
+          [2,4,3,0,1],
+          [2,4,3,1,0],
+          [3,0,1,2,4],
+          [3,0,1,4,2],
+          [3,0,2,1,4],
+          [3,0,2,4,1],
+          [3,0,4,1,2],
+          [3,0,4,2,1],
+          [3,1,0,2,4],
+          [3,1,0,4,2],
+          [3,1,2,0,4],
+          [3,1,2,4,0],
+          [3,1,4,0,2],
+          [3,1,4,2,0],
+          [3,2,0,1,4],
+          [3,2,0,4,1],
+          [3,2,1,0,4],
+          [3,2,1,4,0],
+          [3,2,4,0,1],
+          [3,2,4,1,0],
+          [3,4,0,1,2],
+          [3,4,0,2,1],
+          [3,4,1,0,2],
+          [3,4,1,2,0],
+          [3,4,2,0,1],
+          [3,4,2,1,0],
+          [4,0,1,2,3],
+          [4,0,1,3,2],
+          [4,0,2,1,3],
+          [4,0,2,3,1],
+          [4,0,3,1,2],
+          [4,0,3,2,1],
+          [4,1,0,2,3],
+          [4,1,0,3,2],
+          [4,1,2,0,3],
+          [4,1,2,3,0],
+          [4,1,3,0,2],
+          [4,1,3,2,0],
+          [4,2,0,1,3],
+          [4,2,0,3,1],
+          [4,2,1,0,3],
+          [4,2,1,3,0],
+          [4,2,3,0,1],
+          [4,2,3,1,0],
+          [4,3,0,1,2],
+          [4,3,0,2,1],
+          [4,3,1,0,2],
+          [4,3,1,2,0],
+          [4,3,2,0,1],
+          [4,3,2,1,0]
+        ],
+        "expected": [0,2,4],
+        "finalState": 2
+      },
+      {
+        "name": "stale-update-key",
+        "orders": [
+          [0,1,3,5],
+          [0,1,5,3],
+          [0,3,1,5],
+          [0,3,5,1],
+          [0,5,1,3],
+          [0,5,3,1],
+          [1,0,3,5],
+          [1,0,5,3],
+          [1,3,0,5],
+          [1,3,5,0],
+          [1,5,0,3],
+          [1,5,3,0],
+          [3,0,1,5],
+          [3,0,5,1],
+          [3,1,0,5],
+          [3,1,5,0],
+          [3,5,0,1],
+          [3,5,1,0],
+          [5,0,1,3],
+          [5,0,3,1],
+          [5,1,0,3],
+          [5,1,3,0],
+          [5,3,0,1],
+          [5,3,1,0]
+        ],
+        "expected": [0,1,3],
+        "finalState": 1
+      },
+      {
+        "name": "self-signed-rotation",
+        "orders": [
+          [0,6,7],
+          [0,7,6],
+          [6,0,7],
+          [6,7,0],
+          [7,0,6],
+          [7,6,0]
+        ],
+        "expected": [0],
+        "finalState": 0
+      },
+      {
+        "name": "terminal-deletion",
+        "orders": [
+          [0,1,8,9],
+          [0,1,9,8],
+          [0,8,1,9],
+          [0,8,9,1],
+          [0,9,1,8],
+          [0,9,8,1],
+          [1,0,8,9],
+          [1,0,9,8],
+          [1,8,0,9],
+          [1,8,9,0],
+          [1,9,0,8],
+          [1,9,8,0],
+          [8,0,1,9],
+          [8,0,9,1],
+          [8,1,0,9],
+          [8,1,9,0],
+          [8,9,0,1],
+          [8,9,1,0],
+          [9,0,1,8],
+          [9,0,8,1],
+          [9,1,0,8],
+          [9,1,8,0],
+          [9,8,0,1],
+          [9,8,1,0]
+        ],
+        "expected": [0,1,8],
+        "finalState": "deleted"
+      },
+      {
+        "name": "replace-deleted-branch",
+        "orders": [
+          [0,1,8,3],
+          [0,1,3,8],
+          [0,8,1,3],
+          [0,8,3,1],
+          [0,3,1,8],
+          [0,3,8,1],
+          [1,0,8,3],
+          [1,0,3,8],
+          [1,8,0,3],
+          [1,8,3,0],
+          [1,3,0,8],
+          [1,3,8,0],
+          [8,0,1,3],
+          [8,0,3,1],
+          [8,1,0,3],
+          [8,1,3,0],
+          [8,3,0,1],
+          [8,3,1,0],
+          [3,0,1,8],
+          [3,0,8,1],
+          [3,1,0,8],
+          [3,1,8,0],
+          [3,8,0,1],
+          [3,8,1,0]
+        ],
+        "expected": [0,1,3],
+        "finalState": 1
+      },
+      {
+        "name": "stale-delete-key",
+        "orders": [
+          [0,1,10],
+          [0,10,1],
+          [1,0,10],
+          [1,10,0],
+          [10,0,1],
+          [10,1,0]
+        ],
+        "expected": [0,1],
+        "finalState": 1
+      },
+      {
+        "name": "wrong-branch-key",
+        "orders": [
+          [0,2,11,4],
+          [0,2,4,11],
+          [0,11,2,4],
+          [0,11,4,2],
+          [0,4,2,11],
+          [0,4,11,2],
+          [2,0,11,4],
+          [2,0,4,11],
+          [2,11,0,4],
+          [2,11,4,0],
+          [2,4,0,11],
+          [2,4,11,0],
+          [11,0,2,4],
+          [11,0,4,2],
+          [11,2,0,4],
+          [11,2,4,0],
+          [11,4,0,2],
+          [11,4,2,0],
+          [4,0,2,11],
+          [4,0,11,2],
+          [4,2,0,11],
+          [4,2,11,0],
+          [4,11,0,2],
+          [4,11,2,0]
+        ],
+        "expected": [0,2,4],
+        "finalState": 2
+      }
+    ]
+  },
+  {
+    "legacy": false,
+    "did": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+    "operations": [
+      {
+        "type": "create",
+        "created": "2026-09-01T00:00:00.000Z",
+        "registration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "hyperswarm"
+        },
+        "publicJwk": {
+          "kty": "EC",
+          "crv": "secp256k1",
+          "x": "uvdonAo1WPtgRYkDao0eS2hdkJ9uDixgGKFASa5k7CY",
+          "y": "bObdbau_JE8AyoXwIJks8OmsHE8rgP7_PViD8DTam8U"
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:00.000Z",
+          "verificationMethod": "#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "D_65p5VjSGHKLnVAAlNirBCUW_sWvN0d8WBFBPZAwt4oEiaMMWrm30cPA7cXIEbSgPrg6lvKpCBjZSRO1Zh-HQ"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "previd": "bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "doc": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1"
+            ],
+            "id": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+            "verificationMethod": [
+              {
+                "id": "#key-2",
+                "controller": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+                "type": "EcdsaSecp256k1VerificationKey2019",
+                "publicKeyJwk": {
+                  "kty": "EC",
+                  "crv": "secp256k1",
+                  "x": "nB9YWqgHYvn0RY9oBpeLe--0bHtor4LTmWMHk_8aK1A",
+                  "y": "3DQZTU526LT_AvSCR00txrA03zzK75FZtQwo6snMStY"
+                }
+              }
+            ],
+            "authentication": [
+              "#key-2"
+            ],
+            "assertionMethod": [
+              "#key-2"
+            ],
+            "capabilityInvocation": [
+              "#key-2"
+            ]
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:01.000Z",
+          "verificationMethod": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "ij3gkIhEFKhNuayVlERHufNF6T8T7r1_cATbT0LrK0FQGBMI59hXJzve6kcKle2cwoS8wuOgoxkMH0S_lkuKsg"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "previd": "bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "doc": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1"
+            ],
+            "id": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+            "verificationMethod": [
+              {
+                "id": "#key-3",
+                "controller": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+                "type": "EcdsaSecp256k1VerificationKey2019",
+                "publicKeyJwk": {
+                  "kty": "EC",
+                  "crv": "secp256k1",
+                  "x": "FCjzo1Mv9PHKxw9ykr-tBtEDf4AO6IObVuu6kXoi6QA",
+                  "y": "rFh5KVUgrlaQq2aPV_j99tBuQQ594GS2ds6FYexib1c"
+                }
+              }
+            ],
+            "authentication": [
+              "#key-3"
+            ],
+            "assertionMethod": [
+              "#key-3"
+            ],
+            "capabilityInvocation": [
+              "#key-3"
+            ]
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:02.000Z",
+          "verificationMethod": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "yFaqQ9wOJftca1FYN8gvVXnKlKyxiUu-ughHLXYuUwh_PuZI2ODMfnvoeUPBo20lCcqGILt1T4y8Uw0x9cshZg"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "previd": "bagaaieraxqml5w3vv2gcph2mnibxvmw6lszuve7g35g3yech4tn6t5jrq4ma",
+        "doc": {
+          "didDocumentData": {
+            "state": "after-A"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:03.000Z",
+          "verificationMethod": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq#key-2",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "68vAXTRZzpVqzL6KI144WyDkBHAvwrRyU6oH-P3ck9Bn2IONJaj1zy1h4hxZtdHQhHXjMatNNuU1tPdMb16aEQ"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "previd": "bagaaierafrwecsn47lcpln4yr7hz6mnyungsylyeynu2rwhja4zq47a26esq",
+        "doc": {
+          "didDocumentData": {
+            "state": "after-B"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:04.000Z",
+          "verificationMethod": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq#key-3",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "Ju44KYXkJ2knP0-EWrJA4g7P_j94EIKCGYAEC8z9hPoazDf4LCPZOqqw3kYnreqivtieIe_SPofSDqzE8JTmgw"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "previd": "bagaaieraxqml5w3vv2gcph2mnibxvmw6lszuve7g35g3yech4tn6t5jrq4ma",
+        "doc": {
+          "didDocumentData": {
+            "state": "stale-key"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:05.000Z",
+          "verificationMethod": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "QeHc_q-7679g0M6snTeZvocOsZVzxoSX1O_FfmAKDT9BHScLm0l_KS8ag-rqBmNOuArZ6XELRHVkqEmurX8ncw"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "previd": "bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "doc": {
+          "didDocument": {
+            "@context": [
+              "https://www.w3.org/ns/did/v1"
+            ],
+            "id": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+            "verificationMethod": [
+              {
+                "id": "#key-2",
+                "controller": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+                "type": "EcdsaSecp256k1VerificationKey2019",
+                "publicKeyJwk": {
+                  "kty": "EC",
+                  "crv": "secp256k1",
+                  "x": "nB9YWqgHYvn0RY9oBpeLe--0bHtor4LTmWMHk_8aK1A",
+                  "y": "3DQZTU526LT_AvSCR00txrA03zzK75FZtQwo6snMStY"
+                }
+              }
+            ],
+            "authentication": [
+              "#key-2"
+            ],
+            "assertionMethod": [
+              "#key-2"
+            ],
+            "capabilityInvocation": [
+              "#key-2"
+            ]
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:06.000Z",
+          "verificationMethod": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq#key-2",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "C8TAmR49RgXoH8JoI2eCqWtZmDzaahWe-PT8d3MTIrFkraZG0YOtCgEd84YGhiyO31EPZMWXPiv9C59AGt8Y1g"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "previd": "bagaaierasdnul4kxd3uy2sxxsdtihy57seff3ob3m7yrmuse45wvprnlsfta",
+        "doc": {
+          "didDocumentData": {
+            "state": "invalid-ancestor"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:07.000Z",
+          "verificationMethod": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq#key-2",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "V0Yo6nRdGR2JiEl2nFTK3BUswo7yh9MEGuPxrA3bYURWxfV8UWGvlMokJ3wdia7sMfYJxZ2vzJ5sHf2MZe28ew"
+        }
+      },
+      {
+        "type": "delete",
+        "did": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "previd": "bagaaieraxqml5w3vv2gcph2mnibxvmw6lszuve7g35g3yech4tn6t5jrq4ma",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:20.000Z",
+          "verificationMethod": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq#key-2",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "nMpP9zYux-wQcBZyZIVwpz4gZ3AcF1uN5zMqK8G7KtI7HjeKHptsuo3ndwh7X59W53HEYZa_y7vFArmvM0i_Hg"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "previd": "bagaaierap2pcdxz5qk5lty257qhukgeutjgwpseu6ufn6k3eqskqnbhvvoya",
+        "doc": {
+          "didDocumentData": {
+            "state": "after-deletion"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:10.000Z",
+          "verificationMethod": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq#key-2",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "phGUMRn3pE5mlBXXlzKd3omXoHjuuqR2NmAID2RyB-UX-6i2FJyix_XIc9KU7u6O_8V717TG0jHDPgFLxrNqvw"
+        }
+      },
+      {
+        "type": "delete",
+        "did": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "previd": "bagaaieraxqml5w3vv2gcph2mnibxvmw6lszuve7g35g3yech4tn6t5jrq4ma",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:11.000Z",
+          "verificationMethod": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "JKKbwnMmC4gtEV94NInewmvi1qr5-Drkmv2zQPRNRTgc3PMDNJgCH7uOCXE9tn7vTqkkgzKES52kjSZJUcuLkQ"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+        "previd": "bagaaierafrwecsn47lcpln4yr7hz6mnyungsylyeynu2rwhja4zq47a26esq",
+        "doc": {
+          "didDocumentData": {
+            "state": "wrong-branch-key"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:12.000Z",
+          "verificationMethod": "did:cid:bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq#key-2",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "KbJRAmCxm_6iIZUr0vx-fxVpIIT8XpBNFUkXhY33a3tVshM7DU2NonOu3Y63NP9Ap6MB0CCn_SIu5-u2hh4yPw"
+        }
+      }
+    ],
+    "keys": [
+      {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "uvdonAo1WPtgRYkDao0eS2hdkJ9uDixgGKFASa5k7CY",
+        "y": "bObdbau_JE8AyoXwIJks8OmsHE8rgP7_PViD8DTam8U"
+      },
+      {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "nB9YWqgHYvn0RY9oBpeLe--0bHtor4LTmWMHk_8aK1A",
+        "y": "3DQZTU526LT_AvSCR00txrA03zzK75FZtQwo6snMStY"
+      },
+      {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "FCjzo1Mv9PHKxw9ykr-tBtEDf4AO6IObVuu6kXoi6QA",
+        "y": "rFh5KVUgrlaQq2aPV_j99tBuQQ594GS2ds6FYexib1c"
+      }
+    ],
+    "ids": [
+      "bagaaiera3f7q3qjk36fpe6okdanx3xuxmt7hen4b3zdam2okz7l2hoe6z2zq",
+      "bagaaieraxqml5w3vv2gcph2mnibxvmw6lszuve7g35g3yech4tn6t5jrq4ma",
+      "bagaaierafrwecsn47lcpln4yr7hz6mnyungsylyeynu2rwhja4zq47a26esq",
+      "bagaaierajlhyfntsbsgzspmcthninagnrxfvm3pqzwen5htmf7exa6loh2jq",
+      "bagaaieraor4agban7rmuvoar5nmzxmo5t3dnfagq7hdkvcutxzh3qcyrdzqq",
+      "bagaaierarjlxxqju6czbtys77g64j7q6fbrz3dnbupg4diubadhtdkguolzq",
+      "bagaaierasdnul4kxd3uy2sxxsdtihy57seff3ob3m7yrmuse45wvprnlsfta",
+      "bagaaierap75nxtbe3leedebqze54hx5empikjm2wxkkykrwyszemrbca5b4q",
+      "bagaaierap2pcdxz5qk5lty257qhukgeutjgwpseu6ufn6k3eqskqnbhvvoya",
+      "bagaaierastlj64yobwy7enh4pefs6rrwmqzfsgrgvdpx2iqhmfbqemc6p3aq",
+      "bagaaieraqxi3jytap3vg2ennr4yvflh3grtbmkcebgz3y4v2ffrp763l2suq",
+      "bagaaieraikgyj7h25uapcjy67nnabgkjn5i3a7vonzzb5oa2llsq6ogylvkq"
+    ],
+    "parents": [
+      null,
+      0,
+      0,
+      1,
+      2,
+      1,
+      0,
+      6,
+      1,
+      8,
+      1,
+      2
+    ],
+    "actions": [
+      "keep",
+      1,
+      2,
+      "keep",
+      "keep",
+      "keep",
+      1,
+      "keep",
+      "delete",
+      "keep",
+      "delete",
+      "keep"
+    ],
+    "validBy": [
+      [
+        true,
+        false,
+        false
+      ],
+      [
+        true,
+        false,
+        false
+      ],
+      [
+        true,
+        false,
+        false
+      ],
+      [
+        false,
+        true,
+        false
+      ],
+      [
+        false,
+        false,
+        true
+      ],
+      [
+        true,
+        false,
+        false
+      ],
+      [
+        false,
+        true,
+        false
+      ],
+      [
+        false,
+        true,
+        false
+      ],
+      [
+        false,
+        true,
+        false
+      ],
+      [
+        false,
+        true,
+        false
+      ],
+      [
+        true,
+        false,
+        false
+      ],
+      [
+        false,
+        true,
+        false
+      ]
+    ],
+    "states": [
+      0,
+      1,
+      2,
+      1,
+      2,
+      null,
+      null,
+      null,
+      "deleted",
+      null,
+      null,
+      null
+    ],
+    "scenarios": [
+      {
+        "name": "competing-key-branches",
+        "orders": [
+          [0,1,2,3,4],
+          [0,1,2,4,3],
+          [0,1,3,2,4],
+          [0,1,3,4,2],
+          [0,1,4,2,3],
+          [0,1,4,3,2],
+          [0,2,1,3,4],
+          [0,2,1,4,3],
+          [0,2,3,1,4],
+          [0,2,3,4,1],
+          [0,2,4,1,3],
+          [0,2,4,3,1],
+          [0,3,1,2,4],
+          [0,3,1,4,2],
+          [0,3,2,1,4],
+          [0,3,2,4,1],
+          [0,3,4,1,2],
+          [0,3,4,2,1],
+          [0,4,1,2,3],
+          [0,4,1,3,2],
+          [0,4,2,1,3],
+          [0,4,2,3,1],
+          [0,4,3,1,2],
+          [0,4,3,2,1],
+          [1,0,2,3,4],
+          [1,0,2,4,3],
+          [1,0,3,2,4],
+          [1,0,3,4,2],
+          [1,0,4,2,3],
+          [1,0,4,3,2],
+          [1,2,0,3,4],
+          [1,2,0,4,3],
+          [1,2,3,0,4],
+          [1,2,3,4,0],
+          [1,2,4,0,3],
+          [1,2,4,3,0],
+          [1,3,0,2,4],
+          [1,3,0,4,2],
+          [1,3,2,0,4],
+          [1,3,2,4,0],
+          [1,3,4,0,2],
+          [1,3,4,2,0],
+          [1,4,0,2,3],
+          [1,4,0,3,2],
+          [1,4,2,0,3],
+          [1,4,2,3,0],
+          [1,4,3,0,2],
+          [1,4,3,2,0],
+          [2,0,1,3,4],
+          [2,0,1,4,3],
+          [2,0,3,1,4],
+          [2,0,3,4,1],
+          [2,0,4,1,3],
+          [2,0,4,3,1],
+          [2,1,0,3,4],
+          [2,1,0,4,3],
+          [2,1,3,0,4],
+          [2,1,3,4,0],
+          [2,1,4,0,3],
+          [2,1,4,3,0],
+          [2,3,0,1,4],
+          [2,3,0,4,1],
+          [2,3,1,0,4],
+          [2,3,1,4,0],
+          [2,3,4,0,1],
+          [2,3,4,1,0],
+          [2,4,0,1,3],
+          [2,4,0,3,1],
+          [2,4,1,0,3],
+          [2,4,1,3,0],
+          [2,4,3,0,1],
+          [2,4,3,1,0],
+          [3,0,1,2,4],
+          [3,0,1,4,2],
+          [3,0,2,1,4],
+          [3,0,2,4,1],
+          [3,0,4,1,2],
+          [3,0,4,2,1],
+          [3,1,0,2,4],
+          [3,1,0,4,2],
+          [3,1,2,0,4],
+          [3,1,2,4,0],
+          [3,1,4,0,2],
+          [3,1,4,2,0],
+          [3,2,0,1,4],
+          [3,2,0,4,1],
+          [3,2,1,0,4],
+          [3,2,1,4,0],
+          [3,2,4,0,1],
+          [3,2,4,1,0],
+          [3,4,0,1,2],
+          [3,4,0,2,1],
+          [3,4,1,0,2],
+          [3,4,1,2,0],
+          [3,4,2,0,1],
+          [3,4,2,1,0],
+          [4,0,1,2,3],
+          [4,0,1,3,2],
+          [4,0,2,1,3],
+          [4,0,2,3,1],
+          [4,0,3,1,2],
+          [4,0,3,2,1],
+          [4,1,0,2,3],
+          [4,1,0,3,2],
+          [4,1,2,0,3],
+          [4,1,2,3,0],
+          [4,1,3,0,2],
+          [4,1,3,2,0],
+          [4,2,0,1,3],
+          [4,2,0,3,1],
+          [4,2,1,0,3],
+          [4,2,1,3,0],
+          [4,2,3,0,1],
+          [4,2,3,1,0],
+          [4,3,0,1,2],
+          [4,3,0,2,1],
+          [4,3,1,0,2],
+          [4,3,1,2,0],
+          [4,3,2,0,1],
+          [4,3,2,1,0]
+        ],
+        "expected": [0,2,4],
+        "finalState": 2
+      },
+      {
+        "name": "stale-update-key",
+        "orders": [
+          [0,1,3,5],
+          [0,1,5,3],
+          [0,3,1,5],
+          [0,3,5,1],
+          [0,5,1,3],
+          [0,5,3,1],
+          [1,0,3,5],
+          [1,0,5,3],
+          [1,3,0,5],
+          [1,3,5,0],
+          [1,5,0,3],
+          [1,5,3,0],
+          [3,0,1,5],
+          [3,0,5,1],
+          [3,1,0,5],
+          [3,1,5,0],
+          [3,5,0,1],
+          [3,5,1,0],
+          [5,0,1,3],
+          [5,0,3,1],
+          [5,1,0,3],
+          [5,1,3,0],
+          [5,3,0,1],
+          [5,3,1,0]
+        ],
+        "expected": [0,1,3],
+        "finalState": 1
+      },
+      {
+        "name": "self-signed-rotation",
+        "orders": [
+          [0,6,7],
+          [0,7,6],
+          [6,0,7],
+          [6,7,0],
+          [7,0,6],
+          [7,6,0]
+        ],
+        "expected": [0],
+        "finalState": 0
+      },
+      {
+        "name": "terminal-deletion",
+        "orders": [
+          [0,1,8,9],
+          [0,1,9,8],
+          [0,8,1,9],
+          [0,8,9,1],
+          [0,9,1,8],
+          [0,9,8,1],
+          [1,0,8,9],
+          [1,0,9,8],
+          [1,8,0,9],
+          [1,8,9,0],
+          [1,9,0,8],
+          [1,9,8,0],
+          [8,0,1,9],
+          [8,0,9,1],
+          [8,1,0,9],
+          [8,1,9,0],
+          [8,9,0,1],
+          [8,9,1,0],
+          [9,0,1,8],
+          [9,0,8,1],
+          [9,1,0,8],
+          [9,1,8,0],
+          [9,8,0,1],
+          [9,8,1,0]
+        ],
+        "expected": [0,1,8],
+        "finalState": "deleted"
+      },
+      {
+        "name": "replace-deleted-branch",
+        "orders": [
+          [0,1,8,3],
+          [0,1,3,8],
+          [0,8,1,3],
+          [0,8,3,1],
+          [0,3,1,8],
+          [0,3,8,1],
+          [1,0,8,3],
+          [1,0,3,8],
+          [1,8,0,3],
+          [1,8,3,0],
+          [1,3,0,8],
+          [1,3,8,0],
+          [8,0,1,3],
+          [8,0,3,1],
+          [8,1,0,3],
+          [8,1,3,0],
+          [8,3,0,1],
+          [8,3,1,0],
+          [3,0,1,8],
+          [3,0,8,1],
+          [3,1,0,8],
+          [3,1,8,0],
+          [3,8,0,1],
+          [3,8,1,0]
+        ],
+        "expected": [0,1,3],
+        "finalState": 1
+      },
+      {
+        "name": "stale-delete-key",
+        "orders": [
+          [0,1,10],
+          [0,10,1],
+          [1,0,10],
+          [1,10,0],
+          [10,0,1],
+          [10,1,0]
+        ],
+        "expected": [0,1],
+        "finalState": 1
+      },
+      {
+        "name": "wrong-branch-key",
+        "orders": [
+          [0,2,11,4],
+          [0,2,4,11],
+          [0,11,2,4],
+          [0,11,4,2],
+          [0,4,2,11],
+          [0,4,11,2],
+          [2,0,11,4],
+          [2,0,4,11],
+          [2,11,0,4],
+          [2,11,4,0],
+          [2,4,0,11],
+          [2,4,11,0],
+          [11,0,2,4],
+          [11,0,4,2],
+          [11,2,0,4],
+          [11,2,4,0],
+          [11,4,0,2],
+          [11,4,2,0],
+          [4,0,2,11],
+          [4,0,11,2],
+          [4,2,0,11],
+          [4,2,11,0],
+          [4,11,0,2],
+          [4,11,2,0]
+        ],
+        "expected": [0,2,4],
+        "finalState": 2
+      }
+    ]
+  }
+]

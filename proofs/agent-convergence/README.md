@@ -1,4 +1,4 @@
-# Provisional agent-history convergence (#1199, #1201, #1203, #1205, #1207)
+# Provisional agent-history convergence (#1199, #1201, #1203, #1205, #1207, #1209)
 
 This Lean project proves a bounded specification and an operational replay
 model of Archon's canonical-CID successor rule. It changes no runtime code. It uses Lean's standard library only;
@@ -20,6 +20,8 @@ The result quantifies over arbitrary finite models and evidence lists. It is not
 limited to the four-operation test graphs.
 
 ## Assumptions and exact meaning
+
+These are the original fixed-key model assumptions. The [authorization extension](#predecessor-key-authorization--1209) below replaces the fixed-key restriction with predecessor-selected key rotation and deletion; the other boundaries remain.
 
 - Both nodes agree on the same unique valid genesis/root ID and use the same
   model. The root has no predecessor and is eventually included in retained
@@ -300,6 +302,51 @@ CI runs the TypeScript pass bridge alongside the proofs and runs Rust convergenc
 unit tests with the production Rust 1.90.0 toolchain. The workflow now also triggers
 on Gatekeeper implementation and bridge-test changes. Runtime code is unchanged.
 
+## Predecessor-key authorization — #1209
+
+`AgentAuthorization.lean` extends the model to a self-controlled agent with one
+active verification method/key, key-preserving updates, replacement of that key,
+and deletion. Authorization is derived recursively from the signed predecessor
+chain. A rotation must pass verification with the predecessor's key before its
+new key takes effect; a deleted predecessor authorizes no successor. A preferred
+sibling can still replace a deleted branch through its live predecessor.
+
+The graph has a finite operation domain and a topological depth witness. Both
+nodes agree on the graph, valid genesis, and the signature/method-validation
+oracle (`validBy`). Key identities include method identity and permissions. The
+oracle is fixed for these immutable operations, but the key checked at each
+operation is derived from its predecessor, not fixed across the history.
+`agent_authorization_matches` proves that the derived predicate used by replay
+agrees with that state transition. `valid_agent_path_runs` proves that replay's
+accepted path can actually execute those transitions in sequence.
+
+`rotating_agent_converges` instantiates full-event replay with this derived
+predicate: replay terminates at a fixed full-record history, its IDs are the
+canonical path, and its final active key or deleted state agrees with predecessor
+reconstruction. `rotating_agent_same_evidence` proves equal ID histories **and**
+equal final key/deletion states for the same retained operation membership,
+regardless of order or duplicates. These statements quantify over arbitrary
+finite graphs satisfying the premises, not just the fixtures.
+
+The signed bridge adds 456 delivery traces across legacy and modern proofs.
+Both ordinary runtime importers check competing rotations, stale update/delete
+keys, a proposed key signing its own rotation, an invalid ancestor, wrong-branch
+keys, a child of deletion, and replacement of a deleted branch. They compare ID
+histories and final key/deletion states after delivery, reversed repeats, and
+restart. The generator derives signature validity using the real verifier and
+maps CIDs to sorted ranks. Lean independently checks all 24 reconstructed
+operation states and all 456 replay results from those tables. The bridge derives
+the unique genesis, initial key, predecessors, and update actions from operation
+records, rejects shapes outside this single-key subset, and cross-checks stored
+graph annotations. Generator tests cover reordered tables and unsupported shapes.
+
+This does not prove cryptography, arbitrary DID-document updates, multiple
+simultaneous verification methods, capability-permission migration, assets, or
+chain-priority behavior. The oracle and mapping to executable validation remain
+explicit abstraction boundaries. Runtime tests provide finite correspondence
+evidence; the TypeScript/Rust source is not formally verified. No runtime code
+changes are needed.
+
 ## Reproduce
 
 Install Elan using the [official Lean instructions](https://lean-lang.org/install/manual/).
@@ -310,6 +357,7 @@ From the repository root:
 ```sh
 node proofs/agent-convergence/generate-fixtures.mjs --check
 node proofs/agent-convergence/generate-record-fixtures.mjs --check
+node proofs/agent-convergence/generate-agent-fixtures.mjs --check
 cd proofs/agent-convergence
 lake build
 ```
@@ -324,10 +372,12 @@ npm run build -w @didcid/common
 npm run build -w @didcid/cipher
 npm run build -w @didcid/ipfs
 node tests/convergence/generate-vectors.mjs
-git diff --exit-code -- tests/convergence/vectors.json
-node --test proofs/agent-convergence/generate-fixtures.test.mjs
+node tests/convergence/generate-agent-vectors.mjs
+git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json
+node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs
 node proofs/agent-convergence/generate-fixtures.mjs --check
 node proofs/agent-convergence/generate-record-fixtures.mjs --check
+node proofs/agent-convergence/generate-agent-fixtures.mjs --check
 ```
 
 Run that block from the repository root. CI performs it before building Lean and
@@ -344,9 +394,8 @@ update must also update and verify the committed checksum.
 
 ## Follow-up proof work
 
-1. Extend agent authorization to key rotation and deletion, preserving the
-   predecessor-selected authorizing document. This is the next protocol-model
-   extension beyond the fixed-key domain.
+1. Extend the single-active-key abstraction to general agent documents and
+   multiple verification methods with their authorization relationships.
 2. Establish the concrete codec/normalization domain and general executable
    refinement. Serialized stopping transfer and signed per-pass correspondence
    are now proved/tested respectively; neither is a proof of the runtimes.
@@ -356,6 +405,6 @@ update must also update and verify the committed checksum.
    between the specification and both runtime implementations.
 
 The full Archon convergence theorem remains open. The canonical projection and
-its bounded full-event operational refinement are proved; expanded authorization/chain
+its bounded full-event operational refinement are proved; general document/chain
 semantics and the connection to the runtime implementations remain explicit
 obligations.

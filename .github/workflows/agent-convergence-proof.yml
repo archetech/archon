@@ -11,6 +11,7 @@ on:
       - 'packages/ipfs/**'
       - 'packages/gatekeeper/**'
       - 'tests/gatekeeper/convergence.test.ts'
+      - 'tests/gatekeeper/agent-convergence.test.ts'
       - 'rust/services/gatekeeper/**'
       - 'package.json'
       - 'package-lock.json'
@@ -26,6 +27,7 @@ on:
       - 'packages/ipfs/**'
       - 'packages/gatekeeper/**'
       - 'tests/gatekeeper/convergence.test.ts'
+      - 'tests/gatekeeper/agent-convergence.test.ts'
       - 'rust/services/gatekeeper/**'
       - 'package.json'
       - 'package-lock.json'
@@ -62,14 +64,18 @@ jobs:
           npm run build -w @didcid/cipher
           npm run build -w @didcid/ipfs
           node tests/convergence/generate-vectors.mjs
-          git diff --exit-code -- tests/convergence/vectors.json
+          node tests/convergence/generate-agent-vectors.mjs
+          git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json
       - name: Check shared fixture bridge
         run: |
-          node --test proofs/agent-convergence/generate-fixtures.test.mjs
+          node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs
           node proofs/agent-convergence/generate-fixtures.mjs --check
           node proofs/agent-convergence/generate-record-fixtures.mjs --check
+          node proofs/agent-convergence/generate-agent-fixtures.mjs --check
       - name: Check TypeScript replay pass bridge
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/convergence.test.ts --runInBand --coverage=false -t 'Lean-checked'
+      - name: Check signed agent authorization
+        run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/agent-convergence.test.ts --runInBand --coverage=false
       - name: Check proofs and concrete histories
         working-directory: proofs/agent-convergence
         run: lake build

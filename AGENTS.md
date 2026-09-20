@@ -156,7 +156,7 @@ These rules apply to coding agents working in this repository.
 
 - Formal convergence work must distinguish a unique canonical projection from proof that the production insertion/replay loop computes it. State graph, authorization, evidence-retention, and CID-abstraction assumptions explicitly; keep a checked bridge to shared signed fixtures, and audit theorem axioms without treating finite examples as a universal implementation proof.
 
-- Proof CI must enforce the documented theorem-axiom allowlist and regenerate signed source vectors before checking the Lean bridge. Validate the bridge’s genesis and update-shape assumptions; do not rely on a fixed operation-table index for genesis.
+- Proof CI must enforce the documented theorem-axiom allowlist and regenerate signed source vectors before checking the Lean bridge. Validate the bridge’s genesis and update-shape assumptions; do not rely on a fixed operation-table index for genesis. Apply these checks to each new bridge, derive actions from operation records, and emit warnings-as-errors in generated Lean modules too.
 
 - Operational replay proofs must model late genesis, missing predecessors, duplicate identity, suffix truncation, and the actual stop-on-unchanged condition. Distinguish operation-ID path equality from the runtime’s serialized event-record equality; a path-level pass bound is not automatically a bound on all metadata transitions.
 
@@ -165,3 +165,5 @@ These rules apply to coding agents working in this repository.
 - When extending Lean replay proofs, prove the event-to-ID projection and complete-path phase boundary before reusing path/metadata bounds. Keep synthetic receipt projection examples distinct from full signed-record bridge cases, and retain the existing transitive axiom allowlist.
 
 - Replay proof bridges should compare the actual per-event replay importers against Lean-checked intermediate pass states and the final serialized stopping decision, while retaining public ingress/restart coverage. Codec round-trip assumptions apply to normalized JSON/model values, not arbitrary JavaScript object identity; finite bridge traces do not prove general serializer or executable refinement.
+
+- In convergence models, derive an agent operation's signing authority from its signed predecessor chain. Deletion makes that predecessor terminal; it does not prevent a preferred sibling from replacing a deleted branch through an earlier live predecessor. Keep signature-oracle assumptions distinct from executable verification claims.

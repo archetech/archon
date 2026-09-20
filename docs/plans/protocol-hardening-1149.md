@@ -215,3 +215,19 @@ checks are implementation evidence, not source verification. Key rotation,
 deletion, chain priority, controller-dependent assets, and retention remain
 separate extensions, with fixed-agent key rotation/deletion the next model step.
 See the [serialized stopping contract](../../proofs/agent-convergence/README.md#serialized-stopping-and-runtime-pass-bridge--1207).
+
+## Predecessor-key authorization — #1209
+
+The agent model now derives authorization from immutable predecessor chains,
+including single-key rotation and deletion. Lean proves that canonical replay
+executes valid transitions and converges to the same ID history and final
+key/deletion state for equal retained evidence. Deleted predecessors cannot
+have accepted successors; preferred siblings can replace a deleted branch.
+
+456 new signed delivery traces exercise both proof formats in TypeScript and
+Rust, with repeated delivery and restart. Lean checks their reconstructed states
+and replay outcomes. No runtime behavior changes. Valid genesis, signature/method
+verification, finite acyclic predecessor graphs, and agreement on the operation
+snapshot remain explicit premises. General agent documents/multiple methods,
+concrete codec/executable refinement, chain priority, assets, and retention
+remain follow-ups. See the [authorization proof scope](../../proofs/agent-convergence/README.md#predecessor-key-authorization--1209).
