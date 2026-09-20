@@ -345,6 +345,20 @@ checked against the four-pass fixture bound; two cases reach that bound. No
 production loop limit or other runtime behavior changes.
 
 This closes the universal interleaving argument in the current model. The next
-connections are full document/key authorization and the prior settled-priority
-projection, followed by registry migrations, dynamic assets, metadata/codecs,
+connections are full document/key authorization, followed by registry migrations,
+dynamic assets, metadata/codecs,
 and retention. Universal executable correspondence remains open; #1215 stays open.
+
+### Interleaved/settled-priority equivalence — #1215
+
+The local representation contract now connects the two replay models: preferred
+copies preserve eligibility, compiled candidates are sound retained evidence,
+and selected ranks identify canonical representatives. Lean derives equal
+successors and ranked histories, including genesis and the stopping loop, without
+assuming history equality. All six signed graphs satisfy the contract; 36 delivery
+orders instantiate the result. The existing per-transition runtime tests cover
+these same graphs. No runtime changes are needed.
+
+Next connect full document/key authorization to this model. Registry migrations,
+dynamic controller/asset authorization, metadata/codecs, retention, and universal
+executable correspondence remain open; #1215 is still the tracking issue.

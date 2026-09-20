@@ -6,6 +6,7 @@ import ChainAnchors
 import ChainSuccessors
 import InterleavedReplay
 import InterleavedBound
+import PriorityProjection
 import Lean.Util.CollectAxioms
 import Lean.Elab.Command
 
@@ -14,7 +15,9 @@ set_option warningAsError true
 open Lean Elab Command in
 run_cmd do
   let allowed := #[``propext, ``Quot.sound]
-  for theoremName in #[``Archon.interleaved_insert_valid, ``Archon.interleaved_pass_valid,
+  for theoremName in #[``Archon.priority_projection_winner, ``Archon.priority_projection_suffix,
+      ``Archon.interleaved_computes_priority_suffix, ``Archon.interleaved_and_priority_replay_agree,
+      ``Archon.interleaved_insert_valid, ``Archon.interleaved_pass_valid,
       ``Archon.interleaved_after_parent, ``Archon.interleaved_pass_fixed_head,
       ``Archon.interleaved_rounds_converge, ``Archon.interleaved_suffix_complete,
       ``Archon.interleaved_replay_converges, ``Archon.interleaved_replay_same_evidence,
