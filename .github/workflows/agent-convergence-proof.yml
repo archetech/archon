@@ -66,14 +66,16 @@ jobs:
           node tests/convergence/generate-vectors.mjs
           node tests/convergence/generate-agent-vectors.mjs
           node tests/convergence/generate-document-vectors.mjs
-          git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json tests/convergence/document-vectors.json
+          node tests/convergence/generate-component-vectors.mjs
+          git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json tests/convergence/document-vectors.json tests/convergence/component-vectors.json
       - name: Check shared fixture bridge
         run: |
-          node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs proofs/agent-convergence/generate-document-fixtures.test.mjs
+          node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs proofs/agent-convergence/generate-document-fixtures.test.mjs proofs/agent-convergence/generate-component-fixtures.test.mjs
           node proofs/agent-convergence/generate-fixtures.mjs --check
           node proofs/agent-convergence/generate-record-fixtures.mjs --check
           node proofs/agent-convergence/generate-agent-fixtures.mjs --check
           node proofs/agent-convergence/generate-document-fixtures.mjs --check
+          node proofs/agent-convergence/generate-component-fixtures.mjs --check
       - name: Check TypeScript replay pass bridge
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/convergence.test.ts --runInBand --coverage=false -t 'Lean-checked'
       - name: Check signed agent authorization

@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from 'node:util';
 
 // Structural bridge only: signature validity is independently computed from
 // signed bytes, and checked by the ordinary runtime import suites.
-export function documentGraph(vector) {
+export function documentGraph(vector, components = false) {
     const { operations, ids, keys, did, signatureValid } = vector;
     const creates = operations.flatMap((op, i) => op.type === 'create' ? [i] : []);
     if (creates.length !== 1) throw new Error('Expected exactly one create');
@@ -34,11 +34,15 @@ export function documentGraph(vector) {
             if (Object.hasOwn(op, 'doc')) throw new Error('Deletion with document');
             return [];
         }
-        if (!op.doc || Object.keys(op.doc).length !== 1) throw new Error('Expected data-only update or document replacement');
-        if (Object.hasOwn(op.doc, 'didDocumentData')) return [];
+        if (!op.doc || Object.keys(op.doc).length === 0
+            || Object.keys(op.doc).some(k => !['didDocument', 'didDocumentData', 'didDocumentRegistration'].includes(k))
+            || (!components && Object.keys(op.doc).length !== 1)) throw new Error('Expected data-only update or document replacement');
+        if (Object.hasOwn(op.doc, 'didDocumentRegistration')
+            && (!components || !isDeepStrictEqual(op.doc.didDocumentRegistration, create.registration))) throw new Error('Registry changes are outside component model');
+        if (!Object.hasOwn(op.doc, 'didDocument')) return [];
         const doc = op.doc.didDocument;
         if (!doc || doc.id !== did || !Array.isArray(doc.verificationMethod)
-            || Object.keys(doc).some(k => !['@context', 'id', 'verificationMethod', 'authentication', 'assertionMethod', 'capabilityInvocation'].includes(k))) throw new Error('Outside document model');
+            || Object.keys(doc).some(k => ![...['@context', 'id', 'verificationMethod', 'authentication', 'assertionMethod', 'capabilityInvocation'], ...(components ? ['service', 'alsoKnownAs'] : [])].includes(k))) throw new Error('Outside document model');
         return doc.verificationMethod.map(method => {
             if (method.controller !== did || method.type !== 'EcdsaSecp256k1VerificationKey2019'
                 || Object.keys(method).some(k => !['id', 'controller', 'type', 'publicKeyJwk'].includes(k))) throw new Error('Unsupported verification method');
