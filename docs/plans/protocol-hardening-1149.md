@@ -379,3 +379,25 @@ Combined repeated-chain-anchor/key-rotation transition fixtures and connection o
 this derived predicate to the settled-priority projection are the next step.
 Migrations, assets, full components/metadata/codecs, retention, and universal
 executable correspondence remain open under #1215.
+
+### Combined chain/document projection and transition bridge — #1215
+
+#1223 merged after Copilot completed without findings and all required checks
+passed. The next increment composes its derived predecessor-document predicate
+with the settled-priority projection, proving that the canonical ranked suffix
+is executable with the correct documents and, with the admitted genesis, equals
+the compiled cold replay. Root ownership explicitly connects the decoded compiled
+genesis to the document genesis; the theorem also exposes decoded-history equality.
+Delivery-order coverage counts distinct permutations. The local projection contract is
+checked for four signed mixed gossip/chain graphs, across 24 delivery orders.
+
+Both ports check 920 individual transitions and 68 pass/stopping decisions;
+public imports, repeat imports, and restarts check the same cases. Fixtures include
+competing keys under one method name, earlier repeated anchors, an anchored
+wrong-key candidate, invalid ancestry, deletion, and a post-deletion candidate.
+Genesis is seeded for transition traces and may arrive late in public-import
+traces. Registry eligibility remains fixed, and no runtime code changes.
+
+Next audit registry-migration eligibility/ordering before extending that part of
+the model. Assets, full component/metadata/codecs in the combined loop, retention,
+and universal executable correspondence remain open under #1215.

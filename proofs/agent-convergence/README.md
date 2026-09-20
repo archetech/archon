@@ -728,3 +728,38 @@ model, not a general proof of the executable importer. Next connect this derived
 predicate to the settled-priority projection with signed chain/rotation cases.
 Registry migrations, assets, full component/metadata/codec equality, changing
 retained evidence, and general runtime correspondence remain open.
+
+## Chain priorities with document authorization — #1215
+
+`ChainDocuments.lean` composes the document-authorized interleaved theorem with
+`PriorityProjection`. Under the local representative/eligibility contract, the
+interleaved loop returns the settled-priority suffix, and that decoded suffix
+executes using successive predecessor documents to the ancestry-derived final
+state. With genesis ownership and depth alignment, prepending the selected genesis
+rank identifies that result with the compiled cold replay. Decoding through the
+event owner function gives the document genesis followed by the executed path. The fixture bridge checks
+these conditions and the compiled decreasing-edge condition in Lean. Operation
+authorization is derived, not supplied as an unrelated table;
+registry/position eligibility and cryptographic signature validity remain inputs.
+
+Four signed graphs combine two proof formats with competing document branches,
+same-name methods holding different keys, descendants arriving first, repeated
+anchors promoting an earlier branch, an earlier anchored operation signed by the
+wrong branch's key, invalid ancestry, deletion, and a post-deletion candidate.
+Lean checks the projection contract for each graph and the composed convergence
+result for 24 delivery orders. The bridge also checks 920 individual transitions
+and 68 passes. Both runtime tests compare complete stored event records after
+each transition and the serialized stop decision after each pass. Public-import,
+repeat, and restart tests check the selected path, active methods or deletion,
+and candidate retention for the same signed graphs.
+
+The transition bridge starts with the preferred genesis anchor already admitted,
+matching the suffix theorem's boundary. The public-import tests also exercise
+late genesis. Registry stays `BTC:signet`; hints are provisional and complete,
+untied anchor ordinals supply priority. These finite traces strengthen the bridge
+but do not prove either runtime implements the model for every input.
+
+Next audit registry-migration eligibility and ordering. Dynamic asset/controller
+authorization, full component/metadata/codec equality in the combined loop,
+changes in retained evidence, and universal executable correspondence remain
+open. This increment changes no production behavior.
