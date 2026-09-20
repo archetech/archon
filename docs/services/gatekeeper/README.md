@@ -991,8 +991,10 @@ The following is the insertion algorithm reused during replay:
 3. current = store.get_events(did); derive any missing canonical operation IDs
 4. if any current event has opid == event.opid:
        expectedRegistry = expected_registry_for_index(current, index_of_match)
-       if current[match].registry == expectedRegistry: return MERGED
-       elif event.registry == expectedRegistry:
+       earlierAnchor = expectedRegistry is a chain registry and event.registry == expectedRegistry
+           and both ordinals exist and compare_ordinals(event.ordinal, current[match].ordinal) < 0
+       if current[match].registry == expectedRegistry and not earlierAnchor: return MERGED
+       if event.registry == expectedRegistry:
            previous = selected predecessor document, or none for creation
            authorize_operation(event.operation, previous, event)
            // same failure handling as step 7; do not replace an unauthorized anchor
@@ -1030,6 +1032,16 @@ The following is the insertion algorithm reused during replay:
 starting from `events[0].operation.registration.registry`, switching to
 `event.operation.doc.didDocumentRegistration.registry` whenever an `update`
 re-registers it.
+
+For repeated anchors of one canonical operation on its expected chain, an earlier
+ordinal replaces a later accepted anchor only after authorization at that earlier
+position succeeds. A descendant's early anchor may initially defer because its
+predecessor is unavailable, while a later copy becomes applicable during the same
+replay pass. Subsequent passes must still reconsider the earlier anchor; retaining
+the first applicable copy can change controller cutoffs and dependent asset
+acceptance according to gossip arrival order. Distinct candidates remain retained.
+Equal or missing ordinals do not replace an already-confirmed copy under this
+rule; local, Hyperswarm, and pin representations keep first-observation behavior.
 
 The [unanchored successor rule](../../scheme.md#competing-unanchored-successors)
 is a sibling preference, not a timestamp cutoff or a replacement for chain

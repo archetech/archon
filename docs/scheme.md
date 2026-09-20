@@ -585,6 +585,14 @@ Gatekeeper retains imported event candidates separately from accepted DID histor
 
 Controller constraints are enforced at the shared authorization boundary for direct submissions, imports, and verified replay. Startup reconstruction rejects historical operations that assigned external agent controllers, assigned asset owners that were not agents, or changed DID type. Their candidate evidence remains retained, but those operations and dependent successors are not accepted. Agent histories authorize themselves, and asset histories depend only on agents. Replay therefore completes agent histories before asset histories, with predecessor retries within each DID. Startup rebuilds every DID once in that order; replay has no separate oscillation/quarantine policy.
 
+Repeated anchors of the same canonical operation on its expected chain are
+reconsidered during replay: an earlier chain ordinal replaces a later accepted
+anchor only when it passes authorization at the earlier position. A late
+predecessor must not permanently select whichever anchor first became applicable.
+This can revise controller cutoffs and dependent histories. The rule does not
+change tied/missing ordinal handling or first-observation behavior for local,
+Hyperswarm, and pin receipts.
+
 Candidate journals persist across restart, including rejected candidates and replaced branches. Replay reconstructs accepted state before serving resolution after startup and refreshes dependent search and verification state. Existing databases adopt their stored histories into the journal; operations discarded before this upgrade must be recovered by rescanning their anchors. DID exports continue to contain accepted histories, so a DID export alone is not a backup of the candidate journal.
 
 This is convergence on available anchored evidence, not proof of complete history. If a relevant rotation never becomes available, the node cannot take it into account. Competing unanchored successors use the canonical-CID rule below, independently of receipt order. Repeated observations of the same complete canonical operation in the same unanchored registry retain the first observation and do not trigger new authorization replay. Distinct blockchain anchors remain separate evidence; CID priority is a deterministic conflict rule, not evidence of real-world chronology.

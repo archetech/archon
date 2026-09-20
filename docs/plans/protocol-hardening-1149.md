@@ -264,3 +264,22 @@ semantics remain outside this step; the bridge rejects registry changes. #1156
 remains paused. No runtime changes. Next: expected-chain ordering/repeated anchors
 and registry migrations, followed by assets, retention/GC, and stronger executable
 refinement. See [the component theorem](../../proofs/agent-convergence/README.md#complete-document-components--1213).
+
+## Expected-chain audit — #1215 / correction #1216
+
+Before extending the proof to chain priority, signed ordinary-import tests exposed
+a counterexample in both Gatekeepers. Reversing two controller gossip hints made
+replay retain either an early or late anchor of the same key rotation; the chosen
+position changed whether a subsequently anchored asset was authorized. Identical
+retained evidence produced different accepted asset histories even after restart.
+
+#1216 repairs duplicate confirmation selection: an earlier expected-chain ordinal
+can replace an already-confirmed copy after authorization at that position.
+Local/Hyperswarm/pin and tied/missing-position behavior stay unchanged. Shared
+fixtures cover both proof formats, six delivery orders, repeats, restart, durable
+candidate retention, dependent asset recovery, and rejection of an earlier invalid
+asset anchor. Existing candidate replay supplies dependent invalidation/repair.
+
+This is a demonstrated runtime correction, not a completed chain convergence
+proof. #1215 remains open for further chain/migration analysis and formalization;
+asset and metadata proof obligations also remain open.

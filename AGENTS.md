@@ -175,3 +175,5 @@ These rules apply to coding agents working in this repository.
 - In generated component proofs, intern repeated opaque payload values and check their decoding once; do not repeat large JSON-string equality reductions for every delivery permutation. Measure proof memory before running expensive Lean and cross-port suites together.
 
 - A proof projection contract must be required by the convergence theorem and instantiated by generated fixtures; a standalone agreement lemma does not connect independent authorization and payload tables. Keep deletion metadata assertions independent of payload assertions in cross-port fixtures.
+
+- Repeated expected-chain anchors must reconsider earlier valid ordinals even after a copy is confirmed. A late predecessor can make a later copy apply first; retaining it can make controller cutoffs and asset authorization depend on gossip order. Reauthorize earlier replacements and cover reversed hints plus repeat/startup replay with signed evidence.
