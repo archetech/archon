@@ -1568,7 +1568,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     private async normalizeEvent(event: GatekeeperEvent): Promise<void> {
         // Normalize envelopes at import/recovery, including older mediator and
         // restored events. Resolution consumes the stored event time uniformly.
-        if (event.registry === 'hyperswarm' && event.operation.proof) {
+        if ((event.registry === 'hyperswarm' || event.registry === PIN_QUEUE) && event.operation.proof) {
             event.time = event.operation.proof.created;
         }
         const cid = await this.generateCID(event.operation);

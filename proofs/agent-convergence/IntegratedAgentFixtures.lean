@@ -1352,19 +1352,19 @@ example : (stopWhenStable (rankedPass (coldComponentEvents graph1 anchors1) (cha
 theorem source_agrees1_6_2 : SameAgentSources sources1_6_2 sources1_6_0 := by
   exact same_sources_of_check sources1_6_2 sources1_6_0 (by decide)
 example := integrated_agent_convergence graph1 patch1 registry1 9 12 12 receipts1 operationTime1 chainFacts1 ordered1 bounded1 sources1_6_2 sources1_6_0 source_agrees1_6_2
-def atoms2 : Nat → String := (fun i => ["{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-1\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"q10uec_WIbGwJ_-yTiRT7X-1cbqahB_w4kc0Zsq9Fo0\",\"y\":\"JA0RA4YNSQHalTzHAh1NYvP5VpGsfNQ0y_n8nouNhx0\"}}],\"authentication\":[\"#key-1\"],\"assertionMethod\":[\"#key-1\"],\"capabilityInvocation\":[\"#key-1\"]}", "{\"fork\":true}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-2\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"a36wTgevB7XYLkY2YPnj5Or5yFTlqkc5HW2qjprAGjU\",\"y\":\"k15MQ6A4qqzEw-7g3eQmi-0zx_sxiGllOXTuHoRQzOs\"}}],\"service\":[{\"id\":\"#profile\",\"type\":\"Profile\",\"serviceEndpoint\":\"https://example.org/1\"}]}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-3\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"3vJOFJY5JTcjyYds8AeKBWfyHMMtDJRUyGOTCybxH60\",\"y\":\"oPATA16FwplsMqoR-kakNuIUiQ7quN8BTP2dngDFqME\"}}],\"service\":[{\"id\":\"#profile\",\"type\":\"Profile\",\"serviceEndpoint\":\"https://example.org/2\"}]}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\"}", "{\"invalid\":\"deleted-parent\"}", "{\"invalid\":\"retired-key\"}", "{\"retained\":false}", "{\"retained\":true,\"removed\":true}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"BTC:signet\"}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"ETH:sepolia\"}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"ZEC:testnet\"}", "{}"].getD i (""))
+def atoms2 : Nat → String := (fun i => ["{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"id\":\"did:cid:bagaaieraus5c47yljbv65a3hkkucu265fdnak6ivrbqjno6jxtiwtdsi6rfa\",\"verificationMethod\":[{\"id\":\"#key-1\",\"controller\":\"did:cid:bagaaieraus5c47yljbv65a3hkkucu265fdnak6ivrbqjno6jxtiwtdsi6rfa\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"q10uec_WIbGwJ_-yTiRT7X-1cbqahB_w4kc0Zsq9Fo0\",\"y\":\"JA0RA4YNSQHalTzHAh1NYvP5VpGsfNQ0y_n8nouNhx0\"}}],\"authentication\":[\"#key-1\"],\"assertionMethod\":[\"#key-1\"],\"capabilityInvocation\":[\"#key-1\"]}", "{\"fork\":true}", "{\"id\":\"did:cid:bagaaieraus5c47yljbv65a3hkkucu265fdnak6ivrbqjno6jxtiwtdsi6rfa\",\"verificationMethod\":[{\"id\":\"#key-2\",\"controller\":\"did:cid:bagaaieraus5c47yljbv65a3hkkucu265fdnak6ivrbqjno6jxtiwtdsi6rfa\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"a36wTgevB7XYLkY2YPnj5Or5yFTlqkc5HW2qjprAGjU\",\"y\":\"k15MQ6A4qqzEw-7g3eQmi-0zx_sxiGllOXTuHoRQzOs\"}}],\"service\":[{\"id\":\"#profile\",\"type\":\"Profile\",\"serviceEndpoint\":\"https://example.org/1\"}]}", "{\"id\":\"did:cid:bagaaieraus5c47yljbv65a3hkkucu265fdnak6ivrbqjno6jxtiwtdsi6rfa\",\"verificationMethod\":[{\"id\":\"#key-3\",\"controller\":\"did:cid:bagaaieraus5c47yljbv65a3hkkucu265fdnak6ivrbqjno6jxtiwtdsi6rfa\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"3vJOFJY5JTcjyYds8AeKBWfyHMMtDJRUyGOTCybxH60\",\"y\":\"oPATA16FwplsMqoR-kakNuIUiQ7quN8BTP2dngDFqME\"}}],\"service\":[{\"id\":\"#profile\",\"type\":\"Profile\",\"serviceEndpoint\":\"https://example.org/2\"}]}", "{\"id\":\"did:cid:bagaaieraus5c47yljbv65a3hkkucu265fdnak6ivrbqjno6jxtiwtdsi6rfa\"}", "{\"invalid\":\"deleted-parent\"}", "{\"invalid\":\"retired-key\"}", "{\"retained\":false}", "{\"retained\":true,\"removed\":true}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"BTC:signet\"}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"ETH:sepolia\"}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"pin\"}", "{}"].getD i (""))
 def methods2 : Nat → List VerificationMethod := (fun i => [[⟨0, 0⟩], [], [⟨1, 1⟩], [⟨2, 2⟩], [], [], [], [], [], [], [], [], []].getD i ([]))
-def documents2 : Nat → Nat := (fun i => [12, 12, 3, 2, 12, 2, 3, 0, 12, 12].getD i (12))
+def documents2 : Nat → Nat := (fun i => [12, 2, 2, 12, 12, 12, 0, 3, 3, 12].getD i (12))
 def graph2 : DocumentGraph := {
   size := 10
-  root := 7
-  initialDocument := 7
-  parent := (fun i => [some 5, some 9, some 0, some 7, some 5, some 7, some 7, none, some 6, some 2].getD i (none))
-  depth := (fun i => [2, 5, 3, 1, 2, 1, 1, 0, 2, 4].getD i (0))
-  action := (fun i => [AgentAction.keep, AgentAction.keep, AgentAction.rotate 2, AgentAction.rotate 3, AgentAction.keep, AgentAction.rotate 5, AgentAction.rotate 6, AgentAction.keep, AgentAction.keep, AgentAction.deactivate].getD i (AgentAction.keep))
-  documents := (fun i => [[], [], [⟨2, 2⟩], [⟨1, 1⟩], [], [⟨1, 1⟩], [⟨2, 2⟩], [⟨0, 0⟩], [], []].getD i ([]))
-  named := (fun i => [1, 2, 1, 1, 0, 0, 0, 0, 2, 2].getD i (0))
-  signatureValid := fun i k => ((fun i => [[false, true, false], [false, false, true], [false, true, false], [false, true, false], [true, false, false], [true, false, false], [true, false, false], [true, false, false], [false, false, true], [false, false, true]].getD i ([]))) i |>.getD k false
+  root := 6
+  initialDocument := 6
+  parent := (fun i => [some 2, some 6, some 6, some 7, some 3, some 2, none, some 5, some 6, some 8].getD i (none))
+  depth := (fun i => [2, 1, 1, 4, 5, 2, 0, 3, 1, 2].getD i (0))
+  action := (fun i => [AgentAction.keep, AgentAction.rotate 1, AgentAction.rotate 2, AgentAction.deactivate, AgentAction.keep, AgentAction.keep, AgentAction.keep, AgentAction.rotate 7, AgentAction.rotate 8, AgentAction.keep].getD i (AgentAction.keep))
+  documents := (fun i => [[], [⟨1, 1⟩], [⟨1, 1⟩], [], [], [], [⟨0, 0⟩], [⟨2, 2⟩], [⟨2, 2⟩], []].getD i ([]))
+  named := (fun i => [0, 1, 0, 2, 2, 1, 0, 1, 0, 2].getD i (0))
+  signatureValid := fun i k => ((fun i => [[true, false, false], [false, true, false], [true, false, false], [false, false, true], [false, false, true], [false, true, false], [true, false, false], [false, true, false], [true, false, false], [false, false, true]].getD i ([]))) i |>.getD k false
 }
 theorem methods_agree2 : ∀ i, methods2 (documents2 i) = graph2.documents i := by
   intro i
@@ -1420,625 +1420,625 @@ theorem parents2 : AgentParentBounded graph2 := by
   have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 ∨ i = 8 ∨ i = 9 := by omega
   rcases cases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> simp [graph2] at parent
   all_goals subst p; decide
-def patch2 : Nat → ComponentPatch Nat Nat := (fun i => [⟨some 7, none⟩, ⟨some 5, none⟩, ⟨none, some 9⟩, ⟨none, some 11⟩, ⟨some 6, none⟩, ⟨some 8, some 11⟩, ⟨none, some 10⟩, ⟨none, none⟩, ⟨some 1, none⟩, ⟨none, none⟩].getD i (⟨none, none⟩))
-def registry2 : Nat → Nat := (fun i => [4, 4, 4, 4, 4, 4, 4, 4, 4, 0, 1, 2, 4].getD i (4))
+def patch2 : Nat → ComponentPatch Nat Nat := (fun i => [⟨some 6, none⟩, ⟨none, some 11⟩, ⟨some 8, some 11⟩, ⟨none, none⟩, ⟨some 5, none⟩, ⟨some 7, none⟩, ⟨none, none⟩, ⟨none, some 9⟩, ⟨none, some 10⟩, ⟨some 1, none⟩].getD i (⟨none, none⟩))
+def registry2 : Nat → Nat := (fun i => [4, 4, 4, 4, 4, 4, 4, 4, 4, 0, 1, 3, 4].getD i (4))
 def receipts2 : RegistryReceipts := {
-  size := 14
-  owner := (fun i => [6, 7, 5, 6, 3, 9, 1, 6, 5, 0, 8, 0, 4, 2].getD i (10))
-  registry := (fun i => [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2].getD i (4))
-  chain := (fun i => [true, true, true, false].getD i (false))
+  size := 11
+  owner := (fun i => [8, 6, 2, 8, 1, 3, 4, 8, 2, 5, 9].getD i (10))
+  registry := (fun i => [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1].getD i (4))
+  chain := (fun i => [true, true, false, false].getD i (false))
   accepted := fun _ => true
 }
 abbrev anchors2 := componentAnchors graph2 patch2 registry2 9 receipts2
 abbrev model2 := componentEvents graph2 anchors2
-def positions2 : Nat → List Nat := (fun i => [[100, 2, 0], [100, 10, 0], [100, 11, 0], [100, 11, 0], [100, 14, 0], [100, 16, 0], [100, 17, 0], [100, 18, 0], [101, 1, 0], [100, 1, 0], [100, 19, 0], [100, 12, 0], [100, 13, 0], [100, 15, 0]].getD i ([]))
+def positions2 : Nat → List Nat := (fun i => [[100, 2, 0], [100, 10, 0], [100, 11, 0], [100, 11, 0], [100, 14, 0], [100, 16, 0], [100, 17, 0], [100, 18, 0], [101, 1, 0], [100, 1, 0], [100, 19, 0]].getD i ([]))
 theorem ranks2 : RegistryCidRanks (componentRegistry graph2 patch2 registry2 9) receipts2 positions2 := by
   intro x y xv yv same
-  have xb : x < 14 := eligible_lt _ _ _ xv
-  have yb : y < 14 := eligible_lt _ _ _ yv
-  have checked : ∀ x y : Fin 14,
+  have xb : x < 11 := eligible_lt _ _ _ xv
+  have yb : y < 11 := eligible_lt _ _ _ yv
+  have checked : ∀ x y : Fin 11,
       eligible (registryAnchors (componentRegistry graph2 patch2 registry2 9) receipts2) (receipts2.owner x.val) x.val = true →
       eligible (registryAnchors (componentRegistry graph2 patch2 registry2 9) receipts2) (receipts2.owner y.val) y.val = true →
       receipts2.registry x.val = receipts2.registry y.val →
       (x.val < y.val ↔ compare (positions2 x.val) (positions2 y.val) = .lt ∨
         (compare (positions2 x.val) (positions2 y.val) = .eq ∧ receipts2.owner x.val < receipts2.owner y.val)) := by decide
   exact checked ⟨x, xb⟩ ⟨y, yb⟩ xv yv same
-def operationTime2 : Nat → Int := (fun i => [1788566402000, 1788566407000, 1788566405000, 1788566404000, 1788566403000, 1788566401000, 1788566408000, 1788566400000, 1788566409000, 1788566406000].getD i (0))
-def chainFacts2 : Nat → ChainReceiptView := (fun i => [⟨0, [100, 2, 0], 1788566460000, true⟩, ⟨0, [100, 10, 0], 1788566460000, true⟩, ⟨0, [100, 11, 0], 1788566460000, true⟩, ⟨0, [100, 11, 0], 1788566460000, true⟩, ⟨0, [100, 14, 0], 1788566460000, true⟩, ⟨0, [100, 16, 0], 1788566460000, true⟩, ⟨0, [100, 17, 0], 1788566460000, true⟩, ⟨0, [100, 18, 0], 1788566460000, true⟩, ⟨0, [101, 1, 0], 1788566520000, true⟩, ⟨1, [100, 1, 0], 1788566460000, true⟩, ⟨1, [100, 19, 0], 1788566460000, true⟩, ⟨2, [100, 12, 0], 1788566460000, true⟩, ⟨2, [100, 13, 0], 1788566460000, true⟩, ⟨2, [100, 15, 0], 1788566460000, true⟩].getD i (⟨0, [], 0, false⟩))
-theorem covered2_0 : ∀ i ∈ ([1, 2, 11, 12, 4, 13, 7, 10, 9, 8] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([7, 5, 0, 4, 3, 2, 6, 8] : List Nat) := by
+def operationTime2 : Nat → Int := (fun i => [1788566403000, 1788566404000, 1788566401000, 1788566406000, 1788566407000, 1788566402000, 1788566400000, 1788566405000, 1788566408000, 1788566409000].getD i (0))
+def chainFacts2 : Nat → ChainReceiptView := (fun i => [⟨0, [100, 2, 0], 1788566460000, true⟩, ⟨0, [100, 10, 0], 1788566460000, true⟩, ⟨0, [100, 11, 0], 1788566460000, true⟩, ⟨0, [100, 11, 0], 1788566460000, true⟩, ⟨0, [100, 14, 0], 1788566460000, true⟩, ⟨0, [100, 16, 0], 1788566460000, true⟩, ⟨0, [100, 17, 0], 1788566460000, true⟩, ⟨0, [100, 18, 0], 1788566460000, true⟩, ⟨0, [101, 1, 0], 1788566520000, true⟩, ⟨1, [100, 1, 0], 1788566460000, true⟩, ⟨1, [100, 19, 0], 1788566460000, true⟩].getD i (⟨0, [], 0, false⟩))
+theorem covered2_0 : ∀ i ∈ ([1, 2, 4, 7, 10, 9, 8] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([6, 2, 5, 0, 1, 7, 8, 9] : List Nat) := by
   intro i member ok
-  have bound : i < 14 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 14, i.val ∈ ([1, 2, 11, 12, 4, 13, 7, 10, 9, 8] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([7, 5, 0, 4, 3, 2, 6, 8] : List Nat) := by decide
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 2, 4, 7, 10, 9, 8] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([6, 2, 5, 0, 1, 7, 8, 9] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources2_0_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨5, 3, none⟩, 1⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨4, 3, none⟩, 3⟩, ⟨⟨3, 3, none⟩, 4⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨6, 3, none⟩, 8⟩, ⟨⟨8, 3, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨5, 0, some 2⟩, 11⟩, ⟨⟨0, 2, some 11⟩, 12⟩, ⟨⟨4, 2, some 12⟩, 13⟩, ⟨⟨3, 0, some 4⟩, 14⟩, ⟨⟨2, 2, some 13⟩, 15⟩, ⟨⟨6, 0, some 7⟩, 18⟩, ⟨⟨8, 1, some 10⟩, 19⟩, ⟨⟨0, 1, some 9⟩, 20⟩, ⟨⟨5, 0, some 8⟩, 21⟩]
-def records2_0_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨19, false, 1⟩, ⟨14, false, 2⟩, ⟨18, false, 3⟩, ⟨17, false, 4⟩, ⟨16, false, 5⟩, ⟨20, false, 8⟩, ⟨22, false, 9⟩, ⟨1, true, 10⟩, ⟨21, true, 10⟩, ⟨2, true, 11⟩, ⟨19, true, 11⟩, ⟨11, true, 12⟩, ⟨14, true, 12⟩, ⟨18, true, 13⟩, ⟨17, true, 14⟩, ⟨13, true, 15⟩, ⟨16, true, 15⟩, ⟨7, true, 18⟩, ⟨20, true, 18⟩, ⟨10, true, 19⟩, ⟨22, true, 19⟩, ⟨14, false, 20⟩, ⟨8, true, 21⟩, ⟨19, true, 21⟩]
-theorem represented2_0_0 : ∀ i, i ∈ recordIds records2_0_0 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] := by
+def sources2_0_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨2, 2, none⟩, 1⟩, ⟨⟨5, 2, none⟩, 2⟩, ⟨⟨0, 2, none⟩, 3⟩, ⟨⟨1, 2, none⟩, 4⟩, ⟨⟨7, 2, none⟩, 5⟩, ⟨⟨8, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩, ⟨⟨6, 0, some 1⟩, 10⟩, ⟨⟨2, 0, some 2⟩, 11⟩, ⟨⟨5, 3, none⟩, 12⟩, ⟨⟨5, 3, none⟩, 13⟩, ⟨⟨0, 3, none⟩, 14⟩, ⟨⟨0, 3, none⟩, 15⟩, ⟨⟨1, 0, some 4⟩, 16⟩, ⟨⟨7, 3, none⟩, 17⟩, ⟨⟨7, 3, none⟩, 18⟩, ⟨⟨8, 0, some 7⟩, 21⟩, ⟨⟨9, 1, some 10⟩, 22⟩, ⟨⟨5, 1, some 9⟩, 23⟩, ⟨⟨2, 0, some 8⟩, 24⟩]
+def records2_0_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨13, false, 1⟩, ⟨16, false, 2⟩, ⟨11, false, 3⟩, ⟨12, false, 4⟩, ⟨18, false, 5⟩, ⟨19, false, 8⟩, ⟨20, false, 9⟩, ⟨1, true, 10⟩, ⟨17, true, 10⟩, ⟨2, true, 11⟩, ⟨13, true, 11⟩, ⟨16, true, 12⟩, ⟨16, true, 13⟩, ⟨11, true, 14⟩, ⟨11, true, 15⟩, ⟨12, true, 16⟩, ⟨18, true, 17⟩, ⟨18, true, 18⟩, ⟨7, true, 21⟩, ⟨19, true, 21⟩, ⟨10, true, 22⟩, ⟨20, true, 22⟩, ⟨16, false, 23⟩, ⟨8, true, 24⟩, ⟨13, true, 24⟩]
+theorem represented2_0_0 : ∀ i, i ∈ recordIds records2_0_0 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 4, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 21, 19, 14, 18, 17, 16, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 2, 4, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 8, 9] = [1, 2, 7, 10, 8, 17, 13, 16, 11, 12, 18, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_0_0] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_0_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_0_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_0_0) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_0_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] graph2.root [7, 5, 0, 4, 3, 2, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 4, 7, 10, 9, 8] graph2.root [6, 2, 5, 0, 1, 7, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] records2_0_0 [] covered2_0 (by decide) represented2_0_0 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_0_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 4, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 8, 9] records2_0_0 [] covered2_0 (by decide) represented2_0_0 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_0_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_0) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_0 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_0_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_0_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩] := by decide
-def sources2_0_1 : List (AgentSourceReceipt Nat) := [⟨⟨5, 0, some 8⟩, 1021⟩, ⟨⟨0, 1, some 9⟩, 1020⟩, ⟨⟨8, 1, some 10⟩, 1019⟩, ⟨⟨6, 0, some 7⟩, 1018⟩, ⟨⟨2, 2, some 13⟩, 1015⟩, ⟨⟨3, 0, some 4⟩, 1014⟩, ⟨⟨4, 2, some 12⟩, 1013⟩, ⟨⟨0, 2, some 11⟩, 1012⟩, ⟨⟨5, 0, some 2⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨8, 3, none⟩, 1009⟩, ⟨⟨6, 3, none⟩, 1008⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨3, 3, none⟩, 1004⟩, ⟨⟨4, 3, none⟩, 1003⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨5, 3, none⟩, 1001⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
-def records2_0_1 : List (EventRecord Nat) := [⟨8, true, 1021⟩, ⟨19, true, 1021⟩, ⟨14, false, 1020⟩, ⟨10, true, 1019⟩, ⟨22, true, 1019⟩, ⟨7, true, 1018⟩, ⟨20, true, 1018⟩, ⟨13, true, 1015⟩, ⟨16, true, 1015⟩, ⟨17, true, 1014⟩, ⟨18, true, 1013⟩, ⟨11, true, 1012⟩, ⟨14, true, 1012⟩, ⟨2, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨21, true, 1010⟩, ⟨22, false, 1009⟩, ⟨20, false, 1008⟩, ⟨16, false, 1005⟩, ⟨17, false, 1004⟩, ⟨18, false, 1003⟩, ⟨14, false, 1002⟩, ⟨19, false, 1001⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
-theorem represented2_0_1 : ∀ i, i ∈ recordIds records2_0_1 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] := by
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨7, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩] := by decide
+def sources2_0_1 : List (AgentSourceReceipt Nat) := [⟨⟨2, 0, some 8⟩, 1024⟩, ⟨⟨5, 1, some 9⟩, 1023⟩, ⟨⟨9, 1, some 10⟩, 1022⟩, ⟨⟨8, 0, some 7⟩, 1021⟩, ⟨⟨7, 3, none⟩, 1018⟩, ⟨⟨7, 3, none⟩, 1017⟩, ⟨⟨1, 0, some 4⟩, 1016⟩, ⟨⟨0, 3, none⟩, 1015⟩, ⟨⟨0, 3, none⟩, 1014⟩, ⟨⟨5, 3, none⟩, 1013⟩, ⟨⟨5, 3, none⟩, 1012⟩, ⟨⟨2, 0, some 2⟩, 1011⟩, ⟨⟨6, 0, some 1⟩, 1010⟩, ⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨8, 2, none⟩, 1008⟩, ⟨⟨7, 2, none⟩, 1005⟩, ⟨⟨1, 2, none⟩, 1004⟩, ⟨⟨0, 2, none⟩, 1003⟩, ⟨⟨5, 2, none⟩, 1002⟩, ⟨⟨2, 2, none⟩, 1001⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records2_0_1 : List (EventRecord Nat) := [⟨8, true, 1024⟩, ⟨13, true, 1024⟩, ⟨16, false, 1023⟩, ⟨10, true, 1022⟩, ⟨20, true, 1022⟩, ⟨7, true, 1021⟩, ⟨19, true, 1021⟩, ⟨18, true, 1018⟩, ⟨18, true, 1017⟩, ⟨12, true, 1016⟩, ⟨11, true, 1015⟩, ⟨11, true, 1014⟩, ⟨16, true, 1013⟩, ⟨16, true, 1012⟩, ⟨2, true, 1011⟩, ⟨13, true, 1011⟩, ⟨1, true, 1010⟩, ⟨17, true, 1010⟩, ⟨20, false, 1009⟩, ⟨19, false, 1008⟩, ⟨18, false, 1005⟩, ⟨12, false, 1004⟩, ⟨11, false, 1003⟩, ⟨16, false, 1002⟩, ⟨13, false, 1001⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented2_0_1 : ∀ i, i ∈ recordIds records2_0_1 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 4, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 21, 19, 14, 18, 17, 16, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 2, 4, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 8, 9] = [1, 2, 7, 10, 8, 17, 13, 16, 11, 12, 18, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_0_1] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_0_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_0_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_0_1) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_0_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] graph2.root [7, 5, 0, 4, 3, 2, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 4, 7, 10, 9, 8] graph2.root [6, 2, 5, 0, 1, 7, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] records2_0_1 [] covered2_0 (by decide) represented2_0_1 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_0_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 4, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 8, 9] records2_0_1 [] covered2_0 (by decide) represented2_0_1 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_0_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_1) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_1 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_0_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_0_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨7, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩] := by decide
 theorem source_agrees2_0_1 : SameAgentSources sources2_0_1 sources2_0_0 := by
   exact same_sources_of_check sources2_0_1 sources2_0_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_0_1 sources2_0_0 source_agrees2_0_1
-def sources2_0_2 : List (AgentSourceReceipt Nat) := [⟨⟨5, 3, none⟩, 2001⟩, ⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨4, 3, none⟩, 2003⟩, ⟨⟨3, 3, none⟩, 2004⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨6, 3, none⟩, 2008⟩, ⟨⟨8, 3, none⟩, 2009⟩, ⟨⟨5, 0, some 2⟩, 2011⟩, ⟨⟨0, 2, some 11⟩, 2012⟩, ⟨⟨4, 2, some 12⟩, 2013⟩, ⟨⟨3, 0, some 4⟩, 2014⟩, ⟨⟨2, 2, some 13⟩, 2015⟩, ⟨⟨6, 0, some 7⟩, 2018⟩, ⟨⟨8, 1, some 10⟩, 2019⟩, ⟨⟨0, 1, some 9⟩, 2020⟩, ⟨⟨5, 0, some 8⟩, 2021⟩, ⟨⟨7, 3, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
-def records2_0_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨14, false, 2002⟩, ⟨18, false, 2003⟩, ⟨17, false, 2004⟩, ⟨16, false, 2005⟩, ⟨20, false, 2008⟩, ⟨22, false, 2009⟩, ⟨2, true, 2011⟩, ⟨19, true, 2011⟩, ⟨11, true, 2012⟩, ⟨14, true, 2012⟩, ⟨18, true, 2013⟩, ⟨17, true, 2014⟩, ⟨13, true, 2015⟩, ⟨16, true, 2015⟩, ⟨7, true, 2018⟩, ⟨20, true, 2018⟩, ⟨10, true, 2019⟩, ⟨22, true, 2019⟩, ⟨14, false, 2020⟩, ⟨8, true, 2021⟩, ⟨19, true, 2021⟩, ⟨21, false, 2000⟩, ⟨1, true, 2010⟩, ⟨21, true, 2010⟩]
-theorem represented2_0_2 : ∀ i, i ∈ recordIds records2_0_2 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] := by
+def sources2_0_2 : List (AgentSourceReceipt Nat) := [⟨⟨2, 2, none⟩, 2001⟩, ⟨⟨5, 2, none⟩, 2002⟩, ⟨⟨0, 2, none⟩, 2003⟩, ⟨⟨1, 2, none⟩, 2004⟩, ⟨⟨7, 2, none⟩, 2005⟩, ⟨⟨8, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨2, 0, some 2⟩, 2011⟩, ⟨⟨5, 3, none⟩, 2012⟩, ⟨⟨5, 3, none⟩, 2013⟩, ⟨⟨0, 3, none⟩, 2014⟩, ⟨⟨0, 3, none⟩, 2015⟩, ⟨⟨1, 0, some 4⟩, 2016⟩, ⟨⟨7, 3, none⟩, 2017⟩, ⟨⟨7, 3, none⟩, 2018⟩, ⟨⟨8, 0, some 7⟩, 2021⟩, ⟨⟨9, 1, some 10⟩, 2022⟩, ⟨⟨5, 1, some 9⟩, 2023⟩, ⟨⟨2, 0, some 8⟩, 2024⟩, ⟨⟨6, 2, none⟩, 2000⟩, ⟨⟨6, 0, some 1⟩, 2010⟩]
+def records2_0_2 : List (EventRecord Nat) := [⟨13, false, 2001⟩, ⟨16, false, 2002⟩, ⟨11, false, 2003⟩, ⟨12, false, 2004⟩, ⟨18, false, 2005⟩, ⟨19, false, 2008⟩, ⟨20, false, 2009⟩, ⟨2, true, 2011⟩, ⟨13, true, 2011⟩, ⟨16, true, 2012⟩, ⟨16, true, 2013⟩, ⟨11, true, 2014⟩, ⟨11, true, 2015⟩, ⟨12, true, 2016⟩, ⟨18, true, 2017⟩, ⟨18, true, 2018⟩, ⟨7, true, 2021⟩, ⟨19, true, 2021⟩, ⟨10, true, 2022⟩, ⟨20, true, 2022⟩, ⟨16, false, 2023⟩, ⟨8, true, 2024⟩, ⟨13, true, 2024⟩, ⟨17, false, 2000⟩, ⟨1, true, 2010⟩, ⟨17, true, 2010⟩]
+theorem represented2_0_2 : ∀ i, i ∈ recordIds records2_0_2 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 4, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 21, 19, 14, 18, 17, 16, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 2, 4, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 8, 9] = [1, 2, 7, 10, 8, 17, 13, 16, 11, 12, 18, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_0_2] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_0_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_0_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_0_2) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_0_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] graph2.root [7, 5, 0, 4, 3, 2, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 4, 7, 10, 9, 8] graph2.root [6, 2, 5, 0, 1, 7, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] records2_0_2 [] covered2_0 (by decide) represented2_0_2 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_0_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 4, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 8, 9] records2_0_2 [] covered2_0 (by decide) represented2_0_2 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_0_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_2) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_2 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_0_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_0_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_0_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨7, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩] := by decide
 theorem source_agrees2_0_2 : SameAgentSources sources2_0_2 sources2_0_0 := by
   exact same_sources_of_check sources2_0_2 sources2_0_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_0_2 sources2_0_0 source_agrees2_0_2
-theorem covered2_1 : ∀ i ∈ ([1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([7, 5, 0, 4, 3, 2, 9, 1, 6, 8] : List Nat) := by
+theorem covered2_1 : ∀ i ∈ ([1, 2, 4, 5, 6, 7, 10, 9, 8] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([6, 2, 5, 0, 1, 7, 3, 4, 8, 9] : List Nat) := by
   intro i member ok
-  have bound : i < 14 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 14, i.val ∈ ([1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([7, 5, 0, 4, 3, 2, 9, 1, 6, 8] : List Nat) := by decide
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 2, 4, 5, 6, 7, 10, 9, 8] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([6, 2, 5, 0, 1, 7, 3, 4, 8, 9] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources2_1_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨5, 3, none⟩, 1⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨4, 3, none⟩, 3⟩, ⟨⟨3, 3, none⟩, 4⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨9, 3, none⟩, 6⟩, ⟨⟨1, 3, none⟩, 7⟩, ⟨⟨6, 3, none⟩, 8⟩, ⟨⟨8, 3, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨5, 0, some 2⟩, 11⟩, ⟨⟨0, 2, some 11⟩, 12⟩, ⟨⟨4, 2, some 12⟩, 13⟩, ⟨⟨3, 0, some 4⟩, 14⟩, ⟨⟨2, 2, some 13⟩, 15⟩, ⟨⟨9, 0, some 5⟩, 16⟩, ⟨⟨1, 0, some 6⟩, 17⟩, ⟨⟨6, 0, some 7⟩, 18⟩, ⟨⟨8, 1, some 10⟩, 19⟩, ⟨⟨0, 1, some 9⟩, 20⟩, ⟨⟨5, 0, some 8⟩, 21⟩]
-def records2_1_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨19, false, 1⟩, ⟨14, false, 2⟩, ⟨18, false, 3⟩, ⟨17, false, 4⟩, ⟨16, false, 5⟩, ⟨23, false, 6⟩, ⟨15, false, 7⟩, ⟨20, false, 8⟩, ⟨22, false, 9⟩, ⟨1, true, 10⟩, ⟨21, true, 10⟩, ⟨2, true, 11⟩, ⟨19, true, 11⟩, ⟨11, true, 12⟩, ⟨14, true, 12⟩, ⟨18, true, 13⟩, ⟨17, true, 14⟩, ⟨13, true, 15⟩, ⟨16, true, 15⟩, ⟨5, true, 16⟩, ⟨23, true, 16⟩, ⟨15, true, 17⟩, ⟨7, true, 18⟩, ⟨20, true, 18⟩, ⟨10, true, 19⟩, ⟨22, true, 19⟩, ⟨14, false, 20⟩, ⟨8, true, 21⟩, ⟨19, true, 21⟩]
-theorem represented2_1_0 : ∀ i, i ∈ recordIds records2_1_0 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] := by
+def sources2_1_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨2, 2, none⟩, 1⟩, ⟨⟨5, 2, none⟩, 2⟩, ⟨⟨0, 2, none⟩, 3⟩, ⟨⟨1, 2, none⟩, 4⟩, ⟨⟨7, 2, none⟩, 5⟩, ⟨⟨3, 2, none⟩, 6⟩, ⟨⟨4, 2, none⟩, 7⟩, ⟨⟨8, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩, ⟨⟨6, 0, some 1⟩, 10⟩, ⟨⟨2, 0, some 2⟩, 11⟩, ⟨⟨5, 3, none⟩, 12⟩, ⟨⟨5, 3, none⟩, 13⟩, ⟨⟨0, 3, none⟩, 14⟩, ⟨⟨0, 3, none⟩, 15⟩, ⟨⟨1, 0, some 4⟩, 16⟩, ⟨⟨7, 3, none⟩, 17⟩, ⟨⟨7, 3, none⟩, 18⟩, ⟨⟨3, 0, some 5⟩, 19⟩, ⟨⟨4, 0, some 6⟩, 20⟩, ⟨⟨8, 0, some 7⟩, 21⟩, ⟨⟨9, 1, some 10⟩, 22⟩, ⟨⟨5, 1, some 9⟩, 23⟩, ⟨⟨2, 0, some 8⟩, 24⟩]
+def records2_1_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨13, false, 1⟩, ⟨16, false, 2⟩, ⟨11, false, 3⟩, ⟨12, false, 4⟩, ⟨18, false, 5⟩, ⟨14, false, 6⟩, ⟨15, false, 7⟩, ⟨19, false, 8⟩, ⟨20, false, 9⟩, ⟨1, true, 10⟩, ⟨17, true, 10⟩, ⟨2, true, 11⟩, ⟨13, true, 11⟩, ⟨16, true, 12⟩, ⟨16, true, 13⟩, ⟨11, true, 14⟩, ⟨11, true, 15⟩, ⟨12, true, 16⟩, ⟨18, true, 17⟩, ⟨18, true, 18⟩, ⟨5, true, 19⟩, ⟨14, true, 19⟩, ⟨15, true, 20⟩, ⟨7, true, 21⟩, ⟨19, true, 21⟩, ⟨10, true, 22⟩, ⟨20, true, 22⟩, ⟨16, false, 23⟩, ⟨8, true, 24⟩, ⟨13, true, 24⟩]
+theorem represented2_1_0 : ∀ i, i ∈ recordIds records2_1_0 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 3, 4, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] = [1, 2, 11, 13, 5, 7, 10, 8, 21, 19, 14, 18, 17, 16, 23, 15, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 3, 4, 8, 9] = [1, 2, 5, 7, 10, 8, 17, 13, 16, 11, 12, 18, 14, 15, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_1_0] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_1_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_1_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_1_0) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_1_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] graph2.root [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 4, 5, 6, 7, 10, 9, 8] graph2.root [6, 2, 5, 0, 1, 7, 3, 4, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] records2_1_0 [] covered2_1 (by decide) represented2_1_0 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_1_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2, 9], some (4, 12, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 3, 4, 8, 9] records2_1_0 [] covered2_1 (by decide) represented2_1_0 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_1_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7, 3], some (4, 12, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_0) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_0 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_1_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2, 9], some (4, 12, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7, 3], some (4, 12, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_1_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
-def sources2_1_1 : List (AgentSourceReceipt Nat) := [⟨⟨5, 0, some 8⟩, 1021⟩, ⟨⟨0, 1, some 9⟩, 1020⟩, ⟨⟨8, 1, some 10⟩, 1019⟩, ⟨⟨6, 0, some 7⟩, 1018⟩, ⟨⟨1, 0, some 6⟩, 1017⟩, ⟨⟨9, 0, some 5⟩, 1016⟩, ⟨⟨2, 2, some 13⟩, 1015⟩, ⟨⟨3, 0, some 4⟩, 1014⟩, ⟨⟨4, 2, some 12⟩, 1013⟩, ⟨⟨0, 2, some 11⟩, 1012⟩, ⟨⟨5, 0, some 2⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨8, 3, none⟩, 1009⟩, ⟨⟨6, 3, none⟩, 1008⟩, ⟨⟨1, 3, none⟩, 1007⟩, ⟨⟨9, 3, none⟩, 1006⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨3, 3, none⟩, 1004⟩, ⟨⟨4, 3, none⟩, 1003⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨5, 3, none⟩, 1001⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
-def records2_1_1 : List (EventRecord Nat) := [⟨8, true, 1021⟩, ⟨19, true, 1021⟩, ⟨14, false, 1020⟩, ⟨10, true, 1019⟩, ⟨22, true, 1019⟩, ⟨7, true, 1018⟩, ⟨20, true, 1018⟩, ⟨15, true, 1017⟩, ⟨5, true, 1016⟩, ⟨23, true, 1016⟩, ⟨13, true, 1015⟩, ⟨16, true, 1015⟩, ⟨17, true, 1014⟩, ⟨18, true, 1013⟩, ⟨11, true, 1012⟩, ⟨14, true, 1012⟩, ⟨2, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨21, true, 1010⟩, ⟨22, false, 1009⟩, ⟨20, false, 1008⟩, ⟨15, false, 1007⟩, ⟨23, false, 1006⟩, ⟨16, false, 1005⟩, ⟨17, false, 1004⟩, ⟨18, false, 1003⟩, ⟨14, false, 1002⟩, ⟨19, false, 1001⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
-theorem represented2_1_1 : ∀ i, i ∈ recordIds records2_1_1 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] := by
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨7, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩, ⟨3, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
+def sources2_1_1 : List (AgentSourceReceipt Nat) := [⟨⟨2, 0, some 8⟩, 1024⟩, ⟨⟨5, 1, some 9⟩, 1023⟩, ⟨⟨9, 1, some 10⟩, 1022⟩, ⟨⟨8, 0, some 7⟩, 1021⟩, ⟨⟨4, 0, some 6⟩, 1020⟩, ⟨⟨3, 0, some 5⟩, 1019⟩, ⟨⟨7, 3, none⟩, 1018⟩, ⟨⟨7, 3, none⟩, 1017⟩, ⟨⟨1, 0, some 4⟩, 1016⟩, ⟨⟨0, 3, none⟩, 1015⟩, ⟨⟨0, 3, none⟩, 1014⟩, ⟨⟨5, 3, none⟩, 1013⟩, ⟨⟨5, 3, none⟩, 1012⟩, ⟨⟨2, 0, some 2⟩, 1011⟩, ⟨⟨6, 0, some 1⟩, 1010⟩, ⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨8, 2, none⟩, 1008⟩, ⟨⟨4, 2, none⟩, 1007⟩, ⟨⟨3, 2, none⟩, 1006⟩, ⟨⟨7, 2, none⟩, 1005⟩, ⟨⟨1, 2, none⟩, 1004⟩, ⟨⟨0, 2, none⟩, 1003⟩, ⟨⟨5, 2, none⟩, 1002⟩, ⟨⟨2, 2, none⟩, 1001⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records2_1_1 : List (EventRecord Nat) := [⟨8, true, 1024⟩, ⟨13, true, 1024⟩, ⟨16, false, 1023⟩, ⟨10, true, 1022⟩, ⟨20, true, 1022⟩, ⟨7, true, 1021⟩, ⟨19, true, 1021⟩, ⟨15, true, 1020⟩, ⟨5, true, 1019⟩, ⟨14, true, 1019⟩, ⟨18, true, 1018⟩, ⟨18, true, 1017⟩, ⟨12, true, 1016⟩, ⟨11, true, 1015⟩, ⟨11, true, 1014⟩, ⟨16, true, 1013⟩, ⟨16, true, 1012⟩, ⟨2, true, 1011⟩, ⟨13, true, 1011⟩, ⟨1, true, 1010⟩, ⟨17, true, 1010⟩, ⟨20, false, 1009⟩, ⟨19, false, 1008⟩, ⟨15, false, 1007⟩, ⟨14, false, 1006⟩, ⟨18, false, 1005⟩, ⟨12, false, 1004⟩, ⟨11, false, 1003⟩, ⟨16, false, 1002⟩, ⟨13, false, 1001⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented2_1_1 : ∀ i, i ∈ recordIds records2_1_1 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 3, 4, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] = [1, 2, 11, 13, 5, 7, 10, 8, 21, 19, 14, 18, 17, 16, 23, 15, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 3, 4, 8, 9] = [1, 2, 5, 7, 10, 8, 17, 13, 16, 11, 12, 18, 14, 15, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_1_1] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_1_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_1_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_1_1) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_1_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] graph2.root [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 4, 5, 6, 7, 10, 9, 8] graph2.root [6, 2, 5, 0, 1, 7, 3, 4, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] records2_1_1 [] covered2_1 (by decide) represented2_1_1 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_1_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2, 9], some (4, 12, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 3, 4, 8, 9] records2_1_1 [] covered2_1 (by decide) represented2_1_1 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_1_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7, 3], some (4, 12, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_1) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_1 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_1_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2, 9], some (4, 12, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7, 3], some (4, 12, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_1_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨7, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩, ⟨3, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees2_1_1 : SameAgentSources sources2_1_1 sources2_1_0 := by
   exact same_sources_of_check sources2_1_1 sources2_1_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_1_1 sources2_1_0 source_agrees2_1_1
-def sources2_1_2 : List (AgentSourceReceipt Nat) := [⟨⟨5, 3, none⟩, 2001⟩, ⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨4, 3, none⟩, 2003⟩, ⟨⟨3, 3, none⟩, 2004⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨9, 3, none⟩, 2006⟩, ⟨⟨1, 3, none⟩, 2007⟩, ⟨⟨6, 3, none⟩, 2008⟩, ⟨⟨8, 3, none⟩, 2009⟩, ⟨⟨5, 0, some 2⟩, 2011⟩, ⟨⟨0, 2, some 11⟩, 2012⟩, ⟨⟨4, 2, some 12⟩, 2013⟩, ⟨⟨3, 0, some 4⟩, 2014⟩, ⟨⟨2, 2, some 13⟩, 2015⟩, ⟨⟨9, 0, some 5⟩, 2016⟩, ⟨⟨1, 0, some 6⟩, 2017⟩, ⟨⟨6, 0, some 7⟩, 2018⟩, ⟨⟨8, 1, some 10⟩, 2019⟩, ⟨⟨0, 1, some 9⟩, 2020⟩, ⟨⟨5, 0, some 8⟩, 2021⟩, ⟨⟨7, 3, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
-def records2_1_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨14, false, 2002⟩, ⟨18, false, 2003⟩, ⟨17, false, 2004⟩, ⟨16, false, 2005⟩, ⟨23, false, 2006⟩, ⟨15, false, 2007⟩, ⟨20, false, 2008⟩, ⟨22, false, 2009⟩, ⟨2, true, 2011⟩, ⟨19, true, 2011⟩, ⟨11, true, 2012⟩, ⟨14, true, 2012⟩, ⟨18, true, 2013⟩, ⟨17, true, 2014⟩, ⟨13, true, 2015⟩, ⟨16, true, 2015⟩, ⟨5, true, 2016⟩, ⟨23, true, 2016⟩, ⟨15, true, 2017⟩, ⟨7, true, 2018⟩, ⟨20, true, 2018⟩, ⟨10, true, 2019⟩, ⟨22, true, 2019⟩, ⟨14, false, 2020⟩, ⟨8, true, 2021⟩, ⟨19, true, 2021⟩, ⟨21, false, 2000⟩, ⟨1, true, 2010⟩, ⟨21, true, 2010⟩]
-theorem represented2_1_2 : ∀ i, i ∈ recordIds records2_1_2 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] := by
+def sources2_1_2 : List (AgentSourceReceipt Nat) := [⟨⟨2, 2, none⟩, 2001⟩, ⟨⟨5, 2, none⟩, 2002⟩, ⟨⟨0, 2, none⟩, 2003⟩, ⟨⟨1, 2, none⟩, 2004⟩, ⟨⟨7, 2, none⟩, 2005⟩, ⟨⟨3, 2, none⟩, 2006⟩, ⟨⟨4, 2, none⟩, 2007⟩, ⟨⟨8, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨2, 0, some 2⟩, 2011⟩, ⟨⟨5, 3, none⟩, 2012⟩, ⟨⟨5, 3, none⟩, 2013⟩, ⟨⟨0, 3, none⟩, 2014⟩, ⟨⟨0, 3, none⟩, 2015⟩, ⟨⟨1, 0, some 4⟩, 2016⟩, ⟨⟨7, 3, none⟩, 2017⟩, ⟨⟨7, 3, none⟩, 2018⟩, ⟨⟨3, 0, some 5⟩, 2019⟩, ⟨⟨4, 0, some 6⟩, 2020⟩, ⟨⟨8, 0, some 7⟩, 2021⟩, ⟨⟨9, 1, some 10⟩, 2022⟩, ⟨⟨5, 1, some 9⟩, 2023⟩, ⟨⟨2, 0, some 8⟩, 2024⟩, ⟨⟨6, 2, none⟩, 2000⟩, ⟨⟨6, 0, some 1⟩, 2010⟩]
+def records2_1_2 : List (EventRecord Nat) := [⟨13, false, 2001⟩, ⟨16, false, 2002⟩, ⟨11, false, 2003⟩, ⟨12, false, 2004⟩, ⟨18, false, 2005⟩, ⟨14, false, 2006⟩, ⟨15, false, 2007⟩, ⟨19, false, 2008⟩, ⟨20, false, 2009⟩, ⟨2, true, 2011⟩, ⟨13, true, 2011⟩, ⟨16, true, 2012⟩, ⟨16, true, 2013⟩, ⟨11, true, 2014⟩, ⟨11, true, 2015⟩, ⟨12, true, 2016⟩, ⟨18, true, 2017⟩, ⟨18, true, 2018⟩, ⟨5, true, 2019⟩, ⟨14, true, 2019⟩, ⟨15, true, 2020⟩, ⟨7, true, 2021⟩, ⟨19, true, 2021⟩, ⟨10, true, 2022⟩, ⟨20, true, 2022⟩, ⟨16, false, 2023⟩, ⟨8, true, 2024⟩, ⟨13, true, 2024⟩, ⟨17, false, 2000⟩, ⟨1, true, 2010⟩, ⟨17, true, 2010⟩]
+theorem represented2_1_2 : ∀ i, i ∈ recordIds records2_1_2 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 3, 4, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] = [1, 2, 11, 13, 5, 7, 10, 8, 21, 19, 14, 18, 17, 16, 23, 15, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 3, 4, 8, 9] = [1, 2, 5, 7, 10, 8, 17, 13, 16, 11, 12, 18, 14, 15, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_1_2] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_1_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_1_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_1_2) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_1_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] graph2.root [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 4, 5, 6, 7, 10, 9, 8] graph2.root [6, 2, 5, 0, 1, 7, 3, 4, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] records2_1_2 [] covered2_1 (by decide) represented2_1_2 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_1_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2, 9], some (4, 12, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 2, 5, 0, 1, 7, 3, 4, 8, 9] records2_1_2 [] covered2_1 (by decide) represented2_1_2 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_1_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7, 3], some (4, 12, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_2) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_2 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_1_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2, 9], some (4, 12, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7, 3], some (4, 12, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_1_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_1_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨7, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩, ⟨3, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees2_1_2 : SameAgentSources sources2_1_2 sources2_1_0 := by
   exact same_sources_of_check sources2_1_2 sources2_1_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_1_2 sources2_1_0 source_agrees2_1_2
-theorem covered2_2 : ∀ i ∈ ([1, 2, 11, 13, 7, 10, 9, 8, 0] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([7, 5, 0, 2, 6, 8] : List Nat) := by
+theorem covered2_2 : ∀ i ∈ ([1, 2, 7, 10, 9, 8, 0] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([6, 2, 5, 7, 8, 9] : List Nat) := by
   intro i member ok
-  have bound : i < 14 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 14, i.val ∈ ([1, 2, 11, 13, 7, 10, 9, 8, 0] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([7, 5, 0, 2, 6, 8] : List Nat) := by decide
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 2, 7, 10, 9, 8, 0] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([6, 2, 5, 7, 8, 9] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources2_2_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨5, 3, none⟩, 1⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨6, 3, none⟩, 8⟩, ⟨⟨8, 3, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨5, 0, some 2⟩, 11⟩, ⟨⟨0, 2, some 11⟩, 12⟩, ⟨⟨2, 2, some 13⟩, 15⟩, ⟨⟨6, 0, some 7⟩, 18⟩, ⟨⟨8, 1, some 10⟩, 19⟩, ⟨⟨0, 1, some 9⟩, 20⟩, ⟨⟨5, 0, some 8⟩, 21⟩, ⟨⟨6, 0, some 0⟩, 22⟩]
-def records2_2_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨19, false, 1⟩, ⟨14, false, 2⟩, ⟨16, false, 5⟩, ⟨20, false, 8⟩, ⟨22, false, 9⟩, ⟨1, true, 10⟩, ⟨21, true, 10⟩, ⟨2, true, 11⟩, ⟨19, true, 11⟩, ⟨11, true, 12⟩, ⟨14, true, 12⟩, ⟨13, true, 15⟩, ⟨16, true, 15⟩, ⟨7, true, 18⟩, ⟨20, true, 18⟩, ⟨10, true, 19⟩, ⟨22, true, 19⟩, ⟨14, false, 20⟩, ⟨8, true, 21⟩, ⟨19, true, 21⟩, ⟨0, true, 22⟩, ⟨20, true, 22⟩]
-theorem represented2_2_0 : ∀ i, i ∈ recordIds records2_2_0 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] := by
+def sources2_2_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨2, 2, none⟩, 1⟩, ⟨⟨5, 2, none⟩, 2⟩, ⟨⟨7, 2, none⟩, 5⟩, ⟨⟨8, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩, ⟨⟨6, 0, some 1⟩, 10⟩, ⟨⟨2, 0, some 2⟩, 11⟩, ⟨⟨5, 3, none⟩, 12⟩, ⟨⟨5, 3, none⟩, 13⟩, ⟨⟨7, 3, none⟩, 17⟩, ⟨⟨7, 3, none⟩, 18⟩, ⟨⟨8, 0, some 7⟩, 21⟩, ⟨⟨9, 1, some 10⟩, 22⟩, ⟨⟨5, 1, some 9⟩, 23⟩, ⟨⟨2, 0, some 8⟩, 24⟩, ⟨⟨8, 0, some 0⟩, 25⟩]
+def records2_2_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨13, false, 1⟩, ⟨16, false, 2⟩, ⟨18, false, 5⟩, ⟨19, false, 8⟩, ⟨20, false, 9⟩, ⟨1, true, 10⟩, ⟨17, true, 10⟩, ⟨2, true, 11⟩, ⟨13, true, 11⟩, ⟨16, true, 12⟩, ⟨16, true, 13⟩, ⟨18, true, 17⟩, ⟨18, true, 18⟩, ⟨7, true, 21⟩, ⟨19, true, 21⟩, ⟨10, true, 22⟩, ⟨20, true, 22⟩, ⟨16, false, 23⟩, ⟨8, true, 24⟩, ⟨13, true, 24⟩, ⟨0, true, 25⟩, ⟨19, true, 25⟩]
+theorem represented2_2_0 : ∀ i, i ∈ recordIds records2_2_0 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 7, 10, 9, 8, 0] [6, 2, 5, 7, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 0, 21, 19, 14, 16, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 2, 7, 10, 9, 8, 0] [6, 2, 5, 7, 8, 9] = [1, 2, 7, 10, 8, 0, 17, 13, 16, 18, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_2_0] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_2_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_2_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_2_0) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_2_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 0] graph2.root [7, 5, 0, 2, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 7, 10, 9, 8, 0] graph2.root [6, 2, 5, 7, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] records2_2_0 [] covered2_2 (by decide) represented2_2_0 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_2_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 6, 8], some (3, 1, 10)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 7, 10, 9, 8, 0] [6, 2, 5, 7, 8, 9] records2_2_0 [] covered2_2 (by decide) represented2_2_0 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_2_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 8, 9], some (3, 1, 10)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_0) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_0 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_2_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 6, 8], some (3, 1, 10)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 8, 9], some (3, 1, 10)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_2_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
-def sources2_2_1 : List (AgentSourceReceipt Nat) := [⟨⟨6, 0, some 0⟩, 1022⟩, ⟨⟨5, 0, some 8⟩, 1021⟩, ⟨⟨0, 1, some 9⟩, 1020⟩, ⟨⟨8, 1, some 10⟩, 1019⟩, ⟨⟨6, 0, some 7⟩, 1018⟩, ⟨⟨2, 2, some 13⟩, 1015⟩, ⟨⟨0, 2, some 11⟩, 1012⟩, ⟨⟨5, 0, some 2⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨8, 3, none⟩, 1009⟩, ⟨⟨6, 3, none⟩, 1008⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨5, 3, none⟩, 1001⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
-def records2_2_1 : List (EventRecord Nat) := [⟨0, true, 1022⟩, ⟨20, true, 1022⟩, ⟨8, true, 1021⟩, ⟨19, true, 1021⟩, ⟨14, false, 1020⟩, ⟨10, true, 1019⟩, ⟨22, true, 1019⟩, ⟨7, true, 1018⟩, ⟨20, true, 1018⟩, ⟨13, true, 1015⟩, ⟨16, true, 1015⟩, ⟨11, true, 1012⟩, ⟨14, true, 1012⟩, ⟨2, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨21, true, 1010⟩, ⟨22, false, 1009⟩, ⟨20, false, 1008⟩, ⟨16, false, 1005⟩, ⟨14, false, 1002⟩, ⟨19, false, 1001⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
-theorem represented2_2_1 : ∀ i, i ∈ recordIds records2_2_1 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] := by
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+def sources2_2_1 : List (AgentSourceReceipt Nat) := [⟨⟨8, 0, some 0⟩, 1025⟩, ⟨⟨2, 0, some 8⟩, 1024⟩, ⟨⟨5, 1, some 9⟩, 1023⟩, ⟨⟨9, 1, some 10⟩, 1022⟩, ⟨⟨8, 0, some 7⟩, 1021⟩, ⟨⟨7, 3, none⟩, 1018⟩, ⟨⟨7, 3, none⟩, 1017⟩, ⟨⟨5, 3, none⟩, 1013⟩, ⟨⟨5, 3, none⟩, 1012⟩, ⟨⟨2, 0, some 2⟩, 1011⟩, ⟨⟨6, 0, some 1⟩, 1010⟩, ⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨8, 2, none⟩, 1008⟩, ⟨⟨7, 2, none⟩, 1005⟩, ⟨⟨5, 2, none⟩, 1002⟩, ⟨⟨2, 2, none⟩, 1001⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records2_2_1 : List (EventRecord Nat) := [⟨0, true, 1025⟩, ⟨19, true, 1025⟩, ⟨8, true, 1024⟩, ⟨13, true, 1024⟩, ⟨16, false, 1023⟩, ⟨10, true, 1022⟩, ⟨20, true, 1022⟩, ⟨7, true, 1021⟩, ⟨19, true, 1021⟩, ⟨18, true, 1018⟩, ⟨18, true, 1017⟩, ⟨16, true, 1013⟩, ⟨16, true, 1012⟩, ⟨2, true, 1011⟩, ⟨13, true, 1011⟩, ⟨1, true, 1010⟩, ⟨17, true, 1010⟩, ⟨20, false, 1009⟩, ⟨19, false, 1008⟩, ⟨18, false, 1005⟩, ⟨16, false, 1002⟩, ⟨13, false, 1001⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented2_2_1 : ∀ i, i ∈ recordIds records2_2_1 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 7, 10, 9, 8, 0] [6, 2, 5, 7, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 0, 21, 19, 14, 16, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 2, 7, 10, 9, 8, 0] [6, 2, 5, 7, 8, 9] = [1, 2, 7, 10, 8, 0, 17, 13, 16, 18, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_2_1] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_2_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_2_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_2_1) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_2_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 0] graph2.root [7, 5, 0, 2, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 7, 10, 9, 8, 0] graph2.root [6, 2, 5, 7, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] records2_2_1 [] covered2_2 (by decide) represented2_2_1 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_2_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 6, 8], some (3, 1, 10)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 7, 10, 9, 8, 0] [6, 2, 5, 7, 8, 9] records2_2_1 [] covered2_2 (by decide) represented2_2_1 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_2_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 8, 9], some (3, 1, 10)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_1) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_1 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_2_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 6, 8], some (3, 1, 10)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 8, 9], some (3, 1, 10)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_2_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees2_2_1 : SameAgentSources sources2_2_1 sources2_2_0 := by
   exact same_sources_of_check sources2_2_1 sources2_2_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_2_1 sources2_2_0 source_agrees2_2_1
-def sources2_2_2 : List (AgentSourceReceipt Nat) := [⟨⟨5, 3, none⟩, 2001⟩, ⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨6, 3, none⟩, 2008⟩, ⟨⟨8, 3, none⟩, 2009⟩, ⟨⟨5, 0, some 2⟩, 2011⟩, ⟨⟨0, 2, some 11⟩, 2012⟩, ⟨⟨2, 2, some 13⟩, 2015⟩, ⟨⟨6, 0, some 7⟩, 2018⟩, ⟨⟨8, 1, some 10⟩, 2019⟩, ⟨⟨0, 1, some 9⟩, 2020⟩, ⟨⟨5, 0, some 8⟩, 2021⟩, ⟨⟨6, 0, some 0⟩, 2022⟩, ⟨⟨7, 3, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
-def records2_2_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨14, false, 2002⟩, ⟨16, false, 2005⟩, ⟨20, false, 2008⟩, ⟨22, false, 2009⟩, ⟨2, true, 2011⟩, ⟨19, true, 2011⟩, ⟨11, true, 2012⟩, ⟨14, true, 2012⟩, ⟨13, true, 2015⟩, ⟨16, true, 2015⟩, ⟨7, true, 2018⟩, ⟨20, true, 2018⟩, ⟨10, true, 2019⟩, ⟨22, true, 2019⟩, ⟨14, false, 2020⟩, ⟨8, true, 2021⟩, ⟨19, true, 2021⟩, ⟨0, true, 2022⟩, ⟨20, true, 2022⟩, ⟨21, false, 2000⟩, ⟨1, true, 2010⟩, ⟨21, true, 2010⟩]
-theorem represented2_2_2 : ∀ i, i ∈ recordIds records2_2_2 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] := by
+def sources2_2_2 : List (AgentSourceReceipt Nat) := [⟨⟨2, 2, none⟩, 2001⟩, ⟨⟨5, 2, none⟩, 2002⟩, ⟨⟨7, 2, none⟩, 2005⟩, ⟨⟨8, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨2, 0, some 2⟩, 2011⟩, ⟨⟨5, 3, none⟩, 2012⟩, ⟨⟨5, 3, none⟩, 2013⟩, ⟨⟨7, 3, none⟩, 2017⟩, ⟨⟨7, 3, none⟩, 2018⟩, ⟨⟨8, 0, some 7⟩, 2021⟩, ⟨⟨9, 1, some 10⟩, 2022⟩, ⟨⟨5, 1, some 9⟩, 2023⟩, ⟨⟨2, 0, some 8⟩, 2024⟩, ⟨⟨8, 0, some 0⟩, 2025⟩, ⟨⟨6, 2, none⟩, 2000⟩, ⟨⟨6, 0, some 1⟩, 2010⟩]
+def records2_2_2 : List (EventRecord Nat) := [⟨13, false, 2001⟩, ⟨16, false, 2002⟩, ⟨18, false, 2005⟩, ⟨19, false, 2008⟩, ⟨20, false, 2009⟩, ⟨2, true, 2011⟩, ⟨13, true, 2011⟩, ⟨16, true, 2012⟩, ⟨16, true, 2013⟩, ⟨18, true, 2017⟩, ⟨18, true, 2018⟩, ⟨7, true, 2021⟩, ⟨19, true, 2021⟩, ⟨10, true, 2022⟩, ⟨20, true, 2022⟩, ⟨16, false, 2023⟩, ⟨8, true, 2024⟩, ⟨13, true, 2024⟩, ⟨0, true, 2025⟩, ⟨19, true, 2025⟩, ⟨17, false, 2000⟩, ⟨1, true, 2010⟩, ⟨17, true, 2010⟩]
+theorem represented2_2_2 : ∀ i, i ∈ recordIds records2_2_2 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 7, 10, 9, 8, 0] [6, 2, 5, 7, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 0, 21, 19, 14, 16, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 2, 7, 10, 9, 8, 0] [6, 2, 5, 7, 8, 9] = [1, 2, 7, 10, 8, 0, 17, 13, 16, 18, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_2_2] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_2_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_2_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_2_2) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_2_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 0] graph2.root [7, 5, 0, 2, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 7, 10, 9, 8, 0] graph2.root [6, 2, 5, 7, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] records2_2_2 [] covered2_2 (by decide) represented2_2_2 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_2_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 6, 8], some (3, 1, 10)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 7, 10, 9, 8, 0] [6, 2, 5, 7, 8, 9] records2_2_2 [] covered2_2 (by decide) represented2_2_2 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_2_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 8, 9], some (3, 1, 10)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_2) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_2 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_2_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 6, 8], some (3, 1, 10)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 8, 9], some (3, 1, 10)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_2_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_2_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees2_2_2 : SameAgentSources sources2_2_2 sources2_2_0 := by
   exact same_sources_of_check sources2_2_2 sources2_2_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_2_2 sources2_2_0 source_agrees2_2_2
-theorem covered2_3 : ∀ i ∈ ([1, 2, 11, 13, 7, 10, 9, 8, 3] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([7, 5, 0, 2, 6, 8] : List Nat) := by
+theorem covered2_3 : ∀ i ∈ ([1, 2, 7, 10, 9, 8, 3] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([6, 2, 5, 7, 8, 9] : List Nat) := by
   intro i member ok
-  have bound : i < 14 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 14, i.val ∈ ([1, 2, 11, 13, 7, 10, 9, 8, 3] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([7, 5, 0, 2, 6, 8] : List Nat) := by decide
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 2, 7, 10, 9, 8, 3] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([6, 2, 5, 7, 8, 9] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources2_3_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨5, 3, none⟩, 1⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨6, 3, none⟩, 8⟩, ⟨⟨8, 3, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨5, 0, some 2⟩, 11⟩, ⟨⟨0, 2, some 11⟩, 12⟩, ⟨⟨2, 2, some 13⟩, 15⟩, ⟨⟨6, 0, some 7⟩, 18⟩, ⟨⟨8, 1, some 10⟩, 19⟩, ⟨⟨0, 1, some 9⟩, 20⟩, ⟨⟨5, 0, some 8⟩, 21⟩, ⟨⟨6, 0, some 3⟩, 23⟩]
-def records2_3_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨19, false, 1⟩, ⟨14, false, 2⟩, ⟨16, false, 5⟩, ⟨20, false, 8⟩, ⟨22, false, 9⟩, ⟨1, true, 10⟩, ⟨21, true, 10⟩, ⟨2, true, 11⟩, ⟨19, true, 11⟩, ⟨11, true, 12⟩, ⟨14, true, 12⟩, ⟨13, true, 15⟩, ⟨16, true, 15⟩, ⟨7, true, 18⟩, ⟨20, true, 18⟩, ⟨10, true, 19⟩, ⟨22, true, 19⟩, ⟨14, false, 20⟩, ⟨8, true, 21⟩, ⟨19, true, 21⟩, ⟨3, true, 23⟩, ⟨20, true, 23⟩]
-theorem represented2_3_0 : ∀ i, i ∈ recordIds records2_3_0 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] := by
+def sources2_3_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨2, 2, none⟩, 1⟩, ⟨⟨5, 2, none⟩, 2⟩, ⟨⟨7, 2, none⟩, 5⟩, ⟨⟨8, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩, ⟨⟨6, 0, some 1⟩, 10⟩, ⟨⟨2, 0, some 2⟩, 11⟩, ⟨⟨5, 3, none⟩, 12⟩, ⟨⟨5, 3, none⟩, 13⟩, ⟨⟨7, 3, none⟩, 17⟩, ⟨⟨7, 3, none⟩, 18⟩, ⟨⟨8, 0, some 7⟩, 21⟩, ⟨⟨9, 1, some 10⟩, 22⟩, ⟨⟨5, 1, some 9⟩, 23⟩, ⟨⟨2, 0, some 8⟩, 24⟩, ⟨⟨8, 0, some 3⟩, 26⟩]
+def records2_3_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨13, false, 1⟩, ⟨16, false, 2⟩, ⟨18, false, 5⟩, ⟨19, false, 8⟩, ⟨20, false, 9⟩, ⟨1, true, 10⟩, ⟨17, true, 10⟩, ⟨2, true, 11⟩, ⟨13, true, 11⟩, ⟨16, true, 12⟩, ⟨16, true, 13⟩, ⟨18, true, 17⟩, ⟨18, true, 18⟩, ⟨7, true, 21⟩, ⟨19, true, 21⟩, ⟨10, true, 22⟩, ⟨20, true, 22⟩, ⟨16, false, 23⟩, ⟨8, true, 24⟩, ⟨13, true, 24⟩, ⟨3, true, 26⟩, ⟨19, true, 26⟩]
+theorem represented2_3_0 : ∀ i, i ∈ recordIds records2_3_0 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 7, 10, 9, 8, 3] [6, 2, 5, 7, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 3, 21, 19, 14, 16, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 2, 7, 10, 9, 8, 3] [6, 2, 5, 7, 8, 9] = [1, 2, 7, 10, 8, 3, 17, 13, 16, 18, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_3_0] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_3_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_3_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_3_0) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_3_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 3] graph2.root [7, 5, 0, 2, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 7, 10, 9, 8, 3] graph2.root [6, 2, 5, 7, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] records2_3_0 [] covered2_3 (by decide) represented2_3_0 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_3_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 7, 10, 9, 8, 3] [6, 2, 5, 7, 8, 9] records2_3_0 [] covered2_3 (by decide) represented2_3_0 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_3_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_0) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_0 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_3_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_3_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩] := by decide
-def sources2_3_1 : List (AgentSourceReceipt Nat) := [⟨⟨6, 0, some 3⟩, 1023⟩, ⟨⟨5, 0, some 8⟩, 1021⟩, ⟨⟨0, 1, some 9⟩, 1020⟩, ⟨⟨8, 1, some 10⟩, 1019⟩, ⟨⟨6, 0, some 7⟩, 1018⟩, ⟨⟨2, 2, some 13⟩, 1015⟩, ⟨⟨0, 2, some 11⟩, 1012⟩, ⟨⟨5, 0, some 2⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨8, 3, none⟩, 1009⟩, ⟨⟨6, 3, none⟩, 1008⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨5, 3, none⟩, 1001⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
-def records2_3_1 : List (EventRecord Nat) := [⟨3, true, 1023⟩, ⟨20, true, 1023⟩, ⟨8, true, 1021⟩, ⟨19, true, 1021⟩, ⟨14, false, 1020⟩, ⟨10, true, 1019⟩, ⟨22, true, 1019⟩, ⟨7, true, 1018⟩, ⟨20, true, 1018⟩, ⟨13, true, 1015⟩, ⟨16, true, 1015⟩, ⟨11, true, 1012⟩, ⟨14, true, 1012⟩, ⟨2, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨21, true, 1010⟩, ⟨22, false, 1009⟩, ⟨20, false, 1008⟩, ⟨16, false, 1005⟩, ⟨14, false, 1002⟩, ⟨19, false, 1001⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
-theorem represented2_3_1 : ∀ i, i ∈ recordIds records2_3_1 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] := by
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨7, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩] := by decide
+def sources2_3_1 : List (AgentSourceReceipt Nat) := [⟨⟨8, 0, some 3⟩, 1026⟩, ⟨⟨2, 0, some 8⟩, 1024⟩, ⟨⟨5, 1, some 9⟩, 1023⟩, ⟨⟨9, 1, some 10⟩, 1022⟩, ⟨⟨8, 0, some 7⟩, 1021⟩, ⟨⟨7, 3, none⟩, 1018⟩, ⟨⟨7, 3, none⟩, 1017⟩, ⟨⟨5, 3, none⟩, 1013⟩, ⟨⟨5, 3, none⟩, 1012⟩, ⟨⟨2, 0, some 2⟩, 1011⟩, ⟨⟨6, 0, some 1⟩, 1010⟩, ⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨8, 2, none⟩, 1008⟩, ⟨⟨7, 2, none⟩, 1005⟩, ⟨⟨5, 2, none⟩, 1002⟩, ⟨⟨2, 2, none⟩, 1001⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records2_3_1 : List (EventRecord Nat) := [⟨3, true, 1026⟩, ⟨19, true, 1026⟩, ⟨8, true, 1024⟩, ⟨13, true, 1024⟩, ⟨16, false, 1023⟩, ⟨10, true, 1022⟩, ⟨20, true, 1022⟩, ⟨7, true, 1021⟩, ⟨19, true, 1021⟩, ⟨18, true, 1018⟩, ⟨18, true, 1017⟩, ⟨16, true, 1013⟩, ⟨16, true, 1012⟩, ⟨2, true, 1011⟩, ⟨13, true, 1011⟩, ⟨1, true, 1010⟩, ⟨17, true, 1010⟩, ⟨20, false, 1009⟩, ⟨19, false, 1008⟩, ⟨18, false, 1005⟩, ⟨16, false, 1002⟩, ⟨13, false, 1001⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented2_3_1 : ∀ i, i ∈ recordIds records2_3_1 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 7, 10, 9, 8, 3] [6, 2, 5, 7, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 3, 21, 19, 14, 16, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 2, 7, 10, 9, 8, 3] [6, 2, 5, 7, 8, 9] = [1, 2, 7, 10, 8, 3, 17, 13, 16, 18, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_3_1] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_3_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_3_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_3_1) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_3_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 3] graph2.root [7, 5, 0, 2, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 7, 10, 9, 8, 3] graph2.root [6, 2, 5, 7, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] records2_3_1 [] covered2_3 (by decide) represented2_3_1 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_3_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 7, 10, 9, 8, 3] [6, 2, 5, 7, 8, 9] records2_3_1 [] covered2_3 (by decide) represented2_3_1 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_3_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_1) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_1 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_3_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_3_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨7, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩] := by decide
 theorem source_agrees2_3_1 : SameAgentSources sources2_3_1 sources2_3_0 := by
   exact same_sources_of_check sources2_3_1 sources2_3_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_3_1 sources2_3_0 source_agrees2_3_1
-def sources2_3_2 : List (AgentSourceReceipt Nat) := [⟨⟨5, 3, none⟩, 2001⟩, ⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨6, 3, none⟩, 2008⟩, ⟨⟨8, 3, none⟩, 2009⟩, ⟨⟨5, 0, some 2⟩, 2011⟩, ⟨⟨0, 2, some 11⟩, 2012⟩, ⟨⟨2, 2, some 13⟩, 2015⟩, ⟨⟨6, 0, some 7⟩, 2018⟩, ⟨⟨8, 1, some 10⟩, 2019⟩, ⟨⟨0, 1, some 9⟩, 2020⟩, ⟨⟨5, 0, some 8⟩, 2021⟩, ⟨⟨6, 0, some 3⟩, 2023⟩, ⟨⟨7, 3, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
-def records2_3_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨14, false, 2002⟩, ⟨16, false, 2005⟩, ⟨20, false, 2008⟩, ⟨22, false, 2009⟩, ⟨2, true, 2011⟩, ⟨19, true, 2011⟩, ⟨11, true, 2012⟩, ⟨14, true, 2012⟩, ⟨13, true, 2015⟩, ⟨16, true, 2015⟩, ⟨7, true, 2018⟩, ⟨20, true, 2018⟩, ⟨10, true, 2019⟩, ⟨22, true, 2019⟩, ⟨14, false, 2020⟩, ⟨8, true, 2021⟩, ⟨19, true, 2021⟩, ⟨3, true, 2023⟩, ⟨20, true, 2023⟩, ⟨21, false, 2000⟩, ⟨1, true, 2010⟩, ⟨21, true, 2010⟩]
-theorem represented2_3_2 : ∀ i, i ∈ recordIds records2_3_2 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] := by
+def sources2_3_2 : List (AgentSourceReceipt Nat) := [⟨⟨2, 2, none⟩, 2001⟩, ⟨⟨5, 2, none⟩, 2002⟩, ⟨⟨7, 2, none⟩, 2005⟩, ⟨⟨8, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨2, 0, some 2⟩, 2011⟩, ⟨⟨5, 3, none⟩, 2012⟩, ⟨⟨5, 3, none⟩, 2013⟩, ⟨⟨7, 3, none⟩, 2017⟩, ⟨⟨7, 3, none⟩, 2018⟩, ⟨⟨8, 0, some 7⟩, 2021⟩, ⟨⟨9, 1, some 10⟩, 2022⟩, ⟨⟨5, 1, some 9⟩, 2023⟩, ⟨⟨2, 0, some 8⟩, 2024⟩, ⟨⟨8, 0, some 3⟩, 2026⟩, ⟨⟨6, 2, none⟩, 2000⟩, ⟨⟨6, 0, some 1⟩, 2010⟩]
+def records2_3_2 : List (EventRecord Nat) := [⟨13, false, 2001⟩, ⟨16, false, 2002⟩, ⟨18, false, 2005⟩, ⟨19, false, 2008⟩, ⟨20, false, 2009⟩, ⟨2, true, 2011⟩, ⟨13, true, 2011⟩, ⟨16, true, 2012⟩, ⟨16, true, 2013⟩, ⟨18, true, 2017⟩, ⟨18, true, 2018⟩, ⟨7, true, 2021⟩, ⟨19, true, 2021⟩, ⟨10, true, 2022⟩, ⟨20, true, 2022⟩, ⟨16, false, 2023⟩, ⟨8, true, 2024⟩, ⟨13, true, 2024⟩, ⟨3, true, 2026⟩, ⟨19, true, 2026⟩, ⟨17, false, 2000⟩, ⟨1, true, 2010⟩, ⟨17, true, 2010⟩]
+theorem represented2_3_2 : ∀ i, i ∈ recordIds records2_3_2 ↔ i ∈ componentEventEvidence anchors2 [1, 2, 7, 10, 9, 8, 3] [6, 2, 5, 7, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 3, 21, 19, 14, 16, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 2, 7, 10, 9, 8, 3] [6, 2, 5, 7, 8, 9] = [1, 2, 7, 10, 8, 3, 17, 13, 16, 18, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_3_2] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_3_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_3_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_3_2) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_3_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 11, 13, 7, 10, 9, 8, 3] graph2.root [7, 5, 0, 2, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 2, 7, 10, 9, 8, 3] graph2.root [6, 2, 5, 7, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] records2_3_2 [] covered2_3 (by decide) represented2_3_2 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_3_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 2, 7, 10, 9, 8, 3] [6, 2, 5, 7, 8, 9] records2_3_2 [] covered2_3 (by decide) represented2_3_2 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_3_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_2) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_2 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_3_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_3_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_3_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨7, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩] := by decide
 theorem source_agrees2_3_2 : SameAgentSources sources2_3_2 sources2_3_0 := by
   exact same_sources_of_check sources2_3_2 sources2_3_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_3_2 sources2_3_0 source_agrees2_3_2
-theorem covered2_4 : ∀ i ∈ ([] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([7, 5, 0, 2, 6, 8] : List Nat) := by
+theorem covered2_4 : ∀ i ∈ ([] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([6, 2, 5, 7, 8, 9] : List Nat) := by
   intro i member ok
-  have bound : i < 14 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 14, i.val ∈ ([] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([7, 5, 0, 2, 6, 8] : List Nat) := by decide
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([6, 2, 5, 7, 8, 9] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources2_4_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨5, 3, none⟩, 1⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨6, 3, none⟩, 8⟩, ⟨⟨8, 3, none⟩, 9⟩]
-def records2_4_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨19, false, 1⟩, ⟨14, false, 2⟩, ⟨16, false, 5⟩, ⟨20, false, 8⟩, ⟨22, false, 9⟩]
-theorem represented2_4_0 : ∀ i, i ∈ recordIds records2_4_0 ↔ i ∈ componentEventEvidence anchors2 [] [7, 5, 0, 2, 6, 8] := by
+def sources2_4_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨2, 2, none⟩, 1⟩, ⟨⟨5, 2, none⟩, 2⟩, ⟨⟨7, 2, none⟩, 5⟩, ⟨⟨8, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩]
+def records2_4_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨13, false, 1⟩, ⟨16, false, 2⟩, ⟨18, false, 5⟩, ⟨19, false, 8⟩, ⟨20, false, 9⟩]
+theorem represented2_4_0 : ∀ i, i ∈ recordIds records2_4_0 ↔ i ∈ componentEventEvidence anchors2 [] [6, 2, 5, 7, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [] [7, 5, 0, 2, 6, 8] = [21, 19, 14, 16, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [] [6, 2, 5, 7, 8, 9] = [17, 13, 16, 18, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_4_0] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_4_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_4_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_4_0) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_4_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [] graph2.root [7, 5, 0, 2, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [] graph2.root [6, 2, 5, 7, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [] [7, 5, 0, 2, 6, 8] records2_4_0 [] covered2_4 (by decide) represented2_4_0 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_4_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [] [6, 2, 5, 7, 8, 9] records2_4_0 [] covered2_4 (by decide) represented2_4_0 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_4_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_0) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_0 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_4_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_4_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, false, ReceiptCutoffView.unconfirmed⟩] := by decide
-def sources2_4_1 : List (AgentSourceReceipt Nat) := [⟨⟨8, 3, none⟩, 1009⟩, ⟨⟨6, 3, none⟩, 1008⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨5, 3, none⟩, 1001⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
-def records2_4_1 : List (EventRecord Nat) := [⟨22, false, 1009⟩, ⟨20, false, 1008⟩, ⟨16, false, 1005⟩, ⟨14, false, 1002⟩, ⟨19, false, 1001⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
-theorem represented2_4_1 : ∀ i, i ∈ recordIds records2_4_1 ↔ i ∈ componentEventEvidence anchors2 [] [7, 5, 0, 2, 6, 8] := by
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, false, ReceiptCutoffView.unconfirmed⟩] := by decide
+def sources2_4_1 : List (AgentSourceReceipt Nat) := [⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨8, 2, none⟩, 1008⟩, ⟨⟨7, 2, none⟩, 1005⟩, ⟨⟨5, 2, none⟩, 1002⟩, ⟨⟨2, 2, none⟩, 1001⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records2_4_1 : List (EventRecord Nat) := [⟨20, false, 1009⟩, ⟨19, false, 1008⟩, ⟨18, false, 1005⟩, ⟨16, false, 1002⟩, ⟨13, false, 1001⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented2_4_1 : ∀ i, i ∈ recordIds records2_4_1 ↔ i ∈ componentEventEvidence anchors2 [] [6, 2, 5, 7, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [] [7, 5, 0, 2, 6, 8] = [21, 19, 14, 16, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [] [6, 2, 5, 7, 8, 9] = [17, 13, 16, 18, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_4_1] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_4_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_4_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_4_1) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_4_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [] graph2.root [7, 5, 0, 2, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [] graph2.root [6, 2, 5, 7, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [] [7, 5, 0, 2, 6, 8] records2_4_1 [] covered2_4 (by decide) represented2_4_1 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_4_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [] [6, 2, 5, 7, 8, 9] records2_4_1 [] covered2_4 (by decide) represented2_4_1 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_4_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_1) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_1 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_4_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_4_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, false, ReceiptCutoffView.unconfirmed⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, false, ReceiptCutoffView.unconfirmed⟩] := by decide
 theorem source_agrees2_4_1 : SameAgentSources sources2_4_1 sources2_4_0 := by
   exact same_sources_of_check sources2_4_1 sources2_4_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_4_1 sources2_4_0 source_agrees2_4_1
-def sources2_4_2 : List (AgentSourceReceipt Nat) := [⟨⟨5, 3, none⟩, 2001⟩, ⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨6, 3, none⟩, 2008⟩, ⟨⟨8, 3, none⟩, 2009⟩, ⟨⟨7, 3, none⟩, 2000⟩]
-def records2_4_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨14, false, 2002⟩, ⟨16, false, 2005⟩, ⟨20, false, 2008⟩, ⟨22, false, 2009⟩, ⟨21, false, 2000⟩]
-theorem represented2_4_2 : ∀ i, i ∈ recordIds records2_4_2 ↔ i ∈ componentEventEvidence anchors2 [] [7, 5, 0, 2, 6, 8] := by
+def sources2_4_2 : List (AgentSourceReceipt Nat) := [⟨⟨2, 2, none⟩, 2001⟩, ⟨⟨5, 2, none⟩, 2002⟩, ⟨⟨7, 2, none⟩, 2005⟩, ⟨⟨8, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨6, 2, none⟩, 2000⟩]
+def records2_4_2 : List (EventRecord Nat) := [⟨13, false, 2001⟩, ⟨16, false, 2002⟩, ⟨18, false, 2005⟩, ⟨19, false, 2008⟩, ⟨20, false, 2009⟩, ⟨17, false, 2000⟩]
+theorem represented2_4_2 : ∀ i, i ∈ recordIds records2_4_2 ↔ i ∈ componentEventEvidence anchors2 [] [6, 2, 5, 7, 8, 9] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [] [7, 5, 0, 2, 6, 8] = [21, 19, 14, 16, 20, 22] := by decide
+  have normalized : componentEventEvidence anchors2 [] [6, 2, 5, 7, 8, 9] = [17, 13, 16, 18, 19, 20] := by decide
   rw [normalized]
   simp [recordIds, records2_4_2] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_4_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_4_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_4_2) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_4_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [] graph2.root [7, 5, 0, 2, 6, 8] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [] graph2.root [6, 2, 5, 7, 8, 9] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [] [7, 5, 0, 2, 6, 8] records2_4_2 [] covered2_4 (by decide) represented2_4_2 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_4_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [] [6, 2, 5, 7, 8, 9] records2_4_2 [] covered2_4 (by decide) represented2_4_2 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_4_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_2) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_2 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_4_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_4_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, false, ReceiptCutoffView.unconfirmed⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_4_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, false, ReceiptCutoffView.unconfirmed⟩] := by decide
 theorem source_agrees2_4_2 : SameAgentSources sources2_4_2 sources2_4_0 := by
   exact same_sources_of_check sources2_4_2 sources2_4_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_4_2 sources2_4_0 source_agrees2_4_2
-theorem covered2_5 : ∀ i ∈ ([1, 11, 13, 9] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([7, 5, 0, 2] : List Nat) := by
+theorem covered2_5 : ∀ i ∈ ([1, 9] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([6, 2, 5, 7] : List Nat) := by
   intro i member ok
-  have bound : i < 14 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 14, i.val ∈ ([1, 11, 13, 9] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([7, 5, 0, 2] : List Nat) := by decide
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 9] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([6, 2, 5, 7] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources2_5_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨5, 3, none⟩, 1⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨0, 2, some 11⟩, 12⟩, ⟨⟨2, 2, some 13⟩, 15⟩, ⟨⟨0, 1, some 9⟩, 20⟩]
-def records2_5_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨19, false, 1⟩, ⟨14, false, 2⟩, ⟨16, false, 5⟩, ⟨1, true, 10⟩, ⟨21, true, 10⟩, ⟨11, true, 12⟩, ⟨14, true, 12⟩, ⟨13, true, 15⟩, ⟨16, true, 15⟩, ⟨14, false, 20⟩]
-theorem represented2_5_0 : ∀ i, i ∈ recordIds records2_5_0 ↔ i ∈ componentEventEvidence anchors2 [1, 11, 13, 9] [7, 5, 0, 2] := by
+def sources2_5_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨2, 2, none⟩, 1⟩, ⟨⟨5, 2, none⟩, 2⟩, ⟨⟨7, 2, none⟩, 5⟩, ⟨⟨6, 0, some 1⟩, 10⟩, ⟨⟨5, 3, none⟩, 12⟩, ⟨⟨5, 3, none⟩, 13⟩, ⟨⟨7, 3, none⟩, 17⟩, ⟨⟨7, 3, none⟩, 18⟩, ⟨⟨5, 1, some 9⟩, 23⟩]
+def records2_5_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨13, false, 1⟩, ⟨16, false, 2⟩, ⟨18, false, 5⟩, ⟨1, true, 10⟩, ⟨17, true, 10⟩, ⟨16, true, 12⟩, ⟨16, true, 13⟩, ⟨18, true, 17⟩, ⟨18, true, 18⟩, ⟨16, false, 23⟩]
+theorem represented2_5_0 : ∀ i, i ∈ recordIds records2_5_0 ↔ i ∈ componentEventEvidence anchors2 [1, 9] [6, 2, 5, 7] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 11, 13, 9] [7, 5, 0, 2] = [1, 11, 13, 21, 19, 14, 16] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 9] [6, 2, 5, 7] = [1, 17, 13, 16, 18] := by decide
   rw [normalized]
   simp [recordIds, records2_5_0] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_5_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_5_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_5_0) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_5_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 11, 13, 9] graph2.root [7, 5, 0, 2] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 9] graph2.root [6, 2, 5, 7] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 11, 13, 9] [7, 5, 0, 2] records2_5_0 [] covered2_5 (by decide) represented2_5_0 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_5_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 9] [6, 2, 5, 7] records2_5_0 [] covered2_5 (by decide) represented2_5_0 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_5_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_0) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_0 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_5_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_5_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
-def sources2_5_1 : List (AgentSourceReceipt Nat) := [⟨⟨0, 1, some 9⟩, 1020⟩, ⟨⟨2, 2, some 13⟩, 1015⟩, ⟨⟨0, 2, some 11⟩, 1012⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨5, 3, none⟩, 1001⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
-def records2_5_1 : List (EventRecord Nat) := [⟨14, false, 1020⟩, ⟨13, true, 1015⟩, ⟨16, true, 1015⟩, ⟨11, true, 1012⟩, ⟨14, true, 1012⟩, ⟨1, true, 1010⟩, ⟨21, true, 1010⟩, ⟨16, false, 1005⟩, ⟨14, false, 1002⟩, ⟨19, false, 1001⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
-theorem represented2_5_1 : ∀ i, i ∈ recordIds records2_5_1 ↔ i ∈ componentEventEvidence anchors2 [1, 11, 13, 9] [7, 5, 0, 2] := by
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+def sources2_5_1 : List (AgentSourceReceipt Nat) := [⟨⟨5, 1, some 9⟩, 1023⟩, ⟨⟨7, 3, none⟩, 1018⟩, ⟨⟨7, 3, none⟩, 1017⟩, ⟨⟨5, 3, none⟩, 1013⟩, ⟨⟨5, 3, none⟩, 1012⟩, ⟨⟨6, 0, some 1⟩, 1010⟩, ⟨⟨7, 2, none⟩, 1005⟩, ⟨⟨5, 2, none⟩, 1002⟩, ⟨⟨2, 2, none⟩, 1001⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records2_5_1 : List (EventRecord Nat) := [⟨16, false, 1023⟩, ⟨18, true, 1018⟩, ⟨18, true, 1017⟩, ⟨16, true, 1013⟩, ⟨16, true, 1012⟩, ⟨1, true, 1010⟩, ⟨17, true, 1010⟩, ⟨18, false, 1005⟩, ⟨16, false, 1002⟩, ⟨13, false, 1001⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented2_5_1 : ∀ i, i ∈ recordIds records2_5_1 ↔ i ∈ componentEventEvidence anchors2 [1, 9] [6, 2, 5, 7] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 11, 13, 9] [7, 5, 0, 2] = [1, 11, 13, 21, 19, 14, 16] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 9] [6, 2, 5, 7] = [1, 17, 13, 16, 18] := by decide
   rw [normalized]
   simp [recordIds, records2_5_1] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_5_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_5_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_5_1) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_5_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 11, 13, 9] graph2.root [7, 5, 0, 2] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 9] graph2.root [6, 2, 5, 7] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 11, 13, 9] [7, 5, 0, 2] records2_5_1 [] covered2_5 (by decide) represented2_5_1 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_5_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 9] [6, 2, 5, 7] records2_5_1 [] covered2_5 (by decide) represented2_5_1 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_5_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_1) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_1 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_5_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_5_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees2_5_1 : SameAgentSources sources2_5_1 sources2_5_0 := by
   exact same_sources_of_check sources2_5_1 sources2_5_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_5_1 sources2_5_0 source_agrees2_5_1
-def sources2_5_2 : List (AgentSourceReceipt Nat) := [⟨⟨5, 3, none⟩, 2001⟩, ⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨0, 2, some 11⟩, 2012⟩, ⟨⟨2, 2, some 13⟩, 2015⟩, ⟨⟨0, 1, some 9⟩, 2020⟩, ⟨⟨7, 3, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
-def records2_5_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨14, false, 2002⟩, ⟨16, false, 2005⟩, ⟨11, true, 2012⟩, ⟨14, true, 2012⟩, ⟨13, true, 2015⟩, ⟨16, true, 2015⟩, ⟨14, false, 2020⟩, ⟨21, false, 2000⟩, ⟨1, true, 2010⟩, ⟨21, true, 2010⟩]
-theorem represented2_5_2 : ∀ i, i ∈ recordIds records2_5_2 ↔ i ∈ componentEventEvidence anchors2 [1, 11, 13, 9] [7, 5, 0, 2] := by
+def sources2_5_2 : List (AgentSourceReceipt Nat) := [⟨⟨2, 2, none⟩, 2001⟩, ⟨⟨5, 2, none⟩, 2002⟩, ⟨⟨7, 2, none⟩, 2005⟩, ⟨⟨5, 3, none⟩, 2012⟩, ⟨⟨5, 3, none⟩, 2013⟩, ⟨⟨7, 3, none⟩, 2017⟩, ⟨⟨7, 3, none⟩, 2018⟩, ⟨⟨5, 1, some 9⟩, 2023⟩, ⟨⟨6, 2, none⟩, 2000⟩, ⟨⟨6, 0, some 1⟩, 2010⟩]
+def records2_5_2 : List (EventRecord Nat) := [⟨13, false, 2001⟩, ⟨16, false, 2002⟩, ⟨18, false, 2005⟩, ⟨16, true, 2012⟩, ⟨16, true, 2013⟩, ⟨18, true, 2017⟩, ⟨18, true, 2018⟩, ⟨16, false, 2023⟩, ⟨17, false, 2000⟩, ⟨1, true, 2010⟩, ⟨17, true, 2010⟩]
+theorem represented2_5_2 : ∀ i, i ∈ recordIds records2_5_2 ↔ i ∈ componentEventEvidence anchors2 [1, 9] [6, 2, 5, 7] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 11, 13, 9] [7, 5, 0, 2] = [1, 11, 13, 21, 19, 14, 16] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 9] [6, 2, 5, 7] = [1, 17, 13, 16, 18] := by decide
   rw [normalized]
   simp [recordIds, records2_5_2] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_5_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_5_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_5_2) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_5_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 11, 13, 9] graph2.root [7, 5, 0, 2] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 9] graph2.root [6, 2, 5, 7] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 11, 13, 9] [7, 5, 0, 2] records2_5_2 [] covered2_5 (by decide) represented2_5_2 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_5_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 9] [6, 2, 5, 7] records2_5_2 [] covered2_5 (by decide) represented2_5_2 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_5_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_2) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_2 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_5_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6, 2, 5, 7], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_5_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_5_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees2_5_2 : SameAgentSources sources2_5_2 sources2_5_0 := by
   exact same_sources_of_check sources2_5_2 sources2_5_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_5_2 sources2_5_0 source_agrees2_5_2
-theorem covered2_6 : ∀ i ∈ ([1, 11, 12, 4, 13, 5, 6, 9] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([7, 0, 4, 3, 2, 9, 1] : List Nat) := by
+theorem covered2_6 : ∀ i ∈ ([1, 4, 5, 6, 9] : List Nat), eligible anchors2 (chainOwner anchors2 i) i = true → chainOwner anchors2 i ∈ ([6, 5, 0, 1, 7, 3, 4] : List Nat) := by
   intro i member ok
-  have bound : i < 14 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 14, i.val ∈ ([1, 11, 12, 4, 13, 5, 6, 9] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([7, 0, 4, 3, 2, 9, 1] : List Nat) := by decide
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 4, 5, 6, 9] : List Nat) → eligible anchors2 (chainOwner anchors2 i.val) i.val = true → chainOwner anchors2 i.val ∈ ([6, 5, 0, 1, 7, 3, 4] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources2_6_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨4, 3, none⟩, 3⟩, ⟨⟨3, 3, none⟩, 4⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨9, 3, none⟩, 6⟩, ⟨⟨1, 3, none⟩, 7⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨0, 2, some 11⟩, 12⟩, ⟨⟨4, 2, some 12⟩, 13⟩, ⟨⟨3, 0, some 4⟩, 14⟩, ⟨⟨2, 2, some 13⟩, 15⟩, ⟨⟨9, 0, some 5⟩, 16⟩, ⟨⟨1, 0, some 6⟩, 17⟩, ⟨⟨0, 1, some 9⟩, 20⟩]
-def records2_6_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨14, false, 2⟩, ⟨18, false, 3⟩, ⟨17, false, 4⟩, ⟨16, false, 5⟩, ⟨23, false, 6⟩, ⟨15, false, 7⟩, ⟨1, true, 10⟩, ⟨21, true, 10⟩, ⟨11, true, 12⟩, ⟨14, true, 12⟩, ⟨18, true, 13⟩, ⟨17, true, 14⟩, ⟨13, true, 15⟩, ⟨16, true, 15⟩, ⟨5, true, 16⟩, ⟨23, true, 16⟩, ⟨15, true, 17⟩, ⟨14, false, 20⟩]
-theorem represented2_6_0 : ∀ i, i ∈ recordIds records2_6_0 ↔ i ∈ componentEventEvidence anchors2 [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] := by
+def sources2_6_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨5, 2, none⟩, 2⟩, ⟨⟨0, 2, none⟩, 3⟩, ⟨⟨1, 2, none⟩, 4⟩, ⟨⟨7, 2, none⟩, 5⟩, ⟨⟨3, 2, none⟩, 6⟩, ⟨⟨4, 2, none⟩, 7⟩, ⟨⟨6, 0, some 1⟩, 10⟩, ⟨⟨5, 3, none⟩, 12⟩, ⟨⟨5, 3, none⟩, 13⟩, ⟨⟨0, 3, none⟩, 14⟩, ⟨⟨0, 3, none⟩, 15⟩, ⟨⟨1, 0, some 4⟩, 16⟩, ⟨⟨7, 3, none⟩, 17⟩, ⟨⟨7, 3, none⟩, 18⟩, ⟨⟨3, 0, some 5⟩, 19⟩, ⟨⟨4, 0, some 6⟩, 20⟩, ⟨⟨5, 1, some 9⟩, 23⟩]
+def records2_6_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨16, false, 2⟩, ⟨11, false, 3⟩, ⟨12, false, 4⟩, ⟨18, false, 5⟩, ⟨14, false, 6⟩, ⟨15, false, 7⟩, ⟨1, true, 10⟩, ⟨17, true, 10⟩, ⟨16, true, 12⟩, ⟨16, true, 13⟩, ⟨11, true, 14⟩, ⟨11, true, 15⟩, ⟨12, true, 16⟩, ⟨18, true, 17⟩, ⟨18, true, 18⟩, ⟨5, true, 19⟩, ⟨14, true, 19⟩, ⟨15, true, 20⟩, ⟨16, false, 23⟩]
+theorem represented2_6_0 : ∀ i, i ∈ recordIds records2_6_0 ↔ i ∈ componentEventEvidence anchors2 [1, 4, 5, 6, 9] [6, 5, 0, 1, 7, 3, 4] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] = [1, 11, 13, 5, 21, 14, 18, 17, 16, 23, 15] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 4, 5, 6, 9] [6, 5, 0, 1, 7, 3, 4] = [1, 5, 17, 16, 11, 12, 18, 14, 15] := by decide
   rw [normalized]
   simp [recordIds, records2_6_0] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_6_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_6_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_6_0) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_6_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 11, 12, 4, 13, 5, 6, 9] graph2.root [7, 0, 4, 3, 2, 9, 1] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 4, 5, 6, 9] graph2.root [6, 5, 0, 1, 7, 3, 4] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] records2_6_0 [] covered2_6 (by decide) represented2_6_0 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_6_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7], some (0, 12, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 4, 5, 6, 9] [6, 5, 0, 1, 7, 3, 4] records2_6_0 [] covered2_6 (by decide) represented2_6_0 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_6_0) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6], some (0, 12, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_0) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_0 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_6_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7], some (0, 12, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6], some (0, 12, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_6_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
-def sources2_6_1 : List (AgentSourceReceipt Nat) := [⟨⟨0, 1, some 9⟩, 1020⟩, ⟨⟨1, 0, some 6⟩, 1017⟩, ⟨⟨9, 0, some 5⟩, 1016⟩, ⟨⟨2, 2, some 13⟩, 1015⟩, ⟨⟨3, 0, some 4⟩, 1014⟩, ⟨⟨4, 2, some 12⟩, 1013⟩, ⟨⟨0, 2, some 11⟩, 1012⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨1, 3, none⟩, 1007⟩, ⟨⟨9, 3, none⟩, 1006⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨3, 3, none⟩, 1004⟩, ⟨⟨4, 3, none⟩, 1003⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
-def records2_6_1 : List (EventRecord Nat) := [⟨14, false, 1020⟩, ⟨15, true, 1017⟩, ⟨5, true, 1016⟩, ⟨23, true, 1016⟩, ⟨13, true, 1015⟩, ⟨16, true, 1015⟩, ⟨17, true, 1014⟩, ⟨18, true, 1013⟩, ⟨11, true, 1012⟩, ⟨14, true, 1012⟩, ⟨1, true, 1010⟩, ⟨21, true, 1010⟩, ⟨15, false, 1007⟩, ⟨23, false, 1006⟩, ⟨16, false, 1005⟩, ⟨17, false, 1004⟩, ⟨18, false, 1003⟩, ⟨14, false, 1002⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
-theorem represented2_6_1 : ∀ i, i ∈ recordIds records2_6_1 ↔ i ∈ componentEventEvidence anchors2 [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] := by
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_0) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+def sources2_6_1 : List (AgentSourceReceipt Nat) := [⟨⟨5, 1, some 9⟩, 1023⟩, ⟨⟨4, 0, some 6⟩, 1020⟩, ⟨⟨3, 0, some 5⟩, 1019⟩, ⟨⟨7, 3, none⟩, 1018⟩, ⟨⟨7, 3, none⟩, 1017⟩, ⟨⟨1, 0, some 4⟩, 1016⟩, ⟨⟨0, 3, none⟩, 1015⟩, ⟨⟨0, 3, none⟩, 1014⟩, ⟨⟨5, 3, none⟩, 1013⟩, ⟨⟨5, 3, none⟩, 1012⟩, ⟨⟨6, 0, some 1⟩, 1010⟩, ⟨⟨4, 2, none⟩, 1007⟩, ⟨⟨3, 2, none⟩, 1006⟩, ⟨⟨7, 2, none⟩, 1005⟩, ⟨⟨1, 2, none⟩, 1004⟩, ⟨⟨0, 2, none⟩, 1003⟩, ⟨⟨5, 2, none⟩, 1002⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records2_6_1 : List (EventRecord Nat) := [⟨16, false, 1023⟩, ⟨15, true, 1020⟩, ⟨5, true, 1019⟩, ⟨14, true, 1019⟩, ⟨18, true, 1018⟩, ⟨18, true, 1017⟩, ⟨12, true, 1016⟩, ⟨11, true, 1015⟩, ⟨11, true, 1014⟩, ⟨16, true, 1013⟩, ⟨16, true, 1012⟩, ⟨1, true, 1010⟩, ⟨17, true, 1010⟩, ⟨15, false, 1007⟩, ⟨14, false, 1006⟩, ⟨18, false, 1005⟩, ⟨12, false, 1004⟩, ⟨11, false, 1003⟩, ⟨16, false, 1002⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented2_6_1 : ∀ i, i ∈ recordIds records2_6_1 ↔ i ∈ componentEventEvidence anchors2 [1, 4, 5, 6, 9] [6, 5, 0, 1, 7, 3, 4] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] = [1, 11, 13, 5, 21, 14, 18, 17, 16, 23, 15] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 4, 5, 6, 9] [6, 5, 0, 1, 7, 3, 4] = [1, 5, 17, 16, 11, 12, 18, 14, 15] := by decide
   rw [normalized]
   simp [recordIds, records2_6_1] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_6_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_6_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_6_1) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_6_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 11, 12, 4, 13, 5, 6, 9] graph2.root [7, 0, 4, 3, 2, 9, 1] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 4, 5, 6, 9] graph2.root [6, 5, 0, 1, 7, 3, 4] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] records2_6_1 [] covered2_6 (by decide) represented2_6_1 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_6_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7], some (0, 12, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 4, 5, 6, 9] [6, 5, 0, 1, 7, 3, 4] records2_6_1 [] covered2_6 (by decide) represented2_6_1 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_6_1) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6], some (0, 12, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_1) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_1 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_6_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7], some (0, 12, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6], some (0, 12, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_6_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_1) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees2_6_1 : SameAgentSources sources2_6_1 sources2_6_0 := by
   exact same_sources_of_check sources2_6_1 sources2_6_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_6_1 sources2_6_0 source_agrees2_6_1
-def sources2_6_2 : List (AgentSourceReceipt Nat) := [⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨4, 3, none⟩, 2003⟩, ⟨⟨3, 3, none⟩, 2004⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨9, 3, none⟩, 2006⟩, ⟨⟨1, 3, none⟩, 2007⟩, ⟨⟨0, 2, some 11⟩, 2012⟩, ⟨⟨4, 2, some 12⟩, 2013⟩, ⟨⟨3, 0, some 4⟩, 2014⟩, ⟨⟨2, 2, some 13⟩, 2015⟩, ⟨⟨9, 0, some 5⟩, 2016⟩, ⟨⟨1, 0, some 6⟩, 2017⟩, ⟨⟨0, 1, some 9⟩, 2020⟩, ⟨⟨7, 3, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
-def records2_6_2 : List (EventRecord Nat) := [⟨14, false, 2002⟩, ⟨18, false, 2003⟩, ⟨17, false, 2004⟩, ⟨16, false, 2005⟩, ⟨23, false, 2006⟩, ⟨15, false, 2007⟩, ⟨11, true, 2012⟩, ⟨14, true, 2012⟩, ⟨18, true, 2013⟩, ⟨17, true, 2014⟩, ⟨13, true, 2015⟩, ⟨16, true, 2015⟩, ⟨5, true, 2016⟩, ⟨23, true, 2016⟩, ⟨15, true, 2017⟩, ⟨14, false, 2020⟩, ⟨21, false, 2000⟩, ⟨1, true, 2010⟩, ⟨21, true, 2010⟩]
-theorem represented2_6_2 : ∀ i, i ∈ recordIds records2_6_2 ↔ i ∈ componentEventEvidence anchors2 [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] := by
+def sources2_6_2 : List (AgentSourceReceipt Nat) := [⟨⟨5, 2, none⟩, 2002⟩, ⟨⟨0, 2, none⟩, 2003⟩, ⟨⟨1, 2, none⟩, 2004⟩, ⟨⟨7, 2, none⟩, 2005⟩, ⟨⟨3, 2, none⟩, 2006⟩, ⟨⟨4, 2, none⟩, 2007⟩, ⟨⟨5, 3, none⟩, 2012⟩, ⟨⟨5, 3, none⟩, 2013⟩, ⟨⟨0, 3, none⟩, 2014⟩, ⟨⟨0, 3, none⟩, 2015⟩, ⟨⟨1, 0, some 4⟩, 2016⟩, ⟨⟨7, 3, none⟩, 2017⟩, ⟨⟨7, 3, none⟩, 2018⟩, ⟨⟨3, 0, some 5⟩, 2019⟩, ⟨⟨4, 0, some 6⟩, 2020⟩, ⟨⟨5, 1, some 9⟩, 2023⟩, ⟨⟨6, 2, none⟩, 2000⟩, ⟨⟨6, 0, some 1⟩, 2010⟩]
+def records2_6_2 : List (EventRecord Nat) := [⟨16, false, 2002⟩, ⟨11, false, 2003⟩, ⟨12, false, 2004⟩, ⟨18, false, 2005⟩, ⟨14, false, 2006⟩, ⟨15, false, 2007⟩, ⟨16, true, 2012⟩, ⟨16, true, 2013⟩, ⟨11, true, 2014⟩, ⟨11, true, 2015⟩, ⟨12, true, 2016⟩, ⟨18, true, 2017⟩, ⟨18, true, 2018⟩, ⟨5, true, 2019⟩, ⟨14, true, 2019⟩, ⟨15, true, 2020⟩, ⟨16, false, 2023⟩, ⟨17, false, 2000⟩, ⟨1, true, 2010⟩, ⟨17, true, 2010⟩]
+theorem represented2_6_2 : ∀ i, i ∈ recordIds records2_6_2 ↔ i ∈ componentEventEvidence anchors2 [1, 4, 5, 6, 9] [6, 5, 0, 1, 7, 3, 4] := by
   intro i
-  have normalized : componentEventEvidence anchors2 [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] = [1, 11, 13, 5, 21, 14, 18, 17, 16, 23, 15] := by decide
+  have normalized : componentEventEvidence anchors2 [1, 4, 5, 6, 9] [6, 5, 0, 1, 7, 3, 4] = [1, 5, 17, 16, 11, 12, 18, 14, 15] := by decide
   rw [normalized]
   simp [recordIds, records2_6_2] <;> omega
 example : (normalizeAgentSources anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) sources2_6_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records2_6_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_6_2) (model2.level graph2.root + 2) [] = some result ∧
     rankedPass model2 (chainOwner anchors2) graph2.root records2_6_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 11, 12, 4, 13, 5, 6, 9] graph2.root [7, 0, 4, 3, 2, 9, 1] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
+    chainReplay (agentModel (documentAgent graph2)) anchors2 [1, 4, 5, 6, 9] graph2.root [6, 5, 0, 1, 7, 3, 4] = some (graph2.root :: (recordIds result).map (chainOwner anchors2)) ∧
     runComponents (decodedComponentGraph graph2 documents2 methods2) patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors2)) = some final :=
-  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] records2_6_2 [] covered2_6 (by decide) represented2_6_2 (.nil _)
-example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_6_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([7], some (0, 12, 9)) := by decide
+  component_full_replay graph2 documents2 methods2 methods_agree2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 (by decide) (by decide) [1, 4, 5, 6, 9] [6, 5, 0, 1, 7, 3, 4] records2_6_2 [] covered2_6 (by decide) represented2_6_2 (.nil _)
+example : (stopWhenStable (rankedPass model2 (chainOwner anchors2) graph2.root records2_6_2) (model2.level graph2.root + 2) []).map (fun records => (graph2.root :: (recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors2))).map (componentResult documents2 4))) = some ([6], some (0, 12, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_2) ((coldComponentEvents graph2 anchors2).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_2 result = result ∧
     ((recordIds result).map (chainOwner anchors2)).head? = some graph2.root ∧
     runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors2)).drop 1) = some final :=
   component_cold_full_replay graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) records2_6_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([7], some (0, 12, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors2), (runComponents graph2 patch2 12 ⟨.active graph2.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors2)).drop 1)).map (componentResult documents2 4))) = some ([6], some (0, 12, 9)) := by decide
 example := integrated_agent_execution graph2 patch2 registry2 9 12 12 receipts2 ordered2 bounded2 parents2 (by decide) (by decide) sources2_6_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph2 anchors2) (chainOwner anchors2) graph2.size records2_6_2) ((coldComponentEvents graph2 anchors2).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors2 (expectedRegistry (componentRegistry graph2 patch2 registry2 9)) operationTime2 chainFacts2))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees2_6_2 : SameAgentSources sources2_6_2 sources2_6_0 := by
   exact same_sources_of_check sources2_6_2 sources2_6_0 (by decide)
 example := integrated_agent_convergence graph2 patch2 registry2 9 12 12 receipts2 operationTime2 chainFacts2 ordered2 bounded2 sources2_6_2 sources2_6_0 source_agrees2_6_2
-def atoms3 : Nat → String := (fun i => ["{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-1\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"q10uec_WIbGwJ_-yTiRT7X-1cbqahB_w4kc0Zsq9Fo0\",\"y\":\"JA0RA4YNSQHalTzHAh1NYvP5VpGsfNQ0y_n8nouNhx0\"}}],\"authentication\":[\"#key-1\"],\"assertionMethod\":[\"#key-1\"],\"capabilityInvocation\":[\"#key-1\"]}", "{\"fork\":true}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-2\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"a36wTgevB7XYLkY2YPnj5Or5yFTlqkc5HW2qjprAGjU\",\"y\":\"k15MQ6A4qqzEw-7g3eQmi-0zx_sxiGllOXTuHoRQzOs\"}}],\"service\":[{\"id\":\"#profile\",\"type\":\"Profile\",\"serviceEndpoint\":\"https://example.org/1\"}]}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-3\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"3vJOFJY5JTcjyYds8AeKBWfyHMMtDJRUyGOTCybxH60\",\"y\":\"oPATA16FwplsMqoR-kakNuIUiQ7quN8BTP2dngDFqME\"}}],\"service\":[{\"id\":\"#profile\",\"type\":\"Profile\",\"serviceEndpoint\":\"https://example.org/2\"}]}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\"}", "{\"invalid\":\"deleted-parent\"}", "{\"invalid\":\"retired-key\"}", "{\"retained\":false}", "{\"retained\":true,\"removed\":true}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"BTC:signet\"}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"ETH:sepolia\"}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"hyperswarm\"}", "{}"].getD i (""))
+def atoms3 : Nat → String := (fun i => ["{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-1\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"q10uec_WIbGwJ_-yTiRT7X-1cbqahB_w4kc0Zsq9Fo0\",\"y\":\"JA0RA4YNSQHalTzHAh1NYvP5VpGsfNQ0y_n8nouNhx0\"}}],\"authentication\":[\"#key-1\"],\"assertionMethod\":[\"#key-1\"],\"capabilityInvocation\":[\"#key-1\"]}", "{\"fork\":true}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-2\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"a36wTgevB7XYLkY2YPnj5Or5yFTlqkc5HW2qjprAGjU\",\"y\":\"k15MQ6A4qqzEw-7g3eQmi-0zx_sxiGllOXTuHoRQzOs\"}}],\"service\":[{\"id\":\"#profile\",\"type\":\"Profile\",\"serviceEndpoint\":\"https://example.org/1\"}]}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-3\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"3vJOFJY5JTcjyYds8AeKBWfyHMMtDJRUyGOTCybxH60\",\"y\":\"oPATA16FwplsMqoR-kakNuIUiQ7quN8BTP2dngDFqME\"}}],\"service\":[{\"id\":\"#profile\",\"type\":\"Profile\",\"serviceEndpoint\":\"https://example.org/2\"}]}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\"}", "{\"invalid\":\"deleted-parent\"}", "{\"invalid\":\"retired-key\"}", "{\"retained\":false}", "{\"retained\":true,\"removed\":true}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"BTC:signet\"}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"ETH:sepolia\"}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"ZEC:testnet\"}", "{}"].getD i (""))
 def methods3 : Nat → List VerificationMethod := (fun i => [[⟨0, 0⟩], [], [⟨1, 1⟩], [⟨2, 2⟩], [], [], [], [], [], [], [], [], []].getD i ([]))
-def documents3 : Nat → Nat := (fun i => [12, 12, 2, 3, 12, 12, 3, 0, 2, 12].getD i (12))
+def documents3 : Nat → Nat := (fun i => [12, 12, 3, 2, 12, 2, 3, 0, 12, 12].getD i (12))
 def graph3 : DocumentGraph := {
   size := 10
   root := 7
   initialDocument := 7
-  parent := (fun i => [some 8, some 8, some 7, some 0, some 3, some 4, some 7, none, some 7, some 6].getD i (none))
-  depth := (fun i => [2, 2, 1, 3, 4, 5, 1, 0, 1, 2].getD i (0))
-  action := (fun i => [AgentAction.keep, AgentAction.keep, AgentAction.rotate 2, AgentAction.rotate 3, AgentAction.deactivate, AgentAction.keep, AgentAction.rotate 6, AgentAction.keep, AgentAction.rotate 8, AgentAction.keep].getD i (AgentAction.keep))
-  documents := (fun i => [[], [], [⟨1, 1⟩], [⟨2, 2⟩], [], [], [⟨2, 2⟩], [⟨0, 0⟩], [⟨1, 1⟩], []].getD i ([]))
-  named := (fun i => [1, 0, 1, 1, 2, 2, 0, 0, 0, 2].getD i (0))
-  signatureValid := fun i k => ((fun i => [[false, true, false], [true, false, false], [false, true, false], [false, true, false], [false, false, true], [false, false, true], [true, false, false], [true, false, false], [true, false, false], [false, false, true]].getD i ([]))) i |>.getD k false
+  parent := (fun i => [some 5, some 9, some 0, some 7, some 5, some 7, some 7, none, some 6, some 2].getD i (none))
+  depth := (fun i => [2, 5, 3, 1, 2, 1, 1, 0, 2, 4].getD i (0))
+  action := (fun i => [AgentAction.keep, AgentAction.keep, AgentAction.rotate 2, AgentAction.rotate 3, AgentAction.keep, AgentAction.rotate 5, AgentAction.rotate 6, AgentAction.keep, AgentAction.keep, AgentAction.deactivate].getD i (AgentAction.keep))
+  documents := (fun i => [[], [], [⟨2, 2⟩], [⟨1, 1⟩], [], [⟨1, 1⟩], [⟨2, 2⟩], [⟨0, 0⟩], [], []].getD i ([]))
+  named := (fun i => [1, 2, 1, 1, 0, 0, 0, 0, 2, 2].getD i (0))
+  signatureValid := fun i k => ((fun i => [[false, true, false], [false, false, true], [false, true, false], [false, true, false], [true, false, false], [true, false, false], [true, false, false], [true, false, false], [false, false, true], [false, false, true]].getD i ([]))) i |>.getD k false
 }
 theorem methods_agree3 : ∀ i, methods3 (documents3 i) = graph3.documents i := by
   intro i
@@ -2094,548 +2094,548 @@ theorem parents3 : AgentParentBounded graph3 := by
   have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 ∨ i = 8 ∨ i = 9 := by omega
   rcases cases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> simp [graph3] at parent
   all_goals subst p; decide
-def patch3 : Nat → ComponentPatch Nat Nat := (fun i => [⟨some 7, none⟩, ⟨some 6, none⟩, ⟨none, some 11⟩, ⟨none, some 9⟩, ⟨none, none⟩, ⟨some 5, none⟩, ⟨none, some 10⟩, ⟨none, none⟩, ⟨some 8, some 11⟩, ⟨some 1, none⟩].getD i (⟨none, none⟩))
-def registry3 : Nat → Nat := (fun i => [3, 3, 3, 3, 3, 3, 3, 3, 3, 0, 1, 2, 3].getD i (3))
+def patch3 : Nat → ComponentPatch Nat Nat := (fun i => [⟨some 7, none⟩, ⟨some 5, none⟩, ⟨none, some 9⟩, ⟨none, some 11⟩, ⟨some 6, none⟩, ⟨some 8, some 11⟩, ⟨none, some 10⟩, ⟨none, none⟩, ⟨some 1, none⟩, ⟨none, none⟩].getD i (⟨none, none⟩))
+def registry3 : Nat → Nat := (fun i => [4, 4, 4, 4, 4, 4, 4, 4, 4, 0, 1, 2, 4].getD i (4))
 def receipts3 : RegistryReceipts := {
-  size := 11
-  owner := (fun i => [6, 7, 6, 8, 2, 4, 5, 6, 8, 0, 9].getD i (10))
-  registry := (fun i => [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1].getD i (3))
-  chain := (fun i => [true, true, false].getD i (false))
+  size := 14
+  owner := (fun i => [6, 7, 5, 6, 3, 9, 1, 6, 5, 0, 8, 0, 4, 2].getD i (10))
+  registry := (fun i => [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2].getD i (4))
+  chain := (fun i => [true, true, true, false].getD i (false))
   accepted := fun _ => true
 }
 abbrev anchors3 := componentAnchors graph3 patch3 registry3 9 receipts3
 abbrev model3 := componentEvents graph3 anchors3
-def positions3 : Nat → List Nat := (fun i => [[100, 2, 0], [100, 10, 0], [100, 11, 0], [100, 11, 0], [100, 14, 0], [100, 16, 0], [100, 17, 0], [100, 18, 0], [101, 1, 0], [100, 1, 0], [100, 19, 0]].getD i ([]))
+def positions3 : Nat → List Nat := (fun i => [[100, 2, 0], [100, 10, 0], [100, 11, 0], [100, 11, 0], [100, 14, 0], [100, 16, 0], [100, 17, 0], [100, 18, 0], [101, 1, 0], [100, 1, 0], [100, 19, 0], [100, 12, 0], [100, 13, 0], [100, 15, 0]].getD i ([]))
 theorem ranks3 : RegistryCidRanks (componentRegistry graph3 patch3 registry3 9) receipts3 positions3 := by
   intro x y xv yv same
-  have xb : x < 11 := eligible_lt _ _ _ xv
-  have yb : y < 11 := eligible_lt _ _ _ yv
-  have checked : ∀ x y : Fin 11,
+  have xb : x < 14 := eligible_lt _ _ _ xv
+  have yb : y < 14 := eligible_lt _ _ _ yv
+  have checked : ∀ x y : Fin 14,
       eligible (registryAnchors (componentRegistry graph3 patch3 registry3 9) receipts3) (receipts3.owner x.val) x.val = true →
       eligible (registryAnchors (componentRegistry graph3 patch3 registry3 9) receipts3) (receipts3.owner y.val) y.val = true →
       receipts3.registry x.val = receipts3.registry y.val →
       (x.val < y.val ↔ compare (positions3 x.val) (positions3 y.val) = .lt ∨
         (compare (positions3 x.val) (positions3 y.val) = .eq ∧ receipts3.owner x.val < receipts3.owner y.val)) := by decide
   exact checked ⟨x, xb⟩ ⟨y, yb⟩ xv yv same
-def operationTime3 : Nat → Int := (fun i => [1788566402000, 1788566403000, 1788566404000, 1788566405000, 1788566406000, 1788566407000, 1788566408000, 1788566400000, 1788566401000, 1788566409000].getD i (0))
-def chainFacts3 : Nat → ChainReceiptView := (fun i => [⟨0, [100, 2, 0], 1788566460000, true⟩, ⟨0, [100, 10, 0], 1788566460000, true⟩, ⟨0, [100, 11, 0], 1788566460000, true⟩, ⟨0, [100, 11, 0], 1788566460000, true⟩, ⟨0, [100, 14, 0], 1788566460000, true⟩, ⟨0, [100, 16, 0], 1788566460000, true⟩, ⟨0, [100, 17, 0], 1788566460000, true⟩, ⟨0, [100, 18, 0], 1788566460000, true⟩, ⟨0, [101, 1, 0], 1788566520000, true⟩, ⟨1, [100, 1, 0], 1788566460000, true⟩, ⟨1, [100, 19, 0], 1788566460000, true⟩].getD i (⟨0, [], 0, false⟩))
-theorem covered3_0 : ∀ i ∈ ([1, 3, 4, 7, 10, 9, 8] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 8, 0, 1, 2, 3, 6, 9] : List Nat) := by
+def operationTime3 : Nat → Int := (fun i => [1788566402000, 1788566407000, 1788566405000, 1788566404000, 1788566403000, 1788566401000, 1788566408000, 1788566400000, 1788566409000, 1788566406000].getD i (0))
+def chainFacts3 : Nat → ChainReceiptView := (fun i => [⟨0, [100, 2, 0], 1788566460000, true⟩, ⟨0, [100, 10, 0], 1788566460000, true⟩, ⟨0, [100, 11, 0], 1788566460000, true⟩, ⟨0, [100, 11, 0], 1788566460000, true⟩, ⟨0, [100, 14, 0], 1788566460000, true⟩, ⟨0, [100, 16, 0], 1788566460000, true⟩, ⟨0, [100, 17, 0], 1788566460000, true⟩, ⟨0, [100, 18, 0], 1788566460000, true⟩, ⟨0, [101, 1, 0], 1788566520000, true⟩, ⟨1, [100, 1, 0], 1788566460000, true⟩, ⟨1, [100, 19, 0], 1788566460000, true⟩, ⟨2, [100, 12, 0], 1788566460000, true⟩, ⟨2, [100, 13, 0], 1788566460000, true⟩, ⟨2, [100, 15, 0], 1788566460000, true⟩].getD i (⟨0, [], 0, false⟩))
+theorem covered3_0 : ∀ i ∈ ([1, 2, 11, 12, 4, 13, 7, 10, 9, 8] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 5, 0, 4, 3, 2, 6, 8] : List Nat) := by
   intro i member ok
-  have bound : i < 11 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 11, i.val ∈ ([1, 3, 4, 7, 10, 9, 8] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 8, 0, 1, 2, 3, 6, 9] : List Nat) := by decide
+  have bound : i < 14 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 14, i.val ∈ ([1, 2, 11, 12, 4, 13, 7, 10, 9, 8] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 5, 0, 4, 3, 2, 6, 8] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources3_0_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨8, 2, none⟩, 1⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨1, 2, none⟩, 3⟩, ⟨⟨2, 2, none⟩, 4⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨6, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨8, 0, some 3⟩, 11⟩, ⟨⟨2, 0, some 4⟩, 12⟩, ⟨⟨6, 0, some 7⟩, 15⟩, ⟨⟨9, 1, some 10⟩, 16⟩, ⟨⟨0, 1, some 9⟩, 17⟩, ⟨⟨8, 0, some 8⟩, 18⟩]
-def records3_0_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨19, false, 1⟩, ⟨11, true, 2⟩, ⟨12, true, 3⟩, ⟨13, false, 4⟩, ⟨14, true, 5⟩, ⟨17, false, 8⟩, ⟨20, false, 9⟩, ⟨1, true, 10⟩, ⟨18, true, 10⟩, ⟨3, true, 11⟩, ⟨19, true, 11⟩, ⟨13, true, 12⟩, ⟨7, true, 15⟩, ⟨17, true, 15⟩, ⟨10, true, 16⟩, ⟨20, true, 16⟩, ⟨11, false, 17⟩, ⟨8, true, 18⟩, ⟨19, true, 18⟩]
-theorem represented3_0_0 : ∀ i, i ∈ recordIds records3_0_0 ↔ i ∈ componentEventEvidence anchors3 [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] := by
+def sources3_0_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨5, 3, none⟩, 1⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨4, 3, none⟩, 3⟩, ⟨⟨3, 3, none⟩, 4⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨6, 3, none⟩, 8⟩, ⟨⟨8, 3, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨5, 0, some 2⟩, 11⟩, ⟨⟨0, 2, some 11⟩, 12⟩, ⟨⟨4, 2, some 12⟩, 13⟩, ⟨⟨3, 0, some 4⟩, 14⟩, ⟨⟨2, 2, some 13⟩, 15⟩, ⟨⟨6, 0, some 7⟩, 18⟩, ⟨⟨8, 1, some 10⟩, 19⟩, ⟨⟨0, 1, some 9⟩, 20⟩, ⟨⟨5, 0, some 8⟩, 21⟩]
+def records3_0_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨19, false, 1⟩, ⟨14, false, 2⟩, ⟨18, false, 3⟩, ⟨17, false, 4⟩, ⟨16, false, 5⟩, ⟨20, false, 8⟩, ⟨22, false, 9⟩, ⟨1, true, 10⟩, ⟨21, true, 10⟩, ⟨2, true, 11⟩, ⟨19, true, 11⟩, ⟨11, true, 12⟩, ⟨14, true, 12⟩, ⟨18, true, 13⟩, ⟨17, true, 14⟩, ⟨13, true, 15⟩, ⟨16, true, 15⟩, ⟨7, true, 18⟩, ⟨20, true, 18⟩, ⟨10, true, 19⟩, ⟨22, true, 19⟩, ⟨14, false, 20⟩, ⟨8, true, 21⟩, ⟨19, true, 21⟩]
+theorem represented3_0_0 : ∀ i, i ∈ recordIds records3_0_0 ↔ i ∈ componentEventEvidence anchors3 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] = [1, 3, 7, 10, 8, 18, 19, 11, 12, 13, 14, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 21, 19, 14, 18, 17, 16, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_0_0] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_0_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_0_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_0_0) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_0_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 3, 4, 7, 10, 9, 8] graph3.root [7, 8, 0, 1, 2, 3, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] graph3.root [7, 5, 0, 4, 3, 2, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] records3_0_0 [] covered3_0 (by decide) represented3_0_0 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_0_0) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] records3_0_0 [] covered3_0 (by decide) represented3_0_0 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_0_0) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_0) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_0 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_0_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_0_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.unanchored (some 2) 1788566402000⟩, ⟨3, true, ReceiptCutoffView.unanchored (some 2) 1788566405000⟩] := by decide
-def sources3_0_1 : List (AgentSourceReceipt Nat) := [⟨⟨8, 0, some 8⟩, 1018⟩, ⟨⟨0, 1, some 9⟩, 1017⟩, ⟨⟨9, 1, some 10⟩, 1016⟩, ⟨⟨6, 0, some 7⟩, 1015⟩, ⟨⟨2, 0, some 4⟩, 1012⟩, ⟨⟨8, 0, some 3⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨6, 2, none⟩, 1008⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨2, 2, none⟩, 1004⟩, ⟨⟨1, 2, none⟩, 1003⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨8, 2, none⟩, 1001⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
-def records3_0_1 : List (EventRecord Nat) := [⟨8, true, 1018⟩, ⟨19, true, 1018⟩, ⟨11, false, 1017⟩, ⟨10, true, 1016⟩, ⟨20, true, 1016⟩, ⟨7, true, 1015⟩, ⟨17, true, 1015⟩, ⟨13, true, 1012⟩, ⟨3, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨18, true, 1010⟩, ⟨20, false, 1009⟩, ⟨17, false, 1008⟩, ⟨14, true, 1005⟩, ⟨13, false, 1004⟩, ⟨12, true, 1003⟩, ⟨11, true, 1002⟩, ⟨19, false, 1001⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
-theorem represented3_0_1 : ∀ i, i ∈ recordIds records3_0_1 ↔ i ∈ componentEventEvidence anchors3 [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] := by
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩] := by decide
+def sources3_0_1 : List (AgentSourceReceipt Nat) := [⟨⟨5, 0, some 8⟩, 1021⟩, ⟨⟨0, 1, some 9⟩, 1020⟩, ⟨⟨8, 1, some 10⟩, 1019⟩, ⟨⟨6, 0, some 7⟩, 1018⟩, ⟨⟨2, 2, some 13⟩, 1015⟩, ⟨⟨3, 0, some 4⟩, 1014⟩, ⟨⟨4, 2, some 12⟩, 1013⟩, ⟨⟨0, 2, some 11⟩, 1012⟩, ⟨⟨5, 0, some 2⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨8, 3, none⟩, 1009⟩, ⟨⟨6, 3, none⟩, 1008⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨3, 3, none⟩, 1004⟩, ⟨⟨4, 3, none⟩, 1003⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨5, 3, none⟩, 1001⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
+def records3_0_1 : List (EventRecord Nat) := [⟨8, true, 1021⟩, ⟨19, true, 1021⟩, ⟨14, false, 1020⟩, ⟨10, true, 1019⟩, ⟨22, true, 1019⟩, ⟨7, true, 1018⟩, ⟨20, true, 1018⟩, ⟨13, true, 1015⟩, ⟨16, true, 1015⟩, ⟨17, true, 1014⟩, ⟨18, true, 1013⟩, ⟨11, true, 1012⟩, ⟨14, true, 1012⟩, ⟨2, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨21, true, 1010⟩, ⟨22, false, 1009⟩, ⟨20, false, 1008⟩, ⟨16, false, 1005⟩, ⟨17, false, 1004⟩, ⟨18, false, 1003⟩, ⟨14, false, 1002⟩, ⟨19, false, 1001⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
+theorem represented3_0_1 : ∀ i, i ∈ recordIds records3_0_1 ↔ i ∈ componentEventEvidence anchors3 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] = [1, 3, 7, 10, 8, 18, 19, 11, 12, 13, 14, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 21, 19, 14, 18, 17, 16, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_0_1] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_0_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_0_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_0_1) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_0_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 3, 4, 7, 10, 9, 8] graph3.root [7, 8, 0, 1, 2, 3, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] graph3.root [7, 5, 0, 4, 3, 2, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] records3_0_1 [] covered3_0 (by decide) represented3_0_1 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_0_1) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] records3_0_1 [] covered3_0 (by decide) represented3_0_1 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_0_1) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_1) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_1 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_0_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_0_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.unanchored (some 2) 1788566402000⟩, ⟨3, true, ReceiptCutoffView.unanchored (some 2) 1788566405000⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees3_0_1 : SameAgentSources sources3_0_1 sources3_0_0 := by
   exact same_sources_of_check sources3_0_1 sources3_0_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_0_1 sources3_0_0 source_agrees3_0_1
-def sources3_0_2 : List (AgentSourceReceipt Nat) := [⟨⟨8, 2, none⟩, 2001⟩, ⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨1, 2, none⟩, 2003⟩, ⟨⟨2, 2, none⟩, 2004⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨6, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨8, 0, some 3⟩, 2011⟩, ⟨⟨2, 0, some 4⟩, 2012⟩, ⟨⟨6, 0, some 7⟩, 2015⟩, ⟨⟨9, 1, some 10⟩, 2016⟩, ⟨⟨0, 1, some 9⟩, 2017⟩, ⟨⟨8, 0, some 8⟩, 2018⟩, ⟨⟨7, 2, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
-def records3_0_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨11, true, 2002⟩, ⟨12, true, 2003⟩, ⟨13, false, 2004⟩, ⟨14, true, 2005⟩, ⟨17, false, 2008⟩, ⟨20, false, 2009⟩, ⟨3, true, 2011⟩, ⟨19, true, 2011⟩, ⟨13, true, 2012⟩, ⟨7, true, 2015⟩, ⟨17, true, 2015⟩, ⟨10, true, 2016⟩, ⟨20, true, 2016⟩, ⟨11, false, 2017⟩, ⟨8, true, 2018⟩, ⟨19, true, 2018⟩, ⟨18, false, 2000⟩, ⟨1, true, 2010⟩, ⟨18, true, 2010⟩]
-theorem represented3_0_2 : ∀ i, i ∈ recordIds records3_0_2 ↔ i ∈ componentEventEvidence anchors3 [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] := by
+def sources3_0_2 : List (AgentSourceReceipt Nat) := [⟨⟨5, 3, none⟩, 2001⟩, ⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨4, 3, none⟩, 2003⟩, ⟨⟨3, 3, none⟩, 2004⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨6, 3, none⟩, 2008⟩, ⟨⟨8, 3, none⟩, 2009⟩, ⟨⟨5, 0, some 2⟩, 2011⟩, ⟨⟨0, 2, some 11⟩, 2012⟩, ⟨⟨4, 2, some 12⟩, 2013⟩, ⟨⟨3, 0, some 4⟩, 2014⟩, ⟨⟨2, 2, some 13⟩, 2015⟩, ⟨⟨6, 0, some 7⟩, 2018⟩, ⟨⟨8, 1, some 10⟩, 2019⟩, ⟨⟨0, 1, some 9⟩, 2020⟩, ⟨⟨5, 0, some 8⟩, 2021⟩, ⟨⟨7, 3, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
+def records3_0_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨14, false, 2002⟩, ⟨18, false, 2003⟩, ⟨17, false, 2004⟩, ⟨16, false, 2005⟩, ⟨20, false, 2008⟩, ⟨22, false, 2009⟩, ⟨2, true, 2011⟩, ⟨19, true, 2011⟩, ⟨11, true, 2012⟩, ⟨14, true, 2012⟩, ⟨18, true, 2013⟩, ⟨17, true, 2014⟩, ⟨13, true, 2015⟩, ⟨16, true, 2015⟩, ⟨7, true, 2018⟩, ⟨20, true, 2018⟩, ⟨10, true, 2019⟩, ⟨22, true, 2019⟩, ⟨14, false, 2020⟩, ⟨8, true, 2021⟩, ⟨19, true, 2021⟩, ⟨21, false, 2000⟩, ⟨1, true, 2010⟩, ⟨21, true, 2010⟩]
+theorem represented3_0_2 : ∀ i, i ∈ recordIds records3_0_2 ↔ i ∈ componentEventEvidence anchors3 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] = [1, 3, 7, 10, 8, 18, 19, 11, 12, 13, 14, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 21, 19, 14, 18, 17, 16, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_0_2] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_0_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_0_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_0_2) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_0_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 3, 4, 7, 10, 9, 8] graph3.root [7, 8, 0, 1, 2, 3, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] graph3.root [7, 5, 0, 4, 3, 2, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] records3_0_2 [] covered3_0 (by decide) represented3_0_2 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_0_2) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 2, 11, 12, 4, 13, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 6, 8] records3_0_2 [] covered3_0 (by decide) represented3_0_2 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_0_2) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_2) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_2 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_0_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_0_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.unanchored (some 2) 1788566402000⟩, ⟨3, true, ReceiptCutoffView.unanchored (some 2) 1788566405000⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_0_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees3_0_2 : SameAgentSources sources3_0_2 sources3_0_0 := by
   exact same_sources_of_check sources3_0_2 sources3_0_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_0_2 sources3_0_0 source_agrees3_0_2
-theorem covered3_1 : ∀ i ∈ ([1, 3, 4, 5, 6, 7, 10, 9, 8] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 8, 0, 1, 2, 3, 4, 5, 6, 9] : List Nat) := by
+theorem covered3_1 : ∀ i ∈ ([1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 5, 0, 4, 3, 2, 9, 1, 6, 8] : List Nat) := by
   intro i member ok
-  have bound : i < 11 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 11, i.val ∈ ([1, 3, 4, 5, 6, 7, 10, 9, 8] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 8, 0, 1, 2, 3, 4, 5, 6, 9] : List Nat) := by decide
+  have bound : i < 14 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 14, i.val ∈ ([1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 5, 0, 4, 3, 2, 9, 1, 6, 8] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources3_1_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨8, 2, none⟩, 1⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨1, 2, none⟩, 3⟩, ⟨⟨2, 2, none⟩, 4⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨4, 2, none⟩, 6⟩, ⟨⟨5, 2, none⟩, 7⟩, ⟨⟨6, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨8, 0, some 3⟩, 11⟩, ⟨⟨2, 0, some 4⟩, 12⟩, ⟨⟨4, 0, some 5⟩, 13⟩, ⟨⟨5, 0, some 6⟩, 14⟩, ⟨⟨6, 0, some 7⟩, 15⟩, ⟨⟨9, 1, some 10⟩, 16⟩, ⟨⟨0, 1, some 9⟩, 17⟩, ⟨⟨8, 0, some 8⟩, 18⟩]
-def records3_1_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨19, false, 1⟩, ⟨11, true, 2⟩, ⟨12, true, 3⟩, ⟨13, false, 4⟩, ⟨14, true, 5⟩, ⟨15, false, 6⟩, ⟨16, false, 7⟩, ⟨17, false, 8⟩, ⟨20, false, 9⟩, ⟨1, true, 10⟩, ⟨18, true, 10⟩, ⟨3, true, 11⟩, ⟨19, true, 11⟩, ⟨13, true, 12⟩, ⟨5, true, 13⟩, ⟨15, true, 13⟩, ⟨16, true, 14⟩, ⟨7, true, 15⟩, ⟨17, true, 15⟩, ⟨10, true, 16⟩, ⟨20, true, 16⟩, ⟨11, false, 17⟩, ⟨8, true, 18⟩, ⟨19, true, 18⟩]
-theorem represented3_1_0 : ∀ i, i ∈ recordIds records3_1_0 ↔ i ∈ componentEventEvidence anchors3 [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] := by
+def sources3_1_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨5, 3, none⟩, 1⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨4, 3, none⟩, 3⟩, ⟨⟨3, 3, none⟩, 4⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨9, 3, none⟩, 6⟩, ⟨⟨1, 3, none⟩, 7⟩, ⟨⟨6, 3, none⟩, 8⟩, ⟨⟨8, 3, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨5, 0, some 2⟩, 11⟩, ⟨⟨0, 2, some 11⟩, 12⟩, ⟨⟨4, 2, some 12⟩, 13⟩, ⟨⟨3, 0, some 4⟩, 14⟩, ⟨⟨2, 2, some 13⟩, 15⟩, ⟨⟨9, 0, some 5⟩, 16⟩, ⟨⟨1, 0, some 6⟩, 17⟩, ⟨⟨6, 0, some 7⟩, 18⟩, ⟨⟨8, 1, some 10⟩, 19⟩, ⟨⟨0, 1, some 9⟩, 20⟩, ⟨⟨5, 0, some 8⟩, 21⟩]
+def records3_1_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨19, false, 1⟩, ⟨14, false, 2⟩, ⟨18, false, 3⟩, ⟨17, false, 4⟩, ⟨16, false, 5⟩, ⟨23, false, 6⟩, ⟨15, false, 7⟩, ⟨20, false, 8⟩, ⟨22, false, 9⟩, ⟨1, true, 10⟩, ⟨21, true, 10⟩, ⟨2, true, 11⟩, ⟨19, true, 11⟩, ⟨11, true, 12⟩, ⟨14, true, 12⟩, ⟨18, true, 13⟩, ⟨17, true, 14⟩, ⟨13, true, 15⟩, ⟨16, true, 15⟩, ⟨5, true, 16⟩, ⟨23, true, 16⟩, ⟨15, true, 17⟩, ⟨7, true, 18⟩, ⟨20, true, 18⟩, ⟨10, true, 19⟩, ⟨22, true, 19⟩, ⟨14, false, 20⟩, ⟨8, true, 21⟩, ⟨19, true, 21⟩]
+theorem represented3_1_0 : ∀ i, i ∈ recordIds records3_1_0 ↔ i ∈ componentEventEvidence anchors3 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] = [1, 3, 5, 7, 10, 8, 18, 19, 11, 12, 13, 14, 15, 16, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] = [1, 2, 11, 13, 5, 7, 10, 8, 21, 19, 14, 18, 17, 16, 23, 15, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_1_0] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_1_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_1_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_1_0) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_1_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 3, 4, 5, 6, 7, 10, 9, 8] graph3.root [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] graph3.root [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] records3_1_0 [] covered3_1 (by decide) represented3_1_0 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_1_0) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 8, 0, 3, 4], some (4, 12, 9)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] records3_1_0 [] covered3_1 (by decide) represented3_1_0 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_1_0) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2, 9], some (4, 12, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_0) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_0 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_1_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 8, 0, 3, 4], some (4, 12, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2, 9], some (4, 12, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_1_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.unanchored (some 2) 1788566402000⟩, ⟨3, true, ReceiptCutoffView.unanchored (some 2) 1788566405000⟩, ⟨4, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
-def sources3_1_1 : List (AgentSourceReceipt Nat) := [⟨⟨8, 0, some 8⟩, 1018⟩, ⟨⟨0, 1, some 9⟩, 1017⟩, ⟨⟨9, 1, some 10⟩, 1016⟩, ⟨⟨6, 0, some 7⟩, 1015⟩, ⟨⟨5, 0, some 6⟩, 1014⟩, ⟨⟨4, 0, some 5⟩, 1013⟩, ⟨⟨2, 0, some 4⟩, 1012⟩, ⟨⟨8, 0, some 3⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨6, 2, none⟩, 1008⟩, ⟨⟨5, 2, none⟩, 1007⟩, ⟨⟨4, 2, none⟩, 1006⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨2, 2, none⟩, 1004⟩, ⟨⟨1, 2, none⟩, 1003⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨8, 2, none⟩, 1001⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
-def records3_1_1 : List (EventRecord Nat) := [⟨8, true, 1018⟩, ⟨19, true, 1018⟩, ⟨11, false, 1017⟩, ⟨10, true, 1016⟩, ⟨20, true, 1016⟩, ⟨7, true, 1015⟩, ⟨17, true, 1015⟩, ⟨16, true, 1014⟩, ⟨5, true, 1013⟩, ⟨15, true, 1013⟩, ⟨13, true, 1012⟩, ⟨3, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨18, true, 1010⟩, ⟨20, false, 1009⟩, ⟨17, false, 1008⟩, ⟨16, false, 1007⟩, ⟨15, false, 1006⟩, ⟨14, true, 1005⟩, ⟨13, false, 1004⟩, ⟨12, true, 1003⟩, ⟨11, true, 1002⟩, ⟨19, false, 1001⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
-theorem represented3_1_1 : ∀ i, i ∈ recordIds records3_1_1 ↔ i ∈ componentEventEvidence anchors3 [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] := by
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
+def sources3_1_1 : List (AgentSourceReceipt Nat) := [⟨⟨5, 0, some 8⟩, 1021⟩, ⟨⟨0, 1, some 9⟩, 1020⟩, ⟨⟨8, 1, some 10⟩, 1019⟩, ⟨⟨6, 0, some 7⟩, 1018⟩, ⟨⟨1, 0, some 6⟩, 1017⟩, ⟨⟨9, 0, some 5⟩, 1016⟩, ⟨⟨2, 2, some 13⟩, 1015⟩, ⟨⟨3, 0, some 4⟩, 1014⟩, ⟨⟨4, 2, some 12⟩, 1013⟩, ⟨⟨0, 2, some 11⟩, 1012⟩, ⟨⟨5, 0, some 2⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨8, 3, none⟩, 1009⟩, ⟨⟨6, 3, none⟩, 1008⟩, ⟨⟨1, 3, none⟩, 1007⟩, ⟨⟨9, 3, none⟩, 1006⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨3, 3, none⟩, 1004⟩, ⟨⟨4, 3, none⟩, 1003⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨5, 3, none⟩, 1001⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
+def records3_1_1 : List (EventRecord Nat) := [⟨8, true, 1021⟩, ⟨19, true, 1021⟩, ⟨14, false, 1020⟩, ⟨10, true, 1019⟩, ⟨22, true, 1019⟩, ⟨7, true, 1018⟩, ⟨20, true, 1018⟩, ⟨15, true, 1017⟩, ⟨5, true, 1016⟩, ⟨23, true, 1016⟩, ⟨13, true, 1015⟩, ⟨16, true, 1015⟩, ⟨17, true, 1014⟩, ⟨18, true, 1013⟩, ⟨11, true, 1012⟩, ⟨14, true, 1012⟩, ⟨2, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨21, true, 1010⟩, ⟨22, false, 1009⟩, ⟨20, false, 1008⟩, ⟨15, false, 1007⟩, ⟨23, false, 1006⟩, ⟨16, false, 1005⟩, ⟨17, false, 1004⟩, ⟨18, false, 1003⟩, ⟨14, false, 1002⟩, ⟨19, false, 1001⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
+theorem represented3_1_1 : ∀ i, i ∈ recordIds records3_1_1 ↔ i ∈ componentEventEvidence anchors3 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] = [1, 3, 5, 7, 10, 8, 18, 19, 11, 12, 13, 14, 15, 16, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] = [1, 2, 11, 13, 5, 7, 10, 8, 21, 19, 14, 18, 17, 16, 23, 15, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_1_1] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_1_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_1_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_1_1) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_1_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 3, 4, 5, 6, 7, 10, 9, 8] graph3.root [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] graph3.root [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] records3_1_1 [] covered3_1 (by decide) represented3_1_1 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_1_1) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 8, 0, 3, 4], some (4, 12, 9)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] records3_1_1 [] covered3_1 (by decide) represented3_1_1 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_1_1) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2, 9], some (4, 12, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_1) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_1 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_1_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 8, 0, 3, 4], some (4, 12, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2, 9], some (4, 12, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_1_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.unanchored (some 2) 1788566402000⟩, ⟨3, true, ReceiptCutoffView.unanchored (some 2) 1788566405000⟩, ⟨4, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees3_1_1 : SameAgentSources sources3_1_1 sources3_1_0 := by
   exact same_sources_of_check sources3_1_1 sources3_1_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_1_1 sources3_1_0 source_agrees3_1_1
-def sources3_1_2 : List (AgentSourceReceipt Nat) := [⟨⟨8, 2, none⟩, 2001⟩, ⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨1, 2, none⟩, 2003⟩, ⟨⟨2, 2, none⟩, 2004⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨4, 2, none⟩, 2006⟩, ⟨⟨5, 2, none⟩, 2007⟩, ⟨⟨6, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨8, 0, some 3⟩, 2011⟩, ⟨⟨2, 0, some 4⟩, 2012⟩, ⟨⟨4, 0, some 5⟩, 2013⟩, ⟨⟨5, 0, some 6⟩, 2014⟩, ⟨⟨6, 0, some 7⟩, 2015⟩, ⟨⟨9, 1, some 10⟩, 2016⟩, ⟨⟨0, 1, some 9⟩, 2017⟩, ⟨⟨8, 0, some 8⟩, 2018⟩, ⟨⟨7, 2, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
-def records3_1_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨11, true, 2002⟩, ⟨12, true, 2003⟩, ⟨13, false, 2004⟩, ⟨14, true, 2005⟩, ⟨15, false, 2006⟩, ⟨16, false, 2007⟩, ⟨17, false, 2008⟩, ⟨20, false, 2009⟩, ⟨3, true, 2011⟩, ⟨19, true, 2011⟩, ⟨13, true, 2012⟩, ⟨5, true, 2013⟩, ⟨15, true, 2013⟩, ⟨16, true, 2014⟩, ⟨7, true, 2015⟩, ⟨17, true, 2015⟩, ⟨10, true, 2016⟩, ⟨20, true, 2016⟩, ⟨11, false, 2017⟩, ⟨8, true, 2018⟩, ⟨19, true, 2018⟩, ⟨18, false, 2000⟩, ⟨1, true, 2010⟩, ⟨18, true, 2010⟩]
-theorem represented3_1_2 : ∀ i, i ∈ recordIds records3_1_2 ↔ i ∈ componentEventEvidence anchors3 [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] := by
+def sources3_1_2 : List (AgentSourceReceipt Nat) := [⟨⟨5, 3, none⟩, 2001⟩, ⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨4, 3, none⟩, 2003⟩, ⟨⟨3, 3, none⟩, 2004⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨9, 3, none⟩, 2006⟩, ⟨⟨1, 3, none⟩, 2007⟩, ⟨⟨6, 3, none⟩, 2008⟩, ⟨⟨8, 3, none⟩, 2009⟩, ⟨⟨5, 0, some 2⟩, 2011⟩, ⟨⟨0, 2, some 11⟩, 2012⟩, ⟨⟨4, 2, some 12⟩, 2013⟩, ⟨⟨3, 0, some 4⟩, 2014⟩, ⟨⟨2, 2, some 13⟩, 2015⟩, ⟨⟨9, 0, some 5⟩, 2016⟩, ⟨⟨1, 0, some 6⟩, 2017⟩, ⟨⟨6, 0, some 7⟩, 2018⟩, ⟨⟨8, 1, some 10⟩, 2019⟩, ⟨⟨0, 1, some 9⟩, 2020⟩, ⟨⟨5, 0, some 8⟩, 2021⟩, ⟨⟨7, 3, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
+def records3_1_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨14, false, 2002⟩, ⟨18, false, 2003⟩, ⟨17, false, 2004⟩, ⟨16, false, 2005⟩, ⟨23, false, 2006⟩, ⟨15, false, 2007⟩, ⟨20, false, 2008⟩, ⟨22, false, 2009⟩, ⟨2, true, 2011⟩, ⟨19, true, 2011⟩, ⟨11, true, 2012⟩, ⟨14, true, 2012⟩, ⟨18, true, 2013⟩, ⟨17, true, 2014⟩, ⟨13, true, 2015⟩, ⟨16, true, 2015⟩, ⟨5, true, 2016⟩, ⟨23, true, 2016⟩, ⟨15, true, 2017⟩, ⟨7, true, 2018⟩, ⟨20, true, 2018⟩, ⟨10, true, 2019⟩, ⟨22, true, 2019⟩, ⟨14, false, 2020⟩, ⟨8, true, 2021⟩, ⟨19, true, 2021⟩, ⟨21, false, 2000⟩, ⟨1, true, 2010⟩, ⟨21, true, 2010⟩]
+theorem represented3_1_2 : ∀ i, i ∈ recordIds records3_1_2 ↔ i ∈ componentEventEvidence anchors3 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] = [1, 3, 5, 7, 10, 8, 18, 19, 11, 12, 13, 14, 15, 16, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] = [1, 2, 11, 13, 5, 7, 10, 8, 21, 19, 14, 18, 17, 16, 23, 15, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_1_2] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_1_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_1_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_1_2) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_1_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 3, 4, 5, 6, 7, 10, 9, 8] graph3.root [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] graph3.root [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] records3_1_2 [] covered3_1 (by decide) represented3_1_2 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_1_2) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 8, 0, 3, 4], some (4, 12, 9)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 2, 11, 12, 4, 13, 5, 6, 7, 10, 9, 8] [7, 5, 0, 4, 3, 2, 9, 1, 6, 8] records3_1_2 [] covered3_1 (by decide) represented3_1_2 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_1_2) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2, 9], some (4, 12, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_2) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_2 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_1_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 8, 0, 3, 4], some (4, 12, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2, 9], some (4, 12, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_1_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.unanchored (some 2) 1788566402000⟩, ⟨3, true, ReceiptCutoffView.unanchored (some 2) 1788566405000⟩, ⟨4, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_1_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees3_1_2 : SameAgentSources sources3_1_2 sources3_1_0 := by
   exact same_sources_of_check sources3_1_2 sources3_1_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_1_2 sources3_1_0 source_agrees3_1_2
-theorem covered3_2 : ∀ i ∈ ([1, 3, 7, 10, 9, 8, 0] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 8, 0, 3, 6, 9] : List Nat) := by
+theorem covered3_2 : ∀ i ∈ ([1, 2, 11, 13, 7, 10, 9, 8, 0] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 5, 0, 2, 6, 8] : List Nat) := by
   intro i member ok
-  have bound : i < 11 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 11, i.val ∈ ([1, 3, 7, 10, 9, 8, 0] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 8, 0, 3, 6, 9] : List Nat) := by decide
+  have bound : i < 14 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 14, i.val ∈ ([1, 2, 11, 13, 7, 10, 9, 8, 0] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 5, 0, 2, 6, 8] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources3_2_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨8, 2, none⟩, 1⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨6, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨8, 0, some 3⟩, 11⟩, ⟨⟨6, 0, some 7⟩, 15⟩, ⟨⟨9, 1, some 10⟩, 16⟩, ⟨⟨0, 1, some 9⟩, 17⟩, ⟨⟨8, 0, some 8⟩, 18⟩, ⟨⟨6, 0, some 0⟩, 19⟩]
-def records3_2_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨19, false, 1⟩, ⟨11, true, 2⟩, ⟨14, true, 5⟩, ⟨17, false, 8⟩, ⟨20, false, 9⟩, ⟨1, true, 10⟩, ⟨18, true, 10⟩, ⟨3, true, 11⟩, ⟨19, true, 11⟩, ⟨7, true, 15⟩, ⟨17, true, 15⟩, ⟨10, true, 16⟩, ⟨20, true, 16⟩, ⟨11, false, 17⟩, ⟨8, true, 18⟩, ⟨19, true, 18⟩, ⟨0, true, 19⟩, ⟨17, true, 19⟩]
-theorem represented3_2_0 : ∀ i, i ∈ recordIds records3_2_0 ↔ i ∈ componentEventEvidence anchors3 [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] := by
+def sources3_2_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨5, 3, none⟩, 1⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨6, 3, none⟩, 8⟩, ⟨⟨8, 3, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨5, 0, some 2⟩, 11⟩, ⟨⟨0, 2, some 11⟩, 12⟩, ⟨⟨2, 2, some 13⟩, 15⟩, ⟨⟨6, 0, some 7⟩, 18⟩, ⟨⟨8, 1, some 10⟩, 19⟩, ⟨⟨0, 1, some 9⟩, 20⟩, ⟨⟨5, 0, some 8⟩, 21⟩, ⟨⟨6, 0, some 0⟩, 22⟩]
+def records3_2_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨19, false, 1⟩, ⟨14, false, 2⟩, ⟨16, false, 5⟩, ⟨20, false, 8⟩, ⟨22, false, 9⟩, ⟨1, true, 10⟩, ⟨21, true, 10⟩, ⟨2, true, 11⟩, ⟨19, true, 11⟩, ⟨11, true, 12⟩, ⟨14, true, 12⟩, ⟨13, true, 15⟩, ⟨16, true, 15⟩, ⟨7, true, 18⟩, ⟨20, true, 18⟩, ⟨10, true, 19⟩, ⟨22, true, 19⟩, ⟨14, false, 20⟩, ⟨8, true, 21⟩, ⟨19, true, 21⟩, ⟨0, true, 22⟩, ⟨20, true, 22⟩]
+theorem represented3_2_0 : ∀ i, i ∈ recordIds records3_2_0 ↔ i ∈ componentEventEvidence anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] = [1, 3, 7, 10, 8, 0, 18, 19, 11, 14, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 0, 21, 19, 14, 16, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_2_0] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_2_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_2_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_2_0) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_2_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 3, 7, 10, 9, 8, 0] graph3.root [7, 8, 0, 3, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 0] graph3.root [7, 5, 0, 2, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] records3_2_0 [] covered3_2 (by decide) represented3_2_0 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_2_0) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] records3_2_0 [] covered3_2 (by decide) represented3_2_0 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_2_0) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 6, 8], some (3, 1, 10)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_0) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_0 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_2_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 6, 8], some (3, 1, 10)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_2_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
-def sources3_2_1 : List (AgentSourceReceipt Nat) := [⟨⟨6, 0, some 0⟩, 1019⟩, ⟨⟨8, 0, some 8⟩, 1018⟩, ⟨⟨0, 1, some 9⟩, 1017⟩, ⟨⟨9, 1, some 10⟩, 1016⟩, ⟨⟨6, 0, some 7⟩, 1015⟩, ⟨⟨8, 0, some 3⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨6, 2, none⟩, 1008⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨8, 2, none⟩, 1001⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
-def records3_2_1 : List (EventRecord Nat) := [⟨0, true, 1019⟩, ⟨17, true, 1019⟩, ⟨8, true, 1018⟩, ⟨19, true, 1018⟩, ⟨11, false, 1017⟩, ⟨10, true, 1016⟩, ⟨20, true, 1016⟩, ⟨7, true, 1015⟩, ⟨17, true, 1015⟩, ⟨3, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨18, true, 1010⟩, ⟨20, false, 1009⟩, ⟨17, false, 1008⟩, ⟨14, true, 1005⟩, ⟨11, true, 1002⟩, ⟨19, false, 1001⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
-theorem represented3_2_1 : ∀ i, i ∈ recordIds records3_2_1 ↔ i ∈ componentEventEvidence anchors3 [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] := by
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+def sources3_2_1 : List (AgentSourceReceipt Nat) := [⟨⟨6, 0, some 0⟩, 1022⟩, ⟨⟨5, 0, some 8⟩, 1021⟩, ⟨⟨0, 1, some 9⟩, 1020⟩, ⟨⟨8, 1, some 10⟩, 1019⟩, ⟨⟨6, 0, some 7⟩, 1018⟩, ⟨⟨2, 2, some 13⟩, 1015⟩, ⟨⟨0, 2, some 11⟩, 1012⟩, ⟨⟨5, 0, some 2⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨8, 3, none⟩, 1009⟩, ⟨⟨6, 3, none⟩, 1008⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨5, 3, none⟩, 1001⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
+def records3_2_1 : List (EventRecord Nat) := [⟨0, true, 1022⟩, ⟨20, true, 1022⟩, ⟨8, true, 1021⟩, ⟨19, true, 1021⟩, ⟨14, false, 1020⟩, ⟨10, true, 1019⟩, ⟨22, true, 1019⟩, ⟨7, true, 1018⟩, ⟨20, true, 1018⟩, ⟨13, true, 1015⟩, ⟨16, true, 1015⟩, ⟨11, true, 1012⟩, ⟨14, true, 1012⟩, ⟨2, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨21, true, 1010⟩, ⟨22, false, 1009⟩, ⟨20, false, 1008⟩, ⟨16, false, 1005⟩, ⟨14, false, 1002⟩, ⟨19, false, 1001⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
+theorem represented3_2_1 : ∀ i, i ∈ recordIds records3_2_1 ↔ i ∈ componentEventEvidence anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] = [1, 3, 7, 10, 8, 0, 18, 19, 11, 14, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 0, 21, 19, 14, 16, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_2_1] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_2_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_2_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_2_1) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_2_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 3, 7, 10, 9, 8, 0] graph3.root [7, 8, 0, 3, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 0] graph3.root [7, 5, 0, 2, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] records3_2_1 [] covered3_2 (by decide) represented3_2_1 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_2_1) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] records3_2_1 [] covered3_2 (by decide) represented3_2_1 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_2_1) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 6, 8], some (3, 1, 10)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_1) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_1 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_2_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 6, 8], some (3, 1, 10)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_2_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees3_2_1 : SameAgentSources sources3_2_1 sources3_2_0 := by
   exact same_sources_of_check sources3_2_1 sources3_2_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_2_1 sources3_2_0 source_agrees3_2_1
-def sources3_2_2 : List (AgentSourceReceipt Nat) := [⟨⟨8, 2, none⟩, 2001⟩, ⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨6, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨8, 0, some 3⟩, 2011⟩, ⟨⟨6, 0, some 7⟩, 2015⟩, ⟨⟨9, 1, some 10⟩, 2016⟩, ⟨⟨0, 1, some 9⟩, 2017⟩, ⟨⟨8, 0, some 8⟩, 2018⟩, ⟨⟨6, 0, some 0⟩, 2019⟩, ⟨⟨7, 2, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
-def records3_2_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨11, true, 2002⟩, ⟨14, true, 2005⟩, ⟨17, false, 2008⟩, ⟨20, false, 2009⟩, ⟨3, true, 2011⟩, ⟨19, true, 2011⟩, ⟨7, true, 2015⟩, ⟨17, true, 2015⟩, ⟨10, true, 2016⟩, ⟨20, true, 2016⟩, ⟨11, false, 2017⟩, ⟨8, true, 2018⟩, ⟨19, true, 2018⟩, ⟨0, true, 2019⟩, ⟨17, true, 2019⟩, ⟨18, false, 2000⟩, ⟨1, true, 2010⟩, ⟨18, true, 2010⟩]
-theorem represented3_2_2 : ∀ i, i ∈ recordIds records3_2_2 ↔ i ∈ componentEventEvidence anchors3 [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] := by
+def sources3_2_2 : List (AgentSourceReceipt Nat) := [⟨⟨5, 3, none⟩, 2001⟩, ⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨6, 3, none⟩, 2008⟩, ⟨⟨8, 3, none⟩, 2009⟩, ⟨⟨5, 0, some 2⟩, 2011⟩, ⟨⟨0, 2, some 11⟩, 2012⟩, ⟨⟨2, 2, some 13⟩, 2015⟩, ⟨⟨6, 0, some 7⟩, 2018⟩, ⟨⟨8, 1, some 10⟩, 2019⟩, ⟨⟨0, 1, some 9⟩, 2020⟩, ⟨⟨5, 0, some 8⟩, 2021⟩, ⟨⟨6, 0, some 0⟩, 2022⟩, ⟨⟨7, 3, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
+def records3_2_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨14, false, 2002⟩, ⟨16, false, 2005⟩, ⟨20, false, 2008⟩, ⟨22, false, 2009⟩, ⟨2, true, 2011⟩, ⟨19, true, 2011⟩, ⟨11, true, 2012⟩, ⟨14, true, 2012⟩, ⟨13, true, 2015⟩, ⟨16, true, 2015⟩, ⟨7, true, 2018⟩, ⟨20, true, 2018⟩, ⟨10, true, 2019⟩, ⟨22, true, 2019⟩, ⟨14, false, 2020⟩, ⟨8, true, 2021⟩, ⟨19, true, 2021⟩, ⟨0, true, 2022⟩, ⟨20, true, 2022⟩, ⟨21, false, 2000⟩, ⟨1, true, 2010⟩, ⟨21, true, 2010⟩]
+theorem represented3_2_2 : ∀ i, i ∈ recordIds records3_2_2 ↔ i ∈ componentEventEvidence anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] = [1, 3, 7, 10, 8, 0, 18, 19, 11, 14, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 0, 21, 19, 14, 16, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_2_2] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_2_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_2_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_2_2) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_2_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 3, 7, 10, 9, 8, 0] graph3.root [7, 8, 0, 3, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 0] graph3.root [7, 5, 0, 2, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] records3_2_2 [] covered3_2 (by decide) represented3_2_2 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_2_2) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 2, 11, 13, 7, 10, 9, 8, 0] [7, 5, 0, 2, 6, 8] records3_2_2 [] covered3_2 (by decide) represented3_2_2 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_2_2) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 6, 8], some (3, 1, 10)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_2) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_2 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_2_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 6, 8], some (3, 1, 10)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_2_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_2_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees3_2_2 : SameAgentSources sources3_2_2 sources3_2_0 := by
   exact same_sources_of_check sources3_2_2 sources3_2_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_2_2 sources3_2_0 source_agrees3_2_2
-theorem covered3_3 : ∀ i ∈ ([1, 3, 7, 10, 9, 8, 2] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 8, 0, 3, 6, 9] : List Nat) := by
+theorem covered3_3 : ∀ i ∈ ([1, 2, 11, 13, 7, 10, 9, 8, 3] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 5, 0, 2, 6, 8] : List Nat) := by
   intro i member ok
-  have bound : i < 11 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 11, i.val ∈ ([1, 3, 7, 10, 9, 8, 2] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 8, 0, 3, 6, 9] : List Nat) := by decide
+  have bound : i < 14 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 14, i.val ∈ ([1, 2, 11, 13, 7, 10, 9, 8, 3] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 5, 0, 2, 6, 8] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources3_3_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨8, 2, none⟩, 1⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨6, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨8, 0, some 3⟩, 11⟩, ⟨⟨6, 0, some 7⟩, 15⟩, ⟨⟨9, 1, some 10⟩, 16⟩, ⟨⟨0, 1, some 9⟩, 17⟩, ⟨⟨8, 0, some 8⟩, 18⟩, ⟨⟨6, 0, some 2⟩, 20⟩]
-def records3_3_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨19, false, 1⟩, ⟨11, true, 2⟩, ⟨14, true, 5⟩, ⟨17, false, 8⟩, ⟨20, false, 9⟩, ⟨1, true, 10⟩, ⟨18, true, 10⟩, ⟨3, true, 11⟩, ⟨19, true, 11⟩, ⟨7, true, 15⟩, ⟨17, true, 15⟩, ⟨10, true, 16⟩, ⟨20, true, 16⟩, ⟨11, false, 17⟩, ⟨8, true, 18⟩, ⟨19, true, 18⟩, ⟨2, true, 20⟩, ⟨17, true, 20⟩]
-theorem represented3_3_0 : ∀ i, i ∈ recordIds records3_3_0 ↔ i ∈ componentEventEvidence anchors3 [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] := by
+def sources3_3_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨5, 3, none⟩, 1⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨6, 3, none⟩, 8⟩, ⟨⟨8, 3, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨5, 0, some 2⟩, 11⟩, ⟨⟨0, 2, some 11⟩, 12⟩, ⟨⟨2, 2, some 13⟩, 15⟩, ⟨⟨6, 0, some 7⟩, 18⟩, ⟨⟨8, 1, some 10⟩, 19⟩, ⟨⟨0, 1, some 9⟩, 20⟩, ⟨⟨5, 0, some 8⟩, 21⟩, ⟨⟨6, 0, some 3⟩, 23⟩]
+def records3_3_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨19, false, 1⟩, ⟨14, false, 2⟩, ⟨16, false, 5⟩, ⟨20, false, 8⟩, ⟨22, false, 9⟩, ⟨1, true, 10⟩, ⟨21, true, 10⟩, ⟨2, true, 11⟩, ⟨19, true, 11⟩, ⟨11, true, 12⟩, ⟨14, true, 12⟩, ⟨13, true, 15⟩, ⟨16, true, 15⟩, ⟨7, true, 18⟩, ⟨20, true, 18⟩, ⟨10, true, 19⟩, ⟨22, true, 19⟩, ⟨14, false, 20⟩, ⟨8, true, 21⟩, ⟨19, true, 21⟩, ⟨3, true, 23⟩, ⟨20, true, 23⟩]
+theorem represented3_3_0 : ∀ i, i ∈ recordIds records3_3_0 ↔ i ∈ componentEventEvidence anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] = [1, 3, 7, 10, 8, 2, 18, 19, 11, 14, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 3, 21, 19, 14, 16, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_3_0] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_3_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_3_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_3_0) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_3_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 3, 7, 10, 9, 8, 2] graph3.root [7, 8, 0, 3, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 3] graph3.root [7, 5, 0, 2, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] records3_3_0 [] covered3_3 (by decide) represented3_3_0 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_3_0) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] records3_3_0 [] covered3_3 (by decide) represented3_3_0 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_3_0) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_0) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_0 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_3_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_3_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
-def sources3_3_1 : List (AgentSourceReceipt Nat) := [⟨⟨6, 0, some 2⟩, 1020⟩, ⟨⟨8, 0, some 8⟩, 1018⟩, ⟨⟨0, 1, some 9⟩, 1017⟩, ⟨⟨9, 1, some 10⟩, 1016⟩, ⟨⟨6, 0, some 7⟩, 1015⟩, ⟨⟨8, 0, some 3⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨6, 2, none⟩, 1008⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨8, 2, none⟩, 1001⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
-def records3_3_1 : List (EventRecord Nat) := [⟨2, true, 1020⟩, ⟨17, true, 1020⟩, ⟨8, true, 1018⟩, ⟨19, true, 1018⟩, ⟨11, false, 1017⟩, ⟨10, true, 1016⟩, ⟨20, true, 1016⟩, ⟨7, true, 1015⟩, ⟨17, true, 1015⟩, ⟨3, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨18, true, 1010⟩, ⟨20, false, 1009⟩, ⟨17, false, 1008⟩, ⟨14, true, 1005⟩, ⟨11, true, 1002⟩, ⟨19, false, 1001⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
-theorem represented3_3_1 : ∀ i, i ∈ recordIds records3_3_1 ↔ i ∈ componentEventEvidence anchors3 [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] := by
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩] := by decide
+def sources3_3_1 : List (AgentSourceReceipt Nat) := [⟨⟨6, 0, some 3⟩, 1023⟩, ⟨⟨5, 0, some 8⟩, 1021⟩, ⟨⟨0, 1, some 9⟩, 1020⟩, ⟨⟨8, 1, some 10⟩, 1019⟩, ⟨⟨6, 0, some 7⟩, 1018⟩, ⟨⟨2, 2, some 13⟩, 1015⟩, ⟨⟨0, 2, some 11⟩, 1012⟩, ⟨⟨5, 0, some 2⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨8, 3, none⟩, 1009⟩, ⟨⟨6, 3, none⟩, 1008⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨5, 3, none⟩, 1001⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
+def records3_3_1 : List (EventRecord Nat) := [⟨3, true, 1023⟩, ⟨20, true, 1023⟩, ⟨8, true, 1021⟩, ⟨19, true, 1021⟩, ⟨14, false, 1020⟩, ⟨10, true, 1019⟩, ⟨22, true, 1019⟩, ⟨7, true, 1018⟩, ⟨20, true, 1018⟩, ⟨13, true, 1015⟩, ⟨16, true, 1015⟩, ⟨11, true, 1012⟩, ⟨14, true, 1012⟩, ⟨2, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨21, true, 1010⟩, ⟨22, false, 1009⟩, ⟨20, false, 1008⟩, ⟨16, false, 1005⟩, ⟨14, false, 1002⟩, ⟨19, false, 1001⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
+theorem represented3_3_1 : ∀ i, i ∈ recordIds records3_3_1 ↔ i ∈ componentEventEvidence anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] = [1, 3, 7, 10, 8, 2, 18, 19, 11, 14, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 3, 21, 19, 14, 16, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_3_1] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_3_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_3_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_3_1) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_3_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 3, 7, 10, 9, 8, 2] graph3.root [7, 8, 0, 3, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 3] graph3.root [7, 5, 0, 2, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] records3_3_1 [] covered3_3 (by decide) represented3_3_1 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_3_1) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] records3_3_1 [] covered3_3 (by decide) represented3_3_1 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_3_1) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_1) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_1 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_3_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_3_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees3_3_1 : SameAgentSources sources3_3_1 sources3_3_0 := by
   exact same_sources_of_check sources3_3_1 sources3_3_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_3_1 sources3_3_0 source_agrees3_3_1
-def sources3_3_2 : List (AgentSourceReceipt Nat) := [⟨⟨8, 2, none⟩, 2001⟩, ⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨6, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨8, 0, some 3⟩, 2011⟩, ⟨⟨6, 0, some 7⟩, 2015⟩, ⟨⟨9, 1, some 10⟩, 2016⟩, ⟨⟨0, 1, some 9⟩, 2017⟩, ⟨⟨8, 0, some 8⟩, 2018⟩, ⟨⟨6, 0, some 2⟩, 2020⟩, ⟨⟨7, 2, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
-def records3_3_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨11, true, 2002⟩, ⟨14, true, 2005⟩, ⟨17, false, 2008⟩, ⟨20, false, 2009⟩, ⟨3, true, 2011⟩, ⟨19, true, 2011⟩, ⟨7, true, 2015⟩, ⟨17, true, 2015⟩, ⟨10, true, 2016⟩, ⟨20, true, 2016⟩, ⟨11, false, 2017⟩, ⟨8, true, 2018⟩, ⟨19, true, 2018⟩, ⟨2, true, 2020⟩, ⟨17, true, 2020⟩, ⟨18, false, 2000⟩, ⟨1, true, 2010⟩, ⟨18, true, 2010⟩]
-theorem represented3_3_2 : ∀ i, i ∈ recordIds records3_3_2 ↔ i ∈ componentEventEvidence anchors3 [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] := by
+def sources3_3_2 : List (AgentSourceReceipt Nat) := [⟨⟨5, 3, none⟩, 2001⟩, ⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨6, 3, none⟩, 2008⟩, ⟨⟨8, 3, none⟩, 2009⟩, ⟨⟨5, 0, some 2⟩, 2011⟩, ⟨⟨0, 2, some 11⟩, 2012⟩, ⟨⟨2, 2, some 13⟩, 2015⟩, ⟨⟨6, 0, some 7⟩, 2018⟩, ⟨⟨8, 1, some 10⟩, 2019⟩, ⟨⟨0, 1, some 9⟩, 2020⟩, ⟨⟨5, 0, some 8⟩, 2021⟩, ⟨⟨6, 0, some 3⟩, 2023⟩, ⟨⟨7, 3, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
+def records3_3_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨14, false, 2002⟩, ⟨16, false, 2005⟩, ⟨20, false, 2008⟩, ⟨22, false, 2009⟩, ⟨2, true, 2011⟩, ⟨19, true, 2011⟩, ⟨11, true, 2012⟩, ⟨14, true, 2012⟩, ⟨13, true, 2015⟩, ⟨16, true, 2015⟩, ⟨7, true, 2018⟩, ⟨20, true, 2018⟩, ⟨10, true, 2019⟩, ⟨22, true, 2019⟩, ⟨14, false, 2020⟩, ⟨8, true, 2021⟩, ⟨19, true, 2021⟩, ⟨3, true, 2023⟩, ⟨20, true, 2023⟩, ⟨21, false, 2000⟩, ⟨1, true, 2010⟩, ⟨21, true, 2010⟩]
+theorem represented3_3_2 : ∀ i, i ∈ recordIds records3_3_2 ↔ i ∈ componentEventEvidence anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] = [1, 3, 7, 10, 8, 2, 18, 19, 11, 14, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] = [1, 2, 11, 13, 7, 10, 8, 3, 21, 19, 14, 16, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_3_2] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_3_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_3_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_3_2) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_3_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 3, 7, 10, 9, 8, 2] graph3.root [7, 8, 0, 3, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 2, 11, 13, 7, 10, 9, 8, 3] graph3.root [7, 5, 0, 2, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] records3_3_2 [] covered3_3 (by decide) represented3_3_2 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_3_2) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 2, 11, 13, 7, 10, 9, 8, 3] [7, 5, 0, 2, 6, 8] records3_3_2 [] covered3_3 (by decide) represented3_3_2 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_3_2) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_2) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_2 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_3_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_3_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_3_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨2, [100, 12, 0], 1788566460000, true⟩⟩, ⟨2, true, ReceiptCutoffView.chain ⟨2, [100, 15, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees3_3_2 : SameAgentSources sources3_3_2 sources3_3_0 := by
   exact same_sources_of_check sources3_3_2 sources3_3_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_3_2 sources3_3_0 source_agrees3_3_2
-theorem covered3_4 : ∀ i ∈ ([] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 8, 0, 3, 6, 9] : List Nat) := by
+theorem covered3_4 : ∀ i ∈ ([] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 5, 0, 2, 6, 8] : List Nat) := by
   intro i member ok
-  have bound : i < 11 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 11, i.val ∈ ([] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 8, 0, 3, 6, 9] : List Nat) := by decide
+  have bound : i < 14 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 14, i.val ∈ ([] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 5, 0, 2, 6, 8] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources3_4_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨8, 2, none⟩, 1⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨6, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩]
-def records3_4_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨19, false, 1⟩, ⟨11, true, 2⟩, ⟨14, true, 5⟩, ⟨17, false, 8⟩, ⟨20, false, 9⟩]
-theorem represented3_4_0 : ∀ i, i ∈ recordIds records3_4_0 ↔ i ∈ componentEventEvidence anchors3 [] [7, 8, 0, 3, 6, 9] := by
+def sources3_4_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨5, 3, none⟩, 1⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨6, 3, none⟩, 8⟩, ⟨⟨8, 3, none⟩, 9⟩]
+def records3_4_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨19, false, 1⟩, ⟨14, false, 2⟩, ⟨16, false, 5⟩, ⟨20, false, 8⟩, ⟨22, false, 9⟩]
+theorem represented3_4_0 : ∀ i, i ∈ recordIds records3_4_0 ↔ i ∈ componentEventEvidence anchors3 [] [7, 5, 0, 2, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [] [7, 8, 0, 3, 6, 9] = [18, 19, 11, 14, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [] [7, 5, 0, 2, 6, 8] = [21, 19, 14, 16, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_4_0] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_4_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_4_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_4_0) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_4_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [] graph3.root [7, 8, 0, 3, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [] graph3.root [7, 5, 0, 2, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [] [7, 8, 0, 3, 6, 9] records3_4_0 [] covered3_4 (by decide) represented3_4_0 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_4_0) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [] [7, 5, 0, 2, 6, 8] records3_4_0 [] covered3_4 (by decide) represented3_4_0 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_4_0) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_0) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_0 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_4_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_4_0 (by decide)
 example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, false, ReceiptCutoffView.unconfirmed⟩] := by decide
-def sources3_4_1 : List (AgentSourceReceipt Nat) := [⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨6, 2, none⟩, 1008⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨8, 2, none⟩, 1001⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
-def records3_4_1 : List (EventRecord Nat) := [⟨20, false, 1009⟩, ⟨17, false, 1008⟩, ⟨14, true, 1005⟩, ⟨11, true, 1002⟩, ⟨19, false, 1001⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
-theorem represented3_4_1 : ∀ i, i ∈ recordIds records3_4_1 ↔ i ∈ componentEventEvidence anchors3 [] [7, 8, 0, 3, 6, 9] := by
+def sources3_4_1 : List (AgentSourceReceipt Nat) := [⟨⟨8, 3, none⟩, 1009⟩, ⟨⟨6, 3, none⟩, 1008⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨5, 3, none⟩, 1001⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
+def records3_4_1 : List (EventRecord Nat) := [⟨22, false, 1009⟩, ⟨20, false, 1008⟩, ⟨16, false, 1005⟩, ⟨14, false, 1002⟩, ⟨19, false, 1001⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
+theorem represented3_4_1 : ∀ i, i ∈ recordIds records3_4_1 ↔ i ∈ componentEventEvidence anchors3 [] [7, 5, 0, 2, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [] [7, 8, 0, 3, 6, 9] = [18, 19, 11, 14, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [] [7, 5, 0, 2, 6, 8] = [21, 19, 14, 16, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_4_1] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_4_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_4_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_4_1) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_4_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [] graph3.root [7, 8, 0, 3, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [] graph3.root [7, 5, 0, 2, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [] [7, 8, 0, 3, 6, 9] records3_4_1 [] covered3_4 (by decide) represented3_4_1 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_4_1) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [] [7, 5, 0, 2, 6, 8] records3_4_1 [] covered3_4 (by decide) represented3_4_1 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_4_1) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_1) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_1 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_4_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_4_1 (by decide)
 example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, false, ReceiptCutoffView.unconfirmed⟩] := by decide
 theorem source_agrees3_4_1 : SameAgentSources sources3_4_1 sources3_4_0 := by
   exact same_sources_of_check sources3_4_1 sources3_4_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_4_1 sources3_4_0 source_agrees3_4_1
-def sources3_4_2 : List (AgentSourceReceipt Nat) := [⟨⟨8, 2, none⟩, 2001⟩, ⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨6, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨7, 2, none⟩, 2000⟩]
-def records3_4_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨11, true, 2002⟩, ⟨14, true, 2005⟩, ⟨17, false, 2008⟩, ⟨20, false, 2009⟩, ⟨18, false, 2000⟩]
-theorem represented3_4_2 : ∀ i, i ∈ recordIds records3_4_2 ↔ i ∈ componentEventEvidence anchors3 [] [7, 8, 0, 3, 6, 9] := by
+def sources3_4_2 : List (AgentSourceReceipt Nat) := [⟨⟨5, 3, none⟩, 2001⟩, ⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨6, 3, none⟩, 2008⟩, ⟨⟨8, 3, none⟩, 2009⟩, ⟨⟨7, 3, none⟩, 2000⟩]
+def records3_4_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨14, false, 2002⟩, ⟨16, false, 2005⟩, ⟨20, false, 2008⟩, ⟨22, false, 2009⟩, ⟨21, false, 2000⟩]
+theorem represented3_4_2 : ∀ i, i ∈ recordIds records3_4_2 ↔ i ∈ componentEventEvidence anchors3 [] [7, 5, 0, 2, 6, 8] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [] [7, 8, 0, 3, 6, 9] = [18, 19, 11, 14, 17, 20] := by decide
+  have normalized : componentEventEvidence anchors3 [] [7, 5, 0, 2, 6, 8] = [21, 19, 14, 16, 20, 22] := by decide
   rw [normalized]
   simp [recordIds, records3_4_2] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_4_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_4_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_4_2) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_4_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [] graph3.root [7, 8, 0, 3, 6, 9] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [] graph3.root [7, 5, 0, 2, 6, 8] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [] [7, 8, 0, 3, 6, 9] records3_4_2 [] covered3_4 (by decide) represented3_4_2 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_4_2) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [] [7, 5, 0, 2, 6, 8] records3_4_2 [] covered3_4 (by decide) represented3_4_2 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_4_2) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_2) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_2 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_4_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_4_2 (by decide)
 example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_4_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, false, ReceiptCutoffView.unconfirmed⟩] := by decide
 theorem source_agrees3_4_2 : SameAgentSources sources3_4_2 sources3_4_0 := by
   exact same_sources_of_check sources3_4_2 sources3_4_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_4_2 sources3_4_0 source_agrees3_4_2
-theorem covered3_5 : ∀ i ∈ ([1, 9] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 8, 0, 3] : List Nat) := by
+theorem covered3_5 : ∀ i ∈ ([1, 11, 13, 9] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 5, 0, 2] : List Nat) := by
   intro i member ok
-  have bound : i < 11 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 11, i.val ∈ ([1, 9] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 8, 0, 3] : List Nat) := by decide
+  have bound : i < 14 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 14, i.val ∈ ([1, 11, 13, 9] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 5, 0, 2] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources3_5_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨8, 2, none⟩, 1⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨0, 1, some 9⟩, 17⟩]
-def records3_5_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨19, false, 1⟩, ⟨11, true, 2⟩, ⟨14, true, 5⟩, ⟨1, true, 10⟩, ⟨18, true, 10⟩, ⟨11, false, 17⟩]
-theorem represented3_5_0 : ∀ i, i ∈ recordIds records3_5_0 ↔ i ∈ componentEventEvidence anchors3 [1, 9] [7, 8, 0, 3] := by
+def sources3_5_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨5, 3, none⟩, 1⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨0, 2, some 11⟩, 12⟩, ⟨⟨2, 2, some 13⟩, 15⟩, ⟨⟨0, 1, some 9⟩, 20⟩]
+def records3_5_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨19, false, 1⟩, ⟨14, false, 2⟩, ⟨16, false, 5⟩, ⟨1, true, 10⟩, ⟨21, true, 10⟩, ⟨11, true, 12⟩, ⟨14, true, 12⟩, ⟨13, true, 15⟩, ⟨16, true, 15⟩, ⟨14, false, 20⟩]
+theorem represented3_5_0 : ∀ i, i ∈ recordIds records3_5_0 ↔ i ∈ componentEventEvidence anchors3 [1, 11, 13, 9] [7, 5, 0, 2] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 9] [7, 8, 0, 3] = [1, 18, 19, 11, 14] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 11, 13, 9] [7, 5, 0, 2] = [1, 11, 13, 21, 19, 14, 16] := by decide
   rw [normalized]
   simp [recordIds, records3_5_0] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_5_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_5_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_5_0) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_5_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 9] graph3.root [7, 8, 0, 3] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 11, 13, 9] graph3.root [7, 5, 0, 2] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 9] [7, 8, 0, 3] records3_5_0 [] covered3_5 (by decide) represented3_5_0 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_5_0) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 11, 13, 9] [7, 5, 0, 2] records3_5_0 [] covered3_5 (by decide) represented3_5_0 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_5_0) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_0) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_0 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_5_0 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_5_0 (by decide)
 example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
-def sources3_5_1 : List (AgentSourceReceipt Nat) := [⟨⟨0, 1, some 9⟩, 1017⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨8, 2, none⟩, 1001⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
-def records3_5_1 : List (EventRecord Nat) := [⟨11, false, 1017⟩, ⟨1, true, 1010⟩, ⟨18, true, 1010⟩, ⟨14, true, 1005⟩, ⟨11, true, 1002⟩, ⟨19, false, 1001⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
-theorem represented3_5_1 : ∀ i, i ∈ recordIds records3_5_1 ↔ i ∈ componentEventEvidence anchors3 [1, 9] [7, 8, 0, 3] := by
+def sources3_5_1 : List (AgentSourceReceipt Nat) := [⟨⟨0, 1, some 9⟩, 1020⟩, ⟨⟨2, 2, some 13⟩, 1015⟩, ⟨⟨0, 2, some 11⟩, 1012⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨5, 3, none⟩, 1001⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
+def records3_5_1 : List (EventRecord Nat) := [⟨14, false, 1020⟩, ⟨13, true, 1015⟩, ⟨16, true, 1015⟩, ⟨11, true, 1012⟩, ⟨14, true, 1012⟩, ⟨1, true, 1010⟩, ⟨21, true, 1010⟩, ⟨16, false, 1005⟩, ⟨14, false, 1002⟩, ⟨19, false, 1001⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
+theorem represented3_5_1 : ∀ i, i ∈ recordIds records3_5_1 ↔ i ∈ componentEventEvidence anchors3 [1, 11, 13, 9] [7, 5, 0, 2] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 9] [7, 8, 0, 3] = [1, 18, 19, 11, 14] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 11, 13, 9] [7, 5, 0, 2] = [1, 11, 13, 21, 19, 14, 16] := by decide
   rw [normalized]
   simp [recordIds, records3_5_1] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_5_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_5_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_5_1) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_5_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 9] graph3.root [7, 8, 0, 3] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 11, 13, 9] graph3.root [7, 5, 0, 2] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 9] [7, 8, 0, 3] records3_5_1 [] covered3_5 (by decide) represented3_5_1 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_5_1) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 11, 13, 9] [7, 5, 0, 2] records3_5_1 [] covered3_5 (by decide) represented3_5_1 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_5_1) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_1) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_1 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_5_1 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_5_1 (by decide)
 example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_1) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees3_5_1 : SameAgentSources sources3_5_1 sources3_5_0 := by
   exact same_sources_of_check sources3_5_1 sources3_5_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_5_1 sources3_5_0 source_agrees3_5_1
-def sources3_5_2 : List (AgentSourceReceipt Nat) := [⟨⟨8, 2, none⟩, 2001⟩, ⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨0, 1, some 9⟩, 2017⟩, ⟨⟨7, 2, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
-def records3_5_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨11, true, 2002⟩, ⟨14, true, 2005⟩, ⟨11, false, 2017⟩, ⟨18, false, 2000⟩, ⟨1, true, 2010⟩, ⟨18, true, 2010⟩]
-theorem represented3_5_2 : ∀ i, i ∈ recordIds records3_5_2 ↔ i ∈ componentEventEvidence anchors3 [1, 9] [7, 8, 0, 3] := by
+def sources3_5_2 : List (AgentSourceReceipt Nat) := [⟨⟨5, 3, none⟩, 2001⟩, ⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨0, 2, some 11⟩, 2012⟩, ⟨⟨2, 2, some 13⟩, 2015⟩, ⟨⟨0, 1, some 9⟩, 2020⟩, ⟨⟨7, 3, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
+def records3_5_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨14, false, 2002⟩, ⟨16, false, 2005⟩, ⟨11, true, 2012⟩, ⟨14, true, 2012⟩, ⟨13, true, 2015⟩, ⟨16, true, 2015⟩, ⟨14, false, 2020⟩, ⟨21, false, 2000⟩, ⟨1, true, 2010⟩, ⟨21, true, 2010⟩]
+theorem represented3_5_2 : ∀ i, i ∈ recordIds records3_5_2 ↔ i ∈ componentEventEvidence anchors3 [1, 11, 13, 9] [7, 5, 0, 2] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 9] [7, 8, 0, 3] = [1, 18, 19, 11, 14] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 11, 13, 9] [7, 5, 0, 2] = [1, 11, 13, 21, 19, 14, 16] := by decide
   rw [normalized]
   simp [recordIds, records3_5_2] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_5_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_5_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_5_2) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_5_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 9] graph3.root [7, 8, 0, 3] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 11, 13, 9] graph3.root [7, 5, 0, 2] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 9] [7, 8, 0, 3] records3_5_2 [] covered3_5 (by decide) represented3_5_2 (.nil _)
-example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_5_2) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 11, 13, 9] [7, 5, 0, 2] records3_5_2 [] covered3_5 (by decide) represented3_5_2 (.nil _)
+example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_5_2) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_2) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
     rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_2 result = result ∧
     ((recordIds result).map (chainOwner anchors3)).head? = some graph3.root ∧
     runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors3)).drop 1) = some final :=
   component_cold_full_replay graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) records3_5_2 (by decide)
-example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7, 5, 0, 2], some (3, 7, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_5_2 (by decide)
 example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_5_2) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
 theorem source_agrees3_5_2 : SameAgentSources sources3_5_2 sources3_5_0 := by
   exact same_sources_of_check sources3_5_2 sources3_5_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_5_2 sources3_5_0 source_agrees3_5_2
-theorem covered3_6 : ∀ i ∈ ([1, 4, 5, 6, 9] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 0, 1, 2, 3, 4, 5] : List Nat) := by
+theorem covered3_6 : ∀ i ∈ ([1, 11, 12, 4, 13, 5, 6, 9] : List Nat), eligible anchors3 (chainOwner anchors3 i) i = true → chainOwner anchors3 i ∈ ([7, 0, 4, 3, 2, 9, 1] : List Nat) := by
   intro i member ok
-  have bound : i < 11 := eligible_lt _ _ _ ok
-  have checked : ∀ i : Fin 11, i.val ∈ ([1, 4, 5, 6, 9] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 0, 1, 2, 3, 4, 5] : List Nat) := by decide
+  have bound : i < 14 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 14, i.val ∈ ([1, 11, 12, 4, 13, 5, 6, 9] : List Nat) → eligible anchors3 (chainOwner anchors3 i.val) i.val = true → chainOwner anchors3 i.val ∈ ([7, 0, 4, 3, 2, 9, 1] : List Nat) := by decide
   exact checked ⟨i, bound⟩ member ok
-def sources3_6_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨1, 2, none⟩, 3⟩, ⟨⟨2, 2, none⟩, 4⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨4, 2, none⟩, 6⟩, ⟨⟨5, 2, none⟩, 7⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨2, 0, some 4⟩, 12⟩, ⟨⟨4, 0, some 5⟩, 13⟩, ⟨⟨5, 0, some 6⟩, 14⟩, ⟨⟨0, 1, some 9⟩, 17⟩]
-def records3_6_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨11, true, 2⟩, ⟨12, true, 3⟩, ⟨13, false, 4⟩, ⟨14, true, 5⟩, ⟨15, false, 6⟩, ⟨16, false, 7⟩, ⟨1, true, 10⟩, ⟨18, true, 10⟩, ⟨13, true, 12⟩, ⟨5, true, 13⟩, ⟨15, true, 13⟩, ⟨16, true, 14⟩, ⟨11, false, 17⟩]
-theorem represented3_6_0 : ∀ i, i ∈ recordIds records3_6_0 ↔ i ∈ componentEventEvidence anchors3 [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] := by
+def sources3_6_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 3, none⟩, 0⟩, ⟨⟨0, 3, none⟩, 2⟩, ⟨⟨4, 3, none⟩, 3⟩, ⟨⟨3, 3, none⟩, 4⟩, ⟨⟨2, 3, none⟩, 5⟩, ⟨⟨9, 3, none⟩, 6⟩, ⟨⟨1, 3, none⟩, 7⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨0, 2, some 11⟩, 12⟩, ⟨⟨4, 2, some 12⟩, 13⟩, ⟨⟨3, 0, some 4⟩, 14⟩, ⟨⟨2, 2, some 13⟩, 15⟩, ⟨⟨9, 0, some 5⟩, 16⟩, ⟨⟨1, 0, some 6⟩, 17⟩, ⟨⟨0, 1, some 9⟩, 20⟩]
+def records3_6_0 : List (EventRecord Nat) := [⟨21, false, 0⟩, ⟨14, false, 2⟩, ⟨18, false, 3⟩, ⟨17, false, 4⟩, ⟨16, false, 5⟩, ⟨23, false, 6⟩, ⟨15, false, 7⟩, ⟨1, true, 10⟩, ⟨21, true, 10⟩, ⟨11, true, 12⟩, ⟨14, true, 12⟩, ⟨18, true, 13⟩, ⟨17, true, 14⟩, ⟨13, true, 15⟩, ⟨16, true, 15⟩, ⟨5, true, 16⟩, ⟨23, true, 16⟩, ⟨15, true, 17⟩, ⟨14, false, 20⟩]
+theorem represented3_6_0 : ∀ i, i ∈ recordIds records3_6_0 ↔ i ∈ componentEventEvidence anchors3 [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] = [1, 5, 18, 11, 12, 13, 14, 15, 16] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] = [1, 11, 13, 5, 21, 14, 18, 17, 16, 23, 15] := by decide
   rw [normalized]
   simp [recordIds, records3_6_0] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_6_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_6_0 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_6_0) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_6_0 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 4, 5, 6, 9] graph3.root [7, 0, 1, 2, 3, 4, 5] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 11, 12, 4, 13, 5, 6, 9] graph3.root [7, 0, 4, 3, 2, 9, 1] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] records3_6_0 [] covered3_6 (by decide) represented3_6_0 (.nil _)
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] records3_6_0 [] covered3_6 (by decide) represented3_6_0 (.nil _)
 example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_6_0) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7], some (0, 12, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_6_0) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
@@ -2646,20 +2646,20 @@ example : ∃ result final,
 example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_6_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors3)).drop 1)).map (componentResult documents3 4))) = some ([7], some (0, 12, 9)) := by decide
 example := integrated_agent_execution graph3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 parents3 (by decide) (by decide) sources3_6_0 (by decide)
 example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_6_0) ((coldComponentEvents graph3 anchors3).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) operationTime3 chainFacts3))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
-def sources3_6_1 : List (AgentSourceReceipt Nat) := [⟨⟨0, 1, some 9⟩, 1017⟩, ⟨⟨5, 0, some 6⟩, 1014⟩, ⟨⟨4, 0, some 5⟩, 1013⟩, ⟨⟨2, 0, some 4⟩, 1012⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨5, 2, none⟩, 1007⟩, ⟨⟨4, 2, none⟩, 1006⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨2, 2, none⟩, 1004⟩, ⟨⟨1, 2, none⟩, 1003⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
-def records3_6_1 : List (EventRecord Nat) := [⟨11, false, 1017⟩, ⟨16, true, 1014⟩, ⟨5, true, 1013⟩, ⟨15, true, 1013⟩, ⟨13, true, 1012⟩, ⟨1, true, 1010⟩, ⟨18, true, 1010⟩, ⟨16, false, 1007⟩, ⟨15, false, 1006⟩, ⟨14, true, 1005⟩, ⟨13, false, 1004⟩, ⟨12, true, 1003⟩, ⟨11, true, 1002⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
-theorem represented3_6_1 : ∀ i, i ∈ recordIds records3_6_1 ↔ i ∈ componentEventEvidence anchors3 [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] := by
+def sources3_6_1 : List (AgentSourceReceipt Nat) := [⟨⟨0, 1, some 9⟩, 1020⟩, ⟨⟨1, 0, some 6⟩, 1017⟩, ⟨⟨9, 0, some 5⟩, 1016⟩, ⟨⟨2, 2, some 13⟩, 1015⟩, ⟨⟨3, 0, some 4⟩, 1014⟩, ⟨⟨4, 2, some 12⟩, 1013⟩, ⟨⟨0, 2, some 11⟩, 1012⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨1, 3, none⟩, 1007⟩, ⟨⟨9, 3, none⟩, 1006⟩, ⟨⟨2, 3, none⟩, 1005⟩, ⟨⟨3, 3, none⟩, 1004⟩, ⟨⟨4, 3, none⟩, 1003⟩, ⟨⟨0, 3, none⟩, 1002⟩, ⟨⟨7, 3, none⟩, 1000⟩, ⟨⟨7, 3, none⟩, 1000⟩]
+def records3_6_1 : List (EventRecord Nat) := [⟨14, false, 1020⟩, ⟨15, true, 1017⟩, ⟨5, true, 1016⟩, ⟨23, true, 1016⟩, ⟨13, true, 1015⟩, ⟨16, true, 1015⟩, ⟨17, true, 1014⟩, ⟨18, true, 1013⟩, ⟨11, true, 1012⟩, ⟨14, true, 1012⟩, ⟨1, true, 1010⟩, ⟨21, true, 1010⟩, ⟨15, false, 1007⟩, ⟨23, false, 1006⟩, ⟨16, false, 1005⟩, ⟨17, false, 1004⟩, ⟨18, false, 1003⟩, ⟨14, false, 1002⟩, ⟨21, false, 1000⟩, ⟨21, false, 1000⟩]
+theorem represented3_6_1 : ∀ i, i ∈ recordIds records3_6_1 ↔ i ∈ componentEventEvidence anchors3 [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] = [1, 5, 18, 11, 12, 13, 14, 15, 16] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] = [1, 11, 13, 5, 21, 14, 18, 17, 16, 23, 15] := by decide
   rw [normalized]
   simp [recordIds, records3_6_1] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_6_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_6_1 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_6_1) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_6_1 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 4, 5, 6, 9] graph3.root [7, 0, 1, 2, 3, 4, 5] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 11, 12, 4, 13, 5, 6, 9] graph3.root [7, 0, 4, 3, 2, 9, 1] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] records3_6_1 [] covered3_6 (by decide) represented3_6_1 (.nil _)
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] records3_6_1 [] covered3_6 (by decide) represented3_6_1 (.nil _)
 example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_6_1) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7], some (0, 12, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_6_1) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
@@ -2673,20 +2673,20 @@ example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (cha
 theorem source_agrees3_6_1 : SameAgentSources sources3_6_1 sources3_6_0 := by
   exact same_sources_of_check sources3_6_1 sources3_6_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_6_1 sources3_6_0 source_agrees3_6_1
-def sources3_6_2 : List (AgentSourceReceipt Nat) := [⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨1, 2, none⟩, 2003⟩, ⟨⟨2, 2, none⟩, 2004⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨4, 2, none⟩, 2006⟩, ⟨⟨5, 2, none⟩, 2007⟩, ⟨⟨2, 0, some 4⟩, 2012⟩, ⟨⟨4, 0, some 5⟩, 2013⟩, ⟨⟨5, 0, some 6⟩, 2014⟩, ⟨⟨0, 1, some 9⟩, 2017⟩, ⟨⟨7, 2, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
-def records3_6_2 : List (EventRecord Nat) := [⟨11, true, 2002⟩, ⟨12, true, 2003⟩, ⟨13, false, 2004⟩, ⟨14, true, 2005⟩, ⟨15, false, 2006⟩, ⟨16, false, 2007⟩, ⟨13, true, 2012⟩, ⟨5, true, 2013⟩, ⟨15, true, 2013⟩, ⟨16, true, 2014⟩, ⟨11, false, 2017⟩, ⟨18, false, 2000⟩, ⟨1, true, 2010⟩, ⟨18, true, 2010⟩]
-theorem represented3_6_2 : ∀ i, i ∈ recordIds records3_6_2 ↔ i ∈ componentEventEvidence anchors3 [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] := by
+def sources3_6_2 : List (AgentSourceReceipt Nat) := [⟨⟨0, 3, none⟩, 2002⟩, ⟨⟨4, 3, none⟩, 2003⟩, ⟨⟨3, 3, none⟩, 2004⟩, ⟨⟨2, 3, none⟩, 2005⟩, ⟨⟨9, 3, none⟩, 2006⟩, ⟨⟨1, 3, none⟩, 2007⟩, ⟨⟨0, 2, some 11⟩, 2012⟩, ⟨⟨4, 2, some 12⟩, 2013⟩, ⟨⟨3, 0, some 4⟩, 2014⟩, ⟨⟨2, 2, some 13⟩, 2015⟩, ⟨⟨9, 0, some 5⟩, 2016⟩, ⟨⟨1, 0, some 6⟩, 2017⟩, ⟨⟨0, 1, some 9⟩, 2020⟩, ⟨⟨7, 3, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
+def records3_6_2 : List (EventRecord Nat) := [⟨14, false, 2002⟩, ⟨18, false, 2003⟩, ⟨17, false, 2004⟩, ⟨16, false, 2005⟩, ⟨23, false, 2006⟩, ⟨15, false, 2007⟩, ⟨11, true, 2012⟩, ⟨14, true, 2012⟩, ⟨18, true, 2013⟩, ⟨17, true, 2014⟩, ⟨13, true, 2015⟩, ⟨16, true, 2015⟩, ⟨5, true, 2016⟩, ⟨23, true, 2016⟩, ⟨15, true, 2017⟩, ⟨14, false, 2020⟩, ⟨21, false, 2000⟩, ⟨1, true, 2010⟩, ⟨21, true, 2010⟩]
+theorem represented3_6_2 : ∀ i, i ∈ recordIds records3_6_2 ↔ i ∈ componentEventEvidence anchors3 [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] := by
   intro i
-  have normalized : componentEventEvidence anchors3 [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] = [1, 5, 18, 11, 12, 13, 14, 15, 16] := by decide
+  have normalized : componentEventEvidence anchors3 [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] = [1, 11, 13, 5, 21, 14, 18, 17, 16, 23, 15] := by decide
   rw [normalized]
   simp [recordIds, records3_6_2] <;> omega
 example : (normalizeAgentSources anchors3 (expectedRegistry (componentRegistry graph3 patch3 registry3 9)) sources3_6_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records3_6_2 := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_6_2) (model3.level graph3.root + 2) [] = some result ∧
     rankedPass model3 (chainOwner anchors3) graph3.root records3_6_2 result = result ∧
-    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 4, 5, 6, 9] graph3.root [7, 0, 1, 2, 3, 4, 5] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
+    chainReplay (agentModel (documentAgent graph3)) anchors3 [1, 11, 12, 4, 13, 5, 6, 9] graph3.root [7, 0, 4, 3, 2, 9, 1] = some (graph3.root :: (recordIds result).map (chainOwner anchors3)) ∧
     runComponents (decodedComponentGraph graph3 documents3 methods3) patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors3)) = some final :=
-  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] records3_6_2 [] covered3_6 (by decide) represented3_6_2 (.nil _)
+  component_full_replay graph3 documents3 methods3 methods_agree3 patch3 registry3 9 12 12 receipts3 ordered3 bounded3 (by decide) (by decide) [1, 11, 12, 4, 13, 5, 6, 9] [7, 0, 4, 3, 2, 9, 1] records3_6_2 [] covered3_6 (by decide) represented3_6_2 (.nil _)
 example : (stopWhenStable (rankedPass model3 (chainOwner anchors3) graph3.root records3_6_2) (model3.level graph3.root + 2) []).map (fun records => (graph3.root :: (recordIds records).map (chainOwner anchors3), (runComponents graph3 patch3 12 ⟨.active graph3.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors3))).map (componentResult documents3 4))) = some ([7], some (0, 12, 9)) := by decide
 example : ∃ result final,
     stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (chainOwner anchors3) graph3.size records3_6_2) ((coldComponentEvents graph3 anchors3).size + 3) [] = some result ∧
@@ -2700,4 +2700,1352 @@ example : (stopWhenStable (rankedPass (coldComponentEvents graph3 anchors3) (cha
 theorem source_agrees3_6_2 : SameAgentSources sources3_6_2 sources3_6_0 := by
   exact same_sources_of_check sources3_6_2 sources3_6_0 (by decide)
 example := integrated_agent_convergence graph3 patch3 registry3 9 12 12 receipts3 operationTime3 chainFacts3 ordered3 bounded3 sources3_6_2 sources3_6_0 source_agrees3_6_2
+def atoms4 : Nat → String := (fun i => ["{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-1\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"q10uec_WIbGwJ_-yTiRT7X-1cbqahB_w4kc0Zsq9Fo0\",\"y\":\"JA0RA4YNSQHalTzHAh1NYvP5VpGsfNQ0y_n8nouNhx0\"}}],\"authentication\":[\"#key-1\"],\"assertionMethod\":[\"#key-1\"],\"capabilityInvocation\":[\"#key-1\"]}", "{\"fork\":true}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-2\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"a36wTgevB7XYLkY2YPnj5Or5yFTlqkc5HW2qjprAGjU\",\"y\":\"k15MQ6A4qqzEw-7g3eQmi-0zx_sxiGllOXTuHoRQzOs\"}}],\"service\":[{\"id\":\"#profile\",\"type\":\"Profile\",\"serviceEndpoint\":\"https://example.org/1\"}]}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-3\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"3vJOFJY5JTcjyYds8AeKBWfyHMMtDJRUyGOTCybxH60\",\"y\":\"oPATA16FwplsMqoR-kakNuIUiQ7quN8BTP2dngDFqME\"}}],\"service\":[{\"id\":\"#profile\",\"type\":\"Profile\",\"serviceEndpoint\":\"https://example.org/2\"}]}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\"}", "{\"invalid\":\"deleted-parent\"}", "{\"invalid\":\"retired-key\"}", "{\"retained\":false}", "{\"retained\":true,\"removed\":true}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"BTC:signet\"}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"ETH:sepolia\"}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"hyperswarm\"}", "{}"].getD i (""))
+def methods4 : Nat → List VerificationMethod := (fun i => [[⟨0, 0⟩], [], [⟨1, 1⟩], [⟨2, 2⟩], [], [], [], [], [], [], [], [], []].getD i ([]))
+def documents4 : Nat → Nat := (fun i => [12, 12, 2, 3, 12, 12, 3, 0, 2, 12].getD i (12))
+def graph4 : DocumentGraph := {
+  size := 10
+  root := 7
+  initialDocument := 7
+  parent := (fun i => [some 8, some 8, some 7, some 0, some 3, some 4, some 7, none, some 7, some 6].getD i (none))
+  depth := (fun i => [2, 2, 1, 3, 4, 5, 1, 0, 1, 2].getD i (0))
+  action := (fun i => [AgentAction.keep, AgentAction.keep, AgentAction.rotate 2, AgentAction.rotate 3, AgentAction.deactivate, AgentAction.keep, AgentAction.rotate 6, AgentAction.keep, AgentAction.rotate 8, AgentAction.keep].getD i (AgentAction.keep))
+  documents := (fun i => [[], [], [⟨1, 1⟩], [⟨2, 2⟩], [], [], [⟨2, 2⟩], [⟨0, 0⟩], [⟨1, 1⟩], []].getD i ([]))
+  named := (fun i => [1, 0, 1, 1, 2, 2, 0, 0, 0, 2].getD i (0))
+  signatureValid := fun i k => ((fun i => [[false, true, false], [true, false, false], [false, true, false], [false, true, false], [false, false, true], [false, false, true], [true, false, false], [true, false, false], [true, false, false], [false, false, true]].getD i ([]))) i |>.getD k false
+}
+theorem methods_agree4 : ∀ i, methods4 (documents4 i) = graph4.documents i := by
+  intro i
+  cases i with
+  | zero => rfl
+  | succ i =>
+    cases i with
+    | zero => rfl
+    | succ i =>
+      cases i with
+      | zero => rfl
+      | succ i =>
+        cases i with
+        | zero => rfl
+        | succ i =>
+          cases i with
+          | zero => rfl
+          | succ i =>
+            cases i with
+            | zero => rfl
+            | succ i =>
+              cases i with
+              | zero => rfl
+              | succ i =>
+                cases i with
+                | zero => rfl
+                | succ i =>
+                  cases i with
+                  | zero => rfl
+                  | succ i =>
+                    cases i with
+                    | zero => rfl
+                    | succ i =>
+                      rfl
+theorem ordered4 : AncestryOrdered (documentAgent graph4) := by
+  intro i p parent
+  by_cases bound : i < 10
+  · have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 ∨ i = 8 ∨ i = 9 := by omega
+    rcases cases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> simp [documentAgent, graph4] at parent
+    all_goals subst p; decide
+  · have outside : 10 ≤ i := by omega
+    simp only [documentAgent, graph4] at parent
+    rw [List.getD_eq_getElem?_getD, List.getElem?_eq_none (by simpa using outside)] at parent
+    simp at parent
+theorem bounded4 : DepthBounded (documentAgent graph4) := by
+  intro i bound
+  have small : i < 10 := bound
+  have checked : ∀ i : Fin 10, (documentAgent graph4).depth i.val < (documentAgent graph4).size := by decide
+  exact checked ⟨i, small⟩
+theorem parents4 : AgentParentBounded graph4 := by
+  intro i p bound parent
+  have small : i < 10 := bound
+  have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 ∨ i = 8 ∨ i = 9 := by omega
+  rcases cases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> simp [graph4] at parent
+  all_goals subst p; decide
+def patch4 : Nat → ComponentPatch Nat Nat := (fun i => [⟨some 7, none⟩, ⟨some 6, none⟩, ⟨none, some 11⟩, ⟨none, some 9⟩, ⟨none, none⟩, ⟨some 5, none⟩, ⟨none, some 10⟩, ⟨none, none⟩, ⟨some 8, some 11⟩, ⟨some 1, none⟩].getD i (⟨none, none⟩))
+def registry4 : Nat → Nat := (fun i => [3, 3, 3, 3, 3, 3, 3, 3, 3, 0, 1, 2, 3].getD i (3))
+def receipts4 : RegistryReceipts := {
+  size := 11
+  owner := (fun i => [6, 7, 6, 8, 2, 4, 5, 6, 8, 0, 9].getD i (10))
+  registry := (fun i => [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1].getD i (3))
+  chain := (fun i => [true, true, false].getD i (false))
+  accepted := fun _ => true
+}
+abbrev anchors4 := componentAnchors graph4 patch4 registry4 9 receipts4
+abbrev model4 := componentEvents graph4 anchors4
+def positions4 : Nat → List Nat := (fun i => [[100, 2, 0], [100, 10, 0], [100, 11, 0], [100, 11, 0], [100, 14, 0], [100, 16, 0], [100, 17, 0], [100, 18, 0], [101, 1, 0], [100, 1, 0], [100, 19, 0]].getD i ([]))
+theorem ranks4 : RegistryCidRanks (componentRegistry graph4 patch4 registry4 9) receipts4 positions4 := by
+  intro x y xv yv same
+  have xb : x < 11 := eligible_lt _ _ _ xv
+  have yb : y < 11 := eligible_lt _ _ _ yv
+  have checked : ∀ x y : Fin 11,
+      eligible (registryAnchors (componentRegistry graph4 patch4 registry4 9) receipts4) (receipts4.owner x.val) x.val = true →
+      eligible (registryAnchors (componentRegistry graph4 patch4 registry4 9) receipts4) (receipts4.owner y.val) y.val = true →
+      receipts4.registry x.val = receipts4.registry y.val →
+      (x.val < y.val ↔ compare (positions4 x.val) (positions4 y.val) = .lt ∨
+        (compare (positions4 x.val) (positions4 y.val) = .eq ∧ receipts4.owner x.val < receipts4.owner y.val)) := by decide
+  exact checked ⟨x, xb⟩ ⟨y, yb⟩ xv yv same
+def operationTime4 : Nat → Int := (fun i => [1788566402000, 1788566403000, 1788566404000, 1788566405000, 1788566406000, 1788566407000, 1788566408000, 1788566400000, 1788566401000, 1788566409000].getD i (0))
+def chainFacts4 : Nat → ChainReceiptView := (fun i => [⟨0, [100, 2, 0], 1788566460000, true⟩, ⟨0, [100, 10, 0], 1788566460000, true⟩, ⟨0, [100, 11, 0], 1788566460000, true⟩, ⟨0, [100, 11, 0], 1788566460000, true⟩, ⟨0, [100, 14, 0], 1788566460000, true⟩, ⟨0, [100, 16, 0], 1788566460000, true⟩, ⟨0, [100, 17, 0], 1788566460000, true⟩, ⟨0, [100, 18, 0], 1788566460000, true⟩, ⟨0, [101, 1, 0], 1788566520000, true⟩, ⟨1, [100, 1, 0], 1788566460000, true⟩, ⟨1, [100, 19, 0], 1788566460000, true⟩].getD i (⟨0, [], 0, false⟩))
+theorem covered4_0 : ∀ i ∈ ([1, 3, 4, 7, 10, 9, 8] : List Nat), eligible anchors4 (chainOwner anchors4 i) i = true → chainOwner anchors4 i ∈ ([7, 8, 0, 1, 2, 3, 6, 9] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 3, 4, 7, 10, 9, 8] : List Nat) → eligible anchors4 (chainOwner anchors4 i.val) i.val = true → chainOwner anchors4 i.val ∈ ([7, 8, 0, 1, 2, 3, 6, 9] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources4_0_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨8, 2, none⟩, 1⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨1, 2, none⟩, 3⟩, ⟨⟨2, 2, none⟩, 4⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨6, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨8, 0, some 3⟩, 11⟩, ⟨⟨2, 0, some 4⟩, 12⟩, ⟨⟨6, 0, some 7⟩, 15⟩, ⟨⟨9, 1, some 10⟩, 16⟩, ⟨⟨0, 1, some 9⟩, 17⟩, ⟨⟨8, 0, some 8⟩, 18⟩]
+def records4_0_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨19, false, 1⟩, ⟨11, true, 2⟩, ⟨12, true, 3⟩, ⟨13, false, 4⟩, ⟨14, true, 5⟩, ⟨17, false, 8⟩, ⟨20, false, 9⟩, ⟨1, true, 10⟩, ⟨18, true, 10⟩, ⟨3, true, 11⟩, ⟨19, true, 11⟩, ⟨13, true, 12⟩, ⟨7, true, 15⟩, ⟨17, true, 15⟩, ⟨10, true, 16⟩, ⟨20, true, 16⟩, ⟨11, false, 17⟩, ⟨8, true, 18⟩, ⟨19, true, 18⟩]
+theorem represented4_0_0 : ∀ i, i ∈ recordIds records4_0_0 ↔ i ∈ componentEventEvidence anchors4 [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] = [1, 3, 7, 10, 8, 18, 19, 11, 12, 13, 14, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_0_0] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_0_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_0_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_0_0) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_0_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 3, 4, 7, 10, 9, 8] graph4.root [7, 8, 0, 1, 2, 3, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] records4_0_0 [] covered4_0 (by decide) represented4_0_0 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_0_0) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_0_0) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_0_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_0_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_0_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_0_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_0_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.unanchored (some 2) 1788566402000⟩, ⟨3, true, ReceiptCutoffView.unanchored (some 2) 1788566405000⟩] := by decide
+def sources4_0_1 : List (AgentSourceReceipt Nat) := [⟨⟨8, 0, some 8⟩, 1018⟩, ⟨⟨0, 1, some 9⟩, 1017⟩, ⟨⟨9, 1, some 10⟩, 1016⟩, ⟨⟨6, 0, some 7⟩, 1015⟩, ⟨⟨2, 0, some 4⟩, 1012⟩, ⟨⟨8, 0, some 3⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨6, 2, none⟩, 1008⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨2, 2, none⟩, 1004⟩, ⟨⟨1, 2, none⟩, 1003⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨8, 2, none⟩, 1001⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
+def records4_0_1 : List (EventRecord Nat) := [⟨8, true, 1018⟩, ⟨19, true, 1018⟩, ⟨11, false, 1017⟩, ⟨10, true, 1016⟩, ⟨20, true, 1016⟩, ⟨7, true, 1015⟩, ⟨17, true, 1015⟩, ⟨13, true, 1012⟩, ⟨3, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨18, true, 1010⟩, ⟨20, false, 1009⟩, ⟨17, false, 1008⟩, ⟨14, true, 1005⟩, ⟨13, false, 1004⟩, ⟨12, true, 1003⟩, ⟨11, true, 1002⟩, ⟨19, false, 1001⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
+theorem represented4_0_1 : ∀ i, i ∈ recordIds records4_0_1 ↔ i ∈ componentEventEvidence anchors4 [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] = [1, 3, 7, 10, 8, 18, 19, 11, 12, 13, 14, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_0_1] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_0_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_0_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_0_1) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_0_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 3, 4, 7, 10, 9, 8] graph4.root [7, 8, 0, 1, 2, 3, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] records4_0_1 [] covered4_0 (by decide) represented4_0_1 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_0_1) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_0_1) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_0_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_0_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_0_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_0_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_0_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.unanchored (some 2) 1788566402000⟩, ⟨3, true, ReceiptCutoffView.unanchored (some 2) 1788566405000⟩] := by decide
+theorem source_agrees4_0_1 : SameAgentSources sources4_0_1 sources4_0_0 := by
+  exact same_sources_of_check sources4_0_1 sources4_0_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_0_1 sources4_0_0 source_agrees4_0_1
+def sources4_0_2 : List (AgentSourceReceipt Nat) := [⟨⟨8, 2, none⟩, 2001⟩, ⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨1, 2, none⟩, 2003⟩, ⟨⟨2, 2, none⟩, 2004⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨6, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨8, 0, some 3⟩, 2011⟩, ⟨⟨2, 0, some 4⟩, 2012⟩, ⟨⟨6, 0, some 7⟩, 2015⟩, ⟨⟨9, 1, some 10⟩, 2016⟩, ⟨⟨0, 1, some 9⟩, 2017⟩, ⟨⟨8, 0, some 8⟩, 2018⟩, ⟨⟨7, 2, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
+def records4_0_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨11, true, 2002⟩, ⟨12, true, 2003⟩, ⟨13, false, 2004⟩, ⟨14, true, 2005⟩, ⟨17, false, 2008⟩, ⟨20, false, 2009⟩, ⟨3, true, 2011⟩, ⟨19, true, 2011⟩, ⟨13, true, 2012⟩, ⟨7, true, 2015⟩, ⟨17, true, 2015⟩, ⟨10, true, 2016⟩, ⟨20, true, 2016⟩, ⟨11, false, 2017⟩, ⟨8, true, 2018⟩, ⟨19, true, 2018⟩, ⟨18, false, 2000⟩, ⟨1, true, 2010⟩, ⟨18, true, 2010⟩]
+theorem represented4_0_2 : ∀ i, i ∈ recordIds records4_0_2 ↔ i ∈ componentEventEvidence anchors4 [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] = [1, 3, 7, 10, 8, 18, 19, 11, 12, 13, 14, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_0_2] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_0_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_0_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_0_2) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_0_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 3, 4, 7, 10, 9, 8] graph4.root [7, 8, 0, 1, 2, 3, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 3, 4, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 6, 9] records4_0_2 [] covered4_0 (by decide) represented4_0_2 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_0_2) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_0_2) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_0_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_0_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_0_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_0_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_0_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.unanchored (some 2) 1788566402000⟩, ⟨3, true, ReceiptCutoffView.unanchored (some 2) 1788566405000⟩] := by decide
+theorem source_agrees4_0_2 : SameAgentSources sources4_0_2 sources4_0_0 := by
+  exact same_sources_of_check sources4_0_2 sources4_0_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_0_2 sources4_0_0 source_agrees4_0_2
+theorem covered4_1 : ∀ i ∈ ([1, 3, 4, 5, 6, 7, 10, 9, 8] : List Nat), eligible anchors4 (chainOwner anchors4 i) i = true → chainOwner anchors4 i ∈ ([7, 8, 0, 1, 2, 3, 4, 5, 6, 9] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 3, 4, 5, 6, 7, 10, 9, 8] : List Nat) → eligible anchors4 (chainOwner anchors4 i.val) i.val = true → chainOwner anchors4 i.val ∈ ([7, 8, 0, 1, 2, 3, 4, 5, 6, 9] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources4_1_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨8, 2, none⟩, 1⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨1, 2, none⟩, 3⟩, ⟨⟨2, 2, none⟩, 4⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨4, 2, none⟩, 6⟩, ⟨⟨5, 2, none⟩, 7⟩, ⟨⟨6, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨8, 0, some 3⟩, 11⟩, ⟨⟨2, 0, some 4⟩, 12⟩, ⟨⟨4, 0, some 5⟩, 13⟩, ⟨⟨5, 0, some 6⟩, 14⟩, ⟨⟨6, 0, some 7⟩, 15⟩, ⟨⟨9, 1, some 10⟩, 16⟩, ⟨⟨0, 1, some 9⟩, 17⟩, ⟨⟨8, 0, some 8⟩, 18⟩]
+def records4_1_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨19, false, 1⟩, ⟨11, true, 2⟩, ⟨12, true, 3⟩, ⟨13, false, 4⟩, ⟨14, true, 5⟩, ⟨15, false, 6⟩, ⟨16, false, 7⟩, ⟨17, false, 8⟩, ⟨20, false, 9⟩, ⟨1, true, 10⟩, ⟨18, true, 10⟩, ⟨3, true, 11⟩, ⟨19, true, 11⟩, ⟨13, true, 12⟩, ⟨5, true, 13⟩, ⟨15, true, 13⟩, ⟨16, true, 14⟩, ⟨7, true, 15⟩, ⟨17, true, 15⟩, ⟨10, true, 16⟩, ⟨20, true, 16⟩, ⟨11, false, 17⟩, ⟨8, true, 18⟩, ⟨19, true, 18⟩]
+theorem represented4_1_0 : ∀ i, i ∈ recordIds records4_1_0 ↔ i ∈ componentEventEvidence anchors4 [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] = [1, 3, 5, 7, 10, 8, 18, 19, 11, 12, 13, 14, 15, 16, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_1_0] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_1_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_1_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_1_0) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_1_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 3, 4, 5, 6, 7, 10, 9, 8] graph4.root [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] records4_1_0 [] covered4_1 (by decide) represented4_1_0 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_1_0) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 8, 0, 3, 4], some (4, 12, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_1_0) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_1_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_1_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_1_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 8, 0, 3, 4], some (4, 12, 9)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_1_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_1_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.unanchored (some 2) 1788566402000⟩, ⟨3, true, ReceiptCutoffView.unanchored (some 2) 1788566405000⟩, ⟨4, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
+def sources4_1_1 : List (AgentSourceReceipt Nat) := [⟨⟨8, 0, some 8⟩, 1018⟩, ⟨⟨0, 1, some 9⟩, 1017⟩, ⟨⟨9, 1, some 10⟩, 1016⟩, ⟨⟨6, 0, some 7⟩, 1015⟩, ⟨⟨5, 0, some 6⟩, 1014⟩, ⟨⟨4, 0, some 5⟩, 1013⟩, ⟨⟨2, 0, some 4⟩, 1012⟩, ⟨⟨8, 0, some 3⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨6, 2, none⟩, 1008⟩, ⟨⟨5, 2, none⟩, 1007⟩, ⟨⟨4, 2, none⟩, 1006⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨2, 2, none⟩, 1004⟩, ⟨⟨1, 2, none⟩, 1003⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨8, 2, none⟩, 1001⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
+def records4_1_1 : List (EventRecord Nat) := [⟨8, true, 1018⟩, ⟨19, true, 1018⟩, ⟨11, false, 1017⟩, ⟨10, true, 1016⟩, ⟨20, true, 1016⟩, ⟨7, true, 1015⟩, ⟨17, true, 1015⟩, ⟨16, true, 1014⟩, ⟨5, true, 1013⟩, ⟨15, true, 1013⟩, ⟨13, true, 1012⟩, ⟨3, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨18, true, 1010⟩, ⟨20, false, 1009⟩, ⟨17, false, 1008⟩, ⟨16, false, 1007⟩, ⟨15, false, 1006⟩, ⟨14, true, 1005⟩, ⟨13, false, 1004⟩, ⟨12, true, 1003⟩, ⟨11, true, 1002⟩, ⟨19, false, 1001⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
+theorem represented4_1_1 : ∀ i, i ∈ recordIds records4_1_1 ↔ i ∈ componentEventEvidence anchors4 [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] = [1, 3, 5, 7, 10, 8, 18, 19, 11, 12, 13, 14, 15, 16, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_1_1] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_1_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_1_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_1_1) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_1_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 3, 4, 5, 6, 7, 10, 9, 8] graph4.root [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] records4_1_1 [] covered4_1 (by decide) represented4_1_1 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_1_1) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 8, 0, 3, 4], some (4, 12, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_1_1) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_1_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_1_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_1_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 8, 0, 3, 4], some (4, 12, 9)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_1_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_1_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.unanchored (some 2) 1788566402000⟩, ⟨3, true, ReceiptCutoffView.unanchored (some 2) 1788566405000⟩, ⟨4, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees4_1_1 : SameAgentSources sources4_1_1 sources4_1_0 := by
+  exact same_sources_of_check sources4_1_1 sources4_1_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_1_1 sources4_1_0 source_agrees4_1_1
+def sources4_1_2 : List (AgentSourceReceipt Nat) := [⟨⟨8, 2, none⟩, 2001⟩, ⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨1, 2, none⟩, 2003⟩, ⟨⟨2, 2, none⟩, 2004⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨4, 2, none⟩, 2006⟩, ⟨⟨5, 2, none⟩, 2007⟩, ⟨⟨6, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨8, 0, some 3⟩, 2011⟩, ⟨⟨2, 0, some 4⟩, 2012⟩, ⟨⟨4, 0, some 5⟩, 2013⟩, ⟨⟨5, 0, some 6⟩, 2014⟩, ⟨⟨6, 0, some 7⟩, 2015⟩, ⟨⟨9, 1, some 10⟩, 2016⟩, ⟨⟨0, 1, some 9⟩, 2017⟩, ⟨⟨8, 0, some 8⟩, 2018⟩, ⟨⟨7, 2, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
+def records4_1_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨11, true, 2002⟩, ⟨12, true, 2003⟩, ⟨13, false, 2004⟩, ⟨14, true, 2005⟩, ⟨15, false, 2006⟩, ⟨16, false, 2007⟩, ⟨17, false, 2008⟩, ⟨20, false, 2009⟩, ⟨3, true, 2011⟩, ⟨19, true, 2011⟩, ⟨13, true, 2012⟩, ⟨5, true, 2013⟩, ⟨15, true, 2013⟩, ⟨16, true, 2014⟩, ⟨7, true, 2015⟩, ⟨17, true, 2015⟩, ⟨10, true, 2016⟩, ⟨20, true, 2016⟩, ⟨11, false, 2017⟩, ⟨8, true, 2018⟩, ⟨19, true, 2018⟩, ⟨18, false, 2000⟩, ⟨1, true, 2010⟩, ⟨18, true, 2010⟩]
+theorem represented4_1_2 : ∀ i, i ∈ recordIds records4_1_2 ↔ i ∈ componentEventEvidence anchors4 [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] = [1, 3, 5, 7, 10, 8, 18, 19, 11, 12, 13, 14, 15, 16, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_1_2] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_1_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_1_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_1_2) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_1_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 3, 4, 5, 6, 7, 10, 9, 8] graph4.root [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 3, 4, 5, 6, 7, 10, 9, 8] [7, 8, 0, 1, 2, 3, 4, 5, 6, 9] records4_1_2 [] covered4_1 (by decide) represented4_1_2 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_1_2) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 8, 0, 3, 4], some (4, 12, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_1_2) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_1_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_1_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_1_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 8, 0, 3, 4], some (4, 12, 9)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_1_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_1_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.unanchored (some 2) 1788566402000⟩, ⟨3, true, ReceiptCutoffView.unanchored (some 2) 1788566405000⟩, ⟨4, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees4_1_2 : SameAgentSources sources4_1_2 sources4_1_0 := by
+  exact same_sources_of_check sources4_1_2 sources4_1_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_1_2 sources4_1_0 source_agrees4_1_2
+theorem covered4_2 : ∀ i ∈ ([1, 3, 7, 10, 9, 8, 0] : List Nat), eligible anchors4 (chainOwner anchors4 i) i = true → chainOwner anchors4 i ∈ ([7, 8, 0, 3, 6, 9] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 3, 7, 10, 9, 8, 0] : List Nat) → eligible anchors4 (chainOwner anchors4 i.val) i.val = true → chainOwner anchors4 i.val ∈ ([7, 8, 0, 3, 6, 9] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources4_2_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨8, 2, none⟩, 1⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨6, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨8, 0, some 3⟩, 11⟩, ⟨⟨6, 0, some 7⟩, 15⟩, ⟨⟨9, 1, some 10⟩, 16⟩, ⟨⟨0, 1, some 9⟩, 17⟩, ⟨⟨8, 0, some 8⟩, 18⟩, ⟨⟨6, 0, some 0⟩, 19⟩]
+def records4_2_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨19, false, 1⟩, ⟨11, true, 2⟩, ⟨14, true, 5⟩, ⟨17, false, 8⟩, ⟨20, false, 9⟩, ⟨1, true, 10⟩, ⟨18, true, 10⟩, ⟨3, true, 11⟩, ⟨19, true, 11⟩, ⟨7, true, 15⟩, ⟨17, true, 15⟩, ⟨10, true, 16⟩, ⟨20, true, 16⟩, ⟨11, false, 17⟩, ⟨8, true, 18⟩, ⟨19, true, 18⟩, ⟨0, true, 19⟩, ⟨17, true, 19⟩]
+theorem represented4_2_0 : ∀ i, i ∈ recordIds records4_2_0 ↔ i ∈ componentEventEvidence anchors4 [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] = [1, 3, 7, 10, 8, 0, 18, 19, 11, 14, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_2_0] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_2_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_2_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_2_0) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_2_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 3, 7, 10, 9, 8, 0] graph4.root [7, 8, 0, 3, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] records4_2_0 [] covered4_2 (by decide) represented4_2_0 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_2_0) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_2_0) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_2_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_2_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_2_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_2_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_2_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+def sources4_2_1 : List (AgentSourceReceipt Nat) := [⟨⟨6, 0, some 0⟩, 1019⟩, ⟨⟨8, 0, some 8⟩, 1018⟩, ⟨⟨0, 1, some 9⟩, 1017⟩, ⟨⟨9, 1, some 10⟩, 1016⟩, ⟨⟨6, 0, some 7⟩, 1015⟩, ⟨⟨8, 0, some 3⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨6, 2, none⟩, 1008⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨8, 2, none⟩, 1001⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
+def records4_2_1 : List (EventRecord Nat) := [⟨0, true, 1019⟩, ⟨17, true, 1019⟩, ⟨8, true, 1018⟩, ⟨19, true, 1018⟩, ⟨11, false, 1017⟩, ⟨10, true, 1016⟩, ⟨20, true, 1016⟩, ⟨7, true, 1015⟩, ⟨17, true, 1015⟩, ⟨3, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨18, true, 1010⟩, ⟨20, false, 1009⟩, ⟨17, false, 1008⟩, ⟨14, true, 1005⟩, ⟨11, true, 1002⟩, ⟨19, false, 1001⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
+theorem represented4_2_1 : ∀ i, i ∈ recordIds records4_2_1 ↔ i ∈ componentEventEvidence anchors4 [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] = [1, 3, 7, 10, 8, 0, 18, 19, 11, 14, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_2_1] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_2_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_2_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_2_1) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_2_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 3, 7, 10, 9, 8, 0] graph4.root [7, 8, 0, 3, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] records4_2_1 [] covered4_2 (by decide) represented4_2_1 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_2_1) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_2_1) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_2_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_2_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_2_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_2_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_2_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees4_2_1 : SameAgentSources sources4_2_1 sources4_2_0 := by
+  exact same_sources_of_check sources4_2_1 sources4_2_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_2_1 sources4_2_0 source_agrees4_2_1
+def sources4_2_2 : List (AgentSourceReceipt Nat) := [⟨⟨8, 2, none⟩, 2001⟩, ⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨6, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨8, 0, some 3⟩, 2011⟩, ⟨⟨6, 0, some 7⟩, 2015⟩, ⟨⟨9, 1, some 10⟩, 2016⟩, ⟨⟨0, 1, some 9⟩, 2017⟩, ⟨⟨8, 0, some 8⟩, 2018⟩, ⟨⟨6, 0, some 0⟩, 2019⟩, ⟨⟨7, 2, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
+def records4_2_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨11, true, 2002⟩, ⟨14, true, 2005⟩, ⟨17, false, 2008⟩, ⟨20, false, 2009⟩, ⟨3, true, 2011⟩, ⟨19, true, 2011⟩, ⟨7, true, 2015⟩, ⟨17, true, 2015⟩, ⟨10, true, 2016⟩, ⟨20, true, 2016⟩, ⟨11, false, 2017⟩, ⟨8, true, 2018⟩, ⟨19, true, 2018⟩, ⟨0, true, 2019⟩, ⟨17, true, 2019⟩, ⟨18, false, 2000⟩, ⟨1, true, 2010⟩, ⟨18, true, 2010⟩]
+theorem represented4_2_2 : ∀ i, i ∈ recordIds records4_2_2 ↔ i ∈ componentEventEvidence anchors4 [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] = [1, 3, 7, 10, 8, 0, 18, 19, 11, 14, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_2_2] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_2_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_2_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_2_2) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_2_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 3, 7, 10, 9, 8, 0] graph4.root [7, 8, 0, 3, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 3, 7, 10, 9, 8, 0] [7, 8, 0, 3, 6, 9] records4_2_2 [] covered4_2 (by decide) represented4_2_2 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_2_2) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_2_2) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_2_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_2_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_2_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_2_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_2_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees4_2_2 : SameAgentSources sources4_2_2 sources4_2_0 := by
+  exact same_sources_of_check sources4_2_2 sources4_2_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_2_2 sources4_2_0 source_agrees4_2_2
+theorem covered4_3 : ∀ i ∈ ([1, 3, 7, 10, 9, 8, 2] : List Nat), eligible anchors4 (chainOwner anchors4 i) i = true → chainOwner anchors4 i ∈ ([7, 8, 0, 3, 6, 9] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 3, 7, 10, 9, 8, 2] : List Nat) → eligible anchors4 (chainOwner anchors4 i.val) i.val = true → chainOwner anchors4 i.val ∈ ([7, 8, 0, 3, 6, 9] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources4_3_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨8, 2, none⟩, 1⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨6, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨8, 0, some 3⟩, 11⟩, ⟨⟨6, 0, some 7⟩, 15⟩, ⟨⟨9, 1, some 10⟩, 16⟩, ⟨⟨0, 1, some 9⟩, 17⟩, ⟨⟨8, 0, some 8⟩, 18⟩, ⟨⟨6, 0, some 2⟩, 20⟩]
+def records4_3_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨19, false, 1⟩, ⟨11, true, 2⟩, ⟨14, true, 5⟩, ⟨17, false, 8⟩, ⟨20, false, 9⟩, ⟨1, true, 10⟩, ⟨18, true, 10⟩, ⟨3, true, 11⟩, ⟨19, true, 11⟩, ⟨7, true, 15⟩, ⟨17, true, 15⟩, ⟨10, true, 16⟩, ⟨20, true, 16⟩, ⟨11, false, 17⟩, ⟨8, true, 18⟩, ⟨19, true, 18⟩, ⟨2, true, 20⟩, ⟨17, true, 20⟩]
+theorem represented4_3_0 : ∀ i, i ∈ recordIds records4_3_0 ↔ i ∈ componentEventEvidence anchors4 [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] = [1, 3, 7, 10, 8, 2, 18, 19, 11, 14, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_3_0] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_3_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_3_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_3_0) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_3_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 3, 7, 10, 9, 8, 2] graph4.root [7, 8, 0, 3, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] records4_3_0 [] covered4_3 (by decide) represented4_3_0 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_3_0) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_3_0) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_3_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_3_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_3_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_3_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_3_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+def sources4_3_1 : List (AgentSourceReceipt Nat) := [⟨⟨6, 0, some 2⟩, 1020⟩, ⟨⟨8, 0, some 8⟩, 1018⟩, ⟨⟨0, 1, some 9⟩, 1017⟩, ⟨⟨9, 1, some 10⟩, 1016⟩, ⟨⟨6, 0, some 7⟩, 1015⟩, ⟨⟨8, 0, some 3⟩, 1011⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨6, 2, none⟩, 1008⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨8, 2, none⟩, 1001⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
+def records4_3_1 : List (EventRecord Nat) := [⟨2, true, 1020⟩, ⟨17, true, 1020⟩, ⟨8, true, 1018⟩, ⟨19, true, 1018⟩, ⟨11, false, 1017⟩, ⟨10, true, 1016⟩, ⟨20, true, 1016⟩, ⟨7, true, 1015⟩, ⟨17, true, 1015⟩, ⟨3, true, 1011⟩, ⟨19, true, 1011⟩, ⟨1, true, 1010⟩, ⟨18, true, 1010⟩, ⟨20, false, 1009⟩, ⟨17, false, 1008⟩, ⟨14, true, 1005⟩, ⟨11, true, 1002⟩, ⟨19, false, 1001⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
+theorem represented4_3_1 : ∀ i, i ∈ recordIds records4_3_1 ↔ i ∈ componentEventEvidence anchors4 [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] = [1, 3, 7, 10, 8, 2, 18, 19, 11, 14, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_3_1] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_3_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_3_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_3_1) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_3_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 3, 7, 10, 9, 8, 2] graph4.root [7, 8, 0, 3, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] records4_3_1 [] covered4_3 (by decide) represented4_3_1 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_3_1) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_3_1) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_3_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_3_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_3_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_3_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_3_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees4_3_1 : SameAgentSources sources4_3_1 sources4_3_0 := by
+  exact same_sources_of_check sources4_3_1 sources4_3_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_3_1 sources4_3_0 source_agrees4_3_1
+def sources4_3_2 : List (AgentSourceReceipt Nat) := [⟨⟨8, 2, none⟩, 2001⟩, ⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨6, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨8, 0, some 3⟩, 2011⟩, ⟨⟨6, 0, some 7⟩, 2015⟩, ⟨⟨9, 1, some 10⟩, 2016⟩, ⟨⟨0, 1, some 9⟩, 2017⟩, ⟨⟨8, 0, some 8⟩, 2018⟩, ⟨⟨6, 0, some 2⟩, 2020⟩, ⟨⟨7, 2, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
+def records4_3_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨11, true, 2002⟩, ⟨14, true, 2005⟩, ⟨17, false, 2008⟩, ⟨20, false, 2009⟩, ⟨3, true, 2011⟩, ⟨19, true, 2011⟩, ⟨7, true, 2015⟩, ⟨17, true, 2015⟩, ⟨10, true, 2016⟩, ⟨20, true, 2016⟩, ⟨11, false, 2017⟩, ⟨8, true, 2018⟩, ⟨19, true, 2018⟩, ⟨2, true, 2020⟩, ⟨17, true, 2020⟩, ⟨18, false, 2000⟩, ⟨1, true, 2010⟩, ⟨18, true, 2010⟩]
+theorem represented4_3_2 : ∀ i, i ∈ recordIds records4_3_2 ↔ i ∈ componentEventEvidence anchors4 [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] = [1, 3, 7, 10, 8, 2, 18, 19, 11, 14, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_3_2] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_3_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_3_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_3_2) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_3_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 3, 7, 10, 9, 8, 2] graph4.root [7, 8, 0, 3, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 3, 7, 10, 9, 8, 2] [7, 8, 0, 3, 6, 9] records4_3_2 [] covered4_3 (by decide) represented4_3_2 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_3_2) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_3_2) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_3_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_3_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_3_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_3_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_3_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨9, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees4_3_2 : SameAgentSources sources4_3_2 sources4_3_0 := by
+  exact same_sources_of_check sources4_3_2 sources4_3_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_3_2 sources4_3_0 source_agrees4_3_2
+theorem covered4_4 : ∀ i ∈ ([] : List Nat), eligible anchors4 (chainOwner anchors4 i) i = true → chainOwner anchors4 i ∈ ([7, 8, 0, 3, 6, 9] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([] : List Nat) → eligible anchors4 (chainOwner anchors4 i.val) i.val = true → chainOwner anchors4 i.val ∈ ([7, 8, 0, 3, 6, 9] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources4_4_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨8, 2, none⟩, 1⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨6, 2, none⟩, 8⟩, ⟨⟨9, 2, none⟩, 9⟩]
+def records4_4_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨19, false, 1⟩, ⟨11, true, 2⟩, ⟨14, true, 5⟩, ⟨17, false, 8⟩, ⟨20, false, 9⟩]
+theorem represented4_4_0 : ∀ i, i ∈ recordIds records4_4_0 ↔ i ∈ componentEventEvidence anchors4 [] [7, 8, 0, 3, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [] [7, 8, 0, 3, 6, 9] = [18, 19, 11, 14, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_4_0] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_4_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_4_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_4_0) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_4_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [] graph4.root [7, 8, 0, 3, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [] [7, 8, 0, 3, 6, 9] records4_4_0 [] covered4_4 (by decide) represented4_4_0 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_4_0) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_4_0) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_4_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_4_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_4_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_4_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_4_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, false, ReceiptCutoffView.unconfirmed⟩] := by decide
+def sources4_4_1 : List (AgentSourceReceipt Nat) := [⟨⟨9, 2, none⟩, 1009⟩, ⟨⟨6, 2, none⟩, 1008⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨8, 2, none⟩, 1001⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
+def records4_4_1 : List (EventRecord Nat) := [⟨20, false, 1009⟩, ⟨17, false, 1008⟩, ⟨14, true, 1005⟩, ⟨11, true, 1002⟩, ⟨19, false, 1001⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
+theorem represented4_4_1 : ∀ i, i ∈ recordIds records4_4_1 ↔ i ∈ componentEventEvidence anchors4 [] [7, 8, 0, 3, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [] [7, 8, 0, 3, 6, 9] = [18, 19, 11, 14, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_4_1] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_4_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_4_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_4_1) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_4_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [] graph4.root [7, 8, 0, 3, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [] [7, 8, 0, 3, 6, 9] records4_4_1 [] covered4_4 (by decide) represented4_4_1 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_4_1) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_4_1) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_4_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_4_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_4_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_4_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_4_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, false, ReceiptCutoffView.unconfirmed⟩] := by decide
+theorem source_agrees4_4_1 : SameAgentSources sources4_4_1 sources4_4_0 := by
+  exact same_sources_of_check sources4_4_1 sources4_4_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_4_1 sources4_4_0 source_agrees4_4_1
+def sources4_4_2 : List (AgentSourceReceipt Nat) := [⟨⟨8, 2, none⟩, 2001⟩, ⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨6, 2, none⟩, 2008⟩, ⟨⟨9, 2, none⟩, 2009⟩, ⟨⟨7, 2, none⟩, 2000⟩]
+def records4_4_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨11, true, 2002⟩, ⟨14, true, 2005⟩, ⟨17, false, 2008⟩, ⟨20, false, 2009⟩, ⟨18, false, 2000⟩]
+theorem represented4_4_2 : ∀ i, i ∈ recordIds records4_4_2 ↔ i ∈ componentEventEvidence anchors4 [] [7, 8, 0, 3, 6, 9] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [] [7, 8, 0, 3, 6, 9] = [18, 19, 11, 14, 17, 20] := by decide
+  rw [normalized]
+  simp [recordIds, records4_4_2] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_4_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_4_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_4_2) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_4_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [] graph4.root [7, 8, 0, 3, 6, 9] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [] [7, 8, 0, 3, 6, 9] records4_4_2 [] covered4_4 (by decide) represented4_4_2 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_4_2) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_4_2) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_4_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_4_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_4_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 6, 9], some (3, 1, 10)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_4_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_4_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, false, ReceiptCutoffView.unconfirmed⟩] := by decide
+theorem source_agrees4_4_2 : SameAgentSources sources4_4_2 sources4_4_0 := by
+  exact same_sources_of_check sources4_4_2 sources4_4_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_4_2 sources4_4_0 source_agrees4_4_2
+theorem covered4_5 : ∀ i ∈ ([1, 9] : List Nat), eligible anchors4 (chainOwner anchors4 i) i = true → chainOwner anchors4 i ∈ ([7, 8, 0, 3] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 9] : List Nat) → eligible anchors4 (chainOwner anchors4 i.val) i.val = true → chainOwner anchors4 i.val ∈ ([7, 8, 0, 3] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources4_5_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨8, 2, none⟩, 1⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨0, 1, some 9⟩, 17⟩]
+def records4_5_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨19, false, 1⟩, ⟨11, true, 2⟩, ⟨14, true, 5⟩, ⟨1, true, 10⟩, ⟨18, true, 10⟩, ⟨11, false, 17⟩]
+theorem represented4_5_0 : ∀ i, i ∈ recordIds records4_5_0 ↔ i ∈ componentEventEvidence anchors4 [1, 9] [7, 8, 0, 3] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 9] [7, 8, 0, 3] = [1, 18, 19, 11, 14] := by decide
+  rw [normalized]
+  simp [recordIds, records4_5_0] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_5_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_5_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_5_0) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_5_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 9] graph4.root [7, 8, 0, 3] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 9] [7, 8, 0, 3] records4_5_0 [] covered4_5 (by decide) represented4_5_0 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_5_0) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_5_0) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_5_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_5_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_5_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_5_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_5_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+def sources4_5_1 : List (AgentSourceReceipt Nat) := [⟨⟨0, 1, some 9⟩, 1017⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨8, 2, none⟩, 1001⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
+def records4_5_1 : List (EventRecord Nat) := [⟨11, false, 1017⟩, ⟨1, true, 1010⟩, ⟨18, true, 1010⟩, ⟨14, true, 1005⟩, ⟨11, true, 1002⟩, ⟨19, false, 1001⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
+theorem represented4_5_1 : ∀ i, i ∈ recordIds records4_5_1 ↔ i ∈ componentEventEvidence anchors4 [1, 9] [7, 8, 0, 3] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 9] [7, 8, 0, 3] = [1, 18, 19, 11, 14] := by decide
+  rw [normalized]
+  simp [recordIds, records4_5_1] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_5_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_5_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_5_1) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_5_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 9] graph4.root [7, 8, 0, 3] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 9] [7, 8, 0, 3] records4_5_1 [] covered4_5 (by decide) represented4_5_1 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_5_1) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_5_1) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_5_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_5_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_5_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_5_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_5_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees4_5_1 : SameAgentSources sources4_5_1 sources4_5_0 := by
+  exact same_sources_of_check sources4_5_1 sources4_5_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_5_1 sources4_5_0 source_agrees4_5_1
+def sources4_5_2 : List (AgentSourceReceipt Nat) := [⟨⟨8, 2, none⟩, 2001⟩, ⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨0, 1, some 9⟩, 2017⟩, ⟨⟨7, 2, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
+def records4_5_2 : List (EventRecord Nat) := [⟨19, false, 2001⟩, ⟨11, true, 2002⟩, ⟨14, true, 2005⟩, ⟨11, false, 2017⟩, ⟨18, false, 2000⟩, ⟨1, true, 2010⟩, ⟨18, true, 2010⟩]
+theorem represented4_5_2 : ∀ i, i ∈ recordIds records4_5_2 ↔ i ∈ componentEventEvidence anchors4 [1, 9] [7, 8, 0, 3] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 9] [7, 8, 0, 3] = [1, 18, 19, 11, 14] := by decide
+  rw [normalized]
+  simp [recordIds, records4_5_2] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_5_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_5_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_5_2) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_5_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 9] graph4.root [7, 8, 0, 3] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 9] [7, 8, 0, 3] records4_5_2 [] covered4_5 (by decide) represented4_5_2 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_5_2) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_5_2) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_5_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_5_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_5_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7, 8, 0, 3], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_5_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_5_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees4_5_2 : SameAgentSources sources4_5_2 sources4_5_0 := by
+  exact same_sources_of_check sources4_5_2 sources4_5_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_5_2 sources4_5_0 source_agrees4_5_2
+theorem covered4_6 : ∀ i ∈ ([1, 4, 5, 6, 9] : List Nat), eligible anchors4 (chainOwner anchors4 i) i = true → chainOwner anchors4 i ∈ ([7, 0, 1, 2, 3, 4, 5] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 4, 5, 6, 9] : List Nat) → eligible anchors4 (chainOwner anchors4 i.val) i.val = true → chainOwner anchors4 i.val ∈ ([7, 0, 1, 2, 3, 4, 5] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources4_6_0 : List (AgentSourceReceipt Nat) := [⟨⟨7, 2, none⟩, 0⟩, ⟨⟨0, 2, none⟩, 2⟩, ⟨⟨1, 2, none⟩, 3⟩, ⟨⟨2, 2, none⟩, 4⟩, ⟨⟨3, 2, none⟩, 5⟩, ⟨⟨4, 2, none⟩, 6⟩, ⟨⟨5, 2, none⟩, 7⟩, ⟨⟨7, 0, some 1⟩, 10⟩, ⟨⟨2, 0, some 4⟩, 12⟩, ⟨⟨4, 0, some 5⟩, 13⟩, ⟨⟨5, 0, some 6⟩, 14⟩, ⟨⟨0, 1, some 9⟩, 17⟩]
+def records4_6_0 : List (EventRecord Nat) := [⟨18, false, 0⟩, ⟨11, true, 2⟩, ⟨12, true, 3⟩, ⟨13, false, 4⟩, ⟨14, true, 5⟩, ⟨15, false, 6⟩, ⟨16, false, 7⟩, ⟨1, true, 10⟩, ⟨18, true, 10⟩, ⟨13, true, 12⟩, ⟨5, true, 13⟩, ⟨15, true, 13⟩, ⟨16, true, 14⟩, ⟨11, false, 17⟩]
+theorem represented4_6_0 : ∀ i, i ∈ recordIds records4_6_0 ↔ i ∈ componentEventEvidence anchors4 [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] = [1, 5, 18, 11, 12, 13, 14, 15, 16] := by decide
+  rw [normalized]
+  simp [recordIds, records4_6_0] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_6_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_6_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_6_0) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_6_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 4, 5, 6, 9] graph4.root [7, 0, 1, 2, 3, 4, 5] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] records4_6_0 [] covered4_6 (by decide) represented4_6_0 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_6_0) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7], some (0, 12, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_6_0) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_6_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_6_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_6_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7], some (0, 12, 9)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_6_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_6_0) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+def sources4_6_1 : List (AgentSourceReceipt Nat) := [⟨⟨0, 1, some 9⟩, 1017⟩, ⟨⟨5, 0, some 6⟩, 1014⟩, ⟨⟨4, 0, some 5⟩, 1013⟩, ⟨⟨2, 0, some 4⟩, 1012⟩, ⟨⟨7, 0, some 1⟩, 1010⟩, ⟨⟨5, 2, none⟩, 1007⟩, ⟨⟨4, 2, none⟩, 1006⟩, ⟨⟨3, 2, none⟩, 1005⟩, ⟨⟨2, 2, none⟩, 1004⟩, ⟨⟨1, 2, none⟩, 1003⟩, ⟨⟨0, 2, none⟩, 1002⟩, ⟨⟨7, 2, none⟩, 1000⟩, ⟨⟨7, 2, none⟩, 1000⟩]
+def records4_6_1 : List (EventRecord Nat) := [⟨11, false, 1017⟩, ⟨16, true, 1014⟩, ⟨5, true, 1013⟩, ⟨15, true, 1013⟩, ⟨13, true, 1012⟩, ⟨1, true, 1010⟩, ⟨18, true, 1010⟩, ⟨16, false, 1007⟩, ⟨15, false, 1006⟩, ⟨14, true, 1005⟩, ⟨13, false, 1004⟩, ⟨12, true, 1003⟩, ⟨11, true, 1002⟩, ⟨18, false, 1000⟩, ⟨18, false, 1000⟩]
+theorem represented4_6_1 : ∀ i, i ∈ recordIds records4_6_1 ↔ i ∈ componentEventEvidence anchors4 [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] = [1, 5, 18, 11, 12, 13, 14, 15, 16] := by decide
+  rw [normalized]
+  simp [recordIds, records4_6_1] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_6_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_6_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_6_1) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_6_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 4, 5, 6, 9] graph4.root [7, 0, 1, 2, 3, 4, 5] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] records4_6_1 [] covered4_6 (by decide) represented4_6_1 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_6_1) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7], some (0, 12, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_6_1) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_6_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_6_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_6_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7], some (0, 12, 9)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_6_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_6_1) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees4_6_1 : SameAgentSources sources4_6_1 sources4_6_0 := by
+  exact same_sources_of_check sources4_6_1 sources4_6_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_6_1 sources4_6_0 source_agrees4_6_1
+def sources4_6_2 : List (AgentSourceReceipt Nat) := [⟨⟨0, 2, none⟩, 2002⟩, ⟨⟨1, 2, none⟩, 2003⟩, ⟨⟨2, 2, none⟩, 2004⟩, ⟨⟨3, 2, none⟩, 2005⟩, ⟨⟨4, 2, none⟩, 2006⟩, ⟨⟨5, 2, none⟩, 2007⟩, ⟨⟨2, 0, some 4⟩, 2012⟩, ⟨⟨4, 0, some 5⟩, 2013⟩, ⟨⟨5, 0, some 6⟩, 2014⟩, ⟨⟨0, 1, some 9⟩, 2017⟩, ⟨⟨7, 2, none⟩, 2000⟩, ⟨⟨7, 0, some 1⟩, 2010⟩]
+def records4_6_2 : List (EventRecord Nat) := [⟨11, true, 2002⟩, ⟨12, true, 2003⟩, ⟨13, false, 2004⟩, ⟨14, true, 2005⟩, ⟨15, false, 2006⟩, ⟨16, false, 2007⟩, ⟨13, true, 2012⟩, ⟨5, true, 2013⟩, ⟨15, true, 2013⟩, ⟨16, true, 2014⟩, ⟨11, false, 2017⟩, ⟨18, false, 2000⟩, ⟨1, true, 2010⟩, ⟨18, true, 2010⟩]
+theorem represented4_6_2 : ∀ i, i ∈ recordIds records4_6_2 ↔ i ∈ componentEventEvidence anchors4 [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] := by
+  intro i
+  have normalized : componentEventEvidence anchors4 [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] = [1, 5, 18, 11, 12, 13, 14, 15, 16] := by decide
+  rw [normalized]
+  simp [recordIds, records4_6_2] <;> omega
+example : (normalizeAgentSources anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) sources4_6_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records4_6_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_6_2) (model4.level graph4.root + 2) [] = some result ∧
+    rankedPass model4 (chainOwner anchors4) graph4.root records4_6_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph4)) anchors4 [1, 4, 5, 6, 9] graph4.root [7, 0, 1, 2, 3, 4, 5] = some (graph4.root :: (recordIds result).map (chainOwner anchors4)) ∧
+    runComponents (decodedComponentGraph graph4 documents4 methods4) patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors4)) = some final :=
+  component_full_replay graph4 documents4 methods4 methods_agree4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 (by decide) (by decide) [1, 4, 5, 6, 9] [7, 0, 1, 2, 3, 4, 5] records4_6_2 [] covered4_6 (by decide) represented4_6_2 (.nil _)
+example : (stopWhenStable (rankedPass model4 (chainOwner anchors4) graph4.root records4_6_2) (model4.level graph4.root + 2) []).map (fun records => (graph4.root :: (recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors4))).map (componentResult documents4 4))) = some ([7], some (0, 12, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_6_2) ((coldComponentEvents graph4 anchors4).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_6_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors4)).head? = some graph4.root ∧
+    runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors4)).drop 1) = some final :=
+  component_cold_full_replay graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) records4_6_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_6_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors4), (runComponents graph4 patch4 12 ⟨.active graph4.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors4)).drop 1)).map (componentResult documents4 4))) = some ([7], some (0, 12, 9)) := by decide
+example := integrated_agent_execution graph4 patch4 registry4 9 12 12 receipts4 ordered4 bounded4 parents4 (by decide) (by decide) sources4_6_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph4 anchors4) (chainOwner anchors4) graph4.size records4_6_2) ((coldComponentEvents graph4 anchors4).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors4 (expectedRegistry (componentRegistry graph4 patch4 registry4 9)) operationTime4 chainFacts4))) = some [⟨7, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees4_6_2 : SameAgentSources sources4_6_2 sources4_6_0 := by
+  exact same_sources_of_check sources4_6_2 sources4_6_0 (by decide)
+example := integrated_agent_convergence graph4 patch4 registry4 9 12 12 receipts4 operationTime4 chainFacts4 ordered4 bounded4 sources4_6_2 sources4_6_0 source_agrees4_6_2
+def atoms5 : Nat → String := (fun i => ["{\"@context\":[\"https://www.w3.org/ns/did/v1\"],\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-1\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"q10uec_WIbGwJ_-yTiRT7X-1cbqahB_w4kc0Zsq9Fo0\",\"y\":\"JA0RA4YNSQHalTzHAh1NYvP5VpGsfNQ0y_n8nouNhx0\"}}],\"authentication\":[\"#key-1\"],\"assertionMethod\":[\"#key-1\"],\"capabilityInvocation\":[\"#key-1\"]}", "{\"fork\":true}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-2\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"a36wTgevB7XYLkY2YPnj5Or5yFTlqkc5HW2qjprAGjU\",\"y\":\"k15MQ6A4qqzEw-7g3eQmi-0zx_sxiGllOXTuHoRQzOs\"}}],\"service\":[{\"id\":\"#profile\",\"type\":\"Profile\",\"serviceEndpoint\":\"https://example.org/1\"}]}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"verificationMethod\":[{\"id\":\"#key-3\",\"controller\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\",\"type\":\"EcdsaSecp256k1VerificationKey2019\",\"publicKeyJwk\":{\"kty\":\"EC\",\"crv\":\"secp256k1\",\"x\":\"3vJOFJY5JTcjyYds8AeKBWfyHMMtDJRUyGOTCybxH60\",\"y\":\"oPATA16FwplsMqoR-kakNuIUiQ7quN8BTP2dngDFqME\"}}],\"service\":[{\"id\":\"#profile\",\"type\":\"Profile\",\"serviceEndpoint\":\"https://example.org/2\"}]}", "{\"id\":\"did:cid:bagaaieraqprnezzyyi7alqugudk437xnutep7vjidviywujxwyh2wknuyj4q\"}", "{\"invalid\":\"deleted-parent\"}", "{\"invalid\":\"retired-key\"}", "{\"retained\":false}", "{\"retained\":true,\"removed\":true}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"BTC:signet\"}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"ETH:sepolia\"}", "{\"version\":1,\"type\":\"agent\",\"registry\":\"pin\"}", "{}"].getD i (""))
+def methods5 : Nat → List VerificationMethod := (fun i => [[⟨0, 0⟩], [], [⟨1, 1⟩], [⟨2, 2⟩], [], [], [], [], [], [], [], [], []].getD i ([]))
+def documents5 : Nat → Nat := (fun i => [2, 12, 3, 2, 12, 3, 0, 12, 12, 12].getD i (12))
+def graph5 : DocumentGraph := {
+  size := 10
+  root := 6
+  initialDocument := 6
+  parent := (fun i => [some 6, some 0, some 1, some 6, some 0, some 6, none, some 9, some 5, some 2].getD i (none))
+  depth := (fun i => [1, 2, 3, 1, 2, 1, 0, 5, 2, 4].getD i (0))
+  action := (fun i => [AgentAction.rotate 0, AgentAction.keep, AgentAction.rotate 2, AgentAction.rotate 3, AgentAction.keep, AgentAction.rotate 5, AgentAction.keep, AgentAction.keep, AgentAction.keep, AgentAction.deactivate].getD i (AgentAction.keep))
+  documents := (fun i => [[⟨1, 1⟩], [], [⟨2, 2⟩], [⟨1, 1⟩], [], [⟨2, 2⟩], [⟨0, 0⟩], [], [], []].getD i ([]))
+  named := (fun i => [0, 1, 1, 1, 0, 0, 0, 2, 2, 2].getD i (0))
+  signatureValid := fun i k => ((fun i => [[true, false, false], [false, true, false], [false, true, false], [false, true, false], [true, false, false], [true, false, false], [true, false, false], [false, false, true], [false, false, true], [false, false, true]].getD i ([]))) i |>.getD k false
+}
+theorem methods_agree5 : ∀ i, methods5 (documents5 i) = graph5.documents i := by
+  intro i
+  cases i with
+  | zero => rfl
+  | succ i =>
+    cases i with
+    | zero => rfl
+    | succ i =>
+      cases i with
+      | zero => rfl
+      | succ i =>
+        cases i with
+        | zero => rfl
+        | succ i =>
+          cases i with
+          | zero => rfl
+          | succ i =>
+            cases i with
+            | zero => rfl
+            | succ i =>
+              cases i with
+              | zero => rfl
+              | succ i =>
+                cases i with
+                | zero => rfl
+                | succ i =>
+                  cases i with
+                  | zero => rfl
+                  | succ i =>
+                    cases i with
+                    | zero => rfl
+                    | succ i =>
+                      rfl
+theorem ordered5 : AncestryOrdered (documentAgent graph5) := by
+  intro i p parent
+  by_cases bound : i < 10
+  · have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 ∨ i = 8 ∨ i = 9 := by omega
+    rcases cases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> simp [documentAgent, graph5] at parent
+    all_goals subst p; decide
+  · have outside : 10 ≤ i := by omega
+    simp only [documentAgent, graph5] at parent
+    rw [List.getD_eq_getElem?_getD, List.getElem?_eq_none (by simpa using outside)] at parent
+    simp at parent
+theorem bounded5 : DepthBounded (documentAgent graph5) := by
+  intro i bound
+  have small : i < 10 := bound
+  have checked : ∀ i : Fin 10, (documentAgent graph5).depth i.val < (documentAgent graph5).size := by decide
+  exact checked ⟨i, small⟩
+theorem parents5 : AgentParentBounded graph5 := by
+  intro i p bound parent
+  have small : i < 10 := bound
+  have cases : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 ∨ i = 5 ∨ i = 6 ∨ i = 7 ∨ i = 8 ∨ i = 9 := by omega
+  rcases cases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> simp [graph5] at parent
+  all_goals subst p; decide
+def patch5 : Nat → ComponentPatch Nat Nat := (fun i => [⟨some 8, some 11⟩, ⟨some 7, none⟩, ⟨none, some 9⟩, ⟨none, some 11⟩, ⟨some 6, none⟩, ⟨none, some 10⟩, ⟨none, none⟩, ⟨some 5, none⟩, ⟨some 1, none⟩, ⟨none, none⟩].getD i (⟨none, none⟩))
+def registry5 : Nat → Nat := (fun i => [4, 4, 4, 4, 4, 4, 4, 4, 4, 0, 1, 3, 4].getD i (4))
+def receipts5 : RegistryReceipts := {
+  size := 11
+  owner := (fun i => [5, 6, 0, 5, 3, 9, 7, 5, 0, 1, 8].getD i (10))
+  registry := (fun i => [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1].getD i (4))
+  chain := (fun i => [true, true, false, false].getD i (false))
+  accepted := fun _ => true
+}
+abbrev anchors5 := componentAnchors graph5 patch5 registry5 9 receipts5
+abbrev model5 := componentEvents graph5 anchors5
+def positions5 : Nat → List Nat := (fun i => [[100, 2, 0], [100, 10, 0], [100, 11, 0], [100, 11, 0], [100, 14, 0], [100, 16, 0], [100, 17, 0], [100, 18, 0], [101, 1, 0], [100, 1, 0], [100, 19, 0]].getD i ([]))
+theorem ranks5 : RegistryCidRanks (componentRegistry graph5 patch5 registry5 9) receipts5 positions5 := by
+  intro x y xv yv same
+  have xb : x < 11 := eligible_lt _ _ _ xv
+  have yb : y < 11 := eligible_lt _ _ _ yv
+  have checked : ∀ x y : Fin 11,
+      eligible (registryAnchors (componentRegistry graph5 patch5 registry5 9) receipts5) (receipts5.owner x.val) x.val = true →
+      eligible (registryAnchors (componentRegistry graph5 patch5 registry5 9) receipts5) (receipts5.owner y.val) y.val = true →
+      receipts5.registry x.val = receipts5.registry y.val →
+      (x.val < y.val ↔ compare (positions5 x.val) (positions5 y.val) = .lt ∨
+        (compare (positions5 x.val) (positions5 y.val) = .eq ∧ receipts5.owner x.val < receipts5.owner y.val)) := by decide
+  exact checked ⟨x, xb⟩ ⟨y, yb⟩ xv yv same
+def operationTime5 : Nat → Int := (fun i => [1788566401000, 1788566402000, 1788566405000, 1788566404000, 1788566403000, 1788566408000, 1788566400000, 1788566407000, 1788566409000, 1788566406000].getD i (0))
+def chainFacts5 : Nat → ChainReceiptView := (fun i => [⟨0, [100, 2, 0], 1788566460000, true⟩, ⟨0, [100, 10, 0], 1788566460000, true⟩, ⟨0, [100, 11, 0], 1788566460000, true⟩, ⟨0, [100, 11, 0], 1788566460000, true⟩, ⟨0, [100, 14, 0], 1788566460000, true⟩, ⟨0, [100, 16, 0], 1788566460000, true⟩, ⟨0, [100, 17, 0], 1788566460000, true⟩, ⟨0, [100, 18, 0], 1788566460000, true⟩, ⟨0, [101, 1, 0], 1788566520000, true⟩, ⟨1, [100, 1, 0], 1788566460000, true⟩, ⟨1, [100, 19, 0], 1788566460000, true⟩].getD i (⟨0, [], 0, false⟩))
+theorem covered5_0 : ∀ i ∈ ([1, 2, 4, 7, 10, 9, 8] : List Nat), eligible anchors5 (chainOwner anchors5 i) i = true → chainOwner anchors5 i ∈ ([6, 0, 1, 4, 3, 2, 5, 8] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 2, 4, 7, 10, 9, 8] : List Nat) → eligible anchors5 (chainOwner anchors5 i.val) i.val = true → chainOwner anchors5 i.val ∈ ([6, 0, 1, 4, 3, 2, 5, 8] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources5_0_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨0, 2, none⟩, 1⟩, ⟨⟨1, 2, none⟩, 2⟩, ⟨⟨4, 2, none⟩, 3⟩, ⟨⟨3, 2, none⟩, 4⟩, ⟨⟨2, 2, none⟩, 5⟩, ⟨⟨5, 2, none⟩, 8⟩, ⟨⟨8, 2, none⟩, 9⟩, ⟨⟨6, 0, some 1⟩, 10⟩, ⟨⟨0, 0, some 2⟩, 11⟩, ⟨⟨1, 3, none⟩, 12⟩, ⟨⟨1, 3, none⟩, 13⟩, ⟨⟨4, 3, none⟩, 14⟩, ⟨⟨4, 3, none⟩, 15⟩, ⟨⟨3, 0, some 4⟩, 16⟩, ⟨⟨2, 3, none⟩, 17⟩, ⟨⟨2, 3, none⟩, 18⟩, ⟨⟨5, 0, some 7⟩, 21⟩, ⟨⟨8, 1, some 10⟩, 22⟩, ⟨⟨1, 1, some 9⟩, 23⟩, ⟨⟨0, 0, some 8⟩, 24⟩]
+def records5_0_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨11, false, 1⟩, ⟨12, false, 2⟩, ⟨15, false, 3⟩, ⟨14, false, 4⟩, ⟨13, false, 5⟩, ⟨16, false, 8⟩, ⟨19, false, 9⟩, ⟨1, true, 10⟩, ⟨17, true, 10⟩, ⟨2, true, 11⟩, ⟨11, true, 11⟩, ⟨12, true, 12⟩, ⟨12, true, 13⟩, ⟨15, true, 14⟩, ⟨15, true, 15⟩, ⟨14, true, 16⟩, ⟨13, true, 17⟩, ⟨13, true, 18⟩, ⟨7, true, 21⟩, ⟨16, true, 21⟩, ⟨10, true, 22⟩, ⟨19, true, 22⟩, ⟨12, false, 23⟩, ⟨8, true, 24⟩, ⟨11, true, 24⟩]
+theorem represented5_0_0 : ∀ i, i ∈ recordIds records5_0_0 ↔ i ∈ componentEventEvidence anchors5 [1, 2, 4, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 2, 4, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 5, 8] = [1, 2, 7, 10, 8, 17, 11, 12, 15, 14, 13, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_0_0] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_0_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_0_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_0_0) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_0_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 2, 4, 7, 10, 9, 8] graph5.root [6, 0, 1, 4, 3, 2, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 2, 4, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 5, 8] records5_0_0 [] covered5_0 (by decide) represented5_0_0 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_0_0) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_0_0) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_0_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_0_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_0_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_0_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_0_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨1, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨2, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩] := by decide
+def sources5_0_1 : List (AgentSourceReceipt Nat) := [⟨⟨0, 0, some 8⟩, 1024⟩, ⟨⟨1, 1, some 9⟩, 1023⟩, ⟨⟨8, 1, some 10⟩, 1022⟩, ⟨⟨5, 0, some 7⟩, 1021⟩, ⟨⟨2, 3, none⟩, 1018⟩, ⟨⟨2, 3, none⟩, 1017⟩, ⟨⟨3, 0, some 4⟩, 1016⟩, ⟨⟨4, 3, none⟩, 1015⟩, ⟨⟨4, 3, none⟩, 1014⟩, ⟨⟨1, 3, none⟩, 1013⟩, ⟨⟨1, 3, none⟩, 1012⟩, ⟨⟨0, 0, some 2⟩, 1011⟩, ⟨⟨6, 0, some 1⟩, 1010⟩, ⟨⟨8, 2, none⟩, 1009⟩, ⟨⟨5, 2, none⟩, 1008⟩, ⟨⟨2, 2, none⟩, 1005⟩, ⟨⟨3, 2, none⟩, 1004⟩, ⟨⟨4, 2, none⟩, 1003⟩, ⟨⟨1, 2, none⟩, 1002⟩, ⟨⟨0, 2, none⟩, 1001⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records5_0_1 : List (EventRecord Nat) := [⟨8, true, 1024⟩, ⟨11, true, 1024⟩, ⟨12, false, 1023⟩, ⟨10, true, 1022⟩, ⟨19, true, 1022⟩, ⟨7, true, 1021⟩, ⟨16, true, 1021⟩, ⟨13, true, 1018⟩, ⟨13, true, 1017⟩, ⟨14, true, 1016⟩, ⟨15, true, 1015⟩, ⟨15, true, 1014⟩, ⟨12, true, 1013⟩, ⟨12, true, 1012⟩, ⟨2, true, 1011⟩, ⟨11, true, 1011⟩, ⟨1, true, 1010⟩, ⟨17, true, 1010⟩, ⟨19, false, 1009⟩, ⟨16, false, 1008⟩, ⟨13, false, 1005⟩, ⟨14, false, 1004⟩, ⟨15, false, 1003⟩, ⟨12, false, 1002⟩, ⟨11, false, 1001⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented5_0_1 : ∀ i, i ∈ recordIds records5_0_1 ↔ i ∈ componentEventEvidence anchors5 [1, 2, 4, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 2, 4, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 5, 8] = [1, 2, 7, 10, 8, 17, 11, 12, 15, 14, 13, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_0_1] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_0_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_0_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_0_1) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_0_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 2, 4, 7, 10, 9, 8] graph5.root [6, 0, 1, 4, 3, 2, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 2, 4, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 5, 8] records5_0_1 [] covered5_0 (by decide) represented5_0_1 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_0_1) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_0_1) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_0_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_0_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_0_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_0_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_0_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨1, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨2, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩] := by decide
+theorem source_agrees5_0_1 : SameAgentSources sources5_0_1 sources5_0_0 := by
+  exact same_sources_of_check sources5_0_1 sources5_0_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_0_1 sources5_0_0 source_agrees5_0_1
+def sources5_0_2 : List (AgentSourceReceipt Nat) := [⟨⟨0, 2, none⟩, 2001⟩, ⟨⟨1, 2, none⟩, 2002⟩, ⟨⟨4, 2, none⟩, 2003⟩, ⟨⟨3, 2, none⟩, 2004⟩, ⟨⟨2, 2, none⟩, 2005⟩, ⟨⟨5, 2, none⟩, 2008⟩, ⟨⟨8, 2, none⟩, 2009⟩, ⟨⟨0, 0, some 2⟩, 2011⟩, ⟨⟨1, 3, none⟩, 2012⟩, ⟨⟨1, 3, none⟩, 2013⟩, ⟨⟨4, 3, none⟩, 2014⟩, ⟨⟨4, 3, none⟩, 2015⟩, ⟨⟨3, 0, some 4⟩, 2016⟩, ⟨⟨2, 3, none⟩, 2017⟩, ⟨⟨2, 3, none⟩, 2018⟩, ⟨⟨5, 0, some 7⟩, 2021⟩, ⟨⟨8, 1, some 10⟩, 2022⟩, ⟨⟨1, 1, some 9⟩, 2023⟩, ⟨⟨0, 0, some 8⟩, 2024⟩, ⟨⟨6, 2, none⟩, 2000⟩, ⟨⟨6, 0, some 1⟩, 2010⟩]
+def records5_0_2 : List (EventRecord Nat) := [⟨11, false, 2001⟩, ⟨12, false, 2002⟩, ⟨15, false, 2003⟩, ⟨14, false, 2004⟩, ⟨13, false, 2005⟩, ⟨16, false, 2008⟩, ⟨19, false, 2009⟩, ⟨2, true, 2011⟩, ⟨11, true, 2011⟩, ⟨12, true, 2012⟩, ⟨12, true, 2013⟩, ⟨15, true, 2014⟩, ⟨15, true, 2015⟩, ⟨14, true, 2016⟩, ⟨13, true, 2017⟩, ⟨13, true, 2018⟩, ⟨7, true, 2021⟩, ⟨16, true, 2021⟩, ⟨10, true, 2022⟩, ⟨19, true, 2022⟩, ⟨12, false, 2023⟩, ⟨8, true, 2024⟩, ⟨11, true, 2024⟩, ⟨17, false, 2000⟩, ⟨1, true, 2010⟩, ⟨17, true, 2010⟩]
+theorem represented5_0_2 : ∀ i, i ∈ recordIds records5_0_2 ↔ i ∈ componentEventEvidence anchors5 [1, 2, 4, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 2, 4, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 5, 8] = [1, 2, 7, 10, 8, 17, 11, 12, 15, 14, 13, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_0_2] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_0_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_0_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_0_2) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_0_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 2, 4, 7, 10, 9, 8] graph5.root [6, 0, 1, 4, 3, 2, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 2, 4, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 5, 8] records5_0_2 [] covered5_0 (by decide) represented5_0_2 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_0_2) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_0_2) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_0_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_0_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_0_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_0_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_0_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨1, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨2, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩] := by decide
+theorem source_agrees5_0_2 : SameAgentSources sources5_0_2 sources5_0_0 := by
+  exact same_sources_of_check sources5_0_2 sources5_0_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_0_2 sources5_0_0 source_agrees5_0_2
+theorem covered5_1 : ∀ i ∈ ([1, 2, 4, 5, 6, 7, 10, 9, 8] : List Nat), eligible anchors5 (chainOwner anchors5 i) i = true → chainOwner anchors5 i ∈ ([6, 0, 1, 4, 3, 2, 9, 7, 5, 8] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 2, 4, 5, 6, 7, 10, 9, 8] : List Nat) → eligible anchors5 (chainOwner anchors5 i.val) i.val = true → chainOwner anchors5 i.val ∈ ([6, 0, 1, 4, 3, 2, 9, 7, 5, 8] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources5_1_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨0, 2, none⟩, 1⟩, ⟨⟨1, 2, none⟩, 2⟩, ⟨⟨4, 2, none⟩, 3⟩, ⟨⟨3, 2, none⟩, 4⟩, ⟨⟨2, 2, none⟩, 5⟩, ⟨⟨9, 2, none⟩, 6⟩, ⟨⟨7, 2, none⟩, 7⟩, ⟨⟨5, 2, none⟩, 8⟩, ⟨⟨8, 2, none⟩, 9⟩, ⟨⟨6, 0, some 1⟩, 10⟩, ⟨⟨0, 0, some 2⟩, 11⟩, ⟨⟨1, 3, none⟩, 12⟩, ⟨⟨1, 3, none⟩, 13⟩, ⟨⟨4, 3, none⟩, 14⟩, ⟨⟨4, 3, none⟩, 15⟩, ⟨⟨3, 0, some 4⟩, 16⟩, ⟨⟨2, 3, none⟩, 17⟩, ⟨⟨2, 3, none⟩, 18⟩, ⟨⟨9, 0, some 5⟩, 19⟩, ⟨⟨7, 0, some 6⟩, 20⟩, ⟨⟨5, 0, some 7⟩, 21⟩, ⟨⟨8, 1, some 10⟩, 22⟩, ⟨⟨1, 1, some 9⟩, 23⟩, ⟨⟨0, 0, some 8⟩, 24⟩]
+def records5_1_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨11, false, 1⟩, ⟨12, false, 2⟩, ⟨15, false, 3⟩, ⟨14, false, 4⟩, ⟨13, false, 5⟩, ⟨20, false, 6⟩, ⟨18, false, 7⟩, ⟨16, false, 8⟩, ⟨19, false, 9⟩, ⟨1, true, 10⟩, ⟨17, true, 10⟩, ⟨2, true, 11⟩, ⟨11, true, 11⟩, ⟨12, true, 12⟩, ⟨12, true, 13⟩, ⟨15, true, 14⟩, ⟨15, true, 15⟩, ⟨14, true, 16⟩, ⟨13, true, 17⟩, ⟨13, true, 18⟩, ⟨5, true, 19⟩, ⟨20, true, 19⟩, ⟨18, true, 20⟩, ⟨7, true, 21⟩, ⟨16, true, 21⟩, ⟨10, true, 22⟩, ⟨19, true, 22⟩, ⟨12, false, 23⟩, ⟨8, true, 24⟩, ⟨11, true, 24⟩]
+theorem represented5_1_0 : ∀ i, i ∈ recordIds records5_1_0 ↔ i ∈ componentEventEvidence anchors5 [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 9, 7, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 9, 7, 5, 8] = [1, 2, 5, 7, 10, 8, 17, 11, 12, 15, 14, 13, 20, 18, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_1_0] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_1_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_1_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_1_0) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_1_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 2, 4, 5, 6, 7, 10, 9, 8] graph5.root [6, 0, 1, 4, 3, 2, 9, 7, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 9, 7, 5, 8] records5_1_0 [] covered5_1 (by decide) represented5_1_0 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_1_0) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2, 9], some (4, 12, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_1_0) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_1_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_1_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_1_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2, 9], some (4, 12, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_1_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_1_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨1, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨2, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩, ⟨9, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
+def sources5_1_1 : List (AgentSourceReceipt Nat) := [⟨⟨0, 0, some 8⟩, 1024⟩, ⟨⟨1, 1, some 9⟩, 1023⟩, ⟨⟨8, 1, some 10⟩, 1022⟩, ⟨⟨5, 0, some 7⟩, 1021⟩, ⟨⟨7, 0, some 6⟩, 1020⟩, ⟨⟨9, 0, some 5⟩, 1019⟩, ⟨⟨2, 3, none⟩, 1018⟩, ⟨⟨2, 3, none⟩, 1017⟩, ⟨⟨3, 0, some 4⟩, 1016⟩, ⟨⟨4, 3, none⟩, 1015⟩, ⟨⟨4, 3, none⟩, 1014⟩, ⟨⟨1, 3, none⟩, 1013⟩, ⟨⟨1, 3, none⟩, 1012⟩, ⟨⟨0, 0, some 2⟩, 1011⟩, ⟨⟨6, 0, some 1⟩, 1010⟩, ⟨⟨8, 2, none⟩, 1009⟩, ⟨⟨5, 2, none⟩, 1008⟩, ⟨⟨7, 2, none⟩, 1007⟩, ⟨⟨9, 2, none⟩, 1006⟩, ⟨⟨2, 2, none⟩, 1005⟩, ⟨⟨3, 2, none⟩, 1004⟩, ⟨⟨4, 2, none⟩, 1003⟩, ⟨⟨1, 2, none⟩, 1002⟩, ⟨⟨0, 2, none⟩, 1001⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records5_1_1 : List (EventRecord Nat) := [⟨8, true, 1024⟩, ⟨11, true, 1024⟩, ⟨12, false, 1023⟩, ⟨10, true, 1022⟩, ⟨19, true, 1022⟩, ⟨7, true, 1021⟩, ⟨16, true, 1021⟩, ⟨18, true, 1020⟩, ⟨5, true, 1019⟩, ⟨20, true, 1019⟩, ⟨13, true, 1018⟩, ⟨13, true, 1017⟩, ⟨14, true, 1016⟩, ⟨15, true, 1015⟩, ⟨15, true, 1014⟩, ⟨12, true, 1013⟩, ⟨12, true, 1012⟩, ⟨2, true, 1011⟩, ⟨11, true, 1011⟩, ⟨1, true, 1010⟩, ⟨17, true, 1010⟩, ⟨19, false, 1009⟩, ⟨16, false, 1008⟩, ⟨18, false, 1007⟩, ⟨20, false, 1006⟩, ⟨13, false, 1005⟩, ⟨14, false, 1004⟩, ⟨15, false, 1003⟩, ⟨12, false, 1002⟩, ⟨11, false, 1001⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented5_1_1 : ∀ i, i ∈ recordIds records5_1_1 ↔ i ∈ componentEventEvidence anchors5 [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 9, 7, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 9, 7, 5, 8] = [1, 2, 5, 7, 10, 8, 17, 11, 12, 15, 14, 13, 20, 18, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_1_1] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_1_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_1_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_1_1) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_1_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 2, 4, 5, 6, 7, 10, 9, 8] graph5.root [6, 0, 1, 4, 3, 2, 9, 7, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 9, 7, 5, 8] records5_1_1 [] covered5_1 (by decide) represented5_1_1 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_1_1) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2, 9], some (4, 12, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_1_1) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_1_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_1_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_1_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2, 9], some (4, 12, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_1_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_1_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨1, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨2, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩, ⟨9, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees5_1_1 : SameAgentSources sources5_1_1 sources5_1_0 := by
+  exact same_sources_of_check sources5_1_1 sources5_1_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_1_1 sources5_1_0 source_agrees5_1_1
+def sources5_1_2 : List (AgentSourceReceipt Nat) := [⟨⟨0, 2, none⟩, 2001⟩, ⟨⟨1, 2, none⟩, 2002⟩, ⟨⟨4, 2, none⟩, 2003⟩, ⟨⟨3, 2, none⟩, 2004⟩, ⟨⟨2, 2, none⟩, 2005⟩, ⟨⟨9, 2, none⟩, 2006⟩, ⟨⟨7, 2, none⟩, 2007⟩, ⟨⟨5, 2, none⟩, 2008⟩, ⟨⟨8, 2, none⟩, 2009⟩, ⟨⟨0, 0, some 2⟩, 2011⟩, ⟨⟨1, 3, none⟩, 2012⟩, ⟨⟨1, 3, none⟩, 2013⟩, ⟨⟨4, 3, none⟩, 2014⟩, ⟨⟨4, 3, none⟩, 2015⟩, ⟨⟨3, 0, some 4⟩, 2016⟩, ⟨⟨2, 3, none⟩, 2017⟩, ⟨⟨2, 3, none⟩, 2018⟩, ⟨⟨9, 0, some 5⟩, 2019⟩, ⟨⟨7, 0, some 6⟩, 2020⟩, ⟨⟨5, 0, some 7⟩, 2021⟩, ⟨⟨8, 1, some 10⟩, 2022⟩, ⟨⟨1, 1, some 9⟩, 2023⟩, ⟨⟨0, 0, some 8⟩, 2024⟩, ⟨⟨6, 2, none⟩, 2000⟩, ⟨⟨6, 0, some 1⟩, 2010⟩]
+def records5_1_2 : List (EventRecord Nat) := [⟨11, false, 2001⟩, ⟨12, false, 2002⟩, ⟨15, false, 2003⟩, ⟨14, false, 2004⟩, ⟨13, false, 2005⟩, ⟨20, false, 2006⟩, ⟨18, false, 2007⟩, ⟨16, false, 2008⟩, ⟨19, false, 2009⟩, ⟨2, true, 2011⟩, ⟨11, true, 2011⟩, ⟨12, true, 2012⟩, ⟨12, true, 2013⟩, ⟨15, true, 2014⟩, ⟨15, true, 2015⟩, ⟨14, true, 2016⟩, ⟨13, true, 2017⟩, ⟨13, true, 2018⟩, ⟨5, true, 2019⟩, ⟨20, true, 2019⟩, ⟨18, true, 2020⟩, ⟨7, true, 2021⟩, ⟨16, true, 2021⟩, ⟨10, true, 2022⟩, ⟨19, true, 2022⟩, ⟨12, false, 2023⟩, ⟨8, true, 2024⟩, ⟨11, true, 2024⟩, ⟨17, false, 2000⟩, ⟨1, true, 2010⟩, ⟨17, true, 2010⟩]
+theorem represented5_1_2 : ∀ i, i ∈ recordIds records5_1_2 ↔ i ∈ componentEventEvidence anchors5 [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 9, 7, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 9, 7, 5, 8] = [1, 2, 5, 7, 10, 8, 17, 11, 12, 15, 14, 13, 20, 18, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_1_2] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_1_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_1_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_1_2) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_1_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 2, 4, 5, 6, 7, 10, 9, 8] graph5.root [6, 0, 1, 4, 3, 2, 9, 7, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 2, 4, 5, 6, 7, 10, 9, 8] [6, 0, 1, 4, 3, 2, 9, 7, 5, 8] records5_1_2 [] covered5_1 (by decide) represented5_1_2 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_1_2) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2, 9], some (4, 12, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_1_2) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_1_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_1_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_1_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2, 9], some (4, 12, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_1_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_1_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨1, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨2, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩, ⟨9, true, ReceiptCutoffView.chain ⟨0, [100, 16, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees5_1_2 : SameAgentSources sources5_1_2 sources5_1_0 := by
+  exact same_sources_of_check sources5_1_2 sources5_1_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_1_2 sources5_1_0 source_agrees5_1_2
+theorem covered5_2 : ∀ i ∈ ([1, 2, 7, 10, 9, 8, 0] : List Nat), eligible anchors5 (chainOwner anchors5 i) i = true → chainOwner anchors5 i ∈ ([6, 0, 1, 2, 5, 8] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 2, 7, 10, 9, 8, 0] : List Nat) → eligible anchors5 (chainOwner anchors5 i.val) i.val = true → chainOwner anchors5 i.val ∈ ([6, 0, 1, 2, 5, 8] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources5_2_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨0, 2, none⟩, 1⟩, ⟨⟨1, 2, none⟩, 2⟩, ⟨⟨2, 2, none⟩, 5⟩, ⟨⟨5, 2, none⟩, 8⟩, ⟨⟨8, 2, none⟩, 9⟩, ⟨⟨6, 0, some 1⟩, 10⟩, ⟨⟨0, 0, some 2⟩, 11⟩, ⟨⟨1, 3, none⟩, 12⟩, ⟨⟨1, 3, none⟩, 13⟩, ⟨⟨2, 3, none⟩, 17⟩, ⟨⟨2, 3, none⟩, 18⟩, ⟨⟨5, 0, some 7⟩, 21⟩, ⟨⟨8, 1, some 10⟩, 22⟩, ⟨⟨1, 1, some 9⟩, 23⟩, ⟨⟨0, 0, some 8⟩, 24⟩, ⟨⟨5, 0, some 0⟩, 25⟩]
+def records5_2_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨11, false, 1⟩, ⟨12, false, 2⟩, ⟨13, false, 5⟩, ⟨16, false, 8⟩, ⟨19, false, 9⟩, ⟨1, true, 10⟩, ⟨17, true, 10⟩, ⟨2, true, 11⟩, ⟨11, true, 11⟩, ⟨12, true, 12⟩, ⟨12, true, 13⟩, ⟨13, true, 17⟩, ⟨13, true, 18⟩, ⟨7, true, 21⟩, ⟨16, true, 21⟩, ⟨10, true, 22⟩, ⟨19, true, 22⟩, ⟨12, false, 23⟩, ⟨8, true, 24⟩, ⟨11, true, 24⟩, ⟨0, true, 25⟩, ⟨16, true, 25⟩]
+theorem represented5_2_0 : ∀ i, i ∈ recordIds records5_2_0 ↔ i ∈ componentEventEvidence anchors5 [1, 2, 7, 10, 9, 8, 0] [6, 0, 1, 2, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 2, 7, 10, 9, 8, 0] [6, 0, 1, 2, 5, 8] = [1, 2, 7, 10, 8, 0, 17, 11, 12, 13, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_2_0] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_2_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_2_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_2_0) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_2_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 2, 7, 10, 9, 8, 0] graph5.root [6, 0, 1, 2, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 2, 7, 10, 9, 8, 0] [6, 0, 1, 2, 5, 8] records5_2_0 [] covered5_2 (by decide) represented5_2_0 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_2_0) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 5, 8], some (3, 1, 10)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_2_0) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_2_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_2_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_2_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 5, 8], some (3, 1, 10)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_2_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_2_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+def sources5_2_1 : List (AgentSourceReceipt Nat) := [⟨⟨5, 0, some 0⟩, 1025⟩, ⟨⟨0, 0, some 8⟩, 1024⟩, ⟨⟨1, 1, some 9⟩, 1023⟩, ⟨⟨8, 1, some 10⟩, 1022⟩, ⟨⟨5, 0, some 7⟩, 1021⟩, ⟨⟨2, 3, none⟩, 1018⟩, ⟨⟨2, 3, none⟩, 1017⟩, ⟨⟨1, 3, none⟩, 1013⟩, ⟨⟨1, 3, none⟩, 1012⟩, ⟨⟨0, 0, some 2⟩, 1011⟩, ⟨⟨6, 0, some 1⟩, 1010⟩, ⟨⟨8, 2, none⟩, 1009⟩, ⟨⟨5, 2, none⟩, 1008⟩, ⟨⟨2, 2, none⟩, 1005⟩, ⟨⟨1, 2, none⟩, 1002⟩, ⟨⟨0, 2, none⟩, 1001⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records5_2_1 : List (EventRecord Nat) := [⟨0, true, 1025⟩, ⟨16, true, 1025⟩, ⟨8, true, 1024⟩, ⟨11, true, 1024⟩, ⟨12, false, 1023⟩, ⟨10, true, 1022⟩, ⟨19, true, 1022⟩, ⟨7, true, 1021⟩, ⟨16, true, 1021⟩, ⟨13, true, 1018⟩, ⟨13, true, 1017⟩, ⟨12, true, 1013⟩, ⟨12, true, 1012⟩, ⟨2, true, 1011⟩, ⟨11, true, 1011⟩, ⟨1, true, 1010⟩, ⟨17, true, 1010⟩, ⟨19, false, 1009⟩, ⟨16, false, 1008⟩, ⟨13, false, 1005⟩, ⟨12, false, 1002⟩, ⟨11, false, 1001⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented5_2_1 : ∀ i, i ∈ recordIds records5_2_1 ↔ i ∈ componentEventEvidence anchors5 [1, 2, 7, 10, 9, 8, 0] [6, 0, 1, 2, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 2, 7, 10, 9, 8, 0] [6, 0, 1, 2, 5, 8] = [1, 2, 7, 10, 8, 0, 17, 11, 12, 13, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_2_1] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_2_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_2_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_2_1) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_2_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 2, 7, 10, 9, 8, 0] graph5.root [6, 0, 1, 2, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 2, 7, 10, 9, 8, 0] [6, 0, 1, 2, 5, 8] records5_2_1 [] covered5_2 (by decide) represented5_2_1 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_2_1) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 5, 8], some (3, 1, 10)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_2_1) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_2_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_2_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_2_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 5, 8], some (3, 1, 10)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_2_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_2_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees5_2_1 : SameAgentSources sources5_2_1 sources5_2_0 := by
+  exact same_sources_of_check sources5_2_1 sources5_2_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_2_1 sources5_2_0 source_agrees5_2_1
+def sources5_2_2 : List (AgentSourceReceipt Nat) := [⟨⟨0, 2, none⟩, 2001⟩, ⟨⟨1, 2, none⟩, 2002⟩, ⟨⟨2, 2, none⟩, 2005⟩, ⟨⟨5, 2, none⟩, 2008⟩, ⟨⟨8, 2, none⟩, 2009⟩, ⟨⟨0, 0, some 2⟩, 2011⟩, ⟨⟨1, 3, none⟩, 2012⟩, ⟨⟨1, 3, none⟩, 2013⟩, ⟨⟨2, 3, none⟩, 2017⟩, ⟨⟨2, 3, none⟩, 2018⟩, ⟨⟨5, 0, some 7⟩, 2021⟩, ⟨⟨8, 1, some 10⟩, 2022⟩, ⟨⟨1, 1, some 9⟩, 2023⟩, ⟨⟨0, 0, some 8⟩, 2024⟩, ⟨⟨5, 0, some 0⟩, 2025⟩, ⟨⟨6, 2, none⟩, 2000⟩, ⟨⟨6, 0, some 1⟩, 2010⟩]
+def records5_2_2 : List (EventRecord Nat) := [⟨11, false, 2001⟩, ⟨12, false, 2002⟩, ⟨13, false, 2005⟩, ⟨16, false, 2008⟩, ⟨19, false, 2009⟩, ⟨2, true, 2011⟩, ⟨11, true, 2011⟩, ⟨12, true, 2012⟩, ⟨12, true, 2013⟩, ⟨13, true, 2017⟩, ⟨13, true, 2018⟩, ⟨7, true, 2021⟩, ⟨16, true, 2021⟩, ⟨10, true, 2022⟩, ⟨19, true, 2022⟩, ⟨12, false, 2023⟩, ⟨8, true, 2024⟩, ⟨11, true, 2024⟩, ⟨0, true, 2025⟩, ⟨16, true, 2025⟩, ⟨17, false, 2000⟩, ⟨1, true, 2010⟩, ⟨17, true, 2010⟩]
+theorem represented5_2_2 : ∀ i, i ∈ recordIds records5_2_2 ↔ i ∈ componentEventEvidence anchors5 [1, 2, 7, 10, 9, 8, 0] [6, 0, 1, 2, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 2, 7, 10, 9, 8, 0] [6, 0, 1, 2, 5, 8] = [1, 2, 7, 10, 8, 0, 17, 11, 12, 13, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_2_2] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_2_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_2_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_2_2) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_2_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 2, 7, 10, 9, 8, 0] graph5.root [6, 0, 1, 2, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 2, 7, 10, 9, 8, 0] [6, 0, 1, 2, 5, 8] records5_2_2 [] covered5_2 (by decide) represented5_2_2 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_2_2) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 5, 8], some (3, 1, 10)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_2_2) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_2_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_2_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_2_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 5, 8], some (3, 1, 10)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_2_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_2_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨5, true, ReceiptCutoffView.chain ⟨0, [100, 2, 0], 1788566460000, true⟩⟩, ⟨8, true, ReceiptCutoffView.chain ⟨1, [100, 19, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees5_2_2 : SameAgentSources sources5_2_2 sources5_2_0 := by
+  exact same_sources_of_check sources5_2_2 sources5_2_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_2_2 sources5_2_0 source_agrees5_2_2
+theorem covered5_3 : ∀ i ∈ ([1, 2, 7, 10, 9, 8, 3] : List Nat), eligible anchors5 (chainOwner anchors5 i) i = true → chainOwner anchors5 i ∈ ([6, 0, 1, 2, 5, 8] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 2, 7, 10, 9, 8, 3] : List Nat) → eligible anchors5 (chainOwner anchors5 i.val) i.val = true → chainOwner anchors5 i.val ∈ ([6, 0, 1, 2, 5, 8] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources5_3_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨0, 2, none⟩, 1⟩, ⟨⟨1, 2, none⟩, 2⟩, ⟨⟨2, 2, none⟩, 5⟩, ⟨⟨5, 2, none⟩, 8⟩, ⟨⟨8, 2, none⟩, 9⟩, ⟨⟨6, 0, some 1⟩, 10⟩, ⟨⟨0, 0, some 2⟩, 11⟩, ⟨⟨1, 3, none⟩, 12⟩, ⟨⟨1, 3, none⟩, 13⟩, ⟨⟨2, 3, none⟩, 17⟩, ⟨⟨2, 3, none⟩, 18⟩, ⟨⟨5, 0, some 7⟩, 21⟩, ⟨⟨8, 1, some 10⟩, 22⟩, ⟨⟨1, 1, some 9⟩, 23⟩, ⟨⟨0, 0, some 8⟩, 24⟩, ⟨⟨5, 0, some 3⟩, 26⟩]
+def records5_3_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨11, false, 1⟩, ⟨12, false, 2⟩, ⟨13, false, 5⟩, ⟨16, false, 8⟩, ⟨19, false, 9⟩, ⟨1, true, 10⟩, ⟨17, true, 10⟩, ⟨2, true, 11⟩, ⟨11, true, 11⟩, ⟨12, true, 12⟩, ⟨12, true, 13⟩, ⟨13, true, 17⟩, ⟨13, true, 18⟩, ⟨7, true, 21⟩, ⟨16, true, 21⟩, ⟨10, true, 22⟩, ⟨19, true, 22⟩, ⟨12, false, 23⟩, ⟨8, true, 24⟩, ⟨11, true, 24⟩, ⟨3, true, 26⟩, ⟨16, true, 26⟩]
+theorem represented5_3_0 : ∀ i, i ∈ recordIds records5_3_0 ↔ i ∈ componentEventEvidence anchors5 [1, 2, 7, 10, 9, 8, 3] [6, 0, 1, 2, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 2, 7, 10, 9, 8, 3] [6, 0, 1, 2, 5, 8] = [1, 2, 7, 10, 8, 3, 17, 11, 12, 13, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_3_0] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_3_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_3_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_3_0) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_3_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 2, 7, 10, 9, 8, 3] graph5.root [6, 0, 1, 2, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 2, 7, 10, 9, 8, 3] [6, 0, 1, 2, 5, 8] records5_3_0 [] covered5_3 (by decide) represented5_3_0 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_3_0) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_3_0) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_3_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_3_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_3_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_3_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_3_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨1, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨2, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩] := by decide
+def sources5_3_1 : List (AgentSourceReceipt Nat) := [⟨⟨5, 0, some 3⟩, 1026⟩, ⟨⟨0, 0, some 8⟩, 1024⟩, ⟨⟨1, 1, some 9⟩, 1023⟩, ⟨⟨8, 1, some 10⟩, 1022⟩, ⟨⟨5, 0, some 7⟩, 1021⟩, ⟨⟨2, 3, none⟩, 1018⟩, ⟨⟨2, 3, none⟩, 1017⟩, ⟨⟨1, 3, none⟩, 1013⟩, ⟨⟨1, 3, none⟩, 1012⟩, ⟨⟨0, 0, some 2⟩, 1011⟩, ⟨⟨6, 0, some 1⟩, 1010⟩, ⟨⟨8, 2, none⟩, 1009⟩, ⟨⟨5, 2, none⟩, 1008⟩, ⟨⟨2, 2, none⟩, 1005⟩, ⟨⟨1, 2, none⟩, 1002⟩, ⟨⟨0, 2, none⟩, 1001⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records5_3_1 : List (EventRecord Nat) := [⟨3, true, 1026⟩, ⟨16, true, 1026⟩, ⟨8, true, 1024⟩, ⟨11, true, 1024⟩, ⟨12, false, 1023⟩, ⟨10, true, 1022⟩, ⟨19, true, 1022⟩, ⟨7, true, 1021⟩, ⟨16, true, 1021⟩, ⟨13, true, 1018⟩, ⟨13, true, 1017⟩, ⟨12, true, 1013⟩, ⟨12, true, 1012⟩, ⟨2, true, 1011⟩, ⟨11, true, 1011⟩, ⟨1, true, 1010⟩, ⟨17, true, 1010⟩, ⟨19, false, 1009⟩, ⟨16, false, 1008⟩, ⟨13, false, 1005⟩, ⟨12, false, 1002⟩, ⟨11, false, 1001⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented5_3_1 : ∀ i, i ∈ recordIds records5_3_1 ↔ i ∈ componentEventEvidence anchors5 [1, 2, 7, 10, 9, 8, 3] [6, 0, 1, 2, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 2, 7, 10, 9, 8, 3] [6, 0, 1, 2, 5, 8] = [1, 2, 7, 10, 8, 3, 17, 11, 12, 13, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_3_1] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_3_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_3_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_3_1) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_3_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 2, 7, 10, 9, 8, 3] graph5.root [6, 0, 1, 2, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 2, 7, 10, 9, 8, 3] [6, 0, 1, 2, 5, 8] records5_3_1 [] covered5_3 (by decide) represented5_3_1 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_3_1) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_3_1) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_3_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_3_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_3_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_3_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_3_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨1, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨2, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩] := by decide
+theorem source_agrees5_3_1 : SameAgentSources sources5_3_1 sources5_3_0 := by
+  exact same_sources_of_check sources5_3_1 sources5_3_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_3_1 sources5_3_0 source_agrees5_3_1
+def sources5_3_2 : List (AgentSourceReceipt Nat) := [⟨⟨0, 2, none⟩, 2001⟩, ⟨⟨1, 2, none⟩, 2002⟩, ⟨⟨2, 2, none⟩, 2005⟩, ⟨⟨5, 2, none⟩, 2008⟩, ⟨⟨8, 2, none⟩, 2009⟩, ⟨⟨0, 0, some 2⟩, 2011⟩, ⟨⟨1, 3, none⟩, 2012⟩, ⟨⟨1, 3, none⟩, 2013⟩, ⟨⟨2, 3, none⟩, 2017⟩, ⟨⟨2, 3, none⟩, 2018⟩, ⟨⟨5, 0, some 7⟩, 2021⟩, ⟨⟨8, 1, some 10⟩, 2022⟩, ⟨⟨1, 1, some 9⟩, 2023⟩, ⟨⟨0, 0, some 8⟩, 2024⟩, ⟨⟨5, 0, some 3⟩, 2026⟩, ⟨⟨6, 2, none⟩, 2000⟩, ⟨⟨6, 0, some 1⟩, 2010⟩]
+def records5_3_2 : List (EventRecord Nat) := [⟨11, false, 2001⟩, ⟨12, false, 2002⟩, ⟨13, false, 2005⟩, ⟨16, false, 2008⟩, ⟨19, false, 2009⟩, ⟨2, true, 2011⟩, ⟨11, true, 2011⟩, ⟨12, true, 2012⟩, ⟨12, true, 2013⟩, ⟨13, true, 2017⟩, ⟨13, true, 2018⟩, ⟨7, true, 2021⟩, ⟨16, true, 2021⟩, ⟨10, true, 2022⟩, ⟨19, true, 2022⟩, ⟨12, false, 2023⟩, ⟨8, true, 2024⟩, ⟨11, true, 2024⟩, ⟨3, true, 2026⟩, ⟨16, true, 2026⟩, ⟨17, false, 2000⟩, ⟨1, true, 2010⟩, ⟨17, true, 2010⟩]
+theorem represented5_3_2 : ∀ i, i ∈ recordIds records5_3_2 ↔ i ∈ componentEventEvidence anchors5 [1, 2, 7, 10, 9, 8, 3] [6, 0, 1, 2, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 2, 7, 10, 9, 8, 3] [6, 0, 1, 2, 5, 8] = [1, 2, 7, 10, 8, 3, 17, 11, 12, 13, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_3_2] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_3_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_3_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_3_2) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_3_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 2, 7, 10, 9, 8, 3] graph5.root [6, 0, 1, 2, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 2, 7, 10, 9, 8, 3] [6, 0, 1, 2, 5, 8] records5_3_2 [] covered5_3 (by decide) represented5_3_2 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_3_2) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_3_2) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_3_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_3_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_3_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_3_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_3_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩, ⟨0, true, ReceiptCutoffView.chain ⟨0, [100, 11, 0], 1788566460000, true⟩⟩, ⟨1, true, ReceiptCutoffView.unanchored (some 3) 1788566402000⟩, ⟨2, true, ReceiptCutoffView.unanchored (some 3) 1788566405000⟩] := by decide
+theorem source_agrees5_3_2 : SameAgentSources sources5_3_2 sources5_3_0 := by
+  exact same_sources_of_check sources5_3_2 sources5_3_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_3_2 sources5_3_0 source_agrees5_3_2
+theorem covered5_4 : ∀ i ∈ ([] : List Nat), eligible anchors5 (chainOwner anchors5 i) i = true → chainOwner anchors5 i ∈ ([6, 0, 1, 2, 5, 8] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([] : List Nat) → eligible anchors5 (chainOwner anchors5 i.val) i.val = true → chainOwner anchors5 i.val ∈ ([6, 0, 1, 2, 5, 8] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources5_4_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨0, 2, none⟩, 1⟩, ⟨⟨1, 2, none⟩, 2⟩, ⟨⟨2, 2, none⟩, 5⟩, ⟨⟨5, 2, none⟩, 8⟩, ⟨⟨8, 2, none⟩, 9⟩]
+def records5_4_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨11, false, 1⟩, ⟨12, false, 2⟩, ⟨13, false, 5⟩, ⟨16, false, 8⟩, ⟨19, false, 9⟩]
+theorem represented5_4_0 : ∀ i, i ∈ recordIds records5_4_0 ↔ i ∈ componentEventEvidence anchors5 [] [6, 0, 1, 2, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [] [6, 0, 1, 2, 5, 8] = [17, 11, 12, 13, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_4_0] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_4_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_4_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_4_0) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_4_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [] graph5.root [6, 0, 1, 2, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [] [6, 0, 1, 2, 5, 8] records5_4_0 [] covered5_4 (by decide) represented5_4_0 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_4_0) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_4_0) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_4_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_4_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_4_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_4_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_4_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, false, ReceiptCutoffView.unconfirmed⟩] := by decide
+def sources5_4_1 : List (AgentSourceReceipt Nat) := [⟨⟨8, 2, none⟩, 1009⟩, ⟨⟨5, 2, none⟩, 1008⟩, ⟨⟨2, 2, none⟩, 1005⟩, ⟨⟨1, 2, none⟩, 1002⟩, ⟨⟨0, 2, none⟩, 1001⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records5_4_1 : List (EventRecord Nat) := [⟨19, false, 1009⟩, ⟨16, false, 1008⟩, ⟨13, false, 1005⟩, ⟨12, false, 1002⟩, ⟨11, false, 1001⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented5_4_1 : ∀ i, i ∈ recordIds records5_4_1 ↔ i ∈ componentEventEvidence anchors5 [] [6, 0, 1, 2, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [] [6, 0, 1, 2, 5, 8] = [17, 11, 12, 13, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_4_1] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_4_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_4_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_4_1) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_4_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [] graph5.root [6, 0, 1, 2, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [] [6, 0, 1, 2, 5, 8] records5_4_1 [] covered5_4 (by decide) represented5_4_1 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_4_1) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_4_1) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_4_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_4_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_4_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_4_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_4_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, false, ReceiptCutoffView.unconfirmed⟩] := by decide
+theorem source_agrees5_4_1 : SameAgentSources sources5_4_1 sources5_4_0 := by
+  exact same_sources_of_check sources5_4_1 sources5_4_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_4_1 sources5_4_0 source_agrees5_4_1
+def sources5_4_2 : List (AgentSourceReceipt Nat) := [⟨⟨0, 2, none⟩, 2001⟩, ⟨⟨1, 2, none⟩, 2002⟩, ⟨⟨2, 2, none⟩, 2005⟩, ⟨⟨5, 2, none⟩, 2008⟩, ⟨⟨8, 2, none⟩, 2009⟩, ⟨⟨6, 2, none⟩, 2000⟩]
+def records5_4_2 : List (EventRecord Nat) := [⟨11, false, 2001⟩, ⟨12, false, 2002⟩, ⟨13, false, 2005⟩, ⟨16, false, 2008⟩, ⟨19, false, 2009⟩, ⟨17, false, 2000⟩]
+theorem represented5_4_2 : ∀ i, i ∈ recordIds records5_4_2 ↔ i ∈ componentEventEvidence anchors5 [] [6, 0, 1, 2, 5, 8] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [] [6, 0, 1, 2, 5, 8] = [17, 11, 12, 13, 16, 19] := by decide
+  rw [normalized]
+  simp [recordIds, records5_4_2] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_4_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_4_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_4_2) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_4_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [] graph5.root [6, 0, 1, 2, 5, 8] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [] [6, 0, 1, 2, 5, 8] records5_4_2 [] covered5_4 (by decide) represented5_4_2 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_4_2) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_4_2) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_4_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_4_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_4_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_4_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_4_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, false, ReceiptCutoffView.unconfirmed⟩] := by decide
+theorem source_agrees5_4_2 : SameAgentSources sources5_4_2 sources5_4_0 := by
+  exact same_sources_of_check sources5_4_2 sources5_4_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_4_2 sources5_4_0 source_agrees5_4_2
+theorem covered5_5 : ∀ i ∈ ([1, 9] : List Nat), eligible anchors5 (chainOwner anchors5 i) i = true → chainOwner anchors5 i ∈ ([6, 0, 1, 2] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 9] : List Nat) → eligible anchors5 (chainOwner anchors5 i.val) i.val = true → chainOwner anchors5 i.val ∈ ([6, 0, 1, 2] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources5_5_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨0, 2, none⟩, 1⟩, ⟨⟨1, 2, none⟩, 2⟩, ⟨⟨2, 2, none⟩, 5⟩, ⟨⟨6, 0, some 1⟩, 10⟩, ⟨⟨1, 3, none⟩, 12⟩, ⟨⟨1, 3, none⟩, 13⟩, ⟨⟨2, 3, none⟩, 17⟩, ⟨⟨2, 3, none⟩, 18⟩, ⟨⟨1, 1, some 9⟩, 23⟩]
+def records5_5_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨11, false, 1⟩, ⟨12, false, 2⟩, ⟨13, false, 5⟩, ⟨1, true, 10⟩, ⟨17, true, 10⟩, ⟨12, true, 12⟩, ⟨12, true, 13⟩, ⟨13, true, 17⟩, ⟨13, true, 18⟩, ⟨12, false, 23⟩]
+theorem represented5_5_0 : ∀ i, i ∈ recordIds records5_5_0 ↔ i ∈ componentEventEvidence anchors5 [1, 9] [6, 0, 1, 2] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 9] [6, 0, 1, 2] = [1, 17, 11, 12, 13] := by decide
+  rw [normalized]
+  simp [recordIds, records5_5_0] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_5_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_5_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_5_0) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_5_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 9] graph5.root [6, 0, 1, 2] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 9] [6, 0, 1, 2] records5_5_0 [] covered5_5 (by decide) represented5_5_0 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_5_0) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_5_0) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_5_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_5_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_5_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_5_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_5_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+def sources5_5_1 : List (AgentSourceReceipt Nat) := [⟨⟨1, 1, some 9⟩, 1023⟩, ⟨⟨2, 3, none⟩, 1018⟩, ⟨⟨2, 3, none⟩, 1017⟩, ⟨⟨1, 3, none⟩, 1013⟩, ⟨⟨1, 3, none⟩, 1012⟩, ⟨⟨6, 0, some 1⟩, 1010⟩, ⟨⟨2, 2, none⟩, 1005⟩, ⟨⟨1, 2, none⟩, 1002⟩, ⟨⟨0, 2, none⟩, 1001⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records5_5_1 : List (EventRecord Nat) := [⟨12, false, 1023⟩, ⟨13, true, 1018⟩, ⟨13, true, 1017⟩, ⟨12, true, 1013⟩, ⟨12, true, 1012⟩, ⟨1, true, 1010⟩, ⟨17, true, 1010⟩, ⟨13, false, 1005⟩, ⟨12, false, 1002⟩, ⟨11, false, 1001⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented5_5_1 : ∀ i, i ∈ recordIds records5_5_1 ↔ i ∈ componentEventEvidence anchors5 [1, 9] [6, 0, 1, 2] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 9] [6, 0, 1, 2] = [1, 17, 11, 12, 13] := by decide
+  rw [normalized]
+  simp [recordIds, records5_5_1] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_5_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_5_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_5_1) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_5_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 9] graph5.root [6, 0, 1, 2] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 9] [6, 0, 1, 2] records5_5_1 [] covered5_5 (by decide) represented5_5_1 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_5_1) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_5_1) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_5_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_5_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_5_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_5_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_5_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees5_5_1 : SameAgentSources sources5_5_1 sources5_5_0 := by
+  exact same_sources_of_check sources5_5_1 sources5_5_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_5_1 sources5_5_0 source_agrees5_5_1
+def sources5_5_2 : List (AgentSourceReceipt Nat) := [⟨⟨0, 2, none⟩, 2001⟩, ⟨⟨1, 2, none⟩, 2002⟩, ⟨⟨2, 2, none⟩, 2005⟩, ⟨⟨1, 3, none⟩, 2012⟩, ⟨⟨1, 3, none⟩, 2013⟩, ⟨⟨2, 3, none⟩, 2017⟩, ⟨⟨2, 3, none⟩, 2018⟩, ⟨⟨1, 1, some 9⟩, 2023⟩, ⟨⟨6, 2, none⟩, 2000⟩, ⟨⟨6, 0, some 1⟩, 2010⟩]
+def records5_5_2 : List (EventRecord Nat) := [⟨11, false, 2001⟩, ⟨12, false, 2002⟩, ⟨13, false, 2005⟩, ⟨12, true, 2012⟩, ⟨12, true, 2013⟩, ⟨13, true, 2017⟩, ⟨13, true, 2018⟩, ⟨12, false, 2023⟩, ⟨17, false, 2000⟩, ⟨1, true, 2010⟩, ⟨17, true, 2010⟩]
+theorem represented5_5_2 : ∀ i, i ∈ recordIds records5_5_2 ↔ i ∈ componentEventEvidence anchors5 [1, 9] [6, 0, 1, 2] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 9] [6, 0, 1, 2] = [1, 17, 11, 12, 13] := by decide
+  rw [normalized]
+  simp [recordIds, records5_5_2] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_5_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_5_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_5_2) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_5_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 9] graph5.root [6, 0, 1, 2] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 9] [6, 0, 1, 2] records5_5_2 [] covered5_5 (by decide) represented5_5_2 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_5_2) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_5_2) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_5_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_5_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_5_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6, 0, 1, 2], some (3, 7, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_5_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_5_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees5_5_2 : SameAgentSources sources5_5_2 sources5_5_0 := by
+  exact same_sources_of_check sources5_5_2 sources5_5_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_5_2 sources5_5_0 source_agrees5_5_2
+theorem covered5_6 : ∀ i ∈ ([1, 4, 5, 6, 9] : List Nat), eligible anchors5 (chainOwner anchors5 i) i = true → chainOwner anchors5 i ∈ ([6, 1, 4, 3, 2, 9, 7] : List Nat) := by
+  intro i member ok
+  have bound : i < 11 := eligible_lt _ _ _ ok
+  have checked : ∀ i : Fin 11, i.val ∈ ([1, 4, 5, 6, 9] : List Nat) → eligible anchors5 (chainOwner anchors5 i.val) i.val = true → chainOwner anchors5 i.val ∈ ([6, 1, 4, 3, 2, 9, 7] : List Nat) := by decide
+  exact checked ⟨i, bound⟩ member ok
+def sources5_6_0 : List (AgentSourceReceipt Nat) := [⟨⟨6, 2, none⟩, 0⟩, ⟨⟨1, 2, none⟩, 2⟩, ⟨⟨4, 2, none⟩, 3⟩, ⟨⟨3, 2, none⟩, 4⟩, ⟨⟨2, 2, none⟩, 5⟩, ⟨⟨9, 2, none⟩, 6⟩, ⟨⟨7, 2, none⟩, 7⟩, ⟨⟨6, 0, some 1⟩, 10⟩, ⟨⟨1, 3, none⟩, 12⟩, ⟨⟨1, 3, none⟩, 13⟩, ⟨⟨4, 3, none⟩, 14⟩, ⟨⟨4, 3, none⟩, 15⟩, ⟨⟨3, 0, some 4⟩, 16⟩, ⟨⟨2, 3, none⟩, 17⟩, ⟨⟨2, 3, none⟩, 18⟩, ⟨⟨9, 0, some 5⟩, 19⟩, ⟨⟨7, 0, some 6⟩, 20⟩, ⟨⟨1, 1, some 9⟩, 23⟩]
+def records5_6_0 : List (EventRecord Nat) := [⟨17, false, 0⟩, ⟨12, false, 2⟩, ⟨15, false, 3⟩, ⟨14, false, 4⟩, ⟨13, false, 5⟩, ⟨20, false, 6⟩, ⟨18, false, 7⟩, ⟨1, true, 10⟩, ⟨17, true, 10⟩, ⟨12, true, 12⟩, ⟨12, true, 13⟩, ⟨15, true, 14⟩, ⟨15, true, 15⟩, ⟨14, true, 16⟩, ⟨13, true, 17⟩, ⟨13, true, 18⟩, ⟨5, true, 19⟩, ⟨20, true, 19⟩, ⟨18, true, 20⟩, ⟨12, false, 23⟩]
+theorem represented5_6_0 : ∀ i, i ∈ recordIds records5_6_0 ↔ i ∈ componentEventEvidence anchors5 [1, 4, 5, 6, 9] [6, 1, 4, 3, 2, 9, 7] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 4, 5, 6, 9] [6, 1, 4, 3, 2, 9, 7] = [1, 5, 17, 12, 15, 14, 13, 20, 18] := by decide
+  rw [normalized]
+  simp [recordIds, records5_6_0] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_6_0).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_6_0 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_6_0) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_6_0 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 4, 5, 6, 9] graph5.root [6, 1, 4, 3, 2, 9, 7] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 4, 5, 6, 9] [6, 1, 4, 3, 2, 9, 7] records5_6_0 [] covered5_6 (by decide) represented5_6_0 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_6_0) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6], some (0, 12, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_6_0) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_6_0 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_6_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_6_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6], some (0, 12, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_6_0 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_6_0) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+def sources5_6_1 : List (AgentSourceReceipt Nat) := [⟨⟨1, 1, some 9⟩, 1023⟩, ⟨⟨7, 0, some 6⟩, 1020⟩, ⟨⟨9, 0, some 5⟩, 1019⟩, ⟨⟨2, 3, none⟩, 1018⟩, ⟨⟨2, 3, none⟩, 1017⟩, ⟨⟨3, 0, some 4⟩, 1016⟩, ⟨⟨4, 3, none⟩, 1015⟩, ⟨⟨4, 3, none⟩, 1014⟩, ⟨⟨1, 3, none⟩, 1013⟩, ⟨⟨1, 3, none⟩, 1012⟩, ⟨⟨6, 0, some 1⟩, 1010⟩, ⟨⟨7, 2, none⟩, 1007⟩, ⟨⟨9, 2, none⟩, 1006⟩, ⟨⟨2, 2, none⟩, 1005⟩, ⟨⟨3, 2, none⟩, 1004⟩, ⟨⟨4, 2, none⟩, 1003⟩, ⟨⟨1, 2, none⟩, 1002⟩, ⟨⟨6, 2, none⟩, 1000⟩, ⟨⟨6, 2, none⟩, 1000⟩]
+def records5_6_1 : List (EventRecord Nat) := [⟨12, false, 1023⟩, ⟨18, true, 1020⟩, ⟨5, true, 1019⟩, ⟨20, true, 1019⟩, ⟨13, true, 1018⟩, ⟨13, true, 1017⟩, ⟨14, true, 1016⟩, ⟨15, true, 1015⟩, ⟨15, true, 1014⟩, ⟨12, true, 1013⟩, ⟨12, true, 1012⟩, ⟨1, true, 1010⟩, ⟨17, true, 1010⟩, ⟨18, false, 1007⟩, ⟨20, false, 1006⟩, ⟨13, false, 1005⟩, ⟨14, false, 1004⟩, ⟨15, false, 1003⟩, ⟨12, false, 1002⟩, ⟨17, false, 1000⟩, ⟨17, false, 1000⟩]
+theorem represented5_6_1 : ∀ i, i ∈ recordIds records5_6_1 ↔ i ∈ componentEventEvidence anchors5 [1, 4, 5, 6, 9] [6, 1, 4, 3, 2, 9, 7] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 4, 5, 6, 9] [6, 1, 4, 3, 2, 9, 7] = [1, 5, 17, 12, 15, 14, 13, 20, 18] := by decide
+  rw [normalized]
+  simp [recordIds, records5_6_1] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_6_1).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_6_1 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_6_1) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_6_1 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 4, 5, 6, 9] graph5.root [6, 1, 4, 3, 2, 9, 7] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 4, 5, 6, 9] [6, 1, 4, 3, 2, 9, 7] records5_6_1 [] covered5_6 (by decide) represented5_6_1 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_6_1) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6], some (0, 12, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_6_1) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_6_1 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_6_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_6_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6], some (0, 12, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_6_1 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_6_1) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees5_6_1 : SameAgentSources sources5_6_1 sources5_6_0 := by
+  exact same_sources_of_check sources5_6_1 sources5_6_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_6_1 sources5_6_0 source_agrees5_6_1
+def sources5_6_2 : List (AgentSourceReceipt Nat) := [⟨⟨1, 2, none⟩, 2002⟩, ⟨⟨4, 2, none⟩, 2003⟩, ⟨⟨3, 2, none⟩, 2004⟩, ⟨⟨2, 2, none⟩, 2005⟩, ⟨⟨9, 2, none⟩, 2006⟩, ⟨⟨7, 2, none⟩, 2007⟩, ⟨⟨1, 3, none⟩, 2012⟩, ⟨⟨1, 3, none⟩, 2013⟩, ⟨⟨4, 3, none⟩, 2014⟩, ⟨⟨4, 3, none⟩, 2015⟩, ⟨⟨3, 0, some 4⟩, 2016⟩, ⟨⟨2, 3, none⟩, 2017⟩, ⟨⟨2, 3, none⟩, 2018⟩, ⟨⟨9, 0, some 5⟩, 2019⟩, ⟨⟨7, 0, some 6⟩, 2020⟩, ⟨⟨1, 1, some 9⟩, 2023⟩, ⟨⟨6, 2, none⟩, 2000⟩, ⟨⟨6, 0, some 1⟩, 2010⟩]
+def records5_6_2 : List (EventRecord Nat) := [⟨12, false, 2002⟩, ⟨15, false, 2003⟩, ⟨14, false, 2004⟩, ⟨13, false, 2005⟩, ⟨20, false, 2006⟩, ⟨18, false, 2007⟩, ⟨12, true, 2012⟩, ⟨12, true, 2013⟩, ⟨15, true, 2014⟩, ⟨15, true, 2015⟩, ⟨14, true, 2016⟩, ⟨13, true, 2017⟩, ⟨13, true, 2018⟩, ⟨5, true, 2019⟩, ⟨20, true, 2019⟩, ⟨18, true, 2020⟩, ⟨12, false, 2023⟩, ⟨17, false, 2000⟩, ⟨1, true, 2010⟩, ⟨17, true, 2010⟩]
+theorem represented5_6_2 : ∀ i, i ∈ recordIds records5_6_2 ↔ i ∈ componentEventEvidence anchors5 [1, 4, 5, 6, 9] [6, 1, 4, 3, 2, 9, 7] := by
+  intro i
+  have normalized : componentEventEvidence anchors5 [1, 4, 5, 6, 9] [6, 1, 4, 3, 2, 9, 7] = [1, 5, 17, 12, 15, 14, 13, 20, 18] := by decide
+  rw [normalized]
+  simp [recordIds, records5_6_2] <;> omega
+example : (normalizeAgentSources anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) sources5_6_2).map (fun record => (⟨record.opid, record.expected, record.payload.bookkeeping⟩ : EventRecord Nat)) = records5_6_2 := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_6_2) (model5.level graph5.root + 2) [] = some result ∧
+    rankedPass model5 (chainOwner anchors5) graph5.root records5_6_2 result = result ∧
+    chainReplay (agentModel (documentAgent graph5)) anchors5 [1, 4, 5, 6, 9] graph5.root [6, 1, 4, 3, 2, 9, 7] = some (graph5.root :: (recordIds result).map (chainOwner anchors5)) ∧
+    runComponents (decodedComponentGraph graph5 documents5 methods5) patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds result).map (chainOwner anchors5)) = some final :=
+  component_full_replay graph5 documents5 methods5 methods_agree5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 (by decide) (by decide) [1, 4, 5, 6, 9] [6, 1, 4, 3, 2, 9, 7] records5_6_2 [] covered5_6 (by decide) represented5_6_2 (.nil _)
+example : (stopWhenStable (rankedPass model5 (chainOwner anchors5) graph5.root records5_6_2) (model5.level graph5.root + 2) []).map (fun records => (graph5.root :: (recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ ((recordIds records).map (chainOwner anchors5))).map (componentResult documents5 4))) = some ([6], some (0, 12, 9)) := by decide
+example : ∃ result final,
+    stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_6_2) ((coldComponentEvents graph5 anchors5).size + 3) [] = some result ∧
+    rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_6_2 result = result ∧
+    ((recordIds result).map (chainOwner anchors5)).head? = some graph5.root ∧
+    runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds result).map (chainOwner anchors5)).drop 1) = some final :=
+  component_cold_full_replay graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) records5_6_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_6_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => ((recordIds records).map (chainOwner anchors5), (runComponents graph5 patch5 12 ⟨.active graph5.initialDocument, 12, 9⟩ (((recordIds records).map (chainOwner anchors5)).drop 1)).map (componentResult documents5 4))) = some ([6], some (0, 12, 9)) := by decide
+example := integrated_agent_execution graph5 patch5 registry5 9 12 12 receipts5 ordered5 bounded5 parents5 (by decide) (by decide) sources5_6_2 (by decide)
+example : (stopWhenStable (rankedPass (coldComponentEvents graph5 anchors5) (chainOwner anchors5) graph5.size records5_6_2) ((coldComponentEvents graph5 anchors5).size + 3) []).map (fun records => confirmedReceiptView (records.map (agentReceiptView anchors5 (expectedRegistry (componentRegistry graph5 patch5 registry5 9)) operationTime5 chainFacts5))) = some [⟨6, true, ReceiptCutoffView.chain ⟨0, [100, 10, 0], 1788566460000, true⟩⟩] := by decide
+theorem source_agrees5_6_2 : SameAgentSources sources5_6_2 sources5_6_0 := by
+  exact same_sources_of_check sources5_6_2 sources5_6_0 (by decide)
+example := integrated_agent_convergence graph5 patch5 registry5 9 12 12 receipts5 operationTime5 chainFacts5 ordered5 bounded5 sources5_6_2 sources5_6_0 source_agrees5_6_2
 end Archon.IntegratedAgentFixtures

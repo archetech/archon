@@ -271,11 +271,13 @@ pub(crate) fn event_record_to_value(event: &EventRecord) -> Value {
     let mut val = json!({
         "registry": event.registry,
         "time": event.time,
-        "ordinal": event.ordinal,
         "operation": event.operation,
         "opid": event.opid,
         "did": event.did
     });
+    if let Some(ordinal) = &event.ordinal {
+        val["ordinal"] = json!(ordinal);
+    }
     if let Some(reg) = &event.registration {
         val["registration"] = reg.clone();
     }

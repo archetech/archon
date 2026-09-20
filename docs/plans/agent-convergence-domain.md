@@ -1,7 +1,7 @@
 # Agent convergence domain audit (A2)
 
 This records work under A2 of the [fixed completion contract](protocol-convergence-completion.md).
-It does not add roadmap criteria. A2 remains open; see the pin-receipt counterexample in the
+It does not add roadmap criteria. A2 is complete following the approved pin proof-time correction; see the
 [integrated agent model and signed bridge](agent-convergence-full-records.md).
 
 ## Reachable equal chain positions

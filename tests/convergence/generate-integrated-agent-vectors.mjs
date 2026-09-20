@@ -8,7 +8,7 @@ const keys = [161, 162, 163].map(n => cipher.generateJwk(new Uint8Array(32).fill
 const cid = operation => generateCID(operation, { canonical: true });
 const date = second => new Date(Date.UTC(2026, 8, 5, 0, 0, second)).toISOString();
 const vectors = [];
-for (const legacy of [false, true]) for (const middle of ['ZEC:testnet', 'hyperswarm']) {
+for (const legacy of [false, true]) for (const middle of ['ZEC:testnet', 'hyperswarm', 'pin']) {
     const registration = registry => ({ version: 1, type: 'agent', registry });
     function sign(payload, key, method, second) {
         const config = { type: legacy ? 'EcdsaSecp256k1Signature2019' : 'DataIntegrityProof',
@@ -52,7 +52,14 @@ for (const legacy of [false, true]) for (const middle of ['ZEC:testnet', 'hypers
         registration: { height: 100, index, txid: 'tx-' + index, batch: 'batch-' + index, opidx: 0 } });
     const events = operations.map(hint);
     operations.forEach((operation, i) => {
-        if (expectedRegistry[i] !== 'hyperswarm') events.push(anchor(operation, expectedRegistry[i], i + 10));
+        if (expectedRegistry[i] === 'pin') {
+            // Pin confirmation envelopes have no chain clock. Repeated receipt
+            // times must normalize to the complete operation's proof time.
+            events.push({ operation, registry: 'pin', time: date(90), ordinal: [i] });
+            events.push({ operation, registry: 'pin', time: date(120), ordinal: [i + 20] });
+        } else if (expectedRegistry[i] !== 'hyperswarm') {
+            events.push(anchor(operation, expectedRegistry[i], i + 10));
+        }
     });
     // Wrong-registry hints and repeated anchors retain distinct evidence identities.
     events.push(anchor(operations[2], 'ETH:sepolia', 1));

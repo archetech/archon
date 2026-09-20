@@ -235,3 +235,7 @@ These rules apply to coding agents working in this repository.
 - Absence of a bundled receipt producer does not prove an input is forbidden when the documented protocol and existing signed fixtures admit it. Audit repeated pin receipts before treating every unanchored confirmation clock as intrinsic to the operation.
 
 - Signed proof bridges must validate the genesis method, creation key, and signature oracle before treating the root as authorized; checking only successor signatures leaves invalid source fixtures inside the model domain.
+
+- Pin receipts use operation `proof.created` at import and stored-candidate recovery, as approved for the A2–A4 clock counterexample. This is a timestamp rule, not a change to pin relay trust, deduplication, or ordinals.
+
+- Rust event-to-JSON helpers must omit absent ordinals, matching `EventRecord` serialization; emitting `null` breaks reimport under ordinal validation. Cover the serialized round trip for unanchored receipts.

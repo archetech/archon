@@ -391,7 +391,7 @@ silently skip an invalid operation and apply its successors. This is the shared
 event-authorization contract, not a claim of general DID-document schema validation.
 
 `versionSequence` and `versionTime` select a prefix of accepted history. Historical
-updates use event time, with Hyperswarm envelopes normalized to `proof.created`;
+updates use event time, with Hyperswarm and pin envelopes normalized to `proof.created`;
 controller authorization additionally uses the registry-local ordinal cutoff
 where applicable. Stop at the first excluded successor; do not sort by claimed
 proof times. Genesis `created` comes from the creation operation. Confirmed
@@ -554,7 +554,7 @@ An operation on an asset — create, update, or delete — is authorized by a ke
 
 - For the controller's events on the operation's registry, the cutoff is the **ordinal**: only events the chain committed strictly before the operation's are applied. Every event in a block shares the block's time, so time cannot order a rotation against an operation committed earlier in the same block, and a later block may carry an earlier timestamp; the ordinal is the chain's order.
 - For the controller's events on any other registry, the cutoff is the operation's **block time**, since ordinals do not compare across registries.
-- This applies only when the controller's own confirmed history is chain-anchored — every event confirming it on its registry carries the position the chain assigned. Otherwise, controller selection uses the asset operation's `proof.created` cutoff. For controller events on `hyperswarm`, compare that cutoff with each controller operation's own `proof.created`, never its node-local receipt time. Events on other registries retain their existing event-time/chain-position rules.
+- This applies only when the controller's own confirmed history is chain-anchored — every event confirming it on its registry carries the position the chain assigned. Otherwise, controller selection uses the asset operation's `proof.created` cutoff. For controller events on `hyperswarm` or `pin`, compare that cutoff with each controller operation's own `proof.created`, never its node-local receipt time. Events on other registries retain their existing event-time/chain-position rules.
 
 The anchoring check walks the controller's confirmed prefix using each version's
 predecessor registry, stopping at the first non-confirming successor. Only
@@ -566,13 +566,13 @@ lack registration metadata. An unconfirmed suffix must not
 switch controller selection from proof time to chain position simply because
 one node retained a wrong-registry chain receipt instead of a gossip hint.
 
-Hyperswarm historical resolution selects a predecessor-linked prefix: stop at the
+Hyperswarm and pin historical resolution select a predecessor-linked prefix: stop at the
 first operation whose proof time exceeds the cutoff. Do not sort operations by
 proof time or skip an excluded predecessor to apply a successor with an earlier
-claimed time. The same proof time supplies Hyperswarm `updated` and `deleted`
+claimed time. The same proof time supplies Hyperswarm and pin `updated` and `deleted`
 metadata; genesis `created` continues to come from the creation operation.
 The Hyperswarm mediator assigns proof time to `event.time`. Gatekeeper normalizes
-older/imported Hyperswarm envelopes and stored candidates before replay; the
+older/imported Hyperswarm and pin envelopes and stored candidates before replay; the
 resolver uses `event.time` uniformly. This corrects envelope timestamps without
 rewriting signed operations, operation IDs, or ordinals.
 

@@ -738,6 +738,17 @@ mod tests {
         });
 
         assert!(verify_event_shape(&valid_create));
+        for registry in ["local", "hyperswarm", "pin"] {
+            let mut event = valid_create.clone();
+            event["registry"] = json!(registry);
+            let restored = event_record_to_value(&value_to_event_record(&event));
+            assert!(restored.get("ordinal").is_none());
+            assert!(verify_event_shape(&restored));
+            event["ordinal"] = json!([1, 2]);
+            let restored = event_record_to_value(&value_to_event_record(&event));
+            assert_eq!(restored["ordinal"], event["ordinal"]);
+            assert!(verify_event_shape(&restored));
+        }
         assert!(verify_event_shape(&valid_asset_create));
         assert!(verify_event_shape(&valid_update));
         assert!(verify_event_shape(&valid_delete));

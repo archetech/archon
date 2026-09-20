@@ -739,7 +739,7 @@ set to the DID; otherwise it is omitted.
 
 The resolver uses stored `event.time`, comparing instants at JavaScript
 millisecond precision (including offsets). The Hyperswarm mediator sets this
-field to the operation's `proof.created`. Gatekeeper normalizes Hyperswarm
+field to the operation's `proof.created`. Gatekeeper normalizes Hyperswarm and pin
 envelopes on import and during candidate recovery, covering older mediators,
 HTTP history imports, and existing databases. It corrects envelope timestamps
 without changing operation bytes, IDs, or ordinals. Both ordinary and verified

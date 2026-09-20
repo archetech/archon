@@ -1,16 +1,16 @@
 # Integrated agent convergence (A2–A4)
 
-This advances, but does not yet close, the agent-model integration criteria in the
+This completes the agent-model integration criteria in the
 [fixed completion contract](protocol-convergence-completion.md). The asset/controller
 proof (B1–B3) and protocol composition (C1–C3) remain open. This is a proof of the
 protocol model with a signed executable bridge, not universal verification of the
 TypeScript or Rust programs.
 
-## Blocking pin-receipt audit
+## Pin-receipt audit and approved correction
 
 The post-implementation audit found that the proposed unanchored operation-clock
-table does not model admitted `pin` receipts whose time differs from proof time.
-`pin-receipt-counterexample.json` uses real modern signatures and the ordinary
+table initially failed to model admitted `pin` receipts whose time differed from proof time.
+`pin-receipt-counterexample.json` now covers both proof formats and the ordinary
 importer: genesis G, parent P, a key rotation C, and an asset signed by the old key
 at a time between two pin receipts of C. Both nodes retain exactly the same agent
 candidate set. Their gossip order determines whether P is available when the
@@ -25,12 +25,14 @@ not an observed production occurrence. Bundled
 pinning/Filecoin mediators drain queues but do not emit pin confirmation receipts.
 However, the documented protocol and earlier signed pin migration fixtures admit
 those receipts. Lack of a bundled producer is insufficient to claim they are
-forbidden. No protocol behavior has been changed. Normalizing pin time to the
-operation clock or selecting repeated pin receipts deterministically requires the
-maintainer's protocol decision under the frozen roadmap. A2–A4 remain open.
+forbidden. The maintainer approved normalizing pin receipts to `proof.created`,
+matching Hyperswarm. Both Gatekeepers now do that at import and candidate recovery.
+The signed regression checks equal rejected asset verdicts and repair of a stored
+pre-fix projection that had incorrectly accepted the asset, in both proof formats.
+Operation bytes, canonical IDs, and ordinals are preserved.
 
-The general Lean results below are valid for their explicit source-table model;
-they do not prove that this unresolved input class satisfies the clock contract.
+This closes the clock-contract gap. Pin migration and repeated pin receipt cases
+also participate in the integrated source/model/runtime bridge below.
 
 ## Result and dependencies
 
@@ -103,7 +105,7 @@ The authorization-view tables have specific meanings:
 
 | Input | Source | Why nodes can share it |
 | --- | --- | --- |
-| Operation clock | Complete operation content (local genesis `created`; normalized Hyperswarm and update/delete `proof.created`) | Complete proof is part of canonical identity, including the legacy proof format |
+| Operation clock | Complete operation content (local genesis `created`; normalized Hyperswarm/pin and local update/delete `proof.created`) | Complete proof is part of canonical identity, including the legacy proof format |
 | Chain registry/ordinal/time | Fixed authoritative mediator/chain facts | Equal chain position classes use the same block time; receipt arrival is not the clock |
 | Chain registration presence | Authoritative receipt metadata | Bundled chain mediators supply it; public relays strip chain authority |
 | Confirmation flag | Receipt registry equals derived predecessor registry | Derived during normalization and settled by replay |
@@ -115,8 +117,8 @@ migration state are in the component result. Transaction/batch labels and other
 arrival bookkeeping are excluded; they are not read by these selection rules.
 
 This does not give arbitrary administrator-supplied envelopes authoritative status
-in the model. Chain source facts come from the agreed chain view. Hyperswarm
-normalizes to the operation clock; peer/export relay strips chain authority. The
+in the model. Chain source facts come from the agreed chain view. Hyperswarm and pin
+normalize to the operation clock; peer/export relay strips chain authority. The
 pinning mediators consume queue entries but do not produce chain confirmations.
 The model's source tables express these producer contracts; the signed bridge
 checks their translation. General refinement of all ingress/codec behavior is the
@@ -130,10 +132,10 @@ are irrelevant simply because the mathematical view omits them.
 
 ## Signed bridge (A4)
 
-`integrated-agent-vectors.json` has both proof formats and 28 scenarios, each in
+`integrated-agent-vectors.json` has both proof formats and 42 scenarios, each in
 three delivery orders (including duplicate delivery and genesis-last), followed
 by repeat and restart phases. It combines key/registry replacement, component
-replacement/carry-forward, return and Hyperswarm migrations, deletion, rejected
+replacement/carry-forward, return, Hyperswarm, and pin migrations, deletion, rejected
 retired/proposed keys, rejected post-deletion updates, competing branches,
 wrong-chain hints, repeated/earlier anchors with different block times, equal-position CID ties, absent
 predecessors, provisional-only evidence, and an unconfirmed gap before an anchored
