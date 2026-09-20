@@ -8,9 +8,13 @@ export const comparePositions = (a, b) => {
 };
 export function integratedAgentGraph(vector) {
     const graph = componentGraph(vector, true);
+    const rootIndex = graph.ranks.indexOf(graph.root);
+    const genesisMethod = graph.documents[graph.root].find(method => method.id === graph.named[rootIndex]);
+    assert(vector.operations[rootIndex].proof.verificationMethod === '#key-1'
+        && genesisMethod !== undefined && vector.signatureValid[rootIndex][genesisMethod.key],
+    'genesis requires its own valid key-1 signature');
     const states = documentStates(vector, graph);
     const components = componentStates(vector, graph);
-    const rootIndex = graph.ranks.indexOf(graph.root);
     const registryAt = i => i === rootIndex ? vector.operations[i].registration.registry
         : vector.operations[i].doc?.didDocumentRegistration?.registry ?? registryAt(graph.parents[i]);
     const expected = vector.operations.map((_, i) => registryAt(i === rootIndex ? i : graph.parents[i]));

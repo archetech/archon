@@ -75,3 +75,16 @@ test('receipt view survives operation and receipt table reorderings', () => {
         assert.deepEqual(integratedAgentGraph(changed).scenarios.map(s => s.receiptView), before.scenarios.map(s => s.receiptView));
     }
 });
+
+test('requires genesis authorization by its own creation key', () => {
+    for (const original of vectors) {
+        const v = structuredClone(original);
+        const root = v.operations.findIndex(op => op.type === 'create');
+        const key = v.keys.findIndex(key => JSON.stringify(key) === JSON.stringify(v.operations[root].publicJwk));
+        v.signatureValid[root] = v.keys.map((_, index) => index !== key);
+        assert.throws(() => integratedAgentGraph(v), /genesis requires/);
+        const method = structuredClone(original);
+        method.operations[root].proof.verificationMethod = '#key-2';
+        assert.throws(() => integratedAgentGraph(method), /genesis requires/);
+    }
+});
