@@ -4,14 +4,17 @@ import DbMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import MemoryClient from '@didcid/ipfs/memory';
 import type { GatekeeperEvent, Operation } from '@didcid/gatekeeper/types';
 
-type Vector = { states?: (number | 'deleted' | null)[]; legacy: boolean; mode: string; did: string; operations: Operation[]; ids: string[]; expected: number[]; events: GatekeeperEvent[]; orders: number[][]; block: { height: number; hash: string; time: number } };
-const vectors: Vector[] = ['chain-successor-vectors', 'chain-document-vectors'].flatMap(name => JSON.parse(readFileSync(`tests/convergence/${name}.json`, 'utf8')));
+type Block = { height: number; hash: string; time: number };
+type Vector = { blocks?: { registry: string; block: Block }[]; expectedEvents?: number[]; expectedRegistry?: string; states?: (number | 'deleted' | null)[]; legacy: boolean; mode: string; did: string; operations: Operation[]; ids: string[]; expected: number[]; events: GatekeeperEvent[]; orders: number[][]; block: { height: number; hash: string; time: number } };
+const vectors: Vector[] = ['chain-successor-vectors', 'chain-document-vectors', 'migration-vectors'].flatMap(name => JSON.parse(readFileSync(`tests/convergence/${name}.json`, 'utf8')));
 it.each(vectors)('settles competing branches ($mode, legacy=$legacy)', async vector => {
     for (const order of vector.orders) {
         const db = new DbMemory('chain-successors');
         const ipfs = new MemoryClient();
         let gatekeeper = new Gatekeeper({ db, ipfs });
-        await gatekeeper.addBlock('BTC:signet', vector.block);
+        for (const { registry, block } of vector.blocks ?? [{ registry: 'BTC:signet', block: vector.block }]) {
+            await gatekeeper.addBlock(registry, block);
+        }
         for (const token of order) {
             await gatekeeper.importBatch([structuredClone(vector.events[token])]);
             await gatekeeper.processEvents();
@@ -25,6 +28,11 @@ it.each(vectors)('settles competing branches ($mode, legacy=$legacy)', async vec
             const doc = await gatekeeper.resolveDID(vector.did, { verify: true });
             const events = await db.getEvents(vector.did);
             expect({ order, phase, ids: events.map(e => e.opid) }).toEqual({ order, phase, ids: vector.expected.map(i => vector.ids[i]) });
+            if (vector.expectedEvents) {
+                const expectedEvents = vector.expectedEvents.map((token, i) => ({ ...vector.events[token], did: vector.did, opid: vector.ids[vector.expected[i]] }));
+                expect(JSON.parse(JSON.stringify(events))).toEqual(expectedEvents);
+                expect(doc.didDocumentRegistration?.registry).toBe(vector.expectedRegistry);
+            }
             const last = vector.expected.at(-1)!;
             if (vector.operations[last].type === 'delete') {
                 expect(doc.didDocumentMetadata?.deactivated).toBe(true);
