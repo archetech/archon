@@ -313,3 +313,19 @@ remaining phase obligation is to prove that live interleaved anchor and branch
 replay reaches this compiled state. Then connect full document authorization and
 registry migrations before dynamic assets, metadata, and retention. #1215 remains
 open; this increment is not the general Archon convergence theorem.
+
+
+### Interleaved next-event settlement and transition bridge — #1215
+
+The new model interleaves duplicate anchor promotion and sibling replacement.
+Lean proves that a complete scan settles the next event once its predecessor is
+fixed, including different valid retained warm heads and tails. Duplicate
+promotion preserves descendants; a preferred sibling truncates the old branch.
+
+The shared signed fixture bridge checks 764 transitions and 100 passes in Lean
+and both runtimes, comparing complete event records and serialized stopping.
+This strengthens the runtime correspondence beyond final-path tests without
+changing runtime behavior. The universal whole-path induction remains open:
+prove stable-prefix preservation, suffix progress, and the stop-on-unchanged
+bound. Fixed authorization/registry assumptions, migrations, assets, metadata,
+and retention are still explicit remaining obligations.

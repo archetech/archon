@@ -185,3 +185,5 @@ These rules apply to coding agents working in this repository.
 - When composing chain anchor priorities with successor replay, state the settled-anchor phase boundary explicitly. Preserve operation identity under priority encoding and instantiate the composed theorem from signed competing branches; passing finite runtime traces does not prove the interleaved replay loop reaches that boundary.
 
 - Count distinct delivery permutations when reporting fixture coverage, and test uniqueness for each scenario size. Negative bridge tests must mutate the exact field guarded by the claimed invariant in both operation tables and matching event records.
+
+- Interleaved replay proofs must distinguish next-event settlement under a fixed predecessor from whole-path convergence. Check signed intermediate event records and the serialized stopping pass in both ports before claiming the model matches runtime interleaving.
