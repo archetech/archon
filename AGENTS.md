@@ -210,3 +210,5 @@ These rules apply to coding agents working in this repository.
 
 - Migration ordering bridges may collapse multiple provisional receipts of one operation to one CID rank, but must track full receipt identity separately and preserve the first provisional observation. Exercise both gossip-first and wrong-chain-first deliveries through both per-event importers, and do not infer full metadata or stopping refinement from rank equality alone.
 - Protocol proof completion is tracked by fixed criteria A1–C3 in `docs/plans/protocol-convergence-completion.md`. Map proof PRs to those IDs, distinguish protocol semantics from universal runtime refinement, and report scope changes explicitly instead of extending the rolling roadmap.
+
+- Integrated agent proofs must derive registry changes and document authorization from the same component tables. Prove registry-fold/component agreement, including deletion carry-forward, and distinguish abstract Lean examples from the signed cross-port bridge required by A4.

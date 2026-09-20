@@ -924,3 +924,40 @@ compose registry reconstruction and this representation with
 predecessor-document authorization. Unanchored-registry migration policy, deletion
 in this model, dynamic assets, full metadata/codecs, retention, and universal
 runtime correspondence remain open. No production behavior changes.
+
+
+## Integrated component and registry eligibility — A1, #1215
+
+`AgentRegistry.lean` advances A1 in the [fixed completion contract](../../docs/plans/protocol-convergence-completion.md).
+`componentRegistry` derives ancestry and registration changes from the same
+`DocumentGraph` and `ComponentPatch` used by component execution. The general
+step/fold proofs establish that this registry reconstruction equals the executed
+component's registration, including carry-forward and deletion. Full-document
+methods can be supplied through `decodedComponentGraph`, as in the examples.
+
+`componentAnchors` combines that registry with document-derived authorization.
+Its receipt-admission input represents chain admission only; predecessor-key
+verification is computed separately from named methods and the fixed
+operation/public-key signature matrix. `component_anchor_from_history` derives
+the predecessor component state from a valid document-authorized history and
+proves that anchor eligibility is equivalent to receipt admission, chain policy,
+matching owner and predecessor registry, and successful component execution.
+A migration uses the old registry and old methods; its proposed replacements
+apply to subsequent operations. No final authorizing state or accepted-operation
+set is supplied to the theorem.
+
+The premises still include an admitted bounded genesis, ordered predecessor
+ancestry, a valid prefix under the derived document predicate, and an incoming
+operation linked to that prefix. Registry-name decoding, chain-admission facts,
+and cryptographic signature validity are abstract inputs. This is a local
+eligibility/composition result, not a theorem that arbitrary raw evidence yields
+that prefix or that full protocol reconciliation converges.
+
+`AgentRegistryExamples.lean` checks combined key/registry changes, data carry,
+return migration, deletion, post-deletion rejection, misleading registry receipts,
+repeated anchors, and rejection of retired/proposed-key signatures. It instantiates
+the general prefix theorem using methods decoded from full document values.
+These are hand-written abstract Lean examples, not signed cross-port fixtures;
+A4 remains open. The new modules run in the default CI build, and all six general
+theorems are checked against the existing axiom allowlist. A1 remains in progress
+until the integrated predicate is connected to the raw-event projection/replay.
