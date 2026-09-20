@@ -8,6 +8,7 @@ const vectors = JSON.parse(readFileSync('tests/convergence/tied-anchor-vectors.j
     legacy: boolean; did: string; operations: Operation[]; ids: string[];
 }[];
 const malformed = [undefined, null, [], Array(1), 7, '7', [null], [null, 1], [-1], [0.5], ['1', 2], [Number.MAX_SAFE_INTEGER + 1]];
+const malformedUnanchored = malformed.filter(ordinal => ordinal !== undefined && !(Array.isArray(ordinal) && ordinal.length === 0));
 
 it.each(vectors.filter((_, i) => i % 2 === 0))('requires chain positions through import and restart (legacy=$legacy)', async vector => {
     const genesis: GatekeeperEvent = { registry: 'SOL:devnet', time: '2026-09-01T00:00:00Z',
@@ -52,8 +53,25 @@ it.each(vectors.filter((_, i) => i % 2 === 0))('requires chain positions through
     expect((await positionedDb.getEvents(vector.did))[0].registration?.opidx).toBe(1);
     expect(await positioned.importBatchByCids([null] as never, { ...genesis, ordinal: genesis.ordinal! })).toEqual({ queued: 0, processed: 0, rejected: 0, total: 0 });
     for (const registry of ['local', 'hyperswarm', 'pin']) {
-        const g = new Gatekeeper({ db: new DbMemory('hints'), ipfs: new MemoryClient() });
+        const db = new DbMemory(`hints-${registry}`);
+        const ipfs = new MemoryClient();
+        const cid = await ipfs.addJSON(vector.operations[0]);
+        const g = new Gatekeeper({ db, ipfs });
         expect(await g.verifyEvent({ ...genesis, registry, ordinal: undefined })).toBe(true);
+        expect(await g.verifyEvent({ ...genesis, registry, ordinal: [] })).toBe(true);
+        for (const ordinal of malformedUnanchored) {
+            expect(await g.verifyEvent({ ...genesis, registry, ordinal } as never)).toBe(false);
+            await expect(g.importBatchByCids([cid], { ...genesis, registry, ordinal } as never)).rejects.toThrow('metadata');
+            expect(await db.getOperation(cid)).toBeNull();
+        }
+        await expect(g.importBatchByCids([cid], { ...genesis, registry, ordinal: [] } as never)).resolves.toMatchObject({ queued: 1 });
+        const recoveredDb = new DbMemory(`recovered-${registry}`);
+        const recoveredInvalid = { ...genesis, registry, ordinal: [null] } as never;
+        await recoveredDb.setCandidates(vector.did, [recoveredInvalid]);
+        await recoveredDb.setEvents(vector.did, [recoveredInvalid]);
+        const recovered = new Gatekeeper({ db: recoveredDb, ipfs: new MemoryClient() });
+        await recovered.resolveDID(vector.did, { verify: true });
+        expect(await recoveredDb.getEvents(vector.did)).toEqual([]);
     }
     const db = new DbMemory('relay');
     const g = new Gatekeeper({ db, ipfs: new MemoryClient() });

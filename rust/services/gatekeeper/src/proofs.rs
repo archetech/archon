@@ -72,6 +72,14 @@ pub(crate) fn valid_chain_ordinal(value: Option<&Value>) -> bool {
     })
 }
 
+pub(crate) fn valid_unanchored_ordinal(value: Option<&Value>) -> bool {
+    value.and_then(Value::as_array).is_some_and(|items| {
+        items.iter().all(|item| {
+            ordinal_component(item).is_some_and(|number| number <= MAX_ORDINAL_COMPONENT)
+        })
+    })
+}
+
 pub(crate) fn verify_event_shape(event: &Value) -> bool {
     let Some(registry) = event.get("registry").and_then(Value::as_str) else {
         return false;
@@ -80,9 +88,12 @@ pub(crate) fn verify_event_shape(event: &Value) -> bool {
         return false;
     }
 
-    if !crate::is_unanchored_registry(registry)
-        && !valid_chain_ordinal(event.get("ordinal"))
-    {
+    let valid_ordinal = if crate::is_unanchored_registry(registry) {
+        event.get("ordinal").is_none() || valid_unanchored_ordinal(event.get("ordinal"))
+    } else {
+        valid_chain_ordinal(event.get("ordinal"))
+    };
+    if !valid_ordinal {
         return false;
     }
 

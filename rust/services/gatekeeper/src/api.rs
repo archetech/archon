@@ -667,13 +667,13 @@ pub(crate) async fn import_batch_by_cids(
         .get("time")
         .and_then(Value::as_str)
         .is_some_and(|value| !value.is_empty());
-    let has_ordinal = metadata
-        .get("ordinal")
-        .and_then(Value::as_array)
-        .is_some();
+    let has_ordinal = metadata.get("ordinal").is_some();
     let chain_position = metadata.get("registry").and_then(Value::as_str).is_some_and(|registry| {
-        crate::is_unanchored_registry(registry)
-            || crate::proofs::valid_chain_ordinal(metadata.get("ordinal"))
+        if crate::is_unanchored_registry(registry) {
+            crate::proofs::valid_unanchored_ordinal(metadata.get("ordinal"))
+        } else {
+            crate::proofs::valid_chain_ordinal(metadata.get("ordinal"))
+        }
     });
     if !has_registry || !has_time || !has_ordinal || !chain_position {
         record_metrics(

@@ -597,10 +597,17 @@ pub(crate) fn normalize_event_time(event: &mut EventRecord) {
 }
 
 pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) -> ImportStatus {
-    if !is_unanchored_registry(&event.registry)
-        && !event.ordinal.as_ref().is_some_and(|items| !items.is_empty()
-            && items.iter().all(|number| *number <= crate::proofs::MAX_ORDINAL_COMPONENT))
-    {
+    let valid_ordinal = if is_unanchored_registry(&event.registry) {
+        event.ordinal.as_ref().is_none_or(|items| {
+            items.iter().all(|number| *number <= crate::proofs::MAX_ORDINAL_COMPONENT)
+        })
+    } else {
+        event.ordinal.as_ref().is_some_and(|items| {
+            !items.is_empty()
+                && items.iter().all(|number| *number <= crate::proofs::MAX_ORDINAL_COMPONENT)
+        })
+    };
+    if !valid_ordinal {
         return ImportStatus::Rejected;
     }
     normalize_event_time(&mut event);
@@ -661,10 +668,17 @@ pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) 
 }
 
 pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> ImportStatus {
-    if !is_unanchored_registry(&event.registry)
-        && !event.ordinal.as_ref().is_some_and(|items| !items.is_empty()
-            && items.iter().all(|number| *number <= crate::proofs::MAX_ORDINAL_COMPONENT))
-    {
+    let valid_ordinal = if is_unanchored_registry(&event.registry) {
+        event.ordinal.as_ref().is_none_or(|items| {
+            items.iter().all(|number| *number <= crate::proofs::MAX_ORDINAL_COMPONENT)
+        })
+    } else {
+        event.ordinal.as_ref().is_some_and(|items| {
+            !items.is_empty()
+                && items.iter().all(|number| *number <= crate::proofs::MAX_ORDINAL_COMPONENT)
+        })
+    };
+    if !valid_ordinal {
         return ImportStatus::Rejected;
     }
     let trace = import_trace_enabled();

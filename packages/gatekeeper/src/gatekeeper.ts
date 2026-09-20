@@ -144,13 +144,27 @@ function isUnanchoredRegistry(registry: unknown): boolean {
     return registry === PIN_QUEUE || isLocallyStampedRegistry(registry);
 }
 
-// Chain positions must compare identically in the JavaScript and Rust ports.
-function isValidChainOrdinal(ordinal: unknown): ordinal is number[] {
-    if (!Array.isArray(ordinal) || ordinal.length === 0) return false;
+function hasValidOrdinalComponents(ordinal: unknown, allowEmpty: boolean): ordinal is number[] {
+    if (!Array.isArray(ordinal) || (!allowEmpty && ordinal.length === 0)) return false;
     for (const value of ordinal) {
         if (!Number.isSafeInteger(value) || value < 0) return false;
     }
     return true;
+}
+
+function isValidUnanchoredOrdinal(ordinal: unknown): ordinal is number[] {
+    return hasValidOrdinalComponents(ordinal, true);
+}
+
+// Chain positions must compare identically in the JavaScript and Rust ports.
+function isValidChainOrdinal(ordinal: unknown): ordinal is number[] {
+    return hasValidOrdinalComponents(ordinal, false);
+}
+
+function isValidEventOrdinal(registry: unknown, ordinal: unknown): ordinal is number[] | undefined {
+    return isUnanchoredRegistry(registry)
+        ? ordinal === undefined || isValidUnanchoredOrdinal(ordinal)
+        : isValidChainOrdinal(ordinal);
 }
 
 enum ImportStatus {
@@ -1835,8 +1849,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     private async importEventOnce(event: GatekeeperEvent): Promise<ImportStatus> {
         // Startup replay also enters here directly from retained candidates.
-        if (!isUnanchoredRegistry(event.registry)
-            && !isValidChainOrdinal(event.ordinal)) {
+        if (!isValidEventOrdinal(event.registry, event.ordinal)) {
             return ImportStatus.REJECTED;
         }
 
@@ -2086,8 +2099,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         // Only positioned receipts can claim chain authority. Relayed events
         // have already been converted to unconfirmed Hyperswarm hints.
-        if (!isUnanchoredRegistry(event.registry)
-            && !isValidChainOrdinal(event.ordinal)) {
+        if (!isValidEventOrdinal(event.registry, event.ordinal)) {
             return false;
         }
 
@@ -2241,12 +2253,15 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidParameterError('cids');
         }
 
-        if (!metadata || !metadata.registry || !metadata.time || !metadata.ordinal) {
+        if (!metadata || !metadata.registry || !metadata.time
+            || metadata.ordinal === undefined || metadata.ordinal === null) {
             throw new InvalidParameterError('metadata');
         }
 
-        if (!isUnanchoredRegistry(metadata.registry)
-            && !isValidChainOrdinal(metadata.ordinal)) {
+        if ((isUnanchoredRegistry(metadata.registry)
+            && !isValidUnanchoredOrdinal(metadata.ordinal))
+            || (!isUnanchoredRegistry(metadata.registry)
+                && !isValidChainOrdinal(metadata.ordinal))) {
             throw new InvalidParameterError('metadata');
         }
 

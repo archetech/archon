@@ -1233,6 +1233,29 @@ async fn convergence_chain_ordinals_required() {
             hint["registry"] = json!(registry);
             hint.as_object_mut().unwrap().remove("ordinal");
             assert!(crate::verify_event_shape(&hint));
+            hint["ordinal"] = json!([]);
+            assert!(crate::verify_event_shape(&hint));
+            for ordinal in [
+                json!(null),
+                json!(7),
+                json!([null]),
+                json!([null, 1]),
+                json!([-1]),
+                json!([0.5]),
+                json!(["1", 2]),
+                json!([9_007_199_254_740_992u64]),
+            ] {
+                let mut invalid_hint = genesis.clone();
+                invalid_hint["registry"] = json!(registry);
+                invalid_hint["ordinal"] = ordinal.clone();
+                assert!(!crate::verify_event_shape(&invalid_hint));
+                let response = crate::api::import_batch_by_cids(
+                    axum::extract::State(state.clone()),
+                    axum::http::HeaderMap::from_iter([(axum::http::header::HeaderName::from_static("x-archon-admin-key"), "ordinal-test".parse().unwrap())]),
+                    axum::Json(json!({"cids": [vector["ids"][0]], "metadata": invalid_hint})),
+                ).await;
+                assert_eq!(response.status(), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+            }
         }
         let (state, _directory) = crate::tests::make_state(JsonDb {
             backend: DbBackend::Memory,
