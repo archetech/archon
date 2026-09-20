@@ -88,7 +88,7 @@ roadmap stages.
 
 ### A. Integrated agent convergence
 
-- [ ] **A1 — Derived eligibility:** one agent model combines predecessor-document
+- [x] **A1 — Derived eligibility:** one agent model combines predecessor-document
   authorization, complete component updates, registry ancestry, and per-anchor
   eligibility. Shared tables have proved identity/projection contracts; accepted
   operation sets and final authorizing documents are not assumed equal.
@@ -107,17 +107,21 @@ roadmap stages.
   earlier anchors, provisional duplicates, and cold/late-genesis reconstruction.
   General statements remain Lean proofs; these tests validate the translation.
 
-A1 is **in progress**: `AgentRegistry.component_anchor_from_history` derives
-predecessor components and matching-anchor eligibility from one document graph
-and component-patch table. Registry identity/ancestry is shared by construction;
-`component_run_registry` proves the registry fold agrees with component execution.
-`decodedComponentGraph` supplies methods from the full document values. The new
-Lean examples check combined key/registry changes, return migration, deletion,
-and rejected retired/proposed-key signatures. They are abstract examples, not
-signed runtime fixtures. A1 still needs this predicate connected to the raw-event
-representation/projection used by integrated replay. A2–A4 remain open; in
-particular, this increment does not establish the complete transition domain,
-agent result/termination, or the integrated signed bridge.
+A1 is **complete** at the model-integration boundary:
+`Archon.component_anchor_from_history` in `AgentRegistry.lean` derives predecessor components and
+matching-anchor eligibility; `Archon.component_event_projection` in `AgentEventProjection.lean`
+proves the local representation contract from receipt ownership and normalization;
+`Archon.component_interleaved_replay` composes that contract with document authorization,
+interleaved/compiled ordering, and complete component execution. Methods decode
+from the same full-document values returned by the component model. No equal
+accepted-operation set or final authorizing document is assumed.
+
+The normalized event list includes eligible anchor ranks and a provisional CID
+representative for each retained operation. The latter cannot defeat an eligible
+anchor. It represents ordering, not complete receipt identity. The source-to-rank
+and receipt-metadata bridge, the complete protocol-domain audit, and the semantic
+result/stopping theorem remain A2–A4. The abstract examples are not signed runtime
+fixtures. A2–A4 remain open.
 
 ### B. Asset/controller convergence
 

@@ -1,4 +1,4 @@
-import AgentRegistry
+import AgentEventProjection
 
 set_option warningAsError true
 namespace Archon.AgentRegistryExamples
@@ -137,5 +137,42 @@ example : ∃ state,
       ∃ after, componentStep graph patches 0 5 state = some after) := by
   exact component_anchor_from_history graph patches id 10 0 0 receipts ordered rfl (by decide)
     (List.range 8) [1, 2] (by repeat first | exact ValidPath.nil _ | apply ValidPath.cons (by decide) (by decide)) 5 6 (by decide) rfl
+
+def receiptEvidence := List.range receipts.size
+def operationEvidence := List.range graph.size
+
+theorem receipts_covered : ∀ i ∈ receiptEvidence,
+    eligible anchors (chainOwner anchors i) i = true → chainOwner anchors i ∈ operationEvidence := by
+  have checked : ∀ i : Fin 11,
+      eligible anchors (chainOwner anchors i.val) i.val = true →
+      chainOwner anchors i.val ∈ operationEvidence := by decide
+  intro i member ok
+  exact checked ⟨i, List.mem_range.mp member⟩ ok
+
+example : PriorityProjection (componentEvents graph anchors)
+    (chainGraph (agentModel (documentAgent graph)) anchors receiptEvidence)
+    (chainOwner anchors) (chainPriority anchors receiptEvidence)
+    (componentEventEvidence anchors receiptEvidence operationEvidence)
+    (operationEvidence.map (chainPriority anchors receiptEvidence)) graph.size :=
+  component_event_projection graph anchors receiptEvidence operationEvidence receipts_covered
+
+example : chainReplay (agentModel (documentAgent graph)) anchors receiptEvidence 0 operationEvidence =
+    some [0, 1, 2, 5, 6] := by decide
+
+example : ∃ result final,
+    interleavedUntilStable (componentEvents graph anchors) (chainOwner anchors) graph.root
+      (componentEventEvidence anchors receiptEvidence operationEvidence)
+      ((componentEvents graph anchors).level graph.root + 1) [] = some result ∧
+    chainReplay (agentModel (documentAgent graph)) anchors receiptEvidence graph.root operationEvidence =
+      some (graph.root :: result.map (chainOwner anchors)) ∧
+    runComponents (decodedComponentGraph graph documents Document.methods) patches 0
+      ⟨.active graph.initialDocument, 0, 10⟩ (result.map (chainOwner anchors)) = some final := by
+  have bounded : DepthBounded (documentAgent graph) := by
+    have checked : ∀ i : Fin 8, graph.depth i.val < 8 := by decide
+    intro i bound
+    exact checked ⟨i, bound⟩
+  exact component_interleaved_replay graph documents Document.methods (fun _ => rfl) patches id 10 0 0
+    receipts ordered bounded rfl (by decide) receiptEvidence operationEvidence [] receipts_covered
+    (by decide) (.nil _)
 
 end Archon.AgentRegistryExamples
