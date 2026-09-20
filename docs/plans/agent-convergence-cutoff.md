@@ -22,7 +22,8 @@ harmless without checking its authorization consumers.
 
 The scheme already requires the controller's **confirmed history** to be
 chain-anchored. Both implementations now walk that prefix with each version's
-expected registry and stop at the first unconfirmed successor. Matching chain
+expected registry and stop at the first unconfirmed successor. `pin` receipts are followed as expected-registry confirmations but carry no
+chain anchoring requirement or authority. Matching chain
 receipts within the prefix must all carry registration metadata, with at least
 one such receipt to establish anchoring. Genesis is admitted separately, but a
 wrong-registry genesis receipt does not establish anchoring.
@@ -35,9 +36,13 @@ history filter with a prefix scan.
 
 ## Evidence
 
-`controller-view-vectors.json` contains both proof formats and three cases:
+`controller-view-vectors.json` contains both proof formats and five cases:
 wrong-registry suffix (proof-time fallback), genuine confirming chain receipt
-(chain cutoff), and a matching receipt missing registration metadata (fallback).
+(chain cutoff), a matching receipt missing registration metadata (fallback), wrong-registry
+genesis (fallback), and a pin-to-chain migration (chain cutoff). The latter
+uses ordinary pin receipts without registration metadata; before excluding pin
+from the chain scan, those receipts incorrectly forced proof-time fallback even
+after a genuine Zcash confirmation. Both signed formats reproduced that failure.
 TypeScript and Rust import the same signed events in opposite dependency orders,
 repeat them, reconstruct state, and check controller history, confirmed prefix,
 resolved components, and asset authorization. Raw suffix receipt identity is

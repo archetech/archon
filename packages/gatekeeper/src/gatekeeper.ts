@@ -629,7 +629,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     // Local/hyperswarm histories, unanchored registries, and migrations with
     // no chain event yet retain the historical proof-time fallback.
     private async isAnchored(did: string, registry?: string): Promise<boolean> {
-        if (!registry || isUnanchoredRegistry(registry)) {
+        if (!registry || registry === PIN_QUEUE || isUnanchoredRegistry(registry)) {
             return false;
         }
 
@@ -641,7 +641,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             // the confirmed prefix. Wrong-registry suffix receipts cannot turn
             // an unanchored controller into an anchored one.
             if (index > 0 && event.registry !== expected) break;
-            if (event.registry === expected && !isUnanchoredRegistry(event.registry)) {
+            if (event.registry === expected && event.registry !== PIN_QUEUE && !isUnanchoredRegistry(event.registry)) {
                 if (!event.registration) return false;
                 anchored = true;
             }

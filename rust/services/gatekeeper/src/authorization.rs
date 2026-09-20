@@ -12,9 +12,8 @@ use crate::{resolve_local_doc_async, AppState, EventRecord, GatekeeperDb, Resolv
 /// The two registries whose events this node stamps itself, so that no event
 /// on them can carry a position a chain assigned: a local event holds the
 /// signer's own `created`, a hyperswarm event the operation's proof time.
-/// Every other registry is one an outside source might claim confirmation on.
-/// Whether a registry actually anchors its events on a chain is not inferred
-/// from its name -- `pin` does not -- but read from the events (`is_anchored`).
+/// `pin` also has no chain position; `is_anchored` excludes it explicitly.
+/// Other registries establish anchoring through confirming event metadata.
 pub(crate) fn is_unanchored_registry(registry: &str) -> bool {
     registry == "local" || registry == "hyperswarm"
 }
@@ -27,7 +26,7 @@ async fn is_anchored(state: &AppState, did: &str, registry: Option<&str>) -> boo
     let Some(registry) = registry else {
         return false;
     };
-    if is_unanchored_registry(registry) {
+    if registry == "pin" || is_unanchored_registry(registry) {
         return false;
     }
     let events = {
@@ -45,7 +44,10 @@ async fn is_anchored(state: &AppState, did: &str, registry: Option<&str>) -> boo
         if index > 0 && Some(event.registry.as_str()) != expected {
             break;
         }
-        if Some(event.registry.as_str()) == expected && !is_unanchored_registry(&event.registry) {
+        if Some(event.registry.as_str()) == expected
+            && event.registry != "pin"
+            && !is_unanchored_registry(&event.registry)
+        {
             if event.registration.is_none() {
                 return false;
             }
