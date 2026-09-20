@@ -1,5 +1,7 @@
 # Protocol hardening after #1173
 
+The proof project now follows the [fixed protocol-convergence completion contract](protocol-convergence-completion.md). Its criteria A1–C3 supersede the historical rolling proof roadmaps below; universal implementation verification is separate.
+
 Current status (2026-09-18): #1158 and #1159 are complete. #1156 is paused at
 the maintainer's request. #1149 is complete through #1186. #1185 controller-version references were
 closed as not planned; #1180 RFC 8785 alignment merged in #1191. #1178 was

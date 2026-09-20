@@ -1,5 +1,7 @@
 # Provisional agent-history convergence (#1199, #1201, #1203, #1205, #1207, #1209, #1211, #1213)
 
+The authoritative remaining roadmap is the [protocol convergence completion contract](../../docs/plans/protocol-convergence-completion.md): three fixed deliverables with ten acceptance criteria. The sections below record completed increments and their individual limits; their historical “next” lists do not add prerequisites to that contract.
+
 This Lean project proves a bounded specification and an operational replay
 model of Archon's canonical-CID successor rule. It changes no runtime code. It uses Lean's standard library only;
 there is no Mathlib dependency.
@@ -489,21 +491,15 @@ update must also update and verify the committed checksum.
 
 ## Follow-up proof work
 
-1. Add expected-chain evidence, repeated anchors, and registry migrations to
-   the complete-component model. Future relationship enforcement requires its
-   own protocol decision; #1156 remains paused.
-2. Establish the concrete codec/normalization domain and general executable
-   refinement. Serialized stopping transfer and signed per-pass correspondence
-   are now proved/tested respectively; neither is a proof of the runtimes.
-3. Extend resolved metadata and time/version-bounded queries.
-4. Extend to assets, ownership transfers, and controller-dependent replay.
-5. Model retention, restart, and garbage collection, then strengthen the bridge
-   between the specification and both runtime implementations.
+Use the [completion contract](../../docs/plans/protocol-convergence-completion.md)
+for the target theorem, evidence definition, audited proof inventory, and fixed
+acceptance criteria A1–C3. The remaining deliverables are integrated agent
+convergence, asset/controller convergence, and composition of the protocol-wide
+theorem. Universal implementation refinement is a separate project, not another
+condition for completing this protocol proof.
 
-The full Archon convergence theorem remains open. The canonical projection and
-its bounded full-event operational refinement are proved; general document/chain
-semantics and the connection to the runtime implementations remain explicit
-obligations.
+The chronology below remains useful evidence of each increment's scope. It does
+not replace or expand the completion contract.
 
 ## Expected-chain audit — #1215 / #1216
 
