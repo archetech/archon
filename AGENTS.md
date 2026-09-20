@@ -197,3 +197,5 @@ These rules apply to coding agents working in this repository.
 - When a combined proof starts after genesis, seed the same preferred genesis event in runtime transition fixtures and retain separate public-import coverage for late genesis. Include wrong-branch keys and invalid ancestors when composing document authorization with chain priorities.
 
 - When prepending a compiled genesis rank in a proof, require its owner to be the document genesis and expose decoded full-history equality; a parentless selected rank alone does not establish identity.
+
+- Migration convergence audits must derive the expected registry from signed predecessor ancestry: confirm the migration on the old registry, its successors on the new registry, and never rank receipts from different registries by ordinal alone. Test misleading destination/old-chain receipts and return migrations through ordinary imports and restart.

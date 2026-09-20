@@ -763,3 +763,38 @@ Next audit registry-migration eligibility and ordering. Dynamic asset/controller
 authorization, full component/metadata/codec equality in the combined loop,
 changes in retained evidence, and universal executable correspondence remain
 open. This increment changes no production behavior.
+
+## Registry-migration audit — #1215
+
+The next phase starts with signed executable evidence; this audit adds no Lean
+migration theorem. `tests/convergence/migration-model.mjs` independently derives
+each operation's expected registry from its signed predecessor ancestry. It
+selects matching-chain anchors and competing siblings within that registry,
+without simulating Gatekeeper's insertion loop or comparing cross-chain ordinals.
+
+Four signed graphs (two proof formats, two branch outcomes) exercise BTC-to-ZEC
+versus BTC-to-ETH migrations, a return to BTC, successors arriving before their
+predecessors, and an earlier repeated migration anchor displacing a branch.
+Misleading migration receipts on the destination chain and successor receipts
+on the old chain must not confer priority. Each graph has six distinct delivery
+orders. Both ports check ordinary imports, repeats, and startup recovery against
+independently selected IDs, complete event records, registration, and retained
+candidate counts. All operations are signed by one unchanged agent key and all
+operations have an expected-chain anchor; ties, unanchored registry migrations,
+assets, missing evidence, and changing key permissions remain outside this audit.
+
+The runtime selection rule is predecessor-based: a migration is confirmed on its
+old registry, while its children use the resulting new registry. Gatekeeper owns
+this decision; mediators attach discovery registry/position metadata. Durable
+candidates preserve distinct anchors and replay can revisit them after a late
+predecessor. A return migration does not make old-chain positions globally
+comparable to the intervening chain's positions.
+
+Next derive this expected-registry function in Lean and prove agreement with
+selection on a valid path before incorporating migration eligibility into the
+combined authorization/priority proof. Passing these finite signed cases is not
+a universal migration-convergence claim.
+
+Audit result: all 24 signed delivery traces pass in both implementations through
+repeat import and restart, including complete stored event equality. No runtime
+correction is needed for this tested domain.

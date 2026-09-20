@@ -401,3 +401,26 @@ traces. Registry eligibility remains fixed, and no runtime code changes.
 Next audit registry-migration eligibility/ordering before extending that part of
 the model. Assets, full component/metadata/codecs in the combined loop, retention,
 and universal executable correspondence remain open under #1215.
+
+### Registry-migration ordering audit — #1215
+
+#1224 merged the combined chain/document proof. The next audit traces direct
+submission (queue the predecessor registry), mediator envelopes, durable candidate
+keys, expected-registry selection in both importers, and replay after late history.
+The migration itself uses the old registry; its successors use the new one.
+
+Signed fixtures cover competing BTC-to-ZEC/BTC-to-ETH migrations, return to BTC,
+wrong-chain receipts, earlier repeated anchors, and late predecessors under two
+proof formats and six distinct orders each (24 traces). An independent ancestry
+projection supplies expected full event histories and final registration. Both
+ports check ordinary imports, repeat imports, and restart, retaining all evidence.
+No runtime changes or new Lean theorem are part of this audit.
+
+Next formalize expected registry from signed predecessor ancestry, prove its
+agreement with a valid selected prefix, then compose it with authorization and
+priority selection. Unanchored-registry migrations, assets, ties, retention,
+metadata/codecs, and universal executable correspondence remain open.
+
+Audit result: all 24 signed delivery traces pass in both implementations through
+repeat import and restart, including complete stored event equality. No runtime
+correction is needed for this tested domain.

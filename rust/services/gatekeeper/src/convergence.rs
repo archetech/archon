@@ -685,6 +685,14 @@ async fn convergence_chain_successor_priority() {
         .as_array_mut()
         .unwrap()
         .extend(documents.as_array().unwrap().iter().cloned());
+    let migrations: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/migration-vectors.json"
+    ))
+    .unwrap();
+    vectors
+        .as_array_mut()
+        .unwrap()
+        .extend(migrations.as_array().unwrap().iter().cloned());
     for vector in vectors.as_array().unwrap() {
         let did = vector["did"].as_str().unwrap();
         for order in vector["orders"].as_array().unwrap() {
@@ -693,12 +701,23 @@ async fn convergence_chain_successor_priority() {
                 data: JsonDbFile::default(),
                 redis_connection: None,
             });
-            state
-                .store
-                .lock()
-                .await
-                .add_block("BTC:signet", vector["block"].clone())
-                .unwrap();
+            if let Some(blocks) = vector["blocks"].as_array() {
+                for entry in blocks {
+                    state
+                        .store
+                        .lock()
+                        .await
+                        .add_block(entry["registry"].as_str().unwrap(), entry["block"].clone())
+                        .unwrap();
+                }
+            } else {
+                state
+                    .store
+                    .lock()
+                    .await
+                    .add_block("BTC:signet", vector["block"].clone())
+                    .unwrap();
+            }
             for token in order.as_array().unwrap() {
                 crate::import_batch_impl(
                     &state,
@@ -759,6 +778,27 @@ async fn convergence_chain_successor_priority() {
                     json!(ids),
                     "{order}, phase {phase}"
                 );
+                if let Some(tokens) = vector["expectedEvents"].as_array() {
+                    let expected_events: Vec<crate::EventRecord> = tokens
+                        .iter()
+                        .enumerate()
+                        .map(|(i, token)| {
+                            let mut event =
+                                vector["events"][token.as_u64().unwrap() as usize].clone();
+                            event["did"] = json!(did);
+                            event["opid"] = ids[i].clone();
+                            serde_json::from_value(event).unwrap()
+                        })
+                        .collect();
+                    assert_eq!(
+                        serde_json::to_value(store.get_events(did)).unwrap(),
+                        serde_json::to_value(expected_events).unwrap()
+                    );
+                    assert_eq!(
+                        doc["didDocumentRegistration"]["registry"],
+                        vector["expectedRegistry"]
+                    );
+                }
                 let last = expected.last().unwrap().as_u64().unwrap() as usize;
                 if vector["operations"][last]["type"] == "delete" {
                     assert_eq!(doc["didDocumentMetadata"]["deactivated"], json!(true));
