@@ -75,6 +75,16 @@ export function generateRegistryFixtures(vectors) {
             assert(v.events[a].registry !== v.events[b].registry || owners[a] !== owners[b]
                 || comparePositions(v.events[a].ordinal, v.events[b].ordinal) !== 0, 'tied operation receipts outside bridge domain');
         }
+        const matches = (op, t) => owners[t] === op && chain(v.events[t].registry)
+            && v.events[t].registry === projection.expectedRegistries[v.ids.indexOf(ids[op])];
+        // The rank theorem compares all eligible receipts on a chain, including
+        // operations on different branches or at different ancestry depths.
+        const eligibleReceipts = ranked.filter(t => matches(owners[t], t));
+        for (let i = 1; i < eligibleReceipts.length; i++) {
+            const a = v.events[eligibleReceipts[i - 1]], b = v.events[eligibleReceipts[i]];
+            assert(a.registry !== b.registry || comparePositions(a.ordinal, b.ordinal) !== 0,
+                'tied eligible chain receipts outside rank theorem domain');
+        }
         const r = `receipts${n}`, model = `anchors${n}`, count = ranked.length;
         lines.push(`def ${r} : RegistryReceipts := {`, `  size := ${count}`,
             `  owner := ${table(ranked.map(t => owners[t]), size)}`,
@@ -82,8 +92,6 @@ export function generateRegistryFixtures(vectors) {
             `  chain := ${table(names.map(name => String(chain(name))), 'false')}`,
             `  accepted := fun i => decide (i < ${count})`, '}',
             `def ${model} := registryAnchors ${g} ${r}`);
-        const matches = (op, t) => owners[t] === op && chain(v.events[t].registry)
-            && v.events[t].registry === projection.expectedRegistries[v.ids.indexOf(ids[op])];
         const preferred = ops.map((_, op) => ranked.findIndex(t => matches(op, t)));
         assert(preferred.every(i => i >= 0), 'matching chain anchor required');
         assert.deepEqual(projection.path.map(i => ranked[preferred[ranks[i]]]), v.expectedEvents,

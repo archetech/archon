@@ -87,3 +87,15 @@ test('changing the winning migration ordinal cannot retain the old selected bran
         assert.throws(() => generateRegistryFixtures([v]), /expected path disagrees/);
     }
 });
+
+test('rejects same-chain ordinal ties between eligible operations at different depths', () => {
+    for (const source of vectors) {
+        const v = structuredClone(source);
+        const root = v.events.find(e => e.operation.type === 'create' && e.registry === 'BTC:signet');
+        const returned = v.events.find(e => e.operation.doc?.didDocumentData?.label === 'returned-child'
+            && e.registry === 'BTC:signet');
+        assert(root && returned);
+        returned.ordinal = [...root.ordinal];
+        assert.throws(() => generateRegistryFixtures([v]), /tied eligible chain receipts outside rank theorem domain/);
+    }
+});
