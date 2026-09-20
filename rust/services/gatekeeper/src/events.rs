@@ -589,7 +589,7 @@ fn event_log_did(config: &crate::Config, event: &EventRecord) -> String {
 // Old mediators and HTTP history imports can supply receipt/chain timestamps.
 // Correct the envelope before storage; never rewrite the operation itself.
 pub(crate) fn normalize_event_time(event: &mut EventRecord) {
-    if event.registry == "hyperswarm" {
+    if event.registry == "hyperswarm" || event.registry == "pin" {
         if let Some(time) = event.operation.pointer("/proof/created").and_then(Value::as_str) {
             event.time = time.to_string();
         }

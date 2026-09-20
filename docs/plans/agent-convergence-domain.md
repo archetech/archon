@@ -1,7 +1,8 @@
 # Agent convergence domain audit (A2)
 
 This records work under A2 of the [fixed completion contract](protocol-convergence-completion.md).
-It does not add roadmap criteria. A2 is still in progress.
+It does not add roadmap criteria. A2 is complete following the approved pin proof-time correction; see the
+[integrated agent model and signed bridge](agent-convergence-full-records.md).
 
 ## Reachable equal chain positions
 
@@ -42,16 +43,14 @@ ordinary importer, repeat delivery, and reconstructed storage, comparing selecte
 operation IDs, full selected events, and resolved data. Existing distinct-ordinal
 cases continue to verify ordinal precedence.
 
-## Remaining A2 audit
+## Integrated A2 interpretation
 
-The integrated Lean rank representation must account for the approved
-ordinal-plus-CID comparison, including duplicate positions of the same operation.
-Missing-position behavior must be resolved against the documented input domain;
-this change does not silently treat missing ordinals as equal present positions.
-The combined domain still needs signed coverage of unanchored/return migrations,
-missing predecessors, late genesis, rotations and deletion under the integrated
-A1 theorem. Semantic receipt metadata and actual stopping remain A3; the full
-integrated signed translation is A4.
+The integrated Lean bridge checks `RegistryCidRanks` against ordinal-plus-CID
+order and quotients identical registry/position/operation keys. It checks both
+proof formats with combined registry/key changes, deletion, return and unanchored
+migrations, missing predecessors, and late genesis. The source model separates
+receipt identity from node-local bookkeeping. The linked integrated audit states
+the authoritative clock/registration contracts and their signed runtime checks.
 
 ## Required chain ordinals (supersedes the #1235 proposal)
 

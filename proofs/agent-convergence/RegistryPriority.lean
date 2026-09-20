@@ -35,6 +35,43 @@ theorem registry_sibling_priority (g : RegistryGraph) (r : RegistryReceipts)
   rw [chain_anchored_order _ xs a b aa ab]
   exact ranks _ _ (by simpa only [ao] using ax) (by simpa only [bo] using bv) same
 
+/-- Rank contract for known-position receipt classes under ordinal/CID ordering.
+Operation owners are injective ASCII canonical-CID ranks. Repeated receipts with
+identical registry, ordinal, and owner are one ordering class; full payloads are
+kept separately. Unlike `RegistryOrdinalRanks`, distinct owners may tie positions. -/
+def RegistryCidRanks (g : RegistryGraph) (r : RegistryReceipts)
+    (position : Nat → List Nat) : Prop :=
+  ∀ x y, eligible (registryAnchors g r) (r.owner x) x = true →
+    eligible (registryAnchors g r) (r.owner y) y = true →
+    r.registry x = r.registry y →
+    (x < y ↔ compare (position x) (position y) = .lt ∨
+      (compare (position x) (position y) = .eq ∧ r.owner x < r.owner y))
+
+/-- Known-position siblings compare registry-local ordinal then canonical CID.
+Identical operation/position classes may share a rank. Unanchored receipts use
+provisional operation ranks; chain receipts without positions are rejected before
+entering this source domain. -/
+theorem registry_sibling_cid_priority (g : RegistryGraph) (r : RegistryReceipts)
+    (position : Nat → List Nat) (ranks : RegistryCidRanks g r position)
+    (genesis : g.parent g.root = none) (xs : List Nat) (a b p : Nat)
+    (ap : g.parent a = some p) (bp : g.parent b = some p)
+    (aa : winner (registryAnchors g r) a xs < r.size)
+    (ab : winner (registryAnchors g r) b xs < r.size) :
+    chainPriority (registryAnchors g r) xs a < chainPriority (registryAnchors g r) xs b ↔
+      compare (position (winner (registryAnchors g r) a xs))
+        (position (winner (registryAnchors g r) b xs)) = .lt ∨
+      (compare (position (winner (registryAnchors g r) a xs))
+        (position (winner (registryAnchors g r) b xs)) = .eq ∧ a < b) := by
+  obtain ⟨_, ax⟩ := winner_member (registryAnchors g r) a xs aa
+  obtain ⟨_, bv⟩ := winner_member (registryAnchors g r) b xs ab
+  have ao : r.owner (winner (registryAnchors g r) a xs) = a :=
+    Option.some.inj (eligible_parent _ _ _ ax)
+  have bo : r.owner (winner (registryAnchors g r) b xs) = b :=
+    Option.some.inj (eligible_parent _ _ _ bv)
+  have same := sibling_anchors_same_registry g r genesis a b p _ _ ap bp ax bv
+  rw [chain_anchored_order _ xs a b aa ab]
+  simpa only [ao, bo] using ranks _ _ (by simpa only [ao] using ax) (by simpa only [bo] using bv) same
+
 /-- The settled-priority replay model now derives anchor eligibility from
 registry ancestry. The operation graph contains already authorized create/update
 operations; this is not the raw interleaved runtime or a signature verifier. -/

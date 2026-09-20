@@ -1,6 +1,6 @@
 name = "archonAgentConvergence"
 version = "0.1.0"
-defaultTargets = ["AgentConvergence", "OperationalReplay", "Fixtures", "AxiomAudit", "EventRecords", "RecordFixtures", "FullReplay", "SerializedReplay", "AgentAuthorization", "AgentFixtures", "DocumentAuthorization", "DocumentFixtures", "AgentComponents", "ComponentFixtures", "ChainAnchors", "ChainAnchorFixtures", "ChainSuccessors", "ChainSuccessorFixtures", "InterleavedReplay", "InterleavedFixtures", "InterleavedBound", "PriorityProjection", "PriorityFixtures", "InterleavedAuthorization", "InterleavedDocumentFixtures", "ChainDocuments", "ChainDocumentFixtures", "RegistryAncestry", "RegistryFixtures", "RegistryAnchors", "RegistryPriority", "RegistryInterleaved", "RegistryInterleavedFixtures", "AgentRegistry", "AgentRegistryExamples", "AgentEventProjection"]
+defaultTargets = ["IntegratedAgentConvergence", "AgentSourceRecords", "ReceiptViews", "AgentReceiptViews", "AgentColdRecords", "ColdInterleaved", "IntegratedAgentFixtures", "AgentFullRecords", "InterleavedRecords", "AgentConvergence", "OperationalReplay", "Fixtures", "AxiomAudit", "EventRecords", "RecordFixtures", "FullReplay", "SerializedReplay", "AgentAuthorization", "AgentFixtures", "DocumentAuthorization", "DocumentFixtures", "AgentComponents", "ComponentFixtures", "ChainAnchors", "ChainAnchorFixtures", "ChainSuccessors", "ChainSuccessorFixtures", "InterleavedReplay", "InterleavedFixtures", "InterleavedBound", "PriorityProjection", "PriorityFixtures", "InterleavedAuthorization", "InterleavedDocumentFixtures", "ChainDocuments", "ChainDocumentFixtures", "RegistryAncestry", "RegistryFixtures", "RegistryAnchors", "RegistryPriority", "RegistryInterleaved", "RegistryInterleavedFixtures", "AgentRegistry", "AgentRegistryExamples", "AgentEventProjection"]
 
 [[lean_lib]]
 name = "AgentConvergence"
@@ -109,3 +109,31 @@ name = "AgentRegistryExamples"
 
 [[lean_lib]]
 name = "AgentEventProjection"
+
+[[lean_lib]]
+name = "InterleavedRecords"
+
+[[lean_lib]]
+name = "AgentFullRecords"
+
+[[lean_lib]]
+name = "IntegratedAgentFixtures"
+
+[[lean_lib]]
+name = "ColdInterleaved"
+
+[[lean_lib]]
+name = "AgentColdRecords"
+
+
+[[lean_lib]]
+name = "ReceiptViews"
+
+[[lean_lib]]
+name = "AgentReceiptViews"
+
+[[lean_lib]]
+name = "AgentSourceRecords"
+
+[[lean_lib]]
+name = "IntegratedAgentConvergence"

@@ -1,3 +1,10 @@
+import IntegratedAgentConvergence
+import AgentSourceRecords
+import ReceiptViews
+import AgentColdRecords
+import ColdInterleaved
+import AgentFullRecords
+import InterleavedRecords
 import AgentEventProjection
 import AgentRegistry
 import SerializedReplay
@@ -23,7 +30,14 @@ set_option warningAsError true
 open Lean Elab Command in
 run_cmd do
   let allowed := #[``propext, ``Quot.sound]
-  for theoremName in #[``Archon.component_priority_bound, ``Archon.component_priority_allowed,
+  for theoremName in #[``Archon.normalize_source_provisional, ``Archon.normalize_sources_present, ``Archon.integrated_agent_execution, ``Archon.same_sources_of_check, ``Archon.integrated_agent_convergence, ``Archon.normalize_source_ids, ``Archon.normalize_source_matching, ``Archon.normalize_sources_membership, ``Archon.agent_sources_same_receipt_view, ``Archon.agent_receipt_view_class, ``Archon.component_cold_same_receipt_view, ``Archon.ranked_lookup_preserves, ``Archon.promote_preserves, ``Archon.record_step_preserves, ``Archon.ranked_pass_preserves, ``Archon.stop_preserves, ``Archon.cold_ranked_provenance, ``Archon.settle_expected_of_member, ``Archon.fixed_record_expected, ``Archon.fixed_record_flags_agree, ``Archon.record_views_of_ids, ``Archon.fixed_record_views_agree, ``Archon.cold_ranked_same_view,
+      ``Archon.component_event_owner_bound, ``Archon.component_event_level_bound,
+      ``Archon.cold_component_descending, ``Archon.cold_component_genesis, ``Archon.cold_component_root_eligible,
+      ``Archon.component_cold_full_replay, ``Archon.component_cold_same_state, ``Archon.genesis_valid_tail, ``Archon.genesis_model_descending, ``Archon.genesis_model_eligible,
+      ``Archon.cold_without_genesis, ``Archon.cold_ranked_converges, ``Archon.registry_sibling_cid_priority, ``Archon.component_full_replay, ``Archon.component_full_same_state, ``Archon.ranked_lookup_ids, ``Archon.ranked_import_ids,
+      ``Archon.ranked_pass_ids, ``Archon.ranked_lookup_unchanged, ``Archon.ranked_import_complete,
+      ``Archon.ranked_pass_complete, ``Archon.ranked_pass_settles, ``Archon.ranked_rounds_ids,
+      ``Archon.ranked_full_converges, ``Archon.ranked_full_same_semantics, ``Archon.component_priority_bound, ``Archon.component_priority_allowed,
       ``Archon.component_priority_member, ``Archon.component_priority_le,
       ``Archon.component_compiled_eligible, ``Archon.component_event_projection,
       ``Archon.component_interleaved_replay, ``Archon.component_step_registry, ``Archon.component_run_registry,
