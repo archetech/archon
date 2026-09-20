@@ -187,3 +187,5 @@ These rules apply to coding agents working in this repository.
 - Count distinct delivery permutations when reporting fixture coverage, and test uniqueness for each scenario size. Negative bridge tests must mutate the exact field guarded by the claimed invariant in both operation tables and matching event records.
 
 - Interleaved replay proofs must distinguish next-event settlement under a fixed predecessor from whole-path convergence. Check signed intermediate event records and the serialized stopping pass in both ports before claiming the model matches runtime interleaving.
+
+- Interleaved replay bounds must use decreasing operation/predecessor levels, not event priority ranks. Instantiate the depth condition in signed fixtures, include the extra stability-detection pass, and keep proof fuel distinct from production replay limits.

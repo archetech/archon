@@ -7,10 +7,11 @@ import Cipher from '@didcid/cipher/node';
 import type { GatekeeperEvent, Operation } from '@didcid/gatekeeper/types';
 
 type Vector = { did: string; ids: string[]; operations: Operation[]; events: GatekeeperEvent[]; block: { height: number; hash: string; time: number } };
-type Case = { vector: number; order: number[]; passes: number[][][] };
+type Case = { vector: number; order: number[]; passBound: number; passes: number[][][] };
 const vectors: Vector[] = JSON.parse(readFileSync('tests/convergence/chain-successor-vectors.json', 'utf8'));
 const cases: Case[] = JSON.parse(readFileSync('tests/convergence/interleaved-cases.json', 'utf8'));
 it.each(cases)('matches interleaved Lean transitions: vector=$vector order=$order', async c => {
+    expect(c.passes.length).toBeLessThanOrEqual(c.passBound);
     const v = vectors[c.vector];
     const db = new DbMemory('interleaved-replay');
     const g = new Gatekeeper({ db, ipfs: new MemoryClient() });

@@ -8,6 +8,8 @@ test('shared fixtures reproduce 764 checked transitions and 100 passes', () => {
     assert.equal(lean, readFileSync(new URL('./InterleavedFixtures.lean', import.meta.url), 'utf8'));
     assert.deepEqual(cases, JSON.parse(readFileSync(new URL('../../tests/convergence/interleaved-cases.json', import.meta.url), 'utf8')));
     assert.equal(cases.length, 36);
+    for (const c of cases) assert(c.passes.length <= c.passBound);
+    assert(cases.some(c => c.passes.length === c.passBound), 'exercise the final allowed stopping pass');
     assert.equal(cases.reduce((n, c) => n + c.passes.length, 0), 100);
     assert.equal(cases.reduce((n, c) => n + c.passes.length * c.order.length, 0), 764);
 });

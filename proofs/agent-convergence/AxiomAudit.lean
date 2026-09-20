@@ -5,6 +5,7 @@ import AgentComponents
 import ChainAnchors
 import ChainSuccessors
 import InterleavedReplay
+import InterleavedBound
 import Lean.Util.CollectAxioms
 import Lean.Elab.Command
 
@@ -13,7 +14,11 @@ set_option warningAsError true
 open Lean Elab Command in
 run_cmd do
   let allowed := #[``propext, ``Quot.sound]
-  for theoremName in #[``Archon.interleaved_duplicate_keeps_suffix,
+  for theoremName in #[``Archon.interleaved_insert_valid, ``Archon.interleaved_pass_valid,
+      ``Archon.interleaved_after_parent, ``Archon.interleaved_pass_fixed_head,
+      ``Archon.interleaved_rounds_converge, ``Archon.interleaved_suffix_complete,
+      ``Archon.interleaved_replay_converges, ``Archon.interleaved_replay_same_evidence,
+      ``Archon.interleaved_duplicate_keeps_suffix,
       ``Archon.interleaved_sibling_truncates, ``Archon.interleaved_insert_head,
       ``Archon.interleaved_pass_head, ``Archon.interleaved_next_settles,
       ``Archon.interleaved_empty_head, ``Archon.interleaved_next_same_evidence,

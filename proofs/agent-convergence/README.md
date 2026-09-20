@@ -626,10 +626,9 @@ serialized stop-on-unchanged decision after every pass. Public-import/restart
 coverage remains in the existing successor suite. These traces connect concrete
 interleavings to the model; they are not a universal implementation proof.
 
-Next: prove that a settled prefix stays fixed while its suffix settles, then lift
-the local lemma over predecessor depth to establish whole-path convergence and a
-valid stopping bound. That would discharge the remaining interleaving phase
-obligation before document authorization and registry migrations are composed.
+The following whole-path theorem lifts this local result over predecessor depth.
+Document authorization, registry migrations, and general executable correspondence
+remain separate obligations.
 
 ```sh
 node --test proofs/agent-convergence/generate-interleaved-fixtures.test.mjs
@@ -637,3 +636,36 @@ node proofs/agent-convergence/generate-interleaved-fixtures.mjs --check
 cd proofs/agent-convergence
 lake build
 ```
+
+
+## Whole-path interleaved convergence and stopping bound — #1215
+
+`InterleavedBound.lean` proves whole-path convergence for the fixed-authorization
+interleaved event model. Every eligible signed predecessor edge must strictly
+decrease an operation-level natural-number measure. The initial path must consist
+of eligible retained events linked by their predecessor operations; the empty
+cold-start path satisfies that requirement automatically.
+
+A selected minimum head is preserved while the same scan operates on its suffix.
+Induction over the decreasing measure proves that `level(parent)` complete passes
+reach the canonical ranked path. One further pass suffices to observe stability.
+The stop-on-unchanged loop returns that path even if it stops earlier. Equal
+retained event sets therefore give equal complete ranked paths regardless of
+scan order, duplicate deliveries, or different valid warm initial histories.
+
+The signed fixture bridge derives operation levels from predecessor IDs, includes
+the virtual genesis predecessor, and proves the decreasing-edge condition in
+Lean for each graph. It instantiates the whole-path theorem at every recorded
+pass-start state (100 cold/warm instances), preserving all 764 transition checks.
+Both runtimes check complete event records and stopping within the generated
+bound. Two cold cases reach the fourth and final allowed pass. This replaces the
+fixture generator's arbitrary attempt limit with the instantiated theorem bound;
+it does not introduce a production replay limit.
+
+The theorem now closes whole-path interleaving **in this model**. Authorization
+and expected-registry eligibility are still fixed, event identity/ordering is
+abstracted by ranks, and the bridge is finite testing rather than a universal
+proof that either runtime implements the model. Connecting full document/key
+semantics and the settled-priority projection, registry migrations, dynamic
+controller/asset authorization, complete metadata/serialization, and retention
+remain open. #1215 stays open for those connections.
