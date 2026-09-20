@@ -75,10 +75,11 @@ jobs:
           node tests/convergence/generate-component-vectors.mjs
           node tests/convergence/generate-chain-anchor-vectors.mjs
           node tests/convergence/generate-chain-successor-vectors.mjs
-          git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json tests/convergence/document-vectors.json tests/convergence/component-vectors.json tests/convergence/chain-anchor-vectors.json tests/convergence/chain-successor-vectors.json
+          node tests/convergence/generate-chain-document-vectors.mjs
+          git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json tests/convergence/document-vectors.json tests/convergence/component-vectors.json tests/convergence/chain-anchor-vectors.json tests/convergence/chain-successor-vectors.json tests/convergence/chain-document-vectors.json
       - name: Check shared fixture bridge
         run: |
-          node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs proofs/agent-convergence/generate-document-fixtures.test.mjs proofs/agent-convergence/generate-component-fixtures.test.mjs proofs/agent-convergence/generate-chain-anchor-fixtures.test.mjs proofs/agent-convergence/generate-chain-successor-fixtures.test.mjs proofs/agent-convergence/generate-interleaved-fixtures.test.mjs proofs/agent-convergence/generate-priority-fixtures.test.mjs proofs/agent-convergence/generate-interleaved-document-fixtures.test.mjs
+          node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs proofs/agent-convergence/generate-document-fixtures.test.mjs proofs/agent-convergence/generate-component-fixtures.test.mjs proofs/agent-convergence/generate-chain-anchor-fixtures.test.mjs proofs/agent-convergence/generate-chain-successor-fixtures.test.mjs proofs/agent-convergence/generate-interleaved-fixtures.test.mjs proofs/agent-convergence/generate-priority-fixtures.test.mjs proofs/agent-convergence/generate-interleaved-document-fixtures.test.mjs proofs/agent-convergence/generate-chain-document-fixtures.test.mjs
           node proofs/agent-convergence/generate-fixtures.mjs --check
           node proofs/agent-convergence/generate-record-fixtures.mjs --check
           node proofs/agent-convergence/generate-agent-fixtures.mjs --check
@@ -89,6 +90,7 @@ jobs:
           node proofs/agent-convergence/generate-interleaved-fixtures.mjs --check
           node proofs/agent-convergence/generate-priority-fixtures.mjs --check
           node proofs/agent-convergence/generate-interleaved-document-fixtures.mjs --check
+          node proofs/agent-convergence/generate-chain-document-fixtures.mjs --check
       - name: Check TypeScript replay pass bridge
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/convergence.test.ts --runInBand --coverage=false -t 'Lean-checked'
       - name: Check signed agent authorization

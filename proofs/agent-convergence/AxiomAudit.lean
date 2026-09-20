@@ -8,6 +8,7 @@ import InterleavedReplay
 import InterleavedBound
 import PriorityProjection
 import InterleavedAuthorization
+import ChainDocuments
 import Lean.Util.CollectAxioms
 import Lean.Elab.Command
 
@@ -16,7 +17,9 @@ set_option warningAsError true
 open Lean Elab Command in
 run_cmd do
   let allowed := #[``propext, ``Quot.sound]
-  for theoremName in #[``Archon.document_event_eligible, ``Archon.document_event_authorization,
+  for theoremName in #[``Archon.interleaved_document_priority_converges,
+      ``Archon.interleaved_document_priority_cold,
+      ``Archon.document_event_eligible, ``Archon.document_event_authorization,
       ``Archon.document_events_descending, ``Archon.document_event_path,
       ``Archon.interleaved_document_converges, ``Archon.interleaved_document_same_evidence,
       ``Archon.priority_projection_winner, ``Archon.priority_projection_suffix,

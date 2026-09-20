@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from 'node:util';
 
 // Structural bridge only: signature validity is independently computed from
 // signed bytes, and checked by the ordinary runtime import suites.
-export function documentGraph(vector, components = false) {
+export function documentGraph(vector, components = false, registry = 'hyperswarm') {
     const { operations, ids, keys, did, signatureValid } = vector;
     const creates = operations.flatMap((op, i) => op.type === 'create' ? [i] : []);
     if (creates.length !== 1) throw new Error('Expected exactly one create');
@@ -18,8 +18,8 @@ export function documentGraph(vector, components = false) {
     };
     if (did !== 'did:cid:' + ids[root] || create.previd !== undefined
         || Object.keys(create).some(k => !['type', 'created', 'registration', 'publicJwk', 'proof'].includes(k))
-        || !isDeepStrictEqual(create.registration, { version: 1, type: 'agent', registry: 'hyperswarm' })) {
-        throw new Error('Expected self-controlled hyperswarm genesis');
+        || !isDeepStrictEqual(create.registration, { version: 1, type: 'agent', registry })) {
+        throw new Error(`Expected self-controlled ${registry} genesis`);
     }
     const absolute = id => {
         if (typeof id !== 'string' || !id.includes('#')) throw new Error('Invalid method reference');

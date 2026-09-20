@@ -673,10 +673,18 @@ async fn convergence_earliest_valid_chain_anchors() {
 }
 #[tokio::test]
 async fn convergence_chain_successor_priority() {
-    let vectors: Value = serde_json::from_str(include_str!(
+    let mut vectors: Value = serde_json::from_str(include_str!(
         "../../../../tests/convergence/chain-successor-vectors.json"
     ))
     .unwrap();
+    let documents: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/chain-document-vectors.json"
+    ))
+    .unwrap();
+    vectors
+        .as_array_mut()
+        .unwrap()
+        .extend(documents.as_array().unwrap().iter().cloned());
     for vector in vectors.as_array().unwrap() {
         let did = vector["did"].as_str().unwrap();
         for order in vector["orders"].as_array().unwrap() {
@@ -752,10 +760,31 @@ async fn convergence_chain_successor_priority() {
                     "{order}, phase {phase}"
                 );
                 let last = expected.last().unwrap().as_u64().unwrap() as usize;
-                assert_eq!(
-                    doc["didDocumentData"],
-                    vector["operations"][last]["doc"]["didDocumentData"]
-                );
+                if vector["operations"][last]["type"] == "delete" {
+                    assert_eq!(doc["didDocumentMetadata"]["deactivated"], json!(true));
+                    assert_eq!(doc["didDocumentData"], json!({}));
+                } else {
+                    assert_ne!(doc["didDocumentMetadata"]["deactivated"], json!(true));
+                    assert_eq!(
+                        doc["didDocumentData"],
+                        vector["operations"][last]["doc"]["didDocumentData"]
+                    );
+                    if let Some(active) = vector["states"][last].as_u64() {
+                        let mut ids: Vec<_> = vector["ids"].as_array().unwrap().iter().collect();
+                        ids.sort_by_key(|id| id.as_str().unwrap());
+                        let operation = vector["ids"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .position(|id| id == ids[active as usize])
+                            .unwrap();
+                        assert_eq!(
+                            doc["didDocument"]["verificationMethod"],
+                            vector["operations"][operation]["doc"]["didDocument"]
+                                ["verificationMethod"]
+                        );
+                    }
+                }
                 assert_eq!(
                     store.get_candidates().unwrap()[did].len(),
                     vector["events"].as_array().unwrap().len()
@@ -767,71 +796,81 @@ async fn convergence_chain_successor_priority() {
 }
 #[tokio::test]
 async fn convergence_interleaved_transitions() {
-    let vectors: Value = serde_json::from_str(include_str!(
-        "../../../../tests/convergence/chain-successor-vectors.json"
-    ))
-    .unwrap();
-    let cases: Value = serde_json::from_str(include_str!(
-        "../../../../tests/convergence/interleaved-cases.json"
-    ))
-    .unwrap();
-    for case in cases.as_array().unwrap() {
-        let v = &vectors[case["vector"].as_u64().unwrap() as usize];
-        let did = v["did"].as_str().unwrap();
-        let (state, _directory) = crate::tests::make_state(JsonDb {
-            backend: DbBackend::Memory,
-            data: JsonDbFile::default(),
-            redis_connection: None,
-        });
-        crate::history::ensure_history_ready(&state).await.unwrap();
-        state
-            .store
-            .lock()
-            .await
-            .add_block("BTC:signet", v["block"].clone())
-            .unwrap();
-        let events: Vec<crate::EventRecord> = v["events"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|event| {
-                let op = v["operations"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .position(|op| op == &event["operation"])
-                    .unwrap();
-                let mut event = event.clone();
-                event["did"] = json!(did);
-                event["opid"] = v["ids"][op].clone();
-                serde_json::from_value(event).unwrap()
-            })
-            .collect();
-        let passes = case["passes"].as_array().unwrap();
-        assert!(passes.len() <= case["passBound"].as_u64().unwrap() as usize);
-        for (pass, steps) in passes.iter().enumerate() {
-            let before = serde_json::to_string(&state.store.lock().await.get_events(did)).unwrap();
-            for (step, token) in case["order"].as_array().unwrap().iter().enumerate() {
-                crate::events::import_event_once(
-                    &state,
-                    events[token.as_u64().unwrap() as usize].clone(),
-                )
-                .await;
-                let expected: Vec<_> = steps[step]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|t| events[t.as_u64().unwrap() as usize].clone())
-                    .collect();
-                assert_eq!(
-                    serde_json::to_value(state.store.lock().await.get_events(did)).unwrap(),
-                    serde_json::to_value(expected).unwrap(),
-                    "vector {}, pass {pass}, step {step}",
-                    case["vector"]
-                );
+    for (source, trace) in [
+        (
+            include_str!("../../../../tests/convergence/chain-successor-vectors.json"),
+            include_str!("../../../../tests/convergence/interleaved-cases.json"),
+        ),
+        (
+            include_str!("../../../../tests/convergence/chain-document-vectors.json"),
+            include_str!("../../../../tests/convergence/chain-document-cases.json"),
+        ),
+    ] {
+        let vectors: Value = serde_json::from_str(source).unwrap();
+        let cases: Value = serde_json::from_str(trace).unwrap();
+        for case in cases.as_array().unwrap() {
+            let v = &vectors[case["vector"].as_u64().unwrap() as usize];
+            let did = v["did"].as_str().unwrap();
+            let (state, _directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            crate::history::ensure_history_ready(&state).await.unwrap();
+            state
+                .store
+                .lock()
+                .await
+                .add_block("BTC:signet", v["block"].clone())
+                .unwrap();
+            let events: Vec<crate::EventRecord> = v["events"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|event| {
+                    let op = v["operations"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .position(|op| op == &event["operation"])
+                        .unwrap();
+                    let mut event = event.clone();
+                    event["did"] = json!(did);
+                    event["opid"] = v["ids"][op].clone();
+                    serde_json::from_value(event).unwrap()
+                })
+                .collect();
+            if let Some(seed) = v["seed"].as_u64() {
+                crate::events::import_event_once(&state, events[seed as usize].clone()).await;
             }
-            let after = serde_json::to_string(&state.store.lock().await.get_events(did)).unwrap();
-            assert_eq!(before == after, pass == passes.len() - 1);
+            let passes = case["passes"].as_array().unwrap();
+            assert!(passes.len() <= case["passBound"].as_u64().unwrap() as usize);
+            for (pass, steps) in passes.iter().enumerate() {
+                let before =
+                    serde_json::to_string(&state.store.lock().await.get_events(did)).unwrap();
+                for (step, token) in case["order"].as_array().unwrap().iter().enumerate() {
+                    crate::events::import_event_once(
+                        &state,
+                        events[token.as_u64().unwrap() as usize].clone(),
+                    )
+                    .await;
+                    let expected: Vec<_> = steps[step]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|t| events[t.as_u64().unwrap() as usize].clone())
+                        .collect();
+                    assert_eq!(
+                        serde_json::to_value(state.store.lock().await.get_events(did)).unwrap(),
+                        serde_json::to_value(expected).unwrap(),
+                        "vector {}, pass {pass}, step {step}",
+                        case["vector"]
+                    );
+                }
+                let after =
+                    serde_json::to_string(&state.store.lock().await.get_events(did)).unwrap();
+                assert_eq!(before == after, pass == passes.len() - 1);
+            }
         }
     }
 }
