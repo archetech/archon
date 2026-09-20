@@ -218,3 +218,5 @@ These rules apply to coding agents working in this repository.
 - Proof documentation must distinguish Lean module filenames from qualified theorem names (`Archon.*`) and update earlier status paragraphs when a criterion is completed; keep per-module axiom counts unambiguous.
 
 - Chain ordinal uniqueness must be demonstrated per producer: Solana instruction indices are transaction-local, and separate transactions can collide. Keep the signed A2 tie regression through import/repeat/restart in both ports; distinguish equal present ordinals from missing-position policy.
+
+- Agent convergence must cover the authorization-relevant receipt view, not only operation IDs/documents. Controller anchoring eligibility follows the confirmed prefix and per-version expected registry; an unconfirmed wrong-registry suffix must not switch proof-time versus chain-position authorization.

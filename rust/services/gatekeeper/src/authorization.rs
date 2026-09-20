@@ -11,10 +11,9 @@ use crate::{resolve_local_doc_async, AppState, EventRecord, GatekeeperDb, Resolv
 
 /// The two registries whose events this node stamps itself, so that no event
 /// on them can carry a position a chain assigned: a local event holds the
-/// signer's own `created`, a hyperswarm event the receiving node's clock.
-/// Every other registry is one an outside source might claim confirmation on.
-/// Whether a registry actually anchors its events on a chain is not inferred
-/// from its name -- `pin` does not -- but read from the events (`is_anchored`).
+/// signer's own `created`, a hyperswarm event the operation's proof time.
+/// `pin` also has no chain position; `is_anchored` excludes it explicitly.
+/// Other registries establish anchoring through confirming event metadata.
 pub(crate) fn is_unanchored_registry(registry: &str) -> bool {
     registry == "local" || registry == "hyperswarm"
 }
@@ -27,18 +26,44 @@ async fn is_anchored(state: &AppState, did: &str, registry: Option<&str>) -> boo
     let Some(registry) = registry else {
         return false;
     };
-    if is_unanchored_registry(registry) {
+    if registry == "pin" || is_unanchored_registry(registry) {
         return false;
     }
     let events = {
         let store = state.store.lock().await;
         store.get_events(did)
     };
-    let anchored = events
-        .iter()
-        .filter(|event| !is_unanchored_registry(&event.registry))
-        .collect::<Vec<_>>();
-    !anchored.is_empty() && anchored.iter().all(|event| event.registration.is_some())
+    let mut expected = events
+        .first()
+        .and_then(|event| event.operation.get("registration"))
+        .and_then(|registration| registration.get("registry"))
+        .and_then(Value::as_str);
+    let mut anchored = false;
+    for (index, event) in events.iter().enumerate() {
+        // Genesis is admitted separately; ignore the unconfirmed suffix.
+        if index > 0 && Some(event.registry.as_str()) != expected {
+            break;
+        }
+        if Some(event.registry.as_str()) == expected
+            && event.registry != "pin"
+            && !is_unanchored_registry(&event.registry)
+        {
+            if event.registration.is_none() {
+                return false;
+            }
+            anchored = true;
+        }
+        if event.operation.get("type").and_then(Value::as_str) == Some("update") {
+            expected = event
+                .operation
+                .get("doc")
+                .and_then(|doc| doc.get("didDocumentRegistration"))
+                .and_then(|registration| registration.get("registry"))
+                .and_then(Value::as_str)
+                .or(expected);
+        }
+    }
+    anchored
 }
 
 /// The controller document that authorizes an operation on an asset.
@@ -50,9 +75,9 @@ async fn is_anchored(state: &AppState, did: &str, registry: Option<&str>) -> boo
 /// still listed it (#1131). Once a chain has committed the operation it has a
 /// position the signer did not choose -- the anchoring block -- and the
 /// controller is resolved there instead. Only when the controller's own
-/// rotation history is on a chain, though: a hyperswarm controller stamps its
-/// events with each node's clock, and resolving it at a block time forked on
-/// import order (#1134).
+/// rotation history is on a chain, though: a hyperswarm controller has no
+/// independent chain position. Its events use operation proof time; the
+/// historical proof-time fallback still applies (#1134).
 ///
 /// Within a block every event shares the block's time, so time cannot order a
 /// rotation against an operation the chain committed earlier in the same

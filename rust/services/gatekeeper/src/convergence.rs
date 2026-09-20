@@ -932,3 +932,134 @@ async fn convergence_interleaved_transitions() {
         }
     }
 }
+
+#[tokio::test]
+async fn convergence_controller_cutoff_view() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/controller-view-vectors.json"
+    ))
+    .unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let did = vector["did"].as_str().unwrap();
+        let asset_did = vector["assetDid"].as_str().unwrap();
+        let mut projections = Vec::new();
+        for order in vector["orders"].as_array().unwrap() {
+            let (mut state, _directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            for entry in vector["blocks"].as_array().unwrap() {
+                state
+                    .store
+                    .lock()
+                    .await
+                    .add_block(entry["registry"].as_str().unwrap(), entry["block"].clone())
+                    .unwrap();
+            }
+            for token in order.as_array().unwrap() {
+                crate::import_batch_impl(
+                    &state,
+                    &[vector["events"][token.as_u64().unwrap() as usize].clone()],
+                )
+                .await;
+                crate::process_events_impl(&state).await;
+            }
+            let mut restart_directory = None;
+            for phase in 0..3 {
+                if phase == 1 {
+                    let events: Vec<_> = vector["events"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .rev()
+                        .cloned()
+                        .collect();
+                    crate::import_batch_impl(&state, &events).await;
+                    crate::process_events_impl(&state).await;
+                }
+                if phase == 2 {
+                    let data = serde_json::from_value(
+                        serde_json::to_value(&state.store.lock().await.data).unwrap(),
+                    )
+                    .unwrap();
+                    let (restarted, directory) = crate::tests::make_state(JsonDb {
+                        backend: DbBackend::Memory,
+                        data,
+                        redis_connection: None,
+                    });
+                    state = restarted;
+                    restart_directory = Some(directory);
+                }
+                crate::history::ensure_history_ready(&state).await.unwrap();
+                let agent = crate::resolve_local_doc_async(
+                    &state,
+                    did,
+                    ResolveOptions {
+                        verify: true,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+                let confirmed = crate::resolve_local_doc_async(
+                    &state,
+                    did,
+                    ResolveOptions {
+                        confirm: true,
+                        verify: true,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+                let asset = crate::resolve_local_doc_async(
+                    &state,
+                    asset_did,
+                    ResolveOptions {
+                        verify: true,
+                        ..Default::default()
+                    },
+                )
+                .await;
+                let asset = if vector["assetAccepted"].as_bool().unwrap() {
+                    asset.unwrap()
+                } else {
+                    assert_eq!(asset.unwrap_err().root_cause().to_string(), "DID not found");
+                    json!({"didDocument": {}, "didResolutionMetadata": {"error": "notFound"}})
+                };
+                assert_eq!(
+                    json!(state
+                        .store
+                        .lock()
+                        .await
+                        .get_events(did)
+                        .iter()
+                        .map(|e| &e.opid)
+                        .collect::<Vec<_>>()),
+                    vector["controllerIds"]
+                );
+                assert_eq!(
+                    confirmed["didDocumentMetadata"]["versionSequence"],
+                    vector["confirmedVersions"]
+                );
+                if vector["assetAccepted"].as_bool().unwrap() {
+                    assert_eq!(
+                        asset["didDocument"]["controller"],
+                        json!(did),
+                        "{}, {order}, phase {phase}",
+                        vector["mode"]
+                    );
+                } else {
+                    assert_eq!(asset["didResolutionMetadata"]["error"], "notFound");
+                }
+                projections.push(json!({"agent": agent["didDocument"], "data": agent["didDocumentData"],
+                    "registration": agent["didDocumentRegistration"], "confirmed": confirmed["didDocument"], "asset": asset["didDocument"]}));
+            }
+            drop(restart_directory);
+        }
+        for result in &projections {
+            assert_eq!(result, &projections[0], "{}", vector["mode"]);
+        }
+    }
+}
