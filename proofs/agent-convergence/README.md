@@ -1,4 +1,4 @@
-# Provisional agent-history convergence (#1199, #1201, #1203, #1205, #1207, #1209)
+# Provisional agent-history convergence (#1199, #1201, #1203, #1205, #1207, #1209, #1211)
 
 This Lean project proves a bounded specification and an operational replay
 model of Archon's canonical-CID successor rule. It changes no runtime code. It uses Lean's standard library only;
@@ -21,7 +21,7 @@ limited to the four-operation test graphs.
 
 ## Assumptions and exact meaning
 
-These are the original fixed-key model assumptions. The [authorization extension](#predecessor-key-authorization--1209) below replaces the fixed-key restriction with predecessor-selected key rotation and deletion; the other boundaries remain.
+These are the original fixed-key model assumptions. The [authorization extension](#predecessor-key-authorization--1209) replaces the fixed-key restriction with predecessor-selected rotation and deletion. The [document extension](#multiple-verification-methods--1211) then adds multiple methods; their respective boundaries are stated below.
 
 - Both nodes agree on the same unique valid genesis/root ID and use the same
   model. The root has no predecessor and is eventually included in retained
@@ -347,6 +347,48 @@ explicit abstraction boundaries. Runtime tests provide finite correspondence
 evidence; the TypeScript/Rust source is not formally verified. No runtime code
 changes are needed.
 
+## Multiple verification methods — #1211
+
+`DocumentAuthorization.lean` lifts the previous state/replay proof to an active
+verification-method list. An active index now selects an immutable document
+snapshot, and a `rotate` action replaces that list. Method names and public keys
+have separate identities: replacing the public key under the same method name
+changes which signature verifies. `documentKey` selects the first method whose
+normalized ID matches the proof, exactly as both runtime lookups do.
+
+`document_replacement_uses_predecessor` proves that introducing or replacing
+methods requires authorization by the predecessor list. `document_replay_converges`
+proves a canonical ID path, full-record replay stability, and successful sequential
+authorization. `document_same_evidence` additionally maps the final active index
+to the method list: equal retained evidence produces the same history and final
+method list (or deletion), regardless of order or duplicates. The inherited
+finite acyclic graph, agreed snapshot, valid genesis, and retained-evidence
+premises remain explicit.
+
+This models version 1 as implemented: the proof names a method and verification
+uses its key. Accepted proof-purpose labels **do not** enforce membership in the
+`authentication`, `assertionMethod`, or `capabilityInvocation` arrays. #1156 is
+still paused; the proof introduces no stricter rule. Well-formed admitted proof
+formats and public keys, signature verification, and normalization/injective
+encoding of method IDs and keys remain bridge assumptions. The model includes
+ordered method lists, not arbitrary malformed method objects.
+
+612 additional signed delivery traces cover both proof formats, second-key
+signing without relationship membership, removal, same-name public-key
+replacement, competing document branches, missing methods, deletion, and a new
+method trying to authorize its own introduction. Both runtimes compare accepted
+IDs and full verification-method arrays after ordinary imports, repeated
+delivery, and restart. Lean checks 26 reconstructed states and the same 612
+replay results. The structural bridge derives genesis, document snapshots,
+actions, and predecessor edges from operation records; reordering and negative
+tests keep that translation checked. These finite tests do not prove executable
+correctness or cryptography.
+
+The final-state claim concerns verification methods. Other agent-document
+components and general combined updates, expected-chain priority, asset
+controllers, retention, and executable refinement remain open. No runtime
+behavior changes.
+
 ## Reproduce
 
 Install Elan using the [official Lean instructions](https://lean-lang.org/install/manual/).
@@ -358,6 +400,7 @@ From the repository root:
 node proofs/agent-convergence/generate-fixtures.mjs --check
 node proofs/agent-convergence/generate-record-fixtures.mjs --check
 node proofs/agent-convergence/generate-agent-fixtures.mjs --check
+node proofs/agent-convergence/generate-document-fixtures.mjs --check
 cd proofs/agent-convergence
 lake build
 ```
@@ -373,11 +416,13 @@ npm run build -w @didcid/cipher
 npm run build -w @didcid/ipfs
 node tests/convergence/generate-vectors.mjs
 node tests/convergence/generate-agent-vectors.mjs
-git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json
-node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs
+node tests/convergence/generate-document-vectors.mjs
+git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json tests/convergence/document-vectors.json
+node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs proofs/agent-convergence/generate-document-fixtures.test.mjs
 node proofs/agent-convergence/generate-fixtures.mjs --check
 node proofs/agent-convergence/generate-record-fixtures.mjs --check
 node proofs/agent-convergence/generate-agent-fixtures.mjs --check
+node proofs/agent-convergence/generate-document-fixtures.mjs --check
 ```
 
 Run that block from the repository root. CI performs it before building Lean and
@@ -394,8 +439,9 @@ update must also update and verify the committed checksum.
 
 ## Follow-up proof work
 
-1. Extend the single-active-key abstraction to general agent documents and
-   multiple verification methods with their authorization relationships.
+1. Extend verification-method list state to remaining agent-document components
+   and general combined updates. Future relationship enforcement requires its
+   own protocol decision; #1156 remains paused.
 2. Establish the concrete codec/normalization domain and general executable
    refinement. Serialized stopping transfer and signed per-pass correspondence
    are now proved/tested respectively; neither is a proof of the runtimes.
