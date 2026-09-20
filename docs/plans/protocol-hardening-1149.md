@@ -247,3 +247,20 @@ reordering and unsupported inputs. All proof/cryptographic/normalization and
 retention assumptions stay explicit. Remaining document components, combined
 updates, chain priority, assets, retention, and executable refinement are open.
 No runtime changes. See [scope and theorem](../../proofs/agent-convergence/README.md#multiple-verification-methods--1211).
+
+## Complete agent document components — #1213
+
+Lean now carries complete DID-document values, data, and registration through
+predecessor-authorized replay. Supplied components replace whole components;
+omitted components carry forward. Combined updates and deletion are explicit.
+The proof establishes successful execution and equal final component triples for
+equal retained evidence, with a separate full-document/method-projection contract.
+
+456 new signed traces per runtime compare complete components after ordinary
+imports, repeats, and restart. They include data/member removal, services and
+relationships, combined rotation/data changes, and unchanged registration
+replacement. JSON codecs, executable validation, metadata, and chain/migration
+semantics remain outside this step; the bridge rejects registry changes. #1156
+remains paused. No runtime changes. Next: expected-chain ordering/repeated anchors
+and registry migrations, followed by assets, retention/GC, and stronger executable
+refinement. See [the component theorem](../../proofs/agent-convergence/README.md#complete-document-components--1213).

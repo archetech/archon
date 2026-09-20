@@ -462,6 +462,14 @@ async fn convergence_agent_rotation_and_deletion() {
         .as_array_mut()
         .unwrap()
         .extend(documents.as_array().unwrap().iter().cloned());
+    let components: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/component-vectors.json"
+    ))
+    .unwrap();
+    vectors
+        .as_array_mut()
+        .unwrap()
+        .extend(components.as_array().unwrap().iter().cloned());
     for vector in vectors.as_array().unwrap() {
         let did = vector["did"].as_str().unwrap();
         for scenario in vector["scenarios"].as_array().unwrap() {
@@ -536,8 +544,16 @@ async fn convergence_agent_rotation_and_deletion() {
                         doc["didDocumentMetadata"]["versionId"],
                         ids[*path.last().unwrap()]
                     );
+                    if let Some(components) = scenario.get("components") {
+                        assert_eq!(
+                            json!({ "didDocument": doc["didDocument"], "didDocumentData": doc["didDocumentData"], "didDocumentRegistration": doc["didDocumentRegistration"] }),
+                            *components
+                        );
+                    }
                     if scenario["finalState"] == "deleted" {
                         assert_eq!(doc["didDocumentMetadata"]["deactivated"], true);
+                    } else if scenario.get("components").is_some() {
+                        assert_ne!(doc["didDocumentMetadata"]["deactivated"], true);
                     } else if let Some(documents) = vector.get("methodDocuments") {
                         assert_eq!(
                             doc["didDocument"]["verificationMethod"],

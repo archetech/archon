@@ -1,4 +1,4 @@
-# Provisional agent-history convergence (#1199, #1201, #1203, #1205, #1207, #1209, #1211)
+# Provisional agent-history convergence (#1199, #1201, #1203, #1205, #1207, #1209, #1211, #1213)
 
 This Lean project proves a bounded specification and an operational replay
 model of Archon's canonical-CID successor rule. It changes no runtime code. It uses Lean's standard library only;
@@ -389,6 +389,53 @@ components and general combined updates, expected-chain priority, asset
 controllers, retention, and executable refinement remain open. No runtime
 behavior changes.
 
+## Complete document components — #1213
+
+`AgentComponents.lean` adds the three resolved payload components:
+`didDocument`, `didDocumentData`, and `didDocumentRegistration`. Active document
+indices now decode to complete immutable DID-document values, with an explicit
+contract that their method-list projection agrees with the authorization model.
+Both component convergence theorems require that agreement, and component
+execution uses methods decoded from the same full-document values returned by
+resolution (`decodedComponentGraph`). The fixture module proves the projection
+for every document index and instantiates `component_document_authority`; it
+does not assume agreement between independent tables. Data and registration are arbitrary opaque
+values in Lean. The JSON encoding/decoding contract remains outside the proof.
+
+`componentStep` first authorizes against the predecessor document, then replaces
+supplied components and carries forward omitted components. It does not merge
+members inside a supplied component. A document change can accompany a data or
+registration change in the same operation. Deletion returns the DID-only document,
+clears data, and preserves registration; metadata is modeled separately in future
+work. `component_run_authority` proves that carrying the other components does
+not change the authorization run. `component_replay_converges` proves successful
+full-component execution of the canonical fixed-point history, and
+`components_same_evidence` proves equality of the final decoded component triple
+for equal retained evidence, regardless of delivery order or duplicates.
+
+The general component fold permits registration values, but the sibling-order
+model remains provisional. Registry migrations and changes to admission policy
+are not established by this theorem. The signed bridge therefore permits only
+unchanged registration replacement. Immutable agent kind, admitted operation
+shapes, consistent full-document/method projection, signature validity, the finite
+acyclic graph, and retention remain explicit assumptions.
+
+456 additional signed traces per runtime check combined key/document/data updates,
+service and relationship replacement, removal of old data members, carry-forward
+of omitted components, competing combined branches, rejected proposed-key updates,
+deletion, and empty method lists. Both ports compare the complete three components and independently check
+deactivation after imports, repeats, and restart. Lean checks the same 456 component results and
+24 reconstructed authorization states. Fixture JSON values are interned as opaque tokens; Lean checks each token
+against its JSON string and checks component-token triples for every trace. This
+avoids repeating large string reductions and does not verify a general JSON codec. Bridge tests
+cover table reordering, replacement versus carry-forward, and excluded inputs.
+The representative document fields include services and aliases; arbitrary
+malformed JSON and executable acceptance validation are not proved.
+
+No runtime changes or stricter key-purpose rules are introduced. Expected-chain
+ordering, registry migrations, controller-dependent assets, retention/GC, metadata,
+and executable refinement remain open.
+
 ## Reproduce
 
 Install Elan using the [official Lean instructions](https://lean-lang.org/install/manual/).
@@ -401,6 +448,7 @@ node proofs/agent-convergence/generate-fixtures.mjs --check
 node proofs/agent-convergence/generate-record-fixtures.mjs --check
 node proofs/agent-convergence/generate-agent-fixtures.mjs --check
 node proofs/agent-convergence/generate-document-fixtures.mjs --check
+node proofs/agent-convergence/generate-component-fixtures.mjs --check
 cd proofs/agent-convergence
 lake build
 ```
@@ -417,12 +465,14 @@ npm run build -w @didcid/ipfs
 node tests/convergence/generate-vectors.mjs
 node tests/convergence/generate-agent-vectors.mjs
 node tests/convergence/generate-document-vectors.mjs
-git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json tests/convergence/document-vectors.json
-node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs proofs/agent-convergence/generate-document-fixtures.test.mjs
+node tests/convergence/generate-component-vectors.mjs
+git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json tests/convergence/document-vectors.json tests/convergence/component-vectors.json
+node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs proofs/agent-convergence/generate-document-fixtures.test.mjs proofs/agent-convergence/generate-component-fixtures.test.mjs
 node proofs/agent-convergence/generate-fixtures.mjs --check
 node proofs/agent-convergence/generate-record-fixtures.mjs --check
 node proofs/agent-convergence/generate-agent-fixtures.mjs --check
 node proofs/agent-convergence/generate-document-fixtures.mjs --check
+node proofs/agent-convergence/generate-component-fixtures.mjs --check
 ```
 
 Run that block from the repository root. CI performs it before building Lean and
@@ -439,13 +489,13 @@ update must also update and verify the committed checksum.
 
 ## Follow-up proof work
 
-1. Extend verification-method list state to remaining agent-document components
-   and general combined updates. Future relationship enforcement requires its
+1. Add expected-chain evidence, repeated anchors, and registry migrations to
+   the complete-component model. Future relationship enforcement requires its
    own protocol decision; #1156 remains paused.
 2. Establish the concrete codec/normalization domain and general executable
    refinement. Serialized stopping transfer and signed per-pass correspondence
    are now proved/tested respectively; neither is a proof of the runtimes.
-3. Add expected-chain evidence, repeated anchors, and registry migrations.
+3. Extend resolved metadata and time/version-bounded queries.
 4. Extend to assets, ownership transfers, and controller-dependent replay.
 5. Model retention, restart, and garbage collection, then strengthen the bridge
    between the specification and both runtime implementations.

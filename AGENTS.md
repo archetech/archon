@@ -169,3 +169,9 @@ These rules apply to coding agents working in this repository.
 - In convergence models, derive an agent operation's signing authority from its signed predecessor chain. Deletion makes that predecessor terminal; it does not prevent a preferred sibling from replacing a deleted branch through an earlier live predecessor. Keep signature-oracle assumptions distinct from executable verification claims.
 
 - When modeling multiple verification methods, keep normalized method identity separate from public-key identity: a method can retain its name while replacing its key. Model current version-1 named-method lookup without inventing relationship-membership enforcement while #1156 is paused.
+
+- Full-state convergence bridges must preserve whole-component replacement and omission semantics for didDocument, didDocumentData, and didDocumentRegistration. Keep the full-document/method-list projection explicit; deletion clears document/data while retaining registration, and registry changes require the separate chain-ordering model.
+
+- In generated component proofs, intern repeated opaque payload values and check their decoding once; do not repeat large JSON-string equality reductions for every delivery permutation. Measure proof memory before running expensive Lean and cross-port suites together.
+
+- A proof projection contract must be required by the convergence theorem and instantiated by generated fixtures; a standalone agreement lemma does not connect independent authorization and payload tables. Keep deletion metadata assertions independent of payload assertions in cross-port fixtures.
