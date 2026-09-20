@@ -798,3 +798,32 @@ a universal migration-convergence claim.
 Audit result: all 24 signed delivery traces pass in both implementations through
 repeat import and restart, including complete stored event equality. No runtime
 correction is needed for this tested domain.
+
+## Registry ancestry agrees with a valid prefix — #1215
+
+`RegistryAncestry.lean` models a fixed finite create/update graph with registry
+replacement or omission at each operation. Strictly increasing predecessor depth
+justifies ancestry evaluation; valid paths enforce operation bounds and signed
+predecessor edges. A reconstructed root supplies the initial registry.
+
+The general theorem proves that folding changes along any valid prefix produces
+the same registry as independently evaluating the tip's ancestry. Consequently,
+the next operation's expected registry is the fold of that preceding prefix,
+excluding its own proposed change. Its resulting state includes the change and
+is used by its children. Registry receipt equality agrees with this prefix rule;
+it does not by itself establish chain priority for local, hyperswarm, or pin.
+
+The bridge reuses the unchanged signed migration vectors from #1225. Across four
+graphs and 24 distinct evidence orders, it instantiates 144 predecessor-prefix
+obligations, 24 selected-prefix final states, and 66 receipt-registry checks.
+Every branch's signed edges are checked, including displaced branches. Operation
+and receipt table reordering preserves the generated Lean proof. Existing
+cross-port import/repeat/restart coverage applies to these same source vectors.
+
+This proves registry reconstruction and expected-registry selection given a valid
+prefix. It does not yet prove that the importer chooses that prefix when registry
+changes affect chain priority. Next compose this rule with migration-aware anchor
+and sibling selection, keeping authorization, genesis, and event/operation
+identity contracts explicit. Deletion, unanchored-registry migration policy,
+assets, full metadata/codecs, retention, and universal executable correspondence
+remain separate obligations. No runtime or signed-fixture changes are needed.

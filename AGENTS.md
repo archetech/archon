@@ -199,3 +199,5 @@ These rules apply to coding agents working in this repository.
 - When prepending a compiled genesis rank in a proof, require its owner to be the document genesis and expose decoded full-history equality; a parentless selected rank alone does not establish identity.
 
 - Migration convergence audits must derive the expected registry from signed predecessor ancestry: confirm the migration on the old registry, its successors on the new registry, and never rank receipts from different registries by ordinal alone. Test misleading destination/old-chain receipts and return migrations through ordinary imports and restart.
+
+- Registry-prefix proofs must exclude the incoming operation’s own change when selecting its expected registry. Keep receipt registry equality distinct from chain-priority policy, especially for local, hyperswarm, and pin.
