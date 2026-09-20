@@ -695,3 +695,36 @@ The theorem still assumes fixed eligibility and a common ranked evidence model.
 node --test proofs/agent-convergence/generate-priority-fixtures.test.mjs
 node proofs/agent-convergence/generate-priority-fixtures.mjs --check
 ```
+
+## Document authorization in interleaved replay — #1215
+
+`InterleavedAuthorization.lean` replaces the raw event model's opaque operation
+acceptance predicate with the existing predecessor-document evaluator. Each event
+rank decodes to an operation, whose signed predecessor supplies its authorizing
+document. Named verification methods are looked up in that document; replacement
+uses the old document, and deletion makes further operations ineligible. Version-1
+relationship-permission policy is unchanged. Signature validity remains an input.
+
+For a fixed decoded operation graph and signature-validity table, the proof
+derives the interleaved decreasing measure from signed predecessor depth, and proves that decoding any valid event path yields an executable
+operation path. The bounded interleaved loop therefore returns a canonical ranked
+path whose successive document authorizations succeed and whose final state
+agrees with ancestry evaluation. Equal retained event sets give equal ranked
+paths and decoded verification-method/deletion results, including valid warm
+starts. Event ranks may represent repeated anchors of one operation; their
+registry/position eligibility remains fixed input.
+
+The new bridge instantiates these theorems with the existing two signed document
+graphs and 612 delivery orders. It checks ancestry/depth assumptions in Lean and
+uses the universal convergence result before calculating the expected path and
+final state. These are hyperswarm fixtures covering multiple methods, same-name
+key replacement, missing/removed methods, invalid ancestry, and deletion. Existing
+TypeScript and Rust import/repeat/restart tests check the same signed cases.
+They do not yet provide combined chain-anchor/document-rotation transition traces.
+
+Genesis is admitted separately, and the modeled loop starts at its document.
+This closes the self-controlled document-authorization connection in the event
+model, not a general proof of the executable importer. Next connect this derived
+predicate to the settled-priority projection with signed chain/rotation cases.
+Registry migrations, assets, full component/metadata/codec equality, changing
+retained evidence, and general runtime correspondence remain open.
