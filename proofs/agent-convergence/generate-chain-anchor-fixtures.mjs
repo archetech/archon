@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 
 // Exact lexicographic order for the complete ordinal, including prefix length.
 export function comparePositions(a, b) {
@@ -18,28 +19,41 @@ export function generateChainAnchorFixtures(vectors) {
         'namespace Archon.ChainAnchorFixtures', ''];
     let count = 0;
     vectors.forEach((vector, v) => {
-        const operations = [];
-        const tokens = new Map();
-        for (const [i, event] of vector.events.entries()) {
-            const op = event.operation;
-            if (!(op.did === vector.did || (op.type === 'create' && op.registration?.type === 'agent'))) continue;
-            const serialized = JSON.stringify(op);
-            let index = operations.findIndex(item => JSON.stringify(item) === serialized);
-            if (index < 0) { index = operations.length; operations.push(op); }
-            tokens.set(i, index);
-        }
-        const root = operations.find(op => op.type === 'create');
-        assert(root && operations.filter(op => op.type === 'create').length === 1, 'one agent genesis required');
-        assert.equal(operations[0], root, 'genesis must lead the operation table');
+        assert.equal(vector.operations.length, vector.ids.length, 'operation/ID table lengths must agree');
+        assert.equal(new Set(vector.ids).size, vector.ids.length, 'distinct canonical IDs required');
+        const table = new Map(vector.ids.map((id, i) => [id, vector.operations[i]]));
+        const agents = [...table].filter(([, op]) => op.did === vector.did
+            || (op.type === 'create' && op.registration?.type === 'agent'));
+        const roots = agents.filter(([, op]) => op.type === 'create');
+        assert.equal(roots.length, 1, 'one agent genesis required');
+        const [rootId, root] = roots[0];
+        assert.equal(vector.did, 'did:cid:' + rootId, 'genesis ID must identify the controller');
         assert.equal(root.controller, undefined, 'self-controlled agent required');
         assert(!['local', 'hyperswarm', 'pin'].includes(root.registration.registry), 'expected chain required');
-        operations.forEach((op, i) => {
-            if (!i) return;
+        for (const [id, op] of agents) {
+            if (id === rootId) continue;
             assert.equal(op.type, 'update', 'only settled agent updates supported');
-            assert.equal(op.previd, vector.ids[i - 1], 'predecessor-linked operation table required');
             assert.equal(op.doc?.didDocumentRegistration, undefined, 'registry migrations are outside this model');
             assert.equal(op.doc?.didDocument?.controller, undefined, 'external controller is outside this model');
-        });
+        }
+        // Derive a single settled path by signed predecessor ID, never table index.
+        const path = [rootId];
+        while (true) {
+            const children = agents.filter(([, op]) => op.previd === path.at(-1));
+            assert(children.length <= 1, 'a single settled predecessor path is required');
+            if (!children.length) break;
+            assert(!path.includes(children[0][0]), 'cyclic predecessor path');
+            path.push(children[0][0]);
+        }
+        assert.equal(path.length, agents.length, 'all controller operations must link to genesis');
+        const operations = path.map(id => table.get(id));
+        const tokens = new Map();
+        for (const [i, event] of vector.events.entries()) {
+            const matches = [...table].filter(([, op]) => isDeepStrictEqual(op, event.operation));
+            assert.equal(matches.length, 1, 'event must match one canonical operation table entry');
+            const index = path.indexOf(matches[0][0]);
+            if (index >= 0) tokens.set(i, index);
+        }
         const anchors = [...tokens].filter(([i]) => vector.events[i].registry !== 'hyperswarm');
         anchors.forEach(([i]) => {
             const e = vector.events[i];
@@ -54,7 +68,7 @@ export function generateChainAnchorFixtures(vectors) {
         const size = anchors.length;
         const list = xs => `[${xs.join(', ')}]`;
         const ranks = new Map(anchors.map(([token], rank) => [token, rank]));
-        lines.push(`-- Rank -> source event token: ${JSON.stringify(anchors.map(([token]) => token))}`,
+        lines.push(`-- Rank -> chain ordinal: ${JSON.stringify(anchors.map(([token]) => vector.events[token].ordinal))}`,
             `def model${v} : AnchorModel where`, `  size := ${size}`,
             '  parent := fun rank => match rank with',
             ...anchors.map(([, op], rank) => `    | ${rank} => some ${op}`),

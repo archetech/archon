@@ -20,8 +20,8 @@ test('rejects absent positions, ordinal ties, and migrations outside the theorem
         v => { delete v.events[2].ordinal; },
         v => { v.events[5].ordinal = v.events[2].ordinal; },
         v => {
-            for (const e of v.events) {
-                if (e.operation.previd === v.ids[0]) e.operation.doc.didDocumentRegistration = { registry: 'BTC:mainnet' };
+            for (const op of [...v.operations, ...v.events.map(e => e.operation)]) {
+                if (op.previd === v.ids[0]) op.doc.didDocumentRegistration = { registry: 'BTC:mainnet' };
             }
         },
     ]) {
@@ -43,4 +43,42 @@ test('duplicate deliveries retain the same expected positions', () => {
     const { result, count } = generateChainAnchorFixtures(input);
     assert.equal(count, 36);
     assert.match(result, /\[0, 1, 2, 3, 0, 1, 2, 3\]/);
+});
+
+test('event and operation table reorderings preserve the entire generated proof', () => {
+    for (const mode of ['events', 'operations', 'both']) {
+        const input = structuredClone(vectors);
+        for (const v of input) {
+            if (mode !== 'operations') {
+                const remap = i => v.events.length - 1 - i;
+                v.events.reverse();
+                v.orders = v.orders.map(order => order.map(remap));
+            }
+            if (mode !== 'events') {
+                v.operations.reverse();
+                v.ids.reverse();
+            }
+        }
+        assert.deepEqual(generateChainAnchorFixtures(input), generateChainAnchorFixtures(vectors));
+    }
+});
+
+test('serialized object key order does not change operation identity', () => {
+    const input = structuredClone(vectors);
+    for (const v of input) {
+        for (const e of v.events) e.operation = Object.fromEntries(Object.entries(e.operation).reverse());
+    }
+    assert.deepEqual(generateChainAnchorFixtures(input), generateChainAnchorFixtures(vectors));
+});
+
+test('rejects a disconnected signed predecessor and mismatched operation records', () => {
+    const disconnected = structuredClone(vectors);
+    const v = disconnected[0];
+    for (const op of [...v.operations, ...v.events.map(e => e.operation)]) {
+        if (op.previd === v.ids[0]) op.previd = v.ids[3];
+    }
+    assert.throws(() => generateChainAnchorFixtures(disconnected), /must link to genesis/);
+    const mismatched = structuredClone(vectors);
+    mismatched[0].events[2].operation.proof.proofValue = 'different';
+    assert.throws(() => generateChainAnchorFixtures(mismatched), /must match one canonical operation/);
 });

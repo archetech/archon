@@ -5,7 +5,7 @@ set_option warningAsError true
 
 namespace Archon.ChainAnchorFixtures
 
--- Rank -> source event token: [2,3,4,5]
+-- Rank -> chain ordinal: [[100,10,0],[100,30,0],[100,40,0],[100,50,0]]
 def model0 : AnchorModel where
   size := 4
   parent := fun rank => match rank with
@@ -161,7 +161,7 @@ example : anchorScan model0 2 [3, 2, 1, 0] 0 = 0 := by
 example : anchorScan model0 2 [3, 2, 1, 0] 3 = 0 := by
   rw [anchor_scan_from_retained model0 2 [3, 2, 1, 0] 3 (by decide) (by decide)]
   decide
--- Rank -> source event token: [2,3,4,5]
+-- Rank -> chain ordinal: [[100,10,0],[100,30,0],[100,40,0],[100,50,0]]
 def model1 : AnchorModel where
   size := 4
   parent := fun rank => match rank with

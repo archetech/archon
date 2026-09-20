@@ -529,7 +529,10 @@ The proof reuses the finite minimum lemmas through `AnchorModel`: here `parent`
 identifies the operation owning an anchor and `level` is unused. It does not
 reuse the predecessor-graph interpretation of those fields.
 
-The bridge ranks complete chain ordinals lexicographically and rejects ties,
+The bridge maps source events to the paired operation/canonical-ID table and
+derives the controller path from genesis and signed predecessor IDs. Reordering
+either source table preserves the generated proof. It ranks complete chain
+ordinals lexicographically and rejects ties,
 missing positions, foreign registries, and migrations. It projects the controller
 anchors from the signed #1216 fixtures: both proof formats, six delivery orders,
 and three operations give 36 cases, each checking cold and all eligible warm
