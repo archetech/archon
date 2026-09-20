@@ -201,3 +201,5 @@ These rules apply to coding agents working in this repository.
 - Migration convergence audits must derive the expected registry from signed predecessor ancestry: confirm the migration on the old registry, its successors on the new registry, and never rank receipts from different registries by ordinal alone. Test misleading destination/old-chain receipts and return migrations through ordinary imports and restart.
 
 - Registry-prefix proofs must exclude the incoming operation’s own change when selecting its expected registry. Keep receipt registry equality distinct from chain-priority policy, especially for local, hyperswarm, and pin.
+
+- Migration proof receipt ranks may group registries arbitrarily, but must preserve ordinal order within each chain. Derive anchor eligibility from signed predecessor registry state, retain wrong-chain receipts in the proof input, and prove eligible sibling anchors share a registry before interpreting their ranks as chain priority.

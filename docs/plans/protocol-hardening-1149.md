@@ -444,3 +444,26 @@ Next compose derived registry state with anchor/sibling priority in the replay
 model. This increment assumes a valid prefix; it does not establish selection of
 that prefix under migration. Assets, unanchored-registry migration policy, deletion,
 metadata/codecs, retention, and universal executable correspondence remain open.
+
+### Migration-aware anchor selection — #1215
+
+#1226 merged registry ancestry/prefix agreement. The next increment derives the
+anchor filter from that ancestry and proves its agreement with a valid prefix,
+order/multiplicity-independent cold selection, and agreement from valid retained
+anchors. Competing siblings have the same expected registry; their eligible
+anchors therefore belong to the same chain even if their destinations differ.
+Ranks preserve ordinal order within each chain, without assigning meaning to
+relative positions across chains.
+
+The unchanged migration vectors instantiate 168 cold and 180 retained-anchor
+selections across 24 distinct orders, including gossip and wrong-chain receipts
+in the Lean input. Selected receipts are checked against the runtime fixtures'
+expected histories, and table reordering preserves generated proofs. Signature
+and chain-position acceptance remain explicit abstract inputs. No runtime or
+signed-source changes.
+
+Next compose this filter with migration-aware sibling ordering and interleaved
+replay, checking the rank representation and authorization contracts. This step
+proves anchor selection, not complete migration convergence. Unanchored registry
+policy, deletion, dynamic assets, metadata/codecs, retention, and universal
+executable correspondence remain open.

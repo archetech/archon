@@ -10,6 +10,7 @@ import PriorityProjection
 import InterleavedAuthorization
 import ChainDocuments
 import RegistryAncestry
+import RegistryAnchors
 import Lean.Util.CollectAxioms
 import Lean.Elab.Command
 
@@ -22,6 +23,9 @@ run_cmd do
       ``Archon.registry_at_step, ``Archon.migration_uses_predecessor_registry,
       ``Archon.registry_prefix_agrees, ``Archon.expected_registry_after_prefix,
       ``Archon.receipt_registry_after_prefix,
+      ``Archon.siblings_expected_registry, ``Archon.registry_anchor_matches,
+      ``Archon.sibling_anchors_same_registry, ``Archon.registry_anchor_after_prefix,
+      ``Archon.registry_anchors_same_evidence, ``Archon.registry_anchor_warm_agrees,
       ``Archon.interleaved_document_priority_converges,
       ``Archon.interleaved_document_priority_cold,
       ``Archon.document_event_eligible, ``Archon.document_event_authorization,
