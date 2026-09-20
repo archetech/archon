@@ -424,3 +424,23 @@ metadata/codecs, and universal executable correspondence remain open.
 Audit result: all 24 signed delivery traces pass in both implementations through
 repeat import and restart, including complete stored event equality. No runtime
 correction is needed for this tested domain.
+
+### Registry ancestry/prefix agreement — #1215
+
+#1225 merged the signed migration audit. The next Lean increment proves that a
+valid predecessor-linked prefix's registry fold agrees with independent signed
+ancestry evaluation. The next operation uses that prefix's registry before its
+own change; its resulting state governs its children. Receipt registry equality
+is connected to the same rule without treating every matching registry as a chain.
+
+The unchanged four signed graphs instantiate 144 predecessor-prefix obligations
+and 24 final-prefix states over 24 distinct evidence orders, plus 66 receipt
+checks. All branches are covered and source-table reordering leaves proofs
+unchanged. General theorem assumptions include finite bounds, increasing ancestry
+depth, and an admitted genesis. Existing TypeScript/Rust migration tests cover the
+same source vectors; no runtime or fixture payload changes.
+
+Next compose derived registry state with anchor/sibling priority in the replay
+model. This increment assumes a valid prefix; it does not establish selection of
+that prefix under migration. Assets, unanchored-registry migration policy, deletion,
+metadata/codecs, retention, and universal executable correspondence remain open.

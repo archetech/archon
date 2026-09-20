@@ -9,6 +9,7 @@ import InterleavedBound
 import PriorityProjection
 import InterleavedAuthorization
 import ChainDocuments
+import RegistryAncestry
 import Lean.Util.CollectAxioms
 import Lean.Elab.Command
 
@@ -17,7 +18,11 @@ set_option warningAsError true
 open Lean Elab Command in
 run_cmd do
   let allowed := #[``propext, ``Quot.sound]
-  for theoremName in #[``Archon.interleaved_document_priority_converges,
+  for theoremName in #[``Archon.evaluate_registry_agrees, ``Archon.registry_at_root,
+      ``Archon.registry_at_step, ``Archon.migration_uses_predecessor_registry,
+      ``Archon.registry_prefix_agrees, ``Archon.expected_registry_after_prefix,
+      ``Archon.receipt_registry_after_prefix,
+      ``Archon.interleaved_document_priority_converges,
       ``Archon.interleaved_document_priority_cold,
       ``Archon.document_event_eligible, ``Archon.document_event_authorization,
       ``Archon.document_events_descending, ``Archon.document_event_path,
