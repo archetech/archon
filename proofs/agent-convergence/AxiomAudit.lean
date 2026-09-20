@@ -4,6 +4,7 @@ import DocumentAuthorization
 import AgentComponents
 import ChainAnchors
 import ChainSuccessors
+import InterleavedReplay
 import Lean.Util.CollectAxioms
 import Lean.Elab.Command
 
@@ -12,7 +13,11 @@ set_option warningAsError true
 open Lean Elab Command in
 run_cmd do
   let allowed := #[``propext, ``Quot.sound]
-  for theoremName in #[``Archon.bounded_membership_agrees,
+  for theoremName in #[``Archon.interleaved_duplicate_keeps_suffix,
+      ``Archon.interleaved_sibling_truncates, ``Archon.interleaved_insert_head,
+      ``Archon.interleaved_pass_head, ``Archon.interleaved_next_settles,
+      ``Archon.interleaved_empty_head, ``Archon.interleaved_next_same_evidence,
+      ``Archon.bounded_membership_agrees,
       ``Archon.chain_priority_owner, ``Archon.chain_priority_injective,
       ``Archon.chain_priority_same_evidence, ``Archon.chain_graph_same_evidence,
       ``Archon.chain_anchored_order, ``Archon.chain_provisional_order,

@@ -598,3 +598,42 @@ node proofs/agent-convergence/generate-chain-successor-fixtures.mjs --check
 cd proofs/agent-convergence
 lake build
 ```
+
+
+## Interleaved replay: next-event settlement and transition bridge — #1215
+
+`InterleavedReplay.lean` models one event at a time, with no preselection of the
+operation's anchor. A duplicate representation can improve its priority while
+preserving descendants; a preferred sibling replaces the displaced suffix.
+The head of an interleaved scan provably equals the anchor-minimum scan from
+#1218. Consequently, once a predecessor is fixed, one complete scan settles its
+next event from any valid retained warm head or an empty suffix. Equal retained
+evidence gives equal next events even from different heads and tails.
+
+This is the local lemma needed for a whole-path induction, not yet a proof of
+termination or convergence of arbitrary interleaved histories. Authorization,
+expected-registry eligibility, and signed predecessor edges are fixed. The model
+uses ordinal/CID priority ranks and omits event payloads; a virtual predecessor
+admits genesis in concrete cold-start cases. Tied/missing ordinals, multiple
+provisional representations of one operation, migrations, and dynamic document
+or asset authorization remain outside this fixture domain.
+
+The bridge reuses the signed successor fixtures and their canonical-ID-derived
+graph. Lean checks 764 individual transitions and 100 complete passes across 36
+cases. Both runtime tests invoke the same per-event routine used by history
+replay, compare complete stored event records after every event, and check the
+serialized stop-on-unchanged decision after every pass. Public-import/restart
+coverage remains in the existing successor suite. These traces connect concrete
+interleavings to the model; they are not a universal implementation proof.
+
+Next: prove that a settled prefix stays fixed while its suffix settles, then lift
+the local lemma over predecessor depth to establish whole-path convergence and a
+valid stopping bound. That would discharge the remaining interleaving phase
+obligation before document authorization and registry migrations are composed.
+
+```sh
+node --test proofs/agent-convergence/generate-interleaved-fixtures.test.mjs
+node proofs/agent-convergence/generate-interleaved-fixtures.mjs --check
+cd proofs/agent-convergence
+lake build
+```
