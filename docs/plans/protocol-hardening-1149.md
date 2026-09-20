@@ -503,13 +503,15 @@ first observation's metadata.
 The unchanged signed graphs supply 24 original orders plus four targeted
 wrong-chain-first orders. Lean checks 1,225 transitions, 74 passes, the per-order
 projection contract, and the same-chain ordinal-rank contract. TypeScript and
-Rust compare full stored records after each import and serialized stopping at
-each pass for all 28 traces. Preferred genesis is seeded; existing public import,
+Rust compare the selected stored event records after each import and the
+serialized selected history at each pass for all 28 traces. Preferred genesis
+is seeded; existing public import,
 repeat, and restart tests retain late-genesis/durable-evidence coverage.
 
 The general theorem assumes a fixed already authorized create/update graph,
-an admitted genesis, and a valid warm suffix. Full metadata/stop correspondence
-is finite bridge evidence. Next combine registry reconstruction and this
+an admitted genesis, and a valid warm suffix. Selected-history stopping
+agreement and full receipt/candidate metadata correspondence remain finite
+bridge evidence. Next combine registry reconstruction and this
 representation with predecessor-document authorization. Unanchored migrations,
 deletions in the registry model, dynamic assets, full metadata/codecs, retention,
 and universal runtime refinement remain open. No production behavior changes.
