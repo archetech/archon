@@ -961,3 +961,30 @@ These are hand-written abstract Lean examples, not signed cross-port fixtures;
 A4 remains open. The new modules run in the default CI build, and all six general
 theorems are checked against the existing axiom allowlist. A1 remains in progress
 until the integrated predicate is connected to the raw-event projection/replay.
+
+
+## Derived event projection and integrated agent replay — A1
+
+`AgentEventProjection.lean` closes the A1 model-integration boundary. It derives
+`PriorityProjection` rather than taking its representative/soundness/canonicality
+fields as premises. Eligible retained anchors keep their ranks; each retained
+operation also has a provisional CID representative. A selected anchor precedes
+that fallback. Receipt ownership must point to retained operations; this is an
+input identity contract, not agreement of accepted operations or histories.
+
+The projection proves that removing nonpreferred representations preserves the
+selected suffix. `component_interleaved_replay` instantiates it with the derived
+`componentAnchors` predicate, then proves that interleaved normalized-event replay
+agrees with compiled priority selection and executes to a complete component
+state. Document methods are checked against the full-document decoding contract.
+Genesis is admitted separately, predecessor ancestry is ordered and bounded,
+and a supplied warm suffix is valid under the derived predicate; cold replay
+uses the empty suffix. Rejected operations can remain in the retained inputs.
+
+The examples instantiate the projection and integrated theorem on simultaneous
+key/registry changes, return migration, deletion, and rejected competing updates.
+All seven new general lemmas enter the axiom audit. This completes **A1**, not
+A2–A4: ranks still need their protocol-domain/ordinal interpretation; complete
+semantic metadata and stopping remain to be composed; signed cross-port fixtures
+must validate normalization. The normalized list is an ordering representation,
+not a claim that every synthetic provisional event exists as a stored receipt.
