@@ -1019,7 +1019,9 @@ The following is the insertion algorithm reused during replay:
    currentConfirmed = expectedRegistry is a chain registry and next.registry == expectedRegistry
    if incomingConfirmed or currentConfirmed:
        preferred = incomingConfirmed and (not currentConfirmed or
-           (both ordinals exist and compare_ordinals(event.ordinal, next.ordinal) < 0))
+           (both ordinals exist and
+               (compare_ordinals(event.ordinal, next.ordinal) < 0 or
+                (compare_ordinals(event.ordinal, next.ordinal) == 0 and event.opid < next.opid))))
    else:
        preferred = event.opid < next.opid    // canonical base32 strings, ASCII order
    if preferred:
@@ -1042,6 +1044,13 @@ the first applicable copy can change controller cutoffs and dependent asset
 acceptance according to gossip arrival order. Distinct candidates remain retained.
 Equal or missing ordinals do not replace an already-confirmed copy under this
 rule; local, Hyperswarm, and pin representations keep first-observation behavior.
+
+For distinct competing operations confirmed on the expected chain, present equal
+ordinals are broken by canonical operation CID (ASCII order). This is required
+because chain producers can assign equal positions to different operations;
+first-applicable selection can otherwise depend on hint arrival order and persist
+across reconstruction. Earlier ordinals still take precedence. Missing ordinal
+handling and repeated anchors of the same operation are unchanged by this rule.
 
 The [unanchored successor rule](../../scheme.md#competing-unanchored-successors)
 is a sibling preference, not a timestamp cutoff or a replacement for chain

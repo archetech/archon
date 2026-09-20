@@ -616,7 +616,10 @@ histories are replayed. Candidate evidence for displaced branches remains
 retained. The same preference applies during ordinary import and reconstruction,
 including when a successor arrives before its predecessor. A valid confirmation
 on the predecessor's expected chain registry still takes precedence over hints;
-competition between chain events retains existing registry/ordinal rules.
+competition between chain events compares registry-local ordinals first. When
+both ordinals are present and equal, the lexicographically smaller canonical
+operation CID wins. This tie-breaker applies to distinct competing operations,
+not repeated anchors of the same operation.
 
 Replay retains the existing hint traversal order to avoid repeatedly processing
 long predecessor chains in arbitrary CID order. The shared importer applies CID
@@ -631,6 +634,15 @@ records the production audit and tested boundaries. Both implementations must be
 upgraded together to apply this rule consistently; old nodes can still choose a
 different branch for a newly encountered fork. No operation bytes, signatures,
 genesis identifiers, or registry anchor positions are rewritten.
+
+Equal chain positions are reachable: the Solana mediator currently records a
+transaction-local instruction index, so two transactions in one block can
+produce the same ordinal. The A2 audit in #1215 demonstrated persistent
+arrival-order divergence with real signed operations and ordinary imports in
+both Gatekeepers. The 2026-09-20 decision adds the CID tie-breaker to version 1;
+nodes must upgrade together for consistent selection of such forks. It does not
+rewrite operation identities or chain positions. The [domain audit](plans/agent-convergence-domain.md)
+records the reproducer and remaining domain obligations.
 
 ### Operation identity and retrieval references
 
