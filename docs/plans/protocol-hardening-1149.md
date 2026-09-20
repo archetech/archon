@@ -329,3 +329,22 @@ changing runtime behavior. The universal whole-path induction remains open:
 prove stable-prefix preservation, suffix progress, and the stop-on-unchanged
 bound. Fixed authorization/registry assumptions, migrations, assets, metadata,
 and retention are still explicit remaining obligations.
+
+
+### Whole-path interleaved convergence and stopping bound — #1215
+
+The fixed-authorization interleaved model now proves stable-head preservation,
+suffix progress, and whole-path convergence from any valid retained initial path.
+Strictly decreasing operation levels bound convergence by `level(parent)` scans,
+plus at most one scan detecting stability. Equal retained event sets give equal
+complete ranked paths regardless of order, duplicates, or initial valid branch.
+
+Signed fixtures instantiate the level condition and theorem at 100 cold/warm
+pass starts. All 764 per-event runtime comparisons remain, with actual stopping
+checked against the four-pass fixture bound; two cases reach that bound. No
+production loop limit or other runtime behavior changes.
+
+This closes the universal interleaving argument in the current model. The next
+connections are full document/key authorization and the prior settled-priority
+projection, followed by registry migrations, dynamic assets, metadata/codecs,
+and retention. Universal executable correspondence remains open; #1215 stays open.

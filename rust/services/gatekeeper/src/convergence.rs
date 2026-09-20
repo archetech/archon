@@ -808,6 +808,7 @@ async fn convergence_interleaved_transitions() {
             })
             .collect();
         let passes = case["passes"].as_array().unwrap();
+        assert!(passes.len() <= case["passBound"].as_u64().unwrap() as usize);
         for (pass, steps) in passes.iter().enumerate() {
             let before = serde_json::to_string(&state.store.lock().await.get_events(did)).unwrap();
             for (step, token) in case["order"].as_array().unwrap().iter().enumerate() {
