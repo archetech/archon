@@ -1820,6 +1820,12 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     private async importEventOnce(event: GatekeeperEvent): Promise<ImportStatus> {
+        // Startup replay also enters here directly from retained candidates.
+        if (event.registry !== PIN_QUEUE && !isUnanchoredRegistry(event.registry)
+            && (!Array.isArray(event.ordinal) || event.ordinal.length === 0)) {
+            return ImportStatus.REJECTED;
+        }
+
         try {
             if (!event.did) {
                 if (event.operation.did) {
@@ -2061,6 +2067,13 @@ export default class Gatekeeper implements GatekeeperInterface {
         // Both ports validate the registry name here, so testing presence
         // alone would admit an event the other refuses.
         if (!isValidRegistryName(event.registry) || !event.time || !event.operation) {
+            return false;
+        }
+
+        // Only positioned receipts can claim chain authority. Relayed events
+        // have already been converted to unconfirmed Hyperswarm hints.
+        if (event.registry !== PIN_QUEUE && !isUnanchoredRegistry(event.registry)
+            && (!Array.isArray(event.ordinal) || event.ordinal.length === 0)) {
             return false;
         }
 

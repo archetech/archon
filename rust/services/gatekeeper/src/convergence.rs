@@ -1063,3 +1063,110 @@ async fn convergence_controller_cutoff_view() {
         }
     }
 }
+
+#[tokio::test]
+async fn convergence_chain_ordinals_required() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/tied-anchor-vectors.json"
+    ))
+    .unwrap();
+    for vector in vectors.as_array().unwrap().iter().step_by(2) {
+        let did = vector["did"].as_str().unwrap();
+        let genesis = json!({
+            "registry": "SOL:devnet", "time": "2026-09-01T00:00:00Z",
+            "ordinal": [100, 0, 0], "operation": vector["operations"][0],
+            "opid": vector["ids"][0], "did": did,
+            "registration": {"height": 100, "txid": "ordinal-audit", "batch": did, "opidx": 0}
+        });
+        for ordinal in [
+            None,
+            Some(Value::Null),
+            Some(json!([])),
+            Some(json!(7)),
+            Some(json!("7")),
+        ] {
+            let (mut state, _directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            let mut invalid = genesis.clone();
+            if let Some(value) = ordinal {
+                invalid["ordinal"] = value;
+            } else {
+                invalid.as_object_mut().unwrap().remove("ordinal");
+            }
+            assert!(!crate::verify_event_shape(&invalid));
+            let result = crate::import_batch_impl(&state, &[invalid.clone()]).await;
+            assert_eq!((result.queued, result.rejected), (0, 1));
+            assert!(matches!(
+                crate::events::import_event_impl(&state, crate::value_to_event_record(&invalid))
+                    .await,
+                crate::events::ImportStatus::Rejected
+            ));
+            {
+                let mut store = state.store.lock().await;
+                assert!(store.get_events(did).is_empty());
+                assert!(!store.get_candidates().unwrap().contains_key(did));
+                let event = crate::value_to_event_record(&invalid);
+                store.set_candidates(did, vec![event.clone()]).unwrap();
+                store.set_events(did, vec![event]).unwrap();
+            }
+            let data = serde_json::from_value(
+                serde_json::to_value(&state.store.lock().await.data).unwrap(),
+            )
+            .unwrap();
+            let (restarted, _restart_directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data,
+                redis_connection: None,
+            });
+            state = restarted;
+            crate::history::ensure_history_ready(&state).await.unwrap();
+            assert!(state.store.lock().await.get_events(did).is_empty());
+            let result = crate::import_batch_impl(&state, &[genesis.clone()]).await;
+            assert_eq!((result.queued, result.rejected), (1, 0));
+            crate::process_events_impl(&state).await;
+            assert_eq!(
+                state.store.lock().await.get_events(did)[0].ordinal,
+                Some(vec![100, 0, 0])
+            );
+            let data = serde_json::from_value(
+                serde_json::to_value(&state.store.lock().await.data).unwrap(),
+            )
+            .unwrap();
+            let (restarted, _final_directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data,
+                redis_connection: None,
+            });
+            crate::history::ensure_history_ready(&restarted)
+                .await
+                .unwrap();
+            assert_eq!(
+                restarted.store.lock().await.get_events(did)[0].ordinal,
+                Some(vec![100, 0, 0])
+            );
+        }
+        for registry in ["local", "hyperswarm", "pin"] {
+            let mut hint = genesis.clone();
+            hint["registry"] = json!(registry);
+            hint.as_object_mut().unwrap().remove("ordinal");
+            assert!(crate::verify_event_shape(&hint));
+        }
+        let (state, _directory) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        let mut unpositioned = genesis.clone();
+        unpositioned.as_object_mut().unwrap().remove("ordinal");
+        let result =
+            crate::import_batch_impl(&state, &crate::events::relay_hints(&[unpositioned])).await;
+        assert_eq!((result.queued, result.rejected), (1, 0));
+        crate::process_events_impl(&state).await;
+        let events = state.store.lock().await.get_events(did);
+        assert_eq!(events[0].registry, "hyperswarm");
+        assert!(events[0].registration.is_none());
+    }
+}

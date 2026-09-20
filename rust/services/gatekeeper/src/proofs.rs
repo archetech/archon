@@ -54,6 +54,16 @@ pub(crate) fn verify_event_shape(event: &Value) -> bool {
         return false;
     }
 
+    if registry != "pin"
+        && !crate::is_unanchored_registry(registry)
+        && !event
+            .get("ordinal")
+            .and_then(Value::as_array)
+            .is_some_and(|items| !items.is_empty())
+    {
+        return false;
+    }
+
     let Some(event_time) = event.get("time").and_then(Value::as_str) else {
         return false;
     };

@@ -220,3 +220,5 @@ These rules apply to coding agents working in this repository.
 - Chain ordinal uniqueness must be demonstrated per producer: Solana instruction indices are transaction-local, and separate transactions can collide. Keep the signed A2 tie regression through import/repeat/restart in both ports; distinguish equal present ordinals from missing-position policy.
 
 - Agent convergence must cover the authorization-relevant receipt view, not only operation IDs/documents. Controller anchoring eligibility follows the confirmed prefix and per-version expected registry; an unconfirmed wrong-registry suffix must not switch proof-time versus chain-position authorization.
+
+- Convergence audits must trace authoritative receipt producers and trust-boundary normalization before expanding protocol selection rules. Chain receipts require nonempty ordinals; missing-position examples admitted only by permissive imports do not establish a bundled-mediator or production occurrence. Preserve ordinal-free local/Hyperswarm/pin hints.

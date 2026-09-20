@@ -597,6 +597,12 @@ pub(crate) fn normalize_event_time(event: &mut EventRecord) {
 }
 
 pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) -> ImportStatus {
+    if event.registry != PIN_QUEUE
+        && !is_unanchored_registry(&event.registry)
+        && !event.ordinal.as_ref().is_some_and(|items| !items.is_empty())
+    {
+        return ImportStatus::Rejected;
+    }
     normalize_event_time(&mut event);
     let _guard = state.history_lock.lock().await;
     let did = match infer_event_did(&state.config, &event_record_to_value(&event)) {
@@ -655,6 +661,12 @@ pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) 
 }
 
 pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> ImportStatus {
+    if event.registry != PIN_QUEUE
+        && !is_unanchored_registry(&event.registry)
+        && !event.ordinal.as_ref().is_some_and(|items| !items.is_empty())
+    {
+        return ImportStatus::Rejected;
+    }
     let trace = import_trace_enabled();
     let mut event_value = event_record_to_value(&event);
     let did = match infer_event_did(&state.config, &event_value) {
