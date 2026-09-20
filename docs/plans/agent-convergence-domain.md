@@ -33,7 +33,7 @@ On 2026-09-20 the maintainer approved canonical operation CID as the tie-breaker
 for equally anchored competing operations, preserving ordinal precedence.
 Both present ordinals are compared first; equal ordinals compare complete
 canonical operation IDs in ASCII order. Repeated anchors of one operation and
-missing-position behavior are unchanged in this increment. This permits a later
+missing-position behavior were unchanged in that increment. This permits a later
 preferred sibling to replace the earlier branch and replay dependents.
 
 `tests/convergence/generate-tied-anchor-vectors.mjs` deterministically generates
@@ -42,12 +42,27 @@ ordinary importer, repeat delivery, and reconstructed storage, comparing selecte
 operation IDs, full selected events, and resolved data. Existing distinct-ordinal
 cases continue to verify ordinal precedence.
 
+## Approved missing-position decision
+
+The documented import event allows an omitted ordinal. The same signed A/P/B
+counterexample also diverged when chain receipts omitted their ordinals. On
+2026-09-20 the maintainer approved: matching-chain known positions first, canonical
+operation CID otherwise. Positioned duplicates may replace an unpositioned
+receipt of the same operation; they still undergo predecessor authorization.
+Bundled chain mediators normally supply ordinals, but the admitted import domain
+cannot silently exclude their absence.
+
+`missing-position-vectors.json` uses the same signed operations and covers absent
+ordinals, positioned versus unpositioned siblings, positioned duplicate recovery,
+and wrong-chain positions. Both ports exercise import, repeat delivery, and
+restart, checking the full chosen receipt as well as the operation path.
+
 ## Remaining A2 audit
 
 The integrated Lean rank representation must account for the approved
 ordinal-plus-CID comparison, including duplicate positions of the same operation.
-Missing-position behavior must be resolved against the documented input domain;
-this change does not silently treat missing ordinals as equal present positions.
+The known-position/CID policy now resolves missing ordinals at runtime; its Lean
+representation and combined-domain bridge still need to be completed.
 The combined domain still needs signed coverage of unanchored/return migrations,
 missing predecessors, late genesis, rotations and deletion under the integrated
 A1 theorem. Semantic receipt metadata and actual stopping remain A3; the full

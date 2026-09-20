@@ -703,17 +703,19 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
 
         if let Some(index) = current_events.iter().position(|item| item.opid.as_deref() == Some(&opid)) {
             let expected_registry = expected_registry_for_index(&current_events, index);
-            let earlier_anchor = expected_registry.as_deref().is_some_and(|registry| {
+            let preferred_anchor = expected_registry.as_deref().is_some_and(|registry| {
                 registry != PIN_QUEUE
                     && !is_unanchored_registry(registry)
                     && registry == event.registry.as_str()
-            }) && compare_ordinals(
-                event.ordinal.as_ref(),
-                current_events[index].ordinal.as_ref(),
-            ).is_lt();
+            }) && event.ordinal.is_some()
+                && (current_events[index].ordinal.is_none()
+                    || compare_ordinals(
+                        event.ordinal.as_ref(),
+                        current_events[index].ordinal.as_ref(),
+                    ).is_lt());
             // A late predecessor can make a later anchor apply first. Earlier
-            // anchors still need the predecessor authorization performed below.
-            if expected_registry.as_deref() == Some(current_events[index].registry.as_str()) && !earlier_anchor {
+            // or newly positioned anchors still need predecessor authorization below.
+            if expected_registry.as_deref() == Some(current_events[index].registry.as_str()) && !preferred_anchor {
                 if trace {
                     info!(
                         "process_events merged reason=duplicate_already_confirmed current_registry={} expected_registry={} {}",
@@ -916,12 +918,14 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
         let expected_chain = expected_registry
             .as_deref()
             .filter(|registry| *registry != PIN_QUEUE && !is_unanchored_registry(registry));
-        let incoming_confirmed = expected_chain == Some(event.registry.as_str());
-        let current_confirmed = expected_chain == Some(next_event.registry.as_str());
+        let incoming_positioned =
+            expected_chain == Some(event.registry.as_str()) && event.ordinal.is_some();
+        let current_positioned =
+            expected_chain == Some(next_event.registry.as_str()) && next_event.ordinal.is_some();
         let ordinal_order = compare_ordinals(event.ordinal.as_ref(), next_event.ordinal.as_ref());
-        let preferred = if incoming_confirmed || current_confirmed {
-            incoming_confirmed
-                && (!current_confirmed
+        let preferred = if incoming_positioned || current_positioned {
+            incoming_positioned
+                && (!current_positioned
                     || ordinal_order.is_lt()
                     || (event.ordinal.is_some()
                         && next_event.ordinal.is_some()

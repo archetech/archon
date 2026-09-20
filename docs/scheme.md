@@ -624,12 +624,16 @@ predecessor; CID order is not a global sequence of all operations.
 A later preferred sibling replaces the previously accepted branch, and dependent
 histories are replayed. Candidate evidence for displaced branches remains
 retained. The same preference applies during ordinary import and reconstruction,
-including when a successor arrives before its predecessor. A valid confirmation
-on the predecessor's expected chain registry still takes precedence over hints;
+including when a successor arrives before its predecessor. A valid confirmation with a known ordinal
+on the predecessor's expected chain registry takes precedence over unpositioned evidence;
 competition between chain events compares registry-local ordinals first. When
 both ordinals are present and equal, the lexicographically smaller canonical
 operation CID wins. This tie-breaker applies to distinct competing operations,
-not repeated anchors of the same operation.
+not repeated anchors of the same operation. A receipt without an ordinal
+retains canonical-CID priority even when its registry matches the expected chain.
+A later positioned receipt for that same operation upgrades the unpositioned
+receipt; among known positions, the earlier ordinal still wins. This preserves
+available operations without making missing positions outrank known positions.
 
 Replay retains the existing hint traversal order to avoid repeatedly processing
 long predecessor chains in arbitrary CID order. The shared importer applies CID

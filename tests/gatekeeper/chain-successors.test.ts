@@ -6,7 +6,7 @@ import type { GatekeeperEvent, Operation } from '@didcid/gatekeeper/types';
 
 type Block = { height: number; hash: string; time: number };
 type Vector = { blocks?: { registry: string; block: Block }[]; expectedEvents?: number[]; expectedRegistry?: string; states?: (number | 'deleted' | null)[]; legacy: boolean; mode: string; did: string; operations: Operation[]; ids: string[]; expected: number[]; events: GatekeeperEvent[]; orders: number[][]; block: { height: number; hash: string; time: number } };
-const vectors: Vector[] = ['chain-successor-vectors', 'chain-document-vectors', 'migration-vectors', 'tied-anchor-vectors'].flatMap(name => JSON.parse(readFileSync(`tests/convergence/${name}.json`, 'utf8')));
+const vectors: Vector[] = ['chain-successor-vectors', 'chain-document-vectors', 'migration-vectors', 'tied-anchor-vectors', 'missing-position-vectors'].flatMap(name => JSON.parse(readFileSync(`tests/convergence/${name}.json`, 'utf8')));
 it.each(vectors)('settles competing branches ($mode, legacy=$legacy)', async vector => {
     for (const order of vector.orders) {
         const db = new DbMemory('chain-successors');

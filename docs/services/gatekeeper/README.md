@@ -983,6 +983,12 @@ TypeScript compares stored histories canonically so Redis hydration changing obj
 key order cannot manufacture a history change. Known canonical content is not
 rewritten to IPFS merely because a gossip wrapper omitted its operation ID.
 
+A matching-chain receipt without an ordinal retains CID priority. A matching-chain
+receipt with a known position outranks it, including when both receipts identify
+the same operation. Among positioned competing operations, compare ordinals then
+canonical CIDs; otherwise compare canonical CIDs. This changes selection priority,
+not the signed operation or its registry, and does not discard unavailable positions.
+
 The following is the insertion algorithm reused during replay:
 
 ```
@@ -991,9 +997,10 @@ The following is the insertion algorithm reused during replay:
 3. current = store.get_events(did); derive any missing canonical operation IDs
 4. if any current event has opid == event.opid:
        expectedRegistry = expected_registry_for_index(current, index_of_match)
-       earlierAnchor = expectedRegistry is a chain registry and event.registry == expectedRegistry
-           and both ordinals exist and compare_ordinals(event.ordinal, current[match].ordinal) < 0
-       if current[match].registry == expectedRegistry and not earlierAnchor: return MERGED
+       preferredAnchor = expectedRegistry is a chain registry and event.registry == expectedRegistry
+           and event.ordinal exists and (current[match].ordinal is missing
+               or compare_ordinals(event.ordinal, current[match].ordinal) < 0)
+       if current[match].registry == expectedRegistry and not preferredAnchor: return MERGED
        if event.registry == expectedRegistry:
            previous = selected predecessor document, or none for creation
            authorize_operation(event.operation, previous, event)
@@ -1015,10 +1022,10 @@ The following is the insertion algorithm reused during replay:
    expectedRegistry = expected_registry_for_index(current, i + 1)
    next = current[i+1]
    // local, hyperswarm, and pin do not supply chain priority
-   incomingConfirmed = expectedRegistry is a chain registry and event.registry == expectedRegistry
-   currentConfirmed = expectedRegistry is a chain registry and next.registry == expectedRegistry
-   if incomingConfirmed or currentConfirmed:
-       preferred = incomingConfirmed and (not currentConfirmed or
+   incomingPositioned = expectedRegistry is a chain registry and event.registry == expectedRegistry and event.ordinal exists
+   currentPositioned = expectedRegistry is a chain registry and next.registry == expectedRegistry and next.ordinal exists
+   if incomingPositioned or currentPositioned:
+       preferred = incomingPositioned and (not currentPositioned or
            (both ordinals exist and
                (compare_ordinals(event.ordinal, next.ordinal) < 0 or
                 (compare_ordinals(event.ordinal, next.ordinal) == 0 and event.opid < next.opid))))

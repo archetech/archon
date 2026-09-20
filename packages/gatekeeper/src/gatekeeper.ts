@@ -1868,14 +1868,14 @@ export default class Gatekeeper implements GatekeeperInterface {
                     const index = currentEvents.indexOf(opMatch);
                     const expectedRegistry = expectedRegistryForIndex(currentEvents, index);
 
-                    const earlierAnchor = expectedRegistry && expectedRegistry !== PIN_QUEUE && !isUnanchoredRegistry(expectedRegistry)
-                        && event.registry === expectedRegistry && event.ordinal && opMatch.ordinal
-                        && compareOrdinals(event.ordinal, opMatch.ordinal) < 0;
-                    if (expectedRegistry && opMatch.registry === expectedRegistry && !earlierAnchor) {
+                    const preferredAnchor = expectedRegistry && expectedRegistry !== PIN_QUEUE && !isUnanchoredRegistry(expectedRegistry)
+                        && event.registry === expectedRegistry && event.ordinal
+                        && (!opMatch.ordinal || compareOrdinals(event.ordinal, opMatch.ordinal) < 0);
+                    if (expectedRegistry && opMatch.registry === expectedRegistry && !preferredAnchor) {
                         return ImportStatus.MERGED;
                     }
                     // A late predecessor can make a later anchor apply first.
-                    // Reconsider earlier anchors, with predecessor authorization below.
+                    // Reconsider known positions and earlier anchors, with predecessor authorization below.
 
                     if (expectedRegistry && event.registry === expectedRegistry) {
                         // Confirming is what first gives the event a position the
@@ -1935,12 +1935,12 @@ export default class Gatekeeper implements GatekeeperInterface {
 
                     const nextEvent = currentEvents[index + 1];
                     const expectedChain = expectedRegistry && expectedRegistry !== PIN_QUEUE && !isUnanchoredRegistry(expectedRegistry);
-                    const incomingConfirmed = expectedChain && event.registry === expectedRegistry;
-                    const currentConfirmed = expectedChain && nextEvent.registry === expectedRegistry;
+                    const incomingPositioned = expectedChain && event.registry === expectedRegistry && event.ordinal !== undefined;
+                    const currentPositioned = expectedChain && nextEvent.registry === expectedRegistry && nextEvent.ordinal !== undefined;
                     const ordinalOrder = event.ordinal && nextEvent.ordinal
                         ? compareOrdinals(event.ordinal, nextEvent.ordinal) : undefined;
-                    const preferred = incomingConfirmed || currentConfirmed
-                        ? incomingConfirmed && (!currentConfirmed ||
+                    const preferred = incomingPositioned || currentPositioned
+                        ? incomingPositioned && (!currentPositioned ||
                             (ordinalOrder !== undefined &&
                                 (ordinalOrder < 0 || (ordinalOrder === 0 && event.opid! < nextEvent.opid!))))
                         : event.opid! < nextEvent.opid!;
