@@ -68,7 +68,7 @@ jobs:
           git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json
       - name: Check shared fixture bridge
         run: |
-          node --test proofs/agent-convergence/generate-fixtures.test.mjs
+          node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs
           node proofs/agent-convergence/generate-fixtures.mjs --check
           node proofs/agent-convergence/generate-record-fixtures.mjs --check
           node proofs/agent-convergence/generate-agent-fixtures.mjs --check

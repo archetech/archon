@@ -156,7 +156,7 @@ These rules apply to coding agents working in this repository.
 
 - Formal convergence work must distinguish a unique canonical projection from proof that the production insertion/replay loop computes it. State graph, authorization, evidence-retention, and CID-abstraction assumptions explicitly; keep a checked bridge to shared signed fixtures, and audit theorem axioms without treating finite examples as a universal implementation proof.
 
-- Proof CI must enforce the documented theorem-axiom allowlist and regenerate signed source vectors before checking the Lean bridge. Validate the bridge’s genesis and update-shape assumptions; do not rely on a fixed operation-table index for genesis.
+- Proof CI must enforce the documented theorem-axiom allowlist and regenerate signed source vectors before checking the Lean bridge. Validate the bridge’s genesis and update-shape assumptions; do not rely on a fixed operation-table index for genesis. Apply these checks to each new bridge, derive actions from operation records, and emit warnings-as-errors in generated Lean modules too.
 
 - Operational replay proofs must model late genesis, missing predecessors, duplicate identity, suffix truncation, and the actual stop-on-unchanged condition. Distinguish operation-ID path equality from the runtime’s serialized event-record equality; a path-level pass bound is not automatically a bound on all metadata transitions.
 

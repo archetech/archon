@@ -335,7 +335,10 @@ keys, a child of deletion, and replacement of a deleted branch. They compare ID
 histories and final key/deletion states after delivery, reversed repeats, and
 restart. The generator derives signature validity using the real verifier and
 maps CIDs to sorted ranks. Lean independently checks all 24 reconstructed
-operation states and all 456 replay results from those tables.
+operation states and all 456 replay results from those tables. The bridge derives
+the unique genesis, initial key, predecessors, and update actions from operation
+records, rejects shapes outside this single-key subset, and cross-checks stored
+graph annotations. Generator tests cover reordered tables and unsupported shapes.
 
 This does not prove cryptography, arbitrary DID-document updates, multiple
 simultaneous verification methods, capability-permission migration, assets, or
@@ -371,7 +374,7 @@ npm run build -w @didcid/ipfs
 node tests/convergence/generate-vectors.mjs
 node tests/convergence/generate-agent-vectors.mjs
 git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json
-node --test proofs/agent-convergence/generate-fixtures.test.mjs
+node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs
 node proofs/agent-convergence/generate-fixtures.mjs --check
 node proofs/agent-convergence/generate-record-fixtures.mjs --check
 node proofs/agent-convergence/generate-agent-fixtures.mjs --check
