@@ -394,8 +394,12 @@ behavior changes.
 `AgentComponents.lean` adds the three resolved payload components:
 `didDocument`, `didDocumentData`, and `didDocumentRegistration`. Active document
 indices now decode to complete immutable DID-document values, with an explicit
-contract that their method-list projection agrees with the authorization model
-(`component_document_authority`). Data and registration are arbitrary opaque
+contract that their method-list projection agrees with the authorization model.
+Both component convergence theorems require that agreement, and component
+execution uses methods decoded from the same full-document values returned by
+resolution (`decodedComponentGraph`). The fixture module proves the projection
+for every document index and instantiates `component_document_authority`; it
+does not assume agreement between independent tables. Data and registration are arbitrary opaque
 values in Lean. The JSON encoding/decoding contract remains outside the proof.
 
 `componentStep` first authorizes against the predecessor document, then replaces
@@ -419,8 +423,8 @@ acyclic graph, and retention remain explicit assumptions.
 456 additional signed traces per runtime check combined key/document/data updates,
 service and relationship replacement, removal of old data members, carry-forward
 of omitted components, competing combined branches, rejected proposed-key updates,
-deletion, and empty method lists. Both ports compare the complete three components
-after imports, repeats, and restart. Lean checks the same 456 component results and
+deletion, and empty method lists. Both ports compare the complete three components and independently check
+deactivation after imports, repeats, and restart. Lean checks the same 456 component results and
 24 reconstructed authorization states. Fixture JSON values are interned as opaque tokens; Lean checks each token
 against its JSON string and checks component-token triples for every trace. This
 avoids repeating large string reductions and does not verify a general JSON codec. Bridge tests

@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs';
+import { isDeepStrictEqual } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { componentGraph } from '../../tests/convergence/component-model.mjs';
 const list = values => '[' + values.join(', ') + ']';
@@ -32,12 +33,32 @@ export function generateComponentFixtures(vectors) {
             `  named := ${lookup(graph.named, '0')}`,
             `  signatureValid := fun i k => (${lookup(vector.signatureValid.map(list), '[]')}) i |>.getD k false`, '}');
         for (const i of indices) lines.push(`example : agentStateAt (documentAgent graph${v}) ${ranks[i]} = ${state(vector.states[i])} := by decide`);
+        // Decode methods from the full-document values, independently of the
+        // graph's authorization table, then have Lean prove their agreement.
+        const decodedMethods = atoms.map(atom => {
+            const doc = graph.fullDocuments.find(value => JSON.stringify(value) === atom);
+            return (doc?.verificationMethod ?? []).map(method => {
+                const absolute = method.id.startsWith('#') ? vector.did + method.id : method.id;
+                const id = graph.methodNames.indexOf(absolute);
+                const key = vector.keys.findIndex(value => isDeepStrictEqual(value, method.publicKeyJwk));
+                if (id < 0 || key < 0) throw new Error('Full document has an unrepresented method');
+                return `⟨${id}, ${key}⟩`;
+            });
+        });
+        lines.push(`def methods${v} : Nat → List VerificationMethod := fun i => ${list(decodedMethods.map(list))}.getD i []`);
         const patch = vector.operations.map(op => {
             const member = key => Object.hasOwn(op.doc ?? {}, key) ? 'some ' + token(op.doc[key]) : 'none';
             return '⟨' + member('didDocumentData') + ', ' + member('didDocumentRegistration') + '⟩';
         });
         lines.push(`def patch${v} : Nat → ComponentPatch Nat Nat := ${lookup(patch, '⟨none, none⟩')}`,
-            `def documents${v} : Nat → Nat := fun i => ${list(graph.fullDocuments.map(token))}.getD i 0`);
+            `def documents${v} : Nat → Nat := fun i => ${list(graph.fullDocuments.map(token))}.getD i ${token({})}`);
+        lines.push(`theorem projection${v} : ∀ i, methods${v} (documents${v} i) = graph${v}.documents i := by`, '  intro i');
+        for (let i = 0; i < ranks.length; i++) {
+            const indent = '  '.repeat(i + 1);
+            lines.push(indent + 'cases i with', indent + '| zero => rfl', indent + '| succ i =>');
+        }
+        lines.push('  '.repeat(ranks.length + 1) + 'rfl');
+        lines.push(`example (operation before : Nat) : verifiesDocument (methods${v} (documents${v} before)) (graph${v}.named operation) (graph${v}.signatureValid operation) = (documentAgent graph${v}).validBy operation before := component_document_authority graph${v} documents${v} methods${v} projection${v} operation before`);
         for (const scenario of vector.scenarios) {
             for (const order of scenario.orders) {
                 const records = list(order.map(i => `⟨${ranks[i]}, true, 0⟩`));
@@ -45,7 +66,7 @@ export function generateComponentFixtures(vectors) {
                 const components = scenario.components;
                 const initial = '⟨.active graph' + v + '.initialDocument, ' + token({}) + ', ' + token(graph.registration) + '⟩';
                 const result = '(' + token(components.didDocument) + ', ' + token(components.didDocumentData) + ', ' + token(components.didDocumentRegistration) + ')';
-                lines.push(`example : (replayFullCold (agentModel (documentAgent graph${v})) graph${v}.root (${records} : List (EventRecord Nat))).map (fun s => (recordIds (historyRecords s), (runComponents graph${v} patch${v} ${token({})} ${initial} (recordIds s.2)).map (componentResult documents${v} ${token({ id: vector.did })}))) = some (${expected}, some ${result}) := by decide`);
+                lines.push(`example : (replayFullCold (agentModel (documentAgent graph${v})) graph${v}.root (${records} : List (EventRecord Nat))).map (fun s => (recordIds (historyRecords s), (runComponents (decodedComponentGraph graph${v} documents${v} methods${v}) patch${v} ${token({})} ${initial} (recordIds s.2)).map (componentResult documents${v} ${token({ id: vector.did })}))) = some (${expected}, some ${result}) := by decide`);
             }
         }
     }

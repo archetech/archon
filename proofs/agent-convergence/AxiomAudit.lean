@@ -24,7 +24,7 @@ run_cmd do
       ``Archon.encode_reflects_of_roundtrip, ``Archon.encoded_stop_eq,
       ``Archon.encoded_stop_eq_on_orbit,
       ``Archon.full_cold_loop_converges, ``Archon.serialized_cold_converges,
-      ``Archon.component_document_authority, ``Archon.component_step_authority, ``Archon.component_run_authority,
+      ``Archon.decoded_component_graph_eq, ``Archon.component_document_authority, ``Archon.component_step_authority, ``Archon.component_run_authority,
       ``Archon.component_replay_converges, ``Archon.components_same_evidence,
       ``Archon.named_method_verifies, ``Archon.missing_method_rejected,
       ``Archon.document_replacement_uses_predecessor, ``Archon.document_authorization_matches,

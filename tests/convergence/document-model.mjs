@@ -63,7 +63,7 @@ export function documentGraph(vector, components = false) {
     };
     if (signatureValid.length !== operations.length || signatureValid.some(row => row.length !== keys.length || row.some(b => typeof b !== 'boolean'))) throw new Error('Invalid signature oracle dimensions');
     const byRank = ranks.map((_, rank) => ranks.indexOf(rank));
-    return { root: ranks[root], ranks, parents, depths: operations.map((_, i) => depth(i)),
+    return { root: ranks[root], ranks, parents, methodNames, depths: operations.map((_, i) => depth(i)),
         documents: byRank.map(i => documents[i].map(m => ({ id: methodNames.indexOf(m.id), key: m.key }))),
         named: operations.map(op => methodNames.indexOf(absolute(op.proof.verificationMethod))),
         actions: operations.map((op, i) => op.type === 'delete' ? 'delete' : op.doc?.didDocument ? ranks[i] : 'keep') };

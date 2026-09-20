@@ -25,6 +25,18 @@ theorem component_document_authority (g : DocumentGraph) (documents : Nat → Do
   rw [agrees]
   rfl
 
+/-- Authorization decoded from the same full-document values returned by resolution. -/
+def decodedComponentGraph (g : DocumentGraph) (documents : Nat → Doc)
+    (methods : Doc → List VerificationMethod) : DocumentGraph :=
+  { g with documents := fun i => methods (documents i) }
+
+theorem decoded_component_graph_eq (g : DocumentGraph) (documents : Nat → Doc)
+    (methods : Doc → List VerificationMethod)
+    (agrees : ∀ i, methods (documents i) = g.documents i) :
+    decodedComponentGraph g documents methods = g := by
+  have equal : (fun i => methods (documents i)) = g.documents := funext agrees
+  simp [decodedComponentGraph, equal]
+
 /-- Replace supplied components, carry forward omitted components. Deletion
 clears data and preserves registration, while authority marks the empty DID doc. -/
 def componentStep (g : DocumentGraph) (patch : Nat → ComponentPatch D R)
@@ -68,6 +80,8 @@ theorem component_run_authority (g : DocumentGraph) (patch : Nat → ComponentPa
 
 /-- Reconciliation selects an executable full-component history, not just IDs. -/
 theorem component_replay_converges [DecidableEq α] (g : DocumentGraph)
+    (documents : Nat → Doc) (methods : Doc → List VerificationMethod)
+    (agrees : ∀ i, methods (documents i) = g.documents i)
     (patch : Nat → ComponentPatch D R) (empty initialData : D) (initialRegistration : R)
     (ordered : AncestryOrdered (documentAgent g)) (bounded : DepthBounded (documentAgent g))
     (genesis : g.parent g.root = none) (rootBound : g.root < g.size)
@@ -76,8 +90,9 @@ theorem component_replay_converges [DecidableEq α] (g : DocumentGraph)
       replayFullCold (agentModel (documentAgent g)) g.root evidence = some result ∧
       recordIds (historyRecords result) = history (agentModel (documentAgent g)) g.root (recordIds evidence) ∧
       historyPass (agentModel (documentAgent g)) g.root evidence result = result ∧
-      runComponents g patch empty ⟨.active g.initialDocument, initialData, initialRegistration⟩
+      runComponents (decodedComponentGraph g documents methods) patch empty ⟨.active g.initialDocument, initialData, initialRegistration⟩
         (recordIds result.2) = some final := by
+  rw [decoded_component_graph_eq g documents methods agrees]
   obtain ⟨result, authority, success, canonical, fixed, ran, _⟩ :=
     document_replay_converges g ordered bounded genesis rootBound evidence present
   have projection := component_run_authority g patch empty (recordIds result.2)
@@ -96,25 +111,26 @@ def componentResult (documents : Nat → Doc) (deleted : Doc) (state : Component
 
 theorem components_same_evidence [DecidableEq α] (g : DocumentGraph)
     (patch : Nat → ComponentPatch D R) (empty initialData : D) (initialRegistration : R)
-    (documents : Nat → Doc) (deleted : Doc)
+    (documents : Nat → Doc) (deleted : Doc) (methods : Doc → List VerificationMethod)
+    (agrees : ∀ i, methods (documents i) = g.documents i)
     (ordered : AncestryOrdered (documentAgent g)) (bounded : DepthBounded (documentAgent g))
     (genesis : g.parent g.root = none) (rootBound : g.root < g.size)
     (xs ys : List (EventRecord α)) (present : g.root ∈ recordIds xs)
     (same : ∀ i, i ∈ recordIds xs ↔ i ∈ recordIds ys) :
     (replayFullCold (agentModel (documentAgent g)) g.root xs).map (fun s =>
-      (recordIds (historyRecords s), (runComponents g patch empty
+      (recordIds (historyRecords s), (runComponents (decodedComponentGraph g documents methods) patch empty
         ⟨.active g.initialDocument, initialData, initialRegistration⟩ (recordIds s.2)).map (componentResult documents deleted))) =
     (replayFullCold (agentModel (documentAgent g)) g.root ys).map (fun s =>
-      (recordIds (historyRecords s), (runComponents g patch empty
+      (recordIds (historyRecords s), (runComponents (decodedComponentGraph g documents methods) patch empty
         ⟨.active g.initialDocument, initialData, initialRegistration⟩ (recordIds s.2)).map (componentResult documents deleted))) := by
-  obtain ⟨left, _, hl, pl, _, _⟩ := component_replay_converges g patch empty initialData initialRegistration ordered bounded genesis rootBound xs present
-  obtain ⟨right, _, hr, pr, _, _⟩ := component_replay_converges g patch empty initialData initialRegistration ordered bounded genesis rootBound ys ((same g.root).mp present)
+  obtain ⟨left, _, hl, pl, _, _⟩ := component_replay_converges g documents methods agrees patch empty initialData initialRegistration ordered bounded genesis rootBound xs present
+  obtain ⟨right, _, hr, pr, _, _⟩ := component_replay_converges g documents methods agrees patch empty initialData initialRegistration ordered bounded genesis rootBound ys ((same g.root).mp present)
   have ids : recordIds (historyRecords left) = recordIds (historyRecords right) := by
     rw [pl, pr, history_same_evidence (agentModel (documentAgent g)) g.root (recordIds xs) (recordIds ys) same]
   have tails := (List.cons.inj ids).2
   rw [hl, hr, Option.map_some, Option.map_some]
   exact congrArg some (Prod.ext ids (congrArg (fun path =>
-    (runComponents g patch empty ⟨.active g.initialDocument, initialData, initialRegistration⟩ path).map
+    (runComponents (decodedComponentGraph g documents methods) patch empty ⟨.active g.initialDocument, initialData, initialRegistration⟩ path).map
       (componentResult documents deleted)) tails))
 
 end Archon

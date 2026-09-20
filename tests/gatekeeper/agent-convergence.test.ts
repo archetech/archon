@@ -32,7 +32,8 @@ for (const vector of vectors) {
                 expect({ order, phase, path }).toEqual({ order, phase, path: scenario.expected });
                 expect(doc.didDocumentMetadata?.versionId).toBe(vector.ids[scenario.expected.at(-1)!]);
                 if (scenario.components) expect({ didDocument: doc.didDocument, didDocumentData: doc.didDocumentData, didDocumentRegistration: doc.didDocumentRegistration }).toEqual(scenario.components);
-                else if (scenario.finalState === 'deleted') expect(doc.didDocumentMetadata?.deactivated).toBe(true);
+                if (scenario.finalState === 'deleted') expect(doc.didDocumentMetadata?.deactivated).toBe(true);
+                else if (scenario.components) expect(doc.didDocumentMetadata?.deactivated).not.toBe(true);
                 else if (vector.methodDocuments) expect(doc.didDocument?.verificationMethod).toEqual(vector.methodDocuments[scenario.finalState]);
                 else expect(doc.didDocument?.verificationMethod?.[0].publicKeyJwk).toEqual(vector.keys[scenario.finalState]);
             }

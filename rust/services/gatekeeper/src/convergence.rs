@@ -549,8 +549,11 @@ async fn convergence_agent_rotation_and_deletion() {
                             json!({ "didDocument": doc["didDocument"], "didDocumentData": doc["didDocumentData"], "didDocumentRegistration": doc["didDocumentRegistration"] }),
                             *components
                         );
-                    } else if scenario["finalState"] == "deleted" {
+                    }
+                    if scenario["finalState"] == "deleted" {
                         assert_eq!(doc["didDocumentMetadata"]["deactivated"], true);
+                    } else if scenario.get("components").is_some() {
+                        assert_ne!(doc["didDocumentMetadata"]["deactivated"], true);
                     } else if let Some(documents) = vector.get("methodDocuments") {
                         assert_eq!(
                             doc["didDocument"]["verificationMethod"],
