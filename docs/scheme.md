@@ -560,7 +560,9 @@ The anchoring check walks the controller's confirmed prefix using each version's
 predecessor registry, stopping at the first non-confirming successor. Only
 matching chain receipts in that prefix establish anchoring, and each must carry
 chain registration metadata. Genesis remains admitted separately; a wrong-registry
-genesis receipt does not establish anchoring. An unconfirmed suffix must not
+genesis receipt does not establish anchoring. Pin receipts have no chain position;
+they neither establish anchoring nor disqualify a later chain migration when they
+lack registration metadata. An unconfirmed suffix must not
 switch controller selection from proof time to chain position simply because
 one node retained a wrong-registry chain receipt instead of a gossip hint.
 
