@@ -26,7 +26,7 @@ for (const legacy of [false, true]) {
     const assetDid = 'did:cid:' + await cid(asset);
     const chain = (operation, index) => ({ operation, registry: 'BTC:signet', time: '2026-09-02T00:00:00Z', ordinal: [100, index, 0], registration: { height: 100, txid: 'tx' + index, batch: 'batch', opidx: 0 } });
     const hint = (operation, index) => ({ operation, registry: 'hyperswarm', time: operation.proof.created, ordinal: [index] });
-    vectors.push({ legacy, did, assetDid, ids: await Promise.all([genesis, parent, rotation, asset].map(cid)),
+    vectors.push({ legacy, did, assetDid, operations: [genesis, parent, rotation, asset], ids: await Promise.all([genesis, parent, rotation, asset].map(cid)),
         block: { height: 100, hash: 'block', time: Date.parse('2026-09-02T00:00:00Z') / 1000 },
         events: [hint(genesis, 0), hint(parent, 1), chain(rotation, 10), chain(genesis, 30), chain(parent, 40), chain(rotation, 50), chain(asset, 45), chain(asset, 35)],
         // The asset's anchor at 35 is invalid: the predecessor at 40 is beyond

@@ -177,3 +177,7 @@ These rules apply to coding agents working in this repository.
 - A proof projection contract must be required by the convergence theorem and instantiated by generated fixtures; a standalone agreement lemma does not connect independent authorization and payload tables. Keep deletion metadata assertions independent of payload assertions in cross-port fixtures.
 
 - Repeated expected-chain anchors must reconsider earlier valid ordinals even after a copy is confirmed. A late predecessor can make a later copy apply first; retaining it can make controller cutoffs and asset authorization depend on gossip order. Reauthorize earlier replacements and cover reversed hints plus repeat/startup replay with signed evidence.
+
+- Keep chain-anchor minimum proofs conditional on settled paths and fixed per-anchor authorization. Rank complete ordinals lexicographically, state tie/missing-position exclusions, and instantiate the general theorems from shared signed fixtures; do not present a minimum-selection lemma as a proof of dynamic controller replay.
+
+- Chain-anchor fixture bridges must derive settled paths from signed predecessor IDs using paired operation/ID tables. Reordering source events (with remapped deliveries) or paired operation tables must preserve generated proofs; use stable ordinal descriptions rather than source offsets in generated annotations.
