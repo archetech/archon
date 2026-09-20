@@ -1210,15 +1210,16 @@ async fn convergence_chain_ordinals_required() {
                 axum::http::header::HeaderName::from_static("x-archon-admin-key"),
                 "ordinal-test".parse().unwrap(),
             )]),
-            axum::Json(json!({"cids": [vector["ids"][0]], "metadata": metadata})),
+            axum::Json(json!({"cids": [null, vector["ids"][0]], "metadata": metadata})),
         )
         .await;
         assert_eq!(response.status(), axum::http::StatusCode::OK);
         crate::process_events_impl(&state).await;
         assert_eq!(
             state.store.lock().await.get_events(did)[0].ordinal,
-            Some(vec![1_099_511_627_776, 1, 0])
+            Some(vec![1_099_511_627_776, 1, 1])
         );
+        assert_eq!(state.store.lock().await.get_events(did)[0].registration.as_ref().unwrap()["opidx"], json!(1));
         for registry in ["local", "hyperswarm", "pin"] {
             let mut hint = genesis.clone();
             hint["registry"] = json!(registry);

@@ -224,3 +224,5 @@ These rules apply to coding agents working in this repository.
 - Convergence audits must trace authoritative receipt producers and trust-boundary normalization before expanding protocol selection rules. Chain receipts require nonempty ordinals; missing-position examples admitted only by permissive imports do not establish a bundled-mediator or production occurrence. Preserve ordinal-free local/Hyperswarm/pin hints.
 
 - Keep registry classification explicit: unanchored registries are local, Hyperswarm, and pin; locally stamped receipts are only local/Hyperswarm. Pin relay trust and candidate deduplication use the latter distinction, not the absence of a blockchain.
+
+- Enumerate CID batch entries before filtering malformed references; both the appended ordinal and registration.opidx must retain the original list index. Validate ordinal prefixes before appending that index.

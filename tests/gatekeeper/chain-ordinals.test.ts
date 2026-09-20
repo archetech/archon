@@ -7,7 +7,7 @@ import type { GatekeeperEvent, Operation } from '@didcid/gatekeeper/types';
 const vectors = JSON.parse(readFileSync('tests/convergence/tied-anchor-vectors.json', 'utf8')) as {
     legacy: boolean; did: string; operations: Operation[]; ids: string[];
 }[];
-const malformed = [undefined, null, [], 7, '7', [null], [null, 1], [-1], [0.5], ['1', 2], [Number.MAX_SAFE_INTEGER + 1]];
+const malformed = [undefined, null, [], Array(1), 7, '7', [null], [null, 1], [-1], [0.5], ['1', 2], [Number.MAX_SAFE_INTEGER + 1]];
 
 it.each(vectors.filter((_, i) => i % 2 === 0))('requires chain positions through import and restart (legacy=$legacy)', async vector => {
     const genesis: GatekeeperEvent = { registry: 'SOL:devnet', time: '2026-09-01T00:00:00Z',
@@ -46,9 +46,10 @@ it.each(vectors.filter((_, i) => i % 2 === 0))('requires chain positions through
     const positionedDb = new DbMemory('large-position');
     const positioned = new Gatekeeper({ db: positionedDb, ipfs: new MemoryClient() });
     await positionedDb.addOperation(vector.ids[0], vector.operations[0]);
-    await positioned.importBatchByCids([vector.ids[0]], { ...genesis, ordinal: [2 ** 40, 1.0] });
+    await positioned.importBatchByCids([null, vector.ids[0]] as never, { ...genesis, ordinal: [2 ** 40, 1.0] });
     await positioned.processEvents();
-    expect((await positionedDb.getEvents(vector.did))[0].ordinal).toEqual([2 ** 40, 1, 0]);
+    expect((await positionedDb.getEvents(vector.did))[0].ordinal).toEqual([2 ** 40, 1, 1]);
+    expect((await positionedDb.getEvents(vector.did))[0].registration?.opidx).toBe(1);
     for (const registry of ['local', 'hyperswarm', 'pin']) {
         const g = new Gatekeeper({ db: new DbMemory('hints'), ipfs: new MemoryClient() });
         expect(await g.verifyEvent({ ...genesis, registry, ordinal: undefined })).toBe(true);

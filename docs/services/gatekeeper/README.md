@@ -320,7 +320,8 @@ Chain-registry receipts require a nonempty `ordinal` array of nonnegative safe
 integers (0 through 9007199254740991), so both ports compare the same positions.
 Missing, `null`, non-array, empty, and malformed-member ordinals are rejected
 before queueing or candidate storage. CID imports validate the batch position
-before appending the operation index. Previously stored absent/null/empty ordinal
+before appending the operation index. Non-string CID entries are skipped without
+renumbering subsequent operations. Previously stored absent/null/empty ordinal
 receipts cannot regain chain authority through startup replay. This does not add
 a compatibility decoder for corrupt stored field types. This applies to any
 registry except `local`, `hyperswarm`, and `pin`, whose ordinals remain optional.

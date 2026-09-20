@@ -690,7 +690,8 @@ pub(crate) async fn import_batch_by_cids(
     }
 
     let mut batch = Vec::new();
-    for (index, cid) in cids.iter().filter_map(Value::as_str).enumerate() {
+    for (index, value) in cids.iter().enumerate() {
+        let Some(cid) = value.as_str() else { continue; };
         let cached = {
             let store = state.store.lock().await;
             store.get_operation(cid)

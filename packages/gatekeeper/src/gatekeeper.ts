@@ -146,8 +146,11 @@ function isUnanchoredRegistry(registry: unknown): boolean {
 
 // Chain positions must compare identically in the JavaScript and Rust ports.
 function isValidChainOrdinal(ordinal: unknown): ordinal is number[] {
-    return Array.isArray(ordinal) && ordinal.length > 0
-        && ordinal.every(value => Number.isSafeInteger(value) && value >= 0);
+    if (!Array.isArray(ordinal) || ordinal.length === 0) return false;
+    for (const value of ordinal) {
+        if (!Number.isSafeInteger(value) || value < 0) return false;
+    }
+    return true;
 }
 
 enum ImportStatus {
@@ -2251,6 +2254,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         for (let i = 0; i < cids.length; i++) {
             const cid = cids[i];
+            if (typeof cid !== 'string') continue;
             const cached = await this.db.getOperation(cid);
             let op = isOperation(cached) ? cached : null;
 
