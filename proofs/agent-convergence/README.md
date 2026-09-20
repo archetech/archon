@@ -827,3 +827,35 @@ and sibling selection, keeping authorization, genesis, and event/operation
 identity contracts explicit. Deletion, unanchored-registry migration policy,
 assets, full metadata/codecs, retention, and universal executable correspondence
 remain separate obligations. No runtime or signed-fixture changes are needed.
+
+## Migration-aware anchor selection — #1215
+
+`RegistryAnchors.lean` composes predecessor-derived registry matching with the
+minimum-anchor scan. An eligible receipt must be accepted by the abstract
+signature/position predicate, belong to a chain-enabled registry, and match its
+operation's derived expected registry. The filter agrees with the registry at
+any valid predecessor prefix. Cold scans with the same receipt set agree across
+order and multiplicity; a valid retained anchor cannot bias reconstruction.
+
+Competing siblings have the same expected registry even when their proposed
+migration destinations differ. Eligible sibling anchors therefore belong to one
+chain. Numeric receipt ranks must preserve ordinal order within each chain; the
+relative layout of different chains does not define a cross-chain height order.
+
+The unchanged four signed migration graphs now instantiate 168 cold selections
+and 180 retained-anchor selections across 24 distinct delivery orders. All
+receipts enter the Lean model, including gossip and misleading chain receipts.
+The bridge checks selected receipts against the runtime fixtures' expected full
+histories, checks sibling registry agreement, and remains invariant under paired
+operation-table and receipt-table reordering. Structural negative tests alter
+actual receipt metadata as well as expected-receipt summaries.
+
+This is anchor selection for fixed ancestry and accepted evidence. It does not
+compose migration-aware sibling choice with interleaved replay yet. Signature
+and chain-position validity remain abstract predicates; cryptography, canonical
+ID derivation, and universal runtime correspondence are not proven. The existing
+cross-port signed tests cover these same payloads through import, repeat, and
+restart; production code and signed sources are unchanged. Next connect this
+filter to the combined document/priority replay theorem, including a checked
+rank representation for migration-aware sibling ordering. Unanchored migrations,
+deletions in this model, assets, retention, and full metadata/codecs remain open.
