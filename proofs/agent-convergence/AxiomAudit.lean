@@ -3,6 +3,7 @@ import AgentAuthorization
 import DocumentAuthorization
 import AgentComponents
 import ChainAnchors
+import ChainSuccessors
 import Lean.Util.CollectAxioms
 import Lean.Elab.Command
 
@@ -11,7 +12,13 @@ set_option warningAsError true
 open Lean Elab Command in
 run_cmd do
   let allowed := #[``propext, ``Quot.sound]
-  for theoremName in #[``Archon.anchor_scan_min, ``Archon.anchor_scan_from_retained,
+  for theoremName in #[``Archon.bounded_membership_agrees,
+      ``Archon.chain_priority_owner, ``Archon.chain_priority_injective,
+      ``Archon.chain_priority_same_evidence, ``Archon.chain_graph_same_evidence,
+      ``Archon.chain_anchored_order, ``Archon.chain_provisional_order,
+      ``Archon.chain_anchor_precedes_provisional, ``Archon.chain_replay_converges,
+      ``Archon.chain_successors_same_evidence,
+      ``Archon.anchor_scan_min, ``Archon.anchor_scan_from_retained,
       ``Archon.anchor_scan_cold, ``Archon.anchors_same_evidence, ``Archon.anchor_scan_idempotent,
       ``Archon.convergence, ``Archon.complete_unique,
       ``Archon.history_delivery_permutation, ``Archon.history_duplicate_delivery,

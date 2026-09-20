@@ -1,6 +1,6 @@
 name = "archonAgentConvergence"
 version = "0.1.0"
-defaultTargets = ["AgentConvergence", "OperationalReplay", "Fixtures", "AxiomAudit", "EventRecords", "RecordFixtures", "FullReplay", "SerializedReplay", "AgentAuthorization", "AgentFixtures", "DocumentAuthorization", "DocumentFixtures", "AgentComponents", "ComponentFixtures", "ChainAnchors", "ChainAnchorFixtures"]
+defaultTargets = ["AgentConvergence", "OperationalReplay", "Fixtures", "AxiomAudit", "EventRecords", "RecordFixtures", "FullReplay", "SerializedReplay", "AgentAuthorization", "AgentFixtures", "DocumentAuthorization", "DocumentFixtures", "AgentComponents", "ComponentFixtures", "ChainAnchors", "ChainAnchorFixtures", "ChainSuccessors", "ChainSuccessorFixtures"]
 
 [[lean_lib]]
 name = "AgentConvergence"
@@ -49,3 +49,9 @@ name = "ChainAnchors"
 
 [[lean_lib]]
 name = "ChainAnchorFixtures"
+
+[[lean_lib]]
+name = "ChainSuccessors"
+
+[[lean_lib]]
+name = "ChainSuccessorFixtures"

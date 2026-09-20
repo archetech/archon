@@ -297,3 +297,19 @@ This does not close #1215. Remaining work is to compose anchor selection with
 chain successor/path selection and migrations, then dynamic controller/asset
 authorization, metadata, and retention. Ordinal ties, absent positions, full
 payload equality, and executable refinement are outside this increment.
+
+
+### Successor replay after settled chain priorities — #1215
+
+Compose the anchor scan with the operational predecessor replay model: anchored
+ordinals precede provisional CID ranks, and signed predecessor IDs determine the
+compiled graph. The new conditional theorem proves equal decoded operation paths
+for equal anchor/operation evidence sets, with cold initialization and
+stop-on-unchanged replay. Shared signed fork/descendant fixtures provide 36 traces
+per runtime, plus generated Lean cases and source-table reorder checks.
+
+The runtime audit passes; no runtime changes are required by these cases. The
+remaining phase obligation is to prove that live interleaved anchor and branch
+replay reaches this compiled state. Then connect full document authorization and
+registry migrations before dynamic assets, metadata, and retention. #1215 remains
+open; this increment is not the general Archon convergence theorem.
