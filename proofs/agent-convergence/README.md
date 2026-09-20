@@ -859,3 +859,37 @@ restart; production code and signed sources are unchanged. Next connect this
 filter to the combined document/priority replay theorem, including a checked
 rank representation for migration-aware sibling ordering. Unanchored migrations,
 deletions in this model, assets, retention, and full metadata/codecs remain open.
+
+## Migration-aware sibling priority and compiled replay — #1215
+
+`RegistryPriority.lean` connects the ancestry-derived anchor filter to sibling
+ordering and the settled-priority replay model. `RegistryOrdinalRanks` requires
+that eligible receipts on the same chain preserve the complete lexicographic
+ordinal order. The sibling-order theorem consumes this contract and proves that
+comparing compiled priorities is equivalent to comparing their selected chain
+ordinals. The earlier sibling-registry theorem justifies that comparison; no
+cross-chain position ordering is assumed.
+
+A general lemma proves that priority compilation preserves acyclicity. Bounded,
+increasing predecessor depth supplies that property for the registry graph. The
+compiled replay theorem consequently derives termination from ancestry and proves
+equal decoded operation histories for equal receipt and authorized operation sets,
+regardless of either delivery order or multiplicity. Genesis has no predecessor
+and is present in the delivered operation set.
+
+The unchanged migration vectors instantiate 24 sibling-order comparisons and 24
+compiled replay histories. Lean checks the ordinal-rank contract against every
+eligible receipt pair using the source's complete ordinal arrays. The bridge
+retains misleading and gossip receipts, derives operation identity from paired
+CID tables, and checks the expected branches for competing migrations and return
+migration. Source-table reordering remains invariant. A negative test changes the
+actual winning receipt's ordinal while retaining the old expected branch.
+
+This phase assumes an already authorized create/update graph; receipt signature
+and position validity remain abstract. It does not yet establish that raw
+interleaved migration replay computes this compiled history. Next connect the
+migration filter and checked ordering to the local priority projection and
+predecessor-document authorization, including provisional/wrong-chain duplicate
+representations. The existing shared signed runtime tests remain finite evidence,
+not universal refinement. Unanchored migrations, deletion in the registry model,
+assets, full metadata/codecs, and retention remain open. No runtime changes.

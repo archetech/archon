@@ -203,3 +203,7 @@ These rules apply to coding agents working in this repository.
 - Registry-prefix proofs must exclude the incoming operation’s own change when selecting its expected registry. Keep receipt registry equality distinct from chain-priority policy, especially for local, hyperswarm, and pin.
 
 - Migration proof receipt ranks may group registries arbitrarily, but must preserve ordinal order within each chain. Derive anchor eligibility from signed predecessor registry state, retain wrong-chain receipts in the proof input, and prove eligible sibling anchors share a registry before interpreting their ranks as chain priority.
+
+- When bridging migration priorities, kernel-check the same-chain ordinal-rank contract against complete source ordinals, and distinguish compiled replay equality from correspondence with raw interleaved replay. Derive compiled acyclicity from the operation graph rather than expanding every receipt rank into a termination case.
+- Lean simplification of generic natural-number equality can pull in `Classical.choice` through ordering instances. Under the proof axiom allowlist, use explicit `Option.some_beq_some`/`Nat.beq_eq_true_eq` reductions and recheck transitive dependencies instead of broadening the allowlist.
+- A fixture generator for a strict ordinal-rank theorem must reject ties across every eligible same-chain receipt pair, including distinct operations at different ancestry depths. Validate the theorem's full domain, not only comparisons performed by the expected-path oracle.

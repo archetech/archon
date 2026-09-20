@@ -5,13 +5,15 @@ import { isDeepStrictEqual } from 'node:util';
 import { generateRegistryFixtures } from './generate-registry-fixtures.mjs';
 const vectors = JSON.parse(readFileSync(new URL('../../tests/convergence/migration-vectors.json', import.meta.url), 'utf8'));
 test('signed migration evidence instantiates prefix agreement and registry receipt checks', () => {
-    const { result, orders, prefixes, receipts, anchors, warm } = generateRegistryFixtures(vectors);
+    const { result, orders, prefixes, receipts, anchors, warm, replays, comparisons } = generateRegistryFixtures(vectors);
     assert.equal(result, readFileSync(new URL('./RegistryFixtures.lean', import.meta.url), 'utf8'));
     assert.equal(orders, 24);
     assert.equal(prefixes, 144);
     assert.equal(receipts, 66);
     assert.equal(anchors, 168);
     assert.equal(warm, 180);
+    assert.equal(replays, 24);
+    assert.equal(comparisons, 24);
 });
 test('paired operation tables and receipt tables preserve the registry proof', () => {
     for (const mode of ['operations', 'events', 'both']) {
@@ -72,5 +74,28 @@ test('changing actual receipt registry cannot retain a nonexistent matching anch
         assert(anchor);
         anchor.registry = 'ZEC:testnet';
         assert.throws(() => generateRegistryFixtures([v]), /matching-chain anchor/);
+    }
+});
+
+test('changing the winning migration ordinal cannot retain the old selected branch', () => {
+    for (const source of vectors) {
+        const v = structuredClone(source);
+        // Event metadata is not part of the signed operation. This changes the
+        // actual chain evidence while deliberately retaining the old expectation.
+        v.events[v.expectedEvents[1]].ordinal = [9999, 0, 0];
+        assert.deepEqual(v.expected, source.expected);
+        assert.throws(() => generateRegistryFixtures([v]), /expected path disagrees/);
+    }
+});
+
+test('rejects same-chain ordinal ties between eligible operations at different depths', () => {
+    for (const source of vectors) {
+        const v = structuredClone(source);
+        const root = v.events.find(e => e.operation.type === 'create' && e.registry === 'BTC:signet');
+        const returned = v.events.find(e => e.operation.doc?.didDocumentData?.label === 'returned-child'
+            && e.registry === 'BTC:signet');
+        assert(root && returned);
+        returned.ordinal = [...root.ordinal];
+        assert.throws(() => generateRegistryFixtures([v]), /tied eligible chain receipts outside rank theorem domain/);
     }
 });

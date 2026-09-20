@@ -1,6 +1,6 @@
 name = "archonAgentConvergence"
 version = "0.1.0"
-defaultTargets = ["AgentConvergence", "OperationalReplay", "Fixtures", "AxiomAudit", "EventRecords", "RecordFixtures", "FullReplay", "SerializedReplay", "AgentAuthorization", "AgentFixtures", "DocumentAuthorization", "DocumentFixtures", "AgentComponents", "ComponentFixtures", "ChainAnchors", "ChainAnchorFixtures", "ChainSuccessors", "ChainSuccessorFixtures", "InterleavedReplay", "InterleavedFixtures", "InterleavedBound", "PriorityProjection", "PriorityFixtures", "InterleavedAuthorization", "InterleavedDocumentFixtures", "ChainDocuments", "ChainDocumentFixtures", "RegistryAncestry", "RegistryFixtures", "RegistryAnchors"]
+defaultTargets = ["AgentConvergence", "OperationalReplay", "Fixtures", "AxiomAudit", "EventRecords", "RecordFixtures", "FullReplay", "SerializedReplay", "AgentAuthorization", "AgentFixtures", "DocumentAuthorization", "DocumentFixtures", "AgentComponents", "ComponentFixtures", "ChainAnchors", "ChainAnchorFixtures", "ChainSuccessors", "ChainSuccessorFixtures", "InterleavedReplay", "InterleavedFixtures", "InterleavedBound", "PriorityProjection", "PriorityFixtures", "InterleavedAuthorization", "InterleavedDocumentFixtures", "ChainDocuments", "ChainDocumentFixtures", "RegistryAncestry", "RegistryFixtures", "RegistryAnchors", "RegistryPriority"]
 
 [[lean_lib]]
 name = "AgentConvergence"
@@ -91,3 +91,6 @@ name = "RegistryFixtures"
 
 [[lean_lib]]
 name = "RegistryAnchors"
+
+[[lean_lib]]
+name = "RegistryPriority"

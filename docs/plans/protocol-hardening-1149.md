@@ -467,3 +467,26 @@ replay, checking the rank representation and authorization contracts. This step
 proves anchor selection, not complete migration convergence. Unanchored registry
 policy, deletion, dynamic assets, metadata/codecs, retention, and universal
 executable correspondence remain open.
+
+### Migration sibling priority and compiled replay — #1215
+
+#1227 merged migration-aware anchor selection. This increment proves that anchored
+sibling priority agrees with complete chain ordinal comparison, under an explicit
+rank representation contract checked by Lean for the shared fixtures. Eligible
+siblings are already proven to share a registry, so the proof never compares
+positions across chains.
+
+Priority compilation preserves acyclicity; bounded increasing ancestry depth
+supplies termination. The compiled replay theorem derives equal decoded histories
+from equal receipt and authorized operation sets, independent of order and
+multiplicity. The unchanged migration graphs instantiate 24 sibling comparisons
+and 24 compiled replay histories, with full ordinal arrays, wrong-chain receipts,
+source-table reordering, and a negative test changing actual winning-anchor
+metadata while retaining the old expected branch.
+
+Next connect this compiled result to raw interleaved migration replay through the
+local priority projection and predecessor-document authorization. Multiple
+provisional/wrong-chain representations need an explicit correspondence. This
+step assumes already authorized create/update operations and abstract receipt
+signature/position validity. Unanchored registry policy, deletion, assets,
+metadata/codecs, retention, and universal runtime refinement remain open.
