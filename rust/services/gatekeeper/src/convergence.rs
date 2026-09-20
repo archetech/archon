@@ -1407,3 +1407,67 @@ async fn convergence_integrated_agents() {
         }
     }
 }
+
+// Current admitted-input counterexample; do not treat this as convergence coverage.
+// The pin receipt-time policy is awaiting an explicit protocol decision.
+#[tokio::test]
+async fn convergence_pin_receipt_domain_audit() {
+    let vector: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/pin-receipt-counterexample.json"
+    ))
+    .unwrap();
+    let did = vector["did"].as_str().unwrap();
+    let asset_did = vector["assetDid"].as_str().unwrap();
+    let mut outcomes = Vec::new();
+    let mut candidate_sets = Vec::new();
+    for order in vector["orders"].as_array().unwrap() {
+        let (mut state, _directory) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        for index in order.as_array().unwrap() {
+            let data = serde_json::from_value(
+                serde_json::to_value(&state.store.lock().await.data).unwrap(),
+            )
+            .unwrap();
+            let (restarted, _restart_directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data,
+                redis_connection: None,
+            });
+            state = restarted;
+            crate::import_batch_impl(
+                &state,
+                &[vector["events"][index.as_u64().unwrap() as usize].clone()],
+            )
+            .await;
+            crate::process_events_impl(&state).await;
+        }
+        for _ in 0..2 {
+            let data = serde_json::from_value(
+                serde_json::to_value(&state.store.lock().await.data).unwrap(),
+            )
+            .unwrap();
+            let (restarted, _restart_directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data,
+                redis_connection: None,
+            });
+            state = restarted;
+            crate::history::ensure_history_ready(&state).await.unwrap();
+            crate::import_batch_impl(&state, &[vector["asset"].clone()]).await;
+            crate::process_events_impl(&state).await;
+            let store = state.store.lock().await;
+            outcomes.push(store.get_events(asset_did).len());
+            let mut candidates: Vec<_> = store.get_candidates().unwrap()[did]
+                .iter()
+                .map(|event| serde_json::to_string(event).unwrap())
+                .collect();
+            candidates.sort();
+            candidate_sets.push(candidates);
+        }
+    }
+    assert_eq!(candidate_sets[0], candidate_sets[2]);
+    assert_eq!(outcomes, vec![0, 0, 1, 1]);
+}

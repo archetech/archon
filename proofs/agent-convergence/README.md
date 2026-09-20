@@ -6,7 +6,8 @@ The integrated full-record extension is documented in
 [the A2–A4 audit](../../docs/plans/agent-convergence-full-records.md).
 `Archon.integrated_agent_convergence` combines A1's derived authorization with
 cold full-record stopping, complete component state, and the confirmed receipt
-view. A2–A4 are covered by this model and its signed cross-port bridge. B1–B3
+view under its source-clock contract. A signed pin-receipt counterexample blocks
+that contract for the full admitted domain, so A2–A4 remain open. B1–B3
 (asset/controller selection) and C1–C3 (protocol composition) remain open.
 
 This Lean project proves a bounded specification and an operational replay

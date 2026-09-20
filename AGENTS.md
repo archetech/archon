@@ -231,3 +231,5 @@ These rules apply to coding agents working in this repository.
 - For integrated convergence proofs, derive the metadata-only phase from complete ranked selection and check the stop predicate on full records. Arbitrary-payload stopping does not prove payload irrelevance to controller authorization; keep that receipt-view obligation explicit.
 
 - Bind convergence receipt views to producer-normalized operation clocks and authoritative chain facts, and check the actual selected header fields in both runtime ports. Use a finite reflected check for large signed-fixture source permutations rather than expanding disjunctions with simplification.
+
+- Absence of a bundled receipt producer does not prove an input is forbidden when the documented protocol and existing signed fixtures admit it. Audit repeated pin receipts before treating every unanchored confirmation clock as intrinsic to the operation.

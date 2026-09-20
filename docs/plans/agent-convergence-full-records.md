@@ -1,10 +1,36 @@
 # Integrated agent convergence (A2–A4)
 
-This closes the agent-model integration criteria in the
+This advances, but does not yet close, the agent-model integration criteria in the
 [fixed completion contract](protocol-convergence-completion.md). The asset/controller
 proof (B1–B3) and protocol composition (C1–C3) remain open. This is a proof of the
 protocol model with a signed executable bridge, not universal verification of the
 TypeScript or Rust programs.
+
+## Blocking pin-receipt audit
+
+The post-implementation audit found that the proposed unanchored operation-clock
+table does not model admitted `pin` receipts whose time differs from proof time.
+`pin-receipt-counterexample.json` uses real modern signatures and the ordinary
+importer: genesis G, parent P, a key rotation C, and an asset signed by the old key
+at a time between two pin receipts of C. Both nodes retain exactly the same agent
+candidate set. Their gossip order determines whether P is available when the
+first C receipt is visited; an already selected pin receipt is not replaced by an
+earlier one. One node retains C at September 2 and rejects the asset; the other
+retains C at September 4 and accepts it. Reconstructed replay preserves the split.
+
+Both TypeScript and Rust reproduce the split with identical retained candidate
+sets. A read-only local audit of 25,956 candidate DIDs found 38 with pin-registration
+candidates and zero retained pin receipts. This is an admitted-input counterexample,
+not an observed production occurrence. Bundled
+pinning/Filecoin mediators drain queues but do not emit pin confirmation receipts.
+However, the documented protocol and earlier signed pin migration fixtures admit
+those receipts. Lack of a bundled producer is insufficient to claim they are
+forbidden. No protocol behavior has been changed. Normalizing pin time to the
+operation clock or selecting repeated pin receipts deterministically requires the
+maintainer's protocol decision under the frozen roadmap. A2–A4 remain open.
+
+The general Lean results below are valid for their explicit source-table model;
+they do not prove that this unresolved input class satisfies the clock contract.
 
 ## Result and dependencies
 
