@@ -107,6 +107,18 @@ roadmap stages.
   earlier anchors, provisional duplicates, and cold/late-genesis reconstruction.
   General statements remain Lean proofs; these tests validate the translation.
 
+A1 is **in progress**: `AgentRegistry.component_anchor_from_history` derives
+predecessor components and matching-anchor eligibility from one document graph
+and component-patch table. Registry identity/ancestry is shared by construction;
+`component_run_registry` proves the registry fold agrees with component execution.
+`decodedComponentGraph` supplies methods from the full document values. The new
+Lean examples check combined key/registry changes, return migration, deletion,
+and rejected retired/proposed-key signatures. They are abstract examples, not
+signed runtime fixtures. A1 still needs this predicate connected to the raw-event
+representation/projection used by integrated replay. A2–A4 remain open; in
+particular, this increment does not establish the complete transition domain,
+agent result/termination, or the integrated signed bridge.
+
 ### B. Asset/controller convergence
 
 - [ ] **B1 — Controller selection:** derive the authorizing agent version from the

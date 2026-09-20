@@ -1,3 +1,4 @@
+import AgentRegistry
 import SerializedReplay
 import AgentAuthorization
 import DocumentAuthorization
@@ -21,7 +22,10 @@ set_option warningAsError true
 open Lean Elab Command in
 run_cmd do
   let allowed := #[``propext, ``Quot.sound]
-  for theoremName in #[``Archon.evaluate_registry_agrees, ``Archon.registry_at_root,
+  for theoremName in #[``Archon.component_step_registry, ``Archon.component_run_registry,
+      ``Archon.component_prefix_authority, ``Archon.component_registry_path,
+      ``Archon.component_anchor_after_prefix, ``Archon.component_anchor_from_history,
+      ``Archon.evaluate_registry_agrees, ``Archon.registry_at_root,
       ``Archon.registry_at_step, ``Archon.migration_uses_predecessor_registry,
       ``Archon.registry_prefix_agrees, ``Archon.expected_registry_after_prefix,
       ``Archon.receipt_registry_after_prefix,
