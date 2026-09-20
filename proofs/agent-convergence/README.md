@@ -666,6 +666,32 @@ The theorem now closes whole-path interleaving **in this model**. Authorization
 and expected-registry eligibility are still fixed, event identity/ordering is
 abstracted by ranks, and the bridge is finite testing rather than a universal
 proof that either runtime implements the model. Connecting full document/key
-semantics and the settled-priority projection, registry migrations, dynamic
+semantics, registry migrations, dynamic
 controller/asset authorization, complete metadata/serialization, and retention
 remain open. #1215 stays open for those connections.
+
+## Interleaved and settled-priority agreement — #1215
+
+`PriorityProjection.lean` connects whole-path interleaved replay to the prior
+settled-priority model. Its local representation contract requires every eligible
+raw event to have an eligible preferred copy ranked no later; compiled candidates
+must be retained raw evidence and canonical representatives with in-scope owners.
+The proof derives equal minimum successors, then equal complete ranked suffixes.
+With genesis and depth alignment, the terminating interleaved loop and the
+compiled cold replay return the same ranked history, including from valid warm
+interleaved paths. Equality of histories is a conclusion, not a premise.
+
+`PriorityFixtures.lean` checks that contract for all six signed successor graphs,
+then instantiates the agreement theorem across their 36 delivery orders. Source
+operation/event table reorderings leave this bridge unchanged. The existing
+764-transition runtime bridge supplies finite implementation evidence for these
+same graphs; this addition changes no runtime code or source vectors.
+
+Full document/key authorization, registry migrations, dynamic assets, complete
+metadata/codecs, retention, and universal executable correspondence remain open.
+The theorem still assumes fixed eligibility and a common ranked evidence model.
+
+```sh
+node --test proofs/agent-convergence/generate-priority-fixtures.test.mjs
+node proofs/agent-convergence/generate-priority-fixtures.mjs --check
+```

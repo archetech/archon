@@ -189,3 +189,5 @@ These rules apply to coding agents working in this repository.
 - Interleaved replay proofs must distinguish next-event settlement under a fixed predecessor from whole-path convergence. Check signed intermediate event records and the serialized stopping pass in both ports before claiming the model matches runtime interleaving.
 
 - Interleaved replay bounds must use decreasing operation/predecessor levels, not event priority ranks. Instantiate the depth condition in signed fixtures, include the extra stability-detection pass, and keep proof fuel distinct from production replay limits.
+
+- Proof-model projection contracts must state local eligibility/representation obligations and be instantiated by the shared signed fixtures; derive history equality rather than assuming it as a bridge premise.
