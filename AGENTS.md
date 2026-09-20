@@ -216,3 +216,5 @@ These rules apply to coding agents working in this repository.
 - When composing agent replay proofs, derive local priority projection from normalized receipt ownership and preferred-rank selection. Synthetic provisional representatives establish ordering only; keep stored receipt metadata and the source-to-rank bridge as explicit separate obligations.
 
 - Proof documentation must distinguish Lean module filenames from qualified theorem names (`Archon.*`) and update earlier status paragraphs when a criterion is completed; keep per-module axiom counts unambiguous.
+
+- Chain ordinal uniqueness must be demonstrated per producer: Solana instruction indices are transaction-local, and separate transactions can collide. Keep the signed A2 tie regression through import/repeat/restart in both ports; distinguish equal present ordinals from missing-position policy.

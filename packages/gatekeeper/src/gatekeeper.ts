@@ -1926,7 +1926,9 @@ export default class Gatekeeper implements GatekeeperInterface {
                     const currentConfirmed = expectedChain && nextEvent.registry === expectedRegistry;
                     const preferred = incomingConfirmed || currentConfirmed
                         ? incomingConfirmed && (!currentConfirmed ||
-                            (event.ordinal && nextEvent.ordinal && compareOrdinals(event.ordinal, nextEvent.ordinal) < 0))
+                            (event.ordinal && nextEvent.ordinal &&
+                                (compareOrdinals(event.ordinal, nextEvent.ordinal) < 0 ||
+                                    (compareOrdinals(event.ordinal, nextEvent.ordinal) === 0 && event.opid! < nextEvent.opid!))))
                         : event.opid! < nextEvent.opid!;
                     if (preferred) {
                         // A preferred sibling replaces the branch, including when

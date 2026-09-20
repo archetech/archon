@@ -921,7 +921,11 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
         let preferred = if incoming_confirmed || current_confirmed {
             incoming_confirmed
                 && (!current_confirmed
-                    || compare_ordinals(event.ordinal.as_ref(), next_event.ordinal.as_ref()).is_lt())
+                    || compare_ordinals(event.ordinal.as_ref(), next_event.ordinal.as_ref()).is_lt()
+                    || (event.ordinal.is_some()
+                        && next_event.ordinal.is_some()
+                        && compare_ordinals(event.ordinal.as_ref(), next_event.ordinal.as_ref()).is_eq()
+                        && event.opid < next_event.opid))
         } else {
             event.opid < next_event.opid
         };

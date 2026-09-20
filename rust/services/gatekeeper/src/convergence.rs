@@ -693,6 +693,14 @@ async fn convergence_chain_successor_priority() {
         .as_array_mut()
         .unwrap()
         .extend(migrations.as_array().unwrap().iter().cloned());
+    let tied: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/tied-anchor-vectors.json"
+    ))
+    .unwrap();
+    vectors
+        .as_array_mut()
+        .unwrap()
+        .extend(tied.as_array().unwrap().iter().cloned());
     for vector in vectors.as_array().unwrap() {
         let did = vector["did"].as_str().unwrap();
         for order in vector["orders"].as_array().unwrap() {
