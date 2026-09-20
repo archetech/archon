@@ -703,7 +703,17 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
 
         if let Some(index) = current_events.iter().position(|item| item.opid.as_deref() == Some(&opid)) {
             let expected_registry = expected_registry_for_index(&current_events, index);
-            if expected_registry.as_deref() == Some(current_events[index].registry.as_str()) {
+            let earlier_anchor = expected_registry.as_deref().is_some_and(|registry| {
+                registry != PIN_QUEUE
+                    && !is_unanchored_registry(registry)
+                    && registry == event.registry.as_str()
+            }) && compare_ordinals(
+                event.ordinal.as_ref(),
+                current_events[index].ordinal.as_ref(),
+            ).is_lt();
+            // A late predecessor can make a later anchor apply first. Earlier
+            // anchors still need the predecessor authorization performed below.
+            if expected_registry.as_deref() == Some(current_events[index].registry.as_str()) && !earlier_anchor {
                 if trace {
                     info!(
                         "process_events merged reason=duplicate_already_confirmed current_registry={} expected_registry={} {}",

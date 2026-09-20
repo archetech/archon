@@ -1855,10 +1855,14 @@ export default class Gatekeeper implements GatekeeperInterface {
                     const index = currentEvents.indexOf(opMatch);
                     const expectedRegistry = expectedRegistryForIndex(currentEvents, index);
 
-                    if (expectedRegistry && opMatch.registry === expectedRegistry) {
-                        // Already confirmed on the expected registry for this version
+                    const earlierAnchor = expectedRegistry && expectedRegistry !== PIN_QUEUE && !isUnanchoredRegistry(expectedRegistry)
+                        && event.registry === expectedRegistry && event.ordinal && opMatch.ordinal
+                        && compareOrdinals(event.ordinal, opMatch.ordinal) < 0;
+                    if (expectedRegistry && opMatch.registry === expectedRegistry && !earlierAnchor) {
                         return ImportStatus.MERGED;
                     }
+                    // A late predecessor can make a later anchor apply first.
+                    // Reconsider earlier anchors, with predecessor authorization below.
 
                     if (expectedRegistry && event.registry === expectedRegistry) {
                         // Confirming is what first gives the event a position the

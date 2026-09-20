@@ -571,3 +571,103 @@ async fn convergence_agent_rotation_and_deletion() {
         }
     }
 }
+
+#[tokio::test]
+async fn convergence_earliest_valid_chain_anchors() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/chain-anchor-vectors.json"
+    ))
+    .unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let did = vector["did"].as_str().unwrap();
+        let asset_did = vector["assetDid"].as_str().unwrap();
+        for order in vector["orders"].as_array().unwrap() {
+            let (mut state, _directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            state
+                .store
+                .lock()
+                .await
+                .add_block("BTC:signet", vector["block"].clone())
+                .unwrap();
+            for index in order.as_array().unwrap() {
+                crate::import_batch_impl(
+                    &state,
+                    &[vector["events"][index.as_u64().unwrap() as usize].clone()],
+                )
+                .await;
+                crate::process_events_impl(&state).await;
+            }
+            let mut restart_directory = None;
+            for phase in 0..3 {
+                if phase == 1 {
+                    let events: Vec<_> = vector["events"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .rev()
+                        .cloned()
+                        .collect();
+                    crate::import_batch_impl(&state, &events).await;
+                    crate::process_events_impl(&state).await;
+                }
+                if phase == 2 {
+                    let data = serde_json::from_value(
+                        serde_json::to_value(&state.store.lock().await.data).unwrap(),
+                    )
+                    .unwrap();
+                    let (restarted, directory) = crate::tests::make_state(JsonDb {
+                        backend: DbBackend::Memory,
+                        data,
+                        redis_connection: None,
+                    });
+                    state = restarted;
+                    restart_directory = Some(directory);
+                }
+                crate::history::ensure_history_ready(&state).await.unwrap();
+                let events = state.store.lock().await.get_events(did);
+                assert_eq!(
+                    json!(events
+                        .iter()
+                        .map(|event| &event.ordinal)
+                        .collect::<Vec<_>>()),
+                    json!([[100, 30, 0], [100, 40, 0], [100, 10, 0]]),
+                    "{order}, phase {phase}"
+                );
+                assert_eq!(
+                    json!(events.iter().map(|event| &event.opid).collect::<Vec<_>>()),
+                    json!(&vector["ids"].as_array().unwrap()[..3])
+                );
+                assert!(events.iter().all(|event| event.registry == "BTC:signet"));
+                let asset = crate::resolve_local_doc_async(
+                    &state,
+                    asset_did,
+                    ResolveOptions {
+                        verify: true,
+                        confirm: true,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+                assert_eq!(asset["didDocumentData"], json!({ "state": "created" }));
+                let store = state.store.lock().await;
+                assert_eq!(
+                    json!(store
+                        .get_events(asset_did)
+                        .iter()
+                        .map(|event| &event.ordinal)
+                        .collect::<Vec<_>>()),
+                    json!([[100, 45, 0]])
+                );
+                let candidates = store.get_candidates().unwrap();
+                assert_eq!(candidates[did].len(), 6);
+                assert_eq!(candidates[asset_did].len(), 2);
+            }
+            drop(restart_directory);
+        }
+    }
+}

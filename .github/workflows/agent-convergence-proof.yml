@@ -12,6 +12,7 @@ on:
       - 'packages/gatekeeper/**'
       - 'tests/gatekeeper/convergence.test.ts'
       - 'tests/gatekeeper/agent-convergence.test.ts'
+      - 'tests/gatekeeper/chain-convergence.test.ts'
       - 'rust/services/gatekeeper/**'
       - 'package.json'
       - 'package-lock.json'
@@ -28,6 +29,7 @@ on:
       - 'packages/gatekeeper/**'
       - 'tests/gatekeeper/convergence.test.ts'
       - 'tests/gatekeeper/agent-convergence.test.ts'
+      - 'tests/gatekeeper/chain-convergence.test.ts'
       - 'rust/services/gatekeeper/**'
       - 'package.json'
       - 'package-lock.json'
@@ -67,7 +69,8 @@ jobs:
           node tests/convergence/generate-agent-vectors.mjs
           node tests/convergence/generate-document-vectors.mjs
           node tests/convergence/generate-component-vectors.mjs
-          git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json tests/convergence/document-vectors.json tests/convergence/component-vectors.json
+          node tests/convergence/generate-chain-anchor-vectors.mjs
+          git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json tests/convergence/document-vectors.json tests/convergence/component-vectors.json tests/convergence/chain-anchor-vectors.json
       - name: Check shared fixture bridge
         run: |
           node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs proofs/agent-convergence/generate-document-fixtures.test.mjs proofs/agent-convergence/generate-component-fixtures.test.mjs
@@ -80,6 +83,8 @@ jobs:
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/convergence.test.ts --runInBand --coverage=false -t 'Lean-checked'
       - name: Check signed agent authorization
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/agent-convergence.test.ts --runInBand --coverage=false
+      - name: Check repeated chain anchors
+        run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/chain-convergence.test.ts --runInBand --coverage=false
       - name: Check proofs and concrete histories
         working-directory: proofs/agent-convergence
         run: lake build

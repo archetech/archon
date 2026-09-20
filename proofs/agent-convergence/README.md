@@ -504,3 +504,15 @@ The full Archon convergence theorem remains open. The canonical projection and
 its bounded full-event operational refinement are proved; general document/chain
 semantics and the connection to the runtime implementations remain explicit
 obligations.
+
+## Expected-chain audit — #1215 / #1216
+
+The first signed chain audit found a runtime counterexample: two gossip orders
+could retain different anchors of one controller rotation, changing dependent
+asset acceptance even after restart. #1216 lets an earlier valid expected-chain
+anchor replace a later accepted copy, using the existing predecessor authorization
+and dependent replay. The shared `chain-anchor-vectors.json` fixtures exercise both
+ports, including an earlier invalid asset anchor that must not replace its valid
+later anchor. These cases are implementation regression tests, not Lean-checked
+chain-order examples. The existing Lean models remain provisional; #1215 tracks
+the remaining expected-chain/migration proof work.
