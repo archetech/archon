@@ -889,3 +889,38 @@ predecessor-document authorization, including provisional/wrong-chain duplicate
 representations. The existing shared signed runtime tests remain finite evidence,
 not universal refinement. Unanchored migrations, deletion in the registry model,
 assets, full metadata/codecs, and retention remain open. No runtime changes.
+
+## Interleaved registry ordering and receipt projection — #1215
+
+`RegistryInterleaved.lean` connects interleaved ordering to compiled registry
+replay under the local `PriorityProjection` contract. Predecessor depth gives the
+stopping measure; admitted genesis identity is preserved in the decoded history.
+The theorem covers any valid retained suffix in a fixed, already authorized
+create/update graph. It does not derive signature validity or evolving controller
+authorization.
+
+The new bridge projects each matching-chain receipt to its own ordinal rank.
+Gossip and wrong-chain receipts share one provisional CID rank per operation.
+Sharing an ordering rank does not equate receipt metadata: the trace generator
+retains the first provisional receipt until an eligible anchor replaces it.
+Lean checks the representative/soundness/canonicality contract for every delivery
+order and the same-chain ordinal-rank contract against complete source ordinals.
+
+The four existing signed migration graphs supply 24 audit orders plus four
+explicit wrong-chain-first orders. Across these 28 distinct orders, Lean checks
+1,225 event transitions and 74 passes, and proves decoded agreement with compiled
+replay. TypeScript and Rust execute the same traces through their per-event
+importers, comparing the selected stored event records after every import and
+the serialized selected history at each stopping decision. Tests exercise
+provisional duplicates in both arrival directions and preserve results under
+operation/event-table reordering.
+
+These transition traces seed the preferred genesis separately. The existing
+public-import/repeat/restart migration tests still cover late genesis and durable
+candidate handling. Shared signed operation payloads are unchanged. Projected
+ordering equality is proved generally; selected-history stopping agreement and
+full receipt/candidate metadata remain finite runtime evidence only. Next
+compose registry reconstruction and this representation with
+predecessor-document authorization. Unanchored-registry migration policy, deletion
+in this model, dynamic assets, full metadata/codecs, retention, and universal
+runtime correspondence remain open. No production behavior changes.

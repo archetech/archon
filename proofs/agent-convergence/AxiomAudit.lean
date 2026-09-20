@@ -12,6 +12,7 @@ import ChainDocuments
 import RegistryAncestry
 import RegistryAnchors
 import RegistryPriority
+import RegistryInterleaved
 import Lean.Util.CollectAxioms
 import Lean.Elab.Command
 
@@ -29,6 +30,8 @@ run_cmd do
       ``Archon.registry_anchors_same_evidence, ``Archon.registry_anchor_warm_agrees,
       ``Archon.registry_sibling_priority, ``Archon.registry_replay_same_evidence,
       ``Archon.chain_graph_acyclic, ``Archon.registry_model_acyclic,
+      ``Archon.registry_event_eligible, ``Archon.registry_events_descending,
+      ``Archon.interleaved_registry_cold,
       ``Archon.interleaved_document_priority_converges,
       ``Archon.interleaved_document_priority_cold,
       ``Archon.document_event_eligible, ``Archon.document_event_authorization,
