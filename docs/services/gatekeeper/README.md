@@ -324,7 +324,11 @@ before appending the operation index. Non-string CID entries are skipped without
 renumbering subsequent operations. Previously stored absent/null/empty ordinal
 receipts cannot regain chain authority through startup replay. This does not add
 a compatibility decoder for corrupt stored field types. This applies to any
-registry except `local`, `hyperswarm`, and `pin`, whose ordinals remain optional.
+event registry except `local`, `hyperswarm`, and `pin`, whose event ordinals remain
+optional. The CID-import API still requires `BatchMetadata.ordinal` for every
+registry; an empty prefix is allowed only for local/Hyperswarm/pin. A nonempty CID
+list yielding no importable events returns zero queued/processed/rejected counts
+and the current queue total.
 The signed operation and its CID do not change. Peer/export imports are first
 converted to Hyperswarm hints, so they do not need a chain ordinal and cannot
 assert chain confirmation. Bundled chain mediators already supply positions.

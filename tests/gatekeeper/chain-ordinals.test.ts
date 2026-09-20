@@ -50,6 +50,7 @@ it.each(vectors.filter((_, i) => i % 2 === 0))('requires chain positions through
     await positioned.processEvents();
     expect((await positionedDb.getEvents(vector.did))[0].ordinal).toEqual([2 ** 40, 1, 1]);
     expect((await positionedDb.getEvents(vector.did))[0].registration?.opidx).toBe(1);
+    expect(await positioned.importBatchByCids([null] as never, genesis)).toEqual({ queued: 0, processed: 0, rejected: 0, total: 0 });
     for (const registry of ['local', 'hyperswarm', 'pin']) {
         const g = new Gatekeeper({ db: new DbMemory('hints'), ipfs: new MemoryClient() });
         expect(await g.verifyEvent({ ...genesis, registry, ordinal: undefined })).toBe(true);

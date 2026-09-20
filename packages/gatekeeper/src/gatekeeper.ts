@@ -2280,6 +2280,9 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
         }
 
+        if (events.length === 0) {
+            return { queued: 0, processed: 0, rejected: 0, total: this.eventsQueue.length };
+        }
         return this.importBatch(events);
     }
 
