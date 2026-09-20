@@ -52,3 +52,33 @@ The combined domain still needs signed coverage of unanchored/return migrations,
 missing predecessors, late genesis, rotations and deletion under the integrated
 A1 theorem. Semantic receipt metadata and actual stopping remain A3; the full
 integrated signed translation is A4.
+
+## Required chain ordinals (supersedes the #1235 proposal)
+
+The maintainer chose to require chain positions after tracing actual event
+producers. Bitcoin, Zcash, Ethereum, and Solana mediators all pass `[height, index]`
+to `importBatchByCids`, which appends the batch operation index. Public peer/export
+imports strip chain authority and become Hyperswarm hints. The missing-position
+counterexamples used the permissive core importer; no bundled mediator producing
+such receipts or production occurrence was demonstrated.
+
+The 2026-09-20 read-only audit of the local running Rust/Redis node found 292
+accepted chain receipts and 295 retained chain candidates across BTC, ZEC, ETH,
+and SOL registries. None had missing, null, empty, non-array, negative, fractional,
+or unsafe-integer ordinal components. The scan covered `archon/dids/*` and
+`archon/candidates`, excluding local/Hyperswarm/pin; it is a live local audit, not
+an assertion about every database worldwide.
+
+Both importers now require a nonempty ordinal array of nonnegative safe integers
+for chain registry events, including before the CID importer appends an operation
+index. Replay excludes absent/null/empty ordinal candidates in existing typed
+journals; these remain retained but cannot enter accepted histories. Positioned
+recovery remains possible. No compatibility decoder is added for malformed stored
+field types that Rust could not previously load; the audit found none.
+This supersedes retaining missing-position chain evidence via CID ranking and
+choosing a time for repeated unpositioned receipts. No receipt-time fallback is
+needed for this excluded input class. The proof domain must derive positioned
+chain evidence from these validation rules, while retaining unpositioned gossip
+and tied chain positions. This eliminates the demonstrated missing-position
+counterexamples; it does not by itself finish A2–A4 or prove all receipt metadata
+irrelevant to authorization.

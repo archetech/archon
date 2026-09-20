@@ -316,6 +316,23 @@ carries the legacy form — and a node MUST select the payload from the proof's 
 }
 ```
 
+Chain-registry receipts require a nonempty `ordinal` array of nonnegative safe
+integers (0 through 9007199254740991), so both ports compare the same positions.
+Missing, `null`, non-array, empty, and malformed-member ordinals are rejected
+before queueing or candidate storage. CID imports validate the batch position
+before appending the operation index. Non-string CID entries are skipped without
+renumbering subsequent operations. Previously stored absent/null/empty ordinal
+receipts cannot regain chain authority through startup replay. This does not add
+a compatibility decoder for corrupt stored field types. `local`, `hyperswarm`,
+and `pin` events may omit `ordinal`, but if they provide one it must still be an
+array of nonnegative safe integers; only those unanchored registries may use an
+empty array. The CID-import API still requires `BatchMetadata.ordinal` for every
+registry. A nonempty CID list yielding no importable events returns zero
+queued/processed/rejected counts and the current queue total.
+The signed operation and its CID do not change. Peer/export imports are first
+converted to Hyperswarm hints, so they do not need a chain ordinal and cannot
+assert chain confirmation. Bundled chain mediators already supply positions.
+
 ### 3.6 `DidRegistration` (batch anchoring metadata)
 
 ```jsonc
@@ -1042,15 +1059,16 @@ predecessor is unavailable, while a later copy becomes applicable during the sam
 replay pass. Subsequent passes must still reconsider the earlier anchor; retaining
 the first applicable copy can change controller cutoffs and dependent asset
 acceptance according to gossip arrival order. Distinct candidates remain retained.
-Equal or missing ordinals do not replace an already-confirmed copy under this
+Equal ordinals do not replace an already-confirmed copy under this
 rule; local, Hyperswarm, and pin representations keep first-observation behavior.
 
 For distinct competing operations confirmed on the expected chain, present equal
 ordinals are broken by canonical operation CID (ASCII order). This is required
 because chain producers can assign equal positions to different operations;
 first-applicable selection can otherwise depend on hint arrival order and persist
-across reconstruction. Earlier ordinals still take precedence. Missing ordinal
-handling and repeated anchors of the same operation are unchanged by this rule.
+across reconstruction. Earlier ordinals still take precedence. Chain receipts
+without a nonempty ordinal are invalid; repeated positioned anchors of the same
+operation follow the earlier-anchor rule above.
 
 The [unanchored successor rule](../../scheme.md#competing-unanchored-successors)
 is a sibling preference, not a timestamp cutoff or a replacement for chain

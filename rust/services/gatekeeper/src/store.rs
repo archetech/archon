@@ -252,7 +252,7 @@ pub(crate) fn value_to_event_record(value: &Value) -> EventRecord {
         ordinal: value.get("ordinal").and_then(|items| {
             items
                 .as_array()
-                .map(|values| values.iter().filter_map(Value::as_u64).collect::<Vec<_>>())
+                .map(|values| values.iter().filter_map(crate::proofs::ordinal_component).collect::<Vec<_>>())
         }),
         operation: value.get("operation").cloned().unwrap_or(Value::Null),
         opid: value

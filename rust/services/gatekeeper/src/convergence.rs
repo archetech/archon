@@ -1063,3 +1063,213 @@ async fn convergence_controller_cutoff_view() {
         }
     }
 }
+
+#[tokio::test]
+async fn convergence_chain_ordinals_required() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/tied-anchor-vectors.json"
+    ))
+    .unwrap();
+    for vector in vectors.as_array().unwrap().iter().step_by(2) {
+        let did = vector["did"].as_str().unwrap();
+        let genesis = json!({
+            "registry": "SOL:devnet", "time": "2026-09-01T00:00:00Z",
+            "ordinal": [100, 0, 0], "operation": vector["operations"][0],
+            "opid": vector["ids"][0], "did": did,
+            "registration": {"height": 100, "txid": "ordinal-audit", "batch": did, "opidx": 0}
+        });
+        for ordinal in [
+            None,
+            Some(Value::Null),
+            Some(json!([])),
+            Some(json!(7)),
+            Some(json!("7")),
+            Some(json!([null])),
+            Some(json!([null, 1])),
+            Some(json!([-1])),
+            Some(json!([0.5])),
+            Some(json!(["1", 2])),
+            Some(json!([9_007_199_254_740_992u64])),
+        ] {
+            let (mut state, _directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            state.config.admin_api_key = "ordinal-test".to_string();
+            let mut invalid = genesis.clone();
+            if let Some(value) = ordinal {
+                invalid["ordinal"] = value;
+            } else {
+                invalid.as_object_mut().unwrap().remove("ordinal");
+            }
+            assert!(!crate::verify_event_shape(&invalid));
+            let result = crate::import_batch_impl(&state, &[invalid.clone()]).await;
+            assert_eq!((result.queued, result.rejected), (0, 1));
+            if let Ok(record) = serde_json::from_value::<crate::EventRecord>(invalid.clone()) {
+                assert!(matches!(
+                    crate::events::import_event_impl(&state, record).await,
+                    crate::events::ImportStatus::Rejected
+                ));
+            }
+            state
+                .store
+                .lock()
+                .await
+                .add_operation(
+                    vector["ids"][0].as_str().unwrap(),
+                    vector["operations"][0].clone(),
+                )
+                .unwrap();
+            let response = crate::api::import_batch_by_cids(
+                axum::extract::State(state.clone()),
+                axum::http::HeaderMap::from_iter([(
+                    axum::http::header::HeaderName::from_static("x-archon-admin-key"),
+                    "ordinal-test".parse().unwrap(),
+                )]),
+                axum::Json(json!({"cids": [vector["ids"][0]], "metadata": invalid})),
+            )
+            .await;
+            assert_eq!(
+                response.status(),
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR
+            );
+            assert!(state.import_queue.lock().await.is_empty());
+            // Only absent/null/empty ordinals are representable legacy omissions;
+            // do not sanitize malformed raw storage to manufacture compatibility.
+            if invalid
+                .get("ordinal")
+                .is_some_and(|value| !value.is_null() && value != &json!([]))
+            {
+                continue;
+            }
+            {
+                let mut store = state.store.lock().await;
+                assert!(store.get_events(did).is_empty());
+                assert!(!store.get_candidates().unwrap().contains_key(did));
+                let event = crate::value_to_event_record(&invalid);
+                store.set_candidates(did, vec![event.clone()]).unwrap();
+                store.set_events(did, vec![event]).unwrap();
+            }
+            let data = serde_json::from_value(
+                serde_json::to_value(&state.store.lock().await.data).unwrap(),
+            )
+            .unwrap();
+            let (restarted, _restart_directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data,
+                redis_connection: None,
+            });
+            state = restarted;
+            crate::history::ensure_history_ready(&state).await.unwrap();
+            assert!(state.store.lock().await.get_events(did).is_empty());
+            let result = crate::import_batch_impl(&state, &[genesis.clone()]).await;
+            assert_eq!((result.queued, result.rejected), (1, 0));
+            crate::process_events_impl(&state).await;
+            assert_eq!(
+                state.store.lock().await.get_events(did)[0].ordinal,
+                Some(vec![100, 0, 0])
+            );
+            let data = serde_json::from_value(
+                serde_json::to_value(&state.store.lock().await.data).unwrap(),
+            )
+            .unwrap();
+            let (restarted, _final_directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data,
+                redis_connection: None,
+            });
+            crate::history::ensure_history_ready(&restarted)
+                .await
+                .unwrap();
+            assert_eq!(
+                restarted.store.lock().await.get_events(did)[0].ordinal,
+                Some(vec![100, 0, 0])
+            );
+        }
+        let (mut state, _directory) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        state.config.admin_api_key = "ordinal-test".to_string();
+        state
+            .store
+            .lock()
+            .await
+            .add_operation(
+                vector["ids"][0].as_str().unwrap(),
+                vector["operations"][0].clone(),
+            )
+            .unwrap();
+        let mut metadata = genesis.clone();
+        metadata["ordinal"] = serde_json::from_str("[1099511627776, 1.0]").unwrap();
+        let response = crate::api::import_batch_by_cids(
+            axum::extract::State(state.clone()),
+            axum::http::HeaderMap::from_iter([(
+                axum::http::header::HeaderName::from_static("x-archon-admin-key"),
+                "ordinal-test".parse().unwrap(),
+            )]),
+            axum::Json(json!({"cids": [null, vector["ids"][0]], "metadata": metadata})),
+        )
+        .await;
+        assert_eq!(response.status(), axum::http::StatusCode::OK);
+        crate::process_events_impl(&state).await;
+        assert_eq!(
+            state.store.lock().await.get_events(did)[0].ordinal,
+            Some(vec![1_099_511_627_776, 1, 1])
+        );
+        assert_eq!(state.store.lock().await.get_events(did)[0].registration.as_ref().unwrap()["opidx"], json!(1));
+        let response = crate::api::import_batch_by_cids(
+            axum::extract::State(state.clone()),
+            axum::http::HeaderMap::from_iter([(axum::http::header::HeaderName::from_static("x-archon-admin-key"), "ordinal-test".parse().unwrap())]),
+            axum::Json(json!({"cids": [null], "metadata": genesis})),
+        ).await;
+        assert_eq!(response.status(), axum::http::StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), 4096).await.unwrap();
+        assert_eq!(serde_json::from_slice::<Value>(&body).unwrap(), json!({"queued": 0, "processed": 0, "rejected": 0, "total": 0}));
+        for registry in ["local", "hyperswarm", "pin"] {
+            let mut hint = genesis.clone();
+            hint["registry"] = json!(registry);
+            hint.as_object_mut().unwrap().remove("ordinal");
+            assert!(crate::verify_event_shape(&hint));
+            hint["ordinal"] = json!([]);
+            assert!(crate::verify_event_shape(&hint));
+            for ordinal in [
+                json!(null),
+                json!(7),
+                json!([null]),
+                json!([null, 1]),
+                json!([-1]),
+                json!([0.5]),
+                json!(["1", 2]),
+                json!([9_007_199_254_740_992u64]),
+            ] {
+                let mut invalid_hint = genesis.clone();
+                invalid_hint["registry"] = json!(registry);
+                invalid_hint["ordinal"] = ordinal.clone();
+                assert!(!crate::verify_event_shape(&invalid_hint));
+                let response = crate::api::import_batch_by_cids(
+                    axum::extract::State(state.clone()),
+                    axum::http::HeaderMap::from_iter([(axum::http::header::HeaderName::from_static("x-archon-admin-key"), "ordinal-test".parse().unwrap())]),
+                    axum::Json(json!({"cids": [vector["ids"][0]], "metadata": invalid_hint})),
+                ).await;
+                assert_eq!(response.status(), axum::http::StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        }
+        let (state, _directory) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        let mut unpositioned = genesis.clone();
+        unpositioned.as_object_mut().unwrap().remove("ordinal");
+        let result =
+            crate::import_batch_impl(&state, &crate::events::relay_hints(&[unpositioned])).await;
+        assert_eq!((result.queued, result.rejected), (1, 0));
+        crate::process_events_impl(&state).await;
+        let events = state.store.lock().await.get_events(did);
+        assert_eq!(events[0].registry, "hyperswarm");
+        assert!(events[0].registration.is_none());
+    }
+}

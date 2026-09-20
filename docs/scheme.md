@@ -600,7 +600,7 @@ reconsidered during replay: an earlier chain ordinal replaces a later accepted
 anchor only when it passes authorization at the earlier position. A late
 predecessor must not permanently select whichever anchor first became applicable.
 This can revise controller cutoffs and dependent histories. The rule does not
-change tied/missing ordinal handling or first-observation behavior for local,
+change tied ordinal handling or first-observation behavior for local,
 Hyperswarm, and pin receipts.
 
 Candidate journals persist across restart, including rejected candidates and replaced branches. Replay reconstructs accepted state before serving resolution after startup and refreshes dependent search and verification state. Existing databases adopt their stored histories into the journal; operations discarded before this upgrade must be recovered by rescanning their anchors. DID exports continue to contain accepted histories, so a DID export alone is not a backup of the candidate journal.
@@ -853,3 +853,15 @@ check is not written in the first place.
 For security reasons, this method provides no support for storing private keys. We recommend that clients use BIP-39 to generate a master seed phrase consisting of at least 12 words, and that users safely store the recovery phrase.
 
 If a user loses a device that contains their wallet, they should be able to install the wallet software on a new device, initialize it with their seed phrase and recover their DID along with all their credentials. This implies that a "vault" of the credentials should be stored with the agent DID document, though it should be encrypted with the DID's current private key for privacy.
+
+### Required chain receipt positions
+
+Authoritative chain events must include a nonempty registry-local `ordinal`
+array of nonnegative safe integers (at most 9007199254740991). Gatekeeper
+validates this before appending batch operation indices, queues, or candidate
+writes. Missing/null/empty chain positions are also excluded during reconstruction. Local, Hyperswarm,
+and pin events remain eligible without ordinals. Relayed chain envelopes are
+converted to Hyperswarm hints before validation; peers cannot confer chain
+confirmation. This rule constrains receipt envelopes, not signed operation bytes
+or canonical operation IDs. Equal positions still use the canonical-operation-CID
+rule for competing operations.

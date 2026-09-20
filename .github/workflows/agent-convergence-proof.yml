@@ -15,6 +15,7 @@ on:
       - 'tests/gatekeeper/chain-convergence.test.ts'
       - 'tests/gatekeeper/chain-successors.test.ts'
       - 'tests/gatekeeper/controller-view.test.ts'
+      - 'tests/gatekeeper/chain-ordinals.test.ts'
       - 'tests/gatekeeper/interleaved-replay.test.ts'
       - 'rust/services/gatekeeper/**'
       - 'package.json'
@@ -35,6 +36,7 @@ on:
       - 'tests/gatekeeper/chain-convergence.test.ts'
       - 'tests/gatekeeper/chain-successors.test.ts'
       - 'tests/gatekeeper/controller-view.test.ts'
+      - 'tests/gatekeeper/chain-ordinals.test.ts'
       - 'tests/gatekeeper/interleaved-replay.test.ts'
       - 'rust/services/gatekeeper/**'
       - 'package.json'
@@ -103,7 +105,7 @@ jobs:
       - name: Check signed agent authorization
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/agent-convergence.test.ts --runInBand --coverage=false
       - name: Check repeated chain anchors
-        run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/chain-convergence.test.ts tests/gatekeeper/chain-successors.test.ts tests/gatekeeper/controller-view.test.ts tests/gatekeeper/interleaved-replay.test.ts --runInBand --coverage=false
+        run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/chain-convergence.test.ts tests/gatekeeper/chain-successors.test.ts tests/gatekeeper/controller-view.test.ts tests/gatekeeper/chain-ordinals.test.ts tests/gatekeeper/interleaved-replay.test.ts --runInBand --coverage=false
       - name: Check proofs and concrete histories
         working-directory: proofs/agent-convergence
         run: lake build

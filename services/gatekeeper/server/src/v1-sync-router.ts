@@ -206,6 +206,20 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
      *               metadata:
      *                 type: object
      *                 required: [registry, time, ordinal]
+     *                 oneOf:
+     *                   - properties:
+     *                       registry:
+     *                         enum: [local, hyperswarm, pin]
+     *                   - properties:
+     *                       registry:
+     *                         not:
+     *                           enum: [local, hyperswarm, pin]
+     *                       ordinal:
+     *                         minItems: 1
+     *                         items:
+     *                           type: integer
+     *                           minimum: 0
+     *                           maximum: 9007199254740991
      *                 properties:
      *                   registry:
      *                     type: string
@@ -218,7 +232,7 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
      *                     type: array
      *                     items:
      *                       type: number
-     *                     description: Ordinal for ordering events
+     *                     description: Batch position before the operation index is appended. Chain registries require a nonempty array of nonnegative safe integers.
      *                   registration:
      *                     type: object
      *                     description: Optional blockchain registration metadata

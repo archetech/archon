@@ -63,6 +63,15 @@ this does not promise delivery, content availability, or blockchain finality.
   Prove an omitted form unreachable under protocol rules, handle it, or report
   a demonstrated counterexample and the necessary protocol decision.
 
+The 2026-09-20 chain-receipt decision requires nonempty ordinals for authoritative
+chain events. Bundled mediators already produce them; public relays become
+unconfirmed hints. A2 must derive this domain restriction from importer and replay
+validation, rather than assuming it silently. Unpositioned local/Hyperswarm/pin
+hints and tied chain positions remain in scope. See the
+[producer and production audit](agent-convergence-domain.md#required-chain-ordinals-supersedes-the-1235-proposal).
+This supersedes the proposed missing-position fallback in #1235, including the
+receipt-time fallback for repeated unpositioned copies. A2–A4 remain open.
+
 ## Evidence audit
 
 These are reusable results, not independently completed versions of the target.
