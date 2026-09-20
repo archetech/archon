@@ -6,9 +6,9 @@ import MemoryClient from '@didcid/ipfs/memory';
 import Cipher from '@didcid/cipher/node';
 import type { GatekeeperEvent, Operation } from '@didcid/gatekeeper/types';
 
-type Vector = { seed?: number; did: string; ids: string[]; operations: Operation[]; events: GatekeeperEvent[]; block: { height: number; hash: string; time: number } };
-type Case = { vector: number; order: number[]; passBound: number; passes: number[][][] };
-for (const [source, trace] of [['chain-successor-vectors', 'interleaved-cases'], ['chain-document-vectors', 'chain-document-cases']]) {
+type Vector = { seed?: number; did: string; ids: string[]; operations: Operation[]; events: GatekeeperEvent[]; block: { height: number; hash: string; time: number }; blocks?: { registry: string; block: { height: number; hash: string; time: number } }[] };
+type Case = { seed?: number; vector: number; order: number[]; passBound: number; passes: number[][][] };
+for (const [source, trace] of [['chain-successor-vectors', 'interleaved-cases'], ['chain-document-vectors', 'chain-document-cases'], ['migration-vectors', 'registry-interleaved-cases']]) {
     const vectors: Vector[] = JSON.parse(readFileSync(`tests/convergence/${source}.json`, 'utf8'));
     const cases: Case[] = JSON.parse(readFileSync(`tests/convergence/${trace}.json`, 'utf8'));
     it.each(cases)(`matches ${source} Lean transitions: vector=$vector order=$order`, async c => {
@@ -17,11 +17,14 @@ for (const [source, trace] of [['chain-successor-vectors', 'interleaved-cases'],
         const db = new DbMemory('interleaved-replay');
         const g = new Gatekeeper({ db, ipfs: new MemoryClient() });
         await g.getDIDs();
-        await g.addBlock('BTC:signet', v.block);
+        for (const entry of v.blocks ?? [{ registry: 'BTC:signet', block: v.block }]) {
+            await g.addBlock(entry.registry, entry.block);
+        }
         const events = v.events.map(e => ({ ...e, did: v.did,
             opid: v.ids[v.operations.findIndex(op => isDeepStrictEqual(op, e.operation))] }));
         const replay = g as unknown as { importEventOnce(event: GatekeeperEvent): Promise<unknown> };
-        if (v.seed !== undefined) await replay.importEventOnce(structuredClone(events[v.seed]));
+        const seed = c.seed ?? v.seed;
+        if (seed !== undefined) await replay.importEventOnce(structuredClone(events[seed]));
         const cipher = new Cipher();
         for (const [pass, steps] of c.passes.entries()) {
             const before = cipher.canonicalizeJSON(await db.getEvents(v.did));

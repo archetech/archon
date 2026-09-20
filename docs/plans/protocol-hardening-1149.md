@@ -490,3 +490,26 @@ provisional/wrong-chain representations need an explicit correspondence. This
 step assumes already authorized create/update operations and abstract receipt
 signature/position validity. Unanchored registry policy, deletion, assets,
 metadata/codecs, retention, and universal runtime refinement remain open.
+
+### Interleaved migration ordering and receipt projection — #1215
+
+#1228 merged compiled migration replay. The next increment connects the
+interleaved ordering model to that compiled history through the checked local
+priority projection. Matching-chain receipts retain distinct ordinal ranks;
+provisional gossip/wrong-chain receipts share a CID rank per operation. Full
+receipt identity is tracked separately so provisional duplicates preserve the
+first observation's metadata.
+
+The unchanged signed graphs supply 24 original orders plus four targeted
+wrong-chain-first orders. Lean checks 1,225 transitions, 74 passes, the per-order
+projection contract, and the same-chain ordinal-rank contract. TypeScript and
+Rust compare full stored records after each import and serialized stopping at
+each pass for all 28 traces. Preferred genesis is seeded; existing public import,
+repeat, and restart tests retain late-genesis/durable-evidence coverage.
+
+The general theorem assumes a fixed already authorized create/update graph,
+an admitted genesis, and a valid warm suffix. Full metadata/stop correspondence
+is finite bridge evidence. Next combine registry reconstruction and this
+representation with predecessor-document authorization. Unanchored migrations,
+deletions in the registry model, dynamic assets, full metadata/codecs, retention,
+and universal runtime refinement remain open. No production behavior changes.

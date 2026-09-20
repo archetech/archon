@@ -845,6 +845,10 @@ async fn convergence_interleaved_transitions() {
             include_str!("../../../../tests/convergence/chain-document-vectors.json"),
             include_str!("../../../../tests/convergence/chain-document-cases.json"),
         ),
+        (
+            include_str!("../../../../tests/convergence/migration-vectors.json"),
+            include_str!("../../../../tests/convergence/registry-interleaved-cases.json"),
+        ),
     ] {
         let vectors: Value = serde_json::from_str(source).unwrap();
         let cases: Value = serde_json::from_str(trace).unwrap();
@@ -857,12 +861,18 @@ async fn convergence_interleaved_transitions() {
                 redis_connection: None,
             });
             crate::history::ensure_history_ready(&state).await.unwrap();
-            state
-                .store
-                .lock()
-                .await
-                .add_block("BTC:signet", v["block"].clone())
-                .unwrap();
+            let blocks = v["blocks"]
+                .as_array()
+                .cloned()
+                .unwrap_or_else(|| vec![json!({"registry": "BTC:signet", "block": v["block"]})]);
+            for entry in blocks {
+                state
+                    .store
+                    .lock()
+                    .await
+                    .add_block(entry["registry"].as_str().unwrap(), entry["block"].clone())
+                    .unwrap();
+            }
             let events: Vec<crate::EventRecord> = v["events"]
                 .as_array()
                 .unwrap()
@@ -880,7 +890,7 @@ async fn convergence_interleaved_transitions() {
                     serde_json::from_value(event).unwrap()
                 })
                 .collect();
-            if let Some(seed) = v["seed"].as_u64() {
+            if let Some(seed) = case["seed"].as_u64().or_else(|| v["seed"].as_u64()) {
                 crate::events::import_event_once(&state, events[seed as usize].clone()).await;
             }
             let passes = case["passes"].as_array().unwrap();
