@@ -67,3 +67,23 @@ The combined domain still needs signed coverage of unanchored/return migrations,
 missing predecessors, late genesis, rotations and deletion under the integrated
 A1 theorem. Semantic receipt metadata and actual stopping remain A3; the full
 integrated signed translation is A4.
+
+## Outstanding repeated-unpositioned-receipt counterexample (A3)
+
+The sibling rule does not by itself settle metadata when two receipts contain
+one operation CID. A real signed audit used agent genesis G, data update P,
+rotation U, and an old-key asset anchored at time T. U has two Zcash receipts
+without ordinals: one before T and one after T. P's unpositioned anchor falls
+between them. All block/time facts and all six events are shared.
+
+With G/P gossip in dependency order, the early U receipt applies. Reversing G/P
+initially defers P; the early U receipt remains deferred, P's anchor applies,
+and the late U receipt applies. The earlier unpositioned duplicate cannot replace
+it on subsequent passes. Both nodes select G/P/U but resolve the controller at T
+differently, giving opposite asset verdicts after repeat delivery and restart.
+
+This is an admitted missing-ordinal import case, not evidence that bundled chain
+mediators omit ordinals. It requires a separate deterministic receipt-selection
+rule; competing-operation CID order cannot break a tie between identical CIDs.
+The maintainer decision is pending. A2/A3 must not be reported complete while
+this authorization-view counterexample remains unresolved.
