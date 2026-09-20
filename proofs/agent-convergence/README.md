@@ -735,8 +735,9 @@ retained evidence, and general runtime correspondence remain open.
 `PriorityProjection`. Under the local representative/eligibility contract, the
 interleaved loop returns the settled-priority suffix, and that decoded suffix
 executes using successive predecessor documents to the ancestry-derived final
-state. With genesis and depth alignment, prepending the selected genesis rank
-identifies that result with the compiled cold replay. The fixture bridge checks
+state. With genesis ownership and depth alignment, prepending the selected genesis
+rank identifies that result with the compiled cold replay. Decoding through the
+event owner function gives the document genesis followed by the executed path. The fixture bridge checks
 these conditions and the compiled decreasing-edge condition in Lean. Operation
 authorization is derived, not supplied as an unrelated table;
 registry/position eligibility and cryptographic signature validity remain inputs.

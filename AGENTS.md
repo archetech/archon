@@ -195,3 +195,5 @@ These rules apply to coding agents working in this repository.
 - When combining convergence and authorization proofs, derive event eligibility from the signed predecessor document and prove decoded paths execute; state separately whether shared fixtures cover combined chain-anchor/key-rotation behavior or only each domain independently.
 
 - When a combined proof starts after genesis, seed the same preferred genesis event in runtime transition fixtures and retain separate public-import coverage for late genesis. Include wrong-branch keys and invalid ancestors when composing document authorization with chain priorities.
+
+- When prepending a compiled genesis rank in a proof, require its owner to be the document genesis and expose decoded full-history equality; a parentless selected rank alone does not establish identity.

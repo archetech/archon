@@ -63,12 +63,16 @@ theorem acyclic0 : WellFoundedEdges compiled0 := by
   have checked : ∀ p : Fin 13, ∀ i : Fin 13, eligible compiled0 p.val i.val = true → compiled0.level i.val < compiled0.level p.val := by decide
   exact checked ⟨p, pb⟩ ⟨i, bound⟩ valid
 theorem canonical0 : (interleavedUntilStable raw0 owner0 5 evidence0 (raw0.level 5 + 1) []).map (fun path => (path, runAgent (documentAgent graph0) (.active 5) (path.map owner0))) = some ([2, 8], some (AgentState.active 6)) := by
-  obtain ⟨result, final, replay, cold, _, _⟩ := interleaved_document_priority_cold graph0 13 owner0 priority0 (fun _ => true) compiled0 ordered0 bounded0 (by decide) (by decide) evidence0 selected0 [] projection0 (.nil _) (by decide) acyclic0 (by decide) (by decide)
+  obtain ⟨result, final, replay, cold, decoded, _, _⟩ := interleaved_document_priority_cold graph0 13 owner0 priority0 (fun _ => true) compiled0 ordered0 bounded0 (by decide) (by decide) evidence0 selected0 [] projection0 (.nil _) (by decide) acyclic0 (by decide) (by decide) (chain_priority_owner anchors0 [0, 1, 2, 3] 5)
   have expected : replayCold compiled0 (priority0 5) selected0 = some (priority0 5 :: [2, 8]) := by
     rw [cold_replay_converges compiled0 (priority0 5) selected0 acyclic0 (by decide) (by decide)]
     decide
   have selected : result = [2, 8] := (List.cons.inj (Option.some.inj (cold.symm.trans expected))).2
   change interleavedUntilStable raw0 owner0 5 evidence0 (raw0.level 5 + 1) [] = some result at replay
+  change (replayCold compiled0 (priority0 5) selected0).map (List.map owner0) = some (5 :: result.map owner0) at decoded
+  have decodedExpected : (replayCold compiled0 (priority0 5) selected0).map (List.map owner0) = some [5, 6, 4] := by
+    rw [decoded, selected]
+    decide
   rw [replay, Option.map_some, selected]
   decide
 example : interleavedInsert raw0 owner0 5 9 [] = [] := by decide
@@ -372,12 +376,16 @@ theorem acyclic1 : WellFoundedEdges compiled1 := by
   have checked : ∀ p : Fin 14, ∀ i : Fin 14, eligible compiled1 p.val i.val = true → compiled1.level i.val < compiled1.level p.val := by decide
   exact checked ⟨p, pb⟩ ⟨i, bound⟩ valid
 theorem canonical1 : (interleavedUntilStable raw1 owner1 5 evidence1 (raw1.level 5 + 1) []).map (fun path => (path, runAgent (documentAgent graph1) (.active 5) (path.map owner1))) = some ([2, 12, 7], some AgentState.deleted) := by
-  obtain ⟨result, final, replay, cold, _, _⟩ := interleaved_document_priority_cold graph1 14 owner1 priority1 (fun _ => true) compiled1 ordered1 bounded1 (by decide) (by decide) evidence1 selected1 [] projection1 (.nil _) (by decide) acyclic1 (by decide) (by decide)
+  obtain ⟨result, final, replay, cold, decoded, _, _⟩ := interleaved_document_priority_cold graph1 14 owner1 priority1 (fun _ => true) compiled1 ordered1 bounded1 (by decide) (by decide) evidence1 selected1 [] projection1 (.nil _) (by decide) acyclic1 (by decide) (by decide) (chain_priority_owner anchors1 [0, 1, 2, 3, 4] 5)
   have expected : replayCold compiled1 (priority1 5) selected1 = some (priority1 5 :: [2, 12, 7]) := by
     rw [cold_replay_converges compiled1 (priority1 5) selected1 acyclic1 (by decide) (by decide)]
     decide
   have selected : result = [2, 12, 7] := (List.cons.inj (Option.some.inj (cold.symm.trans expected))).2
   change interleavedUntilStable raw1 owner1 5 evidence1 (raw1.level 5 + 1) [] = some result at replay
+  change (replayCold compiled1 (priority1 5) selected1).map (List.map owner1) = some (5 :: result.map owner1) at decoded
+  have decodedExpected : (replayCold compiled1 (priority1 5) selected1).map (List.map owner1) = some [5, 0, 7, 2] := by
+    rw [decoded, selected]
+    decide
   rw [replay, Option.map_some, selected]
   decide
 example : interleavedInsert raw1 owner1 5 10 [] = [] := by decide
@@ -727,12 +735,16 @@ theorem acyclic2 : WellFoundedEdges compiled2 := by
   have checked : ∀ p : Fin 13, ∀ i : Fin 13, eligible compiled2 p.val i.val = true → compiled2.level i.val < compiled2.level p.val := by decide
   exact checked ⟨p, pb⟩ ⟨i, bound⟩ valid
 theorem canonical2 : (interleavedUntilStable raw2 owner2 4 evidence2 (raw2.level 4 + 1) []).map (fun path => (path, runAgent (documentAgent graph2) (.active 4) (path.map owner2))) = some ([2, 10], some (AgentState.active 8)) := by
-  obtain ⟨result, final, replay, cold, _, _⟩ := interleaved_document_priority_cold graph2 13 owner2 priority2 (fun _ => true) compiled2 ordered2 bounded2 (by decide) (by decide) evidence2 selected2 [] projection2 (.nil _) (by decide) acyclic2 (by decide) (by decide)
+  obtain ⟨result, final, replay, cold, decoded, _, _⟩ := interleaved_document_priority_cold graph2 13 owner2 priority2 (fun _ => true) compiled2 ordered2 bounded2 (by decide) (by decide) evidence2 selected2 [] projection2 (.nil _) (by decide) acyclic2 (by decide) (by decide) (chain_priority_owner anchors2 [0, 1, 2, 3] 4)
   have expected : replayCold compiled2 (priority2 4) selected2 = some (priority2 4 :: [2, 10]) := by
     rw [cold_replay_converges compiled2 (priority2 4) selected2 acyclic2 (by decide) (by decide)]
     decide
   have selected : result = [2, 10] := (List.cons.inj (Option.some.inj (cold.symm.trans expected))).2
   change interleavedUntilStable raw2 owner2 4 evidence2 (raw2.level 4 + 1) [] = some result at replay
+  change (replayCold compiled2 (priority2 4) selected2).map (List.map owner2) = some (4 :: result.map owner2) at decoded
+  have decodedExpected : (replayCold compiled2 (priority2 4) selected2).map (List.map owner2) = some [4, 8, 6] := by
+    rw [decoded, selected]
+    decide
   rw [replay, Option.map_some, selected]
   decide
 example : interleavedInsert raw2 owner2 4 8 [] = [] := by decide
@@ -1036,12 +1048,16 @@ theorem acyclic3 : WellFoundedEdges compiled3 := by
   have checked : ∀ p : Fin 14, ∀ i : Fin 14, eligible compiled3 p.val i.val = true → compiled3.level i.val < compiled3.level p.val := by decide
   exact checked ⟨p, pb⟩ ⟨i, bound⟩ valid
 theorem canonical3 : (interleavedUntilStable raw3 owner3 4 evidence3 (raw3.level 4 + 1) []).map (fun path => (path, runAgent (documentAgent graph3) (.active 4) (path.map owner3))) = some ([2, 10, 12], some AgentState.deleted) := by
-  obtain ⟨result, final, replay, cold, _, _⟩ := interleaved_document_priority_cold graph3 14 owner3 priority3 (fun _ => true) compiled3 ordered3 bounded3 (by decide) (by decide) evidence3 selected3 [] projection3 (.nil _) (by decide) acyclic3 (by decide) (by decide)
+  obtain ⟨result, final, replay, cold, decoded, _, _⟩ := interleaved_document_priority_cold graph3 14 owner3 priority3 (fun _ => true) compiled3 ordered3 bounded3 (by decide) (by decide) evidence3 selected3 [] projection3 (.nil _) (by decide) acyclic3 (by decide) (by decide) (chain_priority_owner anchors3 [0, 1, 2, 3, 4] 4)
   have expected : replayCold compiled3 (priority3 4) selected3 = some (priority3 4 :: [2, 10, 12]) := by
     rw [cold_replay_converges compiled3 (priority3 4) selected3 acyclic3 (by decide) (by decide)]
     decide
   have selected : result = [2, 10, 12] := (List.cons.inj (Option.some.inj (cold.symm.trans expected))).2
   change interleavedUntilStable raw3 owner3 4 evidence3 (raw3.level 4 + 1) [] = some result at replay
+  change (replayCold compiled3 (priority3 4) selected3).map (List.map owner3) = some (4 :: result.map owner3) at decoded
+  have decodedExpected : (replayCold compiled3 (priority3 4) selected3).map (List.map owner3) = some [4, 3, 5, 7] := by
+    rw [decoded, selected]
+    decide
   rw [replay, Option.map_some, selected]
   decide
 example : interleavedInsert raw3 owner3 4 9 [] = [] := by decide

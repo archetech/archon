@@ -42,3 +42,13 @@ test('rejects fixture claims outside the explicit ancestry/position domain', () 
         assert.throws(() => generateChainDocumentFixtures(input), /oracle|ordinal|registry|seed|evidence/);
     }
 });
+
+test('each signed scenario has six distinct delivery orders', () => {
+    for (const vector of vectors) {
+        assert.equal(vector.orders.length, 6);
+        assert.equal(new Set(vector.orders.map(order => JSON.stringify(order))).size, 6);
+    }
+    const input = structuredClone(vectors);
+    input[0].orders[1] = [...input[0].orders[0]];
+    assert.throws(() => generateChainDocumentFixtures(input), /duplicate delivery orders/);
+});

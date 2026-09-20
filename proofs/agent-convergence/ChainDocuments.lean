@@ -43,20 +43,25 @@ theorem interleaved_document_priority_cold (g : DocumentGraph) (size : Nat)
     (valid : InterleavedValid (documentEvents g size owner allowed) owner events g.root path)
     (depth : (documentEvents g size owner allowed).level g.root = compiled.level (priority g.root))
     (acyclic : WellFoundedEdges compiled) (create : compiled.parent (priority g.root) = none)
-    (present : priority g.root ∈ selected) :
+    (present : priority g.root ∈ selected)
+    (rootOwner : owner (priority g.root) = g.root) :
     ∃ result final,
       interleavedUntilStable (documentEvents g size owner allowed) owner g.root events
         ((documentEvents g size owner allowed).level g.root + 1) path = some result ∧
       replayCold compiled (priority g.root) selected = some (priority g.root :: result) ∧
+      (replayCold compiled (priority g.root) selected).map (List.map owner) =
+        some (g.root :: result.map owner) ∧
       runAgent (documentAgent g) (.active g.initialDocument) (result.map owner) = some final ∧
       agentStateAt (documentAgent g) (pathTip g.root (result.map owner)) = some final := by
   obtain ⟨result, final, replay, canonical, ran, atTip⟩ :=
     interleaved_document_priority_converges g size owner priority allowed compiled ordered bounded
       genesis events selected g.root path (.active g.initialDocument) projection rootBound valid
       (agent_state_root (documentAgent g) rootBound)
-  refine ⟨result, final, replay, ?_, ran, atTip⟩
-  rw [cold_replay_converges compiled (priority g.root) selected acyclic create present,
-    canonical, depth]
-  rfl
+  have cold : replayCold compiled (priority g.root) selected = some (priority g.root :: result) := by
+    rw [cold_replay_converges compiled (priority g.root) selected acyclic create present,
+      canonical, depth]
+    rfl
+  refine ⟨result, final, replay, cold, ?_, ran, atTip⟩
+  simp only [cold, Option.map_some, List.map_cons, rootOwner]
 
 end Archon

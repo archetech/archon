@@ -386,7 +386,9 @@ executable correspondence remain open under #1215.
 passed. The next increment composes its derived predecessor-document predicate
 with the settled-priority projection, proving that the canonical ranked suffix
 is executable with the correct documents and, with the admitted genesis, equals
-the compiled cold replay. The local projection contract is
+the compiled cold replay. Root ownership explicitly connects the decoded compiled
+genesis to the document genesis; the theorem also exposes decoded-history equality.
+Delivery-order coverage counts distinct permutations. The local projection contract is
 checked for four signed mixed gossip/chain graphs, across 24 delivery orders.
 
 Both ports check 920 individual transitions and 68 pass/stopping decisions;

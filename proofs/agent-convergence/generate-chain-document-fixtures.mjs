@@ -89,12 +89,15 @@ export function generateChainDocumentFixtures(vectors) {
             `  have checked : ∀ p : Fin ${size}, ∀ i : Fin ${size}, eligible ${c} p.val i.val = true → ${c}.level i.val < ${c}.level p.val := by decide`,
             '  exact checked ⟨p, pb⟩ ⟨i, bound⟩ valid');
         lines.push(`theorem canonical${n} : (interleavedUntilStable ${m} ${owner} ${root} evidence${n} (${m}.level ${root} + 1) []).map (fun path => (path, runAgent (documentAgent ${g}) (.active ${root}) (path.map ${owner}))) = some (${list(final)}, some ${finalLean}) := by`,
-            `  obtain ⟨result, final, replay, cold, _, _⟩ := interleaved_document_priority_cold ${g} ${size} ${owner} ${priority} (fun _ => true) ${c} ordered${n} bounded${n} (by decide) (by decide) evidence${n} selected${n} [] projection${n} (.nil _) (by decide) acyclic${n} (by decide) (by decide)`,
+            `  obtain ⟨result, final, replay, cold, decoded, _, _⟩ := interleaved_document_priority_cold ${g} ${size} ${owner} ${priority} (fun _ => true) ${c} ordered${n} bounded${n} (by decide) (by decide) evidence${n} selected${n} [] projection${n} (.nil _) (by decide) acyclic${n} (by decide) (by decide) (chain_priority_owner ${a} ${list(anchors.map((_, i) => i))} ${root})`,
             `  have expected : replayCold ${c} (${priority} ${root}) selected${n} = some (${priority} ${root} :: ${list(final)}) := by`,
             `    rw [cold_replay_converges ${c} (${priority} ${root}) selected${n} acyclic${n} (by decide) (by decide)]`,
             '    decide',
             `  have selected : result = ${list(final)} := (List.cons.inj (Option.some.inj (cold.symm.trans expected))).2`,
             `  change interleavedUntilStable ${m} ${owner} ${root} evidence${n} (${m}.level ${root} + 1) [] = some result at replay`,
+            `  change (replayCold ${c} (${priority} ${root}) selected${n}).map (List.map ${owner}) = some (${root} :: result.map ${owner}) at decoded`,
+            `  have decodedExpected : (replayCold ${c} (${priority} ${root}) selected${n}).map (List.map ${owner}) = some ${list(v.expected.map(i => ranks[i]))} := by`,
+            '    rw [decoded, selected]', '    decide',
             '  rw [replay, Option.map_some, selected]', '  decide');
         const insert = (p, incoming, path) => {
             const eligible = authorized[incoming] && predecessor[incoming] === p;
@@ -107,6 +110,7 @@ export function generateChainDocumentFixtures(vectors) {
             return [current, ...insert(ownerTable[current], incoming, rest)];
         };
         const passBound = count - d.depths[byRank[root]] + 1;
+        assert.equal(new Set(v.orders.map(order => JSON.stringify(order))).size, v.orders.length, 'duplicate delivery orders');
         for (const order of v.orders) {
             assert(order.every(t => Number.isInteger(t) && v.events[t]), 'unknown event token');
             assert.equal(new Set(order).size, v.events.length, 'complete evidence required');
