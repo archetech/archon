@@ -513,6 +513,45 @@ asset acceptance even after restart. #1216 lets an earlier valid expected-chain
 anchor replace a later accepted copy, using the existing predecessor authorization
 and dependent replay. The shared `chain-anchor-vectors.json` fixtures exercise both
 ports, including an earlier invalid asset anchor that must not replace its valid
-later anchor. These cases are implementation regression tests, not Lean-checked
-chain-order examples. The existing Lean models remain provisional; #1215 tracks
-the remaining expected-chain/migration proof work.
+later anchor. The full asset/controller scenarios remain runtime regression tests. The controller
+anchor projections now also instantiate the conditional position-selection proof
+below; #1215 remains open for the broader expected-chain/migration proof.
+
+
+## Repeated expected-chain anchor selection — #1215
+
+`ChainAnchors.lean` proves that, for a settled operation path with fixed
+per-anchor authorization and expected registry, one complete scan selects the
+earliest valid retained anchor position. Scans may start cold or from different
+valid retained anchors. Equal evidence sets give equal selected positions,
+regardless of order or multiplicity, and repeating the scan is idempotent.
+The proof reuses the finite minimum lemmas through `AnchorModel`: here `parent`
+identifies the operation owning an anchor and `level` is unused. It does not
+reuse the predecessor-graph interpretation of those fields.
+
+The bridge ranks complete chain ordinals lexicographically and rejects ties,
+missing positions, foreign registries, and migrations. It projects the controller
+anchors from the signed #1216 fixtures: both proof formats, six delivery orders,
+and three operations give 36 cases, each checking cold and all eligible warm
+starts. Generated examples invoke the general scan theorems. CI checks the
+projection, regeneration, Lean build, axiom allowlist, and existing cross-port
+signed regressions.
+
+This theorem covers positions under fixed authorization, not full event payloads
+or general chain replay. The bridge assumes the controller anchors are authorized
+once their signed predecessor path is settled; both runtimes check that fact in
+the shared regression tests, but Lean does not verify the signatures or the
+TypeScript/Rust importers. The invalid asset anchor is deliberately outside this
+projection: proving changing controller cutoffs requires the asset model.
+Next, compose position selection with chain successor/path selection and then
+registry migrations, before extending to dynamic asset authorization, metadata,
+and retention/GC.
+
+To check this increment from the repository root:
+
+```sh
+node --test proofs/agent-convergence/generate-chain-anchor-fixtures.test.mjs
+node proofs/agent-convergence/generate-chain-anchor-fixtures.mjs --check
+cd proofs/agent-convergence
+lake build
+```

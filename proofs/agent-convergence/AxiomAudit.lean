@@ -2,6 +2,7 @@ import SerializedReplay
 import AgentAuthorization
 import DocumentAuthorization
 import AgentComponents
+import ChainAnchors
 import Lean.Util.CollectAxioms
 import Lean.Elab.Command
 
@@ -10,7 +11,9 @@ set_option warningAsError true
 open Lean Elab Command in
 run_cmd do
   let allowed := #[``propext, ``Quot.sound]
-  for theoremName in #[``Archon.convergence, ``Archon.complete_unique,
+  for theoremName in #[``Archon.anchor_scan_min, ``Archon.anchor_scan_from_retained,
+      ``Archon.anchor_scan_cold, ``Archon.anchors_same_evidence, ``Archon.anchor_scan_idempotent,
+      ``Archon.convergence, ``Archon.complete_unique,
       ``Archon.history_delivery_permutation, ``Archon.history_duplicate_delivery,
       ``Archon.terminal_histories_agree, ``Archon.import_eq_insert,
       ``Archon.rounds_eq_suffix, ``Archon.operational_replay_converges,

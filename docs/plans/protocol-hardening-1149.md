@@ -283,3 +283,17 @@ asset anchor. Existing candidate replay supplies dependent invalidation/repair.
 This is a demonstrated runtime correction, not a completed chain convergence
 proof. #1215 remains open for further chain/migration analysis and formalization;
 asset and metadata proof obligations also remain open.
+
+
+### Conditional anchor-selection proof — #1215
+
+After #1217 repaired the signed counterexample, `ChainAnchors.lean` proves the
+next isolated obligation: fixed authorization on a settled operation path gives
+order- and multiplicity-independent earliest-valid-anchor selection, including
+cold scans, different valid warm starts, and repeated scans. The shared fixture
+bridge instantiates the theorems for 36 controller-operation/delivery-order cases.
+
+This does not close #1215. Remaining work is to compose anchor selection with
+chain successor/path selection and migrations, then dynamic controller/asset
+authorization, metadata, and retention. Ordinal ties, absent positions, full
+payload equality, and executable refinement are outside this increment.
