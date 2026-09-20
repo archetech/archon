@@ -2,7 +2,7 @@ import { isDeepStrictEqual } from 'node:util';
 
 // Structural bridge only: signature validity is independently computed from
 // signed bytes, and checked by the ordinary runtime import suites.
-export function documentGraph(vector, components = false, registry = 'hyperswarm') {
+export function documentGraph(vector, components = false, registry = 'hyperswarm', migrations = false) {
     const { operations, ids, keys, did, signatureValid } = vector;
     const creates = operations.flatMap((op, i) => op.type === 'create' ? [i] : []);
     if (creates.length !== 1) throw new Error('Expected exactly one create');
@@ -38,7 +38,10 @@ export function documentGraph(vector, components = false, registry = 'hyperswarm
             || Object.keys(op.doc).some(k => !['didDocument', 'didDocumentData', 'didDocumentRegistration'].includes(k))
             || (!components && Object.keys(op.doc).length !== 1)) throw new Error('Expected data-only update or document replacement');
         if (Object.hasOwn(op.doc, 'didDocumentRegistration')
-            && (!components || !isDeepStrictEqual(op.doc.didDocumentRegistration, create.registration))) throw new Error('Registry changes are outside component model');
+            && (!components || !(migrations
+                ? isDeepStrictEqual(op.doc.didDocumentRegistration, { version: 1, type: 'agent', registry: op.doc.didDocumentRegistration?.registry })
+                    && typeof op.doc.didDocumentRegistration.registry === 'string'
+                : isDeepStrictEqual(op.doc.didDocumentRegistration, create.registration)))) throw new Error('Registry changes are outside component model');
         if (!Object.hasOwn(op.doc, 'didDocument')) return [];
         const doc = op.doc.didDocument;
         if (!doc || doc.id !== did || !Array.isArray(doc.verificationMethod)

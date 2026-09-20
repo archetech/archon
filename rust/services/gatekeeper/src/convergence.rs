@@ -1273,3 +1273,137 @@ async fn convergence_chain_ordinals_required() {
         assert!(events[0].registration.is_none());
     }
 }
+
+#[tokio::test]
+async fn convergence_integrated_agents() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/integrated-agent-vectors.json"
+    ))
+    .unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let did = vector["did"].as_str().unwrap();
+        for scenario in vector["scenarios"].as_array().unwrap() {
+            for order in scenario["orders"].as_array().unwrap() {
+                let (mut state, _directory) = crate::tests::make_state(JsonDb {
+                    backend: DbBackend::Memory,
+                    data: JsonDbFile::default(),
+                    redis_connection: None,
+                });
+                for entry in vector["blocks"].as_array().unwrap() {
+                    state
+                        .store
+                        .lock()
+                        .await
+                        .add_block(entry["registry"].as_str().unwrap(), entry["block"].clone())
+                        .unwrap();
+                }
+                for token in order.as_array().unwrap() {
+                    crate::import_batch_impl(
+                        &state,
+                        &[vector["events"][token.as_u64().unwrap() as usize].clone()],
+                    )
+                    .await;
+                    crate::process_events_impl(&state).await;
+                }
+                let mut restart_directory = None;
+                for phase in 0..3 {
+                    if phase == 1 {
+                        let events: Vec<_> = order
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .rev()
+                            .map(|token| vector["events"][token.as_u64().unwrap() as usize].clone())
+                            .collect();
+                        crate::import_batch_impl(&state, &events).await;
+                        crate::process_events_impl(&state).await;
+                    }
+                    if phase == 2 {
+                        let data = serde_json::from_value(
+                            serde_json::to_value(&state.store.lock().await.data).unwrap(),
+                        )
+                        .unwrap();
+                        let (restarted, directory) = crate::tests::make_state(JsonDb {
+                            backend: DbBackend::Memory,
+                            data,
+                            redis_connection: None,
+                        });
+                        state = restarted;
+                        restart_directory = Some(directory);
+                    }
+                    crate::history::ensure_history_ready(&state).await.unwrap();
+                    let resolved = crate::resolve_local_doc_async(
+                        &state,
+                        did,
+                        ResolveOptions {
+                            verify: true,
+                            ..Default::default()
+                        },
+                    )
+                    .await
+                    .unwrap();
+                    let expected: Vec<_> = scenario["expected"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|index| vector["ids"][index.as_u64().unwrap() as usize].clone())
+                        .collect();
+                    assert_eq!(
+                        json!(state
+                            .store
+                            .lock()
+                            .await
+                            .get_events(did)
+                            .iter()
+                            .map(|e| &e.opid)
+                            .collect::<Vec<_>>()),
+                        json!(expected),
+                        "{}, {order}, phase {phase}",
+                        scenario["name"]
+                    );
+                    let history = state.store.lock().await.get_events(did);
+                    let mut expected_registry = history[0].operation["registration"]["registry"]
+                        .as_str()
+                        .unwrap()
+                        .to_owned();
+                    let mut receipt_view = Vec::new();
+                    for (index, event) in history.iter().enumerate() {
+                        let matching = event.registry == expected_registry;
+                        if index > 0 && !matching {
+                            break;
+                        }
+                        let cutoff = if !matching {
+                            json!({"kind": "unconfirmed"})
+                        } else if crate::is_unanchored_registry(&event.registry) {
+                            json!({"kind": "unanchored", "registry": event.registry,
+                                "time": chrono::DateTime::parse_from_rfc3339(&event.time).unwrap().timestamp_millis()})
+                        } else {
+                            json!({"kind": "chain", "registry": event.registry, "ordinal": event.ordinal,
+                                "time": chrono::DateTime::parse_from_rfc3339(&event.time).unwrap().timestamp_millis(),
+                                "registration": event.registration.is_some()})
+                        };
+                        receipt_view.push(json!({"operation": event.opid, "matching": matching, "cutoff": cutoff}));
+                        if let Some(registry) =
+                            event.operation["doc"]["didDocumentRegistration"]["registry"].as_str()
+                        {
+                            expected_registry = registry.to_owned();
+                        }
+                    }
+                    assert_eq!(json!(receipt_view), scenario["receiptView"]);
+                    assert_eq!(
+                        json!({"didDocument": resolved["didDocument"], "didDocumentData": resolved["didDocumentData"],
+                        "didDocumentRegistration": resolved["didDocumentRegistration"]}),
+                        scenario["components"]
+                    );
+                    assert_eq!(
+                        resolved["didDocumentMetadata"]["deactivated"]
+                            .as_bool()
+                            .unwrap_or(false),
+                        scenario["deactivated"].as_bool().unwrap()
+                    );
+                }
+                drop(restart_directory);
+            }
+        }
+    }
+}

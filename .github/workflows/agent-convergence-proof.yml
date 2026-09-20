@@ -17,6 +17,7 @@ on:
       - 'tests/gatekeeper/controller-view.test.ts'
       - 'tests/gatekeeper/chain-ordinals.test.ts'
       - 'tests/gatekeeper/interleaved-replay.test.ts'
+      - 'tests/gatekeeper/integrated-agent.test.ts'
       - 'rust/services/gatekeeper/**'
       - 'package.json'
       - 'package-lock.json'
@@ -38,6 +39,7 @@ on:
       - 'tests/gatekeeper/controller-view.test.ts'
       - 'tests/gatekeeper/chain-ordinals.test.ts'
       - 'tests/gatekeeper/interleaved-replay.test.ts'
+      - 'tests/gatekeeper/integrated-agent.test.ts'
       - 'rust/services/gatekeeper/**'
       - 'package.json'
       - 'package-lock.json'
@@ -83,10 +85,11 @@ jobs:
           node tests/convergence/generate-migration-vectors.mjs
           node tests/convergence/generate-tied-anchor-vectors.mjs
           node tests/convergence/generate-controller-view-vectors.mjs
-          git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json tests/convergence/document-vectors.json tests/convergence/component-vectors.json tests/convergence/chain-anchor-vectors.json tests/convergence/chain-successor-vectors.json tests/convergence/chain-document-vectors.json tests/convergence/migration-vectors.json tests/convergence/tied-anchor-vectors.json tests/convergence/controller-view-vectors.json
+          node tests/convergence/generate-integrated-agent-vectors.mjs
+          git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json tests/convergence/document-vectors.json tests/convergence/component-vectors.json tests/convergence/chain-anchor-vectors.json tests/convergence/chain-successor-vectors.json tests/convergence/chain-document-vectors.json tests/convergence/migration-vectors.json tests/convergence/tied-anchor-vectors.json tests/convergence/controller-view-vectors.json tests/convergence/integrated-agent-vectors.json
       - name: Check shared fixture bridge
         run: |
-          node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs proofs/agent-convergence/generate-document-fixtures.test.mjs proofs/agent-convergence/generate-component-fixtures.test.mjs proofs/agent-convergence/generate-chain-anchor-fixtures.test.mjs proofs/agent-convergence/generate-chain-successor-fixtures.test.mjs proofs/agent-convergence/generate-interleaved-fixtures.test.mjs proofs/agent-convergence/generate-priority-fixtures.test.mjs proofs/agent-convergence/generate-interleaved-document-fixtures.test.mjs proofs/agent-convergence/generate-chain-document-fixtures.test.mjs proofs/agent-convergence/generate-registry-fixtures.test.mjs proofs/agent-convergence/generate-registry-interleaved-fixtures.test.mjs tests/convergence/migration-model.test.mjs
+          node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs proofs/agent-convergence/generate-document-fixtures.test.mjs proofs/agent-convergence/generate-component-fixtures.test.mjs proofs/agent-convergence/generate-chain-anchor-fixtures.test.mjs proofs/agent-convergence/generate-chain-successor-fixtures.test.mjs proofs/agent-convergence/generate-interleaved-fixtures.test.mjs proofs/agent-convergence/generate-priority-fixtures.test.mjs proofs/agent-convergence/generate-interleaved-document-fixtures.test.mjs proofs/agent-convergence/generate-chain-document-fixtures.test.mjs proofs/agent-convergence/generate-registry-fixtures.test.mjs proofs/agent-convergence/generate-registry-interleaved-fixtures.test.mjs tests/convergence/migration-model.test.mjs proofs/agent-convergence/generate-integrated-agent-fixtures.test.mjs
           node proofs/agent-convergence/generate-fixtures.mjs --check
           node proofs/agent-convergence/generate-record-fixtures.mjs --check
           node proofs/agent-convergence/generate-agent-fixtures.mjs --check
@@ -100,12 +103,13 @@ jobs:
           node proofs/agent-convergence/generate-chain-document-fixtures.mjs --check
           node proofs/agent-convergence/generate-registry-fixtures.mjs --check
           node proofs/agent-convergence/generate-registry-interleaved-fixtures.mjs --check
+          node proofs/agent-convergence/generate-integrated-agent-fixtures.mjs --check
       - name: Check TypeScript replay pass bridge
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/convergence.test.ts --runInBand --coverage=false -t 'Lean-checked'
       - name: Check signed agent authorization
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/agent-convergence.test.ts --runInBand --coverage=false
       - name: Check repeated chain anchors
-        run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/chain-convergence.test.ts tests/gatekeeper/chain-successors.test.ts tests/gatekeeper/controller-view.test.ts tests/gatekeeper/chain-ordinals.test.ts tests/gatekeeper/interleaved-replay.test.ts --runInBand --coverage=false
+        run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/chain-convergence.test.ts tests/gatekeeper/chain-successors.test.ts tests/gatekeeper/controller-view.test.ts tests/gatekeeper/chain-ordinals.test.ts tests/gatekeeper/interleaved-replay.test.ts tests/gatekeeper/integrated-agent.test.ts --runInBand --coverage=false
       - name: Check proofs and concrete histories
         working-directory: proofs/agent-convergence
         run: lake build

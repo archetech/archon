@@ -2,6 +2,13 @@
 
 The authoritative remaining roadmap is the [protocol convergence completion contract](../../docs/plans/protocol-convergence-completion.md): three fixed deliverables with ten acceptance criteria. The sections below record completed increments and their individual limits; their historical “next” lists do not add prerequisites to that contract.
 
+The integrated full-record extension is documented in
+[the A2–A4 audit](../../docs/plans/agent-convergence-full-records.md).
+`Archon.integrated_agent_convergence` combines A1's derived authorization with
+cold full-record stopping, complete component state, and the confirmed receipt
+view. A2–A4 are covered by this model and its signed cross-port bridge. B1–B3
+(asset/controller selection) and C1–C3 (protocol composition) remain open.
+
 This Lean project proves a bounded specification and an operational replay
 model of Archon's canonical-CID successor rule. It changes no runtime code. It uses Lean's standard library only;
 there is no Mathlib dependency.

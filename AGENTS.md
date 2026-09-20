@@ -228,3 +228,6 @@ These rules apply to coding agents working in this repository.
 - Enumerate CID batch entries before filtering malformed references; both the appended ordinal and registration.opidx must retain the original list index. Validate ordinal prefixes before appending that index.
 
 - Inspect completion and exit status of asynchronous lint/typecheck/test runs before committing. Reading a log tail and committing in the same shell command can commit a failed check; keep verification results and git mutations sequential.
+- For integrated convergence proofs, derive the metadata-only phase from complete ranked selection and check the stop predicate on full records. Arbitrary-payload stopping does not prove payload irrelevance to controller authorization; keep that receipt-view obligation explicit.
+
+- Bind convergence receipt views to producer-normalized operation clocks and authoritative chain facts, and check the actual selected header fields in both runtime ports. Use a finite reflected check for large signed-fixture source permutations rather than expanding disjunctions with simplification.

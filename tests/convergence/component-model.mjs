@@ -1,7 +1,8 @@
 import { documentGraph, documentStates } from './document-model.mjs';
 
-export function componentGraph(vector) {
-    const graph = documentGraph(vector, true);
+export function componentGraph(vector, migrations = false) {
+    const registry = migrations ? vector.operations.find(op => op.type === 'create').registration.registry : 'hyperswarm';
+    const graph = documentGraph(vector, true, registry, migrations);
     const root = graph.ranks.indexOf(graph.root);
     const create = vector.operations[root];
     const genesisDocument = { '@context': ['https://www.w3.org/ns/did/v1'], id: vector.did,

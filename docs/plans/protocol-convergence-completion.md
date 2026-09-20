@@ -70,7 +70,7 @@ validation, rather than assuming it silently. Unpositioned local/Hyperswarm/pin
 hints and tied chain positions remain in scope. See the
 [producer and production audit](agent-convergence-domain.md#required-chain-ordinals-supersedes-the-1235-proposal).
 This supersedes the proposed missing-position fallback in #1235, including the
-receipt-time fallback for repeated unpositioned copies. A2–A4 remain open.
+receipt-time fallback for repeated unpositioned copies. A2–A4 are discharged by the integrated agent result described below.
 
 ## Evidence audit
 
@@ -101,17 +101,17 @@ roadmap stages.
   authorization, complete component updates, registry ancestry, and per-anchor
   eligibility. Shared tables have proved identity/projection contracts; accepted
   operation sets and final authorizing documents are not assumed equal.
-- [ ] **A2 — Complete transition domain:** cover create/update/delete, key changes,
+- [x] **A2 — Complete transition domain:** cover create/update/delete, key changes,
   competing branches, provisional and anchored evidence, return/unanchored
   migrations, missing predecessors, repeated receipts, and late genesis together.
   Resolve tied/missing ordinal and receipt-time cases against actual protocol
   admissibility rather than inheriting exclusions from the current fixtures.
-- [ ] **A3 — Agent result and termination:** prove unique agent histories, complete
+- [x] **A3 — Agent result and termination:** prove unique agent histories, complete
   resolved component/deactivation state, and the authorization-relevant view.
   Prove modeled reconciliation reaches that result and really stops, including
   any selected-record changes its stop predicate observes. Establish which
   first-observation fields may vary without affecting this result.
-- [ ] **A4 — Agent bridge:** shared signed cases exercise the integrated theorem's
+- [x] **A4 — Agent bridge:** shared signed cases exercise the integrated theorem's
   contracts and both ports for combined key/registry changes, deletion, forks,
   earlier anchors, provisional duplicates, and cold/late-genesis reconstruction.
   General statements remain Lean proofs; these tests validate the translation.
@@ -125,12 +125,21 @@ interleaved/compiled ordering, and complete component execution. Methods decode
 from the same full-document values returned by the component model. No equal
 accepted-operation set or final authorizing document is assumed.
 
-The normalized event list includes eligible anchor ranks and a provisional CID
-representative for each retained operation. The latter cannot defeat an eligible
-anchor. It represents ordering, not complete receipt identity. The source-to-rank
-and receipt-metadata bridge, the complete protocol-domain audit, and the semantic
-result/stopping theorem remain A2–A4. The abstract examples are not signed runtime
-fixtures. A2–A4 remain open.
+A2–A4 are **complete at the protocol-model and signed-bridge boundary**:
+`Archon.integrated_agent_convergence` in `IntegratedAgentConvergence.lean` derives
+same source rank/matching evidence, actual cold full-record stopping, and equality
+of operation history, complete component state, and confirmed receipt view.
+`integrated_agent_execution` gives successful component execution with an available
+genesis. `RegistryCidRanks` covers ordinal/CID order including tied positions;
+#1236 and its producer/import/replay audit exclude missing chain positions.
+
+The [integrated audit](agent-convergence-full-records.md) records the source-table
+contracts, receipt-field interpretation, theorem dependencies, and signed bridge.
+Twenty-eight signed scenarios exercise both proof formats, migrations, deletion,
+forks, repeated/earlier/tied anchors, missing predecessors, unconfirmed suffixes,
+and cold/late-genesis replay in both ports. Lean checks source normalization and
+independently evaluates the expected components and authorization views. General
+runtime refinement remains outside this contract. B and C remain open.
 
 ### B. Asset/controller convergence
 
