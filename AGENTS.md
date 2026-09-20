@@ -226,3 +226,5 @@ These rules apply to coding agents working in this repository.
 - Keep registry classification explicit: unanchored registries are local, Hyperswarm, and pin; locally stamped receipts are only local/Hyperswarm. Pin relay trust and candidate deduplication use the latter distinction, not the absence of a blockchain.
 
 - Enumerate CID batch entries before filtering malformed references; both the appended ordinal and registration.opidx must retain the original list index. Validate ordinal prefixes before appending that index.
+
+- Inspect completion and exit status of asynchronous lint/typecheck/test runs before committing. Reading a log tail and committing in the same shell command can commit a failed check; keep verification results and git mutations sequential.
