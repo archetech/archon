@@ -231,3 +231,19 @@ verification, finite acyclic predecessor graphs, and agreement on the operation
 snapshot remain explicit premises. General agent documents/multiple methods,
 concrete codec/executable refinement, chain priority, assets, and retention
 remain follow-ups. See the [authorization proof scope](../../proofs/agent-convergence/README.md#predecessor-key-authorization--1209).
+
+## Multiple verification methods — #1211
+
+The authorization model now selects the method named by the proof from the
+predecessor's ordered method list, with separate method and public-key identities.
+Lean transfers canonical replay, full-record stability, and final method-list /
+deletion agreement to this model. 612 additional signed traces per runtime cover
+second-key signing, removal, same-name replacement, competing documents, and
+invalid/missing methods, including repeats and restart. Version-1 relationship
+membership is not enforced, matching both implementations; #1156 stays paused.
+
+The bridge derives document actions/genesis from operation records and checks
+reordering and unsupported inputs. All proof/cryptographic/normalization and
+retention assumptions stay explicit. Remaining document components, combined
+updates, chain priority, assets, retention, and executable refinement are open.
+No runtime changes. See [scope and theorem](../../proofs/agent-convergence/README.md#multiple-verification-methods--1211).

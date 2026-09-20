@@ -4,9 +4,9 @@ import DbMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import MemoryClient from '@didcid/ipfs/memory';
 import type { Operation, GatekeeperEvent } from '@didcid/gatekeeper/types';
 
-type Vector = { legacy: boolean; did: string; operations: Operation[]; ids: string[]; keys: unknown[];
+type Vector = { legacy: boolean; did: string; operations: Operation[]; ids: string[]; keys: unknown[]; methodDocuments?: unknown[][];
     scenarios: { name: string; orders: number[][]; expected: number[]; finalState: number | 'deleted' }[] };
-const vectors: Vector[] = JSON.parse(readFileSync('tests/convergence/agent-vectors.json', 'utf8'));
+const vectors: Vector[] = ['agent-vectors', 'document-vectors'].flatMap(name => JSON.parse(readFileSync(`tests/convergence/${name}.json`, 'utf8')));
 for (const vector of vectors) {
     it.each(vector.scenarios)(`agent authorization converges (legacy=${vector.legacy}): $name`, async scenario => {
         for (const order of scenario.orders) {
@@ -32,6 +32,7 @@ for (const vector of vectors) {
                 expect({ order, phase, path }).toEqual({ order, phase, path: scenario.expected });
                 expect(doc.didDocumentMetadata?.versionId).toBe(vector.ids[scenario.expected.at(-1)!]);
                 if (scenario.finalState === 'deleted') expect(doc.didDocumentMetadata?.deactivated).toBe(true);
+                else if (vector.methodDocuments) expect(doc.didDocument?.verificationMethod).toEqual(vector.methodDocuments[scenario.finalState]);
                 else expect(doc.didDocument?.verificationMethod?.[0].publicKeyJwk).toEqual(vector.keys[scenario.finalState]);
             }
         }

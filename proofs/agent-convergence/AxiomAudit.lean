@@ -1,5 +1,6 @@
 import SerializedReplay
 import AgentAuthorization
+import DocumentAuthorization
 import Lean.Util.CollectAxioms
 import Lean.Elab.Command
 
@@ -22,6 +23,9 @@ run_cmd do
       ``Archon.encode_reflects_of_roundtrip, ``Archon.encoded_stop_eq,
       ``Archon.encoded_stop_eq_on_orbit,
       ``Archon.full_cold_loop_converges, ``Archon.serialized_cold_converges,
+      ``Archon.named_method_verifies, ``Archon.missing_method_rejected,
+      ``Archon.document_replacement_uses_predecessor, ``Archon.document_authorization_matches,
+      ``Archon.document_replay_converges, ``Archon.document_same_evidence,
       ``Archon.agent_authorization_matches, ``Archon.agent_deleted_terminal,
       ``Archon.agent_rotation_uses_previous_key, ``Archon.rotating_agent_converges,
       ``Archon.rotating_agent_same_evidence, ``Archon.history_wire_roundtrip, ``Archon.serialized_array_converges] do

@@ -450,10 +450,18 @@ async fn convergence_runtime_passes_match_lean_and_serialized_stopping() {
 
 #[tokio::test]
 async fn convergence_agent_rotation_and_deletion() {
-    let vectors: Value = serde_json::from_str(include_str!(
+    let mut vectors: Value = serde_json::from_str(include_str!(
         "../../../../tests/convergence/agent-vectors.json"
     ))
     .unwrap();
+    let documents: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/document-vectors.json"
+    ))
+    .unwrap();
+    vectors
+        .as_array_mut()
+        .unwrap()
+        .extend(documents.as_array().unwrap().iter().cloned());
     for vector in vectors.as_array().unwrap() {
         let did = vector["did"].as_str().unwrap();
         for scenario in vector["scenarios"].as_array().unwrap() {
@@ -530,6 +538,11 @@ async fn convergence_agent_rotation_and_deletion() {
                     );
                     if scenario["finalState"] == "deleted" {
                         assert_eq!(doc["didDocumentMetadata"]["deactivated"], true);
+                    } else if let Some(documents) = vector.get("methodDocuments") {
+                        assert_eq!(
+                            doc["didDocument"]["verificationMethod"],
+                            documents[scenario["finalState"].as_u64().unwrap() as usize]
+                        );
                     } else {
                         assert_eq!(
                             doc["didDocument"]["verificationMethod"][0]["publicKeyJwk"],
