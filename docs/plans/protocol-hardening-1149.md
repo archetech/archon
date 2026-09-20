@@ -362,3 +362,20 @@ these same graphs. No runtime changes are needed.
 Next connect full document/key authorization to this model. Registry migrations,
 dynamic controller/asset authorization, metadata/codecs, retention, and universal
 executable correspondence remain open; #1215 is still the tracking issue.
+
+### Document-authorized interleaved replay — #1215
+
+#1222 merged the interleaved/settled-priority connection. The next increment derives
+interleaved event authorization from signed predecessor documents, rather than an
+opaque fixed predicate. Lean proves decreasing levels, decoded path validity,
+successful execution with successive documents, and equal method/deletion results
+for equal retained event sets. Genesis is already admitted; event registry and
+position eligibility remain fixed inputs, and cryptographic verification is an
+oracle. This is self-controlled agent authorization, not dynamic asset authority.
+
+The two existing signed document graphs instantiate the proof over 612 delivery
+orders, with current TypeScript/Rust public-import, repeat, and restart coverage.
+Combined repeated-chain-anchor/key-rotation transition fixtures and connection of
+this derived predicate to the settled-priority projection are the next step.
+Migrations, assets, full components/metadata/codecs, retention, and universal
+executable correspondence remain open under #1215.
