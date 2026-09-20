@@ -222,3 +222,5 @@ These rules apply to coding agents working in this repository.
 - Agent convergence must cover the authorization-relevant receipt view, not only operation IDs/documents. Controller anchoring eligibility follows the confirmed prefix and per-version expected registry; an unconfirmed wrong-registry suffix must not switch proof-time versus chain-position authorization.
 
 - Convergence audits must trace authoritative receipt producers and trust-boundary normalization before expanding protocol selection rules. Chain receipts require nonempty ordinals; missing-position examples admitted only by permissive imports do not establish a bundled-mediator or production occurrence. Preserve ordinal-free local/Hyperswarm/pin hints.
+
+- Keep registry classification explicit: unanchored registries are local, Hyperswarm, and pin; locally stamped receipts are only local/Hyperswarm. Pin relay trust and candidate deduplication use the latter distinction, not the absence of a blockchain.

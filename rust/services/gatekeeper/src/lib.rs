@@ -16,7 +16,7 @@ mod store;
 pub use app::run;
 
 pub(crate) use api::is_valid_registry;
-pub(crate) use authorization::{authorize_operation, is_unanchored_registry};
+pub(crate) use authorization::{authorize_operation, is_locally_stamped_registry, is_unanchored_registry};
 pub(crate) use app::AppState;
 pub(crate) use config::Config;
 pub(crate) use events::{

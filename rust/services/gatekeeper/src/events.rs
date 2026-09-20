@@ -8,7 +8,7 @@ use tracing::{info, warn};
 use crate::store::compare_ordinals;
 use crate::{
     authorize_operation, ensure_event_opid, event_record_to_value, expected_registry_for_index,
-    generate_did_from_operation, generate_json_cid, infer_event_did, is_unanchored_registry,
+    generate_did_from_operation, generate_json_cid, infer_event_did, is_locally_stamped_registry, is_unanchored_registry,
     resolve_local_doc_async, update_search_doc, value_to_event_record,
     verify_event_shape, AppState, EventRecord, GatekeeperDb, ResolveOptions,
 };
@@ -28,7 +28,7 @@ pub(crate) fn relay_hints(batch: &[Value]) -> Vec<Value> {
             };
             let registry = object.get("registry").and_then(Value::as_str);
             match registry {
-                Some(registry) if !is_unanchored_registry(registry) => {
+                Some(registry) if !is_locally_stamped_registry(registry) => {
                     let mut hint = object.clone();
                     hint.remove("registration");
                     hint.insert("registry".to_string(), Value::String("hyperswarm".to_string()));
@@ -597,8 +597,7 @@ pub(crate) fn normalize_event_time(event: &mut EventRecord) {
 }
 
 pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) -> ImportStatus {
-    if event.registry != PIN_QUEUE
-        && !is_unanchored_registry(&event.registry)
+    if !is_unanchored_registry(&event.registry)
         && !event.ordinal.as_ref().is_some_and(|items| !items.is_empty()
             && items.iter().all(|number| *number <= crate::proofs::MAX_ORDINAL_COMPONENT))
     {
@@ -662,8 +661,7 @@ pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) 
 }
 
 pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> ImportStatus {
-    if event.registry != PIN_QUEUE
-        && !is_unanchored_registry(&event.registry)
+    if !is_unanchored_registry(&event.registry)
         && !event.ordinal.as_ref().is_some_and(|items| !items.is_empty()
             && items.iter().all(|number| *number <= crate::proofs::MAX_ORDINAL_COMPONENT))
     {
@@ -718,8 +716,7 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
         if let Some(index) = current_events.iter().position(|item| item.opid.as_deref() == Some(&opid)) {
             let expected_registry = expected_registry_for_index(&current_events, index);
             let earlier_anchor = expected_registry.as_deref().is_some_and(|registry| {
-                registry != PIN_QUEUE
-                    && !is_unanchored_registry(registry)
+                !is_unanchored_registry(registry)
                     && registry == event.registry.as_str()
             }) && compare_ordinals(
                 event.ordinal.as_ref(),
@@ -929,7 +926,7 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
         let next_event = &current_events[index + 1];
         let expected_chain = expected_registry
             .as_deref()
-            .filter(|registry| *registry != PIN_QUEUE && !is_unanchored_registry(registry));
+            .filter(|registry| !is_unanchored_registry(registry));
         let incoming_confirmed = expected_chain == Some(event.registry.as_str());
         let current_confirmed = expected_chain == Some(next_event.registry.as_str());
         let ordinal_order = compare_ordinals(event.ordinal.as_ref(), next_event.ordinal.as_ref());

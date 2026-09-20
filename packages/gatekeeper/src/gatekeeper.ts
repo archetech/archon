@@ -135,8 +135,13 @@ function isValidRegistryName(registry: unknown): registry is string {
 // registry is one an outside source might claim confirmation on. Whether a
 // registry actually anchors its events on a chain is not inferred from its
 // name -- `pin` does not -- but read from the events themselves (`isAnchored`).
-function isUnanchoredRegistry(registry: unknown): boolean {
+function isLocallyStampedRegistry(registry: unknown): boolean {
     return registry === 'local' || registry === 'hyperswarm';
+}
+
+// Pin receipts can confirm pin-registry DIDs, but never establish chain order.
+function isUnanchoredRegistry(registry: unknown): boolean {
+    return registry === PIN_QUEUE || isLocallyStampedRegistry(registry);
 }
 
 // Chain positions must compare identically in the JavaScript and Rust ports.
@@ -635,7 +640,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     // Local/hyperswarm histories, unanchored registries, and migrations with
     // no chain event yet retain the historical proof-time fallback.
     private async isAnchored(did: string, registry?: string): Promise<boolean> {
-        if (!registry || registry === PIN_QUEUE || isUnanchoredRegistry(registry)) {
+        if (!registry || isUnanchoredRegistry(registry)) {
             return false;
         }
 
@@ -647,7 +652,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             // the confirmed prefix. Wrong-registry suffix receipts cannot turn
             // an unanchored controller into an anchored one.
             if (index > 0 && event.registry !== expected) break;
-            if (event.registry === expected && event.registry !== PIN_QUEUE && !isUnanchoredRegistry(event.registry)) {
+            if (event.registry === expected && !isUnanchoredRegistry(event.registry)) {
                 if (!event.registration) return false;
                 anchored = true;
             }
@@ -1575,7 +1580,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     private candidateKey(event: GatekeeperEvent): string {
         // A fresh gossip receipt time is not new authorization evidence.
-        if (isUnanchoredRegistry(event.registry)) return JSON.stringify([event.opid, event.registry]);
+        if (isLocallyStampedRegistry(event.registry)) return JSON.stringify([event.opid, event.registry]);
         return JSON.stringify([event.opid, event.registry, event.time, event.ordinal]);
     }
 
@@ -1617,7 +1622,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         const candidates = this.candidateHistory;
         if (incoming.length && incoming.every(event => candidates[did]?.some(known =>
             this.candidateKey(known) === this.candidateKey(event)
-            && (isUnanchoredRegistry(event.registry) || this.cipher.canonicalizeJSON(known) === this.cipher.canonicalizeJSON(event))))) {
+            && (isLocallyStampedRegistry(event.registry) || this.cipher.canonicalizeJSON(known) === this.cipher.canonicalizeJSON(event))))) {
             return { candidates, changed: false };
         }
         const events = [...(candidates[did] ?? []), ...copyJSON(histories?.get(did) ?? await this.db.getEvents(did)), ...incoming];
@@ -1627,7 +1632,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             const key = this.candidateKey(event);
             // Keep the first hint's position. Anchored metadata
             // updates still replace the record at the same chain position.
-            if (!unique.has(key) || !isUnanchoredRegistry(event.registry)) unique.set(key, event);
+            if (!unique.has(key) || !isLocallyStampedRegistry(event.registry)) unique.set(key, event);
         }
         const retained = [...unique.values()];
         const changed = this.cipher.canonicalizeJSON(candidates[did] ?? []) !== this.cipher.canonicalizeJSON(retained);
@@ -1710,8 +1715,8 @@ export default class Gatekeeper implements GatekeeperInterface {
                 // Registry-local order first; do not compare ordinal values
                 // across registries. Stable tie-breaking makes replay independent
                 // of arrival order even when candidates compete for a predecessor.
-                const aHint = isUnanchoredRegistry(a.registry);
-                const bHint = isUnanchoredRegistry(b.registry);
+                const aHint = isLocallyStampedRegistry(a.registry);
+                const bHint = isLocallyStampedRegistry(b.registry);
                 // Preserve the usually predecessor-first traversal of hints.
                 // importEventOnce selects competing siblings by canonical CID,
                 // so traversal order does not decide the unanchored winner.
@@ -1827,7 +1832,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     private async importEventOnce(event: GatekeeperEvent): Promise<ImportStatus> {
         // Startup replay also enters here directly from retained candidates.
-        if (event.registry !== PIN_QUEUE && !isUnanchoredRegistry(event.registry)
+        if (!isUnanchoredRegistry(event.registry)
             && !isValidChainOrdinal(event.ordinal)) {
             return ImportStatus.REJECTED;
         }
@@ -1880,7 +1885,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     const index = currentEvents.indexOf(opMatch);
                     const expectedRegistry = expectedRegistryForIndex(currentEvents, index);
 
-                    const earlierAnchor = expectedRegistry && expectedRegistry !== PIN_QUEUE && !isUnanchoredRegistry(expectedRegistry)
+                    const earlierAnchor = expectedRegistry && !isUnanchoredRegistry(expectedRegistry)
                         && event.registry === expectedRegistry && event.ordinal && opMatch.ordinal
                         && compareOrdinals(event.ordinal, opMatch.ordinal) < 0;
                     if (expectedRegistry && opMatch.registry === expectedRegistry && !earlierAnchor) {
@@ -1946,7 +1951,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     const expectedRegistry = expectedRegistryForIndex(currentEvents, index + 1);
 
                     const nextEvent = currentEvents[index + 1];
-                    const expectedChain = expectedRegistry && expectedRegistry !== PIN_QUEUE && !isUnanchoredRegistry(expectedRegistry);
+                    const expectedChain = expectedRegistry && !isUnanchoredRegistry(expectedRegistry);
                     const incomingConfirmed = expectedChain && event.registry === expectedRegistry;
                     const currentConfirmed = expectedChain && nextEvent.registry === expectedRegistry;
                     const ordinalOrder = event.ordinal && nextEvent.ordinal
@@ -2078,7 +2083,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         // Only positioned receipts can claim chain authority. Relayed events
         // have already been converted to unconfirmed Hyperswarm hints.
-        if (event.registry !== PIN_QUEUE && !isUnanchoredRegistry(event.registry)
+        if (!isUnanchoredRegistry(event.registry)
             && !isValidChainOrdinal(event.ordinal)) {
             return false;
         }
@@ -2177,7 +2182,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         const hints = batch.map(event => {
-            if (!event || typeof event !== 'object' || isUnanchoredRegistry(event.registry)) {
+            if (!event || typeof event !== 'object' || isLocallyStampedRegistry(event.registry)) {
                 return event;
             }
 
@@ -2237,7 +2242,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidParameterError('metadata');
         }
 
-        if (metadata.registry !== PIN_QUEUE && !isUnanchoredRegistry(metadata.registry)
+        if (!isUnanchoredRegistry(metadata.registry)
             && !isValidChainOrdinal(metadata.ordinal)) {
             throw new InvalidParameterError('metadata');
         }

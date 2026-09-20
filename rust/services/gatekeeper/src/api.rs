@@ -672,7 +672,7 @@ pub(crate) async fn import_batch_by_cids(
         .and_then(Value::as_array)
         .is_some();
     let chain_position = metadata.get("registry").and_then(Value::as_str).is_some_and(|registry| {
-        registry == "pin" || crate::is_unanchored_registry(registry)
+        crate::is_unanchored_registry(registry)
             || crate::proofs::valid_chain_ordinal(metadata.get("ordinal"))
     });
     if !has_registry || !has_time || !has_ordinal || !chain_position {

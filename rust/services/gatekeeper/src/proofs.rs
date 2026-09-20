@@ -80,8 +80,7 @@ pub(crate) fn verify_event_shape(event: &Value) -> bool {
         return false;
     }
 
-    if registry != "pin"
-        && !crate::is_unanchored_registry(registry)
+    if !crate::is_unanchored_registry(registry)
         && !valid_chain_ordinal(event.get("ordinal"))
     {
         return false;

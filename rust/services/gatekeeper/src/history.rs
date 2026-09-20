@@ -28,7 +28,7 @@ fn normalize_candidate_event(store: &mut JsonDb, event: &mut EventRecord) -> Res
 }
 
 pub(crate) fn candidate_key(event: &EventRecord) -> String {
-    if crate::is_unanchored_registry(&event.registry) {
+    if crate::is_locally_stamped_registry(&event.registry) {
         // A fresh gossip receipt time is not new authorization evidence.
         return json!([event.opid, event.registry]).to_string();
     }
@@ -118,7 +118,7 @@ async fn retain_candidates_with_histories(
         if let Some(index) = positions.get(&key) {
             // Preserve the first local/gossip position.
             // Anchored metadata updates still replace the same chain position.
-            if !crate::is_unanchored_registry(&event.registry) {
+            if !crate::is_locally_stamped_registry(&event.registry) {
                 retained[*index] = event;
             }
         } else {
@@ -366,8 +366,8 @@ async fn rebuild_histories(
         });
         let mut events = candidates.get(target).cloned().unwrap_or_default();
         events.sort_by(|a, b| {
-            let a_hint = crate::is_unanchored_registry(&a.registry);
-            let b_hint = crate::is_unanchored_registry(&b.registry);
+            let a_hint = crate::is_locally_stamped_registry(&a.registry);
+            let b_hint = crate::is_locally_stamped_registry(&b.registry);
             if a_hint && b_hint {
                 // Keep the usual predecessor-first traversal. The shared importer
                 // selects competing unanchored siblings by canonical CID.
