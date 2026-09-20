@@ -7,7 +7,7 @@ import type { GatekeeperEvent, Operation } from '@didcid/gatekeeper/types';
 const vectors = JSON.parse(readFileSync('tests/convergence/tied-anchor-vectors.json', 'utf8')) as {
     legacy: boolean; did: string; operations: Operation[]; ids: string[];
 }[];
-const malformed = [undefined, null, [], 7, '7'];
+const malformed = [undefined, null, [], 7, '7', [null], [null, 1], [-1], [0.5], ['1', 2], [Number.MAX_SAFE_INTEGER + 1]];
 
 it.each(vectors.filter((_, i) => i % 2 === 0))('requires chain positions through import and restart (legacy=$legacy)', async vector => {
     const genesis: GatekeeperEvent = { registry: 'SOL:devnet', time: '2026-09-01T00:00:00Z',
@@ -23,6 +23,12 @@ it.each(vectors.filter((_, i) => i % 2 === 0))('requires chain positions through
         expect(await g.importEvent(invalid)).toBe('rejected');
         expect(await db.getEvents(vector.did)).toEqual([]);
         expect((await db.getCandidates())[vector.did]).toBeUndefined();
+        await db.addOperation(vector.ids[0], vector.operations[0]);
+        await expect(g.importBatchByCids([vector.ids[0]], { ...genesis, ordinal } as never)).rejects.toThrow('metadata');
+        // Malformed typed fields were never supported by Rust storage. The
+        // audited history has none; only representable absent/empty positions
+        // belong in this stored-history repair check.
+        if (ordinal !== undefined && ordinal !== null && (!Array.isArray(ordinal) || ordinal.length > 0)) continue;
         // Simulate an old stored projection and journal: replay must not restore
         // authority to a receipt that the current importer rejects.
         await db.setCandidates(vector.did, [invalid]);
@@ -37,6 +43,12 @@ it.each(vectors.filter((_, i) => i % 2 === 0))('requires chain positions through
         await g.resolveDID(vector.did, { verify: true });
         expect((await db.getEvents(vector.did))[0].ordinal).toEqual(genesis.ordinal);
     }
+    const positionedDb = new DbMemory('large-position');
+    const positioned = new Gatekeeper({ db: positionedDb, ipfs: new MemoryClient() });
+    await positionedDb.addOperation(vector.ids[0], vector.operations[0]);
+    await positioned.importBatchByCids([vector.ids[0]], { ...genesis, ordinal: [2 ** 40, 1.0] });
+    await positioned.processEvents();
+    expect((await positionedDb.getEvents(vector.did))[0].ordinal).toEqual([2 ** 40, 1, 0]);
     for (const registry of ['local', 'hyperswarm', 'pin']) {
         const g = new Gatekeeper({ db: new DbMemory('hints'), ipfs: new MemoryClient() });
         expect(await g.verifyEvent({ ...genesis, registry, ordinal: undefined })).toBe(true);

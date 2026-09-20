@@ -80,7 +80,7 @@ export interface GetDIDOptions {
 export interface GatekeeperEvent {
     registry: string;
     time: string;
-    /** Required and nonempty for chain registries; optional for local, hyperswarm, and pin. */
+    /** Chain registries require nonempty, nonnegative safe integers; optional for local, hyperswarm, and pin. */
     ordinal?: number[];
     operation: Operation;
     did?: string;

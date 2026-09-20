@@ -316,9 +316,13 @@ carries the legacy form — and a node MUST select the payload from the proof's 
 }
 ```
 
-Chain-registry receipts require a nonempty `ordinal` array. Missing, `null`,
-non-array, and empty ordinals are rejected before queueing or candidate storage,
-and cannot regain chain authority through startup replay. This applies to any
+Chain-registry receipts require a nonempty `ordinal` array of nonnegative safe
+integers (0 through 9007199254740991), so both ports compare the same positions.
+Missing, `null`, non-array, empty, and malformed-member ordinals are rejected
+before queueing or candidate storage. CID imports validate the batch position
+before appending the operation index. Previously stored absent/null/empty ordinal
+receipts cannot regain chain authority through startup replay. This does not add
+a compatibility decoder for corrupt stored field types. This applies to any
 registry except `local`, `hyperswarm`, and `pin`, whose ordinals remain optional.
 The signed operation and its CID do not change. Peer/export imports are first
 converted to Hyperswarm hints, so they do not need a chain ordinal and cannot

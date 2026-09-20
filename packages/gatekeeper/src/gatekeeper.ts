@@ -139,6 +139,12 @@ function isUnanchoredRegistry(registry: unknown): boolean {
     return registry === 'local' || registry === 'hyperswarm';
 }
 
+// Chain positions must compare identically in the JavaScript and Rust ports.
+function isValidChainOrdinal(ordinal: unknown): ordinal is number[] {
+    return Array.isArray(ordinal) && ordinal.length > 0
+        && ordinal.every(value => Number.isSafeInteger(value) && value >= 0);
+}
+
 enum ImportStatus {
     ADDED = 'added',
     MERGED = 'merged',
@@ -1822,7 +1828,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     private async importEventOnce(event: GatekeeperEvent): Promise<ImportStatus> {
         // Startup replay also enters here directly from retained candidates.
         if (event.registry !== PIN_QUEUE && !isUnanchoredRegistry(event.registry)
-            && (!Array.isArray(event.ordinal) || event.ordinal.length === 0)) {
+            && !isValidChainOrdinal(event.ordinal)) {
             return ImportStatus.REJECTED;
         }
 
@@ -2073,7 +2079,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         // Only positioned receipts can claim chain authority. Relayed events
         // have already been converted to unconfirmed Hyperswarm hints.
         if (event.registry !== PIN_QUEUE && !isUnanchoredRegistry(event.registry)
-            && (!Array.isArray(event.ordinal) || event.ordinal.length === 0)) {
+            && !isValidChainOrdinal(event.ordinal)) {
             return false;
         }
 
@@ -2228,6 +2234,11 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         if (!metadata || !metadata.registry || !metadata.time || !metadata.ordinal) {
+            throw new InvalidParameterError('metadata');
+        }
+
+        if (metadata.registry !== PIN_QUEUE && !isUnanchoredRegistry(metadata.registry)
+            && !isValidChainOrdinal(metadata.ordinal)) {
             throw new InvalidParameterError('metadata');
         }
 

@@ -46,6 +46,32 @@ pub(crate) fn ensure_event_opid(event: &mut Value) -> Result<String> {
     Ok(opid)
 }
 
+// Chain ordinals share JavaScript's exactly representable integer domain.
+pub(crate) const MAX_ORDINAL_COMPONENT: u64 = 9_007_199_254_740_991;
+
+pub(crate) fn ordinal_component(value: &Value) -> Option<u64> {
+    value.as_u64().or_else(|| {
+        value
+            .as_f64()
+            .filter(|number| {
+                number.is_finite()
+                    && *number >= 0.0
+                    && number.fract() == 0.0
+                    && *number <= MAX_ORDINAL_COMPONENT as f64
+            })
+            .map(|number| number as u64)
+    })
+}
+
+pub(crate) fn valid_chain_ordinal(value: Option<&Value>) -> bool {
+    value.and_then(Value::as_array).is_some_and(|items| {
+        !items.is_empty()
+            && items.iter().all(|item| {
+                ordinal_component(item).is_some_and(|number| number <= MAX_ORDINAL_COMPONENT)
+            })
+    })
+}
+
 pub(crate) fn verify_event_shape(event: &Value) -> bool {
     let Some(registry) = event.get("registry").and_then(Value::as_str) else {
         return false;
@@ -56,10 +82,7 @@ pub(crate) fn verify_event_shape(event: &Value) -> bool {
 
     if registry != "pin"
         && !crate::is_unanchored_registry(registry)
-        && !event
-            .get("ordinal")
-            .and_then(Value::as_array)
-            .is_some_and(|items| !items.is_empty())
+        && !valid_chain_ordinal(event.get("ordinal"))
     {
         return false;
     }

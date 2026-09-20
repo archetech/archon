@@ -69,9 +69,12 @@ or unsafe-integer ordinal components. The scan covered `archon/dids/*` and
 `archon/candidates`, excluding local/Hyperswarm/pin; it is a live local audit, not
 an assertion about every database worldwide.
 
-Both importers now require a nonempty ordinal array for chain registry events,
-including during replay of old candidate journals. Invalid old candidates remain
-retained but cannot enter accepted histories; positioned recovery remains possible.
+Both importers now require a nonempty ordinal array of nonnegative safe integers
+for chain registry events, including before the CID importer appends an operation
+index. Replay excludes absent/null/empty ordinal candidates in existing typed
+journals; these remain retained but cannot enter accepted histories. Positioned
+recovery remains possible. No compatibility decoder is added for malformed stored
+field types that Rust could not previously load; the audit found none.
 This supersedes retaining missing-position chain evidence via CID ranking and
 choosing a time for repeated unpositioned receipts. No receipt-time fallback is
 needed for this excluded input class. The proof domain must derive positioned

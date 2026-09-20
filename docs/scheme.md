@@ -857,8 +857,9 @@ If a user loses a device that contains their wallet, they should be able to inst
 ### Required chain receipt positions
 
 Authoritative chain events must include a nonempty registry-local `ordinal`
-array. Gatekeeper rejects missing, null, non-array, or empty ordinals at import
-and excludes such receipts when rebuilding accepted histories. Local, Hyperswarm,
+array of nonnegative safe integers (at most 9007199254740991). Gatekeeper
+validates this before appending batch operation indices, queues, or candidate
+writes. Missing/null/empty chain positions are also excluded during reconstruction. Local, Hyperswarm,
 and pin events remain eligible without ordinals. Relayed chain envelopes are
 converted to Hyperswarm hints before validation; peers cannot confer chain
 confirmation. This rule constrains receipt envelopes, not signed operation bytes

@@ -671,7 +671,11 @@ pub(crate) async fn import_batch_by_cids(
         .get("ordinal")
         .and_then(Value::as_array)
         .is_some();
-    if !has_registry || !has_time || !has_ordinal {
+    let chain_position = metadata.get("registry").and_then(Value::as_str).is_some_and(|registry| {
+        registry == "pin" || crate::is_unanchored_registry(registry)
+            || crate::proofs::valid_chain_ordinal(metadata.get("ordinal"))
+    });
+    if !has_registry || !has_time || !has_ordinal || !chain_position {
         record_metrics(
             &state,
             "POST",
@@ -715,13 +719,12 @@ pub(crate) async fn import_batch_by_cids(
                 .map(|items| {
                     let mut values = items
                         .iter()
-                        .filter_map(Value::as_u64)
-                        .filter_map(|value| u32::try_from(value).ok())
+                        .filter_map(crate::proofs::ordinal_component)
                         .collect::<Vec<_>>();
-                    values.push(index as u32);
+                    values.push(index as u64);
                     values
                 })
-                .unwrap_or_else(|| vec![index as u32]);
+                .unwrap_or_else(|| vec![index as u64]);
 
             let mut reg = metadata.get("registration").cloned().unwrap_or(Value::Null);
             if let Some(obj) = reg.as_object_mut() {
