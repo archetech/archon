@@ -546,15 +546,55 @@ once their signed predecessor path is settled; both runtimes check that fact in
 the shared regression tests, but Lean does not verify the signatures or the
 TypeScript/Rust importers. The invalid asset anchor is deliberately outside this
 projection: proving changing controller cutoffs requires the asset model.
-Next, compose position selection with chain successor/path selection and then
-registry migrations, before extending to dynamic asset authorization, metadata,
-and retention/GC.
+The successor composition below discharges the next conditional obligation.
+The live interleaving, registry migrations, dynamic asset authorization, metadata,
+and retention/GC still require further proof.
 
 To check this increment from the repository root:
 
 ```sh
 node --test proofs/agent-convergence/generate-chain-anchor-fixtures.test.mjs
 node proofs/agent-convergence/generate-chain-anchor-fixtures.mjs --check
+cd proofs/agent-convergence
+lake build
+```
+
+
+## Chain successor selection after anchor settlement — #1215
+
+`ChainSuccessors.lean` composes the anchor scan with the existing operational
+predecessor replay model. An operation's earliest eligible expected-chain anchor
+sets its priority; operations without one follow in canonical-CID order. The
+compiled graph maps signed predecessor IDs to those priorities. Lean proves
+that encoding preserves operation identity, that expected-chain anchors precede
+provisional candidates, and that equal retained anchor and operation sets give
+equal decoded paths regardless of scan order or duplicates. The existing cold
+importer and stop-on-unchanged loop compute that path under the compiled graph's
+acyclicity and genesis assumptions.
+
+The explicit boundary is anchor settlement with fixed authorization and registry
+eligibility. The runtime interleaves anchor selection and branch replay; this
+increment does not prove that interleaving reaches the compiled state. It also
+does not yet connect chain priorities to the complete-document authorization
+model. Migrations, changing controller/asset authorization, full event metadata,
+ordinal ties/missing positions, and retention remain open.
+
+Shared signed fixtures exercise both proof formats and six delivery orders in
+three cases: provisional CID preference, anchored ordinal preference overriding
+CID preference, and an earlier repeated anchor changing the winning branch.
+Competing branches have descendants to exercise suffix replacement. Both
+runtimes check all 36 traces through ordinary imports, repeated imports, and
+restart, including verified final data and retained candidate counts.
+
+The bridge derives genesis and predecessor edges by canonical ID, checks the
+same-key data-update domain, ranks complete ordinals, and instantiates the general
+convergence theorem in 36 generated cases. Paired operation-table and event-table
+reorderings preserve its full output. Signature verification and general runtime
+refinement remain separate from this Lean model.
+
+```sh
+node --test proofs/agent-convergence/generate-chain-successor-fixtures.test.mjs
+node proofs/agent-convergence/generate-chain-successor-fixtures.mjs --check
 cd proofs/agent-convergence
 lake build
 ```

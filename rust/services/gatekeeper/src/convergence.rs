@@ -671,3 +671,97 @@ async fn convergence_earliest_valid_chain_anchors() {
         }
     }
 }
+#[tokio::test]
+async fn convergence_chain_successor_priority() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/chain-successor-vectors.json"
+    ))
+    .unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let did = vector["did"].as_str().unwrap();
+        for order in vector["orders"].as_array().unwrap() {
+            let (mut state, _directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            state
+                .store
+                .lock()
+                .await
+                .add_block("BTC:signet", vector["block"].clone())
+                .unwrap();
+            for token in order.as_array().unwrap() {
+                crate::import_batch_impl(
+                    &state,
+                    &[vector["events"][token.as_u64().unwrap() as usize].clone()],
+                )
+                .await;
+                crate::process_events_impl(&state).await;
+            }
+            let mut restart_directory = None;
+            for phase in 0..3 {
+                if phase == 1 {
+                    let events: Vec<_> = vector["events"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .rev()
+                        .cloned()
+                        .collect();
+                    crate::import_batch_impl(&state, &events).await;
+                    crate::process_events_impl(&state).await;
+                }
+                if phase == 2 {
+                    let data = serde_json::from_value(
+                        serde_json::to_value(&state.store.lock().await.data).unwrap(),
+                    )
+                    .unwrap();
+                    let (restarted, directory) = crate::tests::make_state(JsonDb {
+                        backend: DbBackend::Memory,
+                        data,
+                        redis_connection: None,
+                    });
+                    state = restarted;
+                    restart_directory = Some(directory);
+                }
+                crate::history::ensure_history_ready(&state).await.unwrap();
+                let doc = crate::resolve_local_doc_async(
+                    &state,
+                    did,
+                    ResolveOptions {
+                        verify: true,
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap();
+                let store = state.store.lock().await;
+                let expected = vector["expected"].as_array().unwrap();
+                let ids: Vec<_> = expected
+                    .iter()
+                    .map(|i| vector["ids"][i.as_u64().unwrap() as usize].clone())
+                    .collect();
+                assert_eq!(
+                    json!(store
+                        .get_events(did)
+                        .iter()
+                        .map(|e| &e.opid)
+                        .collect::<Vec<_>>()),
+                    json!(ids),
+                    "{order}, phase {phase}"
+                );
+                let last = expected.last().unwrap().as_u64().unwrap() as usize;
+                assert_eq!(
+                    doc["didDocumentData"],
+                    vector["operations"][last]["doc"]["didDocumentData"]
+                );
+                assert_eq!(
+                    store.get_candidates().unwrap()[did].len(),
+                    vector["events"].as_array().unwrap().len()
+                );
+            }
+            drop(restart_directory);
+        }
+    }
+}
