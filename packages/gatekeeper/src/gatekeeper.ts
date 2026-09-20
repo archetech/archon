@@ -600,9 +600,9 @@ export default class Gatekeeper implements GatekeeperInterface {
     // that still listed it (#1131). Once a chain has committed the operation it
     // has a position the signer did not choose -- the anchoring block -- and the
     // controller is resolved there instead. Only when the controller's own
-    // rotation history is on a chain, though: a hyperswarm controller stamps
-    // its events with each node's clock, and resolving it at a block time
-    // forked on import order (#1134).
+    // rotation history is on a chain, though: a hyperswarm controller has no
+    // independent chain position. Its events use operation proof time; the
+    // historical proof-time fallback still applies (#1134).
     //
     // Within a block every event shares the block's time, so time cannot order
     // a rotation against an operation the chain committed earlier in the same
@@ -634,9 +634,22 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         const events = await this.db.getEvents(did);
-        const anchored = events.filter(event => !isUnanchoredRegistry(event.registry));
-
-        return anchored.length > 0 && anchored.every(event => !!event.registration);
+        let expected = events[0]?.operation.registration?.registry;
+        let anchored = false;
+        for (const [index, event] of events.entries()) {
+            // Genesis is admitted separately; subsequent versions must stay in
+            // the confirmed prefix. Wrong-registry suffix receipts cannot turn
+            // an unanchored controller into an anchored one.
+            if (index > 0 && event.registry !== expected) break;
+            if (event.registry === expected && !isUnanchoredRegistry(event.registry)) {
+                if (!event.registration) return false;
+                anchored = true;
+            }
+            if (event.operation.type === 'update') {
+                expected = event.operation.doc?.didDocumentRegistration?.registry ?? expected;
+            }
+        }
+        return anchored;
     }
 
     // What the proof signs, which its own type decides.

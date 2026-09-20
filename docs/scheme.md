@@ -556,6 +556,14 @@ An operation on an asset — create, update, or delete — is authorized by a ke
 - For the controller's events on any other registry, the cutoff is the operation's **block time**, since ordinals do not compare across registries.
 - This applies only when the controller's own confirmed history is chain-anchored — every event confirming it on its registry carries the position the chain assigned. Otherwise, controller selection uses the asset operation's `proof.created` cutoff. For controller events on `hyperswarm`, compare that cutoff with each controller operation's own `proof.created`, never its node-local receipt time. Events on other registries retain their existing event-time/chain-position rules.
 
+The anchoring check walks the controller's confirmed prefix using each version's
+predecessor registry, stopping at the first non-confirming successor. Only
+matching chain receipts in that prefix establish anchoring, and each must carry
+chain registration metadata. Genesis remains admitted separately; a wrong-registry
+genesis receipt does not establish anchoring. An unconfirmed suffix must not
+switch controller selection from proof time to chain position simply because
+one node retained a wrong-registry chain receipt instead of a gossip hint.
+
 Hyperswarm historical resolution selects a predecessor-linked prefix: stop at the
 first operation whose proof time exceeds the cutoff. Do not sort operations by
 proof time or skip an excluded predecessor to apply a successor with an earlier

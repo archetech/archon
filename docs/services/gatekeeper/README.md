@@ -1057,6 +1057,15 @@ is a sibling preference, not a timestamp cutoff or a replacement for chain
 ordering. Reconciliation publishes the recovered branch and revalidates its
 dependents; retaining a losing candidate does not make its receipt order authoritative.
 
+Controller anchoring eligibility is derived only from the confirmed prefix.
+Walk predecessor registry changes from genesis; stop at the first successor whose
+receipt registry does not match. Matching chain receipts establish anchoring
+only when all such receipts carry registration metadata. A wrong-registry genesis
+receipt is ignored for this test even though genesis itself is admitted. Receipt
+choices in the unconfirmed suffix cannot enable or disable chain-based controller
+cutoffs. The signed [cutoff audit](../../plans/agent-convergence-cutoff.md) covers
+this distinction through import, repeat delivery, and restart in both ports.
+
 ### 8.5 Event shape validation
 
 ```
