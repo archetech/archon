@@ -1,3 +1,4 @@
+use crate::history_view::{history_entries, apply_transition};
 use std::{collections::HashMap, env, fs, net::IpAddr, path::PathBuf, sync::Mutex as StdMutex};
 
 use anyhow::{Context, Result};
@@ -198,43 +199,6 @@ pub(crate) fn compare_ordinals(
         }
         _ => std::cmp::Ordering::Equal,
     }
-}
-
-pub(crate) fn expected_registry_for_index(events: &[EventRecord], index: usize) -> Option<String> {
-    if events.is_empty() {
-        return None;
-    }
-    if index == 0 {
-        return events[0]
-            .operation
-            .get("registration")
-            .and_then(|value| value.get("registry"))
-            .and_then(Value::as_str)
-            .map(ToString::to_string);
-    }
-
-    let mut registry = events[0]
-        .operation
-        .get("registration")
-        .and_then(|value| value.get("registry"))
-        .and_then(Value::as_str)
-        .map(ToString::to_string);
-
-    for event in events.iter().take(index).skip(1) {
-        if event.operation.get("type").and_then(Value::as_str) == Some("update") {
-            if let Some(next_registry) = event
-                .operation
-                .get("doc")
-                .and_then(|value| value.get("didDocumentRegistration"))
-                .and_then(|value| value.get("registry"))
-                .and_then(Value::as_str)
-            {
-                registry = Some(next_registry.to_string());
-            }
-        }
-    }
-
-    registry
 }
 
 pub(crate) fn value_to_event_record(value: &Value) -> EventRecord {
@@ -1962,8 +1926,7 @@ impl JsonDb {
             state.timestamp = self.build_timestamp(registry, &state.version_id, anchor);
         }
 
-        for event in events.iter().skip(1) {
-            let operation = &event.operation;
+        for (event, expected_registry, event_confirmed) in history_entries(&events).skip(1) {
             let operation_time = standard_datetime(&event.time);
 
             if past_cutoff(&options, event) {
@@ -1976,20 +1939,6 @@ impl JsonDb {
                 }
             }
 
-            // Whether this event is confirmed is decided before it is applied,
-            // so that a confirmed resolution stops at the last confirmed
-            // version -- and reports that version's flag -- rather than one
-            // past it. That is what the verifying resolver and the TypeScript
-            // port do; judging by the previous event's state applied the first
-            // unconfirmed event and reported the result as unconfirmed.
-            let event_confirmed = state.confirmed
-                && state
-                    .did_document_registration
-                    .get("registry")
-                    .and_then(Value::as_str)
-                    .map(|registry| registry == event.registry)
-                    .unwrap_or(false);
-
             if options.confirm && !event_confirmed {
                 break;
             }
@@ -2000,49 +1949,9 @@ impl JsonDb {
                 // Signature verification is handled by higher-level resolver paths.
             }
 
-            let registry_for_timestamp = state
-                .did_document_registration
-                .get("registry")
-                .and_then(Value::as_str)
-                .map(ToString::to_string);
+            apply_transition(&mut state, event, did, operation_time);
 
-            match operation.get("type").and_then(Value::as_str) {
-                Some("update") => {
-                    state.version_sequence += 1;
-                    state.version_id = event
-                        .opid
-                        .clone()
-                        .unwrap_or_else(|| generate_json_cid(operation).unwrap_or_default());
-                    state.updated = Some(operation_time);
-                    if let Some(next_doc) = operation.get("doc") {
-                        if let Some(doc) = next_doc.get("didDocument") {
-                            state.did_document = doc.clone();
-                        }
-                        if let Some(data) = next_doc.get("didDocumentData") {
-                            state.did_document_data = data.clone();
-                        }
-                        if let Some(registration) = next_doc.get("didDocumentRegistration") {
-                            state.did_document_registration = registration.clone();
-                        }
-                    }
-                    state.deactivated = false;
-                }
-                Some("delete") => {
-                    state.version_sequence += 1;
-                    state.version_id = event
-                        .opid
-                        .clone()
-                        .unwrap_or_else(|| generate_json_cid(operation).unwrap_or_default());
-                    state.deleted = Some(operation_time);
-                    state.updated = None;
-                    state.did_document = json!({ "id": did });
-                    state.did_document_data = json!({});
-                    state.deactivated = true;
-                }
-                _ => {}
-            }
-
-            if let Some(registry) = registry_for_timestamp.as_deref() {
+            if let Some(registry) = expected_registry {
                 state.timestamp = self.build_timestamp(registry, &state.version_id, event);
             }
         }

@@ -940,6 +940,27 @@ Chain receipts require complete, position-consistent registration metadata; see
 runs before queue deduplication and in per-event replay. Metadata-free copies
 are rejected rather than preferred or replaced according to arrival history.
 
+### Shared accepted-history interpretation
+
+The per-port `history-view` module walks accepted events in predecessor order.
+Each entry exposes the predecessor registry and whether the event extends the
+confirmed prefix. Genesis is publicly confirmed even when its receipt registry
+is different; chain anchoring still requires a matching chain receipt. A registry
+replacement takes effect only after its operation, so the old registry confirms
+a migration and the new registry confirms its successors.
+
+Resolution consumes this walk up to its existing version/time/ordinal cutoff.
+Controller anchoring separately consumes the **whole confirmed prefix**; a
+cutoff-selected document is not a substitute for that evidence scan. Same-chain
+ordinal precedence, other-chain block time, proof-time fallback, verification,
+and timestamp-bound lookup remain at their existing resolution/authorization
+boundaries. The first excluded predecessor ends historical selection.
+
+Component transitions replace each supplied component in full and carry omitted
+components forward. Deletion clears document/data, retains registration, and
+omits `updated`. Rust's ordinary and verified resolvers share the same transition
+function. The helpers add no storage, cache, database reads, or lock boundaries.
+
 ### Envelope policy shared by import and recovery
 
 TypeScript `event-policy.ts` and Rust `event_policy.rs` define the existing

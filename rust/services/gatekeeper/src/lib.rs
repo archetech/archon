@@ -7,6 +7,7 @@ mod convergence;
 mod event_policy;
 mod events;
 mod history;
+mod history_view;
 mod metrics;
 mod progress;
 mod proofs;
@@ -17,6 +18,7 @@ mod store;
 pub use app::run;
 
 pub(crate) use api::is_valid_registry;
+pub(crate) use history_view::expected_registry_for_index;
 pub(crate) use authorization::authorize_operation;
 pub(crate) use event_policy::{is_locally_stamped_registry, is_unanchored_registry, relay_hints};
 pub(crate) use app::AppState;
@@ -43,7 +45,7 @@ pub(crate) use resolver::ResolveError;
 pub(crate) use resolver::check_dids_impl;
 pub(crate) use search_index::SearchIndex;
 pub(crate) use store::{
-    chrono_like_now, event_record_to_value, expected_registry_for_index, past_cutoff,
+    chrono_like_now, event_record_to_value, past_cutoff,
     standard_datetime, value_to_event_record, BlockLookup, EventRecord, GatekeeperDb, JsonDb,
     ResolveOptions,
 };

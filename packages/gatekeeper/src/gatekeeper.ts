@@ -1,4 +1,5 @@
-import { PIN_QUEUE, isLocallyStampedRegistry, isUnanchoredRegistry, normalizeEventTime, candidateKey, preferredCandidates, relayHints, queueKey } from './event-policy.js';
+import { historyEntries, expectedRegistryForIndex, hasAnchoredPrefix, applyComponents } from './history-view.js';
+import { hasChainMetadata, isValidUnanchoredOrdinal, isValidEventOrdinal, PIN_QUEUE, isLocallyStampedRegistry, isUnanchoredRegistry, normalizeEventTime, candidateKey, preferredCandidates, relayHints, queueKey } from './event-policy.js';
 import CipherNode from '@didcid/cipher/node';
 import { copyJSON, compareOrdinals } from '@didcid/common/utils';
 import { isValidDID, generateCID } from '@didcid/ipfs/utils';
@@ -141,41 +142,6 @@ export function compareSuccessors(expectedRegistry: string | undefined,
     if (aAnchored !== bAnchored) return aAnchored ? -1 : 1;
     const ordinal = aAnchored ? compareOrdinals(a.ordinal!, b.ordinal!) : 0;
     return ordinal || (a.opid! < b.opid! ? -1 : a.opid! > b.opid! ? 1 : 0);
-}
-
-function hasValidOrdinalComponents(ordinal: unknown, allowEmpty: boolean): ordinal is number[] {
-    if (!Array.isArray(ordinal) || (!allowEmpty && ordinal.length === 0)) return false;
-    for (const value of ordinal) {
-        if (!Number.isSafeInteger(value) || value < 0) return false;
-    }
-    return true;
-}
-
-function isValidUnanchoredOrdinal(ordinal: unknown): ordinal is number[] {
-    return hasValidOrdinalComponents(ordinal, true);
-}
-
-// Chain positions must compare identically in the JavaScript and Rust ports.
-function isValidChainOrdinal(ordinal: unknown): ordinal is number[] {
-    return hasValidOrdinalComponents(ordinal, false);
-}
-
-function isValidEventOrdinal(registry: unknown, ordinal: unknown): ordinal is number[] | undefined {
-    return isUnanchoredRegistry(registry)
-        ? ordinal === undefined || isValidUnanchoredOrdinal(ordinal)
-        : isValidChainOrdinal(ordinal);
-}
-
-// Chain positions are [height, index, ...registryPosition, opidx]. CID batch
-// metadata supplies the prefix; Gatekeeper appends the original CID-list index.
-function hasChainMetadata(ordinal: unknown, registration: unknown, batch = false): boolean {
-    if (!isValidChainOrdinal(ordinal) || ordinal.length < (batch ? 2 : 3)) return false;
-    if (!registration || typeof registration !== 'object' || Array.isArray(registration)) return false;
-    const anchor = registration as Record<string, unknown>;
-    return anchor.height === ordinal[0] && anchor.index === ordinal[1]
-        && typeof anchor.txid === 'string' && anchor.txid.length > 0
-        && typeof anchor.batch === 'string' && anchor.batch.length > 0
-        && (batch || anchor.opidx === ordinal[ordinal.length - 1]);
 }
 
 enum ImportStatus {
@@ -679,22 +645,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         const events = await this.db.getEvents(did);
-        let expected = events[0]?.operation.registration?.registry;
-        let anchored = false;
-        for (const [index, event] of events.entries()) {
-            // Genesis is admitted separately; subsequent versions must stay in
-            // the confirmed prefix. Wrong-registry suffix receipts cannot turn
-            // an unanchored controller into an anchored one.
-            if (index > 0 && event.registry !== expected) break;
-            if (event.registry === expected && !isUnanchoredRegistry(event.registry)) {
-                if (!hasChainMetadata(event.ordinal, event.registration)) return false;
-                anchored = true;
-            }
-            if (event.operation.type === 'update') {
-                expected = event.operation.doc?.didDocumentRegistration?.registry ?? expected;
-            }
-        }
-        return anchored;
+        return hasAnchoredPrefix(events);
     }
 
     // What the proof signs, which its own type decides.
@@ -1247,10 +1198,9 @@ export default class Gatekeeper implements GatekeeperInterface {
         };
         let selected: { event: GatekeeperEvent; registry?: string } | undefined;
 
-        for (const event of events) {
+        for (const { event, expectedRegistry: projectionRegistry, confirmed: eventConfirmed } of historyEntries(events)) {
             const { time, ordinal, operation, registry } = event;
             const updated = generateStandardDatetime(time);
-            const projectionRegistry = doc.didDocumentRegistration?.registry;
             // Verification needs each predecessor's metadata. Ordinary resolution
             // needs the CID and block bounds only for the version it returns.
             const { versionId, timestamp } = verify ? await metadataFor(event, projectionRegistry) : {};
@@ -1289,7 +1239,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 break;
             }
 
-            confirmed = confirmed && doc.didDocumentRegistration?.registry === registry;
+            confirmed = eventConfirmed;
 
             if (confirm && !confirmed) {
                 break;
@@ -1306,18 +1256,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             if (operation.type === 'update') {
                 versionNum += 1;
 
-                const nextDoc = operation.doc || {};
-
-                // Merge update: carry forward fields not provided in the update
-                if (nextDoc.didDocument !== undefined) {
-                    doc.didDocument = nextDoc.didDocument;
-                }
-                if (nextDoc.didDocumentData !== undefined) {
-                    doc.didDocumentData = nextDoc.didDocumentData;
-                }
-                if (nextDoc.didDocumentRegistration !== undefined) {
-                    doc.didDocumentRegistration = nextDoc.didDocumentRegistration;
-                }
+                applyComponents(doc, operation, did);
 
                 doc.didDocumentMetadata = {
                     created,
@@ -1335,8 +1274,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             if (operation.type === 'delete') {
                 versionNum += 1;
 
-                doc.didDocument = { id: did };
-                doc.didDocumentData = {};
+                applyComponents(doc, operation, did);
                 doc.didDocumentMetadata = {
                     deactivated: true,
                     created,
@@ -1868,25 +1806,6 @@ export default class Gatekeeper implements GatekeeperInterface {
             const did = await this.eventTarget(event);
             if (!did) return ImportStatus.REJECTED;
             event.did = did;
-
-            const expectedRegistryForIndex = (events: GatekeeperEvent[], index: number): string | undefined => {
-                if (index <= 0) {
-                    return events[0]?.operation?.registration?.registry;
-                }
-
-                let registry = events[0]?.operation?.registration?.registry;
-                for (let i = 1; i < index; i++) {
-                    const op = events[i]?.operation;
-                    if (op?.type === 'update') {
-                        const nextRegistry = op.doc?.didDocumentRegistration?.registry;
-                        if (nextRegistry) {
-                            registry = nextRegistry;
-                        }
-                    }
-                }
-
-                return registry;
-            };
 
             return await this.withDidLock(did, async () => {
                 const currentEvents = await this.db.getEvents(did);

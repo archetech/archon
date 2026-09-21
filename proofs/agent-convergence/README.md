@@ -1088,3 +1088,22 @@ replacement. Shared policy cases and the existing signed local/pin clocks,
 metadata admission, earlier anchors, migration and restart suites check the move.
 The decoded receipt contracts and Lean theorems are unchanged; this refactor
 does not introduce a new normalization premise or claim executable refinement.
+
+### Shared accepted-history interpretation (#1246)
+
+The runtime history walk exposes the predecessor registry and confirmed-prefix
+flag. Its invariant is the existing registry fold: before event `i`, the registry
+is the genesis registry with the supplied registration replacements from events
+`1..i-1` applied. Admitted replacements contain a valid registry. The initial
+confirmation flag is true; each successor conjoins receipt/predecessor-registry
+equality. Induction over the accepted predecessor path gives the same registry
+and confirmation decisions as the former document-based loops. Component
+transitions retain whole-component replacement, omission and deletion semantics.
+
+`ControllerSelection.lean` and `ProtocolModel.lean` are unchanged. The anchoring
+walk still uses the whole confirmed prefix independently of cutoff resolution;
+cutoffs, verification, and output metadata remain with their callers. Existing
+signed controller/component/migration bridges remain in use, with additional
+ordinary-versus-verified full-result comparisons under historical bounds. This
+is an equivalence argument for the extracted interpretation, not a new universal
+runtime-refinement theorem or a change to the completed proof roadmap.
