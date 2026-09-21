@@ -56,6 +56,15 @@ and [registration validation](#registration-validation) apply to every transitio
 
 ### Transition table
 
+An event envelope cannot choose the operation's target. A creation targets the
+DID derived from the complete canonical creation operation and its method prefix;
+an update or deletion targets its signed `operation.did`. If `event.did` is
+present it MUST equal that target; otherwise Gatekeeper derives it. A creation's
+extraneous `operation.did`, if present, does not override content-derived identity.
+Gatekeeper rejects mismatched envelopes before queue deduplication or candidate
+persistence. The same target check applies when replaying events.
+Retrieval-CID aliases remain content references and cannot override target identity.
+
 | Transition | Predecessor and authority | Result | Registry for confirmation |
 | --- | --- | --- | --- |
 | Create agent | No predecessor state. Verify the creation proof with `publicJwk`; the proof names `#key-1`. An explicit creation `controller` is invalid. | Derive the DID from the complete canonical creation operation; initialize an agent document with its key. The agent controls itself. | Initial `registration.registry`. Genesis is resolvable from its seed before registry publication. |

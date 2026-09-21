@@ -811,7 +811,7 @@ mod tests {
     }
 
     #[test]
-    fn infer_event_did_and_ensure_event_opid_follow_expected_precedence() {
+    fn infer_event_did_binds_operation_identity_and_opid_is_canonical() {
         let config = test_config();
         let vectors: Value = serde_json::from_str(include_str!(
             "../../../../tests/gatekeeper/deterministic-vectors.json"
@@ -824,10 +824,9 @@ mod tests {
             "did": "did:cid:bagaaieraexplicit",
             "operation": operation
         });
-        assert_eq!(
-            infer_event_did(&config, &explicit_event).expect("did should be inferred"),
-            "did:cid:bagaaieraexplicit"
-        );
+        assert!(infer_event_did(&config, &explicit_event).is_err());
+        let matching_event = json!({ "did": generated_did, "operation": operation });
+        assert_eq!(infer_event_did(&config, &matching_event).unwrap(), generated_did);
 
         let operation_did_event = json!({
             "operation": {

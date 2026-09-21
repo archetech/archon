@@ -1,4 +1,5 @@
 //! Cross-port checks against the restricted executable convergence model.
+mod event_targets;
 use std::collections::BTreeSet;
 
 use serde_json::{json, Value};

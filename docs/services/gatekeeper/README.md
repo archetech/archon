@@ -934,7 +934,7 @@ cannot fall back to the incomplete copy. Recovery applies the same preference.
 
 ```
 for event in events:
-    if !verify_event_shape(event):           // §8.4
+    if !verify_event_shape(event) or !valid_event_target(event): // §8.5
         rejected += 1; continue
 
     key := event.registry + "/" + canonicalOperationCID(event.operation)
@@ -986,7 +986,10 @@ recovers even if repeated imports are suppressed by the in-memory seen set.
 
 ### 8.4 `importEvent(event)` per-event flow
 
-Imports first persist the candidate event, then run the insertion algorithm below and replay the affected DID and its transitive dependents. Imports and direct submissions serialize history mutations. Replay uses a separate working view and invokes the same insertion/authorization algorithm; it never trusts a previous authorization verdict merely because it was once accepted.
+Imports validate the operation-derived target before queue deduplication and candidate persistence, then run the insertion algorithm below and replay the affected DID and its transitive dependents. Imports and direct submissions serialize history mutations. Replay uses a separate working view and invokes the same insertion/authorization algorithm; it never trusts a previous authorization verdict merely because it was once accepted.
+
+The per-event replay importer applies the same envelope target check. This rule
+adds no storage migration or candidate-journal cleanup.
 
 Local/gossip candidates retain the first observation of each canonical operation per registry; fresh peer receipt timestamps and ordinals do not add authorization evidence. Anchored candidates retain their distinct chain positions. After startup recovery, a merged import that changes neither retained candidates nor accepted history skips reconciliation and leaves status and verification caches intact. New evidence and changed anchors still reconcile normally.
 
@@ -1026,7 +1029,9 @@ rewritten to IPFS merely because a gossip wrapper omitted its operation ID.
 The following is the insertion algorithm reused during replay:
 
 ```
-1. normalize event.did, canonical event.opid, and unanchored event.time from the operation
+1. derive target from canonical creation CID/prefix, or signed update/delete operation.did
+   reject a supplied event.did that differs; fill an omitted event.did with the target
+   normalize canonical event.opid and unanchored event.time from the operation
    select the preferred retained same-position chain receipt before authorization
 2. acquire per-DID lock
 3. current = store.get_events(did); derive any missing canonical operation IDs
@@ -1126,6 +1131,9 @@ operation.type ∈ { create, update, delete }
   - update: did, doc with at least one of { didDocument, didDocumentData, didDocumentRegistration };
             if doc.didDocument.id is set it MUST equal operation.did
   - delete: did
+target := create ? applicableMethodPrefix + ":" + canonicalOperationCID(operation) : operation.did
+if event.did is supplied it MUST equal target
+    // creation.operation.did and peer-supplied event.opid cannot override creation identity
 ```
 
 ### 8.6 Ordinal comparison

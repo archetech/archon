@@ -1565,6 +1565,13 @@ export default class Gatekeeper implements GatekeeperInterface {
         return result;
     }
 
+    private async eventTarget(event: GatekeeperEvent): Promise<string | undefined> {
+        const did = event.operation.type === 'create'
+            ? await this.generateDID(event.operation) : event.operation.did;
+        return typeof did === 'string' && did.length > 0
+            && (event.did === undefined || event.did === did) ? did : undefined;
+    }
+
     private async normalizeEvent(event: GatekeeperEvent): Promise<void> {
         // Normalize envelopes at import/recovery, including older mediator and
         // restored events. Resolution consumes the stored event time uniformly.
@@ -1839,7 +1846,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         await this.ensureHistoryReady();
         if (!await this.verifyEvent(event)) return ImportStatus.REJECTED;
         event = copyJSON(event);
-        event.did ??= event.operation.did ?? await this.generateDID(event.operation);
+        event.did ??= event.operation.type === 'create' ? await this.generateDID(event.operation) : event.operation.did;
         await this.normalizeEvent(event);
         return this.withHistoryLock(async () => {
             const { candidates, changed } = await this.retainCandidates(event.did!, [event]);
@@ -1866,16 +1873,9 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         try {
-            if (!event.did) {
-                if (event.operation.did) {
-                    event.did = event.operation.did;
-                }
-                else {
-                    event.did = await this.generateDID(event.operation);
-                }
-            }
-
-            const did = event.did;
+            const did = await this.eventTarget(event);
+            if (!did) return ImportStatus.REJECTED;
+            event.did = did;
 
             const expectedRegistryForIndex = (events: GatekeeperEvent[], index: number): string | undefined => {
                 if (index <= 0) {
@@ -2027,7 +2027,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             while (event) {
                 i += 1;
 
-                event.did ??= event.operation.did ?? await this.generateDID(event.operation);
+                event.did ??= event.operation.type === 'create' ? await this.generateDID(event.operation) : event.operation.did;
                 const status = await this.importEvent(event);
 
                 if (status === ImportStatus.ADDED) {
@@ -2196,7 +2196,8 @@ export default class Gatekeeper implements GatekeeperInterface {
             return false;
         }
 
-        return true;
+        // Check the target before importBatch records its dedup key.
+        return await this.eventTarget(event) !== undefined;
     }
 
     // Events handed in from a peer or restored export cannot vouch that a

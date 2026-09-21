@@ -1,0 +1,458 @@
+[
+  {
+    "name": "integrity/default",
+    "did": "did:cid:bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+    "operations": [
+      {
+        "type": "create",
+        "created": "2026-09-01T00:00:00Z",
+        "registration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "hyperswarm"
+        },
+        "publicJwk": {
+          "kty": "EC",
+          "crv": "secp256k1",
+          "x": "hbaIiPZzS_S3EH8sSbcUI1tWw7XI1bBlSCpX0jvOlYA",
+          "y": "KkuiezIEp1JcQJqZHm1fYYhUWs9fRHwhLlk-GzKUmNE"
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:00Z",
+          "verificationMethod": "#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "HJE_v-P-zfZNBvYe_qA2ZKa3J9LZr-WNc_oG-ncmetsBsy184LUHaDv-sm0HB6bYLZJ21ogRKecr7lxXDwhx_Q"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+        "previd": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+        "doc": {
+          "didDocumentData": {
+            "2": "two",
+            "10": "ten"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:00Z",
+          "verificationMethod": "did:cid:bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "bqrS7n4i6cBbznM3kFv5pVDjnboc6phfq4bSdb_TsMRT65iLWj825ulPqt-dEvM2Y9lOwaEJUfHogMg2G07dZw"
+        }
+      },
+      {
+        "type": "delete",
+        "did": "did:cid:bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+        "previd": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:00Z",
+          "verificationMethod": "did:cid:bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "Gh0kYeiTqKEdHSwiLDpSaUi4OtTcEILMQzBPi5d1hUJCkc1G6n5F38ZK0Ymk__okRBv9qbplu-GTjnhzY1SWpQ"
+        }
+      }
+    ],
+    "ids": [
+      "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "bagaaierach4y45qxt27tk2j7xfkwnlgthq5jp3rtfxwvt6ccemrpjo43ibnq"
+    ],
+    "other": {
+      "type": "create",
+      "created": "2026-09-02T00:00:00Z",
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm"
+      },
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "hbaIiPZzS_S3EH8sSbcUI1tWw7XI1bBlSCpX0jvOlYA",
+        "y": "KkuiezIEp1JcQJqZHm1fYYhUWs9fRHwhLlk-GzKUmNE"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+        "created": "2026-09-01T00:00:00Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "capabilityInvocation",
+        "proofValue": "y5FscUcFdDMpdVaj7s044BDrjI7fW3H3W4tyQvDp9xF8INdch07gln1_3klm5kBV60xzH2OlS5t3U_kn2Rq-tQ"
+      }
+    },
+    "otherDid": "did:cid:bagaaierab4zem75vqkig3jvx6vvowhvmjrut3orsdw5cmm2lsozzihgsfrqq",
+    "createWithDid": {
+      "type": "create",
+      "created": "2026-09-01T00:00:00Z",
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm"
+      },
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "hbaIiPZzS_S3EH8sSbcUI1tWw7XI1bBlSCpX0jvOlYA",
+        "y": "KkuiezIEp1JcQJqZHm1fYYhUWs9fRHwhLlk-GzKUmNE"
+      },
+      "did": "did:cid:bagaaierab4zem75vqkig3jvx6vvowhvmjrut3orsdw5cmm2lsozzihgsfrqq",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+        "created": "2026-09-01T00:00:00Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "capabilityInvocation",
+        "proofValue": "6M9vG4Uy0hhIypDOIxTQUERE7dXj-_Rii3YSr4lvQZM8Rb_hvUjVSWf3zz8OYi5vDqARa22R7K_npQWXOJQoUw"
+      }
+    },
+    "createWithDidTarget": "did:cid:bagaaierat652cay5ryh4wzfa3qpykwdtz4olqes7k63anqtzycdtym35ty4a"
+  },
+  {
+    "name": "integrity/did:custom",
+    "did": "did:custom:bagaaierahcauqdpfxe7dkpfpscxigspcxppc7wspnlcima46xjz7eczjfw2a",
+    "operations": [
+      {
+        "type": "create",
+        "created": "2026-09-01T00:00:00Z",
+        "registration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "hyperswarm",
+          "prefix": "did:custom"
+        },
+        "publicJwk": {
+          "kty": "EC",
+          "crv": "secp256k1",
+          "x": "hbaIiPZzS_S3EH8sSbcUI1tWw7XI1bBlSCpX0jvOlYA",
+          "y": "KkuiezIEp1JcQJqZHm1fYYhUWs9fRHwhLlk-GzKUmNE"
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:00Z",
+          "verificationMethod": "#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "SiHdycHcQMtiP7ncZZ3a6Gpok2gdfwXFZIs1FNTQyv1BIo0bp8icJEkKjOFZEHrG8dd_Lph08qJgYylR1fCzYg"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:custom:bagaaierahcauqdpfxe7dkpfpscxigspcxppc7wspnlcima46xjz7eczjfw2a",
+        "previd": "bagaaierahcauqdpfxe7dkpfpscxigspcxppc7wspnlcima46xjz7eczjfw2a",
+        "doc": {
+          "didDocumentData": {
+            "2": "two",
+            "10": "ten"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:00Z",
+          "verificationMethod": "did:custom:bagaaierahcauqdpfxe7dkpfpscxigspcxppc7wspnlcima46xjz7eczjfw2a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "wfFqb89ICcBhX8R6SRXgJIjQMqbaEDBnbY7yjumNykEAWFscao5xMac5VZLfpfKp7kUhxp7iGM0AvgHosVoizg"
+        }
+      },
+      {
+        "type": "delete",
+        "did": "did:custom:bagaaierahcauqdpfxe7dkpfpscxigspcxppc7wspnlcima46xjz7eczjfw2a",
+        "previd": "bagaaieraincwqd76aro2zvc4v5rvxypfldanuhdt425uaz7sonfc6tv4xylq",
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-01T00:00:00Z",
+          "verificationMethod": "did:custom:bagaaierahcauqdpfxe7dkpfpscxigspcxppc7wspnlcima46xjz7eczjfw2a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "iAK4ozE3PBS-N1BGph7nvJwUXNYYwUGnXzHk_oXEMY86MDcc3NkQpBDWPxOTD5N3n1XW0_rf8gyld9lnbmGObA"
+        }
+      }
+    ],
+    "ids": [
+      "bagaaierahcauqdpfxe7dkpfpscxigspcxppc7wspnlcima46xjz7eczjfw2a",
+      "bagaaieraincwqd76aro2zvc4v5rvxypfldanuhdt425uaz7sonfc6tv4xylq",
+      "bagaaieraqeynkssr2kuwuuu4ta5f6dv66wakbrmgrn3neytyk5fc45w572va"
+    ],
+    "other": {
+      "type": "create",
+      "created": "2026-09-02T00:00:00Z",
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm",
+        "prefix": "did:custom"
+      },
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "hbaIiPZzS_S3EH8sSbcUI1tWw7XI1bBlSCpX0jvOlYA",
+        "y": "KkuiezIEp1JcQJqZHm1fYYhUWs9fRHwhLlk-GzKUmNE"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+        "created": "2026-09-01T00:00:00Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "capabilityInvocation",
+        "proofValue": "xDbJoJ1MaN0YeGJ8xL5CYcv4UTTIcNFTBggQzhMktzJKWAPJPaEzLoEoj8V-J9JTF41IAacYJPOXNFeFBoS96Q"
+      }
+    },
+    "otherDid": "did:custom:bagaaieravzho4j3rlbglmd7bloeyvkkungjnompblf6blh3z4v7fg3si5txa",
+    "createWithDid": {
+      "type": "create",
+      "created": "2026-09-01T00:00:00Z",
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm",
+        "prefix": "did:custom"
+      },
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "hbaIiPZzS_S3EH8sSbcUI1tWw7XI1bBlSCpX0jvOlYA",
+        "y": "KkuiezIEp1JcQJqZHm1fYYhUWs9fRHwhLlk-GzKUmNE"
+      },
+      "did": "did:custom:bagaaieravzho4j3rlbglmd7bloeyvkkungjnompblf6blh3z4v7fg3si5txa",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+        "created": "2026-09-01T00:00:00Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "capabilityInvocation",
+        "proofValue": "lUE7aTxI_a7Bjo-xKqZRZ0UFIXyZQUvYyf7MXwEYGo4g4hP2GA9sxGPtI-_869-ixkzUCEgoFKC12ZWeo3gUNw"
+      }
+    },
+    "createWithDidTarget": "did:custom:bagaaieraadpgfvmga5hf2oob234a4uexyrxrxmcgrcqojircqrqbwwejtdmq"
+  },
+  {
+    "name": "legacy/default",
+    "did": "did:cid:bagaaieralvrozqpicgsqqooy634exlxmi3zjthuqy2wwb6cdbxgkaexpxaqq",
+    "operations": [
+      {
+        "type": "create",
+        "created": "2026-09-01T00:00:00Z",
+        "registration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "hyperswarm"
+        },
+        "publicJwk": {
+          "kty": "EC",
+          "crv": "secp256k1",
+          "x": "hbaIiPZzS_S3EH8sSbcUI1tWw7XI1bBlSCpX0jvOlYA",
+          "y": "KkuiezIEp1JcQJqZHm1fYYhUWs9fRHwhLlk-GzKUmNE"
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:00Z",
+          "verificationMethod": "#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "tDD0wl0O_F4GVIjEYIFmjJMeBY9cxKAdEJgjZKPmga1-YzzZIG_OZ1kTvl5cpKdOdsEgSRJArJ4oz8lZsofdpw"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:cid:bagaaieralvrozqpicgsqqooy634exlxmi3zjthuqy2wwb6cdbxgkaexpxaqq",
+        "previd": "bagaaieralvrozqpicgsqqooy634exlxmi3zjthuqy2wwb6cdbxgkaexpxaqq",
+        "doc": {
+          "didDocumentData": {
+            "2": "two",
+            "10": "ten"
+          }
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:00Z",
+          "verificationMethod": "did:cid:bagaaieralvrozqpicgsqqooy634exlxmi3zjthuqy2wwb6cdbxgkaexpxaqq#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "p8wONdpTDz7gvNyqK8xH764xBmvIb2Dl1GtU4o1Ou-EzesB_N2E6IBayxURg3tAQsOaQM9LNmyEhFOxfqeZIow"
+        }
+      },
+      {
+        "type": "delete",
+        "did": "did:cid:bagaaieralvrozqpicgsqqooy634exlxmi3zjthuqy2wwb6cdbxgkaexpxaqq",
+        "previd": "bagaaierabovlpxdkumz43arw6fpts3ntqahoxqngf6kinfk3bdlqnidqatba",
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:00Z",
+          "verificationMethod": "did:cid:bagaaieralvrozqpicgsqqooy634exlxmi3zjthuqy2wwb6cdbxgkaexpxaqq#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "-D4q7SteMX-4bGOa66UDACCLNbZG9jIS3w7t96vWywFItGhKi-qD155_fkA5tavW4_epSJiNtUUAeG5toAAgtA"
+        }
+      }
+    ],
+    "ids": [
+      "bagaaieralvrozqpicgsqqooy634exlxmi3zjthuqy2wwb6cdbxgkaexpxaqq",
+      "bagaaierabovlpxdkumz43arw6fpts3ntqahoxqngf6kinfk3bdlqnidqatba",
+      "bagaaiera6mnnm2gnoe3xl4y4qp4fnaqgsepye7j4lnh4tgv5y7p66nq7lt3q"
+    ],
+    "other": {
+      "type": "create",
+      "created": "2026-09-02T00:00:00Z",
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm"
+      },
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "hbaIiPZzS_S3EH8sSbcUI1tWw7XI1bBlSCpX0jvOlYA",
+        "y": "KkuiezIEp1JcQJqZHm1fYYhUWs9fRHwhLlk-GzKUmNE"
+      },
+      "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-09-01T00:00:00Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "capabilityInvocation",
+        "proofValue": "PKTGZRhoz1SDdTUp6WejNhi5pdxBa5OON9yN7N6fiOh_ZeeVaMiHzO7FqMHEuDn_wZr187im4lSEW_9WDzChTQ"
+      }
+    },
+    "otherDid": "did:cid:bagaaierax5l5en6tcnnajmt2bxeomruobaw5m4ara2p7lytsapcwgrykh2vq",
+    "createWithDid": {
+      "type": "create",
+      "created": "2026-09-01T00:00:00Z",
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm"
+      },
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "hbaIiPZzS_S3EH8sSbcUI1tWw7XI1bBlSCpX0jvOlYA",
+        "y": "KkuiezIEp1JcQJqZHm1fYYhUWs9fRHwhLlk-GzKUmNE"
+      },
+      "did": "did:cid:bagaaierax5l5en6tcnnajmt2bxeomruobaw5m4ara2p7lytsapcwgrykh2vq",
+      "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-09-01T00:00:00Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "capabilityInvocation",
+        "proofValue": "27KYq0TB28AznZQMIqUGX11dNHv3KdwZZJ7PlYsNKx4-aQ4WUwBzp_Ru1clucHf_e7bIeKclxcuDjlrYNfpRuA"
+      }
+    },
+    "createWithDidTarget": "did:cid:bagaaierac4uof5zgbjc4hhztgam7dec2smvzznn7i3bjkaaf7lto75tqzkyq"
+  },
+  {
+    "name": "legacy/did:custom",
+    "did": "did:custom:bagaaieratffniok43ngdlwbo56zq33sztrpyxd3slyjvzcwnygiez2zasb7a",
+    "operations": [
+      {
+        "type": "create",
+        "created": "2026-09-01T00:00:00Z",
+        "registration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "hyperswarm",
+          "prefix": "did:custom"
+        },
+        "publicJwk": {
+          "kty": "EC",
+          "crv": "secp256k1",
+          "x": "hbaIiPZzS_S3EH8sSbcUI1tWw7XI1bBlSCpX0jvOlYA",
+          "y": "KkuiezIEp1JcQJqZHm1fYYhUWs9fRHwhLlk-GzKUmNE"
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:00Z",
+          "verificationMethod": "#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "2nQQ9JBcTzw1WZCpMo19OwO-GLf916Q6tMlcvm1PoTZF_fEtqBx4-BSOKWw1UWBv0tZ08vbChj37eO5deIeV2w"
+        }
+      },
+      {
+        "type": "update",
+        "did": "did:custom:bagaaieratffniok43ngdlwbo56zq33sztrpyxd3slyjvzcwnygiez2zasb7a",
+        "previd": "bagaaieratffniok43ngdlwbo56zq33sztrpyxd3slyjvzcwnygiez2zasb7a",
+        "doc": {
+          "didDocumentData": {
+            "2": "two",
+            "10": "ten"
+          }
+        },
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:00Z",
+          "verificationMethod": "did:custom:bagaaieratffniok43ngdlwbo56zq33sztrpyxd3slyjvzcwnygiez2zasb7a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "xxlGrNZYdxuVyX3ggowRQoWaULpBzaYm55RXgSvUo-17_uU80bau0wXi8fYbL_NkcHoPPumWnaGtPgo9bQE8MA"
+        }
+      },
+      {
+        "type": "delete",
+        "did": "did:custom:bagaaieratffniok43ngdlwbo56zq33sztrpyxd3slyjvzcwnygiez2zasb7a",
+        "previd": "bagaaieramefa7ibkj33icykabn4tupy7wy3hyxm2m7oxfpkc5aw3bnkdcndq",
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-01T00:00:00Z",
+          "verificationMethod": "did:custom:bagaaieratffniok43ngdlwbo56zq33sztrpyxd3slyjvzcwnygiez2zasb7a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "1Pwkkx4jIMpFCN2AQ4cblGyF4HfKT2DrMeoQsPq1-rVSwPh2h1KK-nWCRerSb1U5FXJOlNdFl5LrT6dUOPjt7Q"
+        }
+      }
+    ],
+    "ids": [
+      "bagaaieratffniok43ngdlwbo56zq33sztrpyxd3slyjvzcwnygiez2zasb7a",
+      "bagaaieramefa7ibkj33icykabn4tupy7wy3hyxm2m7oxfpkc5aw3bnkdcndq",
+      "bagaaieratcec23svtkslb7qit4si6ogk3vq5fkw7oie4btzxgvy5zpqroqiq"
+    ],
+    "other": {
+      "type": "create",
+      "created": "2026-09-02T00:00:00Z",
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm",
+        "prefix": "did:custom"
+      },
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "hbaIiPZzS_S3EH8sSbcUI1tWw7XI1bBlSCpX0jvOlYA",
+        "y": "KkuiezIEp1JcQJqZHm1fYYhUWs9fRHwhLlk-GzKUmNE"
+      },
+      "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-09-01T00:00:00Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "capabilityInvocation",
+        "proofValue": "oz6uCZP27DE0LGB_5ST7ZvFRZfMEhAdKhNDAt0ReTn18sOJWZMj55nJhh_Zv6QV4DBiSjIf45EJYmBpm8tX3WA"
+      }
+    },
+    "otherDid": "did:custom:bagaaierahaaxy4pvvvhz52fhurvmv56wrrk7vrqzobfhmjtr7g4ipav4zyqa",
+    "createWithDid": {
+      "type": "create",
+      "created": "2026-09-01T00:00:00Z",
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm",
+        "prefix": "did:custom"
+      },
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "hbaIiPZzS_S3EH8sSbcUI1tWw7XI1bBlSCpX0jvOlYA",
+        "y": "KkuiezIEp1JcQJqZHm1fYYhUWs9fRHwhLlk-GzKUmNE"
+      },
+      "did": "did:custom:bagaaierahaaxy4pvvvhz52fhurvmv56wrrk7vrqzobfhmjtr7g4ipav4zyqa",
+      "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-09-01T00:00:00Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "capabilityInvocation",
+        "proofValue": "Fdthg7eB4WdX66ta_1t40ahPV3Kfe9gkGkGIXbZezr5eNuLUhTz7etEj0e5bzkcSMJ2IN7oy6nIJpSkPbRy7DQ"
+      }
+    },
+    "createWithDidTarget": "did:custom:bagaaieraszhjrdwiiqagvckvvouu45zz5pbc2hclnrygh5uplstvvaaychpa"
+  }
+]

@@ -21,6 +21,7 @@ export function integratedAgentGraph(vector, registryNames) {
     const owners = vector.events.map(event => {
         const i = vector.operations.findIndex(operation => isDeepStrictEqual(operation, event.operation));
         assert(i >= 0, 'receipt must contain a source operation');
+        assert(event.did === undefined || event.did === vector.did, 'receipt DID must match operation target');
         return i;
     });
     const chain = name => !['local', 'hyperswarm', 'pin'].includes(name);
