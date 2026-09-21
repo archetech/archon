@@ -50,4 +50,24 @@ theorem asset_sibling_priority (g : AssetGraph) (r : AssetReceipts) (position : 
   rw [xreg, yreg] at same
   exact ranks x y xa ya (Option.some.inj same)
 
+/-- The actual replay winner cannot rank after an available matching-chain
+sibling in ordinal/CID order. Numeric replay ranks are interpreted by the same
+required contract, not by an unrelated ordering oracle. -/
+theorem asset_winner_priority (g : AssetGraph) (r : AssetReceipts) (position : Nat → List Nat)
+    (ranks : AssetCidRanks g r position) (genesis : g.parent g.root = none)
+    (evidence : List Nat) (parent x y : Nat)
+    (chosen : x = winner (coldAssetModel g (assetAnchors g r)) parent evidence)
+    (present : y ∈ evidence)
+    (available : eligible (coldAssetModel g (assetAnchors g r)) parent y = true)
+    (xp : g.parent (r.owner x) = some parent) (yp : g.parent (r.owner y) = some parent)
+    (xa : eligible (assetAnchors g r) (r.owner x) x = true)
+    (ya : eligible (assetAnchors g r) (r.owner y) y = true) :
+    ¬ (compare (position y) (position x) = .lt ∨
+      (compare (position y) (position x) = .eq ∧ r.owner y < r.owner x)) := by
+  have minimum := winner_le_member (coldAssetModel g (assetAnchors g r)) parent y evidence present available
+  rw [← chosen] at minimum
+  intro earlier
+  have smaller := (asset_sibling_priority g r position ranks genesis y x parent yp xp ya xa).mpr earlier
+  omega
+
 end Archon

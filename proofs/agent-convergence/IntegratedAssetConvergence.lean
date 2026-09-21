@@ -80,6 +80,15 @@ def AssetSiblingOrdering (g : AssetGraph) (r : AssetReceipts) (position : Nat �
     (x < y ↔ compare (position x) (position y) = .lt ∨
       (compare (position x) (position y) = .eq ∧ r.owner x < r.owner y))
 
+def AssetWinnerOrdering (g : AssetGraph) (r : AssetReceipts) (position : Nat → List Nat)
+    (evidence : List Nat) : Prop :=
+  ∀ parent x y, x = winner (coldAssetModel g (assetAnchors g r)) parent evidence →
+    y ∈ evidence → eligible (coldAssetModel g (assetAnchors g r)) parent y = true →
+    g.parent (r.owner x) = some parent → g.parent (r.owner y) = some parent →
+    eligible (assetAnchors g r) (r.owner x) x = true → eligible (assetAnchors g r) (r.owner y) y = true →
+    ¬ (compare (position y) (position x) = .lt ∨
+      (compare (position y) (position x) = .eq ∧ r.owner y < r.owner x))
+
 /-- Guarantees for each source-derived world, including the conditional
 nonempty execution result and provenance of every selected representation. -/
 structure AssetSourceGuarantees (g : AssetGraph) (r : AssetReceipts)
@@ -151,6 +160,8 @@ theorem integrated_asset_convergence [DecidableEq α] (inputs : AssetControllerI
        unanchored localRegistry chainFacts xs
      let rrecords := assetSourceRecords g r inputs.table (reconciledControllerHistories inputs agentRight)
        unanchored localRegistry chainFacts ys
+     AssetWinnerOrdering g r position (recordIds lrecords) ∧
+     AssetWinnerOrdering g r position (recordIds rrecords) ∧
      ∃ lresult rresult,
        stopWhenStable (rankedPass m (chainOwner a) g.size lrecords) (m.size + 3) [] = some lresult ∧
        stopWhenStable (rankedPass m (chainOwner a) g.size rrecords) (m.size + 3) [] = some rresult ∧
@@ -168,8 +179,11 @@ theorem integrated_asset_convergence [DecidableEq α] (inputs : AssetControllerI
       ordered bounded parents genesis rootBound xs
   · exact asset_source_guarantees inputs agentRight g r unanchored localRegistry chainFacts
       ordered bounded parents genesis rootBound ys
-  · exact asset_reconciliation_converges g r inputs.table _ _
-      (controllers_from_shared_sources inputs agentLeft agentRight agentsSame agentsValid)
-      unanchored localRegistry chainFacts ordered bounded xs ys same
+  · refine ⟨?_, ?_, ?_⟩
+    · exact fun parent x y => asset_winner_priority g r position ranks genesis _ parent x y
+    · exact fun parent x y => asset_winner_priority g r position ranks genesis _ parent x y
+    · exact asset_reconciliation_converges g r inputs.table _ _
+        (controllers_from_shared_sources inputs agentLeft agentRight agentsSame agentsValid)
+        unanchored localRegistry chainFacts ordered bounded xs ys same
 
 end Archon
