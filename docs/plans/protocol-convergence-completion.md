@@ -150,7 +150,7 @@ runtime refinement remains outside this contract. B and C remain open.
   controller rotation/deletion, and missing controller evidence. Historical
   cutoffs needed for authorization are in scope even though general HTTP query
   behavior is not.
-- [ ] **B2 — Asset result and termination:** prove asset create/update/delete and
+- [x] **B2 — Asset result and termination:** prove asset create/update/delete and
   transfer authorization from the predecessor owner and prospective-owner rules;
   derive the unique asset history and full component/deactivation state. Include
   replay of previously rejected/deferred candidates when evidence becomes
@@ -164,8 +164,14 @@ B1 is implemented in `ControllerSelection.lean`: the confirmed-prefix and
 historical cutoff rules derive controller components from A3's source result,
 including the whole-prefix anchoring check and proof-time fallback. Named-method
 verification rejects missing/deleted controllers. The [architecture audit](asset-controller-convergence.md)
-records both ports and the existing source contracts. B2 and the signed B3 bridge
-remain open; synthetic kernel examples are not runtime correspondence proofs.
+records both ports and the existing source contracts.
+
+B2 is implemented by `asset_reconciliation_converges`, `asset_source_execution`,
+and the authorization/provenance/component/priority lemmas in `Asset*.lean`.
+Asset verdicts are derived per receipt from B1 and the signed predecessor owner;
+reconciliation considers the whole retained journal and proves actual full-record
+stopping and successful component execution. The signed B3 bridge remains open;
+synthetic kernel examples are not runtime correspondence proofs.
 
 ### C. Close the protocol theorem
 

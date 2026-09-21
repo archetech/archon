@@ -241,3 +241,5 @@ These rules apply to coding agents working in this repository.
 - Rust event-to-JSON helpers must omit absent ordinals, matching `EventRecord` serialization; emitting `null` breaks reimport under ordinal validation. Cover the serialized round trip for unanchored receipts.
 
 - Controller-selection proofs must distinguish the time-bounded resolved version from the whole confirmed-prefix anchoring scan; the selected version’s registry controls proof-time fallback. Preserve genesis admission and stop-at-first-excluded successor behavior.
+
+- Asset proof normalization must derive authorization in each retained receipt’s own controller cutoff before projecting priority. A rejected chain receipt must not synthesize an authorized proof-time provisional hint. Keep predecessor-owner signatures distinct from prospective-owner availability, and include the local-controller creation restriction.
