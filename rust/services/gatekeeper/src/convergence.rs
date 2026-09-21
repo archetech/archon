@@ -1527,3 +1527,147 @@ async fn convergence_pin_receipt_proof_time() {
         }
     }
 }
+
+#[tokio::test]
+async fn convergence_assets_with_controller_recovery() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/asset-vectors.json"
+    ))
+    .unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let did = vector["did"].as_str().unwrap();
+        let stages = vector["stages"].as_array().unwrap();
+        let mut scenarios: Vec<Vec<&Value>> = stages.iter().map(|stage| vec![stage]).collect();
+        scenarios.push(
+            vector["transitions"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|name| stages.iter().find(|stage| &stage["name"] == name).unwrap())
+                .collect(),
+        );
+        for scenario in scenarios {
+            for order_index in 0..3 {
+                let directory = tempfile::tempdir().unwrap();
+                let path = directory.path().join("assets.json");
+                let (mut state, mut state_directory) = crate::tests::make_state(JsonDb {
+                    backend: DbBackend::JsonFile { path: path.clone() },
+                    data: JsonDbFile::default(),
+                    redis_connection: None,
+                });
+                for entry in vector["blocks"].as_array().unwrap() {
+                    state
+                        .store
+                        .lock()
+                        .await
+                        .add_block(entry["registry"].as_str().unwrap(), entry["block"].clone())
+                        .unwrap();
+                }
+                for stage in &scenario {
+                    let order = stage["orders"][order_index].as_array().unwrap();
+                    for index in order {
+                        crate::import_batch_impl(
+                            &state,
+                            &[vector["events"][index.as_u64().unwrap() as usize].clone()],
+                        )
+                        .await;
+                        crate::process_events_impl(&state).await;
+                    }
+                    for phase in 0..3 {
+                        if phase == 1 {
+                            let events: Vec<_> = order
+                                .iter()
+                                .rev()
+                                .map(|i| vector["events"][i.as_u64().unwrap() as usize].clone())
+                                .collect();
+                            crate::import_batch_impl(&state, &events).await;
+                            crate::process_events_impl(&state).await;
+                        }
+                        if phase == 2 {
+                            // Read persisted bytes, not an in-memory clone of the previous store.
+                            let data =
+                                serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+                            let (restarted, restarted_directory) =
+                                crate::tests::make_state(JsonDb {
+                                    backend: DbBackend::JsonFile { path: path.clone() },
+                                    data,
+                                    redis_connection: None,
+                                });
+                            state = restarted;
+                            state_directory = restarted_directory;
+                        }
+                        crate::history::ensure_history_ready(&state).await.unwrap();
+                        let resolved = crate::resolve_local_doc_async(
+                            &state,
+                            did,
+                            ResolveOptions {
+                                verify: true,
+                                ..Default::default()
+                            },
+                        )
+                        .await;
+                        let resolved = if stage["components"].is_null() {
+                            assert!(
+                                format!("{:#}", resolved.unwrap_err()).contains("DID not found")
+                            );
+                            json!({"didResolutionMetadata": {"error": "notFound"}})
+                        } else {
+                            resolved.unwrap()
+                        };
+                        let store = state.store.lock().await;
+                        let history = store.get_events(did);
+                        let expected: Vec<_> = stage["expected"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|i| vector["ids"][i.as_u64().unwrap() as usize].clone())
+                            .collect();
+                        let context = format!(
+                            "{} legacy={} stage={} order={} phase={}",
+                            vector["mode"], vector["legacy"], stage["name"], order_index, phase
+                        );
+                        assert_eq!(
+                            json!(history.iter().map(|e| &e.opid).collect::<Vec<_>>()),
+                            json!(expected),
+                            "{context}"
+                        );
+                        if !stage["components"].is_null() {
+                            assert_eq!(
+                                json!({"didDocument": resolved["didDocument"], "didDocumentData": resolved["didDocumentData"], "didDocumentRegistration": resolved["didDocumentRegistration"]}),
+                                stage["components"],
+                                "{context}"
+                            );
+                            assert_eq!(
+                                resolved["didDocumentMetadata"]["deactivated"]
+                                    .as_bool()
+                                    .unwrap_or(false),
+                                stage["deactivated"].as_bool().unwrap(),
+                                "{context}"
+                            );
+                        } else {
+                            assert_eq!(
+                                resolved["didResolutionMetadata"]["error"], "notFound",
+                                "{context}"
+                            );
+                        }
+                        let candidates = store.get_candidates().unwrap();
+                        let retained = candidates.get(did).unwrap();
+                        for index in stage["evidence"].as_array().unwrap() {
+                            let op =
+                                &vector["events"][index.as_u64().unwrap() as usize]["operation"];
+                            if op["did"] == did
+                                || op["type"] == "create" && op["registration"]["type"] == "asset"
+                            {
+                                assert!(
+                                    retained.iter().any(|event| event.operation == *op),
+                                    "lost candidate {context}"
+                                );
+                            }
+                        }
+                    }
+                }
+                drop(state_directory);
+            }
+        }
+    }
+}

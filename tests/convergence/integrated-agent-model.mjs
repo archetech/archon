@@ -6,7 +6,7 @@ export const comparePositions = (a, b) => {
     for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i] - b[i];
     return a.length - b.length;
 };
-export function integratedAgentGraph(vector) {
+export function integratedAgentGraph(vector, registryNames) {
     const graph = componentGraph(vector, true);
     const rootIndex = graph.ranks.indexOf(graph.root);
     const genesisMethod = graph.documents[graph.root].find(method => method.id === graph.named[rootIndex]);
@@ -28,7 +28,9 @@ export function integratedAgentGraph(vector) {
     const positioned = i => chain(vector.events[i].registry);
     const anchorEvents = vector.events.map((_, i) => i).filter(positioned);
     // Registry-local ordinal/CID keys, quotienting repeated identical ordering keys.
-    const names = [...new Set([...expected, ...vector.events.map(event => event.registry), ...vector.operations.flatMap(op => op.doc?.didDocumentRegistration ? [op.doc.didDocumentRegistration.registry] : [])])].sort();
+    const derivedNames = [...new Set([...expected, ...vector.events.map(event => event.registry), ...vector.operations.flatMap(op => op.doc?.didDocumentRegistration ? [op.doc.didDocumentRegistration.registry] : [])])].sort();
+    const names = registryNames ?? derivedNames;
+    assert(new Set(names).size === names.length && derivedNames.every(name => names.includes(name)), 'registry projection must cover every source name');
     const compare = (x, y) => names.indexOf(vector.events[x].registry) - names.indexOf(vector.events[y].registry)
         || comparePositions(vector.events[x].ordinal, vector.events[y].ordinal)
         || graph.ranks[owners[x]] - graph.ranks[owners[y]];

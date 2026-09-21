@@ -1,6 +1,6 @@
 # Asset/controller convergence (B1–B3)
 
-This document covers the B1–B3 work area of the fixed [completion contract](protocol-convergence-completion.md). A1–A4 are merged in #1237. B1 is merged in #1238. B2 is complete at the protocol-model boundary in this change; B3 remains open. C1–C3 remain separate fixed criteria.
+This document covers the B1–B3 work area of the fixed [completion contract](protocol-convergence-completion.md). A1–A4 are merged in #1237. B1 is merged in #1238. B2 is merged in #1239. B3 is complete at the signed-bridge boundary in this change. C1–C3 remain separate fixed criteria.
 
 ## Architecture audit
 
@@ -49,3 +49,15 @@ The asset tables encode operation shape/identity/registration validity, canonica
 The integrated endpoint also returns `AssetSourceGuarantees` for both reconstructed worlds: every newly authorized retained receipt contributes to replay, every selected record has an authorized retained source, and an authorized retained creation implies nonempty history and successful full-component execution. These are instantiated over the reconstructed controllers, not supplied controller histories. Parent bounds and root bounds are explicit graph premises.
 
 Creation alone requires the proof method's DID prefix to equal the controller DID (`g.signer`). Updates/deletions use normalized named-method lookup in the selected predecessor owner's document, exactly as TypeScript `verifyUpdateOperation`/`operationKey` and Rust operation verification do; they do not impose a separate prefix-equality rule. Method identity and public-key identity remain distinct, and the signature oracle cannot bypass named-method lookup.
+
+## B3: signed asset bridge
+
+`tests/convergence/generate-asset-vectors.mjs` creates public synthetic signatures in both proof formats. Ten vectors cover Hyperswarm, pin, same-chain ordinal selection, cross-chain time selection, and the local-controller registration restriction. Each has seven evidence stages and three delivery orders (forward, reversed, and late genesis with duplicates). Ten additional staged recovery cases reuse one database while importing controller rotations. The TypeScript and Rust suites repeat imports and reopen JSON storage from disk at every stage, checking accepted canonical operation IDs, all document/data/registration components, deactivation separately, and retention of rejected/deferred asset evidence.
+
+Coverage includes owner transfers, prospective owners that are missing or are assets, whole-component replacement/omission, named secondary keys including relative references, unknown methods, controller deletion, terminal asset deletion, competing canonical-CID successors, tied ordinals, registry migration, an earlier controller anchor arriving after a later copy, an invalid early asset receipt alongside a valid later receipt, and gossip-only assets with chain-anchored controllers. The staged cases explicitly revoke accepted old-key operations and recover previously rejected new-key operations.
+
+`generate-asset-fixtures.mjs` derives controller graphs, asset predecessor graphs, owners, named methods, component tokens, registry projections, signature predicates and receipt classes from the signed tables. `AssetControllerFixtures.lean` supplies A3 graphs and component/method projections; `AssetFixtures.lean` reconstructs controllers from each source set, checks every retained asset receipt's derived verdict and the complete replay result with the kernel, and instantiates `integrated_asset_convergence` for each delivery order. It does not supply equal accepted histories or verdicts to that theorem. Registry names share one numeric projection across controllers and assets; complete registration objects remain distinct tokens. Root creation invariants are checked explicitly.
+
+Generator rejection tests cover malformed roots, missing predecessors, detached receipts, bad signature-table dimensions, invalid agent genesis signatures, missing asset owners, incorrect expected payload/deletion metadata and unequal evidence. Reordering paired operation/ID/signature tables or event tables with remapped deliveries preserves successful generation. CI regenerates source signatures before checking both generated Lean modules, runs both runtime bridges, and builds proofs under the existing axiom allowlist.
+
+This is finite correspondence coverage for the B1/B2 source model. It does not prove universal TypeScript/Rust refinement, signature primitives, arbitrary JSON decoding, storage/concurrency correctness or global family scheduling. C1–C3 remain the unchanged remaining roadmap.

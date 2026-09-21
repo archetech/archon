@@ -140,7 +140,7 @@ forks, repeated/earlier/tied anchors, missing predecessors, unconfirmed suffixes
 and cold/late-genesis replay in both ports. The signed pin audit led to the approved proof-time normalization rule; both ports
 now converge on asset verdicts and repair stored pre-fix projections. Lean checks source normalization and
 independently evaluates the expected components and authorization views. General
-runtime refinement remains outside this contract. B and C remain open.
+runtime refinement remains outside this contract. B is completed below; C remains open.
 
 ### B. Asset/controller convergence
 
@@ -156,7 +156,7 @@ runtime refinement remains outside this contract. B and C remain open.
   replay of previously rejected/deferred candidates when evidence becomes
   available. Establish termination using self-controlled agents and agent-only
   owners; do not assume all dependent operations already have fixed verdicts.
-- [ ] **B3 — Asset bridge:** shared signed cross-port cases instantiate these rules,
+- [x] **B3 — Asset bridge:** shared signed cross-port cases instantiate these rules,
   including transfers, late rotations, earlier anchors, revocation/recovery of
   previously accepted/rejected candidates, and restart from retained evidence.
 
@@ -171,8 +171,19 @@ and the authorization/provenance/component/priority lemmas in `Asset*.lean`.
 The endpoint derives controller histories from shared A3 source evidence and requires
 the ordinal/CID ordering contract. Asset verdicts are derived per receipt from B1 and the signed predecessor owner;
 reconciliation considers the whole retained journal and proves actual full-record
-stopping and successful component execution. The signed B3 bridge remains open;
+stopping and successful component execution. The signed B3 bridge is completed below;
 synthetic kernel examples are not runtime correspondence proofs.
+
+B3 is complete at the signed-bridge boundary: `AssetControllerFixtures.lean` and
+`AssetFixtures.lean` instantiate source reconstruction, receipt authorization,
+complete asset results and `integrated_asset_convergence` from shared signed
+operations. Seventy evidence scenarios plus ten staged recovery cases run in both
+ports across three delivery orders, repeated import and actual JSON-storage reopen.
+Coverage includes transfer, late rotations, earlier/tied anchors, missing/deleted/
+nonagent owners, relative secondary methods, migration, provisional gossip,
+terminal deletion, and the local-controller restriction. CI regenerates signatures
+and checks the bridge before building Lean. This is finite runtime correspondence,
+not universal executable refinement. See the [audit](asset-controller-convergence.md).
 
 ### C. Close the protocol theorem
 
