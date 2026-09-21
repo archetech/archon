@@ -1,6 +1,6 @@
 # Asset/controller convergence (B1–B3)
 
-This work implements B1–B3 of the fixed [completion contract](protocol-convergence-completion.md). A1–A4 are merged in #1237. B1 is complete at the protocol-model boundary; B2/B3 remain open. C1–C3 remain separate fixed criteria.
+This document covers the B1–B3 work area of the fixed [completion contract](protocol-convergence-completion.md). A1–A4 are merged in #1237. B1 is complete at the protocol-model boundary; B2/B3 remain open. C1–C3 remain separate fixed criteria.
 
 ## Architecture audit
 
