@@ -915,6 +915,13 @@ each other's effects when computing `previd`.
 Used by `/dids/import`, `/batch/import`, `/batch/import/cids`, and
 `/events/process`.
 
+Historical controller selection uses chain context only when an event has
+registration metadata and belongs to a chain registry. Local, Hyperswarm and pin
+receipts always select the controller at the operation's `proof.created`, even
+if their envelopes include registration metadata or ordinals. Those fields stay
+in retained evidence but do not confer chain authority. Startup reconstruction
+uses the same rule and reauthorizes previously accepted dependent assets.
+
 ### 8.1 `importBatch(events)`
 
 ```

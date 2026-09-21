@@ -78,3 +78,15 @@ it.each(vectors)('repairs stored local clocks and reauthorizes assets (legacy=$l
     for (const event of repaired) expect(event.time).toBe(event.operation.type === 'create'
         ? event.operation.created : event.operation.proof!.created);
 });
+
+it.each(vectors)('uses creation time for direct local creation (legacy=$legacy)', async vector => {
+    const db = new DbMemory('direct-local-clock');
+    const gatekeeper = new Gatekeeper({ db, ipfs: new MemoryClient() });
+    const operation = structuredClone(vector.events[0].operation);
+    expect(operation.created).not.toBe(operation.proof!.created);
+    expect(await gatekeeper.createDID(operation)).toBe(vector.did);
+    const accepted = await db.getEvents(vector.did);
+    expect(accepted).toHaveLength(1);
+    expect(accepted[0].operation).toEqual(operation);
+    expect(accepted[0].time).toBe(operation.created);
+});

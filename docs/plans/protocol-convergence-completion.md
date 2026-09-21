@@ -191,24 +191,24 @@ not universal executable refinement. See the [audit](asset-controller-convergenc
   finite set of agent/asset DIDs. Prove uniqueness, complete modeled reconciliation
   termination, arrival-order/duplicate independence, and reconstruction independent
   of a stale accepted projection. State the eventual-settled-evidence corollary.
-- [ ] **C2 — Assumption/domain audit:** every premise is an explicit primitive or
+- [x] **C2 — Assumption/domain audit:** every premise is an explicit primitive or
   justified protocol condition. No circular shared-authorization assumption, hidden
   unique-anchor restriction, unexplained local timestamp equality, or fixture-only
   restriction may substitute for a missing argument. Any reachable protocol
   counterexample blocks completion until resolved; it is not renamed a limitation.
-- [ ] **C3 — Release the claim:** CI checks the top-level theorem with the existing
+- [x] **C3 — Release the claim:** CI checks the top-level theorem with the existing
   `propext`/`Quot.sound` allowlist and no admitted proofs. Document its exact inputs,
   output equality, assumptions, theorem dependencies, and finite runtime bridge.
   Close #1215 when A1–C3 are satisfied; do not hold it open for the separate work below.
 
-C1's composed theorem and settled-evidence corollary are implemented and checked.
-The approved local-clock normalization fixes the first signed C2 counterexample
-in both Gatekeepers, including recovery of old stored projections. A second
-signed ordinary-import audit found that registration metadata on a local receipt
-can trigger chain-based controller selection and opposite asset verdicts. C2/C3
-remain open pending the explicit receipt-authority decision; this cannot be
-excluded through a stronger source premise. The [final audit](protocol-convergence-theorem.md)
-records the exact findings and unchanged completion criteria.
+C1–C3 are implemented in #1241. The composed theorem and settled-evidence
+corollary are checked, with complete semantic-family comparisons in the signed
+bridge. The C2 audit found two signed counterexamples, both corrected under the
+2026-09-21 maintainer decisions: intrinsic local clocks at direct submission,
+import and recovery; and chain-based controller selection only for chain
+registries. Both ports test reversed receipt order and repair of old projections.
+The [final audit](protocol-convergence-theorem.md) records the exact premises,
+theorem dependencies, checked bridge and unchanged completion criteria.
 
 ## Separate work, not prerequisites for this claim
 

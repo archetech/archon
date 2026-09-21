@@ -640,7 +640,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     // controller's events on the operation's registry and the block time for
     // any other.
     private async controllerForEvent(controllerDid: string, operation: Operation, event?: GatekeeperEvent): Promise<DidCidDocument> {
-        if (event?.registration && event.time) {
+        if (event?.registration && event.time && !isUnanchoredRegistry(event.registry)) {
             const cutoff = event.ordinal ? { registry: event.registry, ordinal: event.ordinal } : undefined;
             const doc = await this.resolveDIDAt(controllerDid, { confirm: true, versionTime: event.time, versionOrdinal: cutoff });
 

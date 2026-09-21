@@ -242,24 +242,18 @@ pub(crate) async fn handle_did_operation(
         resolved_registry = Some(current_registry);
     }
 
-    let event_time = payload
-        .get("proof")
-        .and_then(|value| value.get("created"))
-        .and_then(Value::as_str)
-        .or_else(|| payload.get("created").and_then(Value::as_str))
-        .unwrap_or("")
-        .to_string();
-
     let opid = generate_json_cid(payload).map_err(|error| error.to_string())?;
-    let event = EventRecord {
+    let mut event = EventRecord {
         registry: "local".to_string(),
-        time: event_time,
+        time: String::new(),
         ordinal: Some(vec![0]),
         operation: payload.clone(),
         opid: Some(opid),
         did: Some(did.clone()),
         registration: None,
     };
+
+    normalize_event_time(&mut event);
 
     let queue_registry = if op_type == "create" {
         payload

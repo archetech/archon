@@ -1774,7 +1774,7 @@ async fn convergence_local_receipt_clock_audit() {
     }
 }
 
-// C2 blocker: local registration metadata currently supplies chain context.
+// Unanchored registration metadata cannot supply chain context.
 #[tokio::test]
 async fn convergence_local_registration_metadata_audit() {
     let vectors: Value = serde_json::from_str(include_str!(
@@ -1797,6 +1797,7 @@ async fn convergence_local_registration_metadata_audit() {
                 crate::import_batch_impl(&state, &[vector["receipts"][index].clone()]).await;
                 crate::process_events_impl(&state).await;
             }
+            assert!(state.store.lock().await.get_events(vector["assetDid"].as_str().unwrap()).is_empty());
             let data = serde_json::from_value(
                 serde_json::to_value(&state.store.lock().await.data).unwrap(),
             ).unwrap();
@@ -1818,6 +1819,56 @@ async fn convergence_local_registration_metadata_audit() {
             assert_eq!(candidates[did][0].operation, vector["receipts"][0]["operation"]);
             outcomes.push(store.get_events(did).len());
         }
-        assert_eq!(outcomes, vec![0, 1]);
+        assert_eq!(outcomes, vec![0, 0]);
+        let mut db = JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        };
+        let did = vector["did"].as_str().unwrap();
+        let asset_did = vector["assetDid"].as_str().unwrap();
+        let retained: Vec<_> = vector["events"].as_array().unwrap().iter().map(|event| {
+            let mut value = event.clone();
+            value["did"] = json!(did);
+            value["opid"] = json!(crate::generate_json_cid(&value["operation"]).unwrap());
+            crate::value_to_event_record(&value)
+        }).collect();
+        let mut asset = vector["receipts"][1].clone();
+        asset["did"] = json!(asset_did);
+        asset["opid"] = json!(crate::generate_json_cid(&asset["operation"]).unwrap());
+        let asset = crate::value_to_event_record(&asset);
+        db.set_candidates(did, retained.clone()).unwrap();
+        db.set_events(did, retained).unwrap();
+        db.set_candidates(asset_did, vec![asset.clone()]).unwrap();
+        db.set_events(asset_did, vec![asset.clone()]).unwrap();
+        let (state, _directory) = crate::tests::make_state(db);
+        crate::history::ensure_history_ready(&state).await.unwrap();
+        let store = state.store.lock().await;
+        assert!(store.get_events(asset_did).is_empty());
+        assert_eq!(serde_json::to_value(&store.get_candidates().unwrap()[asset_did]).unwrap(),
+            serde_json::to_value(vec![asset]).unwrap());
+    }
+}
+
+#[tokio::test]
+async fn convergence_direct_local_creation_clock() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/local-receipt-counterexample.json"
+    )).unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let (state, _directory) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        let operation = &vector["events"][0]["operation"];
+        assert_ne!(operation["created"], operation["proof"]["created"]);
+        let result = crate::events::handle_did_operation(&state, operation).await.unwrap();
+        assert_eq!(result, vector["did"]);
+        let store = state.store.lock().await;
+        let accepted = store.get_events(vector["did"].as_str().unwrap());
+        assert_eq!(accepted.len(), 1);
+        assert_eq!(&accepted[0].operation, operation);
+        assert_eq!(accepted[0].time, operation["created"].as_str().unwrap());
     }
 }

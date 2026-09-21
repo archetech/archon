@@ -2,9 +2,9 @@
 
 This completes the agent-model integration criteria in the
 [fixed completion contract](protocol-convergence-completion.md). The asset/controller
-proof (B1–B3) is complete. C1 is implemented in the [final theorem](protocol-convergence-theorem.md), including
-the approved correction to local receipt clocks; the registration-context audit
-still blocks C2/C3. This is a proof of the
+proof (B1–B3) is complete. C1–C3 are implemented in the [final theorem](protocol-convergence-theorem.md), including
+the approved corrections to local receipt clocks and unanchored controller
+selection. This is a proof of the
 protocol model with a signed executable bridge, not universal verification of the
 TypeScript or Rust programs.
 

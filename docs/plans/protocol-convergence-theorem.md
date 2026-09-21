@@ -16,7 +16,7 @@ input counterexample, not an observed production incident.
 
 On 2026-09-21 the maintainer approved normalizing local receipt clocks to the
 existing local producer rule: `operation.created` for creation and `proof.created`
-for updates/deletions. Both ports now normalize at import and candidate recovery,
+for updates/deletions. Both ports enforce this in direct submission, import and candidate recovery,
 then reconstruct histories and dependent asset authorization. Signed regressions
 check actual retained agent operations, intrinsic clocks, deletion and recovery
 from an old accepted projection. The creation fixture deliberately has different
@@ -27,21 +27,24 @@ those complete-operation fields and the immutable creation/registry identity.
 There is no independent receipt-clock table, root exception or assumed equality
 of node-local timestamps in the final protocol input.
 
-## Remaining C2 blocker: unanchored registration metadata
+## Unanchored registration-metadata correction
 
 After the clock correction, an additional signed ordinary-import audit found
-that `controllerForEvent`/`controller_for_event` can treat `registration` on a
+that `controllerForEvent`/`controller_for_event` treated `registration` on a
 local receipt as chain context. With an anchored controller, a local asset whose
-creation precedes its proof time can select different historical keys depending
+creation preceded its proof time selected different historical keys depending
 on whether the first retained receipt carries that field. The same signed asset
-is rejected in one order and accepted in the other, persisting across replay.
+was rejected in one order and accepted in the other, persisting across replay.
 `local-registration-counterexample.json` isolates the case with real signatures.
 
-The composed model uses proof-time authorization for sources without a chain
-anchor. That domain boundary is not yet enforced by production controller
-selection. C2/C3 remain open pending the explicit decision to restrict chain
-context to actual chain registries (recommended) or reject this metadata on
-unanchored receipts. The local-clock normalization itself is approved and fixed.
+On 2026-09-21 the maintainer approved requiring an actual chain registry for
+chain-based controller selection. Both Gatekeepers now use proof-time
+authorization for local, Hyperswarm and pin receipts even when their envelopes
+carry registration metadata. The fields remain retained; they confer no chain
+authority. The signed regression rejects the old-key asset in both orders and
+repairs a previously accepted projection on startup without changing its evidence.
+This enforces the composed model's anchorless authorization boundary rather than
+excluding the demonstrated input through a stronger premise.
 
 ## Exact claim
 
@@ -120,7 +123,7 @@ one finite fixture happens to satisfy.
 | Authoritative chain facts | Registry, complete nonempty ordinal, block time and registration presence belong to the fixed chain view. The receipt-class registry/position projections are checked. Same registry/ordinal/CID is one ordering class with the same authoritative facts, not a uniqueness assumption about ordinals. Conflicting chain views are different input snapshots. |
 | Ordinal admission | Both ordinary import and replay require nonempty chain positions after #1236. `ProtocolSources` checks that an anchor is in range, belongs to the source operation and registry, and denotes a chain registry. Unpositioned local/Hyperswarm/pin remain permitted. A chain relay is downgraded to a gossip hint before this domain. Wrong-chain positioned receipts remain permitted provisional evidence. |
 | Receipt ordering | `RegistryCidRanks` and `AssetCidRanks` interpret registry-local ordinal then canonical CID. Tied positions for distinct operations are admitted. Repeated identical operation/position classes share ranks; different anchors remain distinct. Only predecessor-registry anchors receive chain priority. Unanchored and wrong-chain evidence uses canonical CID priority. |
-| Unanchored clock | Hyperswarm and pin clocks are normalized to `proof.created` at import and retained-candidate recovery. Local producer clocks are operation-intrinsic: creation `created`, update/deletion `proof.created` (Gatekeeper specification §8.1–8.2). This does not assume equal local arrival times. Both ports now enforce the local clock rule at ordinary import and recovery too; the separate registration-context gap is described above. Agent/asset receipt clocks are derived from creation and proof fields, including genesis. |
+| Unanchored clock | Hyperswarm and pin clocks are normalized to `proof.created` at import and retained-candidate recovery. Local producer clocks are operation-intrinsic: creation `created`, update/deletion `proof.created` (Gatekeeper specification §8.1–8.2). This does not assume equal local arrival times. Both ports now enforce the local clock rule at ordinary import and recovery too; unanchored registration metadata cannot select chain authority. Agent/asset receipt clocks are derived from creation and proof fields, including genesis. |
 | Registry configuration | Nodes agree on registry-name projection and classification; these are not a closed supported-chain allowlist. Local/Hyperswarm/pin have no chain priority. The separate local-owner/nonlocal-asset creation restriction remains active. |
 | Same retained evidence | Same operation/registry/anchor-class key sets per DID. Arrival order, duplicate count and arbitrary bookkeeping may differ. The source-admission contract is preserved by this equivalence. Candidate retention is separate from accepted projection: rejected/deferred evidence is reconsidered. Equal operation bytes with different known anchors do not meet this premise. |
 | Complete reconciliation | Independent agents precede assets; assets cannot control agents or other assets. The theorem executes this schedule over any finite family and proves termination. Dynamic imports must eventually invoke complete reconciliation after evidence settles. |
@@ -135,7 +138,8 @@ The implementation architecture remains the audited A/B architecture: mediators
 produce chain positions; Gatekeeper normalizes and journals candidates; event
 authorization selects historical controllers; low-level verification receives the
 selected document; reconstruction publishes agents before dependent assets.
-The approved local-clock normalization is the only runtime protocol change.
+The two approved runtime corrections normalize local clocks and require an actual
+chain registry for chain-based controller selection.
 The paused #1156 relationship-permission rule remains paused.
 
 ## C3 checked bridge and CI

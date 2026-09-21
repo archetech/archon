@@ -1,9 +1,9 @@
 # Archon protocol convergence
 
 The [frozen completion contract](../../docs/plans/protocol-convergence-completion.md)
-has A1–A4, B1–B3 and the C1 composition implemented. The approved local-clock
-correction closes the first C2 counterexample. A separate unanchored registration-
-metadata audit still blocks C2/C3; see the final audit below. `Archon.protocol_convergence` proves a unique complete semantic result and
+has A1–A4, B1–B3 and C1–C3 implemented. The approved local-clock and
+unanchored registration-metadata corrections resolve both signed C2
+counterexamples; see the final audit below. `Archon.protocol_convergence` proves a unique complete semantic result and
 actual terminating reconstruction for any finite family of agents and assets
 with the same retained protocol evidence. Arrival order, duplicate count,
 first-observation bookkeeping and previously published projections may differ.
@@ -1012,13 +1012,13 @@ not a claim that every synthetic provisional event exists as a stored receipt.
 
 ## Controller selection (B1)
 
-`ControllerSelection.lean` derives historical controller components and named-method authorization from A3’s converged confirmed receipt view. It models strict same-chain ordinals, inclusive cross-chain time, whole-prefix anchoring, selected-registry fallback, genesis admission and missing/deleted controllers. `controller_selection_same_sources` composes selection with shared source evidence, without assuming equal authorizing documents. See the [B1–B3 audit](../../docs/plans/asset-controller-convergence.md). B1 is merged in #1238. B2 is merged in #1239; the B3 bridge is described below. C1 is implemented in #1241; C2/C3 remain open as recorded in the final audit.
+`ControllerSelection.lean` derives historical controller components and named-method authorization from A3’s converged confirmed receipt view. It models strict same-chain ordinals, inclusive cross-chain time, whole-prefix anchoring, selected-registry fallback, genesis admission and missing/deleted controllers. `controller_selection_same_sources` composes selection with shared source evidence, without assuming equal authorizing documents. See the [B1–B3 audit](../../docs/plans/asset-controller-convergence.md). B1 is merged in #1238. B2 is merged in #1239; the B3 bridge is described below. C1–C3 are implemented in #1241 as recorded in the final audit.
 
 ## Asset reconciliation (B2)
 
 `integrated_asset_convergence` reconstructs controller histories from A3 source evidence, proves those reconstructions terminate, and consumes the ordinal/CID ordering contract in the asset result theorem. Equal authorizing histories/verdicts are not endpoint premises.
 
-`AssetAuthorization`, `AssetComponents`, `AssetReplay`, `AssetExecution` and `AssetPriority` derive receipt-specific owner authorization, complete asset components and registry priority, then prove full-record reconciliation termination and unique results from converged agent histories. `asset_source_execution` proves successful nonempty execution from an actually authorized retained creation. `asset_selected_authorized` traces every selected record to a valid retained source; `asset_reconsidered` covers recovery of earlier rejected/deferred evidence. All named results are axiom-audited. The [B1–B3 audit](../../docs/plans/asset-controller-convergence.md) records source, shape, signature and component-decoding contracts. The signed B3 bridge is described below; protocol-wide C1 composition is implemented in #1241; its C2/C3 audit remains open.
+`AssetAuthorization`, `AssetComponents`, `AssetReplay`, `AssetExecution` and `AssetPriority` derive receipt-specific owner authorization, complete asset components and registry priority, then prove full-record reconciliation termination and unique results from converged agent histories. `asset_source_execution` proves successful nonempty execution from an actually authorized retained creation. `asset_selected_authorized` traces every selected record to a valid retained source; `asset_reconsidered` covers recovery of earlier rejected/deferred evidence. All named results are axiom-audited. The [B1–B3 audit](../../docs/plans/asset-controller-convergence.md) records source, shape, signature and component-decoding contracts. The signed B3 bridge is described below; protocol-wide C1–C3 are implemented in #1241.
 
 
 ## Signed asset/controller bridge (B3)
@@ -1032,5 +1032,5 @@ TypeScript and Rust run the same 70 evidence scenarios and 10 staged recovery ca
 in three delivery orders, including repeated import and real JSON database reopen.
 Generator rejection/reordering tests protect the translation. CI regenerates signed
 sources and checks both generated modules. B1–B3 are complete at this boundary;
-C1 is implemented in #1241; C2/C3 remain open as recorded in the final audit. See the [audit](../../docs/plans/asset-controller-convergence.md)
+C1–C3 are implemented in #1241 as recorded in the final audit. See the [audit](../../docs/plans/asset-controller-convergence.md)
 for source-decoding, signature and finite-correspondence assumptions.
