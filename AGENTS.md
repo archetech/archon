@@ -95,7 +95,7 @@ These rules apply to coding agents working in this repository.
 
 - Before adding protocol safeguards, demonstrate reachability with real signed operations and the ordinary importer. Mocked failure tests establish containment, not protocol validity; distinguish inputs accepted by permissive implementation code from the documented agent/asset model.
 
-- Bind event targets before queue deduplication and candidate persistence. During recovery validate the storage target too; derive creation identity from canonical signed bytes, preserve explicit method prefixes when enumerating suffix-keyed stores, and never relocate misaddressed evidence to another DID.
+- Bind event targets before queue deduplication and in the replay importer. A clean production audit does not justify adding hypothetical storage repair or unrelated prefix-policy changes; keep admission fixes scoped to their demonstrated bug.
 
 - Public history reads and verification must hold the history lock throughout asynchronous resolution, including status-cache refreshes. GC persistence failures must propagate to callers and preserve pending imports; only successful GC performs queue cleanup. Parity ingress must preserve every fixture ordinal component.
 

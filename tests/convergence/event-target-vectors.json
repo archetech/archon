@@ -112,26 +112,7 @@
         "proofValue": "6M9vG4Uy0hhIypDOIxTQUERE7dXj-_Rii3YSr4lvQZM8Rb_hvUjVSWf3zz8OYi5vDqARa22R7K_npQWXOJQoUw"
       }
     },
-    "createWithDidTarget": "did:cid:bagaaierat652cay5ryh4wzfa3qpykwdtz4olqes7k63anqtzycdtym35ty4a",
-    "aliasDid": "did:alias:bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
-    "aliasUpdate": {
-      "type": "update",
-      "did": "did:alias:bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
-      "previd": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
-      "doc": {
-        "didDocumentData": {
-          "alias": true
-        }
-      },
-      "proof": {
-        "type": "DataIntegrityProof",
-        "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-        "created": "2026-09-01T00:00:00Z",
-        "verificationMethod": "did:alias:bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a#key-1",
-        "proofPurpose": "capabilityInvocation",
-        "proofValue": "rROELq17LTE4B4dF54GxFOuOOn1WDf9DvqyFVmlr5F1qDM5q8zav-xpp307HDBZDNUeBJlgvyAaCdOxPkBCRsg"
-      }
-    }
+    "createWithDidTarget": "did:cid:bagaaierat652cay5ryh4wzfa3qpykwdtz4olqes7k63anqtzycdtym35ty4a"
   },
   {
     "name": "integrity/did:custom",
@@ -249,26 +230,7 @@
         "proofValue": "lUE7aTxI_a7Bjo-xKqZRZ0UFIXyZQUvYyf7MXwEYGo4g4hP2GA9sxGPtI-_869-ixkzUCEgoFKC12ZWeo3gUNw"
       }
     },
-    "createWithDidTarget": "did:custom:bagaaieraadpgfvmga5hf2oob234a4uexyrxrxmcgrcqojircqrqbwwejtdmq",
-    "aliasDid": "did:alias:bagaaierahcauqdpfxe7dkpfpscxigspcxppc7wspnlcima46xjz7eczjfw2a",
-    "aliasUpdate": {
-      "type": "update",
-      "did": "did:alias:bagaaierahcauqdpfxe7dkpfpscxigspcxppc7wspnlcima46xjz7eczjfw2a",
-      "previd": "bagaaierahcauqdpfxe7dkpfpscxigspcxppc7wspnlcima46xjz7eczjfw2a",
-      "doc": {
-        "didDocumentData": {
-          "alias": true
-        }
-      },
-      "proof": {
-        "type": "DataIntegrityProof",
-        "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-        "created": "2026-09-01T00:00:00Z",
-        "verificationMethod": "did:alias:bagaaierahcauqdpfxe7dkpfpscxigspcxppc7wspnlcima46xjz7eczjfw2a#key-1",
-        "proofPurpose": "capabilityInvocation",
-        "proofValue": "7H4MStPEG9vrTTVvGVZQQVhx1K37h5iHlj6tSqcU3no9UJxwqpjyuAqfhbHXgWzNUzQdcqQR2oa2C6pW2D-BsQ"
-      }
-    }
+    "createWithDidTarget": "did:custom:bagaaieraadpgfvmga5hf2oob234a4uexyrxrxmcgrcqojircqrqbwwejtdmq"
   },
   {
     "name": "legacy/default",
@@ -378,25 +340,7 @@
         "proofValue": "27KYq0TB28AznZQMIqUGX11dNHv3KdwZZJ7PlYsNKx4-aQ4WUwBzp_Ru1clucHf_e7bIeKclxcuDjlrYNfpRuA"
       }
     },
-    "createWithDidTarget": "did:cid:bagaaierac4uof5zgbjc4hhztgam7dec2smvzznn7i3bjkaaf7lto75tqzkyq",
-    "aliasDid": "did:alias:bagaaieralvrozqpicgsqqooy634exlxmi3zjthuqy2wwb6cdbxgkaexpxaqq",
-    "aliasUpdate": {
-      "type": "update",
-      "did": "did:alias:bagaaieralvrozqpicgsqqooy634exlxmi3zjthuqy2wwb6cdbxgkaexpxaqq",
-      "previd": "bagaaieralvrozqpicgsqqooy634exlxmi3zjthuqy2wwb6cdbxgkaexpxaqq",
-      "doc": {
-        "didDocumentData": {
-          "alias": true
-        }
-      },
-      "proof": {
-        "type": "EcdsaSecp256k1Signature2019",
-        "created": "2026-09-01T00:00:00Z",
-        "verificationMethod": "did:alias:bagaaieralvrozqpicgsqqooy634exlxmi3zjthuqy2wwb6cdbxgkaexpxaqq#key-1",
-        "proofPurpose": "capabilityInvocation",
-        "proofValue": "NgGVRbfu2txB61_qmMtTKDvamfmgcGPg0e29VPLW3qEgIG-OMhlMyNyQ3j-lUPjVcRshSRm-As0CFiAXI3SOcQ"
-      }
-    }
+    "createWithDidTarget": "did:cid:bagaaierac4uof5zgbjc4hhztgam7dec2smvzznn7i3bjkaaf7lto75tqzkyq"
   },
   {
     "name": "legacy/did:custom",
@@ -509,24 +453,6 @@
         "proofValue": "Fdthg7eB4WdX66ta_1t40ahPV3Kfe9gkGkGIXbZezr5eNuLUhTz7etEj0e5bzkcSMJ2IN7oy6nIJpSkPbRy7DQ"
       }
     },
-    "createWithDidTarget": "did:custom:bagaaieraszhjrdwiiqagvckvvouu45zz5pbc2hclnrygh5uplstvvaaychpa",
-    "aliasDid": "did:alias:bagaaieratffniok43ngdlwbo56zq33sztrpyxd3slyjvzcwnygiez2zasb7a",
-    "aliasUpdate": {
-      "type": "update",
-      "did": "did:alias:bagaaieratffniok43ngdlwbo56zq33sztrpyxd3slyjvzcwnygiez2zasb7a",
-      "previd": "bagaaieratffniok43ngdlwbo56zq33sztrpyxd3slyjvzcwnygiez2zasb7a",
-      "doc": {
-        "didDocumentData": {
-          "alias": true
-        }
-      },
-      "proof": {
-        "type": "EcdsaSecp256k1Signature2019",
-        "created": "2026-09-01T00:00:00Z",
-        "verificationMethod": "did:alias:bagaaieratffniok43ngdlwbo56zq33sztrpyxd3slyjvzcwnygiez2zasb7a#key-1",
-        "proofPurpose": "capabilityInvocation",
-        "proofValue": "5UdknbR6Fu0UwjUX0_ryVfT23zAqb9e3LmNXuu_lzIxTHUoo0iGfowQGr-eNqPh1-vSS8YsDjl4D_yK80xssBQ"
-      }
-    }
+    "createWithDidTarget": "did:custom:bagaaieraszhjrdwiiqagvckvvouu45zz5pbc2hclnrygh5uplstvvaaychpa"
   }
 ]

@@ -24,11 +24,11 @@ The model assumes each DID has one content-addressed genesis and every receipt
 belongs to its operation's target. Issue #1248 found that runtime envelope routing
 did not enforce that admission boundary: misaddressed signed genesis operations
 could produce order-dependent histories. Both importers now reject contradictory
-targets before deduplication and repair them out of stored evidence. The final
+targets before deduplication and apply the same check during replay. The final
 agent/asset fixture bridge checks explicit envelope targets as well as its existing
 genesis and signed-successor identity checks; negative generator tests cover all
 three operation kinds. Shared signed `event-target-vectors.json` exercise ordinary
-imports, direct submission, storage-key validation, custom prefixes and durable
+imports, direct submission, replay, custom prefixes and durable
 restart in both ports. These admission tests close the demonstrated runtime gap;
 they do not turn the existing protocol theorem into universal runtime refinement.
 

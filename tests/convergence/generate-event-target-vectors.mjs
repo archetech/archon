@@ -31,12 +31,9 @@ for (const legacy of [false, true]) {
         // Even a signed extraneous creation.did cannot override its content ID.
         const createWithDid = sign({ ...payload, did: otherDid }, '#key-1');
         const operations = [create, update, deletion];
-        const aliasDid = `did:alias:${await cid(create)}`;
-        const aliasUpdate = sign({ type: 'update', did: aliasDid, previd: await cid(create),
-            doc: { didDocumentData: { alias: true } } }, aliasDid + '#key-1');
         vectors.push({ name: `${legacy ? 'legacy' : 'integrity'}/${prefix ?? 'default'}`, did,
             operations, ids: await Promise.all(operations.map(cid)), other, otherDid,
-            createWithDid, createWithDidTarget: `${prefix ?? 'did:cid'}:${await cid(createWithDid)}`, aliasDid, aliasUpdate });
+            createWithDid, createWithDidTarget: `${prefix ?? 'did:cid'}:${await cid(createWithDid)}` });
     }
 }
 writeFileSync('tests/convergence/event-target-vectors.json', JSON.stringify(vectors, null, 2) + '\n');

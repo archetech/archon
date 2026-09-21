@@ -25,12 +25,6 @@ fn hint(operation: &Value, did: Option<&str>) -> Value {
     event
 }
 
-fn stored(operation: &Value, did: Option<&str>) -> crate::EventRecord {
-    let mut event = hint(operation, did);
-    event["opid"] = json!(crate::generate_json_cid(operation).unwrap());
-    crate::value_to_event_record(&event)
-}
-
 #[tokio::test]
 async fn binds_targets_before_queue_deduplication() {
     for v in vectors() {
@@ -113,130 +107,6 @@ async fn conflicting_genesis_converges_through_durable_restart() {
 }
 
 #[tokio::test]
-async fn removes_misaddressed_stored_evidence_before_replay() {
-    for v in vectors() {
-        for journal in [false, true] {
-            for envelope in ["wrong", "correct", "omitted"] {
-                let did = v["did"].as_str().unwrap();
-                let wrong = v["otherDid"].as_str().unwrap();
-                let mut db = memory();
-                let claimed = match envelope {
-                    "wrong" => Some(wrong),
-                    "correct" => Some(did),
-                    _ => None,
-                };
-                let bad: Vec<_> = v["operations"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|op| stored(op, claimed))
-                    .collect();
-                db.set_events(wrong, bad.clone()).unwrap();
-                if journal {
-                    let mut retained = bad;
-                    retained.push(stored(&v["other"], Some(wrong)));
-                    db.set_candidates(wrong, retained).unwrap();
-                }
-                let valid = v["operations"]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|op| stored(op, Some(did)))
-                    .collect();
-                db.set_events(did, valid).unwrap();
-                let (state, _directory) = crate::tests::make_state(db);
-                crate::history::ensure_history_ready(&state).await.unwrap();
-                let store = state.store.lock().await;
-                let accepted: Vec<_> = store
-                    .get_events(did)
-                    .iter()
-                    .map(|e| e.operation.clone())
-                    .collect();
-                assert_eq!(json!(accepted), v["operations"], "{} {envelope}", v["name"]);
-                let expected = if journal {
-                    vec![v["other"].clone()]
-                } else {
-                    vec![]
-                };
-                assert_eq!(
-                    store
-                        .get_events(wrong)
-                        .iter()
-                        .map(|e| e.operation.clone())
-                        .collect::<Vec<_>>(),
-                    expected
-                );
-                assert_eq!(
-                    store
-                        .get_candidates()
-                        .unwrap()
-                        .get(wrong)
-                        .into_iter()
-                        .flatten()
-                        .map(|e| e.operation.clone())
-                        .collect::<Vec<_>>(),
-                    expected
-                );
-                assert_eq!(
-                    store
-                        .get_candidates()
-                        .unwrap()
-                        .values()
-                        .map(Vec::len)
-                        .sum::<usize>(),
-                    v["operations"].as_array().unwrap().len() + usize::from(journal)
-                );
-            }
-        }
-    }
-}
-
-#[tokio::test]
-async fn rejected_prefix_alias_cannot_erase_canonical_history() {
-    for v in vectors() {
-        for (published, journal) in [(false, true), (true, true), (true, false)] {
-            let did = v["did"].as_str().unwrap();
-            let alias = v["aliasDid"].as_str().unwrap();
-            let mut db = memory();
-            let good = stored(&v["operations"][0], Some(did));
-            if journal {
-                db.set_candidates(did, vec![good.clone()]).unwrap();
-            }
-            db.set_candidates(alias, vec![stored(&v["operations"][0], Some(alias))])
-                .unwrap();
-            if published {
-                db.set_events(did, vec![good]).unwrap();
-            }
-            let (state, _directory) = crate::tests::make_state(db);
-            crate::history::ensure_history_ready(&state).await.unwrap();
-            {
-                let store = state.store.lock().await;
-                assert_eq!(store.get_events(did).len(), 1);
-                assert_eq!(store.get_events(did)[0].operation, v["operations"][0]);
-                assert!(store.get_candidates().unwrap()[alias].is_empty());
-            }
-            let resolved =
-                crate::resolve_local_doc_async(&state, alias, crate::ResolveOptions::default())
-                    .await
-                    .unwrap();
-            assert_eq!(resolved["didDocument"]["id"], alias);
-            assert!(
-                crate::events::handle_did_operation(&state, &v["aliasUpdate"])
-                    .await
-                    .is_err()
-            );
-            crate::import_batch_impl(&state, &[hint(&v["aliasUpdate"], None)]).await;
-            let result = crate::process_events_impl(&state).await;
-            assert_eq!(result.rejected, Some(1));
-            assert_eq!(result.added, Some(0));
-            let store = state.store.lock().await;
-            assert_eq!(store.get_events(did).len(), 1);
-            assert_eq!(store.get_events(did)[0].operation, v["operations"][0]);
-        }
-    }
-}
-
-#[tokio::test]
 async fn direct_and_imported_creation_use_the_same_identity() {
     for v in vectors() {
         let (state, _directory) = crate::tests::make_state(memory());
@@ -272,5 +142,27 @@ async fn direct_and_imported_creation_use_the_same_identity() {
                 .len(),
             1
         );
+    }
+}
+
+#[tokio::test]
+async fn checks_targets_in_per_event_replay_importer() {
+    for v in vectors() {
+        let (state, _directory) = crate::tests::make_state(memory());
+        for op in v["operations"].as_array().unwrap() {
+            let bad = crate::value_to_event_record(&hint(op, v["otherDid"].as_str()));
+            assert!(matches!(
+                crate::events::import_event_once(&state, bad).await,
+                crate::events::ImportStatus::Rejected
+            ));
+            let good = crate::value_to_event_record(&hint(op, v["did"].as_str()));
+            assert!(matches!(
+                crate::events::import_event_once(&state, good).await,
+                crate::events::ImportStatus::Added
+            ));
+        }
+        let store = state.store.lock().await;
+        assert_eq!(store.get_events(v["did"].as_str().unwrap()).len(), 3);
+        assert!(store.get_events(v["otherDid"].as_str().unwrap()).is_empty());
     }
 }

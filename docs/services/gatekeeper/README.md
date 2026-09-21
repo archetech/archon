@@ -988,18 +988,8 @@ recovers even if repeated imports are suppressed by the in-memory seen set.
 
 Imports validate the operation-derived target before queue deduplication and candidate persistence, then run the insertion algorithm below and replay the affected DID and its transitive dependents. Imports and direct submissions serialize history mutations. Replay uses a separate working view and invokes the same insertion/authorization algorithm; it never trusts a previous authorization verdict merely because it was once accepted.
 
-Candidate recovery checks both the envelope DID and the history key against the
-operation-derived target. Mismatched evidence is discarded before deduplication,
-dependency indexing and replay; accepted projections are rebuilt without it.
-It is not moved into another DID's history. Backends enumerate CID suffixes, so
-recovery preserves an explicit signed creation prefix and avoids enumerating the
-same journaled history again under the configured default prefix. Signed operation
-bytes and content-backed predecessor aliases remain unchanged.
-Because physical histories are keyed by CID suffix, replay excludes a rejected
-prefix alias from publication when that suffix belongs to a canonical genesis.
-Deleting the alias's empty projection would otherwise erase the canonical history.
-Direct and imported successors must name the genesis's full DID; alternate-prefix
-resolution remains a read alias.
+The per-event replay importer applies the same envelope target check. This rule
+adds no storage migration or candidate-journal cleanup.
 
 Local/gossip candidates retain the first observation of each canonical operation per registry; fresh peer receipt timestamps and ordinals do not add authorization evidence. Anchored candidates retain their distinct chain positions. After startup recovery, a merged import that changes neither retained candidates nor accepted history skips reconciliation and leaves status and verification caches intact. New evidence and changed anchors still reconcile normally.
 
@@ -1011,9 +1001,9 @@ TypeScript's isolated replay copies event rows while sharing read-only operation
 payloads and memoizing their canonical IDs for that replay only. Resolution
 detaches its result before removing deprecated fields, preserving signed bytes.
 Independent agent histories replay in bounded groups of 32; the agent phase
-finishes before the asset phase. Target validation removes misaddressed retained
-evidence before classifying these histories; mixed-type evidence still keeps a
-history at its original sequential position. Assets then replay in bounded groups,
+finishes before the asset phase. Histories with mixed-type or misaddressed
+retained evidence remain at their original sequential positions instead of
+joining parallel groups. Assets then replay in bounded groups,
 preserving each DID's internal candidate order and publishing
 only after reconstruction completes. This relies on self-controlled agents
 and agent-only asset controllers, which are enforced during authorization.
