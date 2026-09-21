@@ -7,10 +7,30 @@ namespace Archon
 /-- Static agent graphs and authoritative receipt-class facts. Controller
 histories themselves are reconstructed below from retained source evidence. -/
 structure AssetControllerInputs where
-  table : ControllerTable
+  /-- Immutable genesis-kind projection; independent of receipt authorization. -/
+  isAgent : Nat → Bool
+  specifications : ControllerTable
   receipts : Nat → RegistryReceipts
   operationTime : Nat → Nat → Int
   chainFacts : Nat → Nat → ChainReceiptView
+
+/-- Filter by decoded genesis kind before either replay or owner lookup. Agent
+specifications use DocumentGraph's self-controlled predecessor-key verification;
+there is no external-controller edge in that graph. -/
+def AssetControllerInputs.table (inputs : AssetControllerInputs) : ControllerTable := fun owner =>
+  if inputs.isAgent owner then inputs.specifications owner else none
+
+theorem controller_domain (inputs : AssetControllerInputs) (owner : Nat)
+    (nonagent : inputs.isAgent owner = false) : inputs.table owner = none := by
+  simp [AssetControllerInputs.table, nonagent]
+
+theorem nonagent_controller_rejects (inputs : AssetControllerInputs) (owner : Nat)
+    (nonagent : inputs.isAgent owner = false) (histories : ControllerHistories)
+    (unanchored : Nat → Bool) (request : ControllerRequest) (named : Nat) (signature : Nat → Bool) :
+    activeOwner inputs.table histories unanchored owner request = false ∧
+      ownerVerifies inputs.table histories unanchored owner request named signature = false :=
+  absent_owner_rejects inputs.table histories unanchored owner request
+    (controller_domain inputs owner nonagent) named signature
 
 def controllerSourceModel (inputs : AssetControllerInputs) (owner : Nat) (spec : ControllerSpec) :=
   coldComponentEvents spec.graph
@@ -149,6 +169,7 @@ theorem integrated_asset_convergence [DecidableEq α] (inputs : AssetControllerI
     (∀ owner spec, inputs.table owner = some spec →
       (∃ result, controllerSourceStop inputs owner spec (agentLeft owner) = some result) ∧
       (∃ result, controllerSourceStop inputs owner spec (agentRight owner) = some result)) ∧
+    (∀ owner, inputs.isAgent owner = false → inputs.table owner = none) ∧
     AssetSiblingOrdering g r position ∧
     AssetSourceGuarantees g r inputs.table (reconciledControllerHistories inputs agentLeft)
       unanchored localRegistry chainFacts xs ∧
@@ -168,12 +189,13 @@ theorem integrated_asset_convergence [DecidableEq α] (inputs : AssetControllerI
        rankedPass m (chainOwner a) g.size lrecords lresult = lresult ∧
        rankedPass m (chainOwner a) g.size rrecords rresult = rresult ∧
        assetResult g a lresult = assetResult g a rresult) := by
-  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
   · intro owner spec entry
     have bounds := agentsValid owner spec entry
     obtain ⟨left, stoppedLeft, _⟩ := controller_source_terminates inputs owner spec (agentLeft owner) bounds.1 bounds.2
     obtain ⟨right, stoppedRight, _⟩ := controller_source_terminates inputs owner spec (agentRight owner) bounds.1 bounds.2
     exact ⟨⟨left, stoppedLeft⟩, ⟨right, stoppedRight⟩⟩
+  · exact controller_domain inputs
   · exact fun x y parent xp yp xa ya => asset_sibling_priority g r position ranks genesis x y parent xp yp xa ya
   · exact asset_source_guarantees inputs agentLeft g r unanchored localRegistry chainFacts
       ordered bounded parents genesis rootBound xs
