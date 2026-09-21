@@ -80,6 +80,48 @@ def AssetSiblingOrdering (g : AssetGraph) (r : AssetReceipts) (position : Nat �
     (x < y ↔ compare (position x) (position y) = .lt ∨
       (compare (position x) (position y) = .eq ∧ r.owner x < r.owner y))
 
+/-- Guarantees for each source-derived world, including the conditional
+nonempty execution result and provenance of every selected representation. -/
+structure AssetSourceGuarantees (g : AssetGraph) (r : AssetReceipts)
+    (table : ControllerTable) (histories : ControllerHistories)
+    (unanchored : Nat → Bool) (localRegistry : Nat) (chainFacts : Nat → ChainReceiptView)
+    (sources : List (AgentSourceReceipt α)) [DecidableEq α] : Prop where
+  reconsidered : ∀ source ∈ sources,
+    assetReceiptAuthorized g table histories unanchored localRegistry chainFacts source.key = true →
+    (assetAnchors g r).size + source.key.operation ∈
+      recordIds (assetSourceRecords g r table histories unanchored localRegistry chainFacts sources)
+  execution : ∀ source ∈ sources, source.key.operation = g.root →
+    assetReceiptAuthorized g table histories unanchored localRegistry chainFacts source.key = true →
+    let a := assetAnchors g r
+    let m := coldAssetModel g a
+    let records := assetSourceRecords g r table histories unanchored localRegistry chainFacts sources
+    ∃ result final,
+      stopWhenStable (rankedPass m (chainOwner a) g.size records) (m.size + 3) [] = some result ∧
+      rankedPass m (chainOwner a) g.size records result = result ∧
+      ((recordIds result).map (chainOwner a)).head? = some g.root ∧
+      runAssetComponents g (assetInitial g) (((recordIds result).map (chainOwner a)).drop 1) = some final
+  provenance : ∀ result fuel,
+    stopWhenStable
+      (rankedPass (coldAssetModel g (assetAnchors g r)) (chainOwner (assetAnchors g r)) g.size
+        (assetSourceRecords g r table histories unanchored localRegistry chainFacts sources)) fuel [] = some result →
+    ∀ record ∈ result, record.payload ∈ sources ∧
+      assetReceiptAuthorized g table histories unanchored localRegistry chainFacts record.payload.key = true ∧
+      chainOwner (assetAnchors g r) record.opid = record.payload.key.operation
+
+theorem asset_source_guarantees [DecidableEq α] (inputs : AssetControllerInputs)
+    (agents : Nat → List (AgentSourceReceipt α)) (g : AssetGraph) (r : AssetReceipts)
+    (unanchored : Nat → Bool) (localRegistry : Nat) (chainFacts : Nat → ChainReceiptView)
+    (ordered : AncestryOrdered (assetStructure g)) (bounded : DepthBounded (assetStructure g))
+    (parents : AssetParentBounded g) (genesis : g.parent g.root = none) (rootBound : g.root < g.size)
+    (sources : List (AgentSourceReceipt α)) :
+    AssetSourceGuarantees g r inputs.table (reconciledControllerHistories inputs agents)
+      unanchored localRegistry chainFacts sources := by
+  exact ⟨asset_reconsidered g r inputs.table _ unanchored localRegistry chainFacts sources,
+    asset_source_execution g r inputs.table _ unanchored localRegistry chainFacts
+      ordered bounded parents genesis rootBound sources,
+    fun result fuel stopped record selected => asset_selected_authorized g r inputs.table _
+      unanchored localRegistry chainFacts sources result fuel stopped record selected⟩
+
 /-- B2 endpoint from agent and asset source evidence. Agent reconstruction is
 proved to stop, B1 derives each asset's authority, ranked full-record asset replay
 stops with one full result, and the ordering contract is consumed by the endpoint.
@@ -90,6 +132,7 @@ theorem integrated_asset_convergence [DecidableEq α] (inputs : AssetControllerI
     (agentsValid : ∀ owner spec, inputs.table owner = some spec →
       AncestryOrdered (documentAgent spec.graph) ∧ DepthBounded (documentAgent spec.graph))
     (g : AssetGraph) (r : AssetReceipts) (position : Nat → List Nat) (ranks : AssetCidRanks g r position)
+    (parents : AssetParentBounded g) (rootBound : g.root < g.size)
     (genesis : g.parent g.root = none) (unanchored : Nat → Bool) (localRegistry : Nat)
     (chainFacts : Nat → ChainReceiptView)
     (ordered : AncestryOrdered (assetStructure g)) (bounded : DepthBounded (assetStructure g))
@@ -98,6 +141,10 @@ theorem integrated_asset_convergence [DecidableEq α] (inputs : AssetControllerI
       (∃ result, controllerSourceStop inputs owner spec (agentLeft owner) = some result) ∧
       (∃ result, controllerSourceStop inputs owner spec (agentRight owner) = some result)) ∧
     AssetSiblingOrdering g r position ∧
+    AssetSourceGuarantees g r inputs.table (reconciledControllerHistories inputs agentLeft)
+      unanchored localRegistry chainFacts xs ∧
+    AssetSourceGuarantees g r inputs.table (reconciledControllerHistories inputs agentRight)
+      unanchored localRegistry chainFacts ys ∧
     (let a := assetAnchors g r
      let m := coldAssetModel g a
      let lrecords := assetSourceRecords g r inputs.table (reconciledControllerHistories inputs agentLeft)
@@ -110,13 +157,17 @@ theorem integrated_asset_convergence [DecidableEq α] (inputs : AssetControllerI
        rankedPass m (chainOwner a) g.size lrecords lresult = lresult ∧
        rankedPass m (chainOwner a) g.size rrecords rresult = rresult ∧
        assetResult g a lresult = assetResult g a rresult) := by
-  refine ⟨?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
   · intro owner spec entry
     have bounds := agentsValid owner spec entry
     obtain ⟨left, stoppedLeft, _⟩ := controller_source_terminates inputs owner spec (agentLeft owner) bounds.1 bounds.2
     obtain ⟨right, stoppedRight, _⟩ := controller_source_terminates inputs owner spec (agentRight owner) bounds.1 bounds.2
     exact ⟨⟨left, stoppedLeft⟩, ⟨right, stoppedRight⟩⟩
   · exact fun x y parent xp yp xa ya => asset_sibling_priority g r position ranks genesis x y parent xp yp xa ya
+  · exact asset_source_guarantees inputs agentLeft g r unanchored localRegistry chainFacts
+      ordered bounded parents genesis rootBound xs
+  · exact asset_source_guarantees inputs agentRight g r unanchored localRegistry chainFacts
+      ordered bounded parents genesis rootBound ys
   · exact asset_reconciliation_converges g r inputs.table _ _
       (controllers_from_shared_sources inputs agentLeft agentRight agentsSame agentsValid)
       unanchored localRegistry chainFacts ordered bounded xs ys same
