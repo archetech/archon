@@ -140,7 +140,7 @@ forks, repeated/earlier/tied anchors, missing predecessors, unconfirmed suffixes
 and cold/late-genesis replay in both ports. The signed pin audit led to the approved proof-time normalization rule; both ports
 now converge on asset verdicts and repair stored pre-fix projections. Lean checks source normalization and
 independently evaluates the expected components and authorization views. General
-runtime refinement remains outside this contract. B is completed below; C remains open.
+runtime refinement remains outside this contract. B and C1–C3 are completed below.
 
 ### B. Asset/controller convergence
 
@@ -187,19 +187,31 @@ not universal executable refinement. See the [audit](asset-controller-convergenc
 
 ### C. Close the protocol theorem
 
-- [ ] **C1 — Composition:** compose A and B into `protocol_convergence` over any
+- [x] **C1 — Composition:** compose A and B into `protocol_convergence` over any
   finite set of agent/asset DIDs. Prove uniqueness, complete modeled reconciliation
   termination, arrival-order/duplicate independence, and reconstruction independent
   of a stale accepted projection. State the eventual-settled-evidence corollary.
-- [ ] **C2 — Assumption/domain audit:** every premise is an explicit primitive or
+- [x] **C2 — Assumption/domain audit:** every premise is an explicit primitive or
   justified protocol condition. No circular shared-authorization assumption, hidden
   unique-anchor restriction, unexplained local timestamp equality, or fixture-only
   restriction may substitute for a missing argument. Any reachable protocol
   counterexample blocks completion until resolved; it is not renamed a limitation.
-- [ ] **C3 — Release the claim:** CI checks the top-level theorem with the existing
+- [x] **C3 — Release the claim:** CI checks the top-level theorem with the existing
   `propext`/`Quot.sound` allowlist and no admitted proofs. Document its exact inputs,
   output equality, assumptions, theorem dependencies, and finite runtime bridge.
   Close #1215 when A1–C3 are satisfied; do not hold it open for the separate work below.
+
+C1–C3 are implemented in #1241. The composed theorem and settled-evidence
+corollary include receipt normalization before agent/asset reconciliation. The
+2026-09-21 maintainer decisions resolve the signed C2 counterexamples: intrinsic
+local clocks; chain context only for chain registries; and preference for
+metadata-bearing copies at the same operation/registry/chain position before
+authorization. Incomplete copies remain accepted when no richer copy is known.
+Both ports test recovery and rejection without fallback to a weaker receipt.
+The top-level theorem binds decoded headers and derives metadata completeness
+from received copies, and its shared signed bridge includes both copy orders.
+The [final audit](protocol-convergence-theorem.md) records the exact premises,
+theorem dependencies, bridge and unchanged completion criteria.
 
 ## Separate work, not prerequisites for this claim
 

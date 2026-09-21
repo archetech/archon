@@ -554,7 +554,7 @@ An operation on an asset — create, update, or delete — is authorized by a ke
 
 - For the controller's events on the operation's registry, the cutoff is the **ordinal**: only events the chain committed strictly before the operation's are applied. Every event in a block shares the block's time, so time cannot order a rotation against an operation committed earlier in the same block, and a later block may carry an earlier timestamp; the ordinal is the chain's order.
 - For the controller's events on any other registry, the cutoff is the operation's **block time**, since ordinals do not compare across registries.
-- This applies only when the controller's own confirmed history is chain-anchored — every event confirming it on its registry carries the position the chain assigned. Otherwise, controller selection uses the asset operation's `proof.created` cutoff. For controller events on `hyperswarm` or `pin`, compare that cutoff with each controller operation's own `proof.created`, never its node-local receipt time. Events on other registries retain their existing event-time/chain-position rules.
+- Chain-based selection requires an event on an actual chain registry with registration metadata. Local, Hyperswarm and pin receipts always use proof-time authorization, even if their envelopes carry registration metadata or ordinals. The chain rule also applies only when the controller's own confirmed history is chain-anchored — every event confirming it on its registry carries the position the chain assigned. Otherwise, controller selection uses the asset operation's `proof.created` cutoff. For controller events on `hyperswarm` or `pin`, compare that cutoff with each controller operation's own `proof.created`. Local events use `created` for creation and `proof.created` for updates/deletions. Gatekeeper enforces these intrinsic clocks at import and stored-candidate recovery; node-local receipt time does not choose historical authority. Chain events retain their authoritative event-time/chain-position rules.
 
 The anchoring check walks the controller's confirmed prefix using each version's
 predecessor registry, stopping at the first non-confirming successor. Only
@@ -706,6 +706,13 @@ The [registration hardening record](plans/registration-hardening-1158.md) docume
 the production audit and approved version-1 compatibility decision. Malformed
 registrations previously accepted by older implementations are rejected on replay;
 none were found in the audited production history. Version 2 remains disabled.
+
+At the same canonical operation, chain registry and ordinal, a receipt carrying
+registration metadata takes precedence over a metadata-free copy before
+authorization. Incomplete copies remain usable when no richer copy is known;
+later enrichment reauthorizes the operation and dependent histories. An
+unauthorized richer receipt cannot fall back to the incomplete copy's proof-time
+context. This preference is shared by import, candidate recovery and replay.
 
 ### Implementation boundary: event authorization and proof verification
 

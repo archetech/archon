@@ -640,7 +640,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     // controller's events on the operation's registry and the block time for
     // any other.
     private async controllerForEvent(controllerDid: string, operation: Operation, event?: GatekeeperEvent): Promise<DidCidDocument> {
-        if (event?.registration && event.time) {
+        if (event?.registration && event.time && !isUnanchoredRegistry(event.registry)) {
             const cutoff = event.ordinal ? { registry: event.registry, ordinal: event.ordinal } : undefined;
             const doc = await this.resolveDIDAt(controllerDid, { confirm: true, versionTime: event.time, versionOrdinal: cutoff });
 
@@ -1568,7 +1568,10 @@ export default class Gatekeeper implements GatekeeperInterface {
     private async normalizeEvent(event: GatekeeperEvent): Promise<void> {
         // Normalize envelopes at import/recovery, including older mediator and
         // restored events. Resolution consumes the stored event time uniformly.
-        if ((event.registry === 'hyperswarm' || event.registry === PIN_QUEUE) && event.operation.proof) {
+        if (event.registry === 'local' && event.operation.type === 'create' && event.operation.created) {
+            event.time = event.operation.created;
+        }
+        else if ((event.registry === 'local' || event.registry === 'hyperswarm' || event.registry === PIN_QUEUE) && event.operation.proof) {
             event.time = event.operation.proof.created;
         }
         const cid = await this.generateCID(event.operation);
@@ -1598,7 +1601,20 @@ export default class Gatekeeper implements GatekeeperInterface {
     private candidateKey(event: GatekeeperEvent): string {
         // A fresh gossip receipt time is not new authorization evidence.
         if (isLocallyStampedRegistry(event.registry)) return JSON.stringify([event.opid, event.registry]);
+        if (!isUnanchoredRegistry(event.registry)) return JSON.stringify([event.opid, event.registry, event.ordinal]);
         return JSON.stringify([event.opid, event.registry, event.time, event.ordinal]);
+    }
+
+    private preferredCandidates(events: GatekeeperEvent[]): GatekeeperEvent[] {
+        const unique = new Map<string, GatekeeperEvent>();
+        for (const event of events) {
+            const key = this.candidateKey(event);
+            const current = unique.get(key);
+            // At the same chain position, incomplete copies cannot erase known metadata.
+            const keepMetadata = current?.registration && !event.registration && !isUnanchoredRegistry(event.registry);
+            if (!current || (!isLocallyStampedRegistry(event.registry) && !keepMetadata)) unique.set(key, event);
+        }
+        return [...unique.values()];
     }
 
     private candidateHistory?: Record<string, GatekeeperEvent[]>;
@@ -1631,8 +1647,10 @@ export default class Gatekeeper implements GatekeeperInterface {
             for (const [key, events] of Object.entries(candidates)) {
                 const previous = JSON.stringify(events);
                 for (const event of events) await this.normalizeEvent(event);
-                if (JSON.stringify(events) !== previous) await this.db.setCandidates(key, events);
-                this.indexCandidates(key, events);
+                const retained = this.preferredCandidates(events);
+                if (JSON.stringify(retained) !== previous) await this.db.setCandidates(key, retained);
+                candidates[key] = retained;
+                this.indexCandidates(key, retained);
             }
             this.candidateHistory = candidates;
         }
@@ -1644,14 +1662,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
         const events = [...(candidates[did] ?? []), ...copyJSON(histories?.get(did) ?? await this.db.getEvents(did)), ...incoming];
         for (const event of events) await this.normalizeEvent(event);
-        const unique = new Map<string, GatekeeperEvent>();
-        for (const event of events) {
-            const key = this.candidateKey(event);
-            // Keep the first hint's position. Anchored metadata
-            // updates still replace the record at the same chain position.
-            if (!unique.has(key) || !isLocallyStampedRegistry(event.registry)) unique.set(key, event);
-        }
-        const retained = [...unique.values()];
+        const retained = this.preferredCandidates(events);
         const changed = this.cipher.canonicalizeJSON(candidates[did] ?? []) !== this.cipher.canonicalizeJSON(retained);
         if (changed) await this.db.setCandidates(did, retained);
         candidates[did] = retained;
@@ -1831,7 +1842,8 @@ export default class Gatekeeper implements GatekeeperInterface {
         event.did ??= event.operation.did ?? await this.generateDID(event.operation);
         await this.normalizeEvent(event);
         return this.withHistoryLock(async () => {
-            const { changed } = await this.retainCandidates(event.did!, [event]);
+            const { candidates, changed } = await this.retainCandidates(event.did!, [event]);
+            event = candidates[event.did!].find(known => this.candidateKey(known) === this.candidateKey(event)) ?? event;
             const status = await this.importEventOnce(event);
             // Recovery and evidence changes already replay affected histories.
             // Repeated merged or deferred evidence needs no further
@@ -1904,7 +1916,9 @@ export default class Gatekeeper implements GatekeeperInterface {
                     const earlierAnchor = expectedRegistry && !isUnanchoredRegistry(expectedRegistry)
                         && event.registry === expectedRegistry && event.ordinal && opMatch.ordinal
                         && compareOrdinals(event.ordinal, opMatch.ordinal) < 0;
-                    if (expectedRegistry && opMatch.registry === expectedRegistry && !earlierAnchor) {
+                    const richerAnchor = !isUnanchoredRegistry(event.registry) && event.registry === expectedRegistry
+                        && this.candidateKey(event) === this.candidateKey(opMatch) && event.registration && !opMatch.registration;
+                    if (expectedRegistry && opMatch.registry === expectedRegistry && !earlierAnchor && !richerAnchor) {
                         return ImportStatus.MERGED;
                     }
                     // A late predecessor can make a later anchor apply first.

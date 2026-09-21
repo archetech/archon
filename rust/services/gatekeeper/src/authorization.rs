@@ -95,7 +95,9 @@ async fn controller_for_event(
     operation: &Value,
     event: Option<&EventRecord>,
 ) -> Result<Value> {
-    if let Some(event) = event.filter(|event| event.registration.is_some()) {
+    if let Some(event) = event.filter(|event| {
+        event.registration.is_some() && !is_unanchored_registry(&event.registry)
+    }) {
         let doc = resolve_local_doc_async(
             state,
             controller_did,

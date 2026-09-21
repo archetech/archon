@@ -32,7 +32,30 @@ pub(crate) fn candidate_key(event: &EventRecord) -> String {
         // A fresh gossip receipt time is not new authorization evidence.
         return json!([event.opid, event.registry]).to_string();
     }
+    if !crate::is_unanchored_registry(&event.registry) {
+        return json!([event.opid, event.registry, event.ordinal]).to_string();
+    }
     json!([event.opid, event.registry, event.time, event.ordinal]).to_string()
+}
+
+fn preferred_candidates(events: Vec<EventRecord>) -> Vec<EventRecord> {
+    let mut positions = HashMap::new();
+    let mut retained: Vec<EventRecord> = Vec::new();
+    for event in events {
+        let key = candidate_key(&event);
+        if let Some(&index) = positions.get(&key) {
+            let current: &EventRecord = &retained[index];
+            let keep_metadata = current.registration.is_some() && event.registration.is_none()
+                && !crate::is_unanchored_registry(&event.registry);
+            if !crate::is_locally_stamped_registry(&event.registry) && !keep_metadata {
+                retained[index] = event;
+            }
+        } else {
+            positions.insert(key, retained.len());
+            retained.push(event);
+        }
+    }
+    retained
 }
 
 fn index_candidates(
@@ -95,6 +118,9 @@ async fn retain_candidates_with_histories(
                 normalize_candidate_event(&mut store, event)?;
                 changed |= event.opid != previous.0 || event.time != previous.1;
             }
+            let count = events.len();
+            *events = preferred_candidates(std::mem::take(events));
+            changed |= events.len() != count;
             if changed {
                 store.set_candidates(key, events.clone())?;
             }
@@ -110,23 +136,10 @@ async fn retain_candidates_with_histories(
             .unwrap_or_else(|| store.get_events(did)),
     );
     events.extend(incoming);
-    let mut positions = HashMap::new();
-    let mut retained = Vec::new();
-    for mut event in events {
-        normalize_candidate_event(&mut store, &mut event)?;
-        let key = candidate_key(&event);
-        if let Some(index) = positions.get(&key) {
-            // Preserve the first local/gossip position.
-            // Anchored metadata updates still replace the same chain position.
-            if !crate::is_locally_stamped_registry(&event.registry) {
-                retained[*index] = event;
-            }
-        } else {
-            positions.insert(key, retained.len());
-            retained.push(event);
-        }
+    for event in &mut events {
+        normalize_candidate_event(&mut store, event)?;
     }
-    let events = retained;
+    let events = preferred_candidates(events);
     let changed = candidates.get(did) != Some(&events);
     if changed {
         store.set_candidates(did, events.clone())?;

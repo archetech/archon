@@ -1566,12 +1566,17 @@ async fn convergence_assets_with_controller_recovery() {
                 for stage in &scenario {
                     let order = stage["orders"][order_index].as_array().unwrap();
                     for index in order {
-                        crate::import_batch_impl(
-                            &state,
-                            &[vector["events"][index.as_u64().unwrap() as usize].clone()],
-                        )
-                        .await;
-                        crate::process_events_impl(&state).await;
+                        let event = vector["events"][index.as_u64().unwrap() as usize].clone();
+                        let mut weak = event.clone();
+                        weak.as_object_mut().unwrap().remove("registration");
+                        let copies = if event.get("registration").is_some()
+                            && !crate::is_unanchored_registry(event["registry"].as_str().unwrap()) {
+                            if order_index == 1 { vec![event, weak] } else { vec![weak, event] }
+                        } else { vec![event] };
+                        for copy in copies {
+                            crate::import_batch_impl(&state, &[copy]).await;
+                            crate::process_events_impl(&state).await;
+                        }
                     }
                     for phase in 0..3 {
                         if phase == 1 {
@@ -1667,6 +1672,323 @@ async fn convergence_assets_with_controller_recovery() {
                     }
                 }
                 drop(state_directory);
+            }
+        }
+    }
+}
+
+// Local receipt normalization preserves signed history and repairs authorization.
+#[tokio::test]
+async fn convergence_local_receipt_clock_audit() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/local-receipt-counterexample.json"
+    ))
+    .unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let mut outcomes = Vec::new();
+        let did = vector["did"].as_str().unwrap();
+        let asset_did = vector["assetDid"].as_str().unwrap();
+        for order in vector["orders"].as_array().unwrap() {
+            let (mut state, _directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            for index in order.as_array().unwrap() {
+                crate::import_batch_impl(
+                    &state,
+                    &[vector["events"][index.as_u64().unwrap() as usize].clone()],
+                )
+                .await;
+                crate::process_events_impl(&state).await;
+            }
+            for _ in 0..2 {
+                let data = serde_json::from_value(
+                    serde_json::to_value(&state.store.lock().await.data).unwrap(),
+                )
+                .unwrap();
+                let (restarted, _restart_directory) = crate::tests::make_state(JsonDb {
+                    backend: DbBackend::Memory,
+                    data,
+                    redis_connection: None,
+                });
+                state = restarted;
+                crate::history::ensure_history_ready(&state).await.unwrap();
+                crate::import_batch_impl(&state, &[vector["asset"].clone()]).await;
+                crate::process_events_impl(&state).await;
+                let store = state.store.lock().await;
+                let accepted = store.get_events(did);
+                assert_eq!(accepted.len(), 3);
+                for (index, event) in accepted.iter().enumerate() {
+                    assert_eq!(event.operation, vector["events"][index]["operation"]);
+                    assert_eq!(event.opid, Some(crate::generate_json_cid(&event.operation).unwrap()));
+                    let time = if event.operation["type"] == "create" {
+                        &event.operation["created"]
+                    } else {
+                        &event.operation["proof"]["created"]
+                    };
+                    assert_eq!(event.time, time.as_str().unwrap());
+                }
+                outcomes.push(store.get_events(asset_did).len());
+            }
+            crate::import_batch_impl(&state, &[vector["deletion"].clone()]).await;
+            crate::process_events_impl(&state).await;
+            let store = state.store.lock().await;
+            let deleted = store.get_events(did);
+            assert_eq!(deleted.len(), 4);
+            assert_eq!(deleted[3].operation, vector["deletion"]["operation"]);
+            assert_eq!(deleted[3].time, vector["deletion"]["operation"]["proof"]["created"].as_str().unwrap());
+        }
+        assert_eq!(outcomes, vec![0, 0, 0, 0]);
+        let mut db = JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        };
+        let retained: Vec<_> = [0, 1, 4].iter().map(|index| {
+            let mut value = vector["events"][*index].clone();
+            value["did"] = json!(did);
+            value["opid"] = json!(crate::generate_json_cid(&value["operation"]).unwrap());
+            crate::value_to_event_record(&value)
+        }).collect();
+        let mut asset = vector["asset"].clone();
+        asset["did"] = json!(asset_did);
+        asset["opid"] = json!(crate::generate_json_cid(&asset["operation"]).unwrap());
+        let asset = crate::value_to_event_record(&asset);
+        db.set_candidates(did, retained.clone()).unwrap();
+        db.set_events(did, retained.clone()).unwrap();
+        db.set_candidates(asset_did, vec![asset.clone()]).unwrap();
+        db.set_events(asset_did, vec![asset]).unwrap();
+        let (state, _directory) = crate::tests::make_state(db);
+        crate::history::ensure_history_ready(&state).await.unwrap();
+        let store = state.store.lock().await;
+        assert!(store.get_events(asset_did).is_empty());
+        let candidates = store.get_candidates().unwrap();
+        assert_eq!(candidates[did].len(), retained.len());
+        for (old, repaired) in retained.iter().zip(&candidates[did]) {
+            assert_eq!(old.operation, repaired.operation);
+            assert_eq!(old.opid, repaired.opid);
+            assert_eq!(old.ordinal, repaired.ordinal);
+            let time = if repaired.operation["type"] == "create" {
+                &repaired.operation["created"]
+            } else {
+                &repaired.operation["proof"]["created"]
+            };
+            assert_eq!(repaired.time, time.as_str().unwrap());
+        }
+    }
+}
+
+// Unanchored registration metadata cannot supply chain context.
+#[tokio::test]
+async fn convergence_local_registration_metadata_audit() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/local-registration-counterexample.json"
+    ))
+    .unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let mut outcomes = Vec::new();
+        for order in [[0, 1], [1, 0]] {
+            let (state, _directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            for event in vector["events"].as_array().unwrap() {
+                crate::import_batch_impl(&state, &[event.clone()]).await;
+                crate::process_events_impl(&state).await;
+            }
+            for index in order {
+                crate::import_batch_impl(&state, &[vector["receipts"][index].clone()]).await;
+                crate::process_events_impl(&state).await;
+            }
+            assert!(state.store.lock().await.get_events(vector["assetDid"].as_str().unwrap()).is_empty());
+            let data = serde_json::from_value(
+                serde_json::to_value(&state.store.lock().await.data).unwrap(),
+            ).unwrap();
+            let (state, _restart) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data,
+                redis_connection: None,
+            });
+            crate::history::ensure_history_ready(&state).await.unwrap();
+            let store = state.store.lock().await;
+            let agents = store.get_events(vector["did"].as_str().unwrap());
+            assert_eq!(agents.len(), 3);
+            for (index, event) in agents.iter().enumerate() {
+                assert_eq!(event.operation, vector["events"][index]["operation"]);
+            }
+            let did = vector["assetDid"].as_str().unwrap();
+            let candidates = store.get_candidates().unwrap();
+            assert_eq!(candidates[did].len(), 1);
+            assert_eq!(candidates[did][0].operation, vector["receipts"][0]["operation"]);
+            outcomes.push(store.get_events(did).len());
+        }
+        assert_eq!(outcomes, vec![0, 0]);
+        let mut db = JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        };
+        let did = vector["did"].as_str().unwrap();
+        let asset_did = vector["assetDid"].as_str().unwrap();
+        let retained: Vec<_> = vector["events"].as_array().unwrap().iter().map(|event| {
+            let mut value = event.clone();
+            value["did"] = json!(did);
+            value["opid"] = json!(crate::generate_json_cid(&value["operation"]).unwrap());
+            crate::value_to_event_record(&value)
+        }).collect();
+        let mut asset = vector["receipts"][1].clone();
+        asset["did"] = json!(asset_did);
+        asset["opid"] = json!(crate::generate_json_cid(&asset["operation"]).unwrap());
+        let asset = crate::value_to_event_record(&asset);
+        db.set_candidates(did, retained.clone()).unwrap();
+        db.set_events(did, retained).unwrap();
+        db.set_candidates(asset_did, vec![asset.clone()]).unwrap();
+        db.set_events(asset_did, vec![asset.clone()]).unwrap();
+        let (state, _directory) = crate::tests::make_state(db);
+        crate::history::ensure_history_ready(&state).await.unwrap();
+        let store = state.store.lock().await;
+        assert!(store.get_events(asset_did).is_empty());
+        assert_eq!(serde_json::to_value(&store.get_candidates().unwrap()[asset_did]).unwrap(),
+            serde_json::to_value(vec![asset]).unwrap());
+    }
+}
+
+#[tokio::test]
+async fn convergence_direct_local_creation_clock() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/local-receipt-counterexample.json"
+    )).unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let (state, _directory) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        let operation = &vector["events"][0]["operation"];
+        assert_ne!(operation["created"], operation["proof"]["created"]);
+        let result = crate::events::handle_did_operation(&state, operation).await.unwrap();
+        assert_eq!(result, vector["did"]);
+        let store = state.store.lock().await;
+        let accepted = store.get_events(vector["did"].as_str().unwrap());
+        assert_eq!(accepted.len(), 1);
+        assert_eq!(&accepted[0].operation, operation);
+        assert_eq!(accepted[0].time, operation["created"].as_str().unwrap());
+    }
+}
+
+#[tokio::test]
+async fn convergence_local_receipt_of_chain_genesis() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/local-receipt-counterexample.json"
+    )).unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let (mut state, _directory) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        state.supported_registries.lock().await.push("BTC:signet".to_string());
+        let operation = &vector["nonlocalGenesis"];
+        let did = vector["nonlocalDid"].as_str().unwrap();
+        assert_ne!(operation["created"], operation["proof"]["created"]);
+        assert_eq!(crate::events::handle_did_operation(&state, operation).await.unwrap(), vector["nonlocalDid"]);
+        for _ in 0..2 {
+            let data = {
+                let store = state.store.lock().await;
+                let accepted = store.get_events(did);
+                assert_eq!(accepted.len(), 1);
+                assert_eq!(accepted[0].registry, "local");
+                assert_eq!(accepted[0].time, operation["created"].as_str().unwrap());
+                assert_eq!(&accepted[0].operation, operation);
+                let doc = store.resolve_doc(&state.config, did, crate::ResolveOptions {
+                    confirm: true, ..Default::default()
+                }).unwrap();
+                // Genesis admission does not establish matching chain authority.
+                assert_eq!(doc["didDocumentMetadata"]["confirmed"], true);
+                assert_ne!(accepted[0].registry, doc["didDocumentRegistration"]["registry"].as_str().unwrap());
+                assert_eq!(doc["didDocument"]["id"], did);
+                serde_json::from_value(serde_json::to_value(&store.data).unwrap()).unwrap()
+            };
+            let (restarted, _restart) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory, data, redis_connection: None,
+            });
+            state = restarted;
+            crate::history::ensure_history_ready(&state).await.unwrap();
+        }
+    }
+}
+
+// Metadata-bearing copies win at the same chain position before authorization.
+#[tokio::test]
+async fn convergence_chain_registration_metadata_audit() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/chain-registration-counterexample.json"
+    )).unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let mut outcomes = Vec::new();
+        for order in [[0, 1], [1, 0]] {
+            let (state, _directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            for index in order {
+                crate::import_batch_impl(&state, &[vector["genesis"][index].clone()]).await;
+                crate::process_events_impl(&state).await;
+            }
+            for event in vector["events"].as_array().unwrap().iter().chain(std::iter::once(&vector["asset"])) {
+                crate::import_batch_impl(&state, &[event.clone()]).await;
+                crate::process_events_impl(&state).await;
+            }
+            let asset_did = vector["assetDid"].as_str().unwrap();
+            let data = {
+                let store = state.store.lock().await;
+                let agents = store.get_events(vector["did"].as_str().unwrap());
+                assert_eq!(agents.len(), 3);
+                assert_eq!(agents[0].operation, vector["genesis"][0]["operation"]);
+                for (event, original) in agents[1..].iter().zip(vector["events"].as_array().unwrap()) {
+                    assert_eq!(event.operation, original["operation"]);
+                }
+                outcomes.push(store.get_events(asset_did).len());
+                serde_json::from_value(serde_json::to_value(&store.data).unwrap()).unwrap()
+            };
+            let (state, _restart) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory, data, redis_connection: None,
+            });
+            crate::history::ensure_history_ready(&state).await.unwrap();
+            outcomes.push(state.store.lock().await.get_events(asset_did).len());
+        }
+        assert_eq!(outcomes, vec![1, 1, 1, 1]);
+        for order in [[0, 1], [1, 0]] {
+            let (mut state, _directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None,
+            });
+            for event in std::iter::once(&vector["genesis"][1]).chain(vector["events"].as_array().unwrap()) {
+                crate::import_batch_impl(&state, &[event.clone()]).await;
+                crate::process_events_impl(&state).await;
+            }
+            for index in order {
+                crate::import_batch_impl(&state, &[vector["lateReceipts"][index].clone()]).await;
+                crate::process_events_impl(&state).await;
+            }
+            for _ in 0..2 {
+                let data = {
+                    let store = state.store.lock().await;
+                    let did = vector["lateAssetDid"].as_str().unwrap();
+                    assert!(store.get_events(did).is_empty());
+                    let candidates = store.get_candidates().unwrap();
+                    assert_eq!(candidates[did].len(), 1);
+                    assert_eq!(candidates[did][0].registration.as_ref(), Some(&vector["lateReceipts"][1]["registration"]));
+                    assert_eq!(candidates[did][0].operation, vector["lateReceipts"][1]["operation"]);
+                    serde_json::from_value(serde_json::to_value(&store.data).unwrap()).unwrap()
+                };
+                let (restarted, _restart) = crate::tests::make_state(JsonDb {
+                    backend: DbBackend::Memory, data, redis_connection: None,
+                });
+                state = restarted;
+                crate::history::ensure_history_ready(&state).await.unwrap();
             }
         }
     }

@@ -329,6 +329,12 @@ array of nonnegative safe integers; only those unanchored registries may use an
 empty array. The CID-import API still requires `BatchMetadata.ordinal` for every
 registry. A nonempty CID list yielding no importable events returns zero
 queued/processed/rejected counts and the current queue total.
+Before journaling and during stored-candidate recovery, normalize `local` creation
+receipts to `operation.created`, and `local` update/deletion receipts to
+`operation.proof.created`. Hyperswarm and pin receipts use `proof.created` for all
+operation kinds. Preserve operation bytes, canonical IDs and ordinals. Rebuild
+accepted histories and dependent assets after repairing stored clocks; an old
+receipt timestamp must not decide historical authorization.
 The signed operation and its CID do not change. Peer/export imports are first
 converted to Hyperswarm hints, so they do not need a chain ordinal and cannot
 assert chain confirmation. Bundled chain mediators already supply positions.
@@ -743,8 +749,10 @@ field to the operation's `proof.created`. Gatekeeper normalizes Hyperswarm and p
 envelopes on import and during candidate recovery, covering older mediators,
 HTTP history imports, and existing databases. It corrects envelope timestamps
 without changing operation bytes, IDs, or ordinals. Both ordinary and verified
-resolution consume these corrected events. Local and anchored event timestamps
-retain their sources; chain ordinals retain precedence for same-registry
+resolution consume these corrected events. Gatekeeper also normalizes local
+creation receipts to `operation.created` and local update/deletion receipts to
+`proof.created`, including stored-candidate recovery. Anchored receipts keep their
+authoritative chain times; chain ordinals retain precedence for same-registry
 anchored authorization.
 
 `previd` establishes predecessor order. The time cutoff selects a prefix, even
@@ -907,6 +915,21 @@ each other's effects when computing `previd`.
 Used by `/dids/import`, `/batch/import`, `/batch/import/cids`, and
 `/events/process`.
 
+Historical controller selection uses chain context only when an event has
+registration metadata and belongs to a chain registry. Local, Hyperswarm and pin
+receipts always select the controller at the operation's `proof.created`, even
+if their envelopes include registration metadata or ordinals. Those fields stay
+in retained evidence but do not confer chain authority. Startup reconstruction
+uses the same rule and reauthorizes previously accepted dependent assets.
+
+Same-position chain candidates are identified by canonical operation CID,
+registry and complete ordinal. Prefer a copy carrying `registration` over one
+without it, before authorization; event time belongs to the chain facts rather
+than arrival identity. Incomplete copies alone remain admitted. Enrichment can
+replace an accepted same-position receipt only after reauthorization, and must
+replay affected histories. Once the richer copy is known, a rejected operation
+cannot fall back to the incomplete copy. Recovery applies the same preference.
+
 ### 8.1 `importBatch(events)`
 
 ```
@@ -1003,14 +1026,17 @@ rewritten to IPFS merely because a gossip wrapper omitted its operation ID.
 The following is the insertion algorithm reused during replay:
 
 ```
-1. normalize event.did and canonical event.opid from the operation
+1. normalize event.did, canonical event.opid, and unanchored event.time from the operation
+   select the preferred retained same-position chain receipt before authorization
 2. acquire per-DID lock
 3. current = store.get_events(did); derive any missing canonical operation IDs
 4. if any current event has opid == event.opid:
        expectedRegistry = expected_registry_for_index(current, index_of_match)
        earlierAnchor = expectedRegistry is a chain registry and event.registry == expectedRegistry
            and both ordinals exist and compare_ordinals(event.ordinal, current[match].ordinal) < 0
-       if current[match].registry == expectedRegistry and not earlierAnchor: return MERGED
+       richerAnchor = incoming and current refer to the same chain position
+           and incoming has registration metadata and current does not
+       if current[match].registry == expectedRegistry and not earlierAnchor and not richerAnchor: return MERGED
        if event.registry == expectedRegistry:
            previous = selected predecessor document, or none for creation
            authorize_operation(event.operation, previous, event)

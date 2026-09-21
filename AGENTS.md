@@ -245,3 +245,18 @@ These rules apply to coding agents working in this repository.
 - Asset proof normalization must derive authorization in each retained receipt’s own controller cutoff before projecting priority. A rejected chain receipt must not synthesize an authorized proof-time provisional hint. Keep predecessor-owner signatures distinct from prospective-owner availability, and include the local-controller creation restriction.
 
 - Asset proof models must distinguish the creation-only proof DID-prefix check from successor authorization by normalized named-method lookup in the predecessor owner's selected document. Do not add a successor prefix restriction while addressing proof-review comments. Signed bridges should exercise secondary methods, missing methods, whole-component replacement, and actual database reopen; generate controller histories from retained sources rather than fixture-supplied accepted projections.
+
+- Final protocol composition must feed assets the histories returned by the actual finite agent replay phase. Check source admission and full-document projections in the top theorem’s signed bridge; do not replace phase execution with an assumed shared controller table.
+- A documented direct-operation timestamp producer is not enough to establish the import clock contract. Audit signed local receipts through ordinary import and recovery too; do not exclude their demonstrated authorization effects as arbitrary admin input.
+- Local event clocks normalize at both ingress and candidate recovery: creation uses operation.created, updates/deletions use proof.created. Keep the final protocol model’s clock derived from those signed-operation fields, and check creation fixtures whose creation/proof times differ.
+- Before omitting a receipt field from the convergence key/view, trace its use in contextual authorization. In particular, registration metadata can trigger controller selection even on an unanchored receipt; audit that with signed imports instead of assuming the registry name makes the field irrelevant.
+
+- Chain-based controller selection requires an actual chain registry as well as registration metadata. Local/Hyperswarm/pin receipts use proof-time authorization even with metadata; preserve their evidence and repair old projections. Audit direct-operation producers as well as imports/recovery when changing clock normalization.
+
+- In proof receipt views, distinguish source-registry matching from public genesis confirmation. Unmatched genesis has no cutoff clock but is still admitted; prove matching-source clock equivalence before expanding the model to retain irrelevant receipt metadata.
+
+- A fixed authoritative chain snapshot does not by itself justify identical optional registration-metadata presence on repeated receipts. Audit same-position incomplete/complete copies through candidate deduplication, controller anchoring and replay before treating them as one semantic receipt class.
+
+- Prefer metadata-bearing receipts at the same canonical operation/chain registry/ordinal before authorization, including candidate recovery; a rejected richer copy cannot fall back to incomplete proof-time authority. Bind proof receipt metadata to received copies and derive completeness before agent/asset replay.
+
+- Decoded proof models can combine immutable chain facts with evidence-derived metadata. Keep those roles explicit and check incomplete-only theorem instances against identical physical chain facts; do not remove a required authorization binding to admit a mismatched decoded model.
