@@ -1,3 +1,4 @@
+use crate::event_policy::{candidate_key, normalize_event_time, queue_key};
 use std::{cmp::Ordering, env};
 
 use anyhow::Result;
@@ -8,7 +9,7 @@ use tracing::{info, warn};
 use crate::store::compare_ordinals;
 use crate::{
     authorize_operation, ensure_event_opid, event_record_to_value, expected_registry_for_index,
-    generate_did_from_operation, generate_json_cid, infer_event_did, is_locally_stamped_registry, is_unanchored_registry,
+    generate_did_from_operation, generate_json_cid, infer_event_did, is_unanchored_registry,
     resolve_local_doc_async, update_search_doc, value_to_event_record,
     verify_event_shape, AppState, EventRecord, GatekeeperDb, ResolveOptions,
 };
@@ -29,33 +30,6 @@ fn compare_successors(expected_registry: Option<&str>, a: &EventRecord, b: &Even
         Ordering::Equal
     };
     ordinal.then_with(|| a.opid.cmp(&b.opid))
-}
-
-/// Events handed in from a peer or restored export cannot vouch that a
-/// chain committed an event. Chain confirmation is accepted only through
-/// the mediator's CID import; externally supplied chain registrations are
-/// unconfirmed hints. Mediators discover anchors in chain order but skip
-/// unavailable content and retry it later (#1151), so confirmation provenance
-/// does not establish complete or ordered controller history (#1150).
-pub(crate) fn relay_hints(batch: &[Value]) -> Vec<Value> {
-    batch
-        .iter()
-        .map(|event| {
-            let Some(object) = event.as_object() else {
-                return event.clone();
-            };
-            let registry = object.get("registry").and_then(Value::as_str);
-            match registry {
-                Some(registry) if !is_locally_stamped_registry(registry) => {
-                    let mut hint = object.clone();
-                    hint.remove("registration");
-                    hint.insert("registry".to_string(), Value::String("hyperswarm".to_string()));
-                    Value::Object(hint)
-                }
-                _ => event.clone(),
-            }
-        })
-        .collect()
 }
 
 const PIN_QUEUE: &str = "pin";
@@ -380,23 +354,6 @@ pub(crate) async fn queue_outbound_operation(
     Ok(())
 }
 
-fn event_key(event: &Value) -> Option<String> {
-    let registry = event.get("registry").and_then(Value::as_str)?;
-    let opid = generate_json_cid(event.get("operation")?).ok()?;
-    let position = if event
-        .get("registration")
-        .is_some_and(|value| !value.is_null())
-    {
-        format!(
-            "/{}",
-            serde_json::json!([event.get("time"), event.get("ordinal")])
-        )
-    } else {
-        String::new()
-    };
-    Some(format!("{registry}/{opid}{position}"))
-}
-
 pub(crate) async fn import_batch_impl(state: &AppState, batch: &[Value]) -> ImportBatchResult {
     let mut queued = 0;
     let mut rejected = 0;
@@ -417,7 +374,7 @@ pub(crate) async fn import_batch_impl(state: &AppState, batch: &[Value]) -> Impo
             continue;
         }
 
-        let Some(key) = event_key(event) else {
+        let Some(key) = queue_key(event) else {
             if trace {
                 warn!("import_batch rejected event without key {}", summarize_value_event(event));
             }
@@ -598,21 +555,6 @@ fn event_log_did(config: &crate::Config, event: &EventRecord) -> String {
     infer_event_did(config, &event_record_to_value(event)).unwrap_or_default()
 }
 
-// Old mediators and HTTP history imports can supply receipt/chain timestamps.
-// Correct the envelope before storage; never rewrite the operation itself.
-pub(crate) fn normalize_event_time(event: &mut EventRecord) {
-    let time = if event.registry == "local" && event.operation["type"] == "create" {
-        event.operation["created"].as_str()
-    } else if event.registry == "local" || event.registry == "hyperswarm" || event.registry == PIN_QUEUE {
-        event.operation["proof"]["created"].as_str()
-    } else {
-        None
-    };
-    if let Some(time) = time {
-        event.time = time.to_string();
-    }
-}
-
 pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) -> ImportStatus {
     let valid_ordinal = if is_unanchored_registry(&event.registry) {
         event.ordinal.as_ref().is_none_or(|items| {
@@ -642,10 +584,10 @@ pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) 
             return ImportStatus::Deferred;
         }
     };
-    let key = crate::history::candidate_key(&event);
+    let key = candidate_key(&event);
     if let Some(known) = state.candidate_history.lock().await.as_ref()
         .and_then(|candidates| candidates.get(&did))
-        .and_then(|events| events.iter().find(|known| crate::history::candidate_key(known) == key))
+        .and_then(|events| events.iter().find(|known| candidate_key(known) == key))
     {
         event = known.clone();
     }
@@ -680,7 +622,7 @@ pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) 
         .await
         .get_events(&did)
         .iter()
-        .any(|event| crate::history::candidate_key(event) == key);
+        .any(|event| candidate_key(event) == key);
     if accepted && matches!(status, ImportStatus::Rejected | ImportStatus::Deferred) {
         return ImportStatus::Added;
     }

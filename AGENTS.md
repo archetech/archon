@@ -152,6 +152,8 @@ These rules apply to coding agents working in this repository.
 
 - Convergence work must exercise ordinary signed imports with tied receipts, late predecessors, mixed local/gossip hints, chain confirmation, and controller-dependent replay. Distinguish finite permutation coverage from a formal proof, and audit retained production evidence before claiming existing forks.
 
+- Keep envelope policy in the per-port event-policy module. Queue deduplication uses incoming metadata, durable candidates use normalized clocks, and accepted-history replacement is separate. Do not fold content-backed alias storage or authority selection into these helpers.
+
 - Keep distinct-successor comparison pure and after authorization, using the predecessor’s expected registry. Same-operation receipt replacement and replay traversal are separate; comparator extraction must add no database reads or replay passes.
 
 - Choose provisional competing successors in the shared importer by canonical CID; do not globally CID-sort replay traversal. Preserve efficient predecessor-first processing and benchmark populated histories before changing replay ordering. An anchor outside the predecessor’s expected chain registry remains provisional for sibling preference.

@@ -940,6 +940,33 @@ Chain receipts require complete, position-consistent registration metadata; see
 runs before queue deduplication and in per-event replay. Metadata-free copies
 are rejected rather than preferred or replaced according to arrival history.
 
+### Envelope policy shared by import and recovery
+
+TypeScript `event-policy.ts` and Rust `event_policy.rs` define the existing
+registry, clock, relay, and candidate-retention rules in one place per port.
+These helpers do not select a signing authority or rewrite signed operations.
+
+| Registry | Normalized envelope time | Durable candidate key | Same-key candidate copy | Public relay |
+| --- | --- | --- | --- | --- |
+| `local` | creation `operation.created`; update/delete `proof.created` | canonical opid, registry | first | preserve envelope |
+| `hyperswarm` | `proof.created` | canonical opid, registry | first | preserve envelope |
+| `pin` | `proof.created` | canonical opid, registry, normalized time, ordinal | last | Hyperswarm hint; strip registration |
+| Any well-formed chain registry | authoritative receipt time | canonical opid, registry, ordinal | last | Hyperswarm hint; strip registration |
+
+Chain admission still requires complete metadata consistent with the ordinal
+(§8.1). The table describes candidate retention, not accepted-history replacement:
+same-operation confirmation and earlier-anchor authorization remain in the importer.
+Pin remains both an optional DID registry and the auxiliary outbound queue; sharing
+unanchored clocks does not give it local/Hyperswarm transport or retention behavior.
+
+Batch queue deduplication deliberately uses a different key: registry and
+canonical operation CID, plus the incoming time/ordinal when registration metadata
+is present. It runs before envelope-time normalization. Durable candidate keys run
+after normalization, so restamped gossip can enter the batch queue without forcing
+another replay of unchanged evidence. Pending-batch attribution and exported event
+records remain separate from these keys. Canonicalization and content-backed
+predecessor alias storage remain in the existing import/recovery paths.
+
 ### 8.1 `importBatch(events)`
 
 ```

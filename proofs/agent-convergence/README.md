@@ -1077,3 +1077,14 @@ Shared comparator cases cover both ports; existing signed bridges retain
 authorization, late delivery, repeated-anchor and restart coverage. These finite
 checks do not establish universal executable refinement. The Lean rules and
 theorems are unchanged.
+
+### Shared envelope policy (#1245)
+
+Both runtime ports collect clock normalization, registry classification, relay
+conversion, queue identity and durable candidate retention in their event-policy
+module. The [Gatekeeper policy table](../../docs/services/gatekeeper/README.md#envelope-policy-shared-by-import-and-recovery)
+keeps queue deduplication distinct from normalized evidence and accepted-history
+replacement. Shared policy cases and the existing signed local/pin clocks,
+metadata admission, earlier anchors, migration and restart suites check the move.
+The decoded receipt contracts and Lean theorems are unchanged; this refactor
+does not introduce a new normalization premise or claim executable refinement.

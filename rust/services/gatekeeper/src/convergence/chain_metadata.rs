@@ -64,7 +64,7 @@ async fn complete_metadata_is_required_before_dedup_and_replay() {
                 1
             );
             assert_eq!(
-                crate::import_batch_impl(&state, &crate::events::relay_hints(&[bad]))
+                crate::import_batch_impl(&state, &crate::event_policy::relay_hints(&[bad]))
                     .await
                     .rejected,
                 0

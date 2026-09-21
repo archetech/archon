@@ -1,9 +1,12 @@
 //! Durable candidate evidence and import-time revalidation of dependent histories.
+use crate::event_policy::{normalize_event_time, preferred_candidates};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::Result;
-use serde_json::{json, Value};
+use serde_json::Value;
+#[cfg(test)]
+use serde_json::json;
 use tokio::sync::Mutex;
 
 use crate::events::import_event_once;
@@ -16,7 +19,7 @@ use crate::{
 // Derive the TypeScript numeric-key reference from content, never a peer opid.
 // Existing predecessor verification still checks the referenced operation's CID.
 fn normalize_candidate_event(store: &mut JsonDb, event: &mut EventRecord) -> Result<()> {
-    crate::events::normalize_event_time(event);
+    normalize_event_time(event);
     let canonical = generate_json_cid(&event.operation)?;
     if let Some(alias) = crate::proofs::typescript_numeric_cid(&event.operation) {
         if alias != canonical && store.get_operation(&alias).is_none() {
@@ -25,34 +28,6 @@ fn normalize_candidate_event(store: &mut JsonDb, event: &mut EventRecord) -> Res
     }
     event.opid = Some(canonical);
     Ok(())
-}
-
-pub(crate) fn candidate_key(event: &EventRecord) -> String {
-    if crate::is_locally_stamped_registry(&event.registry) {
-        // A fresh gossip receipt time is not new authorization evidence.
-        return json!([event.opid, event.registry]).to_string();
-    }
-    if !crate::is_unanchored_registry(&event.registry) {
-        return json!([event.opid, event.registry, event.ordinal]).to_string();
-    }
-    json!([event.opid, event.registry, event.time, event.ordinal]).to_string()
-}
-
-fn preferred_candidates(events: Vec<EventRecord>) -> Vec<EventRecord> {
-    let mut positions = HashMap::new();
-    let mut retained: Vec<EventRecord> = Vec::new();
-    for event in events {
-        let key = candidate_key(&event);
-        if let Some(&index) = positions.get(&key) {
-            if !crate::is_locally_stamped_registry(&event.registry) {
-                retained[index] = event;
-            }
-        } else {
-            positions.insert(key, retained.len());
-            retained.push(event);
-        }
-    }
-    retained
 }
 
 fn index_candidates(
@@ -1028,7 +1003,7 @@ mod tests {
                 "operation": v[name], "registry": "BTC:signet", "registration": { "height": 42 },
                 "time": "2026-09-17T17:53:05.466Z"
             })).collect();
-            crate::events::import_batch_impl(&state, &crate::events::relay_hints(&incoming)).await;
+            crate::events::import_batch_impl(&state, &crate::event_policy::relay_hints(&incoming)).await;
             crate::events::process_events_impl(&state).await;
             let doc = crate::resolve_local_doc_async(&state, asset, Default::default())
                 .await

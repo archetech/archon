@@ -1,0 +1,8 @@
+[
+  { "registry": "local", "locallyStamped": true, "unanchored": true, "createTime": "created", "updateTime": "proof", "relay": "local", "candidateFields": ["opid", "registry"], "keepFirst": true },
+  { "registry": "hyperswarm", "locallyStamped": true, "unanchored": true, "createTime": "proof", "updateTime": "proof", "relay": "hyperswarm", "candidateFields": ["opid", "registry"], "keepFirst": true },
+  { "registry": "pin", "locallyStamped": false, "unanchored": true, "createTime": "proof", "updateTime": "proof", "relay": "hyperswarm", "candidateFields": ["opid", "registry", "time", "ordinal"], "keepFirst": false },
+  { "registry": "BTC:signet", "locallyStamped": false, "unanchored": false, "createTime": "receipt", "updateTime": "receipt", "relay": "hyperswarm", "candidateFields": ["opid", "registry", "ordinal"], "keepFirst": false },
+  { "registry": "ZEC:testnet", "locallyStamped": false, "unanchored": false, "createTime": "receipt", "updateTime": "receipt", "relay": "hyperswarm", "candidateFields": ["opid", "registry", "ordinal"], "keepFirst": false },
+  { "registry": "future:chain", "locallyStamped": false, "unanchored": false, "createTime": "receipt", "updateTime": "receipt", "relay": "hyperswarm", "candidateFields": ["opid", "registry", "ordinal"], "keepFirst": false }
+]

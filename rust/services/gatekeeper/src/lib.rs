@@ -4,6 +4,7 @@ mod authorization;
 mod config;
 #[cfg(test)]
 mod convergence;
+mod event_policy;
 mod events;
 mod history;
 mod metrics;
@@ -16,12 +17,12 @@ mod store;
 pub use app::run;
 
 pub(crate) use api::is_valid_registry;
-pub(crate) use authorization::{authorize_operation, is_locally_stamped_registry, is_unanchored_registry};
+pub(crate) use authorization::authorize_operation;
+pub(crate) use event_policy::{is_locally_stamped_registry, is_unanchored_registry, relay_hints};
 pub(crate) use app::AppState;
 pub(crate) use config::Config;
 pub(crate) use events::{
     handle_did_operation, import_batch_impl, process_events_impl,
-    relay_hints,
 };
 #[cfg(test)]
 pub(crate) use events::queue_outbound_operation;

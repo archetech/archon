@@ -14,6 +14,7 @@ on:
       - 'tests/gatekeeper/event-targets.test.ts'
       - 'tests/gatekeeper/method-ids.test.ts'
       - 'tests/gatekeeper/successor-ordering.test.ts'
+      - 'tests/gatekeeper/event-policy.test.ts'
       - 'tests/gatekeeper/agent-convergence.test.ts'
       - 'tests/gatekeeper/chain-convergence.test.ts'
       - 'tests/gatekeeper/chain-successors.test.ts'
@@ -44,6 +45,7 @@ on:
       - 'tests/gatekeeper/event-targets.test.ts'
       - 'tests/gatekeeper/method-ids.test.ts'
       - 'tests/gatekeeper/successor-ordering.test.ts'
+      - 'tests/gatekeeper/event-policy.test.ts'
       - 'tests/gatekeeper/agent-convergence.test.ts'
       - 'tests/gatekeeper/chain-convergence.test.ts'
       - 'tests/gatekeeper/chain-successors.test.ts'
@@ -135,7 +137,7 @@ jobs:
       - name: Check signed agent authorization
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/agent-convergence.test.ts --runInBand --coverage=false
       - name: Check repeated chain anchors
-        run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/chain-convergence.test.ts tests/gatekeeper/chain-successors.test.ts tests/gatekeeper/controller-view.test.ts tests/gatekeeper/chain-ordinals.test.ts tests/gatekeeper/interleaved-replay.test.ts tests/gatekeeper/integrated-agent.test.ts tests/gatekeeper/pin-receipt-audit.test.ts tests/gatekeeper/local-receipt-audit.test.ts tests/gatekeeper/local-registration-audit.test.ts tests/gatekeeper/chain-registration-audit.test.ts tests/gatekeeper/event-targets.test.ts tests/gatekeeper/method-ids.test.ts tests/gatekeeper/successor-ordering.test.ts --runInBand --coverage=false
+        run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/chain-convergence.test.ts tests/gatekeeper/chain-successors.test.ts tests/gatekeeper/controller-view.test.ts tests/gatekeeper/chain-ordinals.test.ts tests/gatekeeper/interleaved-replay.test.ts tests/gatekeeper/integrated-agent.test.ts tests/gatekeeper/pin-receipt-audit.test.ts tests/gatekeeper/local-receipt-audit.test.ts tests/gatekeeper/local-registration-audit.test.ts tests/gatekeeper/chain-registration-audit.test.ts tests/gatekeeper/event-targets.test.ts tests/gatekeeper/method-ids.test.ts tests/gatekeeper/successor-ordering.test.ts tests/gatekeeper/event-policy.test.ts --runInBand --coverage=false
       - name: Check signed asset reconciliation and durable restart
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/asset-convergence.test.ts --runInBand --coverage=false --silent
       - name: Check proofs and concrete histories
