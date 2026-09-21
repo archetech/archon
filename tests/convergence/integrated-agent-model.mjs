@@ -1,3 +1,4 @@
+import { assertChainMetadata } from './chain-metadata.mjs';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
 import { componentGraph, componentStates } from './component-model.mjs';
@@ -18,6 +19,7 @@ export function integratedAgentGraph(vector, registryNames) {
     const registryAt = i => i === rootIndex ? vector.operations[i].registration.registry
         : vector.operations[i].doc?.didDocumentRegistration?.registry ?? registryAt(graph.parents[i]);
     const expected = vector.operations.map((_, i) => registryAt(i === rootIndex ? i : graph.parents[i]));
+    vector.events.forEach(assertChainMetadata);
     const owners = vector.events.map(event => {
         const i = vector.operations.findIndex(operation => isDeepStrictEqual(operation, event.operation));
         assert(i >= 0, 'receipt must contain a source operation');

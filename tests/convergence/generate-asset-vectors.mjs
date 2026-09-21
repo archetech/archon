@@ -59,7 +59,7 @@ for (const legacy of [false, true]) for (const mode of ['hyperswarm', 'pin', 'ch
     const events = [], labels = [];
     function add(label, operation, registry, height, index = 0, clock = height) {
         const event = { operation, registry, time: chain || registry === 'local' ? date(clock) : date(clock + 100), ordinal: [height, index, 0] };
-        if (chain) event.registration = { height, index, txid: registry + '-tx-' + height, batch: registry + '-batch-' + height, opidx: index };
+        if (chain) event.registration = { height, index, txid: registry + '-tx-' + height, batch: registry + '-batch-' + height, opidx: 0 };
         labels.push(label); events.push(event); return events.length - 1;
     }
     const ag = add('agent-a-genesis', a, agentRegistry, 1), bg = add('agent-b-genesis', b, agentRegistry, 1, 1);

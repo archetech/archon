@@ -44,10 +44,7 @@ fn preferred_candidates(events: Vec<EventRecord>) -> Vec<EventRecord> {
     for event in events {
         let key = candidate_key(&event);
         if let Some(&index) = positions.get(&key) {
-            let current: &EventRecord = &retained[index];
-            let keep_metadata = current.registration.is_some() && event.registration.is_none()
-                && !crate::is_unanchored_registry(&event.registry);
-            if !crate::is_locally_stamped_registry(&event.registry) && !keep_metadata {
+            if !crate::is_locally_stamped_registry(&event.registry) {
                 retained[index] = event;
             }
         } else {
@@ -1638,7 +1635,7 @@ mod tests {
     fn identity_event(operation: &Value, height: u64) -> EventRecord {
         crate::value_to_event_record(&json!({
             "operation": operation, "registry": "BTC:signet", "time": "2026-04-11T13:00:00Z",
-            "ordinal": [height, 0], "registration": {"height": height, "index": 0, "txid": "tx", "batch": "batch"}
+            "ordinal": [height, 0, 0], "registration": {"height": height, "index": 0, "opidx": 0, "txid": "tx", "batch": "batch"}
         }))
     }
 
@@ -2380,7 +2377,7 @@ mod tests {
         crate::import_batch_impl(&state, vector["base"].as_array().unwrap()).await;
         crate::process_events_impl(&state).await;
         let mut late = vector["rotation"].clone();
-        late["ordinal"] = json!([350, 0]);
+        late["ordinal"] = json!([350, 0, 0]);
         late["time"] = json!("2026-01-01T00:05:50Z");
         late["registration"]["height"] = json!(350);
         crate::import_batch_impl(&state, &[late, vector["old"].clone()]).await;

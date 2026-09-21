@@ -3,7 +3,7 @@ import Gatekeeper from '@didcid/gatekeeper';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 import MemoryClient from '@didcid/ipfs/memory';
-import TestHelper from './helper.ts';
+import TestHelper, { anchorEvent } from './helper.ts';
 
 const mockConsole = {
     log: (): void => { },
@@ -501,7 +501,7 @@ describe('resolveDID', () => {
         let timestamp = Date.now();
 
         for (const op of ops) {
-            op.registry = 'BTC:signet';
+            anchorEvent(op, 'BTC:signet', timestamp);
             timestamp += 3600000; // add 1 hour to timestamp for each op
             op.time = new Date(timestamp).toISOString();
         }

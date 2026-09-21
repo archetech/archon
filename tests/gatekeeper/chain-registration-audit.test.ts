@@ -23,7 +23,7 @@ it.each(vectors)('audits same-position chain metadata (legacy=$legacy)', async v
         await gatekeeper.resolveDID(vector.did, { verify: true });
         outcomes.push((await db.getEvents(vector.assetDid)).length);
     }
-    // Rich metadata wins before authorization in either arrival order.
+    // Incomplete receipts are rejected before authorization in either arrival order.
     expect(outcomes).toEqual([1, 1, 1, 1]);
 });
 
@@ -49,5 +49,43 @@ it.each(vectors)('does not fall back to incomplete chain authority (legacy=$lega
             gatekeeper = new Gatekeeper({ db, ipfs });
             await gatekeeper.resolveDID(vector.did, { verify: true });
         }
+    }
+});
+
+const malformed: { name: string; registration?: unknown }[] = JSON.parse(readFileSync('tests/convergence/invalid-chain-metadata.json', 'utf8'));
+it.each(vectors)('requires complete consistent chain receipts at ingress and replay (legacy=$legacy)', async vector => {
+    for (const { registration } of malformed) {
+        const db = new DbMemory('metadata-admission');
+        const g = new Gatekeeper({ db, ipfs: new MemoryClient() });
+        const good = structuredClone(vector.genesis[1]);
+        const bad = { ...good, registration } as GatekeeperEvent;
+        expect(await g.importBatch([bad])).toMatchObject({ rejected: 1, queued: 0 });
+        const replay = g as unknown as { importEventOnce(event: GatekeeperEvent): Promise<string> };
+        expect(await replay.importEventOnce(bad)).toBe('rejected');
+        expect(await db.getCandidates()).toEqual({});
+        expect(await g.importBatch([good])).toMatchObject({ rejected: 0, queued: 1 });
+        expect(await g.processEvents()).toMatchObject({ added: 1 });
+        // The same signed bytes remain eligible as an unconfirmed relayed hint.
+        expect(await g.importRelayedBatch([bad])).toMatchObject({ rejected: 0 });
+    }
+});
+
+it.each(vectors)('validates CID batch evidence before fetching and keeps original opidx (legacy=$legacy)', async vector => {
+    const db = new DbMemory('metadata-cids');
+    const g = new Gatekeeper({ db, ipfs: new MemoryClient() });
+    const good = vector.genesis[1];
+    const cid = await g.generateCID(good.operation);
+    for (const invalid of malformed.filter(item => !item.name.startsWith('opidx-') && item.name !== 'missing-opidx')) {
+        await expect(g.importBatchByCids([cid], { ...good, ordinal: [1, 0], registration: invalid.registration } as never)).rejects.toThrow('metadata');
+        expect(await db.getOperation(cid)).toBeNull();
+    }
+    await db.addOperation(cid, good.operation);
+    for (const registry of ['BTC:signet', 'ZEC:testnet', 'ETH:sepolia', 'SOL:devnet', 'future:chain']) {
+        // Additional registry position components remain part of the ordinal.
+        expect(await g.importBatchByCids([null, cid] as never, { ...good, registry, ordinal: [1, 0, 7] })).toMatchObject({ queued: 1 });
+        await g.processEvents();
+        const candidate = (await db.getCandidates())[vector.did].find(e => e.registry === registry)!;
+        expect(candidate.ordinal).toEqual([1, 0, 7, 1]);
+        expect(candidate.registration?.opidx).toBe(1);
     }
 });

@@ -230,6 +230,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 10,
           "txid": "tx10",
           "batch": "batch",
           "opidx": 0
@@ -268,6 +269,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 30,
           "txid": "tx30",
           "batch": "batch",
           "opidx": 0
@@ -301,6 +303,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 40,
           "txid": "tx40",
           "batch": "batch",
           "opidx": 0
@@ -359,6 +362,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 50,
           "txid": "tx50",
           "batch": "batch",
           "opidx": 0
@@ -395,6 +399,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 45,
           "txid": "tx45",
           "batch": "batch",
           "opidx": 0
@@ -431,6 +436,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 35,
           "txid": "tx35",
           "batch": "batch",
           "opidx": 0
@@ -724,6 +730,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 10,
           "txid": "tx10",
           "batch": "batch",
           "opidx": 0
@@ -761,6 +768,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 30,
           "txid": "tx30",
           "batch": "batch",
           "opidx": 0
@@ -793,6 +801,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 40,
           "txid": "tx40",
           "batch": "batch",
           "opidx": 0
@@ -850,6 +859,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 50,
           "txid": "tx50",
           "batch": "batch",
           "opidx": 0
@@ -885,6 +895,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 45,
           "txid": "tx45",
           "batch": "batch",
           "opidx": 0
@@ -920,6 +931,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 35,
           "txid": "tx35",
           "batch": "batch",
           "opidx": 0

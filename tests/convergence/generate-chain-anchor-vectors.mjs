@@ -24,7 +24,7 @@ for (const legacy of [false, true]) {
     } } }, did + '#key-1');
     const asset = sign({ type: 'create', created: '2026-09-01T00:00:00Z', registration: { version: 1, type: 'asset', registry: 'BTC:signet' }, controller: did, data: { state: 'created' } }, did + '#key-2', 1);
     const assetDid = 'did:cid:' + await cid(asset);
-    const chain = (operation, index) => ({ operation, registry: 'BTC:signet', time: '2026-09-02T00:00:00Z', ordinal: [100, index, 0], registration: { height: 100, txid: 'tx' + index, batch: 'batch', opidx: 0 } });
+    const chain = (operation, index) => ({ operation, registry: 'BTC:signet', time: '2026-09-02T00:00:00Z', ordinal: [100, index, 0], registration: { height: 100, index, txid: 'tx' + index, batch: 'batch', opidx: 0 } });
     const hint = (operation, index) => ({ operation, registry: 'hyperswarm', time: operation.proof.created, ordinal: [index] });
     vectors.push({ legacy, did, assetDid, operations: [genesis, parent, rotation, asset], ids: await Promise.all([genesis, parent, rotation, asset].map(cid)),
         block: { height: 100, hash: 'block', time: Date.parse('2026-09-02T00:00:00Z') / 1000 },

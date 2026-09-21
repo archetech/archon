@@ -2,7 +2,7 @@
 
 The [frozen completion contract](../../docs/plans/protocol-convergence-completion.md)
 has A1–A4, B1–B3 and C1–C3 implemented. The approved clock, chain-context
-and richer-receipt corrections resolve the signed C2 counterexamples; see the
+and complete-chain-receipt admission resolve the signed C2 counterexamples; see the
 final audit below. `Archon.protocol_convergence` proves a unique complete semantic result and
 actual terminating reconstruction for any finite family of agents and assets
 with the same retained protocol evidence. Arrival order, duplicate count,
@@ -31,6 +31,16 @@ three operation kinds. Shared signed `event-target-vectors.json` exercise ordina
 imports, direct submission, replay, custom prefixes and durable
 restart in both ports. These admission tests close the demonstrated runtime gap;
 they do not turn the existing protocol theorem into universal runtime refinement.
+
+Issue #1249 removes incomplete chain receipts from the admitted domain.
+`ProtocolReceiptValid` now binds a complete decoded chain header directly to the
+model's chain facts. Receipt projection is a simple map: the richer-copy filter,
+metadata-availability lemmas and incomplete-only fixture worlds are removed.
+The signed decoder checks all required fields and ordinal agreement. Existing
+controller-selection lemmas may describe a broader historical model; the final
+protocol theorem's receipt premise excludes incomplete chain headers. This
+narrows admission without asserting complete controller history or changing the
+signature, chain-trust, or executable-refinement assumptions.
 
 ## Earlier agent-only results
 

@@ -210,16 +210,35 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
      *                   - properties:
      *                       registry:
      *                         enum: [local, hyperswarm, pin]
-     *                   - properties:
+     *                   - required: [registration]
+     *                     properties:
      *                       registry:
      *                         not:
      *                           enum: [local, hyperswarm, pin]
      *                       ordinal:
-     *                         minItems: 1
+     *                         minItems: 2
      *                         items:
      *                           type: integer
      *                           minimum: 0
      *                           maximum: 9007199254740991
+     *                       registration:
+     *                         type: object
+     *                         required: [height, index, txid, batch]
+     *                         properties:
+     *                           height:
+     *                             type: integer
+     *                             minimum: 0
+     *                             maximum: 9007199254740991
+     *                           index:
+     *                             type: integer
+     *                             minimum: 0
+     *                             maximum: 9007199254740991
+     *                           txid:
+     *                             type: string
+     *                             minLength: 1
+     *                           batch:
+     *                             type: string
+     *                             minLength: 1
      *                 properties:
      *                   registry:
      *                     type: string
@@ -232,10 +251,10 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
      *                     type: array
      *                     items:
      *                       type: number
-     *                     description: Batch position before the operation index is appended. Chain registries require a nonempty array of nonnegative safe integers.
+     *                     description: Batch position before the operation index is appended. Chain registries require [height, index, ...registryPosition], all nonnegative safe integers, matching registration height and index.
      *                   registration:
      *                     type: object
-     *                     description: Optional blockchain registration metadata
+     *                     description: Required complete evidence for chain registries; Gatekeeper derives opidx from the original CID-list index.
      *
      *     responses:
      *       200:

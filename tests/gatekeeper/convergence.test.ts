@@ -29,8 +29,8 @@ it.each(vectors)('converges to the canonical projection: $name', async v => {
         const events = order.map((index, receipt): GatekeeperEvent => ({
             operation: v.operations[index], registry: v.transport === 'foreign-anchor' ? (index === 2 ? 'BTC:signet' : 'local') : ['mixed', 'pin-mixed'].includes(v.transport) ? (index % 2 ? (v.transport === 'pin-mixed' ? 'pin' : 'hyperswarm') : 'local') : v.transport,
             time: v.operations[index].proof!.created,
-            ordinal: [1000 + (v.receipts === 'fresh' ? receipt : v.receipts === 'tied' ? 0 : index), 0],
-            ...(v.transport !== 'BTC:signet' && !(v.transport === 'foreign-anchor' && index === 2) ? {} : { registration: { height: 1000 + index, txid: `tx${index}`, batch: 'batch', opidx: 0 } }),
+            ordinal: [1000 + (v.receipts === 'fresh' ? receipt : v.receipts === 'tied' ? 0 : index), 0, 0],
+            ...(v.transport !== 'BTC:signet' && !(v.transport === 'foreign-anchor' && index === 2) ? {} : { registration: { height: 1000 + (v.receipts === 'fresh' ? receipt : v.receipts === 'tied' ? 0 : index), index: 0, txid: `tx${index}`, batch: 'batch', opidx: 0 } }),
         }));
         // Ordinary batch/import processing, including deferred predecessors.
         for (const event of events) {

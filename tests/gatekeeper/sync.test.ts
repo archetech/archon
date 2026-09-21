@@ -5,7 +5,7 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import { copyJSON } from '@didcid/common/utils';
 import { ExpectedExceptionError } from '@didcid/common/errors';
 import MemoryClient from '@didcid/ipfs/memory';
-import TestHelper from './helper.ts';
+import TestHelper, { anchorEvent } from './helper.ts';
 
 const mockConsole = {
     log: (): void => { },
@@ -680,21 +680,25 @@ describe('processEvents', () => {
         await gatekeeper.deleteDID(deleteOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].registry = 'BTC:signet';
-        ops[1].registry = 'BTC:signet';
+        anchorEvent(ops[0], 'BTC:signet', 1);
+        anchorEvent(ops[1], 'BTC:signet', 2);
         ops[1].registration = {
             "height": 100,
             "index": 1,
+            "opidx": 0,
             "txid": "mock1",
             "batch": "mock1"
         };
-        ops[2].registry = 'BTC:signet';
+        ops[1].ordinal = [100, 1, 0];
+        anchorEvent(ops[2], 'BTC:signet', 3);
         ops[2].registration = {
             "height": 200,
             "index": 2,
+            "opidx": 0,
             "txid": "mock2",
             "batch": "mock2"
         };
+        ops[2].ordinal = [200, 2, 0];
 
         await gatekeeper.importBatch(ops);
         const response = await gatekeeper.processEvents();
@@ -712,8 +716,8 @@ describe('processEvents', () => {
         await gatekeeper.updateDID(updateOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].registry = 'BTC:signet';
-        ops[1].registry = 'BTC:signet';
+        anchorEvent(ops[0], 'BTC:signet', 1);
+        anchorEvent(ops[1], 'BTC:signet', 2);
         await gatekeeper.importBatch(ops);
         await gatekeeper.processEvents();
 
@@ -786,7 +790,7 @@ describe('processEvents', () => {
         // Import confirmations: v2 confirmed on hyperswarm; v3 confirmed on BTC:signet
         const events = await gatekeeper.exportDID(did);
         events[1].registry = 'hyperswarm';
-        events[2].registry = 'BTC:signet';
+        anchorEvent(events[2], 'BTC:signet', 3);
 
         await gatekeeper.importBatch(events);
         await gatekeeper.processEvents();
@@ -810,14 +814,16 @@ describe('processEvents', () => {
         await gatekeeper.updateDID(updateOp);
         const ops = await gatekeeper.exportDID(did);
 
-        ops[0].registry = 'BTC:signet';
-        ops[1].registry = 'BTC:signet';
+        anchorEvent(ops[0], 'BTC:signet', 1);
+        anchorEvent(ops[1], 'BTC:signet', 2);
         ops[1].registration = {
             "height": 101,
             "index": 1,
+            "opidx": 0,
             "txid": "mockTxid",
             "batch": "mockBatch"
         };
+        ops[1].ordinal = [101, 1, 0];
 
         await gatekeeper.importBatch(ops);
         await gatekeeper.processEvents();
@@ -838,9 +844,10 @@ describe('processEvents', () => {
                 height: mockBlock2.height,
                 time: mockBlock2.time,
                 timeISO: new Date(mockBlock2.time * 1000).toISOString(),
-                txid: ops[1].registration.txid,
-                txidx: ops[1].registration.index,
-                batchid: ops[1].registration.batch,
+                txid: ops[1].registration!.txid,
+                txidx: ops[1].registration!.index,
+                batchid: ops[1].registration!.batch,
+                opidx: 0,
             }
         };
 
@@ -855,8 +862,8 @@ describe('processEvents', () => {
         const updateOp = await helper.createUpdateOp(keypair, did, doc);
         await gatekeeper.updateDID(updateOp);
         const ops = await gatekeeper.exportDID(did);
-        ops[0].registry = 'BTC:signet';
-        ops[1].registry = 'BTC:signet';
+        anchorEvent(ops[0], 'BTC:signet', 1);
+        anchorEvent(ops[1], 'BTC:signet', 2);
         await gatekeeper.importBatch(ops);
 
         ops[0].registry = 'hyperswarm';
@@ -1105,6 +1112,7 @@ describe('processEvents', () => {
             registry: 'BTC:signet',
             operation: updateOp1,
             ordinal: [31226, 1, 0],
+            registration: { height: 31226, index: 1, opidx: 0, txid: 'tx', batch: 'batch' },
             time: new Date().toISOString(),
         };
 
@@ -1112,6 +1120,7 @@ describe('processEvents', () => {
             registry: 'BTC:signet',
             operation: updateOp2,
             ordinal: [31226, 1, 1],
+            registration: { height: 31226, index: 1, opidx: 1, txid: 'tx', batch: 'batch' },
             time: new Date().toISOString(),
         };
 
@@ -1162,7 +1171,7 @@ describe('processEvents', () => {
         expect(assetDoc2.didDocumentMetadata!.confirmed).toBe(false);
 
         for (const event of events) {
-            event.registry = 'BTC:signet';
+            anchorEvent(event, 'BTC:signet', 1);
         }
 
         await gatekeeper.importBatch(events);
@@ -1340,7 +1349,7 @@ describe('getDids', () => {
         let timestamp = Date.now();
 
         for (const op of batch) {
-            op.registry = 'BTC:signet';
+            anchorEvent(op, 'BTC:signet', timestamp);
             timestamp += 3600000; // add 1 hour to timestamp for each op
             op.time = new Date(timestamp).toISOString();
         }
@@ -1381,7 +1390,7 @@ describe('getDids', () => {
         let timestamp = Date.now();
 
         for (const op of batch) {
-            op.registry = 'BTC:signet';
+            anchorEvent(op, 'BTC:signet', timestamp);
             timestamp += 3600000; // add 1 hour to timestamp for each op
             op.time = new Date(timestamp).toISOString();
         }
@@ -1422,7 +1431,7 @@ describe('getDids', () => {
         let timestamp = Date.now();
 
         for (const op of batch) {
-            op.registry = 'BTC:signet';
+            anchorEvent(op, 'BTC:signet', timestamp);
             timestamp += 3600000; // add 1 hour to timestamp for each op
             op.time = new Date(timestamp).toISOString();
         }

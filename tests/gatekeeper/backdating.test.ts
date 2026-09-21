@@ -118,11 +118,12 @@ describe('backdating a proof on chain', () => {
         const rotationBlockTime = new Date(now + hour).toISOString();
         const ops = await gatekeeper.exportDID(alice);
         ops[0].registry = 'BTC:signet';
-        ops[0].registration = { height: 100, index: 0, txid: 'tx100', batch: 'b100' };
+        ops[0].registration = { height: 100, index: 0, opidx: 0, txid: 'tx100', batch: 'b100' };
+        ops[0].ordinal = [100, 0, 0];
         ops[1].registry = 'BTC:signet';
-        ops[1].registration = { height: 200, index: 0, txid: 'tx200', batch: 'b200' };
+        ops[1].registration = { height: 200, index: 0, opidx: 0, txid: 'tx200', batch: 'b200' };
         ops[1].time = rotationBlockTime;
-        ops[1].ordinal = [200, 0];
+        ops[1].ordinal = [200, 0, 0];
         await gatekeeper.importBatch(ops);
         await gatekeeper.processEvents();
 
@@ -136,8 +137,8 @@ describe('backdating a proof on chain', () => {
         const anchored = {
             registry: 'BTC:signet',
             time: new Date(now + 2 * hour).toISOString(),
-            ordinal: [300, 0],
-            registration: { height: 300, index: 0, txid: 'tx300', batch: 'b300' },
+            ordinal: [300, 0, 0],
+            registration: { height: 300, index: 0, opidx: 0, txid: 'tx300', batch: 'b300' },
             operation: forged,
         };
 
@@ -179,19 +180,20 @@ describe('backdating a proof on chain', () => {
         const blockTime = new Date(now + hour).toISOString();
         const ops = await gatekeeper.exportDID(alice);
         ops[0].registry = 'BTC:signet';
-        ops[0].registration = { height: 100, index: 0, txid: 'tx100', batch: 'b100' };
+        ops[0].registration = { height: 100, index: 0, opidx: 0, txid: 'tx100', batch: 'b100' };
+        ops[0].ordinal = [100, 0, 0];
         ops[1].registry = 'BTC:signet';
-        ops[1].registration = { height: 200, index: 1, txid: 'tx200', batch: 'b200' };
+        ops[1].registration = { height: 200, index: 1, opidx: 0, txid: 'tx200', batch: 'b200' };
         ops[1].time = blockTime;
-        ops[1].ordinal = [200, 1];
+        ops[1].ordinal = [200, 1, 0];
         await gatekeeper.importBatch(ops);
         await gatekeeper.processEvents();
 
         const anchored = {
             registry: 'BTC:signet',
             time: blockTime,
-            ordinal: [200, 0],
-            registration: { height: 200, index: 0, txid: 'tx200', batch: 'b200' },
+            ordinal: [200, 0, 0],
+            registration: { height: 200, index: 0, opidx: 0, txid: 'tx200', batch: 'b200' },
             operation: genuine,
         };
         await gatekeeper.importBatch([anchored]);
@@ -227,8 +229,8 @@ describe('backdating a proof on chain', () => {
         const forged = await forgery(k1, asset, new Date(now).toISOString());
 
         const block = (height: number, time: string, operation: typeof createOp) => ({
-            registry: 'BTC:signet', time, ordinal: [height, 0],
-            registration: { height, index: 0, txid: `tx${height}`, batch: `b${height}` }, operation,
+            registry: 'BTC:signet', time, ordinal: [height, 0, 0],
+            registration: { height, index: 0, opidx: 0, txid: `tx${height}`, batch: `b${height}` }, operation,
         });
         const rotation = block(200, new Date(now + hour).toISOString(), rotationOp);
         const forgeryEvent = block(300, new Date(now + 2 * hour).toISOString(), forged);
@@ -304,8 +306,8 @@ describe('backdating a proof on chain', () => {
 
         const forged = await forgery(k1, asset, new Date(now).toISOString());
         await gatekeeper.importBatch([{
-            registry: 'BTC:signet', time: new Date(now + 2 * hour).toISOString(), ordinal: [300, 0],
-            registration: { height: 300, index: 0, txid: 'b300', batch: 'b300' }, operation: forged,
+            registry: 'BTC:signet', time: new Date(now + 2 * hour).toISOString(), ordinal: [300, 0, 0],
+            registration: { height: 300, index: 0, opidx: 0, txid: 'b300', batch: 'b300' }, operation: forged,
         }]);
         const result = await gatekeeper.processEvents();
 
@@ -344,15 +346,16 @@ describe('backdating a proof across a registry migration', () => {
         // the new one. The migration is confirmed where it was made.
         const ops = await gatekeeper.exportDID(alice);
         ops[0].registry = 'ETH:sepolia';
-        ops[0].registration = { height: 1, index: 0, txid: 'e1', batch: 'e1' };
+        ops[0].registration = { height: 1, index: 0, opidx: 0, txid: 'e1', batch: 'e1' };
+        ops[0].ordinal = [1, 0, 0];
         ops[1].registry = 'ETH:sepolia';
         ops[1].time = new Date(now + hour).toISOString();
-        ops[1].ordinal = [999999, 0];
-        ops[1].registration = { height: 999999, index: 0, txid: 'e2', batch: 'e2' };
+        ops[1].ordinal = [999999, 0, 0];
+        ops[1].registration = { height: 999999, index: 0, opidx: 0, txid: 'e2', batch: 'e2' };
         ops[2].registry = 'ETH:sepolia';
         ops[2].time = new Date(now + hour + 1000).toISOString();
-        ops[2].ordinal = [999999, 1];
-        ops[2].registration = { height: 999999, index: 1, txid: 'e3', batch: 'e3' };
+        ops[2].ordinal = [999999, 1, 0];
+        ops[2].registration = { height: 999999, index: 1, opidx: 0, txid: 'e3', batch: 'e3' };
         await gatekeeper.importBatch(ops);
         await gatekeeper.processEvents();
 
@@ -367,8 +370,8 @@ describe('backdating a proof across a registry migration', () => {
         await gatekeeper.importBatch([{
             registry: 'BTC:signet',
             time: new Date(now + 2 * hour).toISOString(),
-            ordinal: [300, 0],
-            registration: { height: 300, index: 0, txid: 'b300', batch: 'b300' },
+            ordinal: [300, 0, 0],
+            registration: { height: 300, index: 0, opidx: 0, txid: 'b300', batch: 'b300' },
             operation: forged,
         }]);
         const result = await gatekeeper.processEvents();
@@ -384,8 +387,8 @@ describe('relayed events cannot assert chain confirmation', () => {
         const k1 = cipher.generateRandomJwk();
         const alice = await gatekeeper.createDID(await helper.createAgentOp(k1, { registry: 'BTC:signet' }));
         const ops = await gatekeeper.exportDID(alice);
-        const claimed = { ...ops[0], registry: 'BTC:signet', time: new Date(now).toISOString(), ordinal: [100, 0],
-            registration: { height: 100, index: 0, txid: 'tx100', batch: 'b100' } };
+        const claimed = { ...ops[0], registry: 'BTC:signet', time: new Date(now).toISOString(), ordinal: [100, 0, 0],
+            registration: { height: 100, index: 0, opidx: 0, txid: 'tx100', batch: 'b100' } };
 
         // Relayed: the claim of confirmation is not honoured.
         await gatekeeper.importRelayedBatch([claimed]);

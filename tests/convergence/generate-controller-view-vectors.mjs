@@ -45,7 +45,7 @@ for (const legacy of [false, true]) for (const origin of ['hyperswarm', 'wrong-g
         }
         const suffix = mode === 'wrong-registry-suffix' ? [] : [6];
         vectors.push({ legacy, mode: origin === 'hyperswarm' ? mode : origin + '-' + mode, did, assetDid, events, controllerIds: await Promise.all([genesis, migration, update].map(cid)),
-            confirmedVersions: mode === 'wrong-registry-suffix' ? '2' : '3', assetAccepted: mode !== 'confirmed-suffix',
+            confirmedVersions: mode === 'confirmed-suffix' ? '3' : '2', assetAccepted: mode !== 'confirmed-suffix',
             orders: [[0, 1, 2, 3, 4, 5, ...suffix], [2, 1, 0, 3, 4, 5, ...suffix]],
             blocks: ['BTC:signet', 'ZEC:testnet'].flatMap(registry => [99, 100].map(height => ({ registry,
                 block: { height, hash: registry + '-block-' + height, time: Date.parse(height === 99 ? date(4) : date(5)) / 1000 } }))) });

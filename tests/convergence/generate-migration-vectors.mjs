@@ -28,7 +28,7 @@ for (const legacy of [false, true]) {
     await update(5, 'returned-child');
     const ids = await Promise.all(operations.map(cid));
     const chain = (op, registry, index) => ({ operation: operations[op], registry, time: '2026-09-02T00:00:00Z', ordinal: [100, index, 0],
-        registration: { height: 100, txid: registry + '-tx' + index, batch: 'batch', opidx: 0 } });
+        registration: { height: 100, index, txid: registry + '-tx' + index, batch: 'batch', opidx: 0 } });
     for (const mode of ['competing-migrations', 'earlier-migration-return']) {
         const events = operations.map((operation, i) => ({ operation, registry: 'hyperswarm', time: operation.proof.created, ordinal: [i] }));
         events.push(chain(0, 'BTC:signet', 0), chain(1, 'BTC:signet', 50), chain(2, 'BTC:signet', 30),

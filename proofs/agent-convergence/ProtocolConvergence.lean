@@ -143,8 +143,8 @@ def ProtocolReceiptCanonical [DecidableEq α] (w : ProtocolModel n)
       reconcileProtocol w (normalizeProtocolEvidence delivery) previous = some result ∧
       ProtocolStable w (normalizeProtocolEvidence delivery) result ∧ protocolResult w result = canonical
 
-/-- C1–C3 endpoint, including deterministic metadata enrichment. Copies lacking
-metadata are admitted, but cannot weaken an available richer chain receipt. -/
+/-- C1–C3 endpoint with complete chain receipts. Copies lacking metadata are
+rejected by the complete-header premise. -/
 theorem protocol_convergence [DecidableEq α] (w : ProtocolModel n) (domain : ProtocolDomain w)
     (receipts : ProtocolReceiptEvidence n α) (sources : ProtocolReceiptSources w receipts) :
     ∃ canonical, ProtocolReceiptCanonical w receipts canonical ∧

@@ -41,7 +41,7 @@ for (const legacy of [false, true]) {
     const base = { legacy, did, operations, ids, keys: keys.map(k => k.publicJwk), signatureValid };
     const states = documentStates(base, documentGraph(base, false, 'BTC:signet'));
     const hint = (operation, index) => ({ operation, registry: 'hyperswarm', time: operation.proof.created, ordinal: [index] });
-    const chain = (operation, index) => ({ operation, registry: 'BTC:signet', time: '2026-09-02T00:00:00Z', ordinal: [100, index, 0], registration: { height: 100, txid: 'tx' + index, batch: 'batch', opidx: 0 } });
+    const chain = (operation, index) => ({ operation, registry: 'BTC:signet', time: '2026-09-02T00:00:00Z', ordinal: [100, index, 0], registration: { height: 100, index, txid: 'tx' + index, batch: 'batch', opidx: 0 } });
     for (const mode of ['chain-priority', 'earlier-repeat']) {
         const events = [...operations.map(hint), chain(genesis, 0), chain(operations[1], 50), chain(operations[2], 30), chain(operations[5], 5)];
         if (mode === 'earlier-repeat') events.push(chain(operations[1], 10));

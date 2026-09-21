@@ -34,13 +34,15 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
           "txid": "0-10",
-          "batch": "0-10"
+          "batch": "0-10",
+          "opidx": 0
         }
       },
       {
@@ -72,13 +74,15 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
           "txid": "1-10",
-          "batch": "1-10"
+          "batch": "1-10",
+          "opidx": 0
         }
       },
       {
@@ -131,13 +135,15 @@
         "time": "2026-01-01T02:46:40.000Z",
         "ordinal": [
           200,
-          1
+          1,
+          0
         ],
         "registration": {
           "height": 200,
           "index": 1,
           "txid": "0-200",
-          "batch": "0-200"
+          "batch": "0-200",
+          "opidx": 0
         }
       },
       {
@@ -190,13 +196,15 @@
         "time": "2026-01-01T00:16:40.000Z",
         "ordinal": [
           50,
+          0,
           0
         ],
         "registration": {
           "height": 50,
           "index": 0,
           "txid": "1-50",
-          "batch": "1-50"
+          "batch": "1-50",
+          "opidx": 0
         }
       },
       {
@@ -248,13 +256,15 @@
         "time": "2026-01-01T02:46:40.000Z",
         "ordinal": [
           200,
+          0,
           0
         ],
         "registration": {
           "height": 200,
           "index": 0,
           "txid": "0-200",
-          "batch": "0-200"
+          "batch": "0-200",
+          "opidx": 0
         }
       },
       {
@@ -306,13 +316,15 @@
         "time": "2026-01-01T02:46:40.000Z",
         "ordinal": [
           300,
+          0,
           0
         ],
         "registration": {
           "height": 300,
           "index": 0,
           "txid": "1-300",
-          "batch": "1-300"
+          "batch": "1-300",
+          "opidx": 0
         }
       }
     ]
@@ -347,11 +359,13 @@
       "time": "2026-01-01T00:00:00.000Z",
       "ordinal": [
         1,
+        0,
         0
       ],
       "registration": {
         "height": 1,
         "index": 0,
+        "opidx": 0,
         "txid": "tx1",
         "batch": "batch1"
       }
@@ -385,11 +399,13 @@
       "time": "2026-01-01T00:00:00.000Z",
       "ordinal": [
         2,
+        0,
         0
       ],
       "registration": {
         "height": 2,
         "index": 0,
+        "opidx": 0,
         "txid": "tx2",
         "batch": "batch2"
       }
@@ -419,11 +435,13 @@
       "time": "2026-01-01T00:00:00.000Z",
       "ordinal": [
         3,
+        0,
         0
       ],
       "registration": {
         "height": 3,
         "index": 0,
+        "opidx": 0,
         "txid": "tx3",
         "batch": "batch3"
       }
@@ -453,11 +471,13 @@
       "time": "2026-01-01T00:00:00.000Z",
       "ordinal": [
         4,
+        0,
         0
       ],
       "registration": {
         "height": 4,
         "index": 0,
+        "opidx": 0,
         "txid": "tx4",
         "batch": "batch4"
       }
@@ -518,11 +538,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }
@@ -582,11 +604,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }
@@ -646,11 +670,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }
@@ -686,11 +712,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }
@@ -726,11 +754,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }
@@ -764,11 +794,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }
@@ -806,11 +838,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }
@@ -848,11 +882,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }
@@ -890,11 +926,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }
@@ -926,11 +964,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }
@@ -970,11 +1010,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }
@@ -1009,11 +1051,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }
@@ -1049,11 +1093,13 @@
           "time": "2026-01-01T00:00:00.000Z",
           "ordinal": [
             6,
+            0,
             0
           ],
           "registration": {
             "height": 6,
             "index": 0,
+            "opidx": 0,
             "txid": "tx6",
             "batch": "batch6"
           }
@@ -1109,11 +1155,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }
@@ -1149,11 +1197,13 @@
           "time": "2026-01-01T00:00:00.000Z",
           "ordinal": [
             6,
+            0,
             0
           ],
           "registration": {
             "height": 6,
             "index": 0,
+            "opidx": 0,
             "txid": "tx6",
             "batch": "batch6"
           }
@@ -1209,11 +1259,13 @@
         "time": "2026-01-01T00:00:00.000Z",
         "ordinal": [
           10,
+          0,
           0
         ],
         "registration": {
           "height": 10,
           "index": 0,
+          "opidx": 0,
           "txid": "tx10",
           "batch": "batch10"
         }

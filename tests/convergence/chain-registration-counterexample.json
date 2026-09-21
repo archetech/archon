@@ -43,6 +43,7 @@
         ],
         "registration": {
           "height": 3,
+          "index": 0,
           "txid": "audit",
           "batch": "audit",
           "opidx": 0
@@ -79,6 +80,7 @@
         ],
         "registration": {
           "height": 1,
+          "index": 0,
           "txid": "audit",
           "batch": "audit",
           "opidx": 0
@@ -112,6 +114,7 @@
         ],
         "registration": {
           "height": 2,
+          "index": 0,
           "txid": "audit",
           "batch": "audit",
           "opidx": 0
@@ -192,6 +195,7 @@
         ],
         "registration": {
           "height": 1,
+          "index": 0,
           "txid": "audit",
           "batch": "audit",
           "opidx": 0
@@ -231,6 +235,7 @@
       ],
       "registration": {
         "height": 1,
+        "index": 1,
         "txid": "audit",
         "batch": "audit",
         "opidx": 0
@@ -299,6 +304,7 @@
         ],
         "registration": {
           "height": 3,
+          "index": 0,
           "txid": "audit",
           "batch": "audit",
           "opidx": 0
@@ -334,6 +340,7 @@
         ],
         "registration": {
           "height": 1,
+          "index": 0,
           "txid": "audit",
           "batch": "audit",
           "opidx": 0
@@ -366,6 +373,7 @@
         ],
         "registration": {
           "height": 2,
+          "index": 0,
           "txid": "audit",
           "batch": "audit",
           "opidx": 0
@@ -444,6 +452,7 @@
         ],
         "registration": {
           "height": 1,
+          "index": 0,
           "txid": "audit",
           "batch": "audit",
           "opidx": 0
@@ -482,6 +491,7 @@
       ],
       "registration": {
         "height": 1,
+        "index": 1,
         "txid": "audit",
         "batch": "audit",
         "opidx": 0

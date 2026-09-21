@@ -167,6 +167,18 @@ function isValidEventOrdinal(registry: unknown, ordinal: unknown): ordinal is nu
         : isValidChainOrdinal(ordinal);
 }
 
+// Chain positions are [height, index, ...registryPosition, opidx]. CID batch
+// metadata supplies the prefix; Gatekeeper appends the original CID-list index.
+function hasChainMetadata(ordinal: unknown, registration: unknown, batch = false): boolean {
+    if (!isValidChainOrdinal(ordinal) || ordinal.length < (batch ? 2 : 3)) return false;
+    if (!registration || typeof registration !== 'object' || Array.isArray(registration)) return false;
+    const anchor = registration as Record<string, unknown>;
+    return anchor.height === ordinal[0] && anchor.index === ordinal[1]
+        && typeof anchor.txid === 'string' && anchor.txid.length > 0
+        && typeof anchor.batch === 'string' && anchor.batch.length > 0
+        && (batch || anchor.opidx === ordinal[ordinal.length - 1]);
+}
+
 enum ImportStatus {
     ADDED = 'added',
     MERGED = 'merged',
@@ -640,7 +652,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     // controller's events on the operation's registry and the block time for
     // any other.
     private async controllerForEvent(controllerDid: string, operation: Operation, event?: GatekeeperEvent): Promise<DidCidDocument> {
-        if (event?.registration && event.time && !isUnanchoredRegistry(event.registry)) {
+        if (event && !isUnanchoredRegistry(event.registry) && hasChainMetadata(event.ordinal, event.registration)) {
             const cutoff = event.ordinal ? { registry: event.registry, ordinal: event.ordinal } : undefined;
             const doc = await this.resolveDIDAt(controllerDid, { confirm: true, versionTime: event.time, versionOrdinal: cutoff });
 
@@ -670,7 +682,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             // an unanchored controller into an anchored one.
             if (index > 0 && event.registry !== expected) break;
             if (event.registry === expected && !isUnanchoredRegistry(event.registry)) {
-                if (!event.registration) return false;
+                if (!hasChainMetadata(event.ordinal, event.registration)) return false;
                 anchored = true;
             }
             if (event.operation.type === 'update') {
@@ -1616,10 +1628,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         const unique = new Map<string, GatekeeperEvent>();
         for (const event of events) {
             const key = this.candidateKey(event);
-            const current = unique.get(key);
-            // At the same chain position, incomplete copies cannot erase known metadata.
-            const keepMetadata = current?.registration && !event.registration && !isUnanchoredRegistry(event.registry);
-            if (!current || (!isLocallyStampedRegistry(event.registry) && !keepMetadata)) unique.set(key, event);
+            if (!unique.has(key) || !isLocallyStampedRegistry(event.registry)) unique.set(key, event);
         }
         return [...unique.values()];
     }
@@ -1868,7 +1877,8 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     private async importEventOnce(event: GatekeeperEvent): Promise<ImportStatus> {
         // Startup replay also enters here directly from retained candidates.
-        if (!isValidEventOrdinal(event.registry, event.ordinal)) {
+        if (!isValidEventOrdinal(event.registry, event.ordinal)
+            || (!isUnanchoredRegistry(event.registry) && !hasChainMetadata(event.ordinal, event.registration))) {
             return ImportStatus.REJECTED;
         }
 
@@ -1916,9 +1926,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     const earlierAnchor = expectedRegistry && !isUnanchoredRegistry(expectedRegistry)
                         && event.registry === expectedRegistry && event.ordinal && opMatch.ordinal
                         && compareOrdinals(event.ordinal, opMatch.ordinal) < 0;
-                    const richerAnchor = !isUnanchoredRegistry(event.registry) && event.registry === expectedRegistry
-                        && this.candidateKey(event) === this.candidateKey(opMatch) && event.registration && !opMatch.registration;
-                    if (expectedRegistry && opMatch.registry === expectedRegistry && !earlierAnchor && !richerAnchor) {
+                    if (expectedRegistry && opMatch.registry === expectedRegistry && !earlierAnchor) {
                         return ImportStatus.MERGED;
                     }
                     // A late predecessor can make a later anchor apply first.
@@ -2113,7 +2121,8 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         // Only positioned receipts can claim chain authority. Relayed events
         // have already been converted to unconfirmed Hyperswarm hints.
-        if (!isValidEventOrdinal(event.registry, event.ordinal)) {
+        if (!isValidEventOrdinal(event.registry, event.ordinal)
+            || (!isUnanchoredRegistry(event.registry) && !hasChainMetadata(event.ordinal, event.registration))) {
             return false;
         }
 
@@ -2276,7 +2285,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         if ((isUnanchoredRegistry(metadata.registry)
             && !isValidUnanchoredOrdinal(metadata.ordinal))
             || (!isUnanchoredRegistry(metadata.registry)
-                && !isValidChainOrdinal(metadata.ordinal))) {
+                && !hasChainMetadata(metadata.ordinal, metadata.registration, true))) {
             throw new InvalidParameterError('metadata');
         }
 
