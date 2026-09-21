@@ -1725,6 +1725,63 @@ example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_6_2) empty2)
   pure [result0, result1, result2, result3]) := by
   rw [normalized2_6_2]
   decide
+def incompleteAgent2_0 : ProtocolAgent := { agent2_0 with chainFacts := fun rank => { agent2_0.chainFacts rank with registration := false } }
+theorem incompleteAgentDomain2_0 : ProtocolAgentDomain incompleteAgent2_0 :=
+  { agentDomain2_0 with facts := agentDomain2_0.facts }
+def incompleteAgent2_1 : ProtocolAgent := { agent2_1 with chainFacts := fun rank => { agent2_1.chainFacts rank with registration := false } }
+theorem incompleteAgentDomain2_1 : ProtocolAgentDomain incompleteAgent2_1 :=
+  { agentDomain2_1 with facts := agentDomain2_1.facts }
+def incompleteAsset2 : ProtocolAsset := { asset2 with chainFacts := fun rank => { asset2.chainFacts rank with registration := false } }
+theorem incompleteAssetDomain2 : ProtocolAssetDomain incompleteAsset2 :=
+  { assetDomain2 with facts := assetDomain2.facts }
+def incompleteWorld2 : ProtocolModel 4 := ⟨fun i => [some (.agent incompleteAgent2_0), some (.agent incompleteAgent2_1), some (.asset incompleteAsset2), none].getD i.val none, AssetFixtures.unanchored, 4⟩
+theorem incompleteDomain2 : ProtocolDomain incompleteWorld2 := by
+  apply protocol_domain_of_slots
+  · intro i spec entry
+    have cases : i.val = 0 ∨ i.val = 1 ∨ i.val = 2 ∨ i.val = 3 := by omega
+    rcases cases with h | h | h | h
+    all_goals simp only [incompleteWorld2, h, List.getD_cons_zero, List.getD_cons_succ] at entry
+    all_goals simp only [Option.some.injEq, ProtocolDID.agent.injEq, reduceCtorEq] at entry
+    all_goals first | contradiction | subst spec
+    all_goals first | exact incompleteAgentDomain2_0 | exact incompleteAgentDomain2_1
+  · intro i spec entry
+    have cases : i.val = 0 ∨ i.val = 1 ∨ i.val = 2 ∨ i.val = 3 := by omega
+    rcases cases with h | h | h | h
+    all_goals simp only [incompleteWorld2, h, List.getD_cons_zero, List.getD_cons_succ] at entry
+    all_goals simp only [Option.some.injEq, ProtocolDID.asset.injEq, reduceCtorEq] at entry
+    all_goals first | contradiction | subst spec
+    all_goals exact incompleteAssetDomain2
+  · intro i spec entry rank bound
+    have cases : i.val = 0 ∨ i.val = 1 ∨ i.val = 2 ∨ i.val = 3 := by omega
+    rcases cases with h | h | h | h
+    all_goals simp only [incompleteWorld2, h, List.getD_cons_zero, List.getD_cons_succ] at entry
+    all_goals simp only [Option.some.injEq, ProtocolDID.agent.injEq, reduceCtorEq] at entry
+    all_goals first | contradiction | subst spec
+    · have small : rank < 4 := bound
+      have checked : ∀ rank : Fin 4, (AssetControllerFixtures.receipts4).chain ((AssetControllerFixtures.receipts4).registry rank.val) = !AssetFixtures.unanchored ((AssetControllerFixtures.receipts4).registry rank.val) := by decide
+      exact checked ⟨rank, small⟩
+    · have small : rank < 2 := bound
+      have checked : ∀ rank : Fin 2, (AssetControllerFixtures.receipts5).chain ((AssetControllerFixtures.receipts5).registry rank.val) = !AssetFixtures.unanchored ((AssetControllerFixtures.receipts5).registry rank.val) := by decide
+      exact checked ⟨rank, small⟩
+  · intro i spec entry rank bound
+    have cases : i.val = 0 ∨ i.val = 1 ∨ i.val = 2 ∨ i.val = 3 := by omega
+    rcases cases with h | h | h | h
+    all_goals simp only [incompleteWorld2, h, List.getD_cons_zero, List.getD_cons_succ] at entry
+    all_goals simp only [Option.some.injEq, ProtocolDID.asset.injEq, reduceCtorEq] at entry
+    all_goals first | contradiction | subst spec
+    all_goals have small : rank < 13 := bound
+    all_goals have checked : ∀ rank : Fin 13, (AssetFixtures.receipts2).chain ((AssetFixtures.receipts2).registry rank.val) = !AssetFixtures.unanchored ((AssetFixtures.receipts2).registry rank.val) := by decide
+    all_goals exact checked ⟨rank, small⟩
+def incompleteEmpty2 : ProtocolRecords 4 Nat := ⟨fun _ => [], fun _ => []⟩
+def incompleteRaw2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  (raw2_6_0 i).map fun receipt => { receipt with chain := withoutRegistration receipt.chain }
+theorem incompleteSources2 : ProtocolReceiptSources incompleteWorld2 incompleteRaw2 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ incompleteRaw2 i, ProtocolReceiptValid incompleteWorld2 i (incompleteRaw2 i) receipt := by decide
+  exact checked
+example := protocol_convergence incompleteWorld2 incompleteDomain2 incompleteRaw2 incompleteSources2
+example : ∀ i : Fin 4, ∀ receipt ∈ incompleteRaw2 i,
+    withoutRegistration (protocolChainFacts incompleteWorld2 i receipt.source.key) =
+    withoutRegistration (protocolChainFacts world2 i receipt.source.key) := by decide
 def agent3_0 : ProtocolAgent := ⟨AssetFixtures.spec3_0, AssetControllerFixtures.receipts6, AssetControllerFixtures.positions6, 1788998460000, AssetControllerFixtures.operationTime6, AssetControllerFixtures.chainFacts6, AssetControllerFixtures.documents6, AssetControllerFixtures.methods6, 2⟩
 theorem agentDomain3_0 : ProtocolAgentDomain agent3_0 := by
   refine ⟨AssetControllerFixtures.ordered6, AssetControllerFixtures.bounded6, AssetControllerFixtures.parents6, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree6, AssetControllerFixtures.ranks6, ?_, ?_⟩

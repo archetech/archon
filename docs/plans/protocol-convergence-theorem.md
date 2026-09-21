@@ -92,6 +92,16 @@ and normalized source keys. The public `protocol_convergence` requires that
 binding and composes normalization with `protocol_normalized_convergence`; it no
 longer assumes identical optional metadata presence on every raw copy.
 
+`ProtocolModel` is a decoded evidence model, not just the physical blockchain
+snapshot. Its `chainFacts.registration` field must be false for incomplete-only
+evidence and true after enrichment. Registry, ordinal and block time remain fixed;
+`withoutRegistration` projects exactly those authoritative fields. Changing the
+available metadata changes this derived model field, as intended, and can change
+authorization. The generated `incompleteWorld` example applies the top-level
+theorem to metadata-free receipts alone and checks that all their physical chain
+facts equal the richer world's. Dropping the completeness binding would instead
+let authorization read a flag unrelated to the received evidence.
+
 ## Exact claim
 
 Fix complete canonical operation content, normalized predecessor references,

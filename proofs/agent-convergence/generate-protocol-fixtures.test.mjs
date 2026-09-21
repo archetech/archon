@@ -7,7 +7,8 @@ const vectors = JSON.parse(readFileSync(new URL('../../tests/convergence/asset-v
 test('final bridge checks typed family, source admission and actual composed execution', () => {
     const code = generateProtocolFixtures(vectors);
     for (const expression of ['ProtocolAgentDomain', 'ProtocolAssetDomain', 'ProtocolSources',
-        'protocol_convergence', 'reconcileProtocol', 'methods_agree', 'sameAgentSourceCheck']) assert(code.includes(expression));
+        'protocol_convergence', 'reconcileProtocol', 'methods_agree', 'sameAgentSourceCheck',
+        'incompleteSources', 'incompleteWorld', 'ProtocolReceiptSources']) assert(code.includes(expression));
 });
 test('final bridge preserves source-table independence', () => {
     const v = reorderedProtocolVector(vectors.find(v => v.mode === 'chain'));

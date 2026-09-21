@@ -106,8 +106,11 @@ theorem normalize_protocol_evidence_shared (left right : ProtocolReceiptEvidence
     SameProtocolEvidence (normalizeProtocolEvidence left) (normalizeProtocolEvidence right) :=
   fun i => normalize_protocol_receipts_shared _ _ (same i)
 
-/-- Chain clocks/positions belong to the shared authoritative snapshot. Optional
-registration presence is derived separately from the available receipt copies. -/
+/-- Decoded authorization headers combine fixed chain clocks/positions with an
+EVIDENCE-DERIVED registration flag. The latter is not part of the authoritative
+snapshot: `ProtocolReceiptValid` below computes its required value from copies.
+An incomplete-only snapshot therefore uses false; later enrichment uses true,
+without changing the physical chain facts (`withoutRegistration`). -/
 def protocolChainFacts (w : ProtocolModel n) (i : Fin n) (key : AgentReceiptKey) : Option ChainReceiptView :=
   key.anchor.bind fun rank => match w.dids i with
     | none => none

@@ -258,3 +258,5 @@ These rules apply to coding agents working in this repository.
 - A fixed authoritative chain snapshot does not by itself justify identical optional registration-metadata presence on repeated receipts. Audit same-position incomplete/complete copies through candidate deduplication, controller anchoring and replay before treating them as one semantic receipt class.
 
 - Prefer metadata-bearing receipts at the same canonical operation/chain registry/ordinal before authorization, including candidate recovery; a rejected richer copy cannot fall back to incomplete proof-time authority. Bind proof receipt metadata to received copies and derive completeness before agent/asset replay.
+
+- Decoded proof models can combine immutable chain facts with evidence-derived metadata. Keep those roles explicit and check incomplete-only theorem instances against identical physical chain facts; do not remove a required authorization binding to admit a mismatched decoded model.

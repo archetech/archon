@@ -44,6 +44,7 @@ export function generateProtocolFixtures(vectors) {
             const agent = agents.findIndex(a => a.owner === i);
             return agent >= 0 ? `some (.agent agent${n}_${agent})` : i === assetIndex ? `some (.asset asset${n})` : 'none';
         });
+        const worldStart = lines.length;
         lines.push(`def world${n} : ProtocolModel ${size} := ⟨fun i => ${list(slots)}.getD i.val none, ${ap}unanchored, ${names.indexOf('local')}⟩`,
             `theorem domain${n} : ProtocolDomain world${n} := by`, `  apply protocol_domain_of_slots`,
             '  · intro i spec entry', ...splitFin(size).map(line => '  ' + line),
@@ -73,6 +74,7 @@ export function generateProtocolFixtures(vectors) {
             `    all_goals have checked : ∀ rank : Fin ${d.anchors.length}, (${ap}receipts${n}).chain ((${ap}receipts${n}).registry rank.val) = !${ap}unanchored ((${ap}receipts${n}).registry rank.val) := by decide`,
             '    all_goals exact checked ⟨rank, small⟩',
             `def empty${n} : ProtocolRecords ${size} Nat := ⟨fun _ => [], fun _ => []⟩`);
+        const worldLines = lines.slice(worldStart);
         v.stages.forEach((stage, s) => {
             const suffix = `${n}_${s}`;
             stage.orders.forEach((_, k) => {
@@ -124,6 +126,31 @@ export function generateProtocolFixtures(vectors) {
             });
             assert.deepEqual(assetScenario(v, d, stage.evidence).expected, stage.expected);
         });
+        // Incomplete-only evidence uses false derived completeness, while every
+        // authoritative registry/position/clock remains the same as the rich case.
+        if (n === vectors.findIndex(vector => vector.mode === 'chain')) {
+            agents.forEach((_, j) => lines.push(
+                `def incompleteAgent${n}_${j} : ProtocolAgent := { agent${n}_${j} with chainFacts := fun rank => { agent${n}_${j}.chainFacts rank with registration := false } }`,
+                `theorem incompleteAgentDomain${n}_${j} : ProtocolAgentDomain incompleteAgent${n}_${j} :=`,
+                `  { agentDomain${n}_${j} with facts := agentDomain${n}_${j}.facts }`));
+            lines.push(`def incompleteAsset${n} : ProtocolAsset := { asset${n} with chainFacts := fun rank => { asset${n}.chainFacts rank with registration := false } }`,
+                `theorem incompleteAssetDomain${n} : ProtocolAssetDomain incompleteAsset${n} :=`,
+                `  { assetDomain${n} with facts := assetDomain${n}.facts }`);
+            const replacements = [[`world${n}`, `incompleteWorld${n}`], [`domain${n}`, `incompleteDomain${n}`],
+                [`empty${n}`, `incompleteEmpty${n}`], [`assetDomain${n}`, `incompleteAssetDomain${n}`], [`asset${n}`, `incompleteAsset${n}`],
+                ...agents.flatMap((_, j) => [[`agentDomain${n}_${j}`, `incompleteAgentDomain${n}_${j}`], [`agent${n}_${j}`, `incompleteAgent${n}_${j}`]])];
+            lines.push(...worldLines.map(line => replacements.reduce((result, [from, to]) => result.replaceAll(from, to), line)));
+            const suffix = `${n}_${v.stages.length - 1}`;
+            lines.push(`def incompleteRaw${n} : ProtocolReceiptEvidence ${size} Nat := fun i =>`,
+                `  (raw${suffix}_0 i).map fun receipt => { receipt with chain := withoutRegistration receipt.chain }`,
+                `theorem incompleteSources${n} : ProtocolReceiptSources incompleteWorld${n} incompleteRaw${n} := by`,
+                `  have checked : ∀ i : Fin ${size}, ∀ receipt ∈ incompleteRaw${n} i, ProtocolReceiptValid incompleteWorld${n} i (incompleteRaw${n} i) receipt := by decide`,
+                '  exact checked',
+                `example := protocol_convergence incompleteWorld${n} incompleteDomain${n} incompleteRaw${n} incompleteSources${n}`,
+                `example : ∀ i : Fin ${size}, ∀ receipt ∈ incompleteRaw${n} i,`,
+                `    withoutRegistration (protocolChainFacts incompleteWorld${n} i receipt.source.key) =`,
+                `    withoutRegistration (protocolChainFacts world${n} i receipt.source.key) := by decide`);
+        }
     });
     // A direct local receipt may create a chain-registered agent. Its mismatched
     // root receipt has no cutoff clock in the authorization view. Use the same
