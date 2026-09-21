@@ -773,6 +773,11 @@ async fn convergence_chain_successor_priority() {
                 )
                 .await
                 .unwrap();
+                let mut ordinary = crate::resolve_local_doc_async(&state, did, ResolveOptions::default()).await.unwrap();
+                let mut verified = doc.clone();
+                ordinary["didResolutionMetadata"].as_object_mut().unwrap().remove("retrieved");
+                verified["didResolutionMetadata"].as_object_mut().unwrap().remove("retrieved");
+                assert_eq!(ordinary, verified);
                 let store = state.store.lock().await;
                 let expected = vector["expected"].as_array().unwrap();
                 let ids: Vec<_> = expected
@@ -994,6 +999,30 @@ async fn convergence_controller_cutoff_view() {
                     restart_directory = Some(directory);
                 }
                 crate::history::ensure_history_ready(&state).await.unwrap();
+                // Ordinary and verified paths must expose identical full bounded views.
+                let accepted = state.store.lock().await.get_events(did);
+                for (index, event) in accepted.iter().enumerate() {
+                    for confirm in [false, true] {
+                        let mut bounds = vec![
+                            ResolveOptions { version_sequence: Some(index + 1), confirm, ..Default::default() },
+                            ResolveOptions { version_time: Some(event.time.clone()), confirm, ..Default::default() },
+                        ];
+                        if let Some(ordinal) = &event.ordinal {
+                            bounds.push(ResolveOptions {
+                                version_time: Some(event.time.clone()),
+                                version_ordinal: Some((event.registry.clone(), ordinal.clone())),
+                                confirm, ..Default::default()
+                            });
+                        }
+                        for options in bounds {
+                            let mut ordinary = crate::resolve_local_doc_async(&state, did, options.clone()).await.unwrap();
+                            let mut verified = crate::resolve_local_doc_async(&state, did, ResolveOptions { verify: true, ..options }).await.unwrap();
+                            ordinary["didResolutionMetadata"].as_object_mut().unwrap().remove("retrieved");
+                            verified["didResolutionMetadata"].as_object_mut().unwrap().remove("retrieved");
+                            assert_eq!(ordinary, verified, "{}, phase {phase}", vector["mode"]);
+                        }
+                    }
+                }
                 let agent = crate::resolve_local_doc_async(
                     &state,
                     did,

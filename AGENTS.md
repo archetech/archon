@@ -152,6 +152,8 @@ These rules apply to coding agents working in this repository.
 
 - Convergence work must exercise ordinary signed imports with tied receipts, late predecessors, mixed local/gossip hints, chain confirmation, and controller-dependent replay. Distinguish finite permutation coverage from a formal proof, and audit retained production evidence before claiming existing forks.
 
+- Keep accepted-history interpretation pure and predecessor-ordered. Share the predecessor-registry/confirmed-prefix walk, but keep whole-prefix anchoring separate from cutoff resolution; component replacement and deletion must agree in ordinary and verified resolution.
+
 - Keep envelope policy in the per-port event-policy module. Queue deduplication uses incoming metadata, durable candidates use normalized clocks, and accepted-history replacement is separate. Do not fold content-backed alias storage or authority selection into these helpers.
 
 - Keep distinct-successor comparison pure and after authorization, using the predecessor’s expected registry. Same-operation receipt replacement and replay traversal are separate; comparator extraction must add no database reads or replay passes.

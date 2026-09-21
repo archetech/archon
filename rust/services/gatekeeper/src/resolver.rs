@@ -1,3 +1,4 @@
+use crate::history_view::{history_entries, apply_transition};
 use std::{collections::HashMap, fs, time::Duration};
 
 use anyhow::Result;
@@ -217,7 +218,7 @@ pub(crate) async fn resolve_local_doc_async(
         return Err(invalid_operation("Invalid operation: proof"));
     }
 
-    for event in events.iter().skip(1) {
+    for (event, expected_registry, event_confirmed) in history_entries(&events).skip(1) {
         let operation = &event.operation;
         let operation_time = standard_datetime(&event.time);
 
@@ -230,16 +231,6 @@ pub(crate) async fn resolve_local_doc_async(
             }
         }
 
-        // Decided before the flag is committed, so a confirmed resolution
-        // that stops here reports the version it stopped at as confirmed --
-        // the store resolver does the same, and the two must agree.
-        let event_confirmed = resolved.confirmed
-            && resolved
-                .did_document_registration
-                .get("registry")
-                .and_then(Value::as_str)
-                .map(|registry| registry == event.registry)
-                .unwrap_or(false);
         if options.confirm && !event_confirmed {
             break;
         }
@@ -268,49 +259,9 @@ pub(crate) async fn resolve_local_doc_async(
             return Err(invalid_operation("Invalid operation: proof"));
         }
 
-        let registry_for_timestamp = resolved
-            .did_document_registration
-            .get("registry")
-            .and_then(Value::as_str)
-            .map(ToString::to_string);
+        apply_transition(&mut resolved, event, did, operation_time);
 
-        match operation.get("type").and_then(Value::as_str) {
-            Some("update") => {
-                resolved.version_sequence += 1;
-                resolved.version_id = event
-                    .opid
-                    .clone()
-                    .unwrap_or_else(|| generate_json_cid(operation).unwrap_or_default());
-                resolved.updated = Some(operation_time);
-                if let Some(next_doc) = operation.get("doc") {
-                    if let Some(doc) = next_doc.get("didDocument") {
-                        resolved.did_document = doc.clone();
-                    }
-                    if let Some(data) = next_doc.get("didDocumentData") {
-                        resolved.did_document_data = data.clone();
-                    }
-                    if let Some(registration) = next_doc.get("didDocumentRegistration") {
-                        resolved.did_document_registration = registration.clone();
-                    }
-                }
-                resolved.deactivated = false;
-            }
-            Some("delete") => {
-                resolved.version_sequence += 1;
-                resolved.version_id = event
-                    .opid
-                    .clone()
-                    .unwrap_or_else(|| generate_json_cid(operation).unwrap_or_default());
-                resolved.deleted = Some(operation_time);
-                resolved.updated = None;
-                resolved.did_document = json!({ "id": did });
-                resolved.did_document_data = json!({});
-                resolved.deactivated = true;
-            }
-            _ => {}
-        }
-
-        if let Some(registry) = registry_for_timestamp.as_deref() {
+        if let Some(registry) = expected_registry {
             resolved.timestamp = state
                 .store
                 .lock()

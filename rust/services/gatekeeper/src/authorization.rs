@@ -25,36 +25,7 @@ async fn is_anchored(state: &AppState, did: &str, registry: Option<&str>) -> boo
         let store = state.store.lock().await;
         store.get_events(did)
     };
-    let mut expected = events
-        .first()
-        .and_then(|event| event.operation.get("registration"))
-        .and_then(|registration| registration.get("registry"))
-        .and_then(Value::as_str);
-    let mut anchored = false;
-    for (index, event) in events.iter().enumerate() {
-        // Genesis is admitted separately; ignore the unconfirmed suffix.
-        if index > 0 && Some(event.registry.as_str()) != expected {
-            break;
-        }
-        if Some(event.registry.as_str()) == expected
-            && !is_unanchored_registry(&event.registry)
-        {
-            if !crate::proofs::record_has_chain_metadata(event) {
-                return false;
-            }
-            anchored = true;
-        }
-        if event.operation.get("type").and_then(Value::as_str) == Some("update") {
-            expected = event
-                .operation
-                .get("doc")
-                .and_then(|doc| doc.get("didDocumentRegistration"))
-                .and_then(|registration| registration.get("registry"))
-                .and_then(Value::as_str)
-                .or(expected);
-        }
-    }
-    anchored
+    crate::history_view::has_anchored_prefix(&events)
 }
 
 /// The controller document that authorizes an operation on an asset.

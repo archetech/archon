@@ -26,6 +26,10 @@ it.each(vectors)('settles competing branches ($mode, legacy=$legacy)', async vec
             }
             if (phase === 'restart') gatekeeper = new Gatekeeper({ db, ipfs });
             const doc = await gatekeeper.resolveDID(vector.did, { verify: true });
+            const ordinary = await gatekeeper.resolveDID(vector.did);
+            delete ordinary.didResolutionMetadata?.retrieved;
+            delete doc.didResolutionMetadata?.retrieved;
+            expect(ordinary).toEqual(doc);
             const events = await db.getEvents(vector.did);
             expect({ order, phase, ids: events.map(e => e.opid) }).toEqual({ order, phase, ids: vector.expected.map(i => vector.ids[i]) });
             if (vector.expectedEvents) {
