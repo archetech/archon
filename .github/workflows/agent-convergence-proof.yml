@@ -62,13 +62,20 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/agent-convergence-proof.yml'
+  schedule:
+    - cron: '23 5 * * *'
   workflow_dispatch:
+    inputs:
+      clean:
+        description: 'Build proofs without restoring the Lean build cache'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
 
 jobs:
-  prove:
+  lean-proof:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -132,6 +139,40 @@ jobs:
           node tests/convergence/generate-local-registration-counterexample.mjs
           node tests/convergence/generate-chain-registration-counterexample.mjs
           git diff --exit-code -- tests/convergence/local-receipt-counterexample.json tests/convergence/local-registration-counterexample.json tests/convergence/chain-registration-counterexample.json
+      # Restore only after mandatory source/fixture freshness checks. Lake still
+      # checks dependency traces and rebuilds changed modules on every run.
+      - name: Cache compiled proof modules
+        if: github.event_name != 'schedule' && inputs.clean != true
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: proofs/agent-convergence/.lake/build
+          key: lean-proof-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('proofs/agent-convergence/lean-toolchain', '.github/workflows/agent-convergence-proof.yml') }}-${{ hashFiles('proofs/agent-convergence/**/*.lean', 'proofs/agent-convergence/lakefile.toml', 'proofs/agent-convergence/lake-manifest.json') }}
+          restore-keys: |
+            lean-proof-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('proofs/agent-convergence/lean-toolchain', '.github/workflows/agent-convergence-proof.yml') }}-
+      - name: Check proofs and concrete histories
+        working-directory: proofs/agent-convergence
+        run: |
+          lake build
+          # Execute the axiom audit even when its compiled module was restored.
+          lake env lean AxiomAudit.lean
+      - name: Check reordered signed protocol bridge with Lean
+        run: node proofs/agent-convergence/check-protocol-reordering.mjs
+
+  typescript-replay-bridge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22.23.2'
+      - name: Build signed-fixture dependencies
+        run: |
+          npm install --global npm@10.9.2
+          npm ci
+          npm run build -w @didcid/common
+          npm run build -w @didcid/cipher
+          npm run build -w @didcid/ipfs
       - name: Check TypeScript replay pass bridge
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/convergence.test.ts --runInBand --coverage=false -t 'Lean-checked'
       - name: Check signed agent authorization
@@ -140,11 +181,6 @@ jobs:
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/chain-convergence.test.ts tests/gatekeeper/chain-successors.test.ts tests/gatekeeper/controller-view.test.ts tests/gatekeeper/chain-ordinals.test.ts tests/gatekeeper/interleaved-replay.test.ts tests/gatekeeper/integrated-agent.test.ts tests/gatekeeper/pin-receipt-audit.test.ts tests/gatekeeper/local-receipt-audit.test.ts tests/gatekeeper/local-registration-audit.test.ts tests/gatekeeper/chain-registration-audit.test.ts tests/gatekeeper/event-targets.test.ts tests/gatekeeper/method-ids.test.ts tests/gatekeeper/successor-ordering.test.ts tests/gatekeeper/event-policy.test.ts --runInBand --coverage=false
       - name: Check signed asset reconciliation and durable restart
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/asset-convergence.test.ts --runInBand --coverage=false --silent
-      - name: Check proofs and concrete histories
-        working-directory: proofs/agent-convergence
-        run: lake build
-      - name: Check reordered signed protocol bridge with Lean
-        run: node proofs/agent-convergence/check-protocol-reordering.mjs
 
   rust-replay-bridge:
     runs-on: ubuntu-latest
@@ -158,3 +194,19 @@ jobs:
       - name: Check Rust signed convergence and replay pass bridge
         run: |
           cargo +1.90.0 test --locked --manifest-path rust/services/gatekeeper/Cargo.toml --lib convergence::
+
+  # Preserve one aggregate result for the complete proof/implementation bridge.
+  prove:
+    if: always()
+    needs: [lean-proof, typescript-replay-bridge, rust-replay-bridge]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all proof and bridge checks
+        env:
+          LEAN_RESULT: ${{ needs.lean-proof.result }}
+          TYPESCRIPT_RESULT: ${{ needs.typescript-replay-bridge.result }}
+          RUST_RESULT: ${{ needs.rust-replay-bridge.result }}
+        run: |
+          test "$LEAN_RESULT" = success
+          test "$TYPESCRIPT_RESULT" = success
+          test "$RUST_RESULT" = success
