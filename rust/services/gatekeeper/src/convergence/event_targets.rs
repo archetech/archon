@@ -36,7 +36,7 @@ async fn binds_targets_before_queue_deduplication() {
                 for (i, op) in v["operations"].as_array().unwrap().iter().enumerate() {
                     let bad = hint(op, Some(wrong));
                     let bad = if relay {
-                        crate::events::relay_hints(&[bad])
+                        crate::event_policy::relay_hints(&[bad])
                     } else {
                         vec![bad]
                     };
@@ -44,7 +44,7 @@ async fn binds_targets_before_queue_deduplication() {
                     assert_eq!((result.rejected, result.queued), (1, 0), "{}", v["name"]);
                     let good = hint(op, explicit.then_some(did));
                     let good = if relay {
-                        crate::events::relay_hints(&[good])
+                        crate::event_policy::relay_hints(&[good])
                     } else {
                         vec![good]
                     };
@@ -83,7 +83,7 @@ async fn conflicting_genesis_converges_through_durable_restart() {
                 events.reverse();
             }
             for event in events {
-                crate::import_batch_impl(&state, &crate::events::relay_hints(&[event])).await;
+                crate::import_batch_impl(&state, &crate::event_policy::relay_hints(&[event])).await;
                 crate::process_events_impl(&state).await;
             }
             for _ in 0..2 {

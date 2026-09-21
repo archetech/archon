@@ -1,3 +1,4 @@
+import { PIN_QUEUE, isLocallyStampedRegistry, isUnanchoredRegistry, normalizeEventTime, candidateKey, preferredCandidates, relayHints, queueKey } from './event-policy.js';
 import CipherNode from '@didcid/cipher/node';
 import { copyJSON, compareOrdinals } from '@didcid/common/utils';
 import { isValidDID, generateCID } from '@didcid/ipfs/utils';
@@ -72,7 +73,6 @@ const LEGACY_PROOF_TYPE = 'EcdsaSecp256k1Signature2019';
 const OPERATION_PROOF_PURPOSES = ['capabilityInvocation', 'authentication', 'assertionMethod'];
 const ValidVersions = [1];
 const ValidTypes = ['agent', 'asset'];
-const PIN_QUEUE = 'pin';
 
 // RFC 3339 proofs may contain :60, which Date does not parse. Match chrono's
 // millisecond instant when comparing event times and historical cutoffs.
@@ -127,21 +127,6 @@ function isValidRegistryName(registry: unknown): registry is string {
         registry.length > 0 &&
         registry.length <= 128 &&
         /^[A-Za-z0-9][A-Za-z0-9:_-]*$/.test(registry);
-}
-
-// The two registries whose events this node stamps itself, so that no event on
-// them can carry a position a chain assigned: a local event holds the signer's
-// own `created`, a hyperswarm event its operation's proof time. Every other
-// registry is one an outside source might claim confirmation on. Whether a
-// registry actually anchors its events on a chain is not inferred from its
-// name -- `pin` does not -- but read from the events themselves (`isAnchored`).
-function isLocallyStampedRegistry(registry: unknown): boolean {
-    return registry === 'local' || registry === 'hyperswarm';
-}
-
-// Pin receipts can confirm pin-registry DIDs, but never establish chain order.
-function isUnanchoredRegistry(registry: unknown): boolean {
-    return registry === PIN_QUEUE || isLocallyStampedRegistry(registry);
 }
 
 // Compare authorized siblings of one predecessor; negative means a wins.
@@ -1605,14 +1590,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     private async normalizeEvent(event: GatekeeperEvent): Promise<void> {
-        // Normalize envelopes at import/recovery, including older mediator and
-        // restored events. Resolution consumes the stored event time uniformly.
-        if (event.registry === 'local' && event.operation.type === 'create' && event.operation.created) {
-            event.time = event.operation.created;
-        }
-        else if ((event.registry === 'local' || event.registry === 'hyperswarm' || event.registry === PIN_QUEUE) && event.operation.proof) {
-            event.time = event.operation.proof.created;
-        }
+        normalizeEventTime(event);
         const cid = await this.generateCID(event.operation);
         if (event.opid !== cid && !this.candidateHistory?.[event.did ?? '']?.some(known => known.opid === cid)) {
             await this.generateCID(event.operation, true);
@@ -1635,22 +1613,6 @@ export default class Gatekeeper implements GatekeeperInterface {
         if (!reference) return reference;
         const operation = await this.db.getOperation(reference);
         return operation ? this.generateCID(operation) : reference;
-    }
-
-    private candidateKey(event: GatekeeperEvent): string {
-        // A fresh gossip receipt time is not new authorization evidence.
-        if (isLocallyStampedRegistry(event.registry)) return JSON.stringify([event.opid, event.registry]);
-        if (!isUnanchoredRegistry(event.registry)) return JSON.stringify([event.opid, event.registry, event.ordinal]);
-        return JSON.stringify([event.opid, event.registry, event.time, event.ordinal]);
-    }
-
-    private preferredCandidates(events: GatekeeperEvent[]): GatekeeperEvent[] {
-        const unique = new Map<string, GatekeeperEvent>();
-        for (const event of events) {
-            const key = this.candidateKey(event);
-            if (!unique.has(key) || !isLocallyStampedRegistry(event.registry)) unique.set(key, event);
-        }
-        return [...unique.values()];
     }
 
     private candidateHistory?: Record<string, GatekeeperEvent[]>;
@@ -1683,7 +1645,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             for (const [key, events] of Object.entries(candidates)) {
                 const previous = JSON.stringify(events);
                 for (const event of events) await this.normalizeEvent(event);
-                const retained = this.preferredCandidates(events);
+                const retained = preferredCandidates(events);
                 if (JSON.stringify(retained) !== previous) await this.db.setCandidates(key, retained);
                 candidates[key] = retained;
                 this.indexCandidates(key, retained);
@@ -1692,13 +1654,13 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
         const candidates = this.candidateHistory;
         if (incoming.length && incoming.every(event => candidates[did]?.some(known =>
-            this.candidateKey(known) === this.candidateKey(event)
+            candidateKey(known) === candidateKey(event)
             && (isLocallyStampedRegistry(event.registry) || this.cipher.canonicalizeJSON(known) === this.cipher.canonicalizeJSON(event))))) {
             return { candidates, changed: false };
         }
         const events = [...(candidates[did] ?? []), ...copyJSON(histories?.get(did) ?? await this.db.getEvents(did)), ...incoming];
         for (const event of events) await this.normalizeEvent(event);
-        const retained = this.preferredCandidates(events);
+        const retained = preferredCandidates(events);
         const changed = this.cipher.canonicalizeJSON(candidates[did] ?? []) !== this.cipher.canonicalizeJSON(retained);
         if (changed) await this.db.setCandidates(did, retained);
         candidates[did] = retained;
@@ -1879,7 +1841,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         await this.normalizeEvent(event);
         return this.withHistoryLock(async () => {
             const { candidates, changed } = await this.retainCandidates(event.did!, [event]);
-            event = candidates[event.did!].find(known => this.candidateKey(known) === this.candidateKey(event)) ?? event;
+            event = candidates[event.did!].find(known => candidateKey(known) === candidateKey(event)) ?? event;
             const status = await this.importEventOnce(event);
             // Recovery and evidence changes already replay affected histories.
             // Repeated merged or deferred evidence needs no further
@@ -1888,7 +1850,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             if (status === ImportStatus.ADDED) delete this.verifiedDIDs[event.did!];
             await this.reconcileHistory(event.did!, true, status === ImportStatus.MERGED);
             const accepted = (await this.db.getEvents(event.did!))
-                .some(current => this.candidateKey(current) === this.candidateKey(event));
+                .some(current => candidateKey(current) === candidateKey(event));
             if (accepted && (status === ImportStatus.REJECTED || status === ImportStatus.DEFERRED)) return ImportStatus.ADDED;
             if (!accepted && status === ImportStatus.ADDED) return ImportStatus.REJECTED;
             return status;
@@ -2230,17 +2192,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidParameterError('batch');
         }
 
-        const hints = batch.map(event => {
-            if (!event || typeof event !== 'object' || isLocallyStampedRegistry(event.registry)) {
-                return event;
-            }
-
-            const { registration, ...rest } = event;
-            void registration;
-
-            return { ...rest, registry: 'hyperswarm' };
-        });
-
+        const hints = relayHints(batch);
         return this.importBatch(hints);
     }
 
@@ -2258,8 +2210,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             const ok = await this.verifyEvent(event);
 
             if (ok) {
-                const position = event.registration ? `/${JSON.stringify([event.time, event.ordinal])}` : '';
-                const eventKey = `${event.registry}/${await this.generateCID(event.operation)}${position}`;
+                const eventKey = queueKey(event, await this.generateCID(event.operation));
                 if (!this.eventsSeen[eventKey]) {
                     this.eventsSeen[eventKey] = true;
                     this.eventsQueue.push(event);

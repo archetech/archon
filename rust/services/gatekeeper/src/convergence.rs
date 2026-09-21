@@ -1269,7 +1269,7 @@ async fn convergence_chain_ordinals_required() {
         let mut unpositioned = genesis.clone();
         unpositioned.as_object_mut().unwrap().remove("ordinal");
         let result =
-            crate::import_batch_impl(&state, &crate::events::relay_hints(&[unpositioned])).await;
+            crate::import_batch_impl(&state, &crate::event_policy::relay_hints(&[unpositioned])).await;
         assert_eq!((result.queued, result.rejected), (1, 0));
         crate::process_events_impl(&state).await;
         let events = state.store.lock().await.get_events(did);
