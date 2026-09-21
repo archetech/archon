@@ -3216,4 +3216,18 @@ example : (reconcileProtocol world9 evidence9_6_2 empty9).map (fun result => Lis
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_6_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_6_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
   pure [result0, result1, result2, result3]) := by decide
+def localClockSource0 : AgentSourceReceipt Nat := ⟨⟨0, 0, none⟩, 0⟩
+example (a : AnchorModel) (facts : Nat → ChainReceiptView) :
+    agentReceiptView a (fun _ => some 1)
+      (protocolOperationTime 0 1 0 1788220800000 (fun _ => 1788307200000)) facts
+      ⟨a.size, false, localClockSource0⟩ = ⟨0, false, .unconfirmed⟩ := by
+  simpa [localClockSource0] using protocol_provisional_receipt_view a (fun _ => some 1)
+    0 1 0 1788220800000 (fun _ => 1788307200000) facts localClockSource0 rfl
+def localClockSource1 : AgentSourceReceipt Nat := ⟨⟨0, 0, none⟩, 0⟩
+example (a : AnchorModel) (facts : Nat → ChainReceiptView) :
+    agentReceiptView a (fun _ => some 1)
+      (protocolOperationTime 0 1 0 1788220800000 (fun _ => 1788307200000)) facts
+      ⟨a.size, false, localClockSource1⟩ = ⟨0, false, .unconfirmed⟩ := by
+  simpa [localClockSource1] using protocol_provisional_receipt_view a (fun _ => some 1)
+    0 1 0 1788220800000 (fun _ => 1788307200000) facts localClockSource1 rfl
 end Archon.ProtocolFixtures

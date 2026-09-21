@@ -252,3 +252,5 @@ These rules apply to coding agents working in this repository.
 - Before omitting a receipt field from the convergence key/view, trace its use in contextual authorization. In particular, registration metadata can trigger controller selection even on an unanchored receipt; audit that with signed imports instead of assuming the registry name makes the field irrelevant.
 
 - Chain-based controller selection requires an actual chain registry as well as registration metadata. Local/Hyperswarm/pin receipts use proof-time authorization even with metadata; preserve their evidence and repair old projections. Audit direct-operation producers as well as imports/recovery when changing clock normalization.
+
+- In proof receipt views, distinguish source-registry matching from public genesis confirmation. Unmatched genesis has no cutoff clock but is still admitted; prove matching-source clock equivalence before expanding the model to retain irrelevant receipt metadata.

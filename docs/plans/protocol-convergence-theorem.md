@@ -27,6 +27,17 @@ those complete-operation fields and the immutable creation/registry identity.
 There is no independent receipt-clock table, root exception or assumed equality
 of node-local timestamps in the final protocol input.
 
+The clock table is read only for matching unanchored receipts. A matching
+creation's receipt registry equals its genesis registry; all successor clocks
+use proof time. `protocol_provisional_receipt_view` proves equivalence with
+computing the clock from the actual source registry. A local receipt of a
+chain-registered creation instead projects to `.unconfirmed`, without a cutoff
+clock. Genesis remains admitted independently (including the runtime's public
+`confirmed: true` convention); this projection flag records registry matching,
+not that API flag. Both ports exercise a signed chain genesis with different
+creation/proof dates through direct submission and recovery, and the generated
+Lean boundary case checks its clock-free receipt view.
+
 ## Unanchored registration-metadata correction
 
 After the clock correction, an additional signed ordinary-import audit found

@@ -140,7 +140,7 @@ forks, repeated/earlier/tied anchors, missing predecessors, unconfirmed suffixes
 and cold/late-genesis replay in both ports. The signed pin audit led to the approved proof-time normalization rule; both ports
 now converge on asset verdicts and repair stored pre-fix projections. Lean checks source normalization and
 independently evaluates the expected components and authorization views. General
-runtime refinement remains outside this contract. B is completed below; C2/C3 remain open as recorded below.
+runtime refinement remains outside this contract. B and C1–C3 are completed below.
 
 ### B. Asset/controller convergence
 

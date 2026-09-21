@@ -1872,3 +1872,45 @@ async fn convergence_direct_local_creation_clock() {
         assert_eq!(accepted[0].time, operation["created"].as_str().unwrap());
     }
 }
+
+#[tokio::test]
+async fn convergence_local_receipt_of_chain_genesis() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/local-receipt-counterexample.json"
+    )).unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let (mut state, _directory) = crate::tests::make_state(JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        state.supported_registries.lock().await.push("BTC:signet".to_string());
+        let operation = &vector["nonlocalGenesis"];
+        let did = vector["nonlocalDid"].as_str().unwrap();
+        assert_ne!(operation["created"], operation["proof"]["created"]);
+        assert_eq!(crate::events::handle_did_operation(&state, operation).await.unwrap(), vector["nonlocalDid"]);
+        for _ in 0..2 {
+            let data = {
+                let store = state.store.lock().await;
+                let accepted = store.get_events(did);
+                assert_eq!(accepted.len(), 1);
+                assert_eq!(accepted[0].registry, "local");
+                assert_eq!(accepted[0].time, operation["created"].as_str().unwrap());
+                assert_eq!(&accepted[0].operation, operation);
+                let doc = store.resolve_doc(&state.config, did, crate::ResolveOptions {
+                    confirm: true, ..Default::default()
+                }).unwrap();
+                // Genesis admission does not establish matching chain authority.
+                assert_eq!(doc["didDocumentMetadata"]["confirmed"], true);
+                assert_ne!(accepted[0].registry, doc["didDocumentRegistration"]["registry"].as_str().unwrap());
+                assert_eq!(doc["didDocument"]["id"], did);
+                serde_json::from_value(serde_json::to_value(&store.data).unwrap()).unwrap()
+            };
+            let (restarted, _restart) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory, data, redis_connection: None,
+            });
+            state = restarted;
+            crate::history::ensure_history_ready(&state).await.unwrap();
+        }
+    }
+}

@@ -21,11 +21,50 @@ structure ProtocolAsset where
   created : Int
   chainFacts : Nat → ChainReceiptView
 
-/-- Operation-intrinsic receipt clock: only local creation uses `created`;
-all other unanchored receipts use the complete operation's proof timestamp. -/
+/-- Clock for a matching unanchored receipt: only local creation uses `created`.
+A matching root's source registry equals the genesis registry. Nonmatching
+receipts project to `.unconfirmed` without reading this clock. -/
 def protocolOperationTime (root registry localRegistry : Nat) (created : Int)
     (proofTime : Nat → Int) (operation : Nat) : Int :=
   if operation = root ∧ registry = localRegistry then created else proofTime operation
+
+/-- Source registry and genesis registry give the same clock wherever a
+matching receipt can read it. Successor clocks do not depend on registry. -/
+theorem protocol_clock_for_matching_source (root genesisRegistry receiptRegistry localRegistry : Nat)
+    (created : Int) (proofTime : Nat → Int) (operation : Nat)
+    (matchingRoot : operation = root → receiptRegistry = genesisRegistry) :
+    protocolOperationTime root genesisRegistry localRegistry created proofTime operation =
+      protocolOperationTime root receiptRegistry localRegistry created proofTime operation := by
+  by_cases h : operation = root
+  · rw [matchingRoot h]
+  · simp [protocolOperationTime, h]
+
+/-- A normalized provisional receipt can use the actual source registry to
+compute its clock with exactly the existing semantic projection. A mismatched
+local receipt of a chain genesis is unconfirmed, so its clock is not observed. -/
+theorem protocol_provisional_receipt_view (a : AnchorModel) (expected : Nat → Option Nat)
+    (root genesisRegistry localRegistry : Nat) (created : Int) (proofTime : Nat → Int)
+    (chainFacts : Nat → ChainReceiptView) (source : AgentSourceReceipt α)
+    (genesis : expected root = some genesisRegistry) :
+    agentReceiptView a expected
+      (protocolOperationTime root genesisRegistry localRegistry created proofTime) chainFacts
+      ⟨a.size + source.key.operation, expected source.key.operation == some source.key.registry, source⟩ =
+    ⟨source.key.operation, expected source.key.operation == some source.key.registry,
+      if expected source.key.operation == some source.key.registry then
+        .unanchored (expected source.key.operation)
+          (protocolOperationTime root source.key.registry localRegistry created proofTime source.key.operation)
+      else .unconfirmed⟩ := by
+  have outside : ¬a.size + source.key.operation < a.size := by omega
+  have owner : chainOwner a (a.size + source.key.operation) = source.key.operation := by
+    simp [chainOwner, outside]
+  by_cases matching : expected source.key.operation = some source.key.registry
+  · have clocks := protocol_clock_for_matching_source root genesisRegistry source.key.registry
+      localRegistry created proofTime source.key.operation (by
+        intro isRoot
+        rw [isRoot, genesis] at matching
+        exact (Option.some.inj matching).symm)
+    simp only [agentReceiptView, outside, owner, beq_iff_eq, matching, ↓reduceIte, clocks]
+  · simp only [agentReceiptView, owner, beq_iff_eq, matching, ↓reduceIte]
 
 def ProtocolAgent.operationTime (spec : ProtocolAgent) (localRegistry : Nat) :=
   protocolOperationTime spec.core.graph.root (spec.core.registry spec.core.initialRegistry)

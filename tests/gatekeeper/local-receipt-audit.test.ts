@@ -6,6 +6,8 @@ import type { GatekeeperEvent } from '@didcid/gatekeeper/types';
 
 type LocalVector = {
     legacy: boolean;
+    nonlocalGenesis: GatekeeperEvent["operation"];
+    nonlocalDid: string;
     did: string;
     assetDid: string;
     asset: GatekeeperEvent;
@@ -89,4 +91,27 @@ it.each(vectors)('uses creation time for direct local creation (legacy=$legacy)'
     expect(accepted).toHaveLength(1);
     expect(accepted[0].operation).toEqual(operation);
     expect(accepted[0].time).toBe(operation.created);
+});
+
+it.each(vectors)('admits local chain-genesis receipts without chain authority (legacy=$legacy)', async vector => {
+    const db = new DbMemory('local-chain-genesis');
+    const ipfs = new MemoryClient();
+    let gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'BTC:signet'] });
+    const operation = structuredClone(vector.nonlocalGenesis);
+    expect(operation.created).not.toBe(operation.proof!.created);
+    expect(await gatekeeper.createDID(operation)).toBe(vector.nonlocalDid);
+    for (let pass = 0; pass < 2; pass++) {
+        const accepted = await db.getEvents(vector.nonlocalDid);
+        expect(accepted).toHaveLength(1);
+        expect(accepted[0].registry).toBe('local');
+        expect(accepted[0].time).toBe(operation.created);
+        expect(accepted[0].operation).toEqual(operation);
+        const doc = await gatekeeper.resolveDID(vector.nonlocalDid, { confirm: true });
+        // Genesis is admitted by definition; receipt matching is a separate fact.
+        expect(doc.didDocumentMetadata?.confirmed).toBe(true);
+        expect(accepted[0].registry).not.toBe(doc.didDocumentRegistration?.registry);
+        expect(doc.didDocument?.id).toBe(vector.nonlocalDid);
+        gatekeeper = new Gatekeeper({ db, ipfs });
+        await gatekeeper.resolveDID(vector.nonlocalDid, { verify: true });
+    }
 });

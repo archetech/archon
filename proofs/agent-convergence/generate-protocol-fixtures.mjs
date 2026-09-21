@@ -109,6 +109,25 @@ export function generateProtocolFixtures(vectors) {
             assert.deepEqual(assetScenario(v, d, stage.evidence).expected, stage.expected);
         });
     });
+    // A direct local receipt may create a chain-registered agent. Its mismatched
+    // root receipt has no cutoff clock in the authorization view. Use the same
+    // distinct-time signed case that both production ports exercise.
+    const clocks = JSON.parse(readFileSync(new URL('../../tests/convergence/local-receipt-counterexample.json', import.meta.url), 'utf8'));
+    clocks.forEach((v, i) => {
+        const op = v.nonlocalGenesis;
+        assert.equal(op.type, 'create');
+        assert.equal(op.registration.registry, 'BTC:signet');
+        assert.notEqual(op.created, op.proof.created);
+        const created = Date.parse(op.created), proof = Date.parse(op.proof.created);
+        assert(Number.isFinite(created) && Number.isFinite(proof));
+        lines.push(`def localClockSource${i} : AgentSourceReceipt Nat := ⟨⟨0, 0, none⟩, 0⟩`,
+            `example (a : AnchorModel) (facts : Nat → ChainReceiptView) :`,
+            `    agentReceiptView a (fun _ => some 1)`,
+            `      (protocolOperationTime 0 1 0 ${created} (fun _ => ${proof})) facts`,
+            `      ⟨a.size, false, localClockSource${i}⟩ = ⟨0, false, .unconfirmed⟩ := by`,
+            `  simpa [localClockSource${i}] using protocol_provisional_receipt_view a (fun _ => some 1)`,
+            `    0 1 0 ${created} (fun _ => ${proof}) facts localClockSource${i} rfl`);
+    });
     lines.push('end Archon.ProtocolFixtures', '');
     return lines.join('\n');
 }

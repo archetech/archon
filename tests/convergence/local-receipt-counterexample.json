@@ -1,6 +1,30 @@
 [
   {
     "legacy": false,
+    "nonlocalGenesis": {
+      "type": "create",
+      "created": "2026-09-01T00:00:00Z",
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "BTC:signet"
+      },
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "Jcv_WooMPF4moNkMGUNL3P4x156E47fghZ0yph62GTg",
+        "y": "rPyvSTDP3ng_wD3i-EkHGzsd1OcaVT9YsD4OL-aliF4"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+        "created": "2026-09-02T00:00:00Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "capabilityInvocation",
+        "proofValue": "MbQA_VhfzHgsP0dUrjWwqJJODkEVZO32okmNRQiuQxMEegw-_XmejDx-IUv45H3XP-6i60b9_SDBbjlQRfHl6A"
+      }
+    },
+    "nonlocalDid": "did:cid:bagaaieraulw2der7zxuxqhtdde3wu2h5hrfz636qd47ydo7e3ce6cimf7tvq",
     "did": "did:cid:bagaaieraflnvfdefatkbarpsosamo45seeuvppdey6dhe4nvvtlrtgyx7v4a",
     "assetDid": "did:cid:bagaaierammibgn6impf5kd6bejvfjoqk7sybe643shgrkzuk5d66bufj3t4a",
     "asset": {
@@ -214,6 +238,29 @@
   },
   {
     "legacy": true,
+    "nonlocalGenesis": {
+      "type": "create",
+      "created": "2026-09-01T00:00:00Z",
+      "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "BTC:signet"
+      },
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "Jcv_WooMPF4moNkMGUNL3P4x156E47fghZ0yph62GTg",
+        "y": "rPyvSTDP3ng_wD3i-EkHGzsd1OcaVT9YsD4OL-aliF4"
+      },
+      "proof": {
+        "type": "EcdsaSecp256k1Signature2019",
+        "created": "2026-09-02T00:00:00Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "capabilityInvocation",
+        "proofValue": "XN9yqUGIaelKS5mqPZa_OXohXMw7VCg3_TW48-TsaRYXmi6lKyT_oCV6miP3A3r6qJ05mIssYkWwRklMLYGEgg"
+      }
+    },
+    "nonlocalDid": "did:cid:bagaaieraiu4edknttp7ssfa7zpt2uugn5zbgyqa6ywz5c7k4hioxrztot67a",
     "did": "did:cid:bagaaieract3iljnvepxd6o5dbwvxrmsa4t7t4nscvnfbnm47fcwn2u5hpqna",
     "assetDid": "did:cid:bagaaieracxpyytgynfmsnfnrknznuq7am7ei7qtzthp2mnsz6pasnybyxhtq",
     "asset": {
