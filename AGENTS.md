@@ -239,3 +239,5 @@ These rules apply to coding agents working in this repository.
 - Pin receipts use operation `proof.created` at import and stored-candidate recovery, as approved for the A2–A4 clock counterexample. This is a timestamp rule, not a change to pin relay trust, deduplication, or ordinals.
 
 - Rust event-to-JSON helpers must omit absent ordinals, matching `EventRecord` serialization; emitting `null` breaks reimport under ordinal validation. Cover the serialized round trip for unanchored receipts.
+
+- Controller-selection proofs must distinguish the time-bounded resolved version from the whole confirmed-prefix anchoring scan; the selected version’s registry controls proof-time fallback. Preserve genesis admission and stop-at-first-excluded successor behavior.

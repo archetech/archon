@@ -1,6 +1,6 @@
 name = "archonAgentConvergence"
 version = "0.1.0"
-defaultTargets = ["IntegratedAgentConvergence", "AgentSourceRecords", "ReceiptViews", "AgentReceiptViews", "AgentColdRecords", "ColdInterleaved", "IntegratedAgentFixtures", "AgentFullRecords", "InterleavedRecords", "AgentConvergence", "OperationalReplay", "Fixtures", "AxiomAudit", "EventRecords", "RecordFixtures", "FullReplay", "SerializedReplay", "AgentAuthorization", "AgentFixtures", "DocumentAuthorization", "DocumentFixtures", "AgentComponents", "ComponentFixtures", "ChainAnchors", "ChainAnchorFixtures", "ChainSuccessors", "ChainSuccessorFixtures", "InterleavedReplay", "InterleavedFixtures", "InterleavedBound", "PriorityProjection", "PriorityFixtures", "InterleavedAuthorization", "InterleavedDocumentFixtures", "ChainDocuments", "ChainDocumentFixtures", "RegistryAncestry", "RegistryFixtures", "RegistryAnchors", "RegistryPriority", "RegistryInterleaved", "RegistryInterleavedFixtures", "AgentRegistry", "AgentRegistryExamples", "AgentEventProjection"]
+defaultTargets = ["ControllerSelectionExamples", "ControllerSelection", "IntegratedAgentConvergence", "AgentSourceRecords", "ReceiptViews", "AgentReceiptViews", "AgentColdRecords", "ColdInterleaved", "IntegratedAgentFixtures", "AgentFullRecords", "InterleavedRecords", "AgentConvergence", "OperationalReplay", "Fixtures", "AxiomAudit", "EventRecords", "RecordFixtures", "FullReplay", "SerializedReplay", "AgentAuthorization", "AgentFixtures", "DocumentAuthorization", "DocumentFixtures", "AgentComponents", "ComponentFixtures", "ChainAnchors", "ChainAnchorFixtures", "ChainSuccessors", "ChainSuccessorFixtures", "InterleavedReplay", "InterleavedFixtures", "InterleavedBound", "PriorityProjection", "PriorityFixtures", "InterleavedAuthorization", "InterleavedDocumentFixtures", "ChainDocuments", "ChainDocumentFixtures", "RegistryAncestry", "RegistryFixtures", "RegistryAnchors", "RegistryPriority", "RegistryInterleaved", "RegistryInterleavedFixtures", "AgentRegistry", "AgentRegistryExamples", "AgentEventProjection"]
 
 [[lean_lib]]
 name = "AgentConvergence"
@@ -137,3 +137,9 @@ name = "AgentSourceRecords"
 
 [[lean_lib]]
 name = "IntegratedAgentConvergence"
+
+[[lean_lib]]
+name = "ControllerSelection"
+
+[[lean_lib]]
+name = "ControllerSelectionExamples"
