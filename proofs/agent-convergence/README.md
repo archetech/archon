@@ -540,6 +540,31 @@ CI installs Elan 4.2.4 only after checking the archive against the committed
 GitHub release asset digest and the downloaded archive. An installer-version
 update must also update and verify the committed checksum.
 
+### CI scheduling and incremental builds
+
+Relevant PRs and pushes to `main` run three parallel jobs: Lean/source-fixture
+checks, the TypeScript replay bridge, and the Rust replay bridge. The final
+`prove` job succeeds only when all three succeed; failures, cancellations, and
+skipped dependencies cannot produce a successful aggregate result. This does
+not change repository branch-protection settings.
+
+PR/push runs cache `.lake/build`. The prebuilt toolchain is installed fresh: it
+took about 11 seconds in the measured CI run, versus 2.9 GB unpacked to cache.
+The build-cache
+key includes the runner platform, toolchain, workflow, Lean sources, and Lake
+configuration. A same-toolchain/workflow fallback can supply older artifacts;
+`lake build` still runs and uses dependency traces to rebuild changed modules.
+Signed-source regeneration, fixture freshness checks, generator tests, the
+explicit axiom audit, and the reordered signed-protocol check always run, even
+on an exact cache hit. Both implementation bridges also always run.
+
+The entire workflow runs nightly at **05:23 UTC** without restoring the Lean build cache.
+Manual runs default to the same clean mode; unset the `clean` input to exercise
+the incremental path. Clean runs use a fresh hosted runner and install the
+prebuilt toolchain before compiling every proof module. A first PR cache miss
+also builds everything. GitHub scopes PR caches separately from `main`, whose
+successful push builds provide reusable caches to later PRs.
+
 ## Follow-up proof work
 
 Use the [completion contract](../../docs/plans/protocol-convergence-completion.md)
