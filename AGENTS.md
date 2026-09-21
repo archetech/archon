@@ -152,6 +152,8 @@ These rules apply to coding agents working in this repository.
 
 - Convergence work must exercise ordinary signed imports with tied receipts, late predecessors, mixed local/gossip hints, chain confirmation, and controller-dependent replay. Distinguish finite permutation coverage from a formal proof, and audit retained production evidence before claiming existing forks.
 
+- Keep distinct-successor comparison pure and after authorization, using the predecessor’s expected registry. Same-operation receipt replacement and replay traversal are separate; comparator extraction must add no database reads or replay passes.
+
 - Choose provisional competing successors in the shared importer by canonical CID; do not globally CID-sort replay traversal. Preserve efficient predecessor-first processing and benchmark populated histories before changing replay ordering. An anchor outside the predecessor’s expected chain registry remains provisional for sibling preference.
 
 - For provisional sibling ordering, `pin` supplies no chain priority even though it is a supported DID registry. Keep this distinct from the local/Hyperswarm helper used for receipt deduplication; cover pin-only and mixed pin/local imports with signed convergence fixtures.
@@ -177,6 +179,8 @@ These rules apply to coding agents working in this repository.
 - When modeling multiple verification methods, keep normalized method identity separate from public-key identity: a method can retain its name while replacing its key. Model current version-1 named-method lookup without inventing relationship-membership enforcement while #1156 is paused.
 
 - Full-state convergence bridges must preserve whole-component replacement and omission semantics for didDocument, didDocumentData, and didDocumentRegistration. Keep the full-document/method-list projection explicit; deletion clears document/data while retaining registration, and registry changes require the separate chain-ordering model.
+
+- When SQLite recovery tests time out, compare a targeted case with unmodified main and isolate temporary database I/O (for example TMPDIR=/dev/shm) before attributing failures to a refactor. Keep the pinned Node version and existing timeouts; avoid concurrent heavy suites.
 
 - In generated component proofs, intern repeated opaque payload values and check their decoding once; do not repeat large JSON-string equality reductions for every delivery permutation. Measure proof memory before running expensive Lean and cross-port suites together.
 

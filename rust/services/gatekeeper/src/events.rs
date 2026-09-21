@@ -1,4 +1,4 @@
-use std::env;
+use std::{cmp::Ordering, env};
 
 use anyhow::Result;
 use serde::Serialize;
@@ -12,6 +12,24 @@ use crate::{
     resolve_local_doc_async, update_search_doc, value_to_event_record,
     verify_event_shape, AppState, EventRecord, GatekeeperDb, ResolveOptions,
 };
+
+// Compare authorized siblings of one predecessor; Less means a wins.
+// Chain ordinals and canonical opids have already passed admission.
+// Same-operation receipt replacement stays in its separate importer branch.
+fn compare_successors(expected_registry: Option<&str>, a: &EventRecord, b: &EventRecord) -> Ordering {
+    let chain = expected_registry.filter(|registry| !is_unanchored_registry(registry));
+    let a_anchored = chain == Some(a.registry.as_str());
+    let b_anchored = chain == Some(b.registry.as_str());
+    if a_anchored != b_anchored {
+        return b_anchored.cmp(&a_anchored);
+    }
+    let ordinal = if a_anchored {
+        compare_ordinals(a.ordinal.as_ref(), b.ordinal.as_ref())
+    } else {
+        Ordering::Equal
+    };
+    ordinal.then_with(|| a.opid.cmp(&b.opid))
+}
 
 /// Events handed in from a peer or restored export cannot vouch that a
 /// chain committed an event. Chain confirmation is accepted only through
@@ -943,24 +961,7 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
 
         let expected_registry = expected_registry_for_index(&current_events, index + 1);
         let next_event = &current_events[index + 1];
-        let expected_chain = expected_registry
-            .as_deref()
-            .filter(|registry| !is_unanchored_registry(registry));
-        let incoming_confirmed = expected_chain == Some(event.registry.as_str());
-        let current_confirmed = expected_chain == Some(next_event.registry.as_str());
-        let ordinal_order = compare_ordinals(event.ordinal.as_ref(), next_event.ordinal.as_ref());
-        let preferred = if incoming_confirmed || current_confirmed {
-            incoming_confirmed
-                && (!current_confirmed
-                    || ordinal_order.is_lt()
-                    || (event.ordinal.is_some()
-                        && next_event.ordinal.is_some()
-                        && ordinal_order.is_eq()
-                        && event.opid < next_event.opid))
-        } else {
-            event.opid < next_event.opid
-        };
-        if preferred {
+        if compare_successors(expected_registry.as_deref(), &event, next_event).is_lt() {
             let mut new_sequence = current_events[..=index].to_vec();
             new_sequence.push(event.clone());
             {
@@ -996,4 +997,25 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
     })
     .await;
     result
+}
+
+#[cfg(test)]
+mod successor_ordering_tests {
+    use super::*;
+
+    #[test]
+    fn shared_successor_ordering_cases() {
+        let cases: Vec<Value> = serde_json::from_str(include_str!(
+            "../../../../tests/convergence/successor-ordering.json"
+        )).unwrap();
+        for case in cases {
+            let a = value_to_event_record(&case["a"]);
+            let b = value_to_event_record(&case["b"]);
+            let expected = case["expectedRegistry"].as_str();
+            let order = case["comparison"].as_i64().unwrap().cmp(&0);
+            assert_eq!(compare_successors(expected, &a, &b), order, "{}", case["name"]);
+            assert_eq!(compare_successors(expected, &b, &a), order.reverse(), "{}", case["name"]);
+            assert_eq!(compare_successors(expected, &a, &a), Ordering::Equal);
+        }
+    }
 }

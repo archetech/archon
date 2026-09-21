@@ -1064,3 +1064,16 @@ Generator rejection/reordering tests protect the translation. CI regenerates sig
 sources and checks both generated modules. B1–B3 are complete at this boundary;
 C1–C3 are implemented in #1241 with receipt normalization and the final audit. See the [audit](../../docs/plans/asset-controller-convergence.md)
 for source-decoding, signature and finite-correspondence assumptions.
+
+### Runtime successor comparator (#1244)
+
+TypeScript `compareSuccessors` and Rust `compare_successors` extract the existing
+distinct-authorized-sibling choice from the shared import/replay path.
+Expected-chain evidence precedes provisional evidence; matching-chain siblings use
+ordinal then canonical CID, corresponding to `RegistryCidRanks` and
+`registry_sibling_cid_priority`. Provisional siblings use CID alone. The expected
+registry comes from the predecessor's history, including migrations.
+Shared comparator cases cover both ports; existing signed bridges retain
+authorization, late delivery, repeated-anchor and restart coverage. These finite
+checks do not establish universal executable refinement. The Lean rules and
+theorems are unchanged.

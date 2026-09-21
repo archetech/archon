@@ -1070,17 +1070,7 @@ The following is the insertion algorithm reused during replay:
        addEvent(did, event); return ADDED
    expectedRegistry = expected_registry_for_index(current, i + 1)
    next = current[i+1]
-   // local, hyperswarm, and pin do not supply chain priority
-   incomingConfirmed = expectedRegistry is a chain registry and event.registry == expectedRegistry
-   currentConfirmed = expectedRegistry is a chain registry and next.registry == expectedRegistry
-   if incomingConfirmed or currentConfirmed:
-       preferred = incomingConfirmed and (not currentConfirmed or
-           (both ordinals exist and
-               (compare_ordinals(event.ordinal, next.ordinal) < 0 or
-                (compare_ordinals(event.ordinal, next.ordinal) == 0 and event.opid < next.opid))))
-   else:
-       preferred = event.opid < next.opid    // canonical base32 strings, ASCII order
-   if preferred:
+   if compare_successors(expectedRegistry, event, next) < 0:
        setEvents(did, current[..=i] + [event]) // replace the displaced branch
        return ADDED
 10. return REJECTED
@@ -1100,6 +1090,14 @@ the first applicable copy can change controller cutoffs and dependent asset
 acceptance according to gossip arrival order. Distinct candidates remain retained.
 Equal ordinals do not replace an already-confirmed copy under this
 rule; local, Hyperswarm, and pin representations keep first-observation behavior.
+
+The pure successor comparator receives already-authorized siblings and the
+predecessor's expected registry. An expected-chain receipt sorts before provisional
+evidence; two expected-chain receipts compare lexicographic ordinal, then canonical
+CID; two provisional receipts compare canonical CID alone. Local, Hyperswarm, pin,
+and wrong-chain receipts remain provisional. A negative result prefers the incoming
+event. Both live import and replay use this same comparison after authorization.
+It does not handle repeated observations of one operation or sort replay traversal.
 
 For distinct competing operations confirmed on the expected chain, present equal
 ordinals are broken by canonical operation CID (ASCII order). This is required

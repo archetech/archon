@@ -1,0 +1,454 @@
+[
+  {
+    "name": "expected anchor beats lower provisional CID",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "b": {
+      "registry": "hyperswarm",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a"
+    },
+    "comparison": -1
+  },
+  {
+    "name": "provisional loses despite lower CID",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "local",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a"
+    },
+    "b": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "comparison": 1
+  },
+  {
+    "name": "earlier chain ordinal beats CID",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        100,
+        1,
+        0
+      ]
+    },
+    "b": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "comparison": -1
+  },
+  {
+    "name": "later chain ordinal loses despite CID",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        100,
+        3,
+        0
+      ]
+    },
+    "b": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "comparison": 1
+  },
+  {
+    "name": "equal chain ordinal uses CID",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "b": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "comparison": -1
+  },
+  {
+    "name": "equal ordinal and CID compare equal",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "b": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "comparison": 0
+  },
+  {
+    "name": "shorter ordinal prefix precedes longer",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "b": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        100,
+        2,
+        0,
+        0
+      ]
+    },
+    "comparison": -1
+  },
+  {
+    "name": "lexicographic components precede length",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        100,
+        1,
+        9,
+        0
+      ]
+    },
+    "b": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "comparison": -1
+  },
+  {
+    "name": "safe integer positions",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        9007199254740990,
+        2,
+        0
+      ]
+    },
+    "b": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        9007199254740991,
+        2,
+        0
+      ]
+    },
+    "comparison": -1
+  },
+  {
+    "name": "local expected registry stays provisional",
+    "expectedRegistry": "local",
+    "a": {
+      "registry": "local",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        0
+      ]
+    },
+    "b": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "comparison": 1
+  },
+  {
+    "name": "local cannot claim chain priority",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "local",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        0
+      ]
+    },
+    "b": {
+      "registry": "hyperswarm",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a"
+    },
+    "comparison": 1
+  },
+  {
+    "name": "hyperswarm expected registry stays provisional",
+    "expectedRegistry": "hyperswarm",
+    "a": {
+      "registry": "hyperswarm",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        0
+      ]
+    },
+    "b": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "comparison": 1
+  },
+  {
+    "name": "hyperswarm cannot claim chain priority",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "hyperswarm",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        0
+      ]
+    },
+    "b": {
+      "registry": "hyperswarm",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a"
+    },
+    "comparison": 1
+  },
+  {
+    "name": "pin expected registry stays provisional",
+    "expectedRegistry": "pin",
+    "a": {
+      "registry": "pin",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        0
+      ]
+    },
+    "b": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "comparison": 1
+  },
+  {
+    "name": "pin cannot claim chain priority",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "pin",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        0
+      ]
+    },
+    "b": {
+      "registry": "hyperswarm",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a"
+    },
+    "comparison": 1
+  },
+  {
+    "name": "wrong-chain ordinals ignored",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "ZEC:testnet",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        1,
+        0,
+        0
+      ]
+    },
+    "b": {
+      "registry": "ZEC:testnet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        9,
+        0,
+        0
+      ]
+    },
+    "comparison": 1
+  },
+  {
+    "name": "wrong-chain versus gossip uses CID",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "ZEC:testnet",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "b": {
+      "registry": "hyperswarm",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a"
+    },
+    "comparison": 1
+  },
+  {
+    "name": "migration predecessor expects old chain",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "b": {
+      "registry": "ZEC:testnet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        1,
+        0,
+        0
+      ]
+    },
+    "comparison": -1
+  },
+  {
+    "name": "migration successor expects new chain",
+    "expectedRegistry": "ZEC:testnet",
+    "a": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "b": {
+      "registry": "ZEC:testnet",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        1,
+        0,
+        0
+      ]
+    },
+    "comparison": 1
+  },
+  {
+    "name": "generic registry name receives priority",
+    "expectedRegistry": "future:chain",
+    "a": {
+      "registry": "future:chain",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "b": {
+      "registry": "hyperswarm",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a"
+    },
+    "comparison": -1
+  },
+  {
+    "name": "missing expected registry gives no priority",
+    "expectedRegistry": null,
+    "a": {
+      "registry": "BTC:signet",
+      "opid": "bagaaieratm2ztx4qidpu7scbmx2w25e5xqhtle6todw22ahncntaakbzsdma",
+      "ordinal": [
+        100,
+        2,
+        0
+      ]
+    },
+    "b": {
+      "registry": "hyperswarm",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a"
+    },
+    "comparison": 1
+  },
+  {
+    "name": "provisional equal CID ignores positions",
+    "expectedRegistry": "BTC:signet",
+    "a": {
+      "registry": "pin",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        9
+      ]
+    },
+    "b": {
+      "registry": "local",
+      "opid": "bagaaieraauyorocqvxlbngw6pke3o7j3bbtvf4opnxjuir3v4kgutehr622a",
+      "ordinal": [
+        1
+      ]
+    },
+    "comparison": 0
+  }
+]
