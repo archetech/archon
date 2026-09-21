@@ -62,3 +62,15 @@ test('rejects missing/multiple genesis and shapes outside the document model', (
         assert.throws(() => generateDocumentFixtures(input), /create|genesis|replacement|document model|verification method|public key|predecessor|Cyclic|distinct IDs|oracle/);
     }
 });
+
+test('rejects literal and relative/absolute duplicate method IDs', () => {
+    for (const absolute of [false, true]) {
+        const input = structuredClone(vectors);
+        const doc = input[0].operations.find(op => op.doc?.didDocument)?.doc.didDocument;
+        const method = structuredClone(doc.verificationMethod[0]);
+        method.id = absolute ? input[0].did + '#key-1' : '#key-1';
+        doc.verificationMethod[0].id = '#key-1';
+        doc.verificationMethod.push(method);
+        assert.throws(() => generateDocumentFixtures(input), /Duplicate normalized/);
+    }
+});

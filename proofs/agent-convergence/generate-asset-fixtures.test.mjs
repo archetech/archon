@@ -49,3 +49,10 @@ test('late history changes revoke and recover retained operations', () => {
         assert.deepEqual(assetScenario(v, d, stages[2].orders[1]).expected, stages[2].expected);
     }
 });
+
+test('rejects duplicate methods published by an asset', () => {
+    const v = structuredClone(vectors[0]);
+    const doc = v.operations.find(op => op.doc?.didDocument).doc.didDocument;
+    doc.verificationMethod = [{ id: '#key-1' }, { id: doc.id + '#key-1' }];
+    assert.throws(() => assetGraph(v), /Duplicate normalized/);
+});

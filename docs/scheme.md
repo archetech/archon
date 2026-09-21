@@ -98,6 +98,14 @@ fields: omitting the whole component is allowed, but omitting `type` inside a
 supplied replacement is not. Registry, expiry, and extension fields can change
 through a valid complete registration replacement.
 
+Within each DID document, verification-method IDs MUST be unique after resolving
+relative fragment IDs against that document's DID. For example, `#key-1` and
+`<did>#key-1` denote the same method and cannot both be listed, even with the
+same public key. This applies to agent and asset documents. Distinct method names
+may share a key, and a later document version may replace the key under an existing
+name. Direct submission, import, and verified replay reject replacements that
+violate this rule; signed operation bytes are never rewritten.
+
 Current validation accepts an owner-signed update that places public keys in an
 asset DID document's `verificationMethod` field. Gatekeeper does not use those
 asset keys to authorize changes to the asset: it uses the owning agent's document.

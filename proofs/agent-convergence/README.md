@@ -32,6 +32,14 @@ imports, direct submission, replay, custom prefixes and durable
 restart in both ports. These admission tests close the demonstrated runtime gap;
 they do not turn the existing protocol theorem into universal runtime refinement.
 
+Issue #1250 requires unique normalized verification-method IDs. The signed
+agent-document and asset decoders reject duplicates, including relative/absolute aliases. Both runtime ports check this invariant
+at shared document authorization, before publishing a replacement, including
+replay. Multiple distinct method names and same-name rotation remain valid.
+The existing Lean document model permits broader method lists and its convergence
+theorems remain valid; narrowing fixture admission requires no new theorem or
+axiom. This does not enable relationship-permission enforcement (#1156).
+
 Issue #1249 removes incomplete chain receipts from the admitted domain.
 `ProtocolReceiptValid` now binds a complete decoded chain header directly to the
 model's chain facts. Receipt projection is a simple map: the richer-copy filter,

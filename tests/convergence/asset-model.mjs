@@ -1,3 +1,4 @@
+import { assertUniqueMethodIds } from './method-ids.mjs';
 import { assertChainMetadata } from './chain-metadata.mjs';
 import assert from 'node:assert/strict';
 import { isDeepStrictEqual } from 'node:util';
@@ -22,6 +23,7 @@ export function assetGraph(v, names = assetRegistryNames([v])) {
         assert(Object.keys(op).every(k => ['type', 'did', 'previd', 'proof', 'doc'].includes(k)), 'asset successor fields');
         assert(op.type === 'delete' ? !op.doc : op.doc && Object.keys(op.doc).length > 0 && Object.keys(op.doc).every(k => ['didDocument', 'didDocumentData', 'didDocumentRegistration'].includes(k)), 'asset component shape');
         if (op.doc?.didDocument) assert(op.doc.didDocument.id === v.did && typeof op.doc.didDocument.controller === 'string', 'asset owner document');
+        assertUniqueMethodIds(op.doc?.didDocument);
         if (op.doc?.didDocumentRegistration) assert(op.doc.didDocumentRegistration.version === 1 && op.doc.didDocumentRegistration.type === 'asset', 'immutable asset kind/version');
         const parent = v.ids.indexOf(op.previd); assert(parent >= 0, 'source predecessor missing'); return parent;
     });
