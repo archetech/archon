@@ -144,6 +144,20 @@ function isUnanchoredRegistry(registry: unknown): boolean {
     return registry === PIN_QUEUE || isLocallyStampedRegistry(registry);
 }
 
+// Compare authorized siblings of one predecessor; negative means a wins.
+// Expected-chain receipts already have validated ordinals and canonical opids.
+// Same-operation receipt replacement is handled separately by the importer.
+export function compareSuccessors(expectedRegistry: string | undefined,
+    a: Pick<GatekeeperEvent, 'registry' | 'ordinal' | 'opid'>,
+    b: Pick<GatekeeperEvent, 'registry' | 'ordinal' | 'opid'>): number {
+    const chain = expectedRegistry !== undefined && !isUnanchoredRegistry(expectedRegistry);
+    const aAnchored = chain && a.registry === expectedRegistry;
+    const bAnchored = chain && b.registry === expectedRegistry;
+    if (aAnchored !== bAnchored) return aAnchored ? -1 : 1;
+    const ordinal = aAnchored ? compareOrdinals(a.ordinal!, b.ordinal!) : 0;
+    return ordinal || (a.opid! < b.opid! ? -1 : a.opid! > b.opid! ? 1 : 0);
+}
+
 function hasValidOrdinalComponents(ordinal: unknown, allowEmpty: boolean): ordinal is number[] {
     if (!Array.isArray(ordinal) || (!allowEmpty && ordinal.length === 0)) return false;
     for (const value of ordinal) {
@@ -1995,17 +2009,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                     const expectedRegistry = expectedRegistryForIndex(currentEvents, index + 1);
 
                     const nextEvent = currentEvents[index + 1];
-                    const expectedChain = expectedRegistry && !isUnanchoredRegistry(expectedRegistry);
-                    const incomingConfirmed = expectedChain && event.registry === expectedRegistry;
-                    const currentConfirmed = expectedChain && nextEvent.registry === expectedRegistry;
-                    const ordinalOrder = event.ordinal && nextEvent.ordinal
-                        ? compareOrdinals(event.ordinal, nextEvent.ordinal) : undefined;
-                    const preferred = incomingConfirmed || currentConfirmed
-                        ? incomingConfirmed && (!currentConfirmed ||
-                            (ordinalOrder !== undefined &&
-                                (ordinalOrder < 0 || (ordinalOrder === 0 && event.opid! < nextEvent.opid!))))
-                        : event.opid! < nextEvent.opid!;
-                    if (preferred) {
+                    if (compareSuccessors(expectedRegistry, event, nextEvent) < 0) {
                         // A preferred sibling replaces the branch, including when
                         // it arrives before its predecessor and becomes applicable later.
                         const newSequence = [...currentEvents.slice(0, index + 1), event];
