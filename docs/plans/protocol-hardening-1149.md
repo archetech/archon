@@ -521,10 +521,10 @@ and universal runtime refinement remain open. No production behavior changes.
 
 ### Final protocol composition (C1–C3)
 
-C1–C3 are implemented at the model/bridge boundary in #1241. The two
+C1–C3 are implemented at the model/bridge boundary in #1241. The three
 2026-09-21 approved corrections resolve the signed C2 counterexamples in both
-ports: intrinsic local clocks, and chain-based controller selection only for
-actual chain registries. Direct submission, import and old-projection recovery
+ports: intrinsic local clocks, chain-based controller selection only for actual
+chain registries, and richer same-position receipts before authorization. Direct submission, import and old-projection recovery
 are covered by signed regressions.
 `protocol_convergence` composes actual finite agent and asset reconstruction,
 proves a unique full semantic result and full-record stopping, and is independent

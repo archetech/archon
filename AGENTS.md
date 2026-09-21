@@ -254,3 +254,7 @@ These rules apply to coding agents working in this repository.
 - Chain-based controller selection requires an actual chain registry as well as registration metadata. Local/Hyperswarm/pin receipts use proof-time authorization even with metadata; preserve their evidence and repair old projections. Audit direct-operation producers as well as imports/recovery when changing clock normalization.
 
 - In proof receipt views, distinguish source-registry matching from public genesis confirmation. Unmatched genesis has no cutoff clock but is still admitted; prove matching-source clock equivalence before expanding the model to retain irrelevant receipt metadata.
+
+- A fixed authoritative chain snapshot does not by itself justify identical optional registration-metadata presence on repeated receipts. Audit same-position incomplete/complete copies through candidate deduplication, controller anchoring and replay before treating them as one semantic receipt class.
+
+- Prefer metadata-bearing receipts at the same canonical operation/chain registry/ordinal before authorization, including candidate recovery; a rejected richer copy cannot fall back to incomplete proof-time authority. Bind proof receipt metadata to received copies and derive completeness before agent/asset replay.

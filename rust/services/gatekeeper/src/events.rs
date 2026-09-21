@@ -625,6 +625,12 @@ pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) 
         }
     };
     let key = crate::history::candidate_key(&event);
+    if let Some(known) = state.candidate_history.lock().await.as_ref()
+        .and_then(|candidates| candidates.get(&did))
+        .and_then(|events| events.iter().find(|known| crate::history::candidate_key(known) == key))
+    {
+        event = known.clone();
+    }
     let status = import_event_once(state, event).await;
     // Recovery and evidence changes already replay affected histories. Repeated
     // merged or deferred evidence needs no further reconstruction.
@@ -737,7 +743,11 @@ pub(crate) async fn import_event_once(state: &AppState, event: EventRecord) -> I
             ).is_lt();
             // A late predecessor can make a later anchor apply first. Earlier
             // anchors still need the predecessor authorization performed below.
-            if expected_registry.as_deref() == Some(current_events[index].registry.as_str()) && !earlier_anchor {
+            let richer_anchor = !is_unanchored_registry(&event.registry)
+                && expected_registry.as_deref() == Some(event.registry.as_str())
+                && crate::history::candidate_key(&event) == crate::history::candidate_key(&current_events[index])
+                && event.registration.is_some() && current_events[index].registration.is_none();
+            if expected_registry.as_deref() == Some(current_events[index].registry.as_str()) && !earlier_anchor && !richer_anchor {
                 if trace {
                     info!(
                         "process_events merged reason=duplicate_already_confirmed current_registry={} expected_registry={} {}",

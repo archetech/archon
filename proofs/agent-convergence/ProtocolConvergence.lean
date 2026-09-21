@@ -1,5 +1,6 @@
 import ProtocolResult
 import ProtocolSources
+import ProtocolReceipts
 
 set_option warningAsError true
 namespace Archon
@@ -105,7 +106,7 @@ def ProtocolCanonical [DecidableEq α] (w : ProtocolModel n) (evidence : Protoco
 /-- C1 endpoint: a unique full protocol result for any finite DID family.
 Authorization is derived in two actual replay phases; neither accepted history
 nor a shared final authorizing document is an input. -/
-theorem protocol_convergence [DecidableEq α] (w : ProtocolModel n) (domain : ProtocolDomain w)
+theorem protocol_normalized_convergence [DecidableEq α] (w : ProtocolModel n) (domain : ProtocolDomain w)
     (evidence : ProtocolEvidence n α) (sources : ProtocolSources w evidence) :
     ∃ canonical, ProtocolCanonical w evidence canonical ∧
       ∀ other, ProtocolCanonical w evidence other → other = canonical := by
@@ -124,13 +125,55 @@ theorem protocol_convergence [DecidableEq α] (w : ProtocolModel n) (domain : Pr
 /-- Evidence may grow, shrink, or reorganize before settlement. Once snapshots
 agree as protocol evidence, any completed later reconciliation has the one
 canonical result. Eventual scheduling/storage success is the liveness premise. -/
-theorem protocol_eventual_convergence [DecidableEq α] (w : ProtocolModel n) (domain : ProtocolDomain w)
+theorem protocol_normalized_eventual_convergence [DecidableEq α] (w : ProtocolModel n) (domain : ProtocolDomain w)
     (settled : ProtocolEvidence n α) (sources : ProtocolSources w settled) (snapshots : Nat → ProtocolEvidence n α) (after : Nat)
     (settles : ∀ time, after ≤ time → SameProtocolEvidence settled (snapshots time)) :
     ∃ canonical, ∀ time, after ≤ time → ∀ previous,
       ∃ result, reconcileProtocol w (snapshots time) previous = some result ∧
         ProtocolStable w (snapshots time) result ∧ protocolResult w result = canonical := by
+  obtain ⟨canonical, converges, _⟩ := protocol_normalized_convergence w domain settled sources
+  exact ⟨canonical, fun time later previous => (converges (snapshots time) (settles time later) previous).2⟩
+
+/-- Complete input boundary: raw receipt headers are bound to chain facts and
+metadata completeness is derived before any history-dependent authorization. -/
+def ProtocolReceiptCanonical [DecidableEq α] (w : ProtocolModel n)
+    (receipts : ProtocolReceiptEvidence n α) (canonical : ProtocolSemanticResult n) : Prop :=
+  ∀ delivery, SameProtocolReceiptEvidence receipts delivery → ∀ previous,
+    ProtocolReceiptSources w delivery ∧ ∃ result,
+      reconcileProtocol w (normalizeProtocolEvidence delivery) previous = some result ∧
+      ProtocolStable w (normalizeProtocolEvidence delivery) result ∧ protocolResult w result = canonical
+
+/-- C1–C3 endpoint, including deterministic metadata enrichment. Copies lacking
+metadata are admitted, but cannot weaken an available richer chain receipt. -/
+theorem protocol_convergence [DecidableEq α] (w : ProtocolModel n) (domain : ProtocolDomain w)
+    (receipts : ProtocolReceiptEvidence n α) (sources : ProtocolReceiptSources w receipts) :
+    ∃ canonical, ProtocolReceiptCanonical w receipts canonical ∧
+      ∀ other, ProtocolReceiptCanonical w receipts other → other = canonical := by
+  obtain ⟨canonical, normalized, _⟩ := protocol_normalized_convergence w domain
+    (normalizeProtocolEvidence receipts) (protocol_normalized_sources w receipts sources)
+  refine ⟨canonical, ?_, ?_⟩
+  · intro delivery same previous
+    exact ⟨protocol_receipt_sources_shared w receipts delivery sources same,
+      (normalized (normalizeProtocolEvidence delivery)
+        (normalize_protocol_evidence_shared receipts delivery same) previous).2⟩
+  · intro other alternative
+    let empty : ProtocolRecords n α := ⟨fun _ => [], fun _ => []⟩
+    obtain ⟨_, result, ran, _, equal⟩ := normalized (normalizeProtocolEvidence receipts)
+      (fun _ _ => Iff.rfl) empty
+    obtain ⟨_, otherResult, otherRan, _, otherEqual⟩ := alternative receipts (fun _ _ => Iff.rfl) empty
+    have results : otherResult = result := Option.some.inj (otherRan.symm.trans ran)
+    rw [results] at otherEqual
+    exact otherEqual.symm.trans equal
+
+theorem protocol_eventual_convergence [DecidableEq α] (w : ProtocolModel n) (domain : ProtocolDomain w)
+    (settled : ProtocolReceiptEvidence n α) (sources : ProtocolReceiptSources w settled)
+    (snapshots : Nat → ProtocolReceiptEvidence n α) (after : Nat)
+    (settles : ∀ time, after ≤ time → SameProtocolReceiptEvidence settled (snapshots time)) :
+    ∃ canonical, ∀ time, after ≤ time → ∀ previous,
+      ∃ result, reconcileProtocol w (normalizeProtocolEvidence (snapshots time)) previous = some result ∧
+        ProtocolStable w (normalizeProtocolEvidence (snapshots time)) result ∧ protocolResult w result = canonical := by
   obtain ⟨canonical, converges, _⟩ := protocol_convergence w domain settled sources
   exact ⟨canonical, fun time later previous => (converges (snapshots time) (settles time later) previous).2⟩
+
 
 end Archon

@@ -81,17 +81,32 @@ export function generateProtocolFixtures(vectors) {
             lines.push(`theorem sources${suffix} : ProtocolSources world${n} evidence${suffix}_0 := by`,
                 `  have checked : ∀ i : Fin ${size}, ∀ source ∈ evidence${suffix}_0 i, protocolSourceValid world${n} i source.key = true := by decide`,
                 '  exact checked',
-                `example := protocol_convergence world${n} domain${n} evidence${suffix}_0 sources${suffix}`);
+            );
+            stage.orders.forEach((_, k) => {
+                lines.push(`def raw${suffix}_${k} : ProtocolReceiptEvidence ${size} Nat := fun i =>`,
+                    `  withIncompleteProtocolReceipts ${k === 1} (protocolReceiptsOfSources world${n} evidence${suffix}_${k} i)`,
+                    `theorem normalized${suffix}_${k} : normalizeProtocolEvidence raw${suffix}_${k} = evidence${suffix}_${k} := by`,
+                    `  have checked : ∀ i : Fin ${size}, normalizeProtocolEvidence raw${suffix}_${k} i = evidence${suffix}_${k} i := by decide`,
+                    '  exact funext checked');
+            });
+            lines.push(`theorem rawSources${suffix} : ProtocolReceiptSources world${n} raw${suffix}_0 := by`,
+                `  have checked : ∀ i : Fin ${size}, ∀ receipt ∈ raw${suffix}_0 i, ProtocolReceiptValid world${n} i (raw${suffix}_0 i) receipt := by decide`,
+                '  exact checked',
+                `example := protocol_convergence world${n} domain${n} raw${suffix}_0 rawSources${suffix}`);
             stage.orders.forEach((_, k) => {
                 lines.push(`theorem same${suffix}_${k} : SameProtocolEvidence evidence${suffix}_0 evidence${suffix}_${k} := by`,
                     `  have checked : ∀ i : Fin ${size}, sameAgentSourceCheck (evidence${suffix}_0 i) (evidence${suffix}_${k} i) = true := by decide`,
                     '  exact fun i => same_sources_of_check _ _ (checked i)',
-                    `example := protocol_sources_shared world${n} evidence${suffix}_0 evidence${suffix}_${k} sources${suffix} same${suffix}_${k}`);
+                    `example := protocol_sources_shared world${n} evidence${suffix}_0 evidence${suffix}_${k} sources${suffix} same${suffix}_${k}`,
+                    `theorem rawSame${suffix}_${k} : SameProtocolReceiptEvidence raw${suffix}_0 raw${suffix}_${k} := by`,
+                    `  have checked : ∀ i : Fin ${size}, sameProtocolReceiptCheck (raw${suffix}_0 i) (raw${suffix}_${k} i) = true := by decide`,
+                    '  exact fun i => same_protocol_receipts_of_check _ _ (checked i)',
+                    `example := protocol_receipt_sources_shared world${n} raw${suffix}_0 raw${suffix}_${k} rawSources${suffix} rawSame${suffix}_${k}`);
             });
             // Compare every DID's complete semantic projection in every order,
             // including decoded agent documents/deactivation and receipt views.
             stage.orders.forEach((_, k) => {
-                const run = `(reconcileProtocol world${n} evidence${suffix}_${k} empty${n})`;
+                const run = `(reconcileProtocol world${n} (normalizeProtocolEvidence raw${suffix}_${k}) empty${n})`;
                 const anchor = `(assetAnchors ${ap}graph${n} ${ap}receipts${n})`;
                 const model = `(coldAssetModel ${ap}graph${n} ${anchor})`;
                 const expectedResults = d.ownerNames.map((_, owner) => {
@@ -104,7 +119,8 @@ export function generateProtocolFixtures(vectors) {
                 });
                 lines.push(`example : ${run}.map (fun result => List.ofFn (protocolResult world${n} result)) = (do`,
                     ...expectedResults.map((value, owner) => '  let result' + owner + ' ← ' + value),
-                    `  pure ${list(expectedResults.map((_, owner) => 'result' + owner))}) := by decide`);
+                    `  pure ${list(expectedResults.map((_, owner) => 'result' + owner))}) := by`,
+                    `  rw [normalized${suffix}_${k}]`, '  decide');
             });
             assert.deepEqual(assetScenario(v, d, stage.evidence).expected, stage.expected);
         });

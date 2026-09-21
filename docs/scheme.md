@@ -707,6 +707,13 @@ the production audit and approved version-1 compatibility decision. Malformed
 registrations previously accepted by older implementations are rejected on replay;
 none were found in the audited production history. Version 2 remains disabled.
 
+At the same canonical operation, chain registry and ordinal, a receipt carrying
+registration metadata takes precedence over a metadata-free copy before
+authorization. Incomplete copies remain usable when no richer copy is known;
+later enrichment reauthorizes the operation and dependent histories. An
+unauthorized richer receipt cannot fall back to the incomplete copy's proof-time
+context. This preference is shared by import, candidate recovery and replay.
+
 ### Implementation boundary: event authorization and proof verification
 
 Import and verified replay share event authorization: select the target state the operation chains from, select the authorizing controller document under the rules above, then verify the operation against that document. Confirmation replacements and competing events use the predecessor state, not the latest document. Direct submissions have no trusted event position and retain the historical `proof.created` selection. Predecessor validation uses the target DID's selected previous version, separately from the agent document selected to verify the signature. Direct updates and deletions must reference the current head before any operation storage or queue write. Import may select an earlier predecessor when considering a competing branch; an unavailable predecessor remains deferred and may become applicable when its history arrives. Verified resolution uses the same predecessor validation. No signed predecessor reference is rewritten.

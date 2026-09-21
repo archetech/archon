@@ -20,6 +20,9 @@ on:
       - 'tests/gatekeeper/integrated-agent.test.ts'
       - 'tests/gatekeeper/asset-convergence.test.ts'
       - 'tests/gatekeeper/pin-receipt-audit.test.ts'
+      - 'tests/gatekeeper/local-receipt-audit.test.ts'
+      - 'tests/gatekeeper/local-registration-audit.test.ts'
+      - 'tests/gatekeeper/chain-registration-audit.test.ts'
       - 'rust/services/gatekeeper/**'
       - 'package.json'
       - 'package-lock.json'
@@ -44,6 +47,9 @@ on:
       - 'tests/gatekeeper/integrated-agent.test.ts'
       - 'tests/gatekeeper/asset-convergence.test.ts'
       - 'tests/gatekeeper/pin-receipt-audit.test.ts'
+      - 'tests/gatekeeper/local-receipt-audit.test.ts'
+      - 'tests/gatekeeper/local-registration-audit.test.ts'
+      - 'tests/gatekeeper/chain-registration-audit.test.ts'
       - 'rust/services/gatekeeper/**'
       - 'package.json'
       - 'package-lock.json'
@@ -114,13 +120,14 @@ jobs:
           node proofs/agent-convergence/generate-protocol-fixtures.mjs --check
           node tests/convergence/generate-local-receipt-counterexample.mjs
           node tests/convergence/generate-local-registration-counterexample.mjs
-          git diff --exit-code -- tests/convergence/local-receipt-counterexample.json tests/convergence/local-registration-counterexample.json
+          node tests/convergence/generate-chain-registration-counterexample.mjs
+          git diff --exit-code -- tests/convergence/local-receipt-counterexample.json tests/convergence/local-registration-counterexample.json tests/convergence/chain-registration-counterexample.json
       - name: Check TypeScript replay pass bridge
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/convergence.test.ts --runInBand --coverage=false -t 'Lean-checked'
       - name: Check signed agent authorization
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/agent-convergence.test.ts --runInBand --coverage=false
       - name: Check repeated chain anchors
-        run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/chain-convergence.test.ts tests/gatekeeper/chain-successors.test.ts tests/gatekeeper/controller-view.test.ts tests/gatekeeper/chain-ordinals.test.ts tests/gatekeeper/interleaved-replay.test.ts tests/gatekeeper/integrated-agent.test.ts tests/gatekeeper/pin-receipt-audit.test.ts tests/gatekeeper/local-receipt-audit.test.ts tests/gatekeeper/local-registration-audit.test.ts --runInBand --coverage=false
+        run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/chain-convergence.test.ts tests/gatekeeper/chain-successors.test.ts tests/gatekeeper/controller-view.test.ts tests/gatekeeper/chain-ordinals.test.ts tests/gatekeeper/interleaved-replay.test.ts tests/gatekeeper/integrated-agent.test.ts tests/gatekeeper/pin-receipt-audit.test.ts tests/gatekeeper/local-receipt-audit.test.ts tests/gatekeeper/local-registration-audit.test.ts tests/gatekeeper/chain-registration-audit.test.ts --runInBand --coverage=false
       - name: Check signed asset reconciliation and durable restart
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/asset-convergence.test.ts --runInBand --coverage=false --silent
       - name: Check proofs and concrete histories

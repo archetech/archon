@@ -74,259 +74,511 @@ def evidence0_0_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFi
 theorem sources0_0 : ProtocolSources world0 evidence0_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_0_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
-example := protocol_convergence world0 domain0 evidence0_0_0 sources0_0
+def raw0_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_0_0 i)
+theorem normalized0_0_0 : normalizeProtocolEvidence raw0_0_0 = evidence0_0_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_0_0 i = evidence0_0_0 i := by decide
+  exact funext checked
+def raw0_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_0_1 i)
+theorem normalized0_0_1 : normalizeProtocolEvidence raw0_0_1 = evidence0_0_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_0_1 i = evidence0_0_1 i := by decide
+  exact funext checked
+def raw0_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_0_2 i)
+theorem normalized0_0_2 : normalizeProtocolEvidence raw0_0_2 = evidence0_0_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_0_2 i = evidence0_0_2 i := by decide
+  exact funext checked
+theorem rawSources0_0 : ProtocolReceiptSources world0 raw0_0_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw0_0_0 i, ProtocolReceiptValid world0 i (raw0_0_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world0 domain0 raw0_0_0 rawSources0_0
 theorem same0_0_0 : SameProtocolEvidence evidence0_0_0 evidence0_0_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_0_0 i) (evidence0_0_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_0_0 evidence0_0_0 sources0_0 same0_0_0
+theorem rawSame0_0_0 : SameProtocolReceiptEvidence raw0_0_0 raw0_0_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_0_0 i) (raw0_0_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_0_0 raw0_0_0 rawSources0_0 rawSame0_0_0
 theorem same0_0_1 : SameProtocolEvidence evidence0_0_0 evidence0_0_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_0_0 i) (evidence0_0_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_0_0 evidence0_0_1 sources0_0 same0_0_1
+theorem rawSame0_0_1 : SameProtocolReceiptEvidence raw0_0_0 raw0_0_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_0_0 i) (raw0_0_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_0_0 raw0_0_1 rawSources0_0 rawSame0_0_1
 theorem same0_0_2 : SameProtocolEvidence evidence0_0_0 evidence0_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_0_0 i) (evidence0_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_0_0 evidence0_0_2 sources0_0 same0_0_2
-example : (reconcileProtocol world0 evidence0_0_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+theorem rawSame0_0_2 : SameProtocolReceiptEvidence raw0_0_0 raw0_0_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_0_0 i) (raw0_0_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_0_0 raw0_0_2 rawSources0_0 rawSame0_0_2
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_0_0) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_0_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_0_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_0_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_0_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_0_0]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_0_1) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_0_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_0_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_0_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_0_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_0_1]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_0_2) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_0_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_0_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_0_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_0_2]
+  decide
 def evidence0_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_1_0 else AssetFixtures.agents0_1_0 i.val
 def evidence0_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_1_1 else AssetFixtures.agents0_1_1 i.val
 def evidence0_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_1_2 else AssetFixtures.agents0_1_2 i.val
 theorem sources0_1 : ProtocolSources world0 evidence0_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_1_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
-example := protocol_convergence world0 domain0 evidence0_1_0 sources0_1
+def raw0_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_1_0 i)
+theorem normalized0_1_0 : normalizeProtocolEvidence raw0_1_0 = evidence0_1_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_1_0 i = evidence0_1_0 i := by decide
+  exact funext checked
+def raw0_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_1_1 i)
+theorem normalized0_1_1 : normalizeProtocolEvidence raw0_1_1 = evidence0_1_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_1_1 i = evidence0_1_1 i := by decide
+  exact funext checked
+def raw0_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_1_2 i)
+theorem normalized0_1_2 : normalizeProtocolEvidence raw0_1_2 = evidence0_1_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_1_2 i = evidence0_1_2 i := by decide
+  exact funext checked
+theorem rawSources0_1 : ProtocolReceiptSources world0 raw0_1_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw0_1_0 i, ProtocolReceiptValid world0 i (raw0_1_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world0 domain0 raw0_1_0 rawSources0_1
 theorem same0_1_0 : SameProtocolEvidence evidence0_1_0 evidence0_1_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_1_0 i) (evidence0_1_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_1_0 evidence0_1_0 sources0_1 same0_1_0
+theorem rawSame0_1_0 : SameProtocolReceiptEvidence raw0_1_0 raw0_1_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_1_0 i) (raw0_1_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_1_0 raw0_1_0 rawSources0_1 rawSame0_1_0
 theorem same0_1_1 : SameProtocolEvidence evidence0_1_0 evidence0_1_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_1_0 i) (evidence0_1_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_1_0 evidence0_1_1 sources0_1 same0_1_1
+theorem rawSame0_1_1 : SameProtocolReceiptEvidence raw0_1_0 raw0_1_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_1_0 i) (raw0_1_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_1_0 raw0_1_1 rawSources0_1 rawSame0_1_1
 theorem same0_1_2 : SameProtocolEvidence evidence0_1_0 evidence0_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_1_0 i) (evidence0_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_1_0 evidence0_1_2 sources0_1 same0_1_2
-example : (reconcileProtocol world0 evidence0_1_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+theorem rawSame0_1_2 : SameProtocolReceiptEvidence raw0_1_0 raw0_1_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_1_0 i) (raw0_1_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_1_0 raw0_1_2 rawSources0_1 rawSame0_1_2
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_1_0) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_1_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_1_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_1_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_1_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_1_0]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_1_1) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_1_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_1_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_1_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_1_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_1_1]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_1_2) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_1_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_1_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_1_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_1_2]
+  decide
 def evidence0_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_2_0 else AssetFixtures.agents0_2_0 i.val
 def evidence0_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_2_1 else AssetFixtures.agents0_2_1 i.val
 def evidence0_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_2_2 else AssetFixtures.agents0_2_2 i.val
 theorem sources0_2 : ProtocolSources world0 evidence0_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_2_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
-example := protocol_convergence world0 domain0 evidence0_2_0 sources0_2
+def raw0_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_2_0 i)
+theorem normalized0_2_0 : normalizeProtocolEvidence raw0_2_0 = evidence0_2_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_2_0 i = evidence0_2_0 i := by decide
+  exact funext checked
+def raw0_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_2_1 i)
+theorem normalized0_2_1 : normalizeProtocolEvidence raw0_2_1 = evidence0_2_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_2_1 i = evidence0_2_1 i := by decide
+  exact funext checked
+def raw0_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_2_2 i)
+theorem normalized0_2_2 : normalizeProtocolEvidence raw0_2_2 = evidence0_2_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_2_2 i = evidence0_2_2 i := by decide
+  exact funext checked
+theorem rawSources0_2 : ProtocolReceiptSources world0 raw0_2_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw0_2_0 i, ProtocolReceiptValid world0 i (raw0_2_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world0 domain0 raw0_2_0 rawSources0_2
 theorem same0_2_0 : SameProtocolEvidence evidence0_2_0 evidence0_2_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_2_0 i) (evidence0_2_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_2_0 evidence0_2_0 sources0_2 same0_2_0
+theorem rawSame0_2_0 : SameProtocolReceiptEvidence raw0_2_0 raw0_2_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_2_0 i) (raw0_2_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_2_0 raw0_2_0 rawSources0_2 rawSame0_2_0
 theorem same0_2_1 : SameProtocolEvidence evidence0_2_0 evidence0_2_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_2_0 i) (evidence0_2_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_2_0 evidence0_2_1 sources0_2 same0_2_1
+theorem rawSame0_2_1 : SameProtocolReceiptEvidence raw0_2_0 raw0_2_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_2_0 i) (raw0_2_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_2_0 raw0_2_1 rawSources0_2 rawSame0_2_1
 theorem same0_2_2 : SameProtocolEvidence evidence0_2_0 evidence0_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_2_0 i) (evidence0_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_2_0 evidence0_2_2 sources0_2 same0_2_2
-example : (reconcileProtocol world0 evidence0_2_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+theorem rawSame0_2_2 : SameProtocolReceiptEvidence raw0_2_0 raw0_2_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_2_0 i) (raw0_2_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_2_0 raw0_2_2 rawSources0_2 rawSame0_2_2
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_2_0) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_2_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_2_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_2_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_2_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_2_0]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_2_1) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_2_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_2_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_2_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_2_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_2_1]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_2_2) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_2_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_2_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_2_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_2_2]
+  decide
 def evidence0_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_3_0 else AssetFixtures.agents0_3_0 i.val
 def evidence0_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_3_1 else AssetFixtures.agents0_3_1 i.val
 def evidence0_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_3_2 else AssetFixtures.agents0_3_2 i.val
 theorem sources0_3 : ProtocolSources world0 evidence0_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_3_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
-example := protocol_convergence world0 domain0 evidence0_3_0 sources0_3
+def raw0_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_3_0 i)
+theorem normalized0_3_0 : normalizeProtocolEvidence raw0_3_0 = evidence0_3_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_3_0 i = evidence0_3_0 i := by decide
+  exact funext checked
+def raw0_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_3_1 i)
+theorem normalized0_3_1 : normalizeProtocolEvidence raw0_3_1 = evidence0_3_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_3_1 i = evidence0_3_1 i := by decide
+  exact funext checked
+def raw0_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_3_2 i)
+theorem normalized0_3_2 : normalizeProtocolEvidence raw0_3_2 = evidence0_3_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_3_2 i = evidence0_3_2 i := by decide
+  exact funext checked
+theorem rawSources0_3 : ProtocolReceiptSources world0 raw0_3_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw0_3_0 i, ProtocolReceiptValid world0 i (raw0_3_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world0 domain0 raw0_3_0 rawSources0_3
 theorem same0_3_0 : SameProtocolEvidence evidence0_3_0 evidence0_3_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_3_0 i) (evidence0_3_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_3_0 evidence0_3_0 sources0_3 same0_3_0
+theorem rawSame0_3_0 : SameProtocolReceiptEvidence raw0_3_0 raw0_3_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_3_0 i) (raw0_3_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_3_0 raw0_3_0 rawSources0_3 rawSame0_3_0
 theorem same0_3_1 : SameProtocolEvidence evidence0_3_0 evidence0_3_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_3_0 i) (evidence0_3_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_3_0 evidence0_3_1 sources0_3 same0_3_1
+theorem rawSame0_3_1 : SameProtocolReceiptEvidence raw0_3_0 raw0_3_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_3_0 i) (raw0_3_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_3_0 raw0_3_1 rawSources0_3 rawSame0_3_1
 theorem same0_3_2 : SameProtocolEvidence evidence0_3_0 evidence0_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_3_0 i) (evidence0_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_3_0 evidence0_3_2 sources0_3 same0_3_2
-example : (reconcileProtocol world0 evidence0_3_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+theorem rawSame0_3_2 : SameProtocolReceiptEvidence raw0_3_0 raw0_3_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_3_0 i) (raw0_3_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_3_0 raw0_3_2 rawSources0_3 rawSame0_3_2
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_3_0) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_3_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_3_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_3_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_3_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_3_0]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_3_1) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_3_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_3_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_3_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_3_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_3_1]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_3_2) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_3_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_3_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_3_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_3_2]
+  decide
 def evidence0_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_4_0 else AssetFixtures.agents0_4_0 i.val
 def evidence0_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_4_1 else AssetFixtures.agents0_4_1 i.val
 def evidence0_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_4_2 else AssetFixtures.agents0_4_2 i.val
 theorem sources0_4 : ProtocolSources world0 evidence0_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_4_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
-example := protocol_convergence world0 domain0 evidence0_4_0 sources0_4
+def raw0_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_4_0 i)
+theorem normalized0_4_0 : normalizeProtocolEvidence raw0_4_0 = evidence0_4_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_4_0 i = evidence0_4_0 i := by decide
+  exact funext checked
+def raw0_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_4_1 i)
+theorem normalized0_4_1 : normalizeProtocolEvidence raw0_4_1 = evidence0_4_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_4_1 i = evidence0_4_1 i := by decide
+  exact funext checked
+def raw0_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_4_2 i)
+theorem normalized0_4_2 : normalizeProtocolEvidence raw0_4_2 = evidence0_4_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_4_2 i = evidence0_4_2 i := by decide
+  exact funext checked
+theorem rawSources0_4 : ProtocolReceiptSources world0 raw0_4_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw0_4_0 i, ProtocolReceiptValid world0 i (raw0_4_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world0 domain0 raw0_4_0 rawSources0_4
 theorem same0_4_0 : SameProtocolEvidence evidence0_4_0 evidence0_4_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_4_0 i) (evidence0_4_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_4_0 evidence0_4_0 sources0_4 same0_4_0
+theorem rawSame0_4_0 : SameProtocolReceiptEvidence raw0_4_0 raw0_4_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_4_0 i) (raw0_4_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_4_0 raw0_4_0 rawSources0_4 rawSame0_4_0
 theorem same0_4_1 : SameProtocolEvidence evidence0_4_0 evidence0_4_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_4_0 i) (evidence0_4_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_4_0 evidence0_4_1 sources0_4 same0_4_1
+theorem rawSame0_4_1 : SameProtocolReceiptEvidence raw0_4_0 raw0_4_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_4_0 i) (raw0_4_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_4_0 raw0_4_1 rawSources0_4 rawSame0_4_1
 theorem same0_4_2 : SameProtocolEvidence evidence0_4_0 evidence0_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_4_0 i) (evidence0_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_4_0 evidence0_4_2 sources0_4 same0_4_2
-example : (reconcileProtocol world0 evidence0_4_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+theorem rawSame0_4_2 : SameProtocolReceiptEvidence raw0_4_0 raw0_4_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_4_0 i) (raw0_4_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_4_0 raw0_4_2 rawSources0_4 rawSame0_4_2
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_4_0) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_4_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_4_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_4_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_4_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_4_0]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_4_1) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_4_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_4_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_4_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_4_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_4_1]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_4_2) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_4_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_4_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_4_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_4_2]
+  decide
 def evidence0_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_5_0 else AssetFixtures.agents0_5_0 i.val
 def evidence0_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_5_1 else AssetFixtures.agents0_5_1 i.val
 def evidence0_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_5_2 else AssetFixtures.agents0_5_2 i.val
 theorem sources0_5 : ProtocolSources world0 evidence0_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_5_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
-example := protocol_convergence world0 domain0 evidence0_5_0 sources0_5
+def raw0_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_5_0 i)
+theorem normalized0_5_0 : normalizeProtocolEvidence raw0_5_0 = evidence0_5_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_5_0 i = evidence0_5_0 i := by decide
+  exact funext checked
+def raw0_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_5_1 i)
+theorem normalized0_5_1 : normalizeProtocolEvidence raw0_5_1 = evidence0_5_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_5_1 i = evidence0_5_1 i := by decide
+  exact funext checked
+def raw0_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_5_2 i)
+theorem normalized0_5_2 : normalizeProtocolEvidence raw0_5_2 = evidence0_5_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_5_2 i = evidence0_5_2 i := by decide
+  exact funext checked
+theorem rawSources0_5 : ProtocolReceiptSources world0 raw0_5_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw0_5_0 i, ProtocolReceiptValid world0 i (raw0_5_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world0 domain0 raw0_5_0 rawSources0_5
 theorem same0_5_0 : SameProtocolEvidence evidence0_5_0 evidence0_5_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_5_0 i) (evidence0_5_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_5_0 evidence0_5_0 sources0_5 same0_5_0
+theorem rawSame0_5_0 : SameProtocolReceiptEvidence raw0_5_0 raw0_5_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_5_0 i) (raw0_5_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_5_0 raw0_5_0 rawSources0_5 rawSame0_5_0
 theorem same0_5_1 : SameProtocolEvidence evidence0_5_0 evidence0_5_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_5_0 i) (evidence0_5_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_5_0 evidence0_5_1 sources0_5 same0_5_1
+theorem rawSame0_5_1 : SameProtocolReceiptEvidence raw0_5_0 raw0_5_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_5_0 i) (raw0_5_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_5_0 raw0_5_1 rawSources0_5 rawSame0_5_1
 theorem same0_5_2 : SameProtocolEvidence evidence0_5_0 evidence0_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_5_0 i) (evidence0_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_5_0 evidence0_5_2 sources0_5 same0_5_2
-example : (reconcileProtocol world0 evidence0_5_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+theorem rawSame0_5_2 : SameProtocolReceiptEvidence raw0_5_0 raw0_5_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_5_0 i) (raw0_5_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_5_0 raw0_5_2 rawSources0_5 rawSame0_5_2
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_5_0) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_5_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_5_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_5_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_5_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_5_0]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_5_1) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_5_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_5_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_5_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_5_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_5_1]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_5_2) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_5_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_5_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_5_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_5_2]
+  decide
 def evidence0_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_6_0 else AssetFixtures.agents0_6_0 i.val
 def evidence0_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_6_1 else AssetFixtures.agents0_6_1 i.val
 def evidence0_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_6_2 else AssetFixtures.agents0_6_2 i.val
 theorem sources0_6 : ProtocolSources world0 evidence0_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_6_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
-example := protocol_convergence world0 domain0 evidence0_6_0 sources0_6
+def raw0_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_6_0 i)
+theorem normalized0_6_0 : normalizeProtocolEvidence raw0_6_0 = evidence0_6_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_6_0 i = evidence0_6_0 i := by decide
+  exact funext checked
+def raw0_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_6_1 i)
+theorem normalized0_6_1 : normalizeProtocolEvidence raw0_6_1 = evidence0_6_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_6_1 i = evidence0_6_1 i := by decide
+  exact funext checked
+def raw0_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_6_2 i)
+theorem normalized0_6_2 : normalizeProtocolEvidence raw0_6_2 = evidence0_6_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_6_2 i = evidence0_6_2 i := by decide
+  exact funext checked
+theorem rawSources0_6 : ProtocolReceiptSources world0 raw0_6_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw0_6_0 i, ProtocolReceiptValid world0 i (raw0_6_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world0 domain0 raw0_6_0 rawSources0_6
 theorem same0_6_0 : SameProtocolEvidence evidence0_6_0 evidence0_6_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_6_0 i) (evidence0_6_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_6_0 evidence0_6_0 sources0_6 same0_6_0
+theorem rawSame0_6_0 : SameProtocolReceiptEvidence raw0_6_0 raw0_6_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_6_0 i) (raw0_6_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_6_0 raw0_6_0 rawSources0_6 rawSame0_6_0
 theorem same0_6_1 : SameProtocolEvidence evidence0_6_0 evidence0_6_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_6_0 i) (evidence0_6_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_6_0 evidence0_6_1 sources0_6 same0_6_1
+theorem rawSame0_6_1 : SameProtocolReceiptEvidence raw0_6_0 raw0_6_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_6_0 i) (raw0_6_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_6_0 raw0_6_1 rawSources0_6 rawSame0_6_1
 theorem same0_6_2 : SameProtocolEvidence evidence0_6_0 evidence0_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_6_0 i) (evidence0_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_6_0 evidence0_6_2 sources0_6 same0_6_2
-example : (reconcileProtocol world0 evidence0_6_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+theorem rawSame0_6_2 : SameProtocolReceiptEvidence raw0_6_0 raw0_6_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw0_6_0 i) (raw0_6_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world0 raw0_6_0 raw0_6_2 rawSources0_6 rawSame0_6_2
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_6_0) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_6_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_6_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_6_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_6_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_6_0]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_6_1) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_6_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_6_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_6_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world0 evidence0_6_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_6_1]
+  decide
+example : (reconcileProtocol world0 (normalizeProtocolEvidence raw0_6_2) empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_6_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_6_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_6_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized0_6_2]
+  decide
 def agent1_0 : ProtocolAgent := ⟨AssetFixtures.spec1_0, AssetControllerFixtures.receipts2, AssetControllerFixtures.positions2, 1788998460000, AssetControllerFixtures.operationTime2, AssetControllerFixtures.chainFacts2, AssetControllerFixtures.documents2, AssetControllerFixtures.methods2, 2⟩
 theorem agentDomain1_0 : ProtocolAgentDomain agent1_0 := by
   refine ⟨AssetControllerFixtures.ordered2, AssetControllerFixtures.bounded2, AssetControllerFixtures.parents2, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree2, AssetControllerFixtures.ranks2, ?_, ?_⟩
@@ -395,259 +647,511 @@ def evidence1_0_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFi
 theorem sources1_0 : ProtocolSources world1 evidence1_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_0_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
-example := protocol_convergence world1 domain1 evidence1_0_0 sources1_0
+def raw1_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_0_0 i)
+theorem normalized1_0_0 : normalizeProtocolEvidence raw1_0_0 = evidence1_0_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_0_0 i = evidence1_0_0 i := by decide
+  exact funext checked
+def raw1_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_0_1 i)
+theorem normalized1_0_1 : normalizeProtocolEvidence raw1_0_1 = evidence1_0_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_0_1 i = evidence1_0_1 i := by decide
+  exact funext checked
+def raw1_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_0_2 i)
+theorem normalized1_0_2 : normalizeProtocolEvidence raw1_0_2 = evidence1_0_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_0_2 i = evidence1_0_2 i := by decide
+  exact funext checked
+theorem rawSources1_0 : ProtocolReceiptSources world1 raw1_0_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw1_0_0 i, ProtocolReceiptValid world1 i (raw1_0_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world1 domain1 raw1_0_0 rawSources1_0
 theorem same1_0_0 : SameProtocolEvidence evidence1_0_0 evidence1_0_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_0_0 i) (evidence1_0_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_0_0 evidence1_0_0 sources1_0 same1_0_0
+theorem rawSame1_0_0 : SameProtocolReceiptEvidence raw1_0_0 raw1_0_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_0_0 i) (raw1_0_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_0_0 raw1_0_0 rawSources1_0 rawSame1_0_0
 theorem same1_0_1 : SameProtocolEvidence evidence1_0_0 evidence1_0_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_0_0 i) (evidence1_0_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_0_0 evidence1_0_1 sources1_0 same1_0_1
+theorem rawSame1_0_1 : SameProtocolReceiptEvidence raw1_0_0 raw1_0_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_0_0 i) (raw1_0_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_0_0 raw1_0_1 rawSources1_0 rawSame1_0_1
 theorem same1_0_2 : SameProtocolEvidence evidence1_0_0 evidence1_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_0_0 i) (evidence1_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_0_0 evidence1_0_2 sources1_0 same1_0_2
-example : (reconcileProtocol world1 evidence1_0_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+theorem rawSame1_0_2 : SameProtocolReceiptEvidence raw1_0_0 raw1_0_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_0_0 i) (raw1_0_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_0_0 raw1_0_2 rawSources1_0 rawSame1_0_2
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_0_0) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_0_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_0_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_0_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_0_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_0_0]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_0_1) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_0_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_0_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_0_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_0_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_0_1]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_0_2) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_0_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_0_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_0_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_0_2]
+  decide
 def evidence1_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_1_0 else AssetFixtures.agents1_1_0 i.val
 def evidence1_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_1_1 else AssetFixtures.agents1_1_1 i.val
 def evidence1_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_1_2 else AssetFixtures.agents1_1_2 i.val
 theorem sources1_1 : ProtocolSources world1 evidence1_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_1_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
-example := protocol_convergence world1 domain1 evidence1_1_0 sources1_1
+def raw1_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_1_0 i)
+theorem normalized1_1_0 : normalizeProtocolEvidence raw1_1_0 = evidence1_1_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_1_0 i = evidence1_1_0 i := by decide
+  exact funext checked
+def raw1_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_1_1 i)
+theorem normalized1_1_1 : normalizeProtocolEvidence raw1_1_1 = evidence1_1_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_1_1 i = evidence1_1_1 i := by decide
+  exact funext checked
+def raw1_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_1_2 i)
+theorem normalized1_1_2 : normalizeProtocolEvidence raw1_1_2 = evidence1_1_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_1_2 i = evidence1_1_2 i := by decide
+  exact funext checked
+theorem rawSources1_1 : ProtocolReceiptSources world1 raw1_1_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw1_1_0 i, ProtocolReceiptValid world1 i (raw1_1_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world1 domain1 raw1_1_0 rawSources1_1
 theorem same1_1_0 : SameProtocolEvidence evidence1_1_0 evidence1_1_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_1_0 i) (evidence1_1_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_1_0 evidence1_1_0 sources1_1 same1_1_0
+theorem rawSame1_1_0 : SameProtocolReceiptEvidence raw1_1_0 raw1_1_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_1_0 i) (raw1_1_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_1_0 raw1_1_0 rawSources1_1 rawSame1_1_0
 theorem same1_1_1 : SameProtocolEvidence evidence1_1_0 evidence1_1_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_1_0 i) (evidence1_1_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_1_0 evidence1_1_1 sources1_1 same1_1_1
+theorem rawSame1_1_1 : SameProtocolReceiptEvidence raw1_1_0 raw1_1_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_1_0 i) (raw1_1_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_1_0 raw1_1_1 rawSources1_1 rawSame1_1_1
 theorem same1_1_2 : SameProtocolEvidence evidence1_1_0 evidence1_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_1_0 i) (evidence1_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_1_0 evidence1_1_2 sources1_1 same1_1_2
-example : (reconcileProtocol world1 evidence1_1_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+theorem rawSame1_1_2 : SameProtocolReceiptEvidence raw1_1_0 raw1_1_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_1_0 i) (raw1_1_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_1_0 raw1_1_2 rawSources1_1 rawSame1_1_2
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_1_0) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_1_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_1_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_1_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_1_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_1_0]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_1_1) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_1_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_1_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_1_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_1_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_1_1]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_1_2) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_1_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_1_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_1_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_1_2]
+  decide
 def evidence1_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_2_0 else AssetFixtures.agents1_2_0 i.val
 def evidence1_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_2_1 else AssetFixtures.agents1_2_1 i.val
 def evidence1_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_2_2 else AssetFixtures.agents1_2_2 i.val
 theorem sources1_2 : ProtocolSources world1 evidence1_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_2_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
-example := protocol_convergence world1 domain1 evidence1_2_0 sources1_2
+def raw1_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_2_0 i)
+theorem normalized1_2_0 : normalizeProtocolEvidence raw1_2_0 = evidence1_2_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_2_0 i = evidence1_2_0 i := by decide
+  exact funext checked
+def raw1_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_2_1 i)
+theorem normalized1_2_1 : normalizeProtocolEvidence raw1_2_1 = evidence1_2_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_2_1 i = evidence1_2_1 i := by decide
+  exact funext checked
+def raw1_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_2_2 i)
+theorem normalized1_2_2 : normalizeProtocolEvidence raw1_2_2 = evidence1_2_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_2_2 i = evidence1_2_2 i := by decide
+  exact funext checked
+theorem rawSources1_2 : ProtocolReceiptSources world1 raw1_2_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw1_2_0 i, ProtocolReceiptValid world1 i (raw1_2_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world1 domain1 raw1_2_0 rawSources1_2
 theorem same1_2_0 : SameProtocolEvidence evidence1_2_0 evidence1_2_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_2_0 i) (evidence1_2_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_2_0 evidence1_2_0 sources1_2 same1_2_0
+theorem rawSame1_2_0 : SameProtocolReceiptEvidence raw1_2_0 raw1_2_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_2_0 i) (raw1_2_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_2_0 raw1_2_0 rawSources1_2 rawSame1_2_0
 theorem same1_2_1 : SameProtocolEvidence evidence1_2_0 evidence1_2_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_2_0 i) (evidence1_2_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_2_0 evidence1_2_1 sources1_2 same1_2_1
+theorem rawSame1_2_1 : SameProtocolReceiptEvidence raw1_2_0 raw1_2_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_2_0 i) (raw1_2_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_2_0 raw1_2_1 rawSources1_2 rawSame1_2_1
 theorem same1_2_2 : SameProtocolEvidence evidence1_2_0 evidence1_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_2_0 i) (evidence1_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_2_0 evidence1_2_2 sources1_2 same1_2_2
-example : (reconcileProtocol world1 evidence1_2_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+theorem rawSame1_2_2 : SameProtocolReceiptEvidence raw1_2_0 raw1_2_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_2_0 i) (raw1_2_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_2_0 raw1_2_2 rawSources1_2 rawSame1_2_2
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_2_0) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_2_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_2_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_2_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_2_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_2_0]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_2_1) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_2_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_2_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_2_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_2_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_2_1]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_2_2) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_2_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_2_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_2_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_2_2]
+  decide
 def evidence1_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_3_0 else AssetFixtures.agents1_3_0 i.val
 def evidence1_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_3_1 else AssetFixtures.agents1_3_1 i.val
 def evidence1_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_3_2 else AssetFixtures.agents1_3_2 i.val
 theorem sources1_3 : ProtocolSources world1 evidence1_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_3_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
-example := protocol_convergence world1 domain1 evidence1_3_0 sources1_3
+def raw1_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_3_0 i)
+theorem normalized1_3_0 : normalizeProtocolEvidence raw1_3_0 = evidence1_3_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_3_0 i = evidence1_3_0 i := by decide
+  exact funext checked
+def raw1_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_3_1 i)
+theorem normalized1_3_1 : normalizeProtocolEvidence raw1_3_1 = evidence1_3_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_3_1 i = evidence1_3_1 i := by decide
+  exact funext checked
+def raw1_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_3_2 i)
+theorem normalized1_3_2 : normalizeProtocolEvidence raw1_3_2 = evidence1_3_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_3_2 i = evidence1_3_2 i := by decide
+  exact funext checked
+theorem rawSources1_3 : ProtocolReceiptSources world1 raw1_3_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw1_3_0 i, ProtocolReceiptValid world1 i (raw1_3_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world1 domain1 raw1_3_0 rawSources1_3
 theorem same1_3_0 : SameProtocolEvidence evidence1_3_0 evidence1_3_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_3_0 i) (evidence1_3_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_3_0 evidence1_3_0 sources1_3 same1_3_0
+theorem rawSame1_3_0 : SameProtocolReceiptEvidence raw1_3_0 raw1_3_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_3_0 i) (raw1_3_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_3_0 raw1_3_0 rawSources1_3 rawSame1_3_0
 theorem same1_3_1 : SameProtocolEvidence evidence1_3_0 evidence1_3_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_3_0 i) (evidence1_3_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_3_0 evidence1_3_1 sources1_3 same1_3_1
+theorem rawSame1_3_1 : SameProtocolReceiptEvidence raw1_3_0 raw1_3_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_3_0 i) (raw1_3_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_3_0 raw1_3_1 rawSources1_3 rawSame1_3_1
 theorem same1_3_2 : SameProtocolEvidence evidence1_3_0 evidence1_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_3_0 i) (evidence1_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_3_0 evidence1_3_2 sources1_3 same1_3_2
-example : (reconcileProtocol world1 evidence1_3_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+theorem rawSame1_3_2 : SameProtocolReceiptEvidence raw1_3_0 raw1_3_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_3_0 i) (raw1_3_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_3_0 raw1_3_2 rawSources1_3 rawSame1_3_2
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_3_0) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_3_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_3_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_3_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_3_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_3_0]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_3_1) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_3_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_3_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_3_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_3_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_3_1]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_3_2) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_3_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_3_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_3_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_3_2]
+  decide
 def evidence1_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_4_0 else AssetFixtures.agents1_4_0 i.val
 def evidence1_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_4_1 else AssetFixtures.agents1_4_1 i.val
 def evidence1_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_4_2 else AssetFixtures.agents1_4_2 i.val
 theorem sources1_4 : ProtocolSources world1 evidence1_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_4_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
-example := protocol_convergence world1 domain1 evidence1_4_0 sources1_4
+def raw1_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_4_0 i)
+theorem normalized1_4_0 : normalizeProtocolEvidence raw1_4_0 = evidence1_4_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_4_0 i = evidence1_4_0 i := by decide
+  exact funext checked
+def raw1_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_4_1 i)
+theorem normalized1_4_1 : normalizeProtocolEvidence raw1_4_1 = evidence1_4_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_4_1 i = evidence1_4_1 i := by decide
+  exact funext checked
+def raw1_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_4_2 i)
+theorem normalized1_4_2 : normalizeProtocolEvidence raw1_4_2 = evidence1_4_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_4_2 i = evidence1_4_2 i := by decide
+  exact funext checked
+theorem rawSources1_4 : ProtocolReceiptSources world1 raw1_4_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw1_4_0 i, ProtocolReceiptValid world1 i (raw1_4_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world1 domain1 raw1_4_0 rawSources1_4
 theorem same1_4_0 : SameProtocolEvidence evidence1_4_0 evidence1_4_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_4_0 i) (evidence1_4_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_4_0 evidence1_4_0 sources1_4 same1_4_0
+theorem rawSame1_4_0 : SameProtocolReceiptEvidence raw1_4_0 raw1_4_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_4_0 i) (raw1_4_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_4_0 raw1_4_0 rawSources1_4 rawSame1_4_0
 theorem same1_4_1 : SameProtocolEvidence evidence1_4_0 evidence1_4_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_4_0 i) (evidence1_4_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_4_0 evidence1_4_1 sources1_4 same1_4_1
+theorem rawSame1_4_1 : SameProtocolReceiptEvidence raw1_4_0 raw1_4_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_4_0 i) (raw1_4_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_4_0 raw1_4_1 rawSources1_4 rawSame1_4_1
 theorem same1_4_2 : SameProtocolEvidence evidence1_4_0 evidence1_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_4_0 i) (evidence1_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_4_0 evidence1_4_2 sources1_4 same1_4_2
-example : (reconcileProtocol world1 evidence1_4_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+theorem rawSame1_4_2 : SameProtocolReceiptEvidence raw1_4_0 raw1_4_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_4_0 i) (raw1_4_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_4_0 raw1_4_2 rawSources1_4 rawSame1_4_2
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_4_0) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_4_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_4_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_4_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_4_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_4_0]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_4_1) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_4_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_4_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_4_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_4_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_4_1]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_4_2) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_4_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_4_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_4_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_4_2]
+  decide
 def evidence1_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_5_0 else AssetFixtures.agents1_5_0 i.val
 def evidence1_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_5_1 else AssetFixtures.agents1_5_1 i.val
 def evidence1_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_5_2 else AssetFixtures.agents1_5_2 i.val
 theorem sources1_5 : ProtocolSources world1 evidence1_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_5_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
-example := protocol_convergence world1 domain1 evidence1_5_0 sources1_5
+def raw1_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_5_0 i)
+theorem normalized1_5_0 : normalizeProtocolEvidence raw1_5_0 = evidence1_5_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_5_0 i = evidence1_5_0 i := by decide
+  exact funext checked
+def raw1_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_5_1 i)
+theorem normalized1_5_1 : normalizeProtocolEvidence raw1_5_1 = evidence1_5_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_5_1 i = evidence1_5_1 i := by decide
+  exact funext checked
+def raw1_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_5_2 i)
+theorem normalized1_5_2 : normalizeProtocolEvidence raw1_5_2 = evidence1_5_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_5_2 i = evidence1_5_2 i := by decide
+  exact funext checked
+theorem rawSources1_5 : ProtocolReceiptSources world1 raw1_5_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw1_5_0 i, ProtocolReceiptValid world1 i (raw1_5_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world1 domain1 raw1_5_0 rawSources1_5
 theorem same1_5_0 : SameProtocolEvidence evidence1_5_0 evidence1_5_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_5_0 i) (evidence1_5_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_5_0 evidence1_5_0 sources1_5 same1_5_0
+theorem rawSame1_5_0 : SameProtocolReceiptEvidence raw1_5_0 raw1_5_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_5_0 i) (raw1_5_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_5_0 raw1_5_0 rawSources1_5 rawSame1_5_0
 theorem same1_5_1 : SameProtocolEvidence evidence1_5_0 evidence1_5_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_5_0 i) (evidence1_5_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_5_0 evidence1_5_1 sources1_5 same1_5_1
+theorem rawSame1_5_1 : SameProtocolReceiptEvidence raw1_5_0 raw1_5_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_5_0 i) (raw1_5_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_5_0 raw1_5_1 rawSources1_5 rawSame1_5_1
 theorem same1_5_2 : SameProtocolEvidence evidence1_5_0 evidence1_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_5_0 i) (evidence1_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_5_0 evidence1_5_2 sources1_5 same1_5_2
-example : (reconcileProtocol world1 evidence1_5_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+theorem rawSame1_5_2 : SameProtocolReceiptEvidence raw1_5_0 raw1_5_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_5_0 i) (raw1_5_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_5_0 raw1_5_2 rawSources1_5 rawSame1_5_2
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_5_0) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_5_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_5_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_5_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_5_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_5_0]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_5_1) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_5_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_5_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_5_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_5_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_5_1]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_5_2) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_5_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_5_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_5_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_5_2]
+  decide
 def evidence1_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_6_0 else AssetFixtures.agents1_6_0 i.val
 def evidence1_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_6_1 else AssetFixtures.agents1_6_1 i.val
 def evidence1_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_6_2 else AssetFixtures.agents1_6_2 i.val
 theorem sources1_6 : ProtocolSources world1 evidence1_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_6_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
-example := protocol_convergence world1 domain1 evidence1_6_0 sources1_6
+def raw1_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_6_0 i)
+theorem normalized1_6_0 : normalizeProtocolEvidence raw1_6_0 = evidence1_6_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_6_0 i = evidence1_6_0 i := by decide
+  exact funext checked
+def raw1_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_6_1 i)
+theorem normalized1_6_1 : normalizeProtocolEvidence raw1_6_1 = evidence1_6_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_6_1 i = evidence1_6_1 i := by decide
+  exact funext checked
+def raw1_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_6_2 i)
+theorem normalized1_6_2 : normalizeProtocolEvidence raw1_6_2 = evidence1_6_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_6_2 i = evidence1_6_2 i := by decide
+  exact funext checked
+theorem rawSources1_6 : ProtocolReceiptSources world1 raw1_6_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw1_6_0 i, ProtocolReceiptValid world1 i (raw1_6_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world1 domain1 raw1_6_0 rawSources1_6
 theorem same1_6_0 : SameProtocolEvidence evidence1_6_0 evidence1_6_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_6_0 i) (evidence1_6_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_6_0 evidence1_6_0 sources1_6 same1_6_0
+theorem rawSame1_6_0 : SameProtocolReceiptEvidence raw1_6_0 raw1_6_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_6_0 i) (raw1_6_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_6_0 raw1_6_0 rawSources1_6 rawSame1_6_0
 theorem same1_6_1 : SameProtocolEvidence evidence1_6_0 evidence1_6_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_6_0 i) (evidence1_6_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_6_0 evidence1_6_1 sources1_6 same1_6_1
+theorem rawSame1_6_1 : SameProtocolReceiptEvidence raw1_6_0 raw1_6_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_6_0 i) (raw1_6_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_6_0 raw1_6_1 rawSources1_6 rawSame1_6_1
 theorem same1_6_2 : SameProtocolEvidence evidence1_6_0 evidence1_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_6_0 i) (evidence1_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_6_0 evidence1_6_2 sources1_6 same1_6_2
-example : (reconcileProtocol world1 evidence1_6_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+theorem rawSame1_6_2 : SameProtocolReceiptEvidence raw1_6_0 raw1_6_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw1_6_0 i) (raw1_6_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world1 raw1_6_0 raw1_6_2 rawSources1_6 rawSame1_6_2
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_6_0) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_6_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_6_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_6_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_6_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_6_0]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_6_1) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_6_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_6_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_6_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world1 evidence1_6_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_6_1]
+  decide
+example : (reconcileProtocol world1 (normalizeProtocolEvidence raw1_6_2) empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_6_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_6_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_6_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized1_6_2]
+  decide
 def agent2_0 : ProtocolAgent := ⟨AssetFixtures.spec2_0, AssetControllerFixtures.receipts4, AssetControllerFixtures.positions4, 1788998460000, AssetControllerFixtures.operationTime4, AssetControllerFixtures.chainFacts4, AssetControllerFixtures.documents4, AssetControllerFixtures.methods4, 2⟩
 theorem agentDomain2_0 : ProtocolAgentDomain agent2_0 := by
   refine ⟨AssetControllerFixtures.ordered4, AssetControllerFixtures.bounded4, AssetControllerFixtures.parents4, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree4, AssetControllerFixtures.ranks4, ?_, ?_⟩
@@ -716,259 +1220,511 @@ def evidence2_0_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFi
 theorem sources2_0 : ProtocolSources world2 evidence2_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_0_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
-example := protocol_convergence world2 domain2 evidence2_0_0 sources2_0
+def raw2_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_0_0 i)
+theorem normalized2_0_0 : normalizeProtocolEvidence raw2_0_0 = evidence2_0_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_0_0 i = evidence2_0_0 i := by decide
+  exact funext checked
+def raw2_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_0_1 i)
+theorem normalized2_0_1 : normalizeProtocolEvidence raw2_0_1 = evidence2_0_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_0_1 i = evidence2_0_1 i := by decide
+  exact funext checked
+def raw2_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_0_2 i)
+theorem normalized2_0_2 : normalizeProtocolEvidence raw2_0_2 = evidence2_0_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_0_2 i = evidence2_0_2 i := by decide
+  exact funext checked
+theorem rawSources2_0 : ProtocolReceiptSources world2 raw2_0_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw2_0_0 i, ProtocolReceiptValid world2 i (raw2_0_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world2 domain2 raw2_0_0 rawSources2_0
 theorem same2_0_0 : SameProtocolEvidence evidence2_0_0 evidence2_0_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_0_0 i) (evidence2_0_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_0_0 evidence2_0_0 sources2_0 same2_0_0
+theorem rawSame2_0_0 : SameProtocolReceiptEvidence raw2_0_0 raw2_0_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_0_0 i) (raw2_0_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_0_0 raw2_0_0 rawSources2_0 rawSame2_0_0
 theorem same2_0_1 : SameProtocolEvidence evidence2_0_0 evidence2_0_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_0_0 i) (evidence2_0_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_0_0 evidence2_0_1 sources2_0 same2_0_1
+theorem rawSame2_0_1 : SameProtocolReceiptEvidence raw2_0_0 raw2_0_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_0_0 i) (raw2_0_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_0_0 raw2_0_1 rawSources2_0 rawSame2_0_1
 theorem same2_0_2 : SameProtocolEvidence evidence2_0_0 evidence2_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_0_0 i) (evidence2_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_0_0 evidence2_0_2 sources2_0 same2_0_2
-example : (reconcileProtocol world2 evidence2_0_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+theorem rawSame2_0_2 : SameProtocolReceiptEvidence raw2_0_0 raw2_0_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_0_0 i) (raw2_0_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_0_0 raw2_0_2 rawSources2_0 rawSame2_0_2
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_0_0) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_0_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_0_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_0_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_0_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_0_0]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_0_1) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_0_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_0_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_0_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_0_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_0_1]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_0_2) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_0_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_0_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_0_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_0_2]
+  decide
 def evidence2_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_1_0 else AssetFixtures.agents2_1_0 i.val
 def evidence2_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_1_1 else AssetFixtures.agents2_1_1 i.val
 def evidence2_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_1_2 else AssetFixtures.agents2_1_2 i.val
 theorem sources2_1 : ProtocolSources world2 evidence2_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_1_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
-example := protocol_convergence world2 domain2 evidence2_1_0 sources2_1
+def raw2_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_1_0 i)
+theorem normalized2_1_0 : normalizeProtocolEvidence raw2_1_0 = evidence2_1_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_1_0 i = evidence2_1_0 i := by decide
+  exact funext checked
+def raw2_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_1_1 i)
+theorem normalized2_1_1 : normalizeProtocolEvidence raw2_1_1 = evidence2_1_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_1_1 i = evidence2_1_1 i := by decide
+  exact funext checked
+def raw2_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_1_2 i)
+theorem normalized2_1_2 : normalizeProtocolEvidence raw2_1_2 = evidence2_1_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_1_2 i = evidence2_1_2 i := by decide
+  exact funext checked
+theorem rawSources2_1 : ProtocolReceiptSources world2 raw2_1_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw2_1_0 i, ProtocolReceiptValid world2 i (raw2_1_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world2 domain2 raw2_1_0 rawSources2_1
 theorem same2_1_0 : SameProtocolEvidence evidence2_1_0 evidence2_1_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_1_0 i) (evidence2_1_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_1_0 evidence2_1_0 sources2_1 same2_1_0
+theorem rawSame2_1_0 : SameProtocolReceiptEvidence raw2_1_0 raw2_1_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_1_0 i) (raw2_1_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_1_0 raw2_1_0 rawSources2_1 rawSame2_1_0
 theorem same2_1_1 : SameProtocolEvidence evidence2_1_0 evidence2_1_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_1_0 i) (evidence2_1_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_1_0 evidence2_1_1 sources2_1 same2_1_1
+theorem rawSame2_1_1 : SameProtocolReceiptEvidence raw2_1_0 raw2_1_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_1_0 i) (raw2_1_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_1_0 raw2_1_1 rawSources2_1 rawSame2_1_1
 theorem same2_1_2 : SameProtocolEvidence evidence2_1_0 evidence2_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_1_0 i) (evidence2_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_1_0 evidence2_1_2 sources2_1 same2_1_2
-example : (reconcileProtocol world2 evidence2_1_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+theorem rawSame2_1_2 : SameProtocolReceiptEvidence raw2_1_0 raw2_1_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_1_0 i) (raw2_1_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_1_0 raw2_1_2 rawSources2_1 rawSame2_1_2
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_1_0) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_1_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_1_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_1_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_1_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_1_0]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_1_1) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_1_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_1_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_1_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_1_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_1_1]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_1_2) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_1_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_1_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_1_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_1_2]
+  decide
 def evidence2_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_2_0 else AssetFixtures.agents2_2_0 i.val
 def evidence2_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_2_1 else AssetFixtures.agents2_2_1 i.val
 def evidence2_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_2_2 else AssetFixtures.agents2_2_2 i.val
 theorem sources2_2 : ProtocolSources world2 evidence2_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_2_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
-example := protocol_convergence world2 domain2 evidence2_2_0 sources2_2
+def raw2_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_2_0 i)
+theorem normalized2_2_0 : normalizeProtocolEvidence raw2_2_0 = evidence2_2_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_2_0 i = evidence2_2_0 i := by decide
+  exact funext checked
+def raw2_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_2_1 i)
+theorem normalized2_2_1 : normalizeProtocolEvidence raw2_2_1 = evidence2_2_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_2_1 i = evidence2_2_1 i := by decide
+  exact funext checked
+def raw2_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_2_2 i)
+theorem normalized2_2_2 : normalizeProtocolEvidence raw2_2_2 = evidence2_2_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_2_2 i = evidence2_2_2 i := by decide
+  exact funext checked
+theorem rawSources2_2 : ProtocolReceiptSources world2 raw2_2_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw2_2_0 i, ProtocolReceiptValid world2 i (raw2_2_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world2 domain2 raw2_2_0 rawSources2_2
 theorem same2_2_0 : SameProtocolEvidence evidence2_2_0 evidence2_2_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_2_0 i) (evidence2_2_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_2_0 evidence2_2_0 sources2_2 same2_2_0
+theorem rawSame2_2_0 : SameProtocolReceiptEvidence raw2_2_0 raw2_2_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_2_0 i) (raw2_2_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_2_0 raw2_2_0 rawSources2_2 rawSame2_2_0
 theorem same2_2_1 : SameProtocolEvidence evidence2_2_0 evidence2_2_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_2_0 i) (evidence2_2_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_2_0 evidence2_2_1 sources2_2 same2_2_1
+theorem rawSame2_2_1 : SameProtocolReceiptEvidence raw2_2_0 raw2_2_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_2_0 i) (raw2_2_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_2_0 raw2_2_1 rawSources2_2 rawSame2_2_1
 theorem same2_2_2 : SameProtocolEvidence evidence2_2_0 evidence2_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_2_0 i) (evidence2_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_2_0 evidence2_2_2 sources2_2 same2_2_2
-example : (reconcileProtocol world2 evidence2_2_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+theorem rawSame2_2_2 : SameProtocolReceiptEvidence raw2_2_0 raw2_2_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_2_0 i) (raw2_2_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_2_0 raw2_2_2 rawSources2_2 rawSame2_2_2
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_2_0) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_2_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_2_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_2_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_2_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_2_0]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_2_1) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_2_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_2_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_2_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_2_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_2_1]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_2_2) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_2_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_2_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_2_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_2_2]
+  decide
 def evidence2_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_3_0 else AssetFixtures.agents2_3_0 i.val
 def evidence2_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_3_1 else AssetFixtures.agents2_3_1 i.val
 def evidence2_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_3_2 else AssetFixtures.agents2_3_2 i.val
 theorem sources2_3 : ProtocolSources world2 evidence2_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_3_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
-example := protocol_convergence world2 domain2 evidence2_3_0 sources2_3
+def raw2_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_3_0 i)
+theorem normalized2_3_0 : normalizeProtocolEvidence raw2_3_0 = evidence2_3_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_3_0 i = evidence2_3_0 i := by decide
+  exact funext checked
+def raw2_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_3_1 i)
+theorem normalized2_3_1 : normalizeProtocolEvidence raw2_3_1 = evidence2_3_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_3_1 i = evidence2_3_1 i := by decide
+  exact funext checked
+def raw2_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_3_2 i)
+theorem normalized2_3_2 : normalizeProtocolEvidence raw2_3_2 = evidence2_3_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_3_2 i = evidence2_3_2 i := by decide
+  exact funext checked
+theorem rawSources2_3 : ProtocolReceiptSources world2 raw2_3_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw2_3_0 i, ProtocolReceiptValid world2 i (raw2_3_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world2 domain2 raw2_3_0 rawSources2_3
 theorem same2_3_0 : SameProtocolEvidence evidence2_3_0 evidence2_3_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_3_0 i) (evidence2_3_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_3_0 evidence2_3_0 sources2_3 same2_3_0
+theorem rawSame2_3_0 : SameProtocolReceiptEvidence raw2_3_0 raw2_3_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_3_0 i) (raw2_3_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_3_0 raw2_3_0 rawSources2_3 rawSame2_3_0
 theorem same2_3_1 : SameProtocolEvidence evidence2_3_0 evidence2_3_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_3_0 i) (evidence2_3_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_3_0 evidence2_3_1 sources2_3 same2_3_1
+theorem rawSame2_3_1 : SameProtocolReceiptEvidence raw2_3_0 raw2_3_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_3_0 i) (raw2_3_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_3_0 raw2_3_1 rawSources2_3 rawSame2_3_1
 theorem same2_3_2 : SameProtocolEvidence evidence2_3_0 evidence2_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_3_0 i) (evidence2_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_3_0 evidence2_3_2 sources2_3 same2_3_2
-example : (reconcileProtocol world2 evidence2_3_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+theorem rawSame2_3_2 : SameProtocolReceiptEvidence raw2_3_0 raw2_3_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_3_0 i) (raw2_3_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_3_0 raw2_3_2 rawSources2_3 rawSame2_3_2
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_3_0) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_3_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_3_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_3_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_3_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_3_0]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_3_1) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_3_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_3_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_3_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_3_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_3_1]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_3_2) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_3_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_3_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_3_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_3_2]
+  decide
 def evidence2_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_4_0 else AssetFixtures.agents2_4_0 i.val
 def evidence2_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_4_1 else AssetFixtures.agents2_4_1 i.val
 def evidence2_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_4_2 else AssetFixtures.agents2_4_2 i.val
 theorem sources2_4 : ProtocolSources world2 evidence2_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_4_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
-example := protocol_convergence world2 domain2 evidence2_4_0 sources2_4
+def raw2_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_4_0 i)
+theorem normalized2_4_0 : normalizeProtocolEvidence raw2_4_0 = evidence2_4_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_4_0 i = evidence2_4_0 i := by decide
+  exact funext checked
+def raw2_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_4_1 i)
+theorem normalized2_4_1 : normalizeProtocolEvidence raw2_4_1 = evidence2_4_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_4_1 i = evidence2_4_1 i := by decide
+  exact funext checked
+def raw2_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_4_2 i)
+theorem normalized2_4_2 : normalizeProtocolEvidence raw2_4_2 = evidence2_4_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_4_2 i = evidence2_4_2 i := by decide
+  exact funext checked
+theorem rawSources2_4 : ProtocolReceiptSources world2 raw2_4_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw2_4_0 i, ProtocolReceiptValid world2 i (raw2_4_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world2 domain2 raw2_4_0 rawSources2_4
 theorem same2_4_0 : SameProtocolEvidence evidence2_4_0 evidence2_4_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_4_0 i) (evidence2_4_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_4_0 evidence2_4_0 sources2_4 same2_4_0
+theorem rawSame2_4_0 : SameProtocolReceiptEvidence raw2_4_0 raw2_4_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_4_0 i) (raw2_4_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_4_0 raw2_4_0 rawSources2_4 rawSame2_4_0
 theorem same2_4_1 : SameProtocolEvidence evidence2_4_0 evidence2_4_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_4_0 i) (evidence2_4_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_4_0 evidence2_4_1 sources2_4 same2_4_1
+theorem rawSame2_4_1 : SameProtocolReceiptEvidence raw2_4_0 raw2_4_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_4_0 i) (raw2_4_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_4_0 raw2_4_1 rawSources2_4 rawSame2_4_1
 theorem same2_4_2 : SameProtocolEvidence evidence2_4_0 evidence2_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_4_0 i) (evidence2_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_4_0 evidence2_4_2 sources2_4 same2_4_2
-example : (reconcileProtocol world2 evidence2_4_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+theorem rawSame2_4_2 : SameProtocolReceiptEvidence raw2_4_0 raw2_4_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_4_0 i) (raw2_4_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_4_0 raw2_4_2 rawSources2_4 rawSame2_4_2
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_4_0) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_4_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_4_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_4_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_4_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_4_0]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_4_1) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_4_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_4_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_4_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_4_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_4_1]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_4_2) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_4_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_4_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_4_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_4_2]
+  decide
 def evidence2_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_5_0 else AssetFixtures.agents2_5_0 i.val
 def evidence2_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_5_1 else AssetFixtures.agents2_5_1 i.val
 def evidence2_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_5_2 else AssetFixtures.agents2_5_2 i.val
 theorem sources2_5 : ProtocolSources world2 evidence2_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_5_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
-example := protocol_convergence world2 domain2 evidence2_5_0 sources2_5
+def raw2_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_5_0 i)
+theorem normalized2_5_0 : normalizeProtocolEvidence raw2_5_0 = evidence2_5_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_5_0 i = evidence2_5_0 i := by decide
+  exact funext checked
+def raw2_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_5_1 i)
+theorem normalized2_5_1 : normalizeProtocolEvidence raw2_5_1 = evidence2_5_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_5_1 i = evidence2_5_1 i := by decide
+  exact funext checked
+def raw2_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_5_2 i)
+theorem normalized2_5_2 : normalizeProtocolEvidence raw2_5_2 = evidence2_5_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_5_2 i = evidence2_5_2 i := by decide
+  exact funext checked
+theorem rawSources2_5 : ProtocolReceiptSources world2 raw2_5_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw2_5_0 i, ProtocolReceiptValid world2 i (raw2_5_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world2 domain2 raw2_5_0 rawSources2_5
 theorem same2_5_0 : SameProtocolEvidence evidence2_5_0 evidence2_5_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_5_0 i) (evidence2_5_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_5_0 evidence2_5_0 sources2_5 same2_5_0
+theorem rawSame2_5_0 : SameProtocolReceiptEvidence raw2_5_0 raw2_5_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_5_0 i) (raw2_5_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_5_0 raw2_5_0 rawSources2_5 rawSame2_5_0
 theorem same2_5_1 : SameProtocolEvidence evidence2_5_0 evidence2_5_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_5_0 i) (evidence2_5_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_5_0 evidence2_5_1 sources2_5 same2_5_1
+theorem rawSame2_5_1 : SameProtocolReceiptEvidence raw2_5_0 raw2_5_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_5_0 i) (raw2_5_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_5_0 raw2_5_1 rawSources2_5 rawSame2_5_1
 theorem same2_5_2 : SameProtocolEvidence evidence2_5_0 evidence2_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_5_0 i) (evidence2_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_5_0 evidence2_5_2 sources2_5 same2_5_2
-example : (reconcileProtocol world2 evidence2_5_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+theorem rawSame2_5_2 : SameProtocolReceiptEvidence raw2_5_0 raw2_5_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_5_0 i) (raw2_5_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_5_0 raw2_5_2 rawSources2_5 rawSame2_5_2
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_5_0) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_5_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_5_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_5_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_5_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_5_0]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_5_1) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_5_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_5_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_5_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_5_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_5_1]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_5_2) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_5_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_5_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_5_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_5_2]
+  decide
 def evidence2_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_6_0 else AssetFixtures.agents2_6_0 i.val
 def evidence2_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_6_1 else AssetFixtures.agents2_6_1 i.val
 def evidence2_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_6_2 else AssetFixtures.agents2_6_2 i.val
 theorem sources2_6 : ProtocolSources world2 evidence2_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_6_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
-example := protocol_convergence world2 domain2 evidence2_6_0 sources2_6
+def raw2_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_6_0 i)
+theorem normalized2_6_0 : normalizeProtocolEvidence raw2_6_0 = evidence2_6_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_6_0 i = evidence2_6_0 i := by decide
+  exact funext checked
+def raw2_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_6_1 i)
+theorem normalized2_6_1 : normalizeProtocolEvidence raw2_6_1 = evidence2_6_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_6_1 i = evidence2_6_1 i := by decide
+  exact funext checked
+def raw2_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_6_2 i)
+theorem normalized2_6_2 : normalizeProtocolEvidence raw2_6_2 = evidence2_6_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_6_2 i = evidence2_6_2 i := by decide
+  exact funext checked
+theorem rawSources2_6 : ProtocolReceiptSources world2 raw2_6_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw2_6_0 i, ProtocolReceiptValid world2 i (raw2_6_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world2 domain2 raw2_6_0 rawSources2_6
 theorem same2_6_0 : SameProtocolEvidence evidence2_6_0 evidence2_6_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_6_0 i) (evidence2_6_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_6_0 evidence2_6_0 sources2_6 same2_6_0
+theorem rawSame2_6_0 : SameProtocolReceiptEvidence raw2_6_0 raw2_6_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_6_0 i) (raw2_6_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_6_0 raw2_6_0 rawSources2_6 rawSame2_6_0
 theorem same2_6_1 : SameProtocolEvidence evidence2_6_0 evidence2_6_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_6_0 i) (evidence2_6_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_6_0 evidence2_6_1 sources2_6 same2_6_1
+theorem rawSame2_6_1 : SameProtocolReceiptEvidence raw2_6_0 raw2_6_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_6_0 i) (raw2_6_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_6_0 raw2_6_1 rawSources2_6 rawSame2_6_1
 theorem same2_6_2 : SameProtocolEvidence evidence2_6_0 evidence2_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_6_0 i) (evidence2_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_6_0 evidence2_6_2 sources2_6 same2_6_2
-example : (reconcileProtocol world2 evidence2_6_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+theorem rawSame2_6_2 : SameProtocolReceiptEvidence raw2_6_0 raw2_6_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw2_6_0 i) (raw2_6_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world2 raw2_6_0 raw2_6_2 rawSources2_6 rawSame2_6_2
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_6_0) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_6_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_6_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_6_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_6_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_6_0]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_6_1) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_6_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_6_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_6_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world2 evidence2_6_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_6_1]
+  decide
+example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_6_2) empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_6_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_6_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_6_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
   let result3 ← some none
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized2_6_2]
+  decide
 def agent3_0 : ProtocolAgent := ⟨AssetFixtures.spec3_0, AssetControllerFixtures.receipts6, AssetControllerFixtures.positions6, 1788998460000, AssetControllerFixtures.operationTime6, AssetControllerFixtures.chainFacts6, AssetControllerFixtures.documents6, AssetControllerFixtures.methods6, 2⟩
 theorem agentDomain3_0 : ProtocolAgentDomain agent3_0 := by
   refine ⟨AssetControllerFixtures.ordered6, AssetControllerFixtures.bounded6, AssetControllerFixtures.parents6, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree6, AssetControllerFixtures.ranks6, ?_, ?_⟩
@@ -1037,259 +1793,511 @@ def evidence3_0_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFi
 theorem sources3_0 : ProtocolSources world3 evidence3_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_0_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
-example := protocol_convergence world3 domain3 evidence3_0_0 sources3_0
+def raw3_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_0_0 i)
+theorem normalized3_0_0 : normalizeProtocolEvidence raw3_0_0 = evidence3_0_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_0_0 i = evidence3_0_0 i := by decide
+  exact funext checked
+def raw3_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_0_1 i)
+theorem normalized3_0_1 : normalizeProtocolEvidence raw3_0_1 = evidence3_0_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_0_1 i = evidence3_0_1 i := by decide
+  exact funext checked
+def raw3_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_0_2 i)
+theorem normalized3_0_2 : normalizeProtocolEvidence raw3_0_2 = evidence3_0_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_0_2 i = evidence3_0_2 i := by decide
+  exact funext checked
+theorem rawSources3_0 : ProtocolReceiptSources world3 raw3_0_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw3_0_0 i, ProtocolReceiptValid world3 i (raw3_0_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world3 domain3 raw3_0_0 rawSources3_0
 theorem same3_0_0 : SameProtocolEvidence evidence3_0_0 evidence3_0_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_0_0 i) (evidence3_0_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_0_0 evidence3_0_0 sources3_0 same3_0_0
+theorem rawSame3_0_0 : SameProtocolReceiptEvidence raw3_0_0 raw3_0_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_0_0 i) (raw3_0_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_0_0 raw3_0_0 rawSources3_0 rawSame3_0_0
 theorem same3_0_1 : SameProtocolEvidence evidence3_0_0 evidence3_0_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_0_0 i) (evidence3_0_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_0_0 evidence3_0_1 sources3_0 same3_0_1
+theorem rawSame3_0_1 : SameProtocolReceiptEvidence raw3_0_0 raw3_0_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_0_0 i) (raw3_0_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_0_0 raw3_0_1 rawSources3_0 rawSame3_0_1
 theorem same3_0_2 : SameProtocolEvidence evidence3_0_0 evidence3_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_0_0 i) (evidence3_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_0_0 evidence3_0_2 sources3_0 same3_0_2
-example : (reconcileProtocol world3 evidence3_0_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+theorem rawSame3_0_2 : SameProtocolReceiptEvidence raw3_0_0 raw3_0_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_0_0 i) (raw3_0_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_0_0 raw3_0_2 rawSources3_0 rawSame3_0_2
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_0_0) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_0_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_0_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_0_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_0_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_0_0]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_0_1) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_0_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_0_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_0_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_0_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_0_1]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_0_2) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_0_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_0_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_0_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_0_2]
+  decide
 def evidence3_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_1_0 else AssetFixtures.agents3_1_0 i.val
 def evidence3_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_1_1 else AssetFixtures.agents3_1_1 i.val
 def evidence3_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_1_2 else AssetFixtures.agents3_1_2 i.val
 theorem sources3_1 : ProtocolSources world3 evidence3_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_1_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
-example := protocol_convergence world3 domain3 evidence3_1_0 sources3_1
+def raw3_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_1_0 i)
+theorem normalized3_1_0 : normalizeProtocolEvidence raw3_1_0 = evidence3_1_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_1_0 i = evidence3_1_0 i := by decide
+  exact funext checked
+def raw3_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_1_1 i)
+theorem normalized3_1_1 : normalizeProtocolEvidence raw3_1_1 = evidence3_1_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_1_1 i = evidence3_1_1 i := by decide
+  exact funext checked
+def raw3_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_1_2 i)
+theorem normalized3_1_2 : normalizeProtocolEvidence raw3_1_2 = evidence3_1_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_1_2 i = evidence3_1_2 i := by decide
+  exact funext checked
+theorem rawSources3_1 : ProtocolReceiptSources world3 raw3_1_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw3_1_0 i, ProtocolReceiptValid world3 i (raw3_1_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world3 domain3 raw3_1_0 rawSources3_1
 theorem same3_1_0 : SameProtocolEvidence evidence3_1_0 evidence3_1_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_1_0 i) (evidence3_1_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_1_0 evidence3_1_0 sources3_1 same3_1_0
+theorem rawSame3_1_0 : SameProtocolReceiptEvidence raw3_1_0 raw3_1_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_1_0 i) (raw3_1_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_1_0 raw3_1_0 rawSources3_1 rawSame3_1_0
 theorem same3_1_1 : SameProtocolEvidence evidence3_1_0 evidence3_1_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_1_0 i) (evidence3_1_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_1_0 evidence3_1_1 sources3_1 same3_1_1
+theorem rawSame3_1_1 : SameProtocolReceiptEvidence raw3_1_0 raw3_1_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_1_0 i) (raw3_1_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_1_0 raw3_1_1 rawSources3_1 rawSame3_1_1
 theorem same3_1_2 : SameProtocolEvidence evidence3_1_0 evidence3_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_1_0 i) (evidence3_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_1_0 evidence3_1_2 sources3_1 same3_1_2
-example : (reconcileProtocol world3 evidence3_1_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+theorem rawSame3_1_2 : SameProtocolReceiptEvidence raw3_1_0 raw3_1_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_1_0 i) (raw3_1_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_1_0 raw3_1_2 rawSources3_1 rawSame3_1_2
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_1_0) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_1_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_1_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_1_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_1_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_1_0]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_1_1) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_1_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_1_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_1_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_1_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_1_1]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_1_2) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_1_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_1_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_1_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_1_2]
+  decide
 def evidence3_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_2_0 else AssetFixtures.agents3_2_0 i.val
 def evidence3_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_2_1 else AssetFixtures.agents3_2_1 i.val
 def evidence3_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_2_2 else AssetFixtures.agents3_2_2 i.val
 theorem sources3_2 : ProtocolSources world3 evidence3_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_2_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
-example := protocol_convergence world3 domain3 evidence3_2_0 sources3_2
+def raw3_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_2_0 i)
+theorem normalized3_2_0 : normalizeProtocolEvidence raw3_2_0 = evidence3_2_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_2_0 i = evidence3_2_0 i := by decide
+  exact funext checked
+def raw3_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_2_1 i)
+theorem normalized3_2_1 : normalizeProtocolEvidence raw3_2_1 = evidence3_2_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_2_1 i = evidence3_2_1 i := by decide
+  exact funext checked
+def raw3_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_2_2 i)
+theorem normalized3_2_2 : normalizeProtocolEvidence raw3_2_2 = evidence3_2_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_2_2 i = evidence3_2_2 i := by decide
+  exact funext checked
+theorem rawSources3_2 : ProtocolReceiptSources world3 raw3_2_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw3_2_0 i, ProtocolReceiptValid world3 i (raw3_2_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world3 domain3 raw3_2_0 rawSources3_2
 theorem same3_2_0 : SameProtocolEvidence evidence3_2_0 evidence3_2_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_2_0 i) (evidence3_2_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_2_0 evidence3_2_0 sources3_2 same3_2_0
+theorem rawSame3_2_0 : SameProtocolReceiptEvidence raw3_2_0 raw3_2_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_2_0 i) (raw3_2_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_2_0 raw3_2_0 rawSources3_2 rawSame3_2_0
 theorem same3_2_1 : SameProtocolEvidence evidence3_2_0 evidence3_2_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_2_0 i) (evidence3_2_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_2_0 evidence3_2_1 sources3_2 same3_2_1
+theorem rawSame3_2_1 : SameProtocolReceiptEvidence raw3_2_0 raw3_2_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_2_0 i) (raw3_2_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_2_0 raw3_2_1 rawSources3_2 rawSame3_2_1
 theorem same3_2_2 : SameProtocolEvidence evidence3_2_0 evidence3_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_2_0 i) (evidence3_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_2_0 evidence3_2_2 sources3_2 same3_2_2
-example : (reconcileProtocol world3 evidence3_2_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+theorem rawSame3_2_2 : SameProtocolReceiptEvidence raw3_2_0 raw3_2_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_2_0 i) (raw3_2_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_2_0 raw3_2_2 rawSources3_2 rawSame3_2_2
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_2_0) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_2_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_2_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_2_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_2_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_2_0]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_2_1) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_2_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_2_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_2_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_2_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_2_1]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_2_2) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_2_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_2_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_2_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_2_2]
+  decide
 def evidence3_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_3_0 else AssetFixtures.agents3_3_0 i.val
 def evidence3_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_3_1 else AssetFixtures.agents3_3_1 i.val
 def evidence3_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_3_2 else AssetFixtures.agents3_3_2 i.val
 theorem sources3_3 : ProtocolSources world3 evidence3_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_3_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
-example := protocol_convergence world3 domain3 evidence3_3_0 sources3_3
+def raw3_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_3_0 i)
+theorem normalized3_3_0 : normalizeProtocolEvidence raw3_3_0 = evidence3_3_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_3_0 i = evidence3_3_0 i := by decide
+  exact funext checked
+def raw3_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_3_1 i)
+theorem normalized3_3_1 : normalizeProtocolEvidence raw3_3_1 = evidence3_3_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_3_1 i = evidence3_3_1 i := by decide
+  exact funext checked
+def raw3_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_3_2 i)
+theorem normalized3_3_2 : normalizeProtocolEvidence raw3_3_2 = evidence3_3_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_3_2 i = evidence3_3_2 i := by decide
+  exact funext checked
+theorem rawSources3_3 : ProtocolReceiptSources world3 raw3_3_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw3_3_0 i, ProtocolReceiptValid world3 i (raw3_3_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world3 domain3 raw3_3_0 rawSources3_3
 theorem same3_3_0 : SameProtocolEvidence evidence3_3_0 evidence3_3_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_3_0 i) (evidence3_3_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_3_0 evidence3_3_0 sources3_3 same3_3_0
+theorem rawSame3_3_0 : SameProtocolReceiptEvidence raw3_3_0 raw3_3_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_3_0 i) (raw3_3_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_3_0 raw3_3_0 rawSources3_3 rawSame3_3_0
 theorem same3_3_1 : SameProtocolEvidence evidence3_3_0 evidence3_3_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_3_0 i) (evidence3_3_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_3_0 evidence3_3_1 sources3_3 same3_3_1
+theorem rawSame3_3_1 : SameProtocolReceiptEvidence raw3_3_0 raw3_3_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_3_0 i) (raw3_3_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_3_0 raw3_3_1 rawSources3_3 rawSame3_3_1
 theorem same3_3_2 : SameProtocolEvidence evidence3_3_0 evidence3_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_3_0 i) (evidence3_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_3_0 evidence3_3_2 sources3_3 same3_3_2
-example : (reconcileProtocol world3 evidence3_3_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+theorem rawSame3_3_2 : SameProtocolReceiptEvidence raw3_3_0 raw3_3_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_3_0 i) (raw3_3_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_3_0 raw3_3_2 rawSources3_3 rawSame3_3_2
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_3_0) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_3_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_3_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_3_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_3_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_3_0]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_3_1) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_3_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_3_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_3_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_3_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_3_1]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_3_2) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_3_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_3_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_3_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_3_2]
+  decide
 def evidence3_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_4_0 else AssetFixtures.agents3_4_0 i.val
 def evidence3_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_4_1 else AssetFixtures.agents3_4_1 i.val
 def evidence3_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_4_2 else AssetFixtures.agents3_4_2 i.val
 theorem sources3_4 : ProtocolSources world3 evidence3_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_4_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
-example := protocol_convergence world3 domain3 evidence3_4_0 sources3_4
+def raw3_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_4_0 i)
+theorem normalized3_4_0 : normalizeProtocolEvidence raw3_4_0 = evidence3_4_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_4_0 i = evidence3_4_0 i := by decide
+  exact funext checked
+def raw3_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_4_1 i)
+theorem normalized3_4_1 : normalizeProtocolEvidence raw3_4_1 = evidence3_4_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_4_1 i = evidence3_4_1 i := by decide
+  exact funext checked
+def raw3_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_4_2 i)
+theorem normalized3_4_2 : normalizeProtocolEvidence raw3_4_2 = evidence3_4_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_4_2 i = evidence3_4_2 i := by decide
+  exact funext checked
+theorem rawSources3_4 : ProtocolReceiptSources world3 raw3_4_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw3_4_0 i, ProtocolReceiptValid world3 i (raw3_4_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world3 domain3 raw3_4_0 rawSources3_4
 theorem same3_4_0 : SameProtocolEvidence evidence3_4_0 evidence3_4_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_4_0 i) (evidence3_4_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_4_0 evidence3_4_0 sources3_4 same3_4_0
+theorem rawSame3_4_0 : SameProtocolReceiptEvidence raw3_4_0 raw3_4_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_4_0 i) (raw3_4_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_4_0 raw3_4_0 rawSources3_4 rawSame3_4_0
 theorem same3_4_1 : SameProtocolEvidence evidence3_4_0 evidence3_4_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_4_0 i) (evidence3_4_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_4_0 evidence3_4_1 sources3_4 same3_4_1
+theorem rawSame3_4_1 : SameProtocolReceiptEvidence raw3_4_0 raw3_4_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_4_0 i) (raw3_4_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_4_0 raw3_4_1 rawSources3_4 rawSame3_4_1
 theorem same3_4_2 : SameProtocolEvidence evidence3_4_0 evidence3_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_4_0 i) (evidence3_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_4_0 evidence3_4_2 sources3_4 same3_4_2
-example : (reconcileProtocol world3 evidence3_4_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+theorem rawSame3_4_2 : SameProtocolReceiptEvidence raw3_4_0 raw3_4_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_4_0 i) (raw3_4_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_4_0 raw3_4_2 rawSources3_4 rawSame3_4_2
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_4_0) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_4_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_4_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_4_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_4_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_4_0]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_4_1) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_4_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_4_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_4_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_4_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_4_1]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_4_2) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_4_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_4_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_4_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_4_2]
+  decide
 def evidence3_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_5_0 else AssetFixtures.agents3_5_0 i.val
 def evidence3_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_5_1 else AssetFixtures.agents3_5_1 i.val
 def evidence3_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_5_2 else AssetFixtures.agents3_5_2 i.val
 theorem sources3_5 : ProtocolSources world3 evidence3_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_5_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
-example := protocol_convergence world3 domain3 evidence3_5_0 sources3_5
+def raw3_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_5_0 i)
+theorem normalized3_5_0 : normalizeProtocolEvidence raw3_5_0 = evidence3_5_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_5_0 i = evidence3_5_0 i := by decide
+  exact funext checked
+def raw3_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_5_1 i)
+theorem normalized3_5_1 : normalizeProtocolEvidence raw3_5_1 = evidence3_5_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_5_1 i = evidence3_5_1 i := by decide
+  exact funext checked
+def raw3_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_5_2 i)
+theorem normalized3_5_2 : normalizeProtocolEvidence raw3_5_2 = evidence3_5_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_5_2 i = evidence3_5_2 i := by decide
+  exact funext checked
+theorem rawSources3_5 : ProtocolReceiptSources world3 raw3_5_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw3_5_0 i, ProtocolReceiptValid world3 i (raw3_5_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world3 domain3 raw3_5_0 rawSources3_5
 theorem same3_5_0 : SameProtocolEvidence evidence3_5_0 evidence3_5_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_5_0 i) (evidence3_5_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_5_0 evidence3_5_0 sources3_5 same3_5_0
+theorem rawSame3_5_0 : SameProtocolReceiptEvidence raw3_5_0 raw3_5_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_5_0 i) (raw3_5_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_5_0 raw3_5_0 rawSources3_5 rawSame3_5_0
 theorem same3_5_1 : SameProtocolEvidence evidence3_5_0 evidence3_5_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_5_0 i) (evidence3_5_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_5_0 evidence3_5_1 sources3_5 same3_5_1
+theorem rawSame3_5_1 : SameProtocolReceiptEvidence raw3_5_0 raw3_5_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_5_0 i) (raw3_5_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_5_0 raw3_5_1 rawSources3_5 rawSame3_5_1
 theorem same3_5_2 : SameProtocolEvidence evidence3_5_0 evidence3_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_5_0 i) (evidence3_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_5_0 evidence3_5_2 sources3_5 same3_5_2
-example : (reconcileProtocol world3 evidence3_5_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+theorem rawSame3_5_2 : SameProtocolReceiptEvidence raw3_5_0 raw3_5_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_5_0 i) (raw3_5_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_5_0 raw3_5_2 rawSources3_5 rawSame3_5_2
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_5_0) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_5_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_5_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_5_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_5_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_5_0]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_5_1) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_5_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_5_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_5_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_5_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_5_1]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_5_2) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_5_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_5_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_5_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_5_2]
+  decide
 def evidence3_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_6_0 else AssetFixtures.agents3_6_0 i.val
 def evidence3_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_6_1 else AssetFixtures.agents3_6_1 i.val
 def evidence3_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_6_2 else AssetFixtures.agents3_6_2 i.val
 theorem sources3_6 : ProtocolSources world3 evidence3_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_6_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
-example := protocol_convergence world3 domain3 evidence3_6_0 sources3_6
+def raw3_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_6_0 i)
+theorem normalized3_6_0 : normalizeProtocolEvidence raw3_6_0 = evidence3_6_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_6_0 i = evidence3_6_0 i := by decide
+  exact funext checked
+def raw3_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_6_1 i)
+theorem normalized3_6_1 : normalizeProtocolEvidence raw3_6_1 = evidence3_6_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_6_1 i = evidence3_6_1 i := by decide
+  exact funext checked
+def raw3_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_6_2 i)
+theorem normalized3_6_2 : normalizeProtocolEvidence raw3_6_2 = evidence3_6_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_6_2 i = evidence3_6_2 i := by decide
+  exact funext checked
+theorem rawSources3_6 : ProtocolReceiptSources world3 raw3_6_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw3_6_0 i, ProtocolReceiptValid world3 i (raw3_6_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world3 domain3 raw3_6_0 rawSources3_6
 theorem same3_6_0 : SameProtocolEvidence evidence3_6_0 evidence3_6_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_6_0 i) (evidence3_6_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_6_0 evidence3_6_0 sources3_6 same3_6_0
+theorem rawSame3_6_0 : SameProtocolReceiptEvidence raw3_6_0 raw3_6_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_6_0 i) (raw3_6_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_6_0 raw3_6_0 rawSources3_6 rawSame3_6_0
 theorem same3_6_1 : SameProtocolEvidence evidence3_6_0 evidence3_6_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_6_0 i) (evidence3_6_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_6_0 evidence3_6_1 sources3_6 same3_6_1
+theorem rawSame3_6_1 : SameProtocolReceiptEvidence raw3_6_0 raw3_6_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_6_0 i) (raw3_6_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_6_0 raw3_6_1 rawSources3_6 rawSame3_6_1
 theorem same3_6_2 : SameProtocolEvidence evidence3_6_0 evidence3_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_6_0 i) (evidence3_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_6_0 evidence3_6_2 sources3_6 same3_6_2
-example : (reconcileProtocol world3 evidence3_6_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+theorem rawSame3_6_2 : SameProtocolReceiptEvidence raw3_6_0 raw3_6_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw3_6_0 i) (raw3_6_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world3 raw3_6_0 raw3_6_2 rawSources3_6 rawSame3_6_2
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_6_0) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_6_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_6_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_6_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_6_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_6_0]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_6_1) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_6_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_6_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_6_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world3 evidence3_6_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_6_1]
+  decide
+example : (reconcileProtocol world3 (normalizeProtocolEvidence raw3_6_2) empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_6_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_6_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_6_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized3_6_2]
+  decide
 def agent4_0 : ProtocolAgent := ⟨AssetFixtures.spec4_0, AssetControllerFixtures.receipts8, AssetControllerFixtures.positions8, 1788998460000, AssetControllerFixtures.operationTime8, AssetControllerFixtures.chainFacts8, AssetControllerFixtures.documents8, AssetControllerFixtures.methods8, 2⟩
 theorem agentDomain4_0 : ProtocolAgentDomain agent4_0 := by
   refine ⟨AssetControllerFixtures.ordered8, AssetControllerFixtures.bounded8, AssetControllerFixtures.parents8, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree8, AssetControllerFixtures.ranks8, ?_, ?_⟩
@@ -1358,259 +2366,511 @@ def evidence4_0_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFi
 theorem sources4_0 : ProtocolSources world4 evidence4_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_0_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
-example := protocol_convergence world4 domain4 evidence4_0_0 sources4_0
+def raw4_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_0_0 i)
+theorem normalized4_0_0 : normalizeProtocolEvidence raw4_0_0 = evidence4_0_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_0_0 i = evidence4_0_0 i := by decide
+  exact funext checked
+def raw4_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_0_1 i)
+theorem normalized4_0_1 : normalizeProtocolEvidence raw4_0_1 = evidence4_0_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_0_1 i = evidence4_0_1 i := by decide
+  exact funext checked
+def raw4_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_0_2 i)
+theorem normalized4_0_2 : normalizeProtocolEvidence raw4_0_2 = evidence4_0_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_0_2 i = evidence4_0_2 i := by decide
+  exact funext checked
+theorem rawSources4_0 : ProtocolReceiptSources world4 raw4_0_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw4_0_0 i, ProtocolReceiptValid world4 i (raw4_0_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world4 domain4 raw4_0_0 rawSources4_0
 theorem same4_0_0 : SameProtocolEvidence evidence4_0_0 evidence4_0_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_0_0 i) (evidence4_0_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_0_0 evidence4_0_0 sources4_0 same4_0_0
+theorem rawSame4_0_0 : SameProtocolReceiptEvidence raw4_0_0 raw4_0_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_0_0 i) (raw4_0_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_0_0 raw4_0_0 rawSources4_0 rawSame4_0_0
 theorem same4_0_1 : SameProtocolEvidence evidence4_0_0 evidence4_0_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_0_0 i) (evidence4_0_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_0_0 evidence4_0_1 sources4_0 same4_0_1
+theorem rawSame4_0_1 : SameProtocolReceiptEvidence raw4_0_0 raw4_0_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_0_0 i) (raw4_0_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_0_0 raw4_0_1 rawSources4_0 rawSame4_0_1
 theorem same4_0_2 : SameProtocolEvidence evidence4_0_0 evidence4_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_0_0 i) (evidence4_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_0_0 evidence4_0_2 sources4_0 same4_0_2
-example : (reconcileProtocol world4 evidence4_0_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+theorem rawSame4_0_2 : SameProtocolReceiptEvidence raw4_0_0 raw4_0_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_0_0 i) (raw4_0_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_0_0 raw4_0_2 rawSources4_0 rawSame4_0_2
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_0_0) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_0_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_0_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_0_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_0_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_0_0]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_0_1) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_0_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_0_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_0_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_0_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_0_1]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_0_2) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_0_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_0_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_0_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_0_2]
+  decide
 def evidence4_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_1_0 else AssetFixtures.agents4_1_0 i.val
 def evidence4_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_1_1 else AssetFixtures.agents4_1_1 i.val
 def evidence4_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_1_2 else AssetFixtures.agents4_1_2 i.val
 theorem sources4_1 : ProtocolSources world4 evidence4_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_1_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
-example := protocol_convergence world4 domain4 evidence4_1_0 sources4_1
+def raw4_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_1_0 i)
+theorem normalized4_1_0 : normalizeProtocolEvidence raw4_1_0 = evidence4_1_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_1_0 i = evidence4_1_0 i := by decide
+  exact funext checked
+def raw4_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_1_1 i)
+theorem normalized4_1_1 : normalizeProtocolEvidence raw4_1_1 = evidence4_1_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_1_1 i = evidence4_1_1 i := by decide
+  exact funext checked
+def raw4_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_1_2 i)
+theorem normalized4_1_2 : normalizeProtocolEvidence raw4_1_2 = evidence4_1_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_1_2 i = evidence4_1_2 i := by decide
+  exact funext checked
+theorem rawSources4_1 : ProtocolReceiptSources world4 raw4_1_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw4_1_0 i, ProtocolReceiptValid world4 i (raw4_1_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world4 domain4 raw4_1_0 rawSources4_1
 theorem same4_1_0 : SameProtocolEvidence evidence4_1_0 evidence4_1_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_1_0 i) (evidence4_1_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_1_0 evidence4_1_0 sources4_1 same4_1_0
+theorem rawSame4_1_0 : SameProtocolReceiptEvidence raw4_1_0 raw4_1_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_1_0 i) (raw4_1_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_1_0 raw4_1_0 rawSources4_1 rawSame4_1_0
 theorem same4_1_1 : SameProtocolEvidence evidence4_1_0 evidence4_1_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_1_0 i) (evidence4_1_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_1_0 evidence4_1_1 sources4_1 same4_1_1
+theorem rawSame4_1_1 : SameProtocolReceiptEvidence raw4_1_0 raw4_1_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_1_0 i) (raw4_1_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_1_0 raw4_1_1 rawSources4_1 rawSame4_1_1
 theorem same4_1_2 : SameProtocolEvidence evidence4_1_0 evidence4_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_1_0 i) (evidence4_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_1_0 evidence4_1_2 sources4_1 same4_1_2
-example : (reconcileProtocol world4 evidence4_1_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+theorem rawSame4_1_2 : SameProtocolReceiptEvidence raw4_1_0 raw4_1_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_1_0 i) (raw4_1_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_1_0 raw4_1_2 rawSources4_1 rawSame4_1_2
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_1_0) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_1_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_1_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_1_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_1_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_1_0]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_1_1) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_1_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_1_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_1_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_1_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_1_1]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_1_2) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_1_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_1_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_1_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_1_2]
+  decide
 def evidence4_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_2_0 else AssetFixtures.agents4_2_0 i.val
 def evidence4_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_2_1 else AssetFixtures.agents4_2_1 i.val
 def evidence4_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_2_2 else AssetFixtures.agents4_2_2 i.val
 theorem sources4_2 : ProtocolSources world4 evidence4_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_2_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
-example := protocol_convergence world4 domain4 evidence4_2_0 sources4_2
+def raw4_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_2_0 i)
+theorem normalized4_2_0 : normalizeProtocolEvidence raw4_2_0 = evidence4_2_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_2_0 i = evidence4_2_0 i := by decide
+  exact funext checked
+def raw4_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_2_1 i)
+theorem normalized4_2_1 : normalizeProtocolEvidence raw4_2_1 = evidence4_2_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_2_1 i = evidence4_2_1 i := by decide
+  exact funext checked
+def raw4_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_2_2 i)
+theorem normalized4_2_2 : normalizeProtocolEvidence raw4_2_2 = evidence4_2_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_2_2 i = evidence4_2_2 i := by decide
+  exact funext checked
+theorem rawSources4_2 : ProtocolReceiptSources world4 raw4_2_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw4_2_0 i, ProtocolReceiptValid world4 i (raw4_2_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world4 domain4 raw4_2_0 rawSources4_2
 theorem same4_2_0 : SameProtocolEvidence evidence4_2_0 evidence4_2_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_2_0 i) (evidence4_2_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_2_0 evidence4_2_0 sources4_2 same4_2_0
+theorem rawSame4_2_0 : SameProtocolReceiptEvidence raw4_2_0 raw4_2_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_2_0 i) (raw4_2_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_2_0 raw4_2_0 rawSources4_2 rawSame4_2_0
 theorem same4_2_1 : SameProtocolEvidence evidence4_2_0 evidence4_2_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_2_0 i) (evidence4_2_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_2_0 evidence4_2_1 sources4_2 same4_2_1
+theorem rawSame4_2_1 : SameProtocolReceiptEvidence raw4_2_0 raw4_2_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_2_0 i) (raw4_2_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_2_0 raw4_2_1 rawSources4_2 rawSame4_2_1
 theorem same4_2_2 : SameProtocolEvidence evidence4_2_0 evidence4_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_2_0 i) (evidence4_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_2_0 evidence4_2_2 sources4_2 same4_2_2
-example : (reconcileProtocol world4 evidence4_2_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+theorem rawSame4_2_2 : SameProtocolReceiptEvidence raw4_2_0 raw4_2_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_2_0 i) (raw4_2_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_2_0 raw4_2_2 rawSources4_2 rawSame4_2_2
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_2_0) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_2_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_2_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_2_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_2_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_2_0]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_2_1) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_2_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_2_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_2_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_2_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_2_1]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_2_2) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_2_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_2_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_2_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_2_2]
+  decide
 def evidence4_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_3_0 else AssetFixtures.agents4_3_0 i.val
 def evidence4_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_3_1 else AssetFixtures.agents4_3_1 i.val
 def evidence4_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_3_2 else AssetFixtures.agents4_3_2 i.val
 theorem sources4_3 : ProtocolSources world4 evidence4_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_3_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
-example := protocol_convergence world4 domain4 evidence4_3_0 sources4_3
+def raw4_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_3_0 i)
+theorem normalized4_3_0 : normalizeProtocolEvidence raw4_3_0 = evidence4_3_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_3_0 i = evidence4_3_0 i := by decide
+  exact funext checked
+def raw4_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_3_1 i)
+theorem normalized4_3_1 : normalizeProtocolEvidence raw4_3_1 = evidence4_3_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_3_1 i = evidence4_3_1 i := by decide
+  exact funext checked
+def raw4_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_3_2 i)
+theorem normalized4_3_2 : normalizeProtocolEvidence raw4_3_2 = evidence4_3_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_3_2 i = evidence4_3_2 i := by decide
+  exact funext checked
+theorem rawSources4_3 : ProtocolReceiptSources world4 raw4_3_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw4_3_0 i, ProtocolReceiptValid world4 i (raw4_3_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world4 domain4 raw4_3_0 rawSources4_3
 theorem same4_3_0 : SameProtocolEvidence evidence4_3_0 evidence4_3_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_3_0 i) (evidence4_3_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_3_0 evidence4_3_0 sources4_3 same4_3_0
+theorem rawSame4_3_0 : SameProtocolReceiptEvidence raw4_3_0 raw4_3_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_3_0 i) (raw4_3_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_3_0 raw4_3_0 rawSources4_3 rawSame4_3_0
 theorem same4_3_1 : SameProtocolEvidence evidence4_3_0 evidence4_3_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_3_0 i) (evidence4_3_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_3_0 evidence4_3_1 sources4_3 same4_3_1
+theorem rawSame4_3_1 : SameProtocolReceiptEvidence raw4_3_0 raw4_3_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_3_0 i) (raw4_3_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_3_0 raw4_3_1 rawSources4_3 rawSame4_3_1
 theorem same4_3_2 : SameProtocolEvidence evidence4_3_0 evidence4_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_3_0 i) (evidence4_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_3_0 evidence4_3_2 sources4_3 same4_3_2
-example : (reconcileProtocol world4 evidence4_3_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+theorem rawSame4_3_2 : SameProtocolReceiptEvidence raw4_3_0 raw4_3_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_3_0 i) (raw4_3_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_3_0 raw4_3_2 rawSources4_3 rawSame4_3_2
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_3_0) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_3_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_3_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_3_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_3_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_3_0]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_3_1) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_3_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_3_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_3_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_3_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_3_1]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_3_2) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_3_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_3_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_3_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_3_2]
+  decide
 def evidence4_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_4_0 else AssetFixtures.agents4_4_0 i.val
 def evidence4_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_4_1 else AssetFixtures.agents4_4_1 i.val
 def evidence4_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_4_2 else AssetFixtures.agents4_4_2 i.val
 theorem sources4_4 : ProtocolSources world4 evidence4_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_4_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
-example := protocol_convergence world4 domain4 evidence4_4_0 sources4_4
+def raw4_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_4_0 i)
+theorem normalized4_4_0 : normalizeProtocolEvidence raw4_4_0 = evidence4_4_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_4_0 i = evidence4_4_0 i := by decide
+  exact funext checked
+def raw4_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_4_1 i)
+theorem normalized4_4_1 : normalizeProtocolEvidence raw4_4_1 = evidence4_4_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_4_1 i = evidence4_4_1 i := by decide
+  exact funext checked
+def raw4_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_4_2 i)
+theorem normalized4_4_2 : normalizeProtocolEvidence raw4_4_2 = evidence4_4_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_4_2 i = evidence4_4_2 i := by decide
+  exact funext checked
+theorem rawSources4_4 : ProtocolReceiptSources world4 raw4_4_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw4_4_0 i, ProtocolReceiptValid world4 i (raw4_4_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world4 domain4 raw4_4_0 rawSources4_4
 theorem same4_4_0 : SameProtocolEvidence evidence4_4_0 evidence4_4_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_4_0 i) (evidence4_4_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_4_0 evidence4_4_0 sources4_4 same4_4_0
+theorem rawSame4_4_0 : SameProtocolReceiptEvidence raw4_4_0 raw4_4_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_4_0 i) (raw4_4_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_4_0 raw4_4_0 rawSources4_4 rawSame4_4_0
 theorem same4_4_1 : SameProtocolEvidence evidence4_4_0 evidence4_4_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_4_0 i) (evidence4_4_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_4_0 evidence4_4_1 sources4_4 same4_4_1
+theorem rawSame4_4_1 : SameProtocolReceiptEvidence raw4_4_0 raw4_4_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_4_0 i) (raw4_4_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_4_0 raw4_4_1 rawSources4_4 rawSame4_4_1
 theorem same4_4_2 : SameProtocolEvidence evidence4_4_0 evidence4_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_4_0 i) (evidence4_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_4_0 evidence4_4_2 sources4_4 same4_4_2
-example : (reconcileProtocol world4 evidence4_4_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+theorem rawSame4_4_2 : SameProtocolReceiptEvidence raw4_4_0 raw4_4_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_4_0 i) (raw4_4_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_4_0 raw4_4_2 rawSources4_4 rawSame4_4_2
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_4_0) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_4_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_4_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_4_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_4_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_4_0]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_4_1) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_4_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_4_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_4_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_4_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_4_1]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_4_2) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_4_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_4_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_4_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_4_2]
+  decide
 def evidence4_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_5_0 else AssetFixtures.agents4_5_0 i.val
 def evidence4_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_5_1 else AssetFixtures.agents4_5_1 i.val
 def evidence4_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_5_2 else AssetFixtures.agents4_5_2 i.val
 theorem sources4_5 : ProtocolSources world4 evidence4_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_5_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
-example := protocol_convergence world4 domain4 evidence4_5_0 sources4_5
+def raw4_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_5_0 i)
+theorem normalized4_5_0 : normalizeProtocolEvidence raw4_5_0 = evidence4_5_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_5_0 i = evidence4_5_0 i := by decide
+  exact funext checked
+def raw4_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_5_1 i)
+theorem normalized4_5_1 : normalizeProtocolEvidence raw4_5_1 = evidence4_5_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_5_1 i = evidence4_5_1 i := by decide
+  exact funext checked
+def raw4_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_5_2 i)
+theorem normalized4_5_2 : normalizeProtocolEvidence raw4_5_2 = evidence4_5_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_5_2 i = evidence4_5_2 i := by decide
+  exact funext checked
+theorem rawSources4_5 : ProtocolReceiptSources world4 raw4_5_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw4_5_0 i, ProtocolReceiptValid world4 i (raw4_5_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world4 domain4 raw4_5_0 rawSources4_5
 theorem same4_5_0 : SameProtocolEvidence evidence4_5_0 evidence4_5_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_5_0 i) (evidence4_5_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_5_0 evidence4_5_0 sources4_5 same4_5_0
+theorem rawSame4_5_0 : SameProtocolReceiptEvidence raw4_5_0 raw4_5_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_5_0 i) (raw4_5_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_5_0 raw4_5_0 rawSources4_5 rawSame4_5_0
 theorem same4_5_1 : SameProtocolEvidence evidence4_5_0 evidence4_5_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_5_0 i) (evidence4_5_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_5_0 evidence4_5_1 sources4_5 same4_5_1
+theorem rawSame4_5_1 : SameProtocolReceiptEvidence raw4_5_0 raw4_5_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_5_0 i) (raw4_5_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_5_0 raw4_5_1 rawSources4_5 rawSame4_5_1
 theorem same4_5_2 : SameProtocolEvidence evidence4_5_0 evidence4_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_5_0 i) (evidence4_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_5_0 evidence4_5_2 sources4_5 same4_5_2
-example : (reconcileProtocol world4 evidence4_5_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+theorem rawSame4_5_2 : SameProtocolReceiptEvidence raw4_5_0 raw4_5_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_5_0 i) (raw4_5_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_5_0 raw4_5_2 rawSources4_5 rawSame4_5_2
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_5_0) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_5_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_5_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_5_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_5_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_5_0]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_5_1) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_5_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_5_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_5_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_5_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_5_1]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_5_2) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_5_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_5_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_5_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_5_2]
+  decide
 def evidence4_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_6_0 else AssetFixtures.agents4_6_0 i.val
 def evidence4_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_6_1 else AssetFixtures.agents4_6_1 i.val
 def evidence4_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_6_2 else AssetFixtures.agents4_6_2 i.val
 theorem sources4_6 : ProtocolSources world4 evidence4_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_6_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
-example := protocol_convergence world4 domain4 evidence4_6_0 sources4_6
+def raw4_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_6_0 i)
+theorem normalized4_6_0 : normalizeProtocolEvidence raw4_6_0 = evidence4_6_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_6_0 i = evidence4_6_0 i := by decide
+  exact funext checked
+def raw4_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_6_1 i)
+theorem normalized4_6_1 : normalizeProtocolEvidence raw4_6_1 = evidence4_6_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_6_1 i = evidence4_6_1 i := by decide
+  exact funext checked
+def raw4_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_6_2 i)
+theorem normalized4_6_2 : normalizeProtocolEvidence raw4_6_2 = evidence4_6_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_6_2 i = evidence4_6_2 i := by decide
+  exact funext checked
+theorem rawSources4_6 : ProtocolReceiptSources world4 raw4_6_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw4_6_0 i, ProtocolReceiptValid world4 i (raw4_6_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world4 domain4 raw4_6_0 rawSources4_6
 theorem same4_6_0 : SameProtocolEvidence evidence4_6_0 evidence4_6_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_6_0 i) (evidence4_6_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_6_0 evidence4_6_0 sources4_6 same4_6_0
+theorem rawSame4_6_0 : SameProtocolReceiptEvidence raw4_6_0 raw4_6_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_6_0 i) (raw4_6_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_6_0 raw4_6_0 rawSources4_6 rawSame4_6_0
 theorem same4_6_1 : SameProtocolEvidence evidence4_6_0 evidence4_6_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_6_0 i) (evidence4_6_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_6_0 evidence4_6_1 sources4_6 same4_6_1
+theorem rawSame4_6_1 : SameProtocolReceiptEvidence raw4_6_0 raw4_6_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_6_0 i) (raw4_6_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_6_0 raw4_6_1 rawSources4_6 rawSame4_6_1
 theorem same4_6_2 : SameProtocolEvidence evidence4_6_0 evidence4_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_6_0 i) (evidence4_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_6_0 evidence4_6_2 sources4_6 same4_6_2
-example : (reconcileProtocol world4 evidence4_6_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+theorem rawSame4_6_2 : SameProtocolReceiptEvidence raw4_6_0 raw4_6_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw4_6_0 i) (raw4_6_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world4 raw4_6_0 raw4_6_2 rawSources4_6 rawSame4_6_2
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_6_0) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_6_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_6_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_6_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_6_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_6_0]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_6_1) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_6_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_6_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_6_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world4 evidence4_6_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_6_1]
+  decide
+example : (reconcileProtocol world4 (normalizeProtocolEvidence raw4_6_2) empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
   let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_6_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
   let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_6_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
   let result2 ← some none
   let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_6_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized4_6_2]
+  decide
 def agent5_0 : ProtocolAgent := ⟨AssetFixtures.spec5_0, AssetControllerFixtures.receipts10, AssetControllerFixtures.positions10, 1788998460000, AssetControllerFixtures.operationTime10, AssetControllerFixtures.chainFacts10, AssetControllerFixtures.documents10, AssetControllerFixtures.methods10, 2⟩
 theorem agentDomain5_0 : ProtocolAgentDomain agent5_0 := by
   refine ⟨AssetControllerFixtures.ordered10, AssetControllerFixtures.bounded10, AssetControllerFixtures.parents10, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree10, AssetControllerFixtures.ranks10, ?_, ?_⟩
@@ -1679,259 +2939,511 @@ def evidence5_0_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFi
 theorem sources5_0 : ProtocolSources world5 evidence5_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_0_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
-example := protocol_convergence world5 domain5 evidence5_0_0 sources5_0
+def raw5_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_0_0 i)
+theorem normalized5_0_0 : normalizeProtocolEvidence raw5_0_0 = evidence5_0_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_0_0 i = evidence5_0_0 i := by decide
+  exact funext checked
+def raw5_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_0_1 i)
+theorem normalized5_0_1 : normalizeProtocolEvidence raw5_0_1 = evidence5_0_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_0_1 i = evidence5_0_1 i := by decide
+  exact funext checked
+def raw5_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_0_2 i)
+theorem normalized5_0_2 : normalizeProtocolEvidence raw5_0_2 = evidence5_0_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_0_2 i = evidence5_0_2 i := by decide
+  exact funext checked
+theorem rawSources5_0 : ProtocolReceiptSources world5 raw5_0_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw5_0_0 i, ProtocolReceiptValid world5 i (raw5_0_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world5 domain5 raw5_0_0 rawSources5_0
 theorem same5_0_0 : SameProtocolEvidence evidence5_0_0 evidence5_0_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_0_0 i) (evidence5_0_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_0_0 evidence5_0_0 sources5_0 same5_0_0
+theorem rawSame5_0_0 : SameProtocolReceiptEvidence raw5_0_0 raw5_0_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_0_0 i) (raw5_0_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_0_0 raw5_0_0 rawSources5_0 rawSame5_0_0
 theorem same5_0_1 : SameProtocolEvidence evidence5_0_0 evidence5_0_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_0_0 i) (evidence5_0_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_0_0 evidence5_0_1 sources5_0 same5_0_1
+theorem rawSame5_0_1 : SameProtocolReceiptEvidence raw5_0_0 raw5_0_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_0_0 i) (raw5_0_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_0_0 raw5_0_1 rawSources5_0 rawSame5_0_1
 theorem same5_0_2 : SameProtocolEvidence evidence5_0_0 evidence5_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_0_0 i) (evidence5_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_0_0 evidence5_0_2 sources5_0 same5_0_2
-example : (reconcileProtocol world5 evidence5_0_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+theorem rawSame5_0_2 : SameProtocolReceiptEvidence raw5_0_0 raw5_0_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_0_0 i) (raw5_0_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_0_0 raw5_0_2 rawSources5_0 rawSame5_0_2
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_0_0) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_0_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_0_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_0_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_0_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_0_0]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_0_1) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_0_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_0_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_0_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_0_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_0_1]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_0_2) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_0_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_0_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_0_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_0_2]
+  decide
 def evidence5_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_1_0 else AssetFixtures.agents5_1_0 i.val
 def evidence5_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_1_1 else AssetFixtures.agents5_1_1 i.val
 def evidence5_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_1_2 else AssetFixtures.agents5_1_2 i.val
 theorem sources5_1 : ProtocolSources world5 evidence5_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_1_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
-example := protocol_convergence world5 domain5 evidence5_1_0 sources5_1
+def raw5_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_1_0 i)
+theorem normalized5_1_0 : normalizeProtocolEvidence raw5_1_0 = evidence5_1_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_1_0 i = evidence5_1_0 i := by decide
+  exact funext checked
+def raw5_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_1_1 i)
+theorem normalized5_1_1 : normalizeProtocolEvidence raw5_1_1 = evidence5_1_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_1_1 i = evidence5_1_1 i := by decide
+  exact funext checked
+def raw5_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_1_2 i)
+theorem normalized5_1_2 : normalizeProtocolEvidence raw5_1_2 = evidence5_1_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_1_2 i = evidence5_1_2 i := by decide
+  exact funext checked
+theorem rawSources5_1 : ProtocolReceiptSources world5 raw5_1_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw5_1_0 i, ProtocolReceiptValid world5 i (raw5_1_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world5 domain5 raw5_1_0 rawSources5_1
 theorem same5_1_0 : SameProtocolEvidence evidence5_1_0 evidence5_1_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_1_0 i) (evidence5_1_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_1_0 evidence5_1_0 sources5_1 same5_1_0
+theorem rawSame5_1_0 : SameProtocolReceiptEvidence raw5_1_0 raw5_1_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_1_0 i) (raw5_1_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_1_0 raw5_1_0 rawSources5_1 rawSame5_1_0
 theorem same5_1_1 : SameProtocolEvidence evidence5_1_0 evidence5_1_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_1_0 i) (evidence5_1_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_1_0 evidence5_1_1 sources5_1 same5_1_1
+theorem rawSame5_1_1 : SameProtocolReceiptEvidence raw5_1_0 raw5_1_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_1_0 i) (raw5_1_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_1_0 raw5_1_1 rawSources5_1 rawSame5_1_1
 theorem same5_1_2 : SameProtocolEvidence evidence5_1_0 evidence5_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_1_0 i) (evidence5_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_1_0 evidence5_1_2 sources5_1 same5_1_2
-example : (reconcileProtocol world5 evidence5_1_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+theorem rawSame5_1_2 : SameProtocolReceiptEvidence raw5_1_0 raw5_1_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_1_0 i) (raw5_1_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_1_0 raw5_1_2 rawSources5_1 rawSame5_1_2
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_1_0) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_1_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_1_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_1_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_1_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_1_0]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_1_1) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_1_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_1_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_1_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_1_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_1_1]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_1_2) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_1_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_1_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_1_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_1_2]
+  decide
 def evidence5_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_2_0 else AssetFixtures.agents5_2_0 i.val
 def evidence5_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_2_1 else AssetFixtures.agents5_2_1 i.val
 def evidence5_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_2_2 else AssetFixtures.agents5_2_2 i.val
 theorem sources5_2 : ProtocolSources world5 evidence5_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_2_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
-example := protocol_convergence world5 domain5 evidence5_2_0 sources5_2
+def raw5_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_2_0 i)
+theorem normalized5_2_0 : normalizeProtocolEvidence raw5_2_0 = evidence5_2_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_2_0 i = evidence5_2_0 i := by decide
+  exact funext checked
+def raw5_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_2_1 i)
+theorem normalized5_2_1 : normalizeProtocolEvidence raw5_2_1 = evidence5_2_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_2_1 i = evidence5_2_1 i := by decide
+  exact funext checked
+def raw5_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_2_2 i)
+theorem normalized5_2_2 : normalizeProtocolEvidence raw5_2_2 = evidence5_2_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_2_2 i = evidence5_2_2 i := by decide
+  exact funext checked
+theorem rawSources5_2 : ProtocolReceiptSources world5 raw5_2_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw5_2_0 i, ProtocolReceiptValid world5 i (raw5_2_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world5 domain5 raw5_2_0 rawSources5_2
 theorem same5_2_0 : SameProtocolEvidence evidence5_2_0 evidence5_2_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_2_0 i) (evidence5_2_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_2_0 evidence5_2_0 sources5_2 same5_2_0
+theorem rawSame5_2_0 : SameProtocolReceiptEvidence raw5_2_0 raw5_2_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_2_0 i) (raw5_2_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_2_0 raw5_2_0 rawSources5_2 rawSame5_2_0
 theorem same5_2_1 : SameProtocolEvidence evidence5_2_0 evidence5_2_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_2_0 i) (evidence5_2_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_2_0 evidence5_2_1 sources5_2 same5_2_1
+theorem rawSame5_2_1 : SameProtocolReceiptEvidence raw5_2_0 raw5_2_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_2_0 i) (raw5_2_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_2_0 raw5_2_1 rawSources5_2 rawSame5_2_1
 theorem same5_2_2 : SameProtocolEvidence evidence5_2_0 evidence5_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_2_0 i) (evidence5_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_2_0 evidence5_2_2 sources5_2 same5_2_2
-example : (reconcileProtocol world5 evidence5_2_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+theorem rawSame5_2_2 : SameProtocolReceiptEvidence raw5_2_0 raw5_2_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_2_0 i) (raw5_2_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_2_0 raw5_2_2 rawSources5_2 rawSame5_2_2
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_2_0) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_2_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_2_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_2_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_2_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_2_0]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_2_1) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_2_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_2_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_2_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_2_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_2_1]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_2_2) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_2_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_2_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_2_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_2_2]
+  decide
 def evidence5_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_3_0 else AssetFixtures.agents5_3_0 i.val
 def evidence5_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_3_1 else AssetFixtures.agents5_3_1 i.val
 def evidence5_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_3_2 else AssetFixtures.agents5_3_2 i.val
 theorem sources5_3 : ProtocolSources world5 evidence5_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_3_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
-example := protocol_convergence world5 domain5 evidence5_3_0 sources5_3
+def raw5_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_3_0 i)
+theorem normalized5_3_0 : normalizeProtocolEvidence raw5_3_0 = evidence5_3_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_3_0 i = evidence5_3_0 i := by decide
+  exact funext checked
+def raw5_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_3_1 i)
+theorem normalized5_3_1 : normalizeProtocolEvidence raw5_3_1 = evidence5_3_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_3_1 i = evidence5_3_1 i := by decide
+  exact funext checked
+def raw5_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_3_2 i)
+theorem normalized5_3_2 : normalizeProtocolEvidence raw5_3_2 = evidence5_3_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_3_2 i = evidence5_3_2 i := by decide
+  exact funext checked
+theorem rawSources5_3 : ProtocolReceiptSources world5 raw5_3_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw5_3_0 i, ProtocolReceiptValid world5 i (raw5_3_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world5 domain5 raw5_3_0 rawSources5_3
 theorem same5_3_0 : SameProtocolEvidence evidence5_3_0 evidence5_3_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_3_0 i) (evidence5_3_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_3_0 evidence5_3_0 sources5_3 same5_3_0
+theorem rawSame5_3_0 : SameProtocolReceiptEvidence raw5_3_0 raw5_3_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_3_0 i) (raw5_3_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_3_0 raw5_3_0 rawSources5_3 rawSame5_3_0
 theorem same5_3_1 : SameProtocolEvidence evidence5_3_0 evidence5_3_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_3_0 i) (evidence5_3_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_3_0 evidence5_3_1 sources5_3 same5_3_1
+theorem rawSame5_3_1 : SameProtocolReceiptEvidence raw5_3_0 raw5_3_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_3_0 i) (raw5_3_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_3_0 raw5_3_1 rawSources5_3 rawSame5_3_1
 theorem same5_3_2 : SameProtocolEvidence evidence5_3_0 evidence5_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_3_0 i) (evidence5_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_3_0 evidence5_3_2 sources5_3 same5_3_2
-example : (reconcileProtocol world5 evidence5_3_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+theorem rawSame5_3_2 : SameProtocolReceiptEvidence raw5_3_0 raw5_3_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_3_0 i) (raw5_3_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_3_0 raw5_3_2 rawSources5_3 rawSame5_3_2
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_3_0) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_3_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_3_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_3_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_3_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_3_0]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_3_1) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_3_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_3_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_3_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_3_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_3_1]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_3_2) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_3_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_3_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_3_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_3_2]
+  decide
 def evidence5_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_4_0 else AssetFixtures.agents5_4_0 i.val
 def evidence5_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_4_1 else AssetFixtures.agents5_4_1 i.val
 def evidence5_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_4_2 else AssetFixtures.agents5_4_2 i.val
 theorem sources5_4 : ProtocolSources world5 evidence5_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_4_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
-example := protocol_convergence world5 domain5 evidence5_4_0 sources5_4
+def raw5_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_4_0 i)
+theorem normalized5_4_0 : normalizeProtocolEvidence raw5_4_0 = evidence5_4_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_4_0 i = evidence5_4_0 i := by decide
+  exact funext checked
+def raw5_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_4_1 i)
+theorem normalized5_4_1 : normalizeProtocolEvidence raw5_4_1 = evidence5_4_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_4_1 i = evidence5_4_1 i := by decide
+  exact funext checked
+def raw5_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_4_2 i)
+theorem normalized5_4_2 : normalizeProtocolEvidence raw5_4_2 = evidence5_4_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_4_2 i = evidence5_4_2 i := by decide
+  exact funext checked
+theorem rawSources5_4 : ProtocolReceiptSources world5 raw5_4_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw5_4_0 i, ProtocolReceiptValid world5 i (raw5_4_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world5 domain5 raw5_4_0 rawSources5_4
 theorem same5_4_0 : SameProtocolEvidence evidence5_4_0 evidence5_4_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_4_0 i) (evidence5_4_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_4_0 evidence5_4_0 sources5_4 same5_4_0
+theorem rawSame5_4_0 : SameProtocolReceiptEvidence raw5_4_0 raw5_4_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_4_0 i) (raw5_4_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_4_0 raw5_4_0 rawSources5_4 rawSame5_4_0
 theorem same5_4_1 : SameProtocolEvidence evidence5_4_0 evidence5_4_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_4_0 i) (evidence5_4_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_4_0 evidence5_4_1 sources5_4 same5_4_1
+theorem rawSame5_4_1 : SameProtocolReceiptEvidence raw5_4_0 raw5_4_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_4_0 i) (raw5_4_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_4_0 raw5_4_1 rawSources5_4 rawSame5_4_1
 theorem same5_4_2 : SameProtocolEvidence evidence5_4_0 evidence5_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_4_0 i) (evidence5_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_4_0 evidence5_4_2 sources5_4 same5_4_2
-example : (reconcileProtocol world5 evidence5_4_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+theorem rawSame5_4_2 : SameProtocolReceiptEvidence raw5_4_0 raw5_4_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_4_0 i) (raw5_4_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_4_0 raw5_4_2 rawSources5_4 rawSame5_4_2
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_4_0) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_4_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_4_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_4_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_4_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_4_0]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_4_1) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_4_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_4_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_4_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_4_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_4_1]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_4_2) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_4_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_4_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_4_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_4_2]
+  decide
 def evidence5_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_5_0 else AssetFixtures.agents5_5_0 i.val
 def evidence5_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_5_1 else AssetFixtures.agents5_5_1 i.val
 def evidence5_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_5_2 else AssetFixtures.agents5_5_2 i.val
 theorem sources5_5 : ProtocolSources world5 evidence5_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_5_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
-example := protocol_convergence world5 domain5 evidence5_5_0 sources5_5
+def raw5_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_5_0 i)
+theorem normalized5_5_0 : normalizeProtocolEvidence raw5_5_0 = evidence5_5_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_5_0 i = evidence5_5_0 i := by decide
+  exact funext checked
+def raw5_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_5_1 i)
+theorem normalized5_5_1 : normalizeProtocolEvidence raw5_5_1 = evidence5_5_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_5_1 i = evidence5_5_1 i := by decide
+  exact funext checked
+def raw5_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_5_2 i)
+theorem normalized5_5_2 : normalizeProtocolEvidence raw5_5_2 = evidence5_5_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_5_2 i = evidence5_5_2 i := by decide
+  exact funext checked
+theorem rawSources5_5 : ProtocolReceiptSources world5 raw5_5_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw5_5_0 i, ProtocolReceiptValid world5 i (raw5_5_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world5 domain5 raw5_5_0 rawSources5_5
 theorem same5_5_0 : SameProtocolEvidence evidence5_5_0 evidence5_5_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_5_0 i) (evidence5_5_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_5_0 evidence5_5_0 sources5_5 same5_5_0
+theorem rawSame5_5_0 : SameProtocolReceiptEvidence raw5_5_0 raw5_5_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_5_0 i) (raw5_5_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_5_0 raw5_5_0 rawSources5_5 rawSame5_5_0
 theorem same5_5_1 : SameProtocolEvidence evidence5_5_0 evidence5_5_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_5_0 i) (evidence5_5_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_5_0 evidence5_5_1 sources5_5 same5_5_1
+theorem rawSame5_5_1 : SameProtocolReceiptEvidence raw5_5_0 raw5_5_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_5_0 i) (raw5_5_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_5_0 raw5_5_1 rawSources5_5 rawSame5_5_1
 theorem same5_5_2 : SameProtocolEvidence evidence5_5_0 evidence5_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_5_0 i) (evidence5_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_5_0 evidence5_5_2 sources5_5 same5_5_2
-example : (reconcileProtocol world5 evidence5_5_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+theorem rawSame5_5_2 : SameProtocolReceiptEvidence raw5_5_0 raw5_5_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_5_0 i) (raw5_5_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_5_0 raw5_5_2 rawSources5_5 rawSame5_5_2
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_5_0) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_5_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_5_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_5_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_5_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_5_0]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_5_1) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_5_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_5_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_5_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_5_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_5_1]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_5_2) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_5_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_5_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_5_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_5_2]
+  decide
 def evidence5_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_6_0 else AssetFixtures.agents5_6_0 i.val
 def evidence5_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_6_1 else AssetFixtures.agents5_6_1 i.val
 def evidence5_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_6_2 else AssetFixtures.agents5_6_2 i.val
 theorem sources5_6 : ProtocolSources world5 evidence5_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_6_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
-example := protocol_convergence world5 domain5 evidence5_6_0 sources5_6
+def raw5_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_6_0 i)
+theorem normalized5_6_0 : normalizeProtocolEvidence raw5_6_0 = evidence5_6_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_6_0 i = evidence5_6_0 i := by decide
+  exact funext checked
+def raw5_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_6_1 i)
+theorem normalized5_6_1 : normalizeProtocolEvidence raw5_6_1 = evidence5_6_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_6_1 i = evidence5_6_1 i := by decide
+  exact funext checked
+def raw5_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_6_2 i)
+theorem normalized5_6_2 : normalizeProtocolEvidence raw5_6_2 = evidence5_6_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_6_2 i = evidence5_6_2 i := by decide
+  exact funext checked
+theorem rawSources5_6 : ProtocolReceiptSources world5 raw5_6_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw5_6_0 i, ProtocolReceiptValid world5 i (raw5_6_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world5 domain5 raw5_6_0 rawSources5_6
 theorem same5_6_0 : SameProtocolEvidence evidence5_6_0 evidence5_6_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_6_0 i) (evidence5_6_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_6_0 evidence5_6_0 sources5_6 same5_6_0
+theorem rawSame5_6_0 : SameProtocolReceiptEvidence raw5_6_0 raw5_6_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_6_0 i) (raw5_6_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_6_0 raw5_6_0 rawSources5_6 rawSame5_6_0
 theorem same5_6_1 : SameProtocolEvidence evidence5_6_0 evidence5_6_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_6_0 i) (evidence5_6_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_6_0 evidence5_6_1 sources5_6 same5_6_1
+theorem rawSame5_6_1 : SameProtocolReceiptEvidence raw5_6_0 raw5_6_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_6_0 i) (raw5_6_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_6_0 raw5_6_1 rawSources5_6 rawSame5_6_1
 theorem same5_6_2 : SameProtocolEvidence evidence5_6_0 evidence5_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_6_0 i) (evidence5_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_6_0 evidence5_6_2 sources5_6 same5_6_2
-example : (reconcileProtocol world5 evidence5_6_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+theorem rawSame5_6_2 : SameProtocolReceiptEvidence raw5_6_0 raw5_6_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw5_6_0 i) (raw5_6_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world5 raw5_6_0 raw5_6_2 rawSources5_6 rawSame5_6_2
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_6_0) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_6_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_6_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_6_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_6_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_6_0]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_6_1) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_6_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_6_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_6_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world5 evidence5_6_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_6_1]
+  decide
+example : (reconcileProtocol world5 (normalizeProtocolEvidence raw5_6_2) empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
   let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_6_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
   let result1 ← some none
   let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_6_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_6_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized5_6_2]
+  decide
 def agent6_0 : ProtocolAgent := ⟨AssetFixtures.spec6_0, AssetControllerFixtures.receipts12, AssetControllerFixtures.positions12, 1788998460000, AssetControllerFixtures.operationTime12, AssetControllerFixtures.chainFacts12, AssetControllerFixtures.documents12, AssetControllerFixtures.methods12, 2⟩
 theorem agentDomain6_0 : ProtocolAgentDomain agent6_0 := by
   refine ⟨AssetControllerFixtures.ordered12, AssetControllerFixtures.bounded12, AssetControllerFixtures.parents12, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree12, AssetControllerFixtures.ranks12, ?_, ?_⟩
@@ -2000,259 +3512,511 @@ def evidence6_0_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFi
 theorem sources6_0 : ProtocolSources world6 evidence6_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_0_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
-example := protocol_convergence world6 domain6 evidence6_0_0 sources6_0
+def raw6_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_0_0 i)
+theorem normalized6_0_0 : normalizeProtocolEvidence raw6_0_0 = evidence6_0_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_0_0 i = evidence6_0_0 i := by decide
+  exact funext checked
+def raw6_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_0_1 i)
+theorem normalized6_0_1 : normalizeProtocolEvidence raw6_0_1 = evidence6_0_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_0_1 i = evidence6_0_1 i := by decide
+  exact funext checked
+def raw6_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_0_2 i)
+theorem normalized6_0_2 : normalizeProtocolEvidence raw6_0_2 = evidence6_0_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_0_2 i = evidence6_0_2 i := by decide
+  exact funext checked
+theorem rawSources6_0 : ProtocolReceiptSources world6 raw6_0_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw6_0_0 i, ProtocolReceiptValid world6 i (raw6_0_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world6 domain6 raw6_0_0 rawSources6_0
 theorem same6_0_0 : SameProtocolEvidence evidence6_0_0 evidence6_0_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_0_0 i) (evidence6_0_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_0_0 evidence6_0_0 sources6_0 same6_0_0
+theorem rawSame6_0_0 : SameProtocolReceiptEvidence raw6_0_0 raw6_0_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_0_0 i) (raw6_0_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_0_0 raw6_0_0 rawSources6_0 rawSame6_0_0
 theorem same6_0_1 : SameProtocolEvidence evidence6_0_0 evidence6_0_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_0_0 i) (evidence6_0_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_0_0 evidence6_0_1 sources6_0 same6_0_1
+theorem rawSame6_0_1 : SameProtocolReceiptEvidence raw6_0_0 raw6_0_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_0_0 i) (raw6_0_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_0_0 raw6_0_1 rawSources6_0 rawSame6_0_1
 theorem same6_0_2 : SameProtocolEvidence evidence6_0_0 evidence6_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_0_0 i) (evidence6_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_0_0 evidence6_0_2 sources6_0 same6_0_2
-example : (reconcileProtocol world6 evidence6_0_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+theorem rawSame6_0_2 : SameProtocolReceiptEvidence raw6_0_0 raw6_0_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_0_0 i) (raw6_0_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_0_0 raw6_0_2 rawSources6_0 rawSame6_0_2
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_0_0) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_0_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_0_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_0_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_0_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_0_0]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_0_1) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_0_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_0_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_0_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_0_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_0_1]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_0_2) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_0_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_0_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_0_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_0_2]
+  decide
 def evidence6_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_1_0 else AssetFixtures.agents6_1_0 i.val
 def evidence6_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_1_1 else AssetFixtures.agents6_1_1 i.val
 def evidence6_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_1_2 else AssetFixtures.agents6_1_2 i.val
 theorem sources6_1 : ProtocolSources world6 evidence6_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_1_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
-example := protocol_convergence world6 domain6 evidence6_1_0 sources6_1
+def raw6_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_1_0 i)
+theorem normalized6_1_0 : normalizeProtocolEvidence raw6_1_0 = evidence6_1_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_1_0 i = evidence6_1_0 i := by decide
+  exact funext checked
+def raw6_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_1_1 i)
+theorem normalized6_1_1 : normalizeProtocolEvidence raw6_1_1 = evidence6_1_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_1_1 i = evidence6_1_1 i := by decide
+  exact funext checked
+def raw6_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_1_2 i)
+theorem normalized6_1_2 : normalizeProtocolEvidence raw6_1_2 = evidence6_1_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_1_2 i = evidence6_1_2 i := by decide
+  exact funext checked
+theorem rawSources6_1 : ProtocolReceiptSources world6 raw6_1_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw6_1_0 i, ProtocolReceiptValid world6 i (raw6_1_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world6 domain6 raw6_1_0 rawSources6_1
 theorem same6_1_0 : SameProtocolEvidence evidence6_1_0 evidence6_1_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_1_0 i) (evidence6_1_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_1_0 evidence6_1_0 sources6_1 same6_1_0
+theorem rawSame6_1_0 : SameProtocolReceiptEvidence raw6_1_0 raw6_1_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_1_0 i) (raw6_1_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_1_0 raw6_1_0 rawSources6_1 rawSame6_1_0
 theorem same6_1_1 : SameProtocolEvidence evidence6_1_0 evidence6_1_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_1_0 i) (evidence6_1_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_1_0 evidence6_1_1 sources6_1 same6_1_1
+theorem rawSame6_1_1 : SameProtocolReceiptEvidence raw6_1_0 raw6_1_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_1_0 i) (raw6_1_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_1_0 raw6_1_1 rawSources6_1 rawSame6_1_1
 theorem same6_1_2 : SameProtocolEvidence evidence6_1_0 evidence6_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_1_0 i) (evidence6_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_1_0 evidence6_1_2 sources6_1 same6_1_2
-example : (reconcileProtocol world6 evidence6_1_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+theorem rawSame6_1_2 : SameProtocolReceiptEvidence raw6_1_0 raw6_1_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_1_0 i) (raw6_1_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_1_0 raw6_1_2 rawSources6_1 rawSame6_1_2
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_1_0) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_1_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_1_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_1_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_1_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_1_0]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_1_1) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_1_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_1_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_1_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_1_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_1_1]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_1_2) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_1_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_1_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_1_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_1_2]
+  decide
 def evidence6_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_2_0 else AssetFixtures.agents6_2_0 i.val
 def evidence6_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_2_1 else AssetFixtures.agents6_2_1 i.val
 def evidence6_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_2_2 else AssetFixtures.agents6_2_2 i.val
 theorem sources6_2 : ProtocolSources world6 evidence6_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_2_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
-example := protocol_convergence world6 domain6 evidence6_2_0 sources6_2
+def raw6_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_2_0 i)
+theorem normalized6_2_0 : normalizeProtocolEvidence raw6_2_0 = evidence6_2_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_2_0 i = evidence6_2_0 i := by decide
+  exact funext checked
+def raw6_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_2_1 i)
+theorem normalized6_2_1 : normalizeProtocolEvidence raw6_2_1 = evidence6_2_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_2_1 i = evidence6_2_1 i := by decide
+  exact funext checked
+def raw6_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_2_2 i)
+theorem normalized6_2_2 : normalizeProtocolEvidence raw6_2_2 = evidence6_2_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_2_2 i = evidence6_2_2 i := by decide
+  exact funext checked
+theorem rawSources6_2 : ProtocolReceiptSources world6 raw6_2_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw6_2_0 i, ProtocolReceiptValid world6 i (raw6_2_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world6 domain6 raw6_2_0 rawSources6_2
 theorem same6_2_0 : SameProtocolEvidence evidence6_2_0 evidence6_2_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_2_0 i) (evidence6_2_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_2_0 evidence6_2_0 sources6_2 same6_2_0
+theorem rawSame6_2_0 : SameProtocolReceiptEvidence raw6_2_0 raw6_2_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_2_0 i) (raw6_2_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_2_0 raw6_2_0 rawSources6_2 rawSame6_2_0
 theorem same6_2_1 : SameProtocolEvidence evidence6_2_0 evidence6_2_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_2_0 i) (evidence6_2_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_2_0 evidence6_2_1 sources6_2 same6_2_1
+theorem rawSame6_2_1 : SameProtocolReceiptEvidence raw6_2_0 raw6_2_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_2_0 i) (raw6_2_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_2_0 raw6_2_1 rawSources6_2 rawSame6_2_1
 theorem same6_2_2 : SameProtocolEvidence evidence6_2_0 evidence6_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_2_0 i) (evidence6_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_2_0 evidence6_2_2 sources6_2 same6_2_2
-example : (reconcileProtocol world6 evidence6_2_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+theorem rawSame6_2_2 : SameProtocolReceiptEvidence raw6_2_0 raw6_2_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_2_0 i) (raw6_2_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_2_0 raw6_2_2 rawSources6_2 rawSame6_2_2
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_2_0) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_2_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_2_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_2_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_2_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_2_0]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_2_1) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_2_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_2_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_2_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_2_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_2_1]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_2_2) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_2_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_2_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_2_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_2_2]
+  decide
 def evidence6_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_3_0 else AssetFixtures.agents6_3_0 i.val
 def evidence6_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_3_1 else AssetFixtures.agents6_3_1 i.val
 def evidence6_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_3_2 else AssetFixtures.agents6_3_2 i.val
 theorem sources6_3 : ProtocolSources world6 evidence6_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_3_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
-example := protocol_convergence world6 domain6 evidence6_3_0 sources6_3
+def raw6_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_3_0 i)
+theorem normalized6_3_0 : normalizeProtocolEvidence raw6_3_0 = evidence6_3_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_3_0 i = evidence6_3_0 i := by decide
+  exact funext checked
+def raw6_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_3_1 i)
+theorem normalized6_3_1 : normalizeProtocolEvidence raw6_3_1 = evidence6_3_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_3_1 i = evidence6_3_1 i := by decide
+  exact funext checked
+def raw6_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_3_2 i)
+theorem normalized6_3_2 : normalizeProtocolEvidence raw6_3_2 = evidence6_3_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_3_2 i = evidence6_3_2 i := by decide
+  exact funext checked
+theorem rawSources6_3 : ProtocolReceiptSources world6 raw6_3_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw6_3_0 i, ProtocolReceiptValid world6 i (raw6_3_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world6 domain6 raw6_3_0 rawSources6_3
 theorem same6_3_0 : SameProtocolEvidence evidence6_3_0 evidence6_3_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_3_0 i) (evidence6_3_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_3_0 evidence6_3_0 sources6_3 same6_3_0
+theorem rawSame6_3_0 : SameProtocolReceiptEvidence raw6_3_0 raw6_3_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_3_0 i) (raw6_3_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_3_0 raw6_3_0 rawSources6_3 rawSame6_3_0
 theorem same6_3_1 : SameProtocolEvidence evidence6_3_0 evidence6_3_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_3_0 i) (evidence6_3_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_3_0 evidence6_3_1 sources6_3 same6_3_1
+theorem rawSame6_3_1 : SameProtocolReceiptEvidence raw6_3_0 raw6_3_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_3_0 i) (raw6_3_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_3_0 raw6_3_1 rawSources6_3 rawSame6_3_1
 theorem same6_3_2 : SameProtocolEvidence evidence6_3_0 evidence6_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_3_0 i) (evidence6_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_3_0 evidence6_3_2 sources6_3 same6_3_2
-example : (reconcileProtocol world6 evidence6_3_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+theorem rawSame6_3_2 : SameProtocolReceiptEvidence raw6_3_0 raw6_3_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_3_0 i) (raw6_3_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_3_0 raw6_3_2 rawSources6_3 rawSame6_3_2
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_3_0) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_3_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_3_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_3_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_3_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_3_0]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_3_1) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_3_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_3_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_3_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_3_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_3_1]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_3_2) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_3_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_3_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_3_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_3_2]
+  decide
 def evidence6_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_4_0 else AssetFixtures.agents6_4_0 i.val
 def evidence6_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_4_1 else AssetFixtures.agents6_4_1 i.val
 def evidence6_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_4_2 else AssetFixtures.agents6_4_2 i.val
 theorem sources6_4 : ProtocolSources world6 evidence6_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_4_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
-example := protocol_convergence world6 domain6 evidence6_4_0 sources6_4
+def raw6_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_4_0 i)
+theorem normalized6_4_0 : normalizeProtocolEvidence raw6_4_0 = evidence6_4_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_4_0 i = evidence6_4_0 i := by decide
+  exact funext checked
+def raw6_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_4_1 i)
+theorem normalized6_4_1 : normalizeProtocolEvidence raw6_4_1 = evidence6_4_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_4_1 i = evidence6_4_1 i := by decide
+  exact funext checked
+def raw6_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_4_2 i)
+theorem normalized6_4_2 : normalizeProtocolEvidence raw6_4_2 = evidence6_4_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_4_2 i = evidence6_4_2 i := by decide
+  exact funext checked
+theorem rawSources6_4 : ProtocolReceiptSources world6 raw6_4_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw6_4_0 i, ProtocolReceiptValid world6 i (raw6_4_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world6 domain6 raw6_4_0 rawSources6_4
 theorem same6_4_0 : SameProtocolEvidence evidence6_4_0 evidence6_4_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_4_0 i) (evidence6_4_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_4_0 evidence6_4_0 sources6_4 same6_4_0
+theorem rawSame6_4_0 : SameProtocolReceiptEvidence raw6_4_0 raw6_4_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_4_0 i) (raw6_4_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_4_0 raw6_4_0 rawSources6_4 rawSame6_4_0
 theorem same6_4_1 : SameProtocolEvidence evidence6_4_0 evidence6_4_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_4_0 i) (evidence6_4_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_4_0 evidence6_4_1 sources6_4 same6_4_1
+theorem rawSame6_4_1 : SameProtocolReceiptEvidence raw6_4_0 raw6_4_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_4_0 i) (raw6_4_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_4_0 raw6_4_1 rawSources6_4 rawSame6_4_1
 theorem same6_4_2 : SameProtocolEvidence evidence6_4_0 evidence6_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_4_0 i) (evidence6_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_4_0 evidence6_4_2 sources6_4 same6_4_2
-example : (reconcileProtocol world6 evidence6_4_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+theorem rawSame6_4_2 : SameProtocolReceiptEvidence raw6_4_0 raw6_4_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_4_0 i) (raw6_4_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_4_0 raw6_4_2 rawSources6_4 rawSame6_4_2
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_4_0) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_4_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_4_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_4_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_4_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_4_0]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_4_1) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_4_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_4_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_4_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_4_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_4_1]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_4_2) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_4_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_4_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_4_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_4_2]
+  decide
 def evidence6_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_5_0 else AssetFixtures.agents6_5_0 i.val
 def evidence6_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_5_1 else AssetFixtures.agents6_5_1 i.val
 def evidence6_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_5_2 else AssetFixtures.agents6_5_2 i.val
 theorem sources6_5 : ProtocolSources world6 evidence6_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_5_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
-example := protocol_convergence world6 domain6 evidence6_5_0 sources6_5
+def raw6_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_5_0 i)
+theorem normalized6_5_0 : normalizeProtocolEvidence raw6_5_0 = evidence6_5_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_5_0 i = evidence6_5_0 i := by decide
+  exact funext checked
+def raw6_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_5_1 i)
+theorem normalized6_5_1 : normalizeProtocolEvidence raw6_5_1 = evidence6_5_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_5_1 i = evidence6_5_1 i := by decide
+  exact funext checked
+def raw6_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_5_2 i)
+theorem normalized6_5_2 : normalizeProtocolEvidence raw6_5_2 = evidence6_5_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_5_2 i = evidence6_5_2 i := by decide
+  exact funext checked
+theorem rawSources6_5 : ProtocolReceiptSources world6 raw6_5_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw6_5_0 i, ProtocolReceiptValid world6 i (raw6_5_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world6 domain6 raw6_5_0 rawSources6_5
 theorem same6_5_0 : SameProtocolEvidence evidence6_5_0 evidence6_5_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_5_0 i) (evidence6_5_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_5_0 evidence6_5_0 sources6_5 same6_5_0
+theorem rawSame6_5_0 : SameProtocolReceiptEvidence raw6_5_0 raw6_5_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_5_0 i) (raw6_5_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_5_0 raw6_5_0 rawSources6_5 rawSame6_5_0
 theorem same6_5_1 : SameProtocolEvidence evidence6_5_0 evidence6_5_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_5_0 i) (evidence6_5_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_5_0 evidence6_5_1 sources6_5 same6_5_1
+theorem rawSame6_5_1 : SameProtocolReceiptEvidence raw6_5_0 raw6_5_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_5_0 i) (raw6_5_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_5_0 raw6_5_1 rawSources6_5 rawSame6_5_1
 theorem same6_5_2 : SameProtocolEvidence evidence6_5_0 evidence6_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_5_0 i) (evidence6_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_5_0 evidence6_5_2 sources6_5 same6_5_2
-example : (reconcileProtocol world6 evidence6_5_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+theorem rawSame6_5_2 : SameProtocolReceiptEvidence raw6_5_0 raw6_5_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_5_0 i) (raw6_5_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_5_0 raw6_5_2 rawSources6_5 rawSame6_5_2
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_5_0) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_5_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_5_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_5_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_5_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_5_0]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_5_1) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_5_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_5_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_5_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_5_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_5_1]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_5_2) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_5_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_5_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_5_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_5_2]
+  decide
 def evidence6_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_6_0 else AssetFixtures.agents6_6_0 i.val
 def evidence6_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_6_1 else AssetFixtures.agents6_6_1 i.val
 def evidence6_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_6_2 else AssetFixtures.agents6_6_2 i.val
 theorem sources6_6 : ProtocolSources world6 evidence6_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_6_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
-example := protocol_convergence world6 domain6 evidence6_6_0 sources6_6
+def raw6_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_6_0 i)
+theorem normalized6_6_0 : normalizeProtocolEvidence raw6_6_0 = evidence6_6_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_6_0 i = evidence6_6_0 i := by decide
+  exact funext checked
+def raw6_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_6_1 i)
+theorem normalized6_6_1 : normalizeProtocolEvidence raw6_6_1 = evidence6_6_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_6_1 i = evidence6_6_1 i := by decide
+  exact funext checked
+def raw6_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_6_2 i)
+theorem normalized6_6_2 : normalizeProtocolEvidence raw6_6_2 = evidence6_6_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_6_2 i = evidence6_6_2 i := by decide
+  exact funext checked
+theorem rawSources6_6 : ProtocolReceiptSources world6 raw6_6_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw6_6_0 i, ProtocolReceiptValid world6 i (raw6_6_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world6 domain6 raw6_6_0 rawSources6_6
 theorem same6_6_0 : SameProtocolEvidence evidence6_6_0 evidence6_6_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_6_0 i) (evidence6_6_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_6_0 evidence6_6_0 sources6_6 same6_6_0
+theorem rawSame6_6_0 : SameProtocolReceiptEvidence raw6_6_0 raw6_6_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_6_0 i) (raw6_6_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_6_0 raw6_6_0 rawSources6_6 rawSame6_6_0
 theorem same6_6_1 : SameProtocolEvidence evidence6_6_0 evidence6_6_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_6_0 i) (evidence6_6_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_6_0 evidence6_6_1 sources6_6 same6_6_1
+theorem rawSame6_6_1 : SameProtocolReceiptEvidence raw6_6_0 raw6_6_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_6_0 i) (raw6_6_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_6_0 raw6_6_1 rawSources6_6 rawSame6_6_1
 theorem same6_6_2 : SameProtocolEvidence evidence6_6_0 evidence6_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_6_0 i) (evidence6_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_6_0 evidence6_6_2 sources6_6 same6_6_2
-example : (reconcileProtocol world6 evidence6_6_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+theorem rawSame6_6_2 : SameProtocolReceiptEvidence raw6_6_0 raw6_6_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw6_6_0 i) (raw6_6_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world6 raw6_6_0 raw6_6_2 rawSources6_6 rawSame6_6_2
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_6_0) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_6_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_6_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_6_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_6_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_6_0]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_6_1) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_6_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_6_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_6_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world6 evidence6_6_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_6_1]
+  decide
+example : (reconcileProtocol world6 (normalizeProtocolEvidence raw6_6_2) empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_6_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_6_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_6_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized6_6_2]
+  decide
 def agent7_0 : ProtocolAgent := ⟨AssetFixtures.spec7_0, AssetControllerFixtures.receipts14, AssetControllerFixtures.positions14, 1788998460000, AssetControllerFixtures.operationTime14, AssetControllerFixtures.chainFacts14, AssetControllerFixtures.documents14, AssetControllerFixtures.methods14, 2⟩
 theorem agentDomain7_0 : ProtocolAgentDomain agent7_0 := by
   refine ⟨AssetControllerFixtures.ordered14, AssetControllerFixtures.bounded14, AssetControllerFixtures.parents14, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree14, AssetControllerFixtures.ranks14, ?_, ?_⟩
@@ -2321,259 +4085,511 @@ def evidence7_0_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFi
 theorem sources7_0 : ProtocolSources world7 evidence7_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_0_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
-example := protocol_convergence world7 domain7 evidence7_0_0 sources7_0
+def raw7_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_0_0 i)
+theorem normalized7_0_0 : normalizeProtocolEvidence raw7_0_0 = evidence7_0_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_0_0 i = evidence7_0_0 i := by decide
+  exact funext checked
+def raw7_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_0_1 i)
+theorem normalized7_0_1 : normalizeProtocolEvidence raw7_0_1 = evidence7_0_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_0_1 i = evidence7_0_1 i := by decide
+  exact funext checked
+def raw7_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_0_2 i)
+theorem normalized7_0_2 : normalizeProtocolEvidence raw7_0_2 = evidence7_0_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_0_2 i = evidence7_0_2 i := by decide
+  exact funext checked
+theorem rawSources7_0 : ProtocolReceiptSources world7 raw7_0_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw7_0_0 i, ProtocolReceiptValid world7 i (raw7_0_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world7 domain7 raw7_0_0 rawSources7_0
 theorem same7_0_0 : SameProtocolEvidence evidence7_0_0 evidence7_0_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_0_0 i) (evidence7_0_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_0_0 evidence7_0_0 sources7_0 same7_0_0
+theorem rawSame7_0_0 : SameProtocolReceiptEvidence raw7_0_0 raw7_0_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_0_0 i) (raw7_0_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_0_0 raw7_0_0 rawSources7_0 rawSame7_0_0
 theorem same7_0_1 : SameProtocolEvidence evidence7_0_0 evidence7_0_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_0_0 i) (evidence7_0_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_0_0 evidence7_0_1 sources7_0 same7_0_1
+theorem rawSame7_0_1 : SameProtocolReceiptEvidence raw7_0_0 raw7_0_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_0_0 i) (raw7_0_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_0_0 raw7_0_1 rawSources7_0 rawSame7_0_1
 theorem same7_0_2 : SameProtocolEvidence evidence7_0_0 evidence7_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_0_0 i) (evidence7_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_0_0 evidence7_0_2 sources7_0 same7_0_2
-example : (reconcileProtocol world7 evidence7_0_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+theorem rawSame7_0_2 : SameProtocolReceiptEvidence raw7_0_0 raw7_0_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_0_0 i) (raw7_0_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_0_0 raw7_0_2 rawSources7_0 rawSame7_0_2
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_0_0) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_0_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_0_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_0_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_0_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_0_0]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_0_1) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_0_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_0_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_0_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_0_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_0_1]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_0_2) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_0_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_0_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_0_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_0_2]
+  decide
 def evidence7_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_1_0 else AssetFixtures.agents7_1_0 i.val
 def evidence7_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_1_1 else AssetFixtures.agents7_1_1 i.val
 def evidence7_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_1_2 else AssetFixtures.agents7_1_2 i.val
 theorem sources7_1 : ProtocolSources world7 evidence7_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_1_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
-example := protocol_convergence world7 domain7 evidence7_1_0 sources7_1
+def raw7_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_1_0 i)
+theorem normalized7_1_0 : normalizeProtocolEvidence raw7_1_0 = evidence7_1_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_1_0 i = evidence7_1_0 i := by decide
+  exact funext checked
+def raw7_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_1_1 i)
+theorem normalized7_1_1 : normalizeProtocolEvidence raw7_1_1 = evidence7_1_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_1_1 i = evidence7_1_1 i := by decide
+  exact funext checked
+def raw7_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_1_2 i)
+theorem normalized7_1_2 : normalizeProtocolEvidence raw7_1_2 = evidence7_1_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_1_2 i = evidence7_1_2 i := by decide
+  exact funext checked
+theorem rawSources7_1 : ProtocolReceiptSources world7 raw7_1_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw7_1_0 i, ProtocolReceiptValid world7 i (raw7_1_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world7 domain7 raw7_1_0 rawSources7_1
 theorem same7_1_0 : SameProtocolEvidence evidence7_1_0 evidence7_1_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_1_0 i) (evidence7_1_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_1_0 evidence7_1_0 sources7_1 same7_1_0
+theorem rawSame7_1_0 : SameProtocolReceiptEvidence raw7_1_0 raw7_1_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_1_0 i) (raw7_1_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_1_0 raw7_1_0 rawSources7_1 rawSame7_1_0
 theorem same7_1_1 : SameProtocolEvidence evidence7_1_0 evidence7_1_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_1_0 i) (evidence7_1_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_1_0 evidence7_1_1 sources7_1 same7_1_1
+theorem rawSame7_1_1 : SameProtocolReceiptEvidence raw7_1_0 raw7_1_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_1_0 i) (raw7_1_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_1_0 raw7_1_1 rawSources7_1 rawSame7_1_1
 theorem same7_1_2 : SameProtocolEvidence evidence7_1_0 evidence7_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_1_0 i) (evidence7_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_1_0 evidence7_1_2 sources7_1 same7_1_2
-example : (reconcileProtocol world7 evidence7_1_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+theorem rawSame7_1_2 : SameProtocolReceiptEvidence raw7_1_0 raw7_1_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_1_0 i) (raw7_1_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_1_0 raw7_1_2 rawSources7_1 rawSame7_1_2
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_1_0) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_1_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_1_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_1_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_1_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_1_0]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_1_1) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_1_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_1_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_1_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_1_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_1_1]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_1_2) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_1_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_1_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_1_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_1_2]
+  decide
 def evidence7_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_2_0 else AssetFixtures.agents7_2_0 i.val
 def evidence7_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_2_1 else AssetFixtures.agents7_2_1 i.val
 def evidence7_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_2_2 else AssetFixtures.agents7_2_2 i.val
 theorem sources7_2 : ProtocolSources world7 evidence7_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_2_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
-example := protocol_convergence world7 domain7 evidence7_2_0 sources7_2
+def raw7_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_2_0 i)
+theorem normalized7_2_0 : normalizeProtocolEvidence raw7_2_0 = evidence7_2_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_2_0 i = evidence7_2_0 i := by decide
+  exact funext checked
+def raw7_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_2_1 i)
+theorem normalized7_2_1 : normalizeProtocolEvidence raw7_2_1 = evidence7_2_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_2_1 i = evidence7_2_1 i := by decide
+  exact funext checked
+def raw7_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_2_2 i)
+theorem normalized7_2_2 : normalizeProtocolEvidence raw7_2_2 = evidence7_2_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_2_2 i = evidence7_2_2 i := by decide
+  exact funext checked
+theorem rawSources7_2 : ProtocolReceiptSources world7 raw7_2_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw7_2_0 i, ProtocolReceiptValid world7 i (raw7_2_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world7 domain7 raw7_2_0 rawSources7_2
 theorem same7_2_0 : SameProtocolEvidence evidence7_2_0 evidence7_2_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_2_0 i) (evidence7_2_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_2_0 evidence7_2_0 sources7_2 same7_2_0
+theorem rawSame7_2_0 : SameProtocolReceiptEvidence raw7_2_0 raw7_2_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_2_0 i) (raw7_2_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_2_0 raw7_2_0 rawSources7_2 rawSame7_2_0
 theorem same7_2_1 : SameProtocolEvidence evidence7_2_0 evidence7_2_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_2_0 i) (evidence7_2_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_2_0 evidence7_2_1 sources7_2 same7_2_1
+theorem rawSame7_2_1 : SameProtocolReceiptEvidence raw7_2_0 raw7_2_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_2_0 i) (raw7_2_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_2_0 raw7_2_1 rawSources7_2 rawSame7_2_1
 theorem same7_2_2 : SameProtocolEvidence evidence7_2_0 evidence7_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_2_0 i) (evidence7_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_2_0 evidence7_2_2 sources7_2 same7_2_2
-example : (reconcileProtocol world7 evidence7_2_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+theorem rawSame7_2_2 : SameProtocolReceiptEvidence raw7_2_0 raw7_2_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_2_0 i) (raw7_2_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_2_0 raw7_2_2 rawSources7_2 rawSame7_2_2
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_2_0) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_2_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_2_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_2_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_2_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_2_0]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_2_1) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_2_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_2_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_2_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_2_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_2_1]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_2_2) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_2_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_2_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_2_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_2_2]
+  decide
 def evidence7_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_3_0 else AssetFixtures.agents7_3_0 i.val
 def evidence7_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_3_1 else AssetFixtures.agents7_3_1 i.val
 def evidence7_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_3_2 else AssetFixtures.agents7_3_2 i.val
 theorem sources7_3 : ProtocolSources world7 evidence7_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_3_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
-example := protocol_convergence world7 domain7 evidence7_3_0 sources7_3
+def raw7_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_3_0 i)
+theorem normalized7_3_0 : normalizeProtocolEvidence raw7_3_0 = evidence7_3_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_3_0 i = evidence7_3_0 i := by decide
+  exact funext checked
+def raw7_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_3_1 i)
+theorem normalized7_3_1 : normalizeProtocolEvidence raw7_3_1 = evidence7_3_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_3_1 i = evidence7_3_1 i := by decide
+  exact funext checked
+def raw7_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_3_2 i)
+theorem normalized7_3_2 : normalizeProtocolEvidence raw7_3_2 = evidence7_3_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_3_2 i = evidence7_3_2 i := by decide
+  exact funext checked
+theorem rawSources7_3 : ProtocolReceiptSources world7 raw7_3_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw7_3_0 i, ProtocolReceiptValid world7 i (raw7_3_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world7 domain7 raw7_3_0 rawSources7_3
 theorem same7_3_0 : SameProtocolEvidence evidence7_3_0 evidence7_3_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_3_0 i) (evidence7_3_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_3_0 evidence7_3_0 sources7_3 same7_3_0
+theorem rawSame7_3_0 : SameProtocolReceiptEvidence raw7_3_0 raw7_3_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_3_0 i) (raw7_3_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_3_0 raw7_3_0 rawSources7_3 rawSame7_3_0
 theorem same7_3_1 : SameProtocolEvidence evidence7_3_0 evidence7_3_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_3_0 i) (evidence7_3_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_3_0 evidence7_3_1 sources7_3 same7_3_1
+theorem rawSame7_3_1 : SameProtocolReceiptEvidence raw7_3_0 raw7_3_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_3_0 i) (raw7_3_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_3_0 raw7_3_1 rawSources7_3 rawSame7_3_1
 theorem same7_3_2 : SameProtocolEvidence evidence7_3_0 evidence7_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_3_0 i) (evidence7_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_3_0 evidence7_3_2 sources7_3 same7_3_2
-example : (reconcileProtocol world7 evidence7_3_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+theorem rawSame7_3_2 : SameProtocolReceiptEvidence raw7_3_0 raw7_3_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_3_0 i) (raw7_3_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_3_0 raw7_3_2 rawSources7_3 rawSame7_3_2
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_3_0) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_3_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_3_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_3_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_3_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_3_0]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_3_1) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_3_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_3_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_3_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_3_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_3_1]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_3_2) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_3_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_3_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_3_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_3_2]
+  decide
 def evidence7_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_4_0 else AssetFixtures.agents7_4_0 i.val
 def evidence7_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_4_1 else AssetFixtures.agents7_4_1 i.val
 def evidence7_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_4_2 else AssetFixtures.agents7_4_2 i.val
 theorem sources7_4 : ProtocolSources world7 evidence7_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_4_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
-example := protocol_convergence world7 domain7 evidence7_4_0 sources7_4
+def raw7_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_4_0 i)
+theorem normalized7_4_0 : normalizeProtocolEvidence raw7_4_0 = evidence7_4_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_4_0 i = evidence7_4_0 i := by decide
+  exact funext checked
+def raw7_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_4_1 i)
+theorem normalized7_4_1 : normalizeProtocolEvidence raw7_4_1 = evidence7_4_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_4_1 i = evidence7_4_1 i := by decide
+  exact funext checked
+def raw7_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_4_2 i)
+theorem normalized7_4_2 : normalizeProtocolEvidence raw7_4_2 = evidence7_4_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_4_2 i = evidence7_4_2 i := by decide
+  exact funext checked
+theorem rawSources7_4 : ProtocolReceiptSources world7 raw7_4_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw7_4_0 i, ProtocolReceiptValid world7 i (raw7_4_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world7 domain7 raw7_4_0 rawSources7_4
 theorem same7_4_0 : SameProtocolEvidence evidence7_4_0 evidence7_4_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_4_0 i) (evidence7_4_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_4_0 evidence7_4_0 sources7_4 same7_4_0
+theorem rawSame7_4_0 : SameProtocolReceiptEvidence raw7_4_0 raw7_4_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_4_0 i) (raw7_4_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_4_0 raw7_4_0 rawSources7_4 rawSame7_4_0
 theorem same7_4_1 : SameProtocolEvidence evidence7_4_0 evidence7_4_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_4_0 i) (evidence7_4_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_4_0 evidence7_4_1 sources7_4 same7_4_1
+theorem rawSame7_4_1 : SameProtocolReceiptEvidence raw7_4_0 raw7_4_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_4_0 i) (raw7_4_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_4_0 raw7_4_1 rawSources7_4 rawSame7_4_1
 theorem same7_4_2 : SameProtocolEvidence evidence7_4_0 evidence7_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_4_0 i) (evidence7_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_4_0 evidence7_4_2 sources7_4 same7_4_2
-example : (reconcileProtocol world7 evidence7_4_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+theorem rawSame7_4_2 : SameProtocolReceiptEvidence raw7_4_0 raw7_4_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_4_0 i) (raw7_4_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_4_0 raw7_4_2 rawSources7_4 rawSame7_4_2
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_4_0) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_4_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_4_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_4_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_4_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_4_0]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_4_1) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_4_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_4_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_4_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_4_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_4_1]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_4_2) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_4_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_4_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_4_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_4_2]
+  decide
 def evidence7_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_5_0 else AssetFixtures.agents7_5_0 i.val
 def evidence7_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_5_1 else AssetFixtures.agents7_5_1 i.val
 def evidence7_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_5_2 else AssetFixtures.agents7_5_2 i.val
 theorem sources7_5 : ProtocolSources world7 evidence7_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_5_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
-example := protocol_convergence world7 domain7 evidence7_5_0 sources7_5
+def raw7_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_5_0 i)
+theorem normalized7_5_0 : normalizeProtocolEvidence raw7_5_0 = evidence7_5_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_5_0 i = evidence7_5_0 i := by decide
+  exact funext checked
+def raw7_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_5_1 i)
+theorem normalized7_5_1 : normalizeProtocolEvidence raw7_5_1 = evidence7_5_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_5_1 i = evidence7_5_1 i := by decide
+  exact funext checked
+def raw7_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_5_2 i)
+theorem normalized7_5_2 : normalizeProtocolEvidence raw7_5_2 = evidence7_5_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_5_2 i = evidence7_5_2 i := by decide
+  exact funext checked
+theorem rawSources7_5 : ProtocolReceiptSources world7 raw7_5_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw7_5_0 i, ProtocolReceiptValid world7 i (raw7_5_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world7 domain7 raw7_5_0 rawSources7_5
 theorem same7_5_0 : SameProtocolEvidence evidence7_5_0 evidence7_5_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_5_0 i) (evidence7_5_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_5_0 evidence7_5_0 sources7_5 same7_5_0
+theorem rawSame7_5_0 : SameProtocolReceiptEvidence raw7_5_0 raw7_5_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_5_0 i) (raw7_5_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_5_0 raw7_5_0 rawSources7_5 rawSame7_5_0
 theorem same7_5_1 : SameProtocolEvidence evidence7_5_0 evidence7_5_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_5_0 i) (evidence7_5_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_5_0 evidence7_5_1 sources7_5 same7_5_1
+theorem rawSame7_5_1 : SameProtocolReceiptEvidence raw7_5_0 raw7_5_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_5_0 i) (raw7_5_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_5_0 raw7_5_1 rawSources7_5 rawSame7_5_1
 theorem same7_5_2 : SameProtocolEvidence evidence7_5_0 evidence7_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_5_0 i) (evidence7_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_5_0 evidence7_5_2 sources7_5 same7_5_2
-example : (reconcileProtocol world7 evidence7_5_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+theorem rawSame7_5_2 : SameProtocolReceiptEvidence raw7_5_0 raw7_5_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_5_0 i) (raw7_5_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_5_0 raw7_5_2 rawSources7_5 rawSame7_5_2
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_5_0) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_5_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_5_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_5_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_5_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_5_0]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_5_1) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_5_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_5_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_5_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_5_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_5_1]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_5_2) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_5_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_5_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_5_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_5_2]
+  decide
 def evidence7_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_6_0 else AssetFixtures.agents7_6_0 i.val
 def evidence7_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_6_1 else AssetFixtures.agents7_6_1 i.val
 def evidence7_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_6_2 else AssetFixtures.agents7_6_2 i.val
 theorem sources7_6 : ProtocolSources world7 evidence7_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_6_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
-example := protocol_convergence world7 domain7 evidence7_6_0 sources7_6
+def raw7_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_6_0 i)
+theorem normalized7_6_0 : normalizeProtocolEvidence raw7_6_0 = evidence7_6_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_6_0 i = evidence7_6_0 i := by decide
+  exact funext checked
+def raw7_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_6_1 i)
+theorem normalized7_6_1 : normalizeProtocolEvidence raw7_6_1 = evidence7_6_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_6_1 i = evidence7_6_1 i := by decide
+  exact funext checked
+def raw7_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_6_2 i)
+theorem normalized7_6_2 : normalizeProtocolEvidence raw7_6_2 = evidence7_6_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_6_2 i = evidence7_6_2 i := by decide
+  exact funext checked
+theorem rawSources7_6 : ProtocolReceiptSources world7 raw7_6_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw7_6_0 i, ProtocolReceiptValid world7 i (raw7_6_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world7 domain7 raw7_6_0 rawSources7_6
 theorem same7_6_0 : SameProtocolEvidence evidence7_6_0 evidence7_6_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_6_0 i) (evidence7_6_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_6_0 evidence7_6_0 sources7_6 same7_6_0
+theorem rawSame7_6_0 : SameProtocolReceiptEvidence raw7_6_0 raw7_6_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_6_0 i) (raw7_6_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_6_0 raw7_6_0 rawSources7_6 rawSame7_6_0
 theorem same7_6_1 : SameProtocolEvidence evidence7_6_0 evidence7_6_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_6_0 i) (evidence7_6_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_6_0 evidence7_6_1 sources7_6 same7_6_1
+theorem rawSame7_6_1 : SameProtocolReceiptEvidence raw7_6_0 raw7_6_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_6_0 i) (raw7_6_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_6_0 raw7_6_1 rawSources7_6 rawSame7_6_1
 theorem same7_6_2 : SameProtocolEvidence evidence7_6_0 evidence7_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_6_0 i) (evidence7_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_6_0 evidence7_6_2 sources7_6 same7_6_2
-example : (reconcileProtocol world7 evidence7_6_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+theorem rawSame7_6_2 : SameProtocolReceiptEvidence raw7_6_0 raw7_6_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw7_6_0 i) (raw7_6_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world7 raw7_6_0 raw7_6_2 rawSources7_6 rawSame7_6_2
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_6_0) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_6_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_6_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_6_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_6_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_6_0]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_6_1) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_6_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_6_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_6_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world7 evidence7_6_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_6_1]
+  decide
+example : (reconcileProtocol world7 (normalizeProtocolEvidence raw7_6_2) empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
   let result0 ← some none
   let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_6_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_6_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
   let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_6_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized7_6_2]
+  decide
 def agent8_0 : ProtocolAgent := ⟨AssetFixtures.spec8_0, AssetControllerFixtures.receipts16, AssetControllerFixtures.positions16, 1788998460000, AssetControllerFixtures.operationTime16, AssetControllerFixtures.chainFacts16, AssetControllerFixtures.documents16, AssetControllerFixtures.methods16, 2⟩
 theorem agentDomain8_0 : ProtocolAgentDomain agent8_0 := by
   refine ⟨AssetControllerFixtures.ordered16, AssetControllerFixtures.bounded16, AssetControllerFixtures.parents16, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree16, AssetControllerFixtures.ranks16, ?_, ?_⟩
@@ -2642,259 +4658,511 @@ def evidence8_0_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFi
 theorem sources8_0 : ProtocolSources world8 evidence8_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_0_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
-example := protocol_convergence world8 domain8 evidence8_0_0 sources8_0
+def raw8_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_0_0 i)
+theorem normalized8_0_0 : normalizeProtocolEvidence raw8_0_0 = evidence8_0_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_0_0 i = evidence8_0_0 i := by decide
+  exact funext checked
+def raw8_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_0_1 i)
+theorem normalized8_0_1 : normalizeProtocolEvidence raw8_0_1 = evidence8_0_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_0_1 i = evidence8_0_1 i := by decide
+  exact funext checked
+def raw8_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_0_2 i)
+theorem normalized8_0_2 : normalizeProtocolEvidence raw8_0_2 = evidence8_0_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_0_2 i = evidence8_0_2 i := by decide
+  exact funext checked
+theorem rawSources8_0 : ProtocolReceiptSources world8 raw8_0_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw8_0_0 i, ProtocolReceiptValid world8 i (raw8_0_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world8 domain8 raw8_0_0 rawSources8_0
 theorem same8_0_0 : SameProtocolEvidence evidence8_0_0 evidence8_0_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_0_0 i) (evidence8_0_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_0_0 evidence8_0_0 sources8_0 same8_0_0
+theorem rawSame8_0_0 : SameProtocolReceiptEvidence raw8_0_0 raw8_0_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_0_0 i) (raw8_0_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_0_0 raw8_0_0 rawSources8_0 rawSame8_0_0
 theorem same8_0_1 : SameProtocolEvidence evidence8_0_0 evidence8_0_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_0_0 i) (evidence8_0_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_0_0 evidence8_0_1 sources8_0 same8_0_1
+theorem rawSame8_0_1 : SameProtocolReceiptEvidence raw8_0_0 raw8_0_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_0_0 i) (raw8_0_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_0_0 raw8_0_1 rawSources8_0 rawSame8_0_1
 theorem same8_0_2 : SameProtocolEvidence evidence8_0_0 evidence8_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_0_0 i) (evidence8_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_0_0 evidence8_0_2 sources8_0 same8_0_2
-example : (reconcileProtocol world8 evidence8_0_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+theorem rawSame8_0_2 : SameProtocolReceiptEvidence raw8_0_0 raw8_0_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_0_0 i) (raw8_0_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_0_0 raw8_0_2 rawSources8_0 rawSame8_0_2
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_0_0) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_0_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_0_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_0_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_0_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_0_0]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_0_1) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_0_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_0_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_0_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_0_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_0_1]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_0_2) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_0_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_0_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_0_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_0_2]
+  decide
 def evidence8_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_1_0 else AssetFixtures.agents8_1_0 i.val
 def evidence8_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_1_1 else AssetFixtures.agents8_1_1 i.val
 def evidence8_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_1_2 else AssetFixtures.agents8_1_2 i.val
 theorem sources8_1 : ProtocolSources world8 evidence8_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_1_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
-example := protocol_convergence world8 domain8 evidence8_1_0 sources8_1
+def raw8_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_1_0 i)
+theorem normalized8_1_0 : normalizeProtocolEvidence raw8_1_0 = evidence8_1_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_1_0 i = evidence8_1_0 i := by decide
+  exact funext checked
+def raw8_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_1_1 i)
+theorem normalized8_1_1 : normalizeProtocolEvidence raw8_1_1 = evidence8_1_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_1_1 i = evidence8_1_1 i := by decide
+  exact funext checked
+def raw8_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_1_2 i)
+theorem normalized8_1_2 : normalizeProtocolEvidence raw8_1_2 = evidence8_1_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_1_2 i = evidence8_1_2 i := by decide
+  exact funext checked
+theorem rawSources8_1 : ProtocolReceiptSources world8 raw8_1_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw8_1_0 i, ProtocolReceiptValid world8 i (raw8_1_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world8 domain8 raw8_1_0 rawSources8_1
 theorem same8_1_0 : SameProtocolEvidence evidence8_1_0 evidence8_1_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_1_0 i) (evidence8_1_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_1_0 evidence8_1_0 sources8_1 same8_1_0
+theorem rawSame8_1_0 : SameProtocolReceiptEvidence raw8_1_0 raw8_1_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_1_0 i) (raw8_1_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_1_0 raw8_1_0 rawSources8_1 rawSame8_1_0
 theorem same8_1_1 : SameProtocolEvidence evidence8_1_0 evidence8_1_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_1_0 i) (evidence8_1_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_1_0 evidence8_1_1 sources8_1 same8_1_1
+theorem rawSame8_1_1 : SameProtocolReceiptEvidence raw8_1_0 raw8_1_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_1_0 i) (raw8_1_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_1_0 raw8_1_1 rawSources8_1 rawSame8_1_1
 theorem same8_1_2 : SameProtocolEvidence evidence8_1_0 evidence8_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_1_0 i) (evidence8_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_1_0 evidence8_1_2 sources8_1 same8_1_2
-example : (reconcileProtocol world8 evidence8_1_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+theorem rawSame8_1_2 : SameProtocolReceiptEvidence raw8_1_0 raw8_1_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_1_0 i) (raw8_1_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_1_0 raw8_1_2 rawSources8_1 rawSame8_1_2
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_1_0) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_1_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_1_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_1_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_1_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_1_0]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_1_1) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_1_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_1_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_1_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_1_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_1_1]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_1_2) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_1_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_1_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_1_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_1_2]
+  decide
 def evidence8_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_2_0 else AssetFixtures.agents8_2_0 i.val
 def evidence8_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_2_1 else AssetFixtures.agents8_2_1 i.val
 def evidence8_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_2_2 else AssetFixtures.agents8_2_2 i.val
 theorem sources8_2 : ProtocolSources world8 evidence8_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_2_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
-example := protocol_convergence world8 domain8 evidence8_2_0 sources8_2
+def raw8_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_2_0 i)
+theorem normalized8_2_0 : normalizeProtocolEvidence raw8_2_0 = evidence8_2_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_2_0 i = evidence8_2_0 i := by decide
+  exact funext checked
+def raw8_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_2_1 i)
+theorem normalized8_2_1 : normalizeProtocolEvidence raw8_2_1 = evidence8_2_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_2_1 i = evidence8_2_1 i := by decide
+  exact funext checked
+def raw8_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_2_2 i)
+theorem normalized8_2_2 : normalizeProtocolEvidence raw8_2_2 = evidence8_2_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_2_2 i = evidence8_2_2 i := by decide
+  exact funext checked
+theorem rawSources8_2 : ProtocolReceiptSources world8 raw8_2_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw8_2_0 i, ProtocolReceiptValid world8 i (raw8_2_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world8 domain8 raw8_2_0 rawSources8_2
 theorem same8_2_0 : SameProtocolEvidence evidence8_2_0 evidence8_2_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_2_0 i) (evidence8_2_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_2_0 evidence8_2_0 sources8_2 same8_2_0
+theorem rawSame8_2_0 : SameProtocolReceiptEvidence raw8_2_0 raw8_2_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_2_0 i) (raw8_2_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_2_0 raw8_2_0 rawSources8_2 rawSame8_2_0
 theorem same8_2_1 : SameProtocolEvidence evidence8_2_0 evidence8_2_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_2_0 i) (evidence8_2_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_2_0 evidence8_2_1 sources8_2 same8_2_1
+theorem rawSame8_2_1 : SameProtocolReceiptEvidence raw8_2_0 raw8_2_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_2_0 i) (raw8_2_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_2_0 raw8_2_1 rawSources8_2 rawSame8_2_1
 theorem same8_2_2 : SameProtocolEvidence evidence8_2_0 evidence8_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_2_0 i) (evidence8_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_2_0 evidence8_2_2 sources8_2 same8_2_2
-example : (reconcileProtocol world8 evidence8_2_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+theorem rawSame8_2_2 : SameProtocolReceiptEvidence raw8_2_0 raw8_2_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_2_0 i) (raw8_2_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_2_0 raw8_2_2 rawSources8_2 rawSame8_2_2
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_2_0) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_2_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_2_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_2_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_2_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_2_0]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_2_1) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_2_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_2_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_2_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_2_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_2_1]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_2_2) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_2_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_2_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_2_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_2_2]
+  decide
 def evidence8_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_3_0 else AssetFixtures.agents8_3_0 i.val
 def evidence8_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_3_1 else AssetFixtures.agents8_3_1 i.val
 def evidence8_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_3_2 else AssetFixtures.agents8_3_2 i.val
 theorem sources8_3 : ProtocolSources world8 evidence8_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_3_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
-example := protocol_convergence world8 domain8 evidence8_3_0 sources8_3
+def raw8_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_3_0 i)
+theorem normalized8_3_0 : normalizeProtocolEvidence raw8_3_0 = evidence8_3_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_3_0 i = evidence8_3_0 i := by decide
+  exact funext checked
+def raw8_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_3_1 i)
+theorem normalized8_3_1 : normalizeProtocolEvidence raw8_3_1 = evidence8_3_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_3_1 i = evidence8_3_1 i := by decide
+  exact funext checked
+def raw8_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_3_2 i)
+theorem normalized8_3_2 : normalizeProtocolEvidence raw8_3_2 = evidence8_3_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_3_2 i = evidence8_3_2 i := by decide
+  exact funext checked
+theorem rawSources8_3 : ProtocolReceiptSources world8 raw8_3_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw8_3_0 i, ProtocolReceiptValid world8 i (raw8_3_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world8 domain8 raw8_3_0 rawSources8_3
 theorem same8_3_0 : SameProtocolEvidence evidence8_3_0 evidence8_3_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_3_0 i) (evidence8_3_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_3_0 evidence8_3_0 sources8_3 same8_3_0
+theorem rawSame8_3_0 : SameProtocolReceiptEvidence raw8_3_0 raw8_3_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_3_0 i) (raw8_3_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_3_0 raw8_3_0 rawSources8_3 rawSame8_3_0
 theorem same8_3_1 : SameProtocolEvidence evidence8_3_0 evidence8_3_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_3_0 i) (evidence8_3_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_3_0 evidence8_3_1 sources8_3 same8_3_1
+theorem rawSame8_3_1 : SameProtocolReceiptEvidence raw8_3_0 raw8_3_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_3_0 i) (raw8_3_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_3_0 raw8_3_1 rawSources8_3 rawSame8_3_1
 theorem same8_3_2 : SameProtocolEvidence evidence8_3_0 evidence8_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_3_0 i) (evidence8_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_3_0 evidence8_3_2 sources8_3 same8_3_2
-example : (reconcileProtocol world8 evidence8_3_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+theorem rawSame8_3_2 : SameProtocolReceiptEvidence raw8_3_0 raw8_3_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_3_0 i) (raw8_3_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_3_0 raw8_3_2 rawSources8_3 rawSame8_3_2
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_3_0) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_3_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_3_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_3_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_3_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_3_0]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_3_1) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_3_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_3_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_3_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_3_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_3_1]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_3_2) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_3_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_3_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_3_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_3_2]
+  decide
 def evidence8_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_4_0 else AssetFixtures.agents8_4_0 i.val
 def evidence8_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_4_1 else AssetFixtures.agents8_4_1 i.val
 def evidence8_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_4_2 else AssetFixtures.agents8_4_2 i.val
 theorem sources8_4 : ProtocolSources world8 evidence8_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_4_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
-example := protocol_convergence world8 domain8 evidence8_4_0 sources8_4
+def raw8_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_4_0 i)
+theorem normalized8_4_0 : normalizeProtocolEvidence raw8_4_0 = evidence8_4_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_4_0 i = evidence8_4_0 i := by decide
+  exact funext checked
+def raw8_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_4_1 i)
+theorem normalized8_4_1 : normalizeProtocolEvidence raw8_4_1 = evidence8_4_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_4_1 i = evidence8_4_1 i := by decide
+  exact funext checked
+def raw8_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_4_2 i)
+theorem normalized8_4_2 : normalizeProtocolEvidence raw8_4_2 = evidence8_4_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_4_2 i = evidence8_4_2 i := by decide
+  exact funext checked
+theorem rawSources8_4 : ProtocolReceiptSources world8 raw8_4_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw8_4_0 i, ProtocolReceiptValid world8 i (raw8_4_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world8 domain8 raw8_4_0 rawSources8_4
 theorem same8_4_0 : SameProtocolEvidence evidence8_4_0 evidence8_4_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_4_0 i) (evidence8_4_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_4_0 evidence8_4_0 sources8_4 same8_4_0
+theorem rawSame8_4_0 : SameProtocolReceiptEvidence raw8_4_0 raw8_4_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_4_0 i) (raw8_4_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_4_0 raw8_4_0 rawSources8_4 rawSame8_4_0
 theorem same8_4_1 : SameProtocolEvidence evidence8_4_0 evidence8_4_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_4_0 i) (evidence8_4_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_4_0 evidence8_4_1 sources8_4 same8_4_1
+theorem rawSame8_4_1 : SameProtocolReceiptEvidence raw8_4_0 raw8_4_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_4_0 i) (raw8_4_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_4_0 raw8_4_1 rawSources8_4 rawSame8_4_1
 theorem same8_4_2 : SameProtocolEvidence evidence8_4_0 evidence8_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_4_0 i) (evidence8_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_4_0 evidence8_4_2 sources8_4 same8_4_2
-example : (reconcileProtocol world8 evidence8_4_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+theorem rawSame8_4_2 : SameProtocolReceiptEvidence raw8_4_0 raw8_4_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_4_0 i) (raw8_4_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_4_0 raw8_4_2 rawSources8_4 rawSame8_4_2
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_4_0) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_4_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_4_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_4_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_4_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_4_0]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_4_1) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_4_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_4_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_4_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_4_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_4_1]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_4_2) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_4_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_4_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_4_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_4_2]
+  decide
 def evidence8_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_5_0 else AssetFixtures.agents8_5_0 i.val
 def evidence8_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_5_1 else AssetFixtures.agents8_5_1 i.val
 def evidence8_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_5_2 else AssetFixtures.agents8_5_2 i.val
 theorem sources8_5 : ProtocolSources world8 evidence8_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_5_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
-example := protocol_convergence world8 domain8 evidence8_5_0 sources8_5
+def raw8_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_5_0 i)
+theorem normalized8_5_0 : normalizeProtocolEvidence raw8_5_0 = evidence8_5_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_5_0 i = evidence8_5_0 i := by decide
+  exact funext checked
+def raw8_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_5_1 i)
+theorem normalized8_5_1 : normalizeProtocolEvidence raw8_5_1 = evidence8_5_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_5_1 i = evidence8_5_1 i := by decide
+  exact funext checked
+def raw8_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_5_2 i)
+theorem normalized8_5_2 : normalizeProtocolEvidence raw8_5_2 = evidence8_5_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_5_2 i = evidence8_5_2 i := by decide
+  exact funext checked
+theorem rawSources8_5 : ProtocolReceiptSources world8 raw8_5_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw8_5_0 i, ProtocolReceiptValid world8 i (raw8_5_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world8 domain8 raw8_5_0 rawSources8_5
 theorem same8_5_0 : SameProtocolEvidence evidence8_5_0 evidence8_5_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_5_0 i) (evidence8_5_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_5_0 evidence8_5_0 sources8_5 same8_5_0
+theorem rawSame8_5_0 : SameProtocolReceiptEvidence raw8_5_0 raw8_5_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_5_0 i) (raw8_5_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_5_0 raw8_5_0 rawSources8_5 rawSame8_5_0
 theorem same8_5_1 : SameProtocolEvidence evidence8_5_0 evidence8_5_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_5_0 i) (evidence8_5_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_5_0 evidence8_5_1 sources8_5 same8_5_1
+theorem rawSame8_5_1 : SameProtocolReceiptEvidence raw8_5_0 raw8_5_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_5_0 i) (raw8_5_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_5_0 raw8_5_1 rawSources8_5 rawSame8_5_1
 theorem same8_5_2 : SameProtocolEvidence evidence8_5_0 evidence8_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_5_0 i) (evidence8_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_5_0 evidence8_5_2 sources8_5 same8_5_2
-example : (reconcileProtocol world8 evidence8_5_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+theorem rawSame8_5_2 : SameProtocolReceiptEvidence raw8_5_0 raw8_5_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_5_0 i) (raw8_5_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_5_0 raw8_5_2 rawSources8_5 rawSame8_5_2
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_5_0) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_5_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_5_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_5_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_5_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_5_0]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_5_1) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_5_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_5_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_5_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_5_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_5_1]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_5_2) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_5_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_5_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_5_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_5_2]
+  decide
 def evidence8_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_6_0 else AssetFixtures.agents8_6_0 i.val
 def evidence8_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_6_1 else AssetFixtures.agents8_6_1 i.val
 def evidence8_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_6_2 else AssetFixtures.agents8_6_2 i.val
 theorem sources8_6 : ProtocolSources world8 evidence8_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_6_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
-example := protocol_convergence world8 domain8 evidence8_6_0 sources8_6
+def raw8_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_6_0 i)
+theorem normalized8_6_0 : normalizeProtocolEvidence raw8_6_0 = evidence8_6_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_6_0 i = evidence8_6_0 i := by decide
+  exact funext checked
+def raw8_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_6_1 i)
+theorem normalized8_6_1 : normalizeProtocolEvidence raw8_6_1 = evidence8_6_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_6_1 i = evidence8_6_1 i := by decide
+  exact funext checked
+def raw8_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_6_2 i)
+theorem normalized8_6_2 : normalizeProtocolEvidence raw8_6_2 = evidence8_6_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_6_2 i = evidence8_6_2 i := by decide
+  exact funext checked
+theorem rawSources8_6 : ProtocolReceiptSources world8 raw8_6_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw8_6_0 i, ProtocolReceiptValid world8 i (raw8_6_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world8 domain8 raw8_6_0 rawSources8_6
 theorem same8_6_0 : SameProtocolEvidence evidence8_6_0 evidence8_6_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_6_0 i) (evidence8_6_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_6_0 evidence8_6_0 sources8_6 same8_6_0
+theorem rawSame8_6_0 : SameProtocolReceiptEvidence raw8_6_0 raw8_6_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_6_0 i) (raw8_6_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_6_0 raw8_6_0 rawSources8_6 rawSame8_6_0
 theorem same8_6_1 : SameProtocolEvidence evidence8_6_0 evidence8_6_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_6_0 i) (evidence8_6_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_6_0 evidence8_6_1 sources8_6 same8_6_1
+theorem rawSame8_6_1 : SameProtocolReceiptEvidence raw8_6_0 raw8_6_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_6_0 i) (raw8_6_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_6_0 raw8_6_1 rawSources8_6 rawSame8_6_1
 theorem same8_6_2 : SameProtocolEvidence evidence8_6_0 evidence8_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_6_0 i) (evidence8_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_6_0 evidence8_6_2 sources8_6 same8_6_2
-example : (reconcileProtocol world8 evidence8_6_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+theorem rawSame8_6_2 : SameProtocolReceiptEvidence raw8_6_0 raw8_6_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw8_6_0 i) (raw8_6_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world8 raw8_6_0 raw8_6_2 rawSources8_6 rawSame8_6_2
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_6_0) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_6_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_6_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_6_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_6_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_6_0]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_6_1) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_6_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_6_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_6_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world8 evidence8_6_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_6_1]
+  decide
+example : (reconcileProtocol world8 (normalizeProtocolEvidence raw8_6_2) empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_6_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_6_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_6_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized8_6_2]
+  decide
 def agent9_0 : ProtocolAgent := ⟨AssetFixtures.spec9_0, AssetControllerFixtures.receipts18, AssetControllerFixtures.positions18, 1788998460000, AssetControllerFixtures.operationTime18, AssetControllerFixtures.chainFacts18, AssetControllerFixtures.documents18, AssetControllerFixtures.methods18, 2⟩
 theorem agentDomain9_0 : ProtocolAgentDomain agent9_0 := by
   refine ⟨AssetControllerFixtures.ordered18, AssetControllerFixtures.bounded18, AssetControllerFixtures.parents18, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree18, AssetControllerFixtures.ranks18, ?_, ?_⟩
@@ -2963,259 +5231,511 @@ def evidence9_0_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFi
 theorem sources9_0 : ProtocolSources world9 evidence9_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_0_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
-example := protocol_convergence world9 domain9 evidence9_0_0 sources9_0
+def raw9_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_0_0 i)
+theorem normalized9_0_0 : normalizeProtocolEvidence raw9_0_0 = evidence9_0_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_0_0 i = evidence9_0_0 i := by decide
+  exact funext checked
+def raw9_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_0_1 i)
+theorem normalized9_0_1 : normalizeProtocolEvidence raw9_0_1 = evidence9_0_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_0_1 i = evidence9_0_1 i := by decide
+  exact funext checked
+def raw9_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_0_2 i)
+theorem normalized9_0_2 : normalizeProtocolEvidence raw9_0_2 = evidence9_0_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_0_2 i = evidence9_0_2 i := by decide
+  exact funext checked
+theorem rawSources9_0 : ProtocolReceiptSources world9 raw9_0_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw9_0_0 i, ProtocolReceiptValid world9 i (raw9_0_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world9 domain9 raw9_0_0 rawSources9_0
 theorem same9_0_0 : SameProtocolEvidence evidence9_0_0 evidence9_0_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_0_0 i) (evidence9_0_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_0_0 evidence9_0_0 sources9_0 same9_0_0
+theorem rawSame9_0_0 : SameProtocolReceiptEvidence raw9_0_0 raw9_0_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_0_0 i) (raw9_0_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_0_0 raw9_0_0 rawSources9_0 rawSame9_0_0
 theorem same9_0_1 : SameProtocolEvidence evidence9_0_0 evidence9_0_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_0_0 i) (evidence9_0_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_0_0 evidence9_0_1 sources9_0 same9_0_1
+theorem rawSame9_0_1 : SameProtocolReceiptEvidence raw9_0_0 raw9_0_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_0_0 i) (raw9_0_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_0_0 raw9_0_1 rawSources9_0 rawSame9_0_1
 theorem same9_0_2 : SameProtocolEvidence evidence9_0_0 evidence9_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_0_0 i) (evidence9_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_0_0 evidence9_0_2 sources9_0 same9_0_2
-example : (reconcileProtocol world9 evidence9_0_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+theorem rawSame9_0_2 : SameProtocolReceiptEvidence raw9_0_0 raw9_0_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_0_0 i) (raw9_0_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_0_0 raw9_0_2 rawSources9_0 rawSame9_0_2
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_0_0) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_0_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_0_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_0_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_0_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_0_0]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_0_1) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_0_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_0_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_0_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_0_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_0_1]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_0_2) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_0_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_0_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_0_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_0_2]
+  decide
 def evidence9_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_1_0 else AssetFixtures.agents9_1_0 i.val
 def evidence9_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_1_1 else AssetFixtures.agents9_1_1 i.val
 def evidence9_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_1_2 else AssetFixtures.agents9_1_2 i.val
 theorem sources9_1 : ProtocolSources world9 evidence9_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_1_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
-example := protocol_convergence world9 domain9 evidence9_1_0 sources9_1
+def raw9_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_1_0 i)
+theorem normalized9_1_0 : normalizeProtocolEvidence raw9_1_0 = evidence9_1_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_1_0 i = evidence9_1_0 i := by decide
+  exact funext checked
+def raw9_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_1_1 i)
+theorem normalized9_1_1 : normalizeProtocolEvidence raw9_1_1 = evidence9_1_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_1_1 i = evidence9_1_1 i := by decide
+  exact funext checked
+def raw9_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_1_2 i)
+theorem normalized9_1_2 : normalizeProtocolEvidence raw9_1_2 = evidence9_1_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_1_2 i = evidence9_1_2 i := by decide
+  exact funext checked
+theorem rawSources9_1 : ProtocolReceiptSources world9 raw9_1_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw9_1_0 i, ProtocolReceiptValid world9 i (raw9_1_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world9 domain9 raw9_1_0 rawSources9_1
 theorem same9_1_0 : SameProtocolEvidence evidence9_1_0 evidence9_1_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_1_0 i) (evidence9_1_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_1_0 evidence9_1_0 sources9_1 same9_1_0
+theorem rawSame9_1_0 : SameProtocolReceiptEvidence raw9_1_0 raw9_1_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_1_0 i) (raw9_1_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_1_0 raw9_1_0 rawSources9_1 rawSame9_1_0
 theorem same9_1_1 : SameProtocolEvidence evidence9_1_0 evidence9_1_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_1_0 i) (evidence9_1_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_1_0 evidence9_1_1 sources9_1 same9_1_1
+theorem rawSame9_1_1 : SameProtocolReceiptEvidence raw9_1_0 raw9_1_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_1_0 i) (raw9_1_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_1_0 raw9_1_1 rawSources9_1 rawSame9_1_1
 theorem same9_1_2 : SameProtocolEvidence evidence9_1_0 evidence9_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_1_0 i) (evidence9_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_1_0 evidence9_1_2 sources9_1 same9_1_2
-example : (reconcileProtocol world9 evidence9_1_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+theorem rawSame9_1_2 : SameProtocolReceiptEvidence raw9_1_0 raw9_1_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_1_0 i) (raw9_1_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_1_0 raw9_1_2 rawSources9_1 rawSame9_1_2
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_1_0) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_1_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_1_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_1_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_1_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_1_0]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_1_1) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_1_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_1_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_1_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_1_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_1_1]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_1_2) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_1_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_1_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_1_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_1_2]
+  decide
 def evidence9_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_2_0 else AssetFixtures.agents9_2_0 i.val
 def evidence9_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_2_1 else AssetFixtures.agents9_2_1 i.val
 def evidence9_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_2_2 else AssetFixtures.agents9_2_2 i.val
 theorem sources9_2 : ProtocolSources world9 evidence9_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_2_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
-example := protocol_convergence world9 domain9 evidence9_2_0 sources9_2
+def raw9_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_2_0 i)
+theorem normalized9_2_0 : normalizeProtocolEvidence raw9_2_0 = evidence9_2_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_2_0 i = evidence9_2_0 i := by decide
+  exact funext checked
+def raw9_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_2_1 i)
+theorem normalized9_2_1 : normalizeProtocolEvidence raw9_2_1 = evidence9_2_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_2_1 i = evidence9_2_1 i := by decide
+  exact funext checked
+def raw9_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_2_2 i)
+theorem normalized9_2_2 : normalizeProtocolEvidence raw9_2_2 = evidence9_2_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_2_2 i = evidence9_2_2 i := by decide
+  exact funext checked
+theorem rawSources9_2 : ProtocolReceiptSources world9 raw9_2_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw9_2_0 i, ProtocolReceiptValid world9 i (raw9_2_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world9 domain9 raw9_2_0 rawSources9_2
 theorem same9_2_0 : SameProtocolEvidence evidence9_2_0 evidence9_2_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_2_0 i) (evidence9_2_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_2_0 evidence9_2_0 sources9_2 same9_2_0
+theorem rawSame9_2_0 : SameProtocolReceiptEvidence raw9_2_0 raw9_2_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_2_0 i) (raw9_2_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_2_0 raw9_2_0 rawSources9_2 rawSame9_2_0
 theorem same9_2_1 : SameProtocolEvidence evidence9_2_0 evidence9_2_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_2_0 i) (evidence9_2_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_2_0 evidence9_2_1 sources9_2 same9_2_1
+theorem rawSame9_2_1 : SameProtocolReceiptEvidence raw9_2_0 raw9_2_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_2_0 i) (raw9_2_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_2_0 raw9_2_1 rawSources9_2 rawSame9_2_1
 theorem same9_2_2 : SameProtocolEvidence evidence9_2_0 evidence9_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_2_0 i) (evidence9_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_2_0 evidence9_2_2 sources9_2 same9_2_2
-example : (reconcileProtocol world9 evidence9_2_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+theorem rawSame9_2_2 : SameProtocolReceiptEvidence raw9_2_0 raw9_2_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_2_0 i) (raw9_2_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_2_0 raw9_2_2 rawSources9_2 rawSame9_2_2
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_2_0) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_2_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_2_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_2_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_2_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_2_0]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_2_1) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_2_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_2_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_2_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_2_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_2_1]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_2_2) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_2_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_2_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_2_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_2_2]
+  decide
 def evidence9_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_3_0 else AssetFixtures.agents9_3_0 i.val
 def evidence9_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_3_1 else AssetFixtures.agents9_3_1 i.val
 def evidence9_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_3_2 else AssetFixtures.agents9_3_2 i.val
 theorem sources9_3 : ProtocolSources world9 evidence9_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_3_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
-example := protocol_convergence world9 domain9 evidence9_3_0 sources9_3
+def raw9_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_3_0 i)
+theorem normalized9_3_0 : normalizeProtocolEvidence raw9_3_0 = evidence9_3_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_3_0 i = evidence9_3_0 i := by decide
+  exact funext checked
+def raw9_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_3_1 i)
+theorem normalized9_3_1 : normalizeProtocolEvidence raw9_3_1 = evidence9_3_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_3_1 i = evidence9_3_1 i := by decide
+  exact funext checked
+def raw9_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_3_2 i)
+theorem normalized9_3_2 : normalizeProtocolEvidence raw9_3_2 = evidence9_3_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_3_2 i = evidence9_3_2 i := by decide
+  exact funext checked
+theorem rawSources9_3 : ProtocolReceiptSources world9 raw9_3_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw9_3_0 i, ProtocolReceiptValid world9 i (raw9_3_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world9 domain9 raw9_3_0 rawSources9_3
 theorem same9_3_0 : SameProtocolEvidence evidence9_3_0 evidence9_3_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_3_0 i) (evidence9_3_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_3_0 evidence9_3_0 sources9_3 same9_3_0
+theorem rawSame9_3_0 : SameProtocolReceiptEvidence raw9_3_0 raw9_3_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_3_0 i) (raw9_3_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_3_0 raw9_3_0 rawSources9_3 rawSame9_3_0
 theorem same9_3_1 : SameProtocolEvidence evidence9_3_0 evidence9_3_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_3_0 i) (evidence9_3_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_3_0 evidence9_3_1 sources9_3 same9_3_1
+theorem rawSame9_3_1 : SameProtocolReceiptEvidence raw9_3_0 raw9_3_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_3_0 i) (raw9_3_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_3_0 raw9_3_1 rawSources9_3 rawSame9_3_1
 theorem same9_3_2 : SameProtocolEvidence evidence9_3_0 evidence9_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_3_0 i) (evidence9_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_3_0 evidence9_3_2 sources9_3 same9_3_2
-example : (reconcileProtocol world9 evidence9_3_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+theorem rawSame9_3_2 : SameProtocolReceiptEvidence raw9_3_0 raw9_3_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_3_0 i) (raw9_3_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_3_0 raw9_3_2 rawSources9_3 rawSame9_3_2
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_3_0) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_3_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_3_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_3_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_3_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_3_0]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_3_1) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_3_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_3_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_3_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_3_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_3_1]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_3_2) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_3_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_3_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_3_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_3_2]
+  decide
 def evidence9_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_4_0 else AssetFixtures.agents9_4_0 i.val
 def evidence9_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_4_1 else AssetFixtures.agents9_4_1 i.val
 def evidence9_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_4_2 else AssetFixtures.agents9_4_2 i.val
 theorem sources9_4 : ProtocolSources world9 evidence9_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_4_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
-example := protocol_convergence world9 domain9 evidence9_4_0 sources9_4
+def raw9_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_4_0 i)
+theorem normalized9_4_0 : normalizeProtocolEvidence raw9_4_0 = evidence9_4_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_4_0 i = evidence9_4_0 i := by decide
+  exact funext checked
+def raw9_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_4_1 i)
+theorem normalized9_4_1 : normalizeProtocolEvidence raw9_4_1 = evidence9_4_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_4_1 i = evidence9_4_1 i := by decide
+  exact funext checked
+def raw9_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_4_2 i)
+theorem normalized9_4_2 : normalizeProtocolEvidence raw9_4_2 = evidence9_4_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_4_2 i = evidence9_4_2 i := by decide
+  exact funext checked
+theorem rawSources9_4 : ProtocolReceiptSources world9 raw9_4_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw9_4_0 i, ProtocolReceiptValid world9 i (raw9_4_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world9 domain9 raw9_4_0 rawSources9_4
 theorem same9_4_0 : SameProtocolEvidence evidence9_4_0 evidence9_4_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_4_0 i) (evidence9_4_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_4_0 evidence9_4_0 sources9_4 same9_4_0
+theorem rawSame9_4_0 : SameProtocolReceiptEvidence raw9_4_0 raw9_4_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_4_0 i) (raw9_4_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_4_0 raw9_4_0 rawSources9_4 rawSame9_4_0
 theorem same9_4_1 : SameProtocolEvidence evidence9_4_0 evidence9_4_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_4_0 i) (evidence9_4_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_4_0 evidence9_4_1 sources9_4 same9_4_1
+theorem rawSame9_4_1 : SameProtocolReceiptEvidence raw9_4_0 raw9_4_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_4_0 i) (raw9_4_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_4_0 raw9_4_1 rawSources9_4 rawSame9_4_1
 theorem same9_4_2 : SameProtocolEvidence evidence9_4_0 evidence9_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_4_0 i) (evidence9_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_4_0 evidence9_4_2 sources9_4 same9_4_2
-example : (reconcileProtocol world9 evidence9_4_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+theorem rawSame9_4_2 : SameProtocolReceiptEvidence raw9_4_0 raw9_4_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_4_0 i) (raw9_4_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_4_0 raw9_4_2 rawSources9_4 rawSame9_4_2
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_4_0) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_4_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_4_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_4_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_4_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_4_0]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_4_1) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_4_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_4_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_4_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_4_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_4_1]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_4_2) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_4_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_4_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_4_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_4_2]
+  decide
 def evidence9_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_5_0 else AssetFixtures.agents9_5_0 i.val
 def evidence9_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_5_1 else AssetFixtures.agents9_5_1 i.val
 def evidence9_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_5_2 else AssetFixtures.agents9_5_2 i.val
 theorem sources9_5 : ProtocolSources world9 evidence9_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_5_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
-example := protocol_convergence world9 domain9 evidence9_5_0 sources9_5
+def raw9_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_5_0 i)
+theorem normalized9_5_0 : normalizeProtocolEvidence raw9_5_0 = evidence9_5_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_5_0 i = evidence9_5_0 i := by decide
+  exact funext checked
+def raw9_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_5_1 i)
+theorem normalized9_5_1 : normalizeProtocolEvidence raw9_5_1 = evidence9_5_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_5_1 i = evidence9_5_1 i := by decide
+  exact funext checked
+def raw9_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_5_2 i)
+theorem normalized9_5_2 : normalizeProtocolEvidence raw9_5_2 = evidence9_5_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_5_2 i = evidence9_5_2 i := by decide
+  exact funext checked
+theorem rawSources9_5 : ProtocolReceiptSources world9 raw9_5_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw9_5_0 i, ProtocolReceiptValid world9 i (raw9_5_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world9 domain9 raw9_5_0 rawSources9_5
 theorem same9_5_0 : SameProtocolEvidence evidence9_5_0 evidence9_5_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_5_0 i) (evidence9_5_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_5_0 evidence9_5_0 sources9_5 same9_5_0
+theorem rawSame9_5_0 : SameProtocolReceiptEvidence raw9_5_0 raw9_5_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_5_0 i) (raw9_5_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_5_0 raw9_5_0 rawSources9_5 rawSame9_5_0
 theorem same9_5_1 : SameProtocolEvidence evidence9_5_0 evidence9_5_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_5_0 i) (evidence9_5_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_5_0 evidence9_5_1 sources9_5 same9_5_1
+theorem rawSame9_5_1 : SameProtocolReceiptEvidence raw9_5_0 raw9_5_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_5_0 i) (raw9_5_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_5_0 raw9_5_1 rawSources9_5 rawSame9_5_1
 theorem same9_5_2 : SameProtocolEvidence evidence9_5_0 evidence9_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_5_0 i) (evidence9_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_5_0 evidence9_5_2 sources9_5 same9_5_2
-example : (reconcileProtocol world9 evidence9_5_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+theorem rawSame9_5_2 : SameProtocolReceiptEvidence raw9_5_0 raw9_5_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_5_0 i) (raw9_5_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_5_0 raw9_5_2 rawSources9_5 rawSame9_5_2
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_5_0) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_5_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_5_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_5_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_5_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_5_0]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_5_1) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_5_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_5_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_5_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_5_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_5_1]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_5_2) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_5_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_5_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_5_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_5_2]
+  decide
 def evidence9_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_6_0 else AssetFixtures.agents9_6_0 i.val
 def evidence9_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_6_1 else AssetFixtures.agents9_6_1 i.val
 def evidence9_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_6_2 else AssetFixtures.agents9_6_2 i.val
 theorem sources9_6 : ProtocolSources world9 evidence9_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_6_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
-example := protocol_convergence world9 domain9 evidence9_6_0 sources9_6
+def raw9_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_6_0 i)
+theorem normalized9_6_0 : normalizeProtocolEvidence raw9_6_0 = evidence9_6_0 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_6_0 i = evidence9_6_0 i := by decide
+  exact funext checked
+def raw9_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_6_1 i)
+theorem normalized9_6_1 : normalizeProtocolEvidence raw9_6_1 = evidence9_6_1 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_6_1 i = evidence9_6_1 i := by decide
+  exact funext checked
+def raw9_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
+  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_6_2 i)
+theorem normalized9_6_2 : normalizeProtocolEvidence raw9_6_2 = evidence9_6_2 := by
+  have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_6_2 i = evidence9_6_2 i := by decide
+  exact funext checked
+theorem rawSources9_6 : ProtocolReceiptSources world9 raw9_6_0 := by
+  have checked : ∀ i : Fin 4, ∀ receipt ∈ raw9_6_0 i, ProtocolReceiptValid world9 i (raw9_6_0 i) receipt := by decide
+  exact checked
+example := protocol_convergence world9 domain9 raw9_6_0 rawSources9_6
 theorem same9_6_0 : SameProtocolEvidence evidence9_6_0 evidence9_6_0 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_6_0 i) (evidence9_6_0 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_6_0 evidence9_6_0 sources9_6 same9_6_0
+theorem rawSame9_6_0 : SameProtocolReceiptEvidence raw9_6_0 raw9_6_0 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_6_0 i) (raw9_6_0 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_6_0 raw9_6_0 rawSources9_6 rawSame9_6_0
 theorem same9_6_1 : SameProtocolEvidence evidence9_6_0 evidence9_6_1 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_6_0 i) (evidence9_6_1 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_6_0 evidence9_6_1 sources9_6 same9_6_1
+theorem rawSame9_6_1 : SameProtocolReceiptEvidence raw9_6_0 raw9_6_1 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_6_0 i) (raw9_6_1 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_6_0 raw9_6_1 rawSources9_6 rawSame9_6_1
 theorem same9_6_2 : SameProtocolEvidence evidence9_6_0 evidence9_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_6_0 i) (evidence9_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_6_0 evidence9_6_2 sources9_6 same9_6_2
-example : (reconcileProtocol world9 evidence9_6_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+theorem rawSame9_6_2 : SameProtocolReceiptEvidence raw9_6_0 raw9_6_2 := by
+  have checked : ∀ i : Fin 4, sameProtocolReceiptCheck (raw9_6_0 i) (raw9_6_2 i) = true := by decide
+  exact fun i => same_protocol_receipts_of_check _ _ (checked i)
+example := protocol_receipt_sources_shared world9 raw9_6_0 raw9_6_2 rawSources9_6 rawSame9_6_2
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_6_0) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_6_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_6_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_6_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_6_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_6_0]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_6_1) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_6_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_6_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_6_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
-example : (reconcileProtocol world9 evidence9_6_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_6_1]
+  decide
+example : (reconcileProtocol world9 (normalizeProtocolEvidence raw9_6_2) empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
   let result0 ← some none
   let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_6_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
   let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_6_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
   let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_6_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
-  pure [result0, result1, result2, result3]) := by decide
+  pure [result0, result1, result2, result3]) := by
+  rw [normalized9_6_2]
+  decide
 def localClockSource0 : AgentSourceReceipt Nat := ⟨⟨0, 0, none⟩, 0⟩
 example (a : AnchorModel) (facts : Nat → ChainReceiptView) :
     agentReceiptView a (fun _ => some 1)

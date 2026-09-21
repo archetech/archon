@@ -202,13 +202,16 @@ not universal executable refinement. See the [audit](asset-controller-convergenc
   Close #1215 when A1–C3 are satisfied; do not hold it open for the separate work below.
 
 C1–C3 are implemented in #1241. The composed theorem and settled-evidence
-corollary are checked, with complete semantic-family comparisons in the signed
-bridge. The C2 audit found two signed counterexamples, both corrected under the
-2026-09-21 maintainer decisions: intrinsic local clocks at direct submission,
-import and recovery; and chain-based controller selection only for chain
-registries. Both ports test reversed receipt order and repair of old projections.
+corollary include receipt normalization before agent/asset reconciliation. The
+2026-09-21 maintainer decisions resolve the signed C2 counterexamples: intrinsic
+local clocks; chain context only for chain registries; and preference for
+metadata-bearing copies at the same operation/registry/chain position before
+authorization. Incomplete copies remain accepted when no richer copy is known.
+Both ports test recovery and rejection without fallback to a weaker receipt.
+The top-level theorem binds decoded headers and derives metadata completeness
+from received copies, and its shared signed bridge includes both copy orders.
 The [final audit](protocol-convergence-theorem.md) records the exact premises,
-theorem dependencies, checked bridge and unchanged completion criteria.
+theorem dependencies, bridge and unchanged completion criteria.
 
 ## Separate work, not prerequisites for this claim
 

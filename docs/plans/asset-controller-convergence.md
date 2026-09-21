@@ -1,6 +1,6 @@
 # Asset/controller convergence (B1–B3)
 
-This document covers the B1–B3 work area of the fixed [completion contract](protocol-convergence-completion.md). A1–A4 are merged in #1237. B1 is merged in #1238. B2 is merged in #1239. B3 is complete at the signed-bridge boundary in this change. C1–C3 are implemented in the [final theorem work](protocol-convergence-theorem.md), including both approved clock/receipt-authority corrections.
+This document covers the B1–B3 work area of the fixed [completion contract](protocol-convergence-completion.md). A1–A4 are merged in #1237. B1 is merged in #1238. B2 is merged in #1239. B3 is complete at the signed-bridge boundary in this change. C1–C3 are implemented in the [final theorem work](protocol-convergence-theorem.md), including the approved clock, chain-context and richer-receipt corrections.
 
 ## Architecture audit
 

@@ -23,8 +23,15 @@ for (const vector of vectors) {
                     for (const { registry, block } of vector.blocks) await gatekeeper.addBlock(registry, block);
                     for (const stage of stages) {
                         for (const index of stage.orders[order]) {
-                            await gatekeeper.importBatch([structuredClone(vector.events[index])]);
-                            await gatekeeper.processEvents();
+                            const event = structuredClone(vector.events[index]);
+                            const weak = structuredClone(event);
+                            delete weak.registration;
+                            const copies = event.registration && !['local', 'hyperswarm', 'pin'].includes(event.registry)
+                                ? (order === 1 ? [event, weak] : [weak, event]) : [event];
+                            for (const copy of copies) {
+                                await gatekeeper.importBatch([copy]);
+                                await gatekeeper.processEvents();
+                            }
                         }
                         for (const phase of ['initial', 'repeat', 'restart']) {
                             if (phase === 'repeat') {

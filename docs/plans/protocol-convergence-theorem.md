@@ -57,12 +57,47 @@ repairs a previously accepted projection on startup without changing its evidenc
 This enforces the composed model's anchorless authorization boundary rather than
 excluding the demonstrated input through a stronger premise.
 
+## Repeated chain-receipt metadata correction
+
+The signed `chain-registration-counterexample.json` audit supplies the same
+controller genesis twice at the same BTC registry, time and ordinal, with identical
+signed operation bytes. One copy omits event `registration`, which the documented
+import format permits; the other includes it. Parent and rotation operations are
+otherwise identical. A chain-anchored asset uses the old key at its earlier chain
+position, while its proof time falls after the rotation.
+
+TypeScript missing-metadata-first delivery makes the controller fail `isAnchored`
+and rejects the asset at proof time; metadata-first uses chain authority and
+accepts it. Rust exhibits the reverse order dependence. Both ports preserve their
+opposite verdicts after reconstruction. Candidate merging and accepted-history
+replay choose representations differently, without a shared deterministic policy. This is a signed admitted-input counterexample,
+not an observed production incident. The fixed chain snapshot supplies the same
+time and position in both orders; optional metadata completeness is the difference.
+
+On 2026-09-21 the maintainer approved preferring the metadata-bearing copy at
+the same operation/registry/chain position before authorization and replay.
+Both Gatekeepers now preserve that preferred candidate during ingress and recovery,
+reauthorize enriched confirmations, and prevent incomplete copies from erasing it.
+Incomplete-only receipts remain admitted. Signed cases check both dependent-asset
+recovery and rejection when the richer receipt is unauthorized; rejection cannot
+fall back to the weaker receipt's proof-time context.
+
+`ProtocolReceipts.lean` makes this preprocessing part of the proof input.
+`ProtocolReceipt` exposes decoded chain headers separately from bookkeeping.
+`ProtocolReceiptSources` binds registry/ordinal/time to the fixed chain facts and
+binds canonical metadata presence to `metadataAvailable`, an existential over the
+actual received copies. `normalizeProtocolReceipts` filters weaker copies before
+controller/asset authorization. Same receipt evidence derives the same completeness
+and normalized source keys. The public `protocol_convergence` requires that
+binding and composes normalization with `protocol_normalized_convergence`; it no
+longer assumes identical optional metadata presence on every raw copy.
+
 ## Exact claim
 
 Fix complete canonical operation content, normalized predecessor references,
 protocol configuration, and an authoritative chain snapshot. For any finite
 retained evidence set satisfying the source contracts below, there is exactly one
-semantic result. Every enumeration with the same receipt identities, irrespective
+semantic result. Every enumeration with the same decoded receipt identities/headers, irrespective
 of order, repetition or first-observation bookkeeping, reconstructs to that result
 and stops. Previously published histories are not inputs to authorization.
 
@@ -94,7 +129,7 @@ absent specification. Only agent slots can enter the controller table; unknown
 owners and asset DIDs cannot authorize assets. Agent graphs have self-controlled
 predecessor-key authority and no external controller dependency.
 
-`reconcileProtocol` executes every agent replay with `collectFinite`, then executes
+`normalizeProtocolEvidence` first selects the richer copies; `reconcileProtocol` then executes every agent replay with `collectFinite`, then executes
 every asset replay using **the histories that the agent phase returned**. Each
 replay starts empty and uses the existing full-record `stopWhenStable` loop,
 including late genesis, suffix replacement, confirmation changes and duplicate
@@ -131,12 +166,12 @@ one finite fixture happens to satisfy.
 | Cryptographic primitives | Per-operation/per-key validity is shared. Predecessor history chooses the key, named-method lookup chooses the method, and historical controller selection chooses the owner version. Neither accepted operations nor final authorizations are supplied. Legacy and DataIntegrityProof formats share this boundary; complete proof bytes remain part of canonical identity even where legacy signatures do not cover proof configuration. |
 | Genesis and immutable kind | Valid agent creation is self-signed, starts active and has no predecessor. Asset creation has no update proposal/deletion. Context-free malformed shapes do not acquire graph authority. The typed table fixes the genesis kind, and only agents appear in owner lookup. This is enforced in both Gatekeepers' operation authorization. |
 | Document projection | `ProtocolAgentDomain.methods` connects the complete document returned in the result to the exact method list used by authorization. Asset owner and document payload come from the same `AssetDocument`. Registration-name lookup uses the same full registration values returned by the component fold. |
-| Authoritative chain facts | Registry, complete nonempty ordinal, block time and registration presence belong to the fixed chain view. The receipt-class registry/position projections are checked. Same registry/ordinal/CID is one ordering class with the same authoritative facts, not a uniqueness assumption about ordinals. Conflicting chain views are different input snapshots. |
+| Authoritative chain facts | Registry, complete nonempty ordinal and block time belong to the fixed chain view. Optional registration presence is derived from received copies before authorization. The receipt-class registry/position projections are checked. Same registry/ordinal/CID is one ordering class with the same authoritative clock/position, not a uniqueness assumption about ordinals; raw copies may differ in metadata completeness. Conflicting chain views are different input snapshots. |
 | Ordinal admission | Both ordinary import and replay require nonempty chain positions after #1236. `ProtocolSources` checks that an anchor is in range, belongs to the source operation and registry, and denotes a chain registry. Unpositioned local/Hyperswarm/pin remain permitted. A chain relay is downgraded to a gossip hint before this domain. Wrong-chain positioned receipts remain permitted provisional evidence. |
 | Receipt ordering | `RegistryCidRanks` and `AssetCidRanks` interpret registry-local ordinal then canonical CID. Tied positions for distinct operations are admitted. Repeated identical operation/position classes share ranks; different anchors remain distinct. Only predecessor-registry anchors receive chain priority. Unanchored and wrong-chain evidence uses canonical CID priority. |
 | Unanchored clock | Hyperswarm and pin clocks are normalized to `proof.created` at import and retained-candidate recovery. Local producer clocks are operation-intrinsic: creation `created`, update/deletion `proof.created` (Gatekeeper specification §8.1–8.2). This does not assume equal local arrival times. Both ports now enforce the local clock rule at ordinary import and recovery too; unanchored registration metadata cannot select chain authority. Agent/asset receipt clocks are derived from creation and proof fields, including genesis. |
-| Registry configuration | Nodes agree on registry-name projection and classification; these are not a closed supported-chain allowlist. Local/Hyperswarm/pin have no chain priority. The separate local-owner/nonlocal-asset creation restriction remains active. |
-| Same retained evidence | Same operation/registry/anchor-class key sets per DID. Arrival order, duplicate count and arbitrary bookkeeping may differ. The source-admission contract is preserved by this equivalence. Candidate retention is separate from accepted projection: rejected/deferred evidence is reconsidered. Equal operation bytes with different known anchors do not meet this premise. |
+| Registry configuration | Nodes agree on registry-name projection and classification; these are not a closed supported-chain allowlist. The `localRegistry` atom is the shared name decoder's image of the literal `local` registry (the signed bridge uses `names.indexOf('local')`). Local/Hyperswarm/pin have no chain priority. The separate local-owner/nonlocal-asset creation restriction remains active. |
+| Same retained evidence | Same decoded operation/registry/anchor-class/header sets per DID, including the available completeness observations. Arrival order, duplicate count and arbitrary bookkeeping may differ. The source-admission contract is preserved by this equivalence. Candidate retention is separate from accepted projection: rejected/deferred evidence is reconsidered. Equal operation bytes with different known anchors do not meet this premise. |
 | Complete reconciliation | Independent agents precede assets; assets cannot control agents or other assets. The theorem executes this schedule over any finite family and proves termination. Dynamic imports must eventually invoke complete reconciliation after evidence settles. |
 
 The local-clock condition now follows from the approved import/recovery normalization as well as the documented direct-operation producer: TypeScript `createDID`/`updateDID` and Rust's
@@ -149,8 +184,9 @@ The implementation architecture remains the audited A/B architecture: mediators
 produce chain positions; Gatekeeper normalizes and journals candidates; event
 authorization selects historical controllers; low-level verification receives the
 selected document; reconstruction publishes agents before dependent assets.
-The two approved runtime corrections normalize local clocks and require an actual
-chain registry for chain-based controller selection.
+The three approved runtime corrections normalize local clocks, require an actual
+chain registry for chain-based controller selection, and select richer same-position
+receipts before authorization.
 The paused #1156 relationship-permission rule remains paused.
 
 ## C3 checked bridge and CI
@@ -158,7 +194,8 @@ The paused #1156 relationship-permission rule remains paused.
 `ProtocolFixtures.lean` is generated from the same signed source vectors used by
 B3. It builds finite typed families containing both agents, the asset and a missing
 owner slot, checks complete graph/document/receipt/source contracts, and applies
-`protocol_convergence` to all 70 evidence stages. It checks three delivery orders
+`protocol_convergence` to all 70 evidence stages. Each stage includes metadata-free copies of its complete chain receipts in both
+copy orders, in Lean and both runtime ports. It checks three delivery orders
 per stage and evaluates every DID’s full semantic result in every order against the independently
 stopped A/B components, including agent documents/deactivation and both receipt views. This ties execution of the agent phase to
 asset execution, not just two unrelated result tables. Agent migrations and the

@@ -922,6 +922,14 @@ if their envelopes include registration metadata or ordinals. Those fields stay
 in retained evidence but do not confer chain authority. Startup reconstruction
 uses the same rule and reauthorizes previously accepted dependent assets.
 
+Same-position chain candidates are identified by canonical operation CID,
+registry and complete ordinal. Prefer a copy carrying `registration` over one
+without it, before authorization; event time belongs to the chain facts rather
+than arrival identity. Incomplete copies alone remain admitted. Enrichment can
+replace an accepted same-position receipt only after reauthorization, and must
+replay affected histories. Once the richer copy is known, a rejected operation
+cannot fall back to the incomplete copy. Recovery applies the same preference.
+
 ### 8.1 `importBatch(events)`
 
 ```
@@ -1019,13 +1027,16 @@ The following is the insertion algorithm reused during replay:
 
 ```
 1. normalize event.did, canonical event.opid, and unanchored event.time from the operation
+   select the preferred retained same-position chain receipt before authorization
 2. acquire per-DID lock
 3. current = store.get_events(did); derive any missing canonical operation IDs
 4. if any current event has opid == event.opid:
        expectedRegistry = expected_registry_for_index(current, index_of_match)
        earlierAnchor = expectedRegistry is a chain registry and event.registry == expectedRegistry
            and both ordinals exist and compare_ordinals(event.ordinal, current[match].ordinal) < 0
-       if current[match].registry == expectedRegistry and not earlierAnchor: return MERGED
+       richerAnchor = incoming and current refer to the same chain position
+           and incoming has registration metadata and current does not
+       if current[match].registry == expectedRegistry and not earlierAnchor and not richerAnchor: return MERGED
        if event.registry == expectedRegistry:
            previous = selected predecessor document, or none for creation
            authorize_operation(event.operation, previous, event)
