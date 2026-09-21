@@ -1,3 +1,4 @@
+import { assertUniqueMethodIds } from './method-ids.mjs';
 import { isDeepStrictEqual } from 'node:util';
 
 // Structural bridge only: signature validity is independently computed from
@@ -46,6 +47,7 @@ export function documentGraph(vector, components = false, registry = 'hyperswarm
         const doc = op.doc.didDocument;
         if (!doc || doc.id !== did || !Array.isArray(doc.verificationMethod)
             || Object.keys(doc).some(k => ![...['@context', 'id', 'verificationMethod', 'authentication', 'assertionMethod', 'capabilityInvocation'], ...(components ? ['service', 'alsoKnownAs'] : [])].includes(k))) throw new Error('Outside document model');
+        assertUniqueMethodIds(doc);
         return doc.verificationMethod.map(method => {
             if (method.controller !== did || method.type !== 'EcdsaSecp256k1VerificationKey2019'
                 || Object.keys(method).some(k => !['id', 'controller', 'type', 'publicKeyJwk'].includes(k))) throw new Error('Unsupported verification method');

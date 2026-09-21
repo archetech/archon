@@ -623,6 +623,14 @@ operation would be retried forever instead of rejected. An **absent**
 `verificationMethod` is the structural error and does defer, because it is what
 a controller that has not been imported yet looks like.
 
+Within each DID document, verification-method IDs MUST be unique after resolving
+relative fragment IDs against that document's DID. For example, `#key-1` and
+`<did>#key-1` denote the same method and cannot both be listed, even with the
+same public key. This applies to agent and asset documents. Distinct method names
+may share a key, and a later document version may replace the key under an existing
+name. Direct submission, import, and verified replay reject replacements that
+violate this rule; signed operation bytes are never rewritten.
+
 ### 5.4 Operation size limit
 
 `JSON.stringify(operation).length <= 64 * 1024` (character count, not byte
@@ -897,6 +905,7 @@ distinguish local GC from signed deletion and identify paused policy changes.
 4. Agents use their own predecessor document. Assets resolve their owner
    at the authorization cutoff; that owner must be an active, self-controlled
    agent. There is no recursive traversal through assets or externally controlled agents.
+   Reject duplicate normalized verification-method IDs in the resulting document (see §5.3).
    Validate the resulting document: agents may omit `controller` or name themselves;
    assets must retain an agent owner, including on transfer. The previous owner
    authorizes a transfer. Use the immutable creation type to classify the DID, even when the registration component is omitted. A supplied registration replaces the whole component and must retain genesis version, type, and prefix while providing a valid registry.

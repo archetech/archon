@@ -12,6 +12,7 @@ on:
       - 'packages/gatekeeper/**'
       - 'tests/gatekeeper/convergence.test.ts'
       - 'tests/gatekeeper/event-targets.test.ts'
+      - 'tests/gatekeeper/method-ids.test.ts'
       - 'tests/gatekeeper/agent-convergence.test.ts'
       - 'tests/gatekeeper/chain-convergence.test.ts'
       - 'tests/gatekeeper/chain-successors.test.ts'
@@ -40,6 +41,7 @@ on:
       - 'packages/gatekeeper/**'
       - 'tests/gatekeeper/convergence.test.ts'
       - 'tests/gatekeeper/event-targets.test.ts'
+      - 'tests/gatekeeper/method-ids.test.ts'
       - 'tests/gatekeeper/agent-convergence.test.ts'
       - 'tests/gatekeeper/chain-convergence.test.ts'
       - 'tests/gatekeeper/chain-successors.test.ts'
@@ -101,7 +103,8 @@ jobs:
           node tests/convergence/generate-asset-vectors.mjs
           node tests/convergence/generate-pin-receipt-counterexample.mjs
           node tests/convergence/generate-event-target-vectors.mjs
-          git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json tests/convergence/document-vectors.json tests/convergence/component-vectors.json tests/convergence/chain-anchor-vectors.json tests/convergence/chain-successor-vectors.json tests/convergence/chain-document-vectors.json tests/convergence/migration-vectors.json tests/convergence/tied-anchor-vectors.json tests/convergence/controller-view-vectors.json tests/convergence/integrated-agent-vectors.json tests/convergence/pin-receipt-counterexample.json tests/convergence/asset-vectors.json tests/convergence/event-target-vectors.json
+          node tests/convergence/generate-method-id-vectors.mjs
+          git diff --exit-code -- tests/convergence/vectors.json tests/convergence/agent-vectors.json tests/convergence/document-vectors.json tests/convergence/component-vectors.json tests/convergence/chain-anchor-vectors.json tests/convergence/chain-successor-vectors.json tests/convergence/chain-document-vectors.json tests/convergence/migration-vectors.json tests/convergence/tied-anchor-vectors.json tests/convergence/controller-view-vectors.json tests/convergence/integrated-agent-vectors.json tests/convergence/pin-receipt-counterexample.json tests/convergence/asset-vectors.json tests/convergence/event-target-vectors.json tests/convergence/method-id-vectors.json
       - name: Check shared fixture bridge
         run: |
           node --test proofs/agent-convergence/generate-fixtures.test.mjs proofs/agent-convergence/generate-agent-fixtures.test.mjs proofs/agent-convergence/generate-document-fixtures.test.mjs proofs/agent-convergence/generate-component-fixtures.test.mjs proofs/agent-convergence/generate-chain-anchor-fixtures.test.mjs proofs/agent-convergence/generate-chain-successor-fixtures.test.mjs proofs/agent-convergence/generate-interleaved-fixtures.test.mjs proofs/agent-convergence/generate-priority-fixtures.test.mjs proofs/agent-convergence/generate-interleaved-document-fixtures.test.mjs proofs/agent-convergence/generate-chain-document-fixtures.test.mjs proofs/agent-convergence/generate-registry-fixtures.test.mjs proofs/agent-convergence/generate-registry-interleaved-fixtures.test.mjs tests/convergence/migration-model.test.mjs proofs/agent-convergence/generate-integrated-agent-fixtures.test.mjs proofs/agent-convergence/generate-asset-fixtures.test.mjs proofs/agent-convergence/generate-protocol-fixtures.test.mjs
@@ -130,7 +133,7 @@ jobs:
       - name: Check signed agent authorization
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/agent-convergence.test.ts --runInBand --coverage=false
       - name: Check repeated chain anchors
-        run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/chain-convergence.test.ts tests/gatekeeper/chain-successors.test.ts tests/gatekeeper/controller-view.test.ts tests/gatekeeper/chain-ordinals.test.ts tests/gatekeeper/interleaved-replay.test.ts tests/gatekeeper/integrated-agent.test.ts tests/gatekeeper/pin-receipt-audit.test.ts tests/gatekeeper/local-receipt-audit.test.ts tests/gatekeeper/local-registration-audit.test.ts tests/gatekeeper/chain-registration-audit.test.ts tests/gatekeeper/event-targets.test.ts --runInBand --coverage=false
+        run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/chain-convergence.test.ts tests/gatekeeper/chain-successors.test.ts tests/gatekeeper/controller-view.test.ts tests/gatekeeper/chain-ordinals.test.ts tests/gatekeeper/interleaved-replay.test.ts tests/gatekeeper/integrated-agent.test.ts tests/gatekeeper/pin-receipt-audit.test.ts tests/gatekeeper/local-receipt-audit.test.ts tests/gatekeeper/local-registration-audit.test.ts tests/gatekeeper/chain-registration-audit.test.ts tests/gatekeeper/event-targets.test.ts tests/gatekeeper/method-ids.test.ts --runInBand --coverage=false
       - name: Check signed asset reconciliation and durable restart
         run: node --experimental-vm-modules node_modules/.bin/jest tests/gatekeeper/asset-convergence.test.ts --runInBand --coverage=false --silent
       - name: Check proofs and concrete histories

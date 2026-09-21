@@ -291,6 +291,15 @@ pub(crate) async fn authorize_operation(
             if next.get("id").and_then(Value::as_str) != Some(did) {
                 return Ok(false);
             }
+            if let Some(methods) = next.get("verificationMethod").and_then(Value::as_array) {
+                let mut ids = std::collections::HashSet::new();
+                if methods.iter().filter_map(|method| method.get("id").and_then(Value::as_str))
+                    .filter(|id| !id.is_empty())
+                    .any(|id| !ids.insert(crate::proofs::absolute_key_id(id, did)))
+                {
+                    return Ok(false);
+                }
+            }
             let authority = match kind {
                 Some("agent") => {
                     if !self_controlled_agent(state, &current).await

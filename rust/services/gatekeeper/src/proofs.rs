@@ -366,7 +366,7 @@ fn operation_message_hash(operation: &Value) -> Result<String> {
 // A DID URL, whichever form it was written in. A proof names its key absolutely
 // (`did:cid:...#key-1`) or relatively (`#key-1`), and a document may list it
 // either way, so the two are compared as URLs rather than as strings.
-fn absolute_key_id(reference: &str, did: &str) -> String {
+pub(crate) fn absolute_key_id(reference: &str, did: &str) -> String {
     if reference.starts_with('#') {
         format!("{did}{reference}")
     } else {
