@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { reorderedProtocolVector } from './check-protocol-reordering.mjs';
 import { generateProtocolFixtures } from './generate-protocol-fixtures.mjs';
 const vectors = JSON.parse(readFileSync(new URL('../../tests/convergence/asset-vectors.json', import.meta.url), 'utf8'));
 test('final bridge checks typed family, source admission and actual composed execution', () => {
@@ -9,16 +10,7 @@ test('final bridge checks typed family, source admission and actual composed exe
         'protocol_convergence', 'reconcileProtocol', 'methods_agree', 'sameAgentSourceCheck']) assert(code.includes(expression));
 });
 test('final bridge preserves source-table independence', () => {
-    const v = structuredClone(vectors.find(v => v.mode === 'chain'));
-    const count = v.operations.length, events = v.events.length;
-    v.operations.reverse(); v.ids.reverse(); v.signatureValid.reverse();
-    for (const c of v.controllers) { c.operations.reverse(); c.ids.reverse(); c.signatureValid.reverse(); }
-    v.events.reverse(); v.labels.reverse();
-    for (const stage of v.stages) {
-        stage.evidence = stage.evidence.map(i => events - i - 1);
-        stage.orders = stage.orders.map(order => order.map(i => events - i - 1));
-        stage.expected = stage.expected.map(i => count - i - 1);
-    }
+    const v = reorderedProtocolVector(vectors.find(v => v.mode === 'chain'));
     assert.doesNotThrow(() => generateProtocolFixtures([v]));
 });
 for (const [name, change] of [

@@ -7,7 +7,8 @@ structure ProtocolAgent where
   core : ControllerSpec
   receipts : RegistryReceipts
   positions : Nat → List Nat
-  operationTime : Nat → Int
+  created : Int
+  proofTime : Nat → Int
   chainFacts : Nat → ChainReceiptView
   documents : Nat → Nat
   methods : Nat → List VerificationMethod
@@ -17,8 +18,22 @@ structure ProtocolAsset where
   graph : AssetGraph
   receipts : AssetReceipts
   positions : Nat → List Nat
-  operationTime : Nat → Int
+  created : Int
   chainFacts : Nat → ChainReceiptView
+
+/-- Operation-intrinsic receipt clock: only local creation uses `created`;
+all other unanchored receipts use the complete operation's proof timestamp. -/
+def protocolOperationTime (root registry localRegistry : Nat) (created : Int)
+    (proofTime : Nat → Int) (operation : Nat) : Int :=
+  if operation = root ∧ registry = localRegistry then created else proofTime operation
+
+def ProtocolAgent.operationTime (spec : ProtocolAgent) (localRegistry : Nat) :=
+  protocolOperationTime spec.core.graph.root (spec.core.registry spec.core.initialRegistry)
+    localRegistry spec.created spec.proofTime
+
+def ProtocolAsset.operationTime (spec : ProtocolAsset) (localRegistry : Nat) :=
+  protocolOperationTime spec.graph.root (spec.graph.registry spec.graph.initialRegistry)
+    localRegistry spec.created spec.graph.proofTime
 
 /-- The immutable genesis kind chooses a single component; an asset can never
 inhabit the controller table. Missing genesis may have no decoded specification. -/
@@ -48,7 +63,7 @@ def ProtocolModel.controllers (w : ProtocolModel n) : AssetControllerInputs wher
   isAgent := fun owner => (w.agent owner).isSome
   specifications := fun owner => (w.agent owner).map ProtocolAgent.core
   receipts := fun owner => ((w.agent owner).map ProtocolAgent.receipts).getD noProtocolReceipts
-  operationTime := fun owner => ((w.agent owner).map ProtocolAgent.operationTime).getD (fun _ => 0)
+  operationTime := fun owner => ((w.agent owner).map (fun spec => spec.operationTime w.localRegistry)).getD (fun _ => 0)
   chainFacts := fun owner => ((w.agent owner).map ProtocolAgent.chainFacts).getD (fun _ => ⟨0, [], 0, false⟩)
 
 theorem protocol_controller_table (w : ProtocolModel n) (owner : Nat) :
@@ -149,7 +164,6 @@ structure ProtocolAssetDomain (spec : ProtocolAsset) : Prop where
   parents : AssetParentBounded spec.graph
   genesis : spec.graph.parent spec.graph.root = none
   rootBound : spec.graph.root < spec.graph.size
-  clocks : ∀ operation, operation ≠ spec.graph.root → spec.operationTime operation = spec.graph.proofTime operation
   ranks : AssetCidRanks spec.graph spec.receipts spec.positions
   facts : ∀ rank, rank < spec.receipts.size →
     (spec.chainFacts rank).registry = spec.receipts.registry rank ∧

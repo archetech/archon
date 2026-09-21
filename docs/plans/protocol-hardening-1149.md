@@ -521,11 +521,14 @@ and universal runtime refinement remain open. No production behavior changes.
 
 ### Final protocol composition (C1–C3)
 
-C1 is implemented at the model boundary; the signed local-clock counterexample
-blocks C2/C3 pending the explicit normalization decision.
+C1 is implemented at the model/bridge boundary. The 2026-09-21 approved
+local-clock normalization closes the first signed C2 counterexample in both ports.
+A second signed registration-context audit blocks C2/C3 pending an explicit
+receipt-authority decision.
 `protocol_convergence` composes actual finite agent and asset reconstruction,
 proves a unique full semantic result and full-record stopping, and is independent
 of stale published projections. `protocol_eventual_convergence` covers settled
 evidence. The [final audit](protocol-convergence-theorem.md) records all premises,
 source contracts, checked signed-family instances, and the unchanged boundary to
-universal implementation refinement. No runtime protocol behavior changes.
+universal implementation refinement. Local import/recovery now uses creation `created` and update/deletion `proof.created`;
+operation bytes, IDs and ordinals are preserved.

@@ -329,6 +329,12 @@ array of nonnegative safe integers; only those unanchored registries may use an
 empty array. The CID-import API still requires `BatchMetadata.ordinal` for every
 registry. A nonempty CID list yielding no importable events returns zero
 queued/processed/rejected counts and the current queue total.
+Before journaling and during stored-candidate recovery, normalize `local` creation
+receipts to `operation.created`, and `local` update/deletion receipts to
+`operation.proof.created`. Hyperswarm and pin receipts use `proof.created` for all
+operation kinds. Preserve operation bytes, canonical IDs and ordinals. Rebuild
+accepted histories and dependent assets after repairing stored clocks; an old
+receipt timestamp must not decide historical authorization.
 The signed operation and its CID do not change. Peer/export imports are first
 converted to Hyperswarm hints, so they do not need a chain ordinal and cannot
 assert chain confirmation. Bundled chain mediators already supply positions.
@@ -743,8 +749,10 @@ field to the operation's `proof.created`. Gatekeeper normalizes Hyperswarm and p
 envelopes on import and during candidate recovery, covering older mediators,
 HTTP history imports, and existing databases. It corrects envelope timestamps
 without changing operation bytes, IDs, or ordinals. Both ordinary and verified
-resolution consume these corrected events. Local and anchored event timestamps
-retain their sources; chain ordinals retain precedence for same-registry
+resolution consume these corrected events. Gatekeeper also normalizes local
+creation receipts to `operation.created` and local update/deletion receipts to
+`proof.created`, including stored-candidate recovery. Anchored receipts keep their
+authoritative chain times; chain ordinals retain precedence for same-registry
 anchored authorization.
 
 `previd` establishes predecessor order. The time cutoff selects a prefix, even
@@ -1003,7 +1011,7 @@ rewritten to IPFS merely because a gossip wrapper omitted its operation ID.
 The following is the insertion algorithm reused during replay:
 
 ```
-1. normalize event.did and canonical event.opid from the operation
+1. normalize event.did, canonical event.opid, and unanchored event.time from the operation
 2. acquire per-DID lock
 3. current = store.get_events(did); derive any missing canonical operation IDs
 4. if any current event has opid == event.opid:

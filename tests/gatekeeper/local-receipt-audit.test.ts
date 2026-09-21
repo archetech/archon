@@ -9,13 +9,14 @@ type LocalVector = {
     did: string;
     assetDid: string;
     asset: GatekeeperEvent;
+    deletion: GatekeeperEvent;
     events: GatekeeperEvent[];
     orders: number[][];
 };
 const vectors: LocalVector[] = JSON.parse(readFileSync('tests/convergence/local-receipt-counterexample.json', 'utf8'));
 
-// C2 blocker: local clock normalization needs an explicit protocol decision.
-it.each(vectors)('reproduces local receipt-clock divergence (legacy=$legacy)', async vector => {
+// Local receipts use intrinsic operation clocks at ingress and recovery.
+it.each(vectors)('normalizes local receipt clocks (legacy=$legacy)', async vector => {
     const outcomes: number[] = [];
     const identities: string[][] = [];
     for (const order of vector.orders) {
@@ -31,13 +32,49 @@ it.each(vectors)('reproduces local receipt-clock divergence (legacy=$legacy)', a
             await restarted.resolveDID(vector.did, { verify: true });
             await restarted.importBatch([structuredClone(vector.asset)]);
             await restarted.processEvents();
+            const accepted = await db.getEvents(vector.did);
+            expect(accepted.map(event => event.operation)).toEqual(vector.events.slice(0, 3).map(event => event.operation));
+            for (const event of accepted) expect(event.time).toBe(event.operation.type === 'create'
+                ? event.operation.created : event.operation.proof!.created);
             outcomes.push((await db.getEvents(vector.assetDid)).length);
             const candidates = (await db.getCandidates())[vector.did];
             identities.push(candidates.map(event => JSON.stringify([event.registry, event.operation])).sort());
         }
+        const restarted = new Gatekeeper({ db, ipfs });
+        await restarted.importBatch([structuredClone(vector.deletion)]);
+        await restarted.processEvents();
+        const deleted = await db.getEvents(vector.did);
+        expect(deleted).toHaveLength(4);
+        expect(deleted[3].operation).toEqual(vector.deletion.operation);
+        expect(deleted[3].time).toBe(vector.deletion.operation.proof!.created);
     }
     // The complete operations (including proofs) agree; local receipt clocks
     // are the difference, and they are excluded by the frozen target claim.
     for (const identity of identities) expect(identity).toEqual(identities[0]);
-    expect(outcomes).toEqual([0, 0, 1, 1]);
+    expect(outcomes).toEqual([0, 0, 0, 0]);
+});
+
+it.each(vectors)('repairs stored local clocks and reauthorizes assets (legacy=$legacy)', async vector => {
+    const db = new DbMemory('local-clock-recovery');
+    const ipfs = new MemoryClient();
+    const gatekeeper = new Gatekeeper({ db, ipfs });
+    const retained = await Promise.all([0, 1, 4].map(async index => ({
+        ...structuredClone(vector.events[index]), did: vector.did,
+        opid: await gatekeeper.generateCID(vector.events[index].operation),
+    })));
+    const oldAsset = { ...structuredClone(vector.asset), did: vector.assetDid,
+        opid: await gatekeeper.generateCID(vector.asset.operation) };
+    await db.setCandidates(vector.did, retained);
+    await db.setEvents(vector.did, retained);
+    await db.setCandidates(vector.assetDid, [oldAsset]);
+    await db.setEvents(vector.assetDid, [oldAsset]);
+    const restarted = new Gatekeeper({ db, ipfs });
+    await restarted.resolveDID(vector.did, { verify: true });
+    expect(await db.getEvents(vector.assetDid)).toEqual([]);
+    const repaired = (await db.getCandidates())[vector.did];
+    expect(repaired.map(event => event.operation)).toEqual(retained.map(event => event.operation));
+    expect(repaired.map(event => event.opid)).toEqual(retained.map(event => event.opid));
+    expect(repaired.map(event => event.ordinal)).toEqual(retained.map(event => event.ordinal));
+    for (const event of repaired) expect(event.time).toBe(event.operation.type === 'create'
+        ? event.operation.created : event.operation.proof!.created);
 });

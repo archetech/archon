@@ -140,7 +140,7 @@ forks, repeated/earlier/tied anchors, missing predecessors, unconfirmed suffixes
 and cold/late-genesis replay in both ports. The signed pin audit led to the approved proof-time normalization rule; both ports
 now converge on asset verdicts and repair stored pre-fix projections. Lean checks source normalization and
 independently evaluates the expected components and authorization views. General
-runtime refinement remains outside this contract. B is completed below; C2/C3 are blocked by the signed local-clock audit.
+runtime refinement remains outside this contract. B is completed below; C2/C3 remain open as recorded below.
 
 ### B. Asset/controller convergence
 
@@ -201,13 +201,14 @@ not universal executable refinement. See the [audit](asset-controller-convergenc
   output equality, assumptions, theorem dependencies, and finite runtime bridge.
   Close #1215 when A1–C3 are satisfied; do not hold it open for the separate work below.
 
-C1's composed theorem and settled-evidence corollary are implemented locally.
-C2 found an admitted signed local-receipt counterexample: two orders retain
-different timestamps for the same local key rotation, causing opposite asset
-verdicts. Local producers use intrinsic operation times, but import/recovery does
-not enforce that contract. C2 and C3 remain open pending the explicit protocol
-decision and correction; the Lean source-clock premise must not conceal this gap.
-See the [final audit](protocol-convergence-theorem.md).
+C1's composed theorem and settled-evidence corollary are implemented and checked.
+The approved local-clock normalization fixes the first signed C2 counterexample
+in both Gatekeepers, including recovery of old stored projections. A second
+signed ordinary-import audit found that registration metadata on a local receipt
+can trigger chain-based controller selection and opposite asset verdicts. C2/C3
+remain open pending the explicit receipt-authority decision; this cannot be
+excluded through a stronger source premise. The [final audit](protocol-convergence-theorem.md)
+records the exact findings and unchanged completion criteria.
 
 ## Separate work, not prerequisites for this claim
 

@@ -3,9 +3,10 @@ import ProtocolConvergence
 import AssetFixtures
 set_option warningAsError true
 set_option maxRecDepth 10000
+set_option synthInstance.maxSize 2048
 set_option maxHeartbeats 8000000
 namespace Archon.ProtocolFixtures
-def agent0_0 : ProtocolAgent := ⟨AssetFixtures.spec0_0, AssetControllerFixtures.receipts0, AssetControllerFixtures.positions0, AssetControllerFixtures.operationTime0, AssetControllerFixtures.chainFacts0, AssetControllerFixtures.documents0, AssetControllerFixtures.methods0, 2⟩
+def agent0_0 : ProtocolAgent := ⟨AssetFixtures.spec0_0, AssetControllerFixtures.receipts0, AssetControllerFixtures.positions0, 1788998460000, AssetControllerFixtures.operationTime0, AssetControllerFixtures.chainFacts0, AssetControllerFixtures.documents0, AssetControllerFixtures.methods0, 2⟩
 theorem agentDomain0_0 : ProtocolAgentDomain agent0_0 := by
   refine ⟨AssetControllerFixtures.ordered0, AssetControllerFixtures.bounded0, AssetControllerFixtures.parents0, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree0, AssetControllerFixtures.ranks0, ?_, ?_⟩
   · intro rank bound; rfl
@@ -13,7 +14,7 @@ theorem agentDomain0_0 : ProtocolAgentDomain agent0_0 := by
     have small : rank < 0 := bound
     have checked : ∀ rank : Fin 0, (AssetControllerFixtures.chainFacts0 rank.val).registry = (AssetControllerFixtures.receipts0).registry rank.val ∧ (AssetControllerFixtures.chainFacts0 rank.val).ordinal = AssetControllerFixtures.positions0 rank.val ∧ AssetControllerFixtures.positions0 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def agent0_1 : ProtocolAgent := ⟨AssetFixtures.spec0_1, AssetControllerFixtures.receipts1, AssetControllerFixtures.positions1, AssetControllerFixtures.operationTime1, AssetControllerFixtures.chainFacts1, AssetControllerFixtures.documents1, AssetControllerFixtures.methods1, 2⟩
+def agent0_1 : ProtocolAgent := ⟨AssetFixtures.spec0_1, AssetControllerFixtures.receipts1, AssetControllerFixtures.positions1, 1788998460000, AssetControllerFixtures.operationTime1, AssetControllerFixtures.chainFacts1, AssetControllerFixtures.documents1, AssetControllerFixtures.methods1, 2⟩
 theorem agentDomain0_1 : ProtocolAgentDomain agent0_1 := by
   refine ⟨AssetControllerFixtures.ordered1, AssetControllerFixtures.bounded1, AssetControllerFixtures.parents1, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree1, AssetControllerFixtures.ranks1, ?_, ?_⟩
   · intro rank bound; rfl
@@ -21,9 +22,9 @@ theorem agentDomain0_1 : ProtocolAgentDomain agent0_1 := by
     have small : rank < 0 := bound
     have checked : ∀ rank : Fin 0, (AssetControllerFixtures.chainFacts1 rank.val).registry = (AssetControllerFixtures.receipts1).registry rank.val ∧ (AssetControllerFixtures.chainFacts1 rank.val).ordinal = AssetControllerFixtures.positions1 rank.val ∧ AssetControllerFixtures.positions1 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def asset0 : ProtocolAsset := ⟨AssetFixtures.graph0, AssetFixtures.receipts0, AssetFixtures.positions0, (fun i => [1789001400000, 1788999120000, 1789002000000, 1789000200000, 1789000200000, 1789001400000, 1789000200000, 1789000800000, 1789001400000, 1789000800000, 1789000200000, 1789000200000].getD i (0)), AssetFixtures.chainFacts0⟩
+def asset0 : ProtocolAsset := ⟨AssetFixtures.graph0, AssetFixtures.receipts0, AssetFixtures.positions0, 1788999120000, AssetFixtures.chainFacts0⟩
 theorem assetDomain0 : ProtocolAssetDomain asset0 := by
-  refine ⟨AssetFixtures.ordered0, AssetFixtures.bounded0, AssetFixtures.parents0, by decide, by decide, (by intro operation nonroot; rfl), AssetFixtures.ranks0, ?_⟩
+  refine ⟨AssetFixtures.ordered0, AssetFixtures.bounded0, AssetFixtures.parents0, by decide, by decide, AssetFixtures.ranks0, ?_⟩
   intro rank bound
   have small : rank < 0 := bound
   have checked : ∀ rank : Fin 0, (AssetFixtures.chainFacts0 rank.val).registry = (AssetFixtures.receipts0).registry rank.val ∧ (AssetFixtures.chainFacts0 rank.val).ordinal = AssetFixtures.positions0 rank.val ∧ AssetFixtures.positions0 rank.val ≠ [] := by decide
@@ -86,8 +87,24 @@ theorem same0_0_2 : SameProtocolEvidence evidence0_0_0 evidence0_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_0_0 i) (evidence0_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_0_0 evidence0_0_2 sources0_0 same0_0_2
-example : (reconcileProtocol world0 evidence0_0_0 empty0).map (fun result => assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_0_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) := by decide
+example : (reconcileProtocol world0 evidence0_0_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_0_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_0_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_0_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_0_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_0_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_0_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_0_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_0_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_0_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_0_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_0_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence0_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_1_0 else AssetFixtures.agents0_1_0 i.val
 def evidence0_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_1_1 else AssetFixtures.agents0_1_1 i.val
 def evidence0_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_1_2 else AssetFixtures.agents0_1_2 i.val
@@ -107,8 +124,24 @@ theorem same0_1_2 : SameProtocolEvidence evidence0_1_0 evidence0_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_1_0 i) (evidence0_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_1_0 evidence0_1_2 sources0_1 same0_1_2
-example : (reconcileProtocol world0 evidence0_1_0 empty0).map (fun result => assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_1_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) := by decide
+example : (reconcileProtocol world0 evidence0_1_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_1_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_1_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_1_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_1_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_1_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_1_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_1_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_1_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_1_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_1_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_1_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence0_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_2_0 else AssetFixtures.agents0_2_0 i.val
 def evidence0_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_2_1 else AssetFixtures.agents0_2_1 i.val
 def evidence0_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_2_2 else AssetFixtures.agents0_2_2 i.val
@@ -128,8 +161,24 @@ theorem same0_2_2 : SameProtocolEvidence evidence0_2_0 evidence0_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_2_0 i) (evidence0_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_2_0 evidence0_2_2 sources0_2 same0_2_2
-example : (reconcileProtocol world0 evidence0_2_0 empty0).map (fun result => assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_2_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) := by decide
+example : (reconcileProtocol world0 evidence0_2_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_2_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_2_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_2_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_2_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_2_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_2_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_2_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_2_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_2_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_2_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_2_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence0_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_3_0 else AssetFixtures.agents0_3_0 i.val
 def evidence0_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_3_1 else AssetFixtures.agents0_3_1 i.val
 def evidence0_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_3_2 else AssetFixtures.agents0_3_2 i.val
@@ -149,8 +198,24 @@ theorem same0_3_2 : SameProtocolEvidence evidence0_3_0 evidence0_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_3_0 i) (evidence0_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_3_0 evidence0_3_2 sources0_3 same0_3_2
-example : (reconcileProtocol world0 evidence0_3_0 empty0).map (fun result => assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_3_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) := by decide
+example : (reconcileProtocol world0 evidence0_3_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_3_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_3_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_3_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_3_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_3_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_3_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_3_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_3_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_3_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_3_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_3_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence0_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_4_0 else AssetFixtures.agents0_4_0 i.val
 def evidence0_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_4_1 else AssetFixtures.agents0_4_1 i.val
 def evidence0_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_4_2 else AssetFixtures.agents0_4_2 i.val
@@ -170,8 +235,24 @@ theorem same0_4_2 : SameProtocolEvidence evidence0_4_0 evidence0_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_4_0 i) (evidence0_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_4_0 evidence0_4_2 sources0_4 same0_4_2
-example : (reconcileProtocol world0 evidence0_4_0 empty0).map (fun result => assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_4_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) := by decide
+example : (reconcileProtocol world0 evidence0_4_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_4_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_4_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_4_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_4_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_4_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_4_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_4_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_4_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_4_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_4_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_4_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence0_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_5_0 else AssetFixtures.agents0_5_0 i.val
 def evidence0_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_5_1 else AssetFixtures.agents0_5_1 i.val
 def evidence0_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_5_2 else AssetFixtures.agents0_5_2 i.val
@@ -191,8 +272,24 @@ theorem same0_5_2 : SameProtocolEvidence evidence0_5_0 evidence0_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_5_0 i) (evidence0_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_5_0 evidence0_5_2 sources0_5 same0_5_2
-example : (reconcileProtocol world0 evidence0_5_0 empty0).map (fun result => assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_5_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) := by decide
+example : (reconcileProtocol world0 evidence0_5_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_5_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_5_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_5_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_5_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_5_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_5_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_5_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_5_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_5_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_5_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_5_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence0_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_6_0 else AssetFixtures.agents0_6_0 i.val
 def evidence0_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_6_1 else AssetFixtures.agents0_6_1 i.val
 def evidence0_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources0_6_2 else AssetFixtures.agents0_6_2 i.val
@@ -212,9 +309,25 @@ theorem same0_6_2 : SameProtocolEvidence evidence0_6_0 evidence0_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence0_6_0 i) (evidence0_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world0 evidence0_6_0 evidence0_6_2 sources0_6 same0_6_2
-example : (reconcileProtocol world0 evidence0_6_0 empty0).map (fun result => assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_6_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (assetResult AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) := by decide
-def agent1_0 : ProtocolAgent := ⟨AssetFixtures.spec1_0, AssetControllerFixtures.receipts2, AssetControllerFixtures.positions2, AssetControllerFixtures.operationTime2, AssetControllerFixtures.chainFacts2, AssetControllerFixtures.documents2, AssetControllerFixtures.methods2, 2⟩
+example : (reconcileProtocol world0 evidence0_6_0 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_6_0) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_6_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_6_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_6_1 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_6_1) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_6_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_6_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world0 evidence0_6_2 empty0).map (fun result => List.ofFn (protocolResult world0 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) (chainOwner (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)) AssetFixtures.graph0.size AssetFixtures.records0_6_2) ((coldAssetModel AssetFixtures.graph0 (assetAnchors AssetFixtures.graph0 AssetFixtures.receipts0)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph0 AssetFixtures.receipts0 (asset0.operationTime 4) AssetFixtures.chainFacts0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs0 1 AssetFixtures.spec0_1 (AssetFixtures.agents0_6_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs0 2 AssetFixtures.spec0_0 (AssetFixtures.agents0_6_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent0_0 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+def agent1_0 : ProtocolAgent := ⟨AssetFixtures.spec1_0, AssetControllerFixtures.receipts2, AssetControllerFixtures.positions2, 1788998460000, AssetControllerFixtures.operationTime2, AssetControllerFixtures.chainFacts2, AssetControllerFixtures.documents2, AssetControllerFixtures.methods2, 2⟩
 theorem agentDomain1_0 : ProtocolAgentDomain agent1_0 := by
   refine ⟨AssetControllerFixtures.ordered2, AssetControllerFixtures.bounded2, AssetControllerFixtures.parents2, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree2, AssetControllerFixtures.ranks2, ?_, ?_⟩
   · intro rank bound; rfl
@@ -222,7 +335,7 @@ theorem agentDomain1_0 : ProtocolAgentDomain agent1_0 := by
     have small : rank < 0 := bound
     have checked : ∀ rank : Fin 0, (AssetControllerFixtures.chainFacts2 rank.val).registry = (AssetControllerFixtures.receipts2).registry rank.val ∧ (AssetControllerFixtures.chainFacts2 rank.val).ordinal = AssetControllerFixtures.positions2 rank.val ∧ AssetControllerFixtures.positions2 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def agent1_1 : ProtocolAgent := ⟨AssetFixtures.spec1_1, AssetControllerFixtures.receipts3, AssetControllerFixtures.positions3, AssetControllerFixtures.operationTime3, AssetControllerFixtures.chainFacts3, AssetControllerFixtures.documents3, AssetControllerFixtures.methods3, 2⟩
+def agent1_1 : ProtocolAgent := ⟨AssetFixtures.spec1_1, AssetControllerFixtures.receipts3, AssetControllerFixtures.positions3, 1788998460000, AssetControllerFixtures.operationTime3, AssetControllerFixtures.chainFacts3, AssetControllerFixtures.documents3, AssetControllerFixtures.methods3, 2⟩
 theorem agentDomain1_1 : ProtocolAgentDomain agent1_1 := by
   refine ⟨AssetControllerFixtures.ordered3, AssetControllerFixtures.bounded3, AssetControllerFixtures.parents3, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree3, AssetControllerFixtures.ranks3, ?_, ?_⟩
   · intro rank bound; rfl
@@ -230,9 +343,9 @@ theorem agentDomain1_1 : ProtocolAgentDomain agent1_1 := by
     have small : rank < 0 := bound
     have checked : ∀ rank : Fin 0, (AssetControllerFixtures.chainFacts3 rank.val).registry = (AssetControllerFixtures.receipts3).registry rank.val ∧ (AssetControllerFixtures.chainFacts3 rank.val).ordinal = AssetControllerFixtures.positions3 rank.val ∧ AssetControllerFixtures.positions3 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def asset1 : ProtocolAsset := ⟨AssetFixtures.graph1, AssetFixtures.receipts1, AssetFixtures.positions1, (fun i => [1789002000000, 1789000800000, 1789000800000, 1789000200000, 1789001400000, 1789000200000, 1789000200000, 1788999120000, 1789001400000, 1789000200000, 1789000200000, 1789001400000].getD i (0)), AssetFixtures.chainFacts1⟩
+def asset1 : ProtocolAsset := ⟨AssetFixtures.graph1, AssetFixtures.receipts1, AssetFixtures.positions1, 1788999120000, AssetFixtures.chainFacts1⟩
 theorem assetDomain1 : ProtocolAssetDomain asset1 := by
-  refine ⟨AssetFixtures.ordered1, AssetFixtures.bounded1, AssetFixtures.parents1, by decide, by decide, (by intro operation nonroot; rfl), AssetFixtures.ranks1, ?_⟩
+  refine ⟨AssetFixtures.ordered1, AssetFixtures.bounded1, AssetFixtures.parents1, by decide, by decide, AssetFixtures.ranks1, ?_⟩
   intro rank bound
   have small : rank < 0 := bound
   have checked : ∀ rank : Fin 0, (AssetFixtures.chainFacts1 rank.val).registry = (AssetFixtures.receipts1).registry rank.val ∧ (AssetFixtures.chainFacts1 rank.val).ordinal = AssetFixtures.positions1 rank.val ∧ AssetFixtures.positions1 rank.val ≠ [] := by decide
@@ -295,8 +408,24 @@ theorem same1_0_2 : SameProtocolEvidence evidence1_0_0 evidence1_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_0_0 i) (evidence1_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_0_0 evidence1_0_2 sources1_0 same1_0_2
-example : (reconcileProtocol world1 evidence1_0_0 empty1).map (fun result => assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_0_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) := by decide
+example : (reconcileProtocol world1 evidence1_0_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_0_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_0_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_0_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_0_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_0_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_0_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_0_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_0_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_0_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_0_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_0_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence1_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_1_0 else AssetFixtures.agents1_1_0 i.val
 def evidence1_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_1_1 else AssetFixtures.agents1_1_1 i.val
 def evidence1_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_1_2 else AssetFixtures.agents1_1_2 i.val
@@ -316,8 +445,24 @@ theorem same1_1_2 : SameProtocolEvidence evidence1_1_0 evidence1_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_1_0 i) (evidence1_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_1_0 evidence1_1_2 sources1_1 same1_1_2
-example : (reconcileProtocol world1 evidence1_1_0 empty1).map (fun result => assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_1_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) := by decide
+example : (reconcileProtocol world1 evidence1_1_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_1_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_1_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_1_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_1_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_1_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_1_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_1_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_1_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_1_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_1_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_1_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence1_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_2_0 else AssetFixtures.agents1_2_0 i.val
 def evidence1_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_2_1 else AssetFixtures.agents1_2_1 i.val
 def evidence1_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_2_2 else AssetFixtures.agents1_2_2 i.val
@@ -337,8 +482,24 @@ theorem same1_2_2 : SameProtocolEvidence evidence1_2_0 evidence1_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_2_0 i) (evidence1_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_2_0 evidence1_2_2 sources1_2 same1_2_2
-example : (reconcileProtocol world1 evidence1_2_0 empty1).map (fun result => assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_2_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) := by decide
+example : (reconcileProtocol world1 evidence1_2_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_2_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_2_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_2_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_2_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_2_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_2_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_2_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_2_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_2_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_2_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_2_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence1_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_3_0 else AssetFixtures.agents1_3_0 i.val
 def evidence1_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_3_1 else AssetFixtures.agents1_3_1 i.val
 def evidence1_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_3_2 else AssetFixtures.agents1_3_2 i.val
@@ -358,8 +519,24 @@ theorem same1_3_2 : SameProtocolEvidence evidence1_3_0 evidence1_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_3_0 i) (evidence1_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_3_0 evidence1_3_2 sources1_3 same1_3_2
-example : (reconcileProtocol world1 evidence1_3_0 empty1).map (fun result => assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_3_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) := by decide
+example : (reconcileProtocol world1 evidence1_3_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_3_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_3_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_3_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_3_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_3_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_3_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_3_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_3_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_3_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_3_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_3_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence1_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_4_0 else AssetFixtures.agents1_4_0 i.val
 def evidence1_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_4_1 else AssetFixtures.agents1_4_1 i.val
 def evidence1_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_4_2 else AssetFixtures.agents1_4_2 i.val
@@ -379,8 +556,24 @@ theorem same1_4_2 : SameProtocolEvidence evidence1_4_0 evidence1_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_4_0 i) (evidence1_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_4_0 evidence1_4_2 sources1_4 same1_4_2
-example : (reconcileProtocol world1 evidence1_4_0 empty1).map (fun result => assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_4_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) := by decide
+example : (reconcileProtocol world1 evidence1_4_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_4_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_4_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_4_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_4_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_4_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_4_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_4_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_4_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_4_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_4_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_4_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence1_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_5_0 else AssetFixtures.agents1_5_0 i.val
 def evidence1_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_5_1 else AssetFixtures.agents1_5_1 i.val
 def evidence1_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_5_2 else AssetFixtures.agents1_5_2 i.val
@@ -400,8 +593,24 @@ theorem same1_5_2 : SameProtocolEvidence evidence1_5_0 evidence1_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_5_0 i) (evidence1_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_5_0 evidence1_5_2 sources1_5 same1_5_2
-example : (reconcileProtocol world1 evidence1_5_0 empty1).map (fun result => assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_5_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) := by decide
+example : (reconcileProtocol world1 evidence1_5_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_5_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_5_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_5_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_5_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_5_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_5_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_5_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_5_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_5_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_5_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_5_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence1_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_6_0 else AssetFixtures.agents1_6_0 i.val
 def evidence1_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_6_1 else AssetFixtures.agents1_6_1 i.val
 def evidence1_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources1_6_2 else AssetFixtures.agents1_6_2 i.val
@@ -421,9 +630,25 @@ theorem same1_6_2 : SameProtocolEvidence evidence1_6_0 evidence1_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence1_6_0 i) (evidence1_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world1 evidence1_6_0 evidence1_6_2 sources1_6 same1_6_2
-example : (reconcileProtocol world1 evidence1_6_0 empty1).map (fun result => assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_6_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (assetResult AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) := by decide
-def agent2_0 : ProtocolAgent := ⟨AssetFixtures.spec2_0, AssetControllerFixtures.receipts4, AssetControllerFixtures.positions4, AssetControllerFixtures.operationTime4, AssetControllerFixtures.chainFacts4, AssetControllerFixtures.documents4, AssetControllerFixtures.methods4, 2⟩
+example : (reconcileProtocol world1 evidence1_6_0 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_6_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_6_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_6_0) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_6_1 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_6_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_6_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_6_1) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world1 evidence1_6_2 empty1).map (fun result => List.ofFn (protocolResult world1 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs1 0 AssetFixtures.spec1_0 (AssetFixtures.agents1_6_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs1 1 AssetFixtures.spec1_1 (AssetFixtures.agents1_6_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent1_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) (chainOwner (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)) AssetFixtures.graph1.size AssetFixtures.records1_6_2) ((coldAssetModel AssetFixtures.graph1 (assetAnchors AssetFixtures.graph1 AssetFixtures.receipts1)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph1 AssetFixtures.receipts1 (asset1.operationTime 4) AssetFixtures.chainFacts1 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+def agent2_0 : ProtocolAgent := ⟨AssetFixtures.spec2_0, AssetControllerFixtures.receipts4, AssetControllerFixtures.positions4, 1788998460000, AssetControllerFixtures.operationTime4, AssetControllerFixtures.chainFacts4, AssetControllerFixtures.documents4, AssetControllerFixtures.methods4, 2⟩
 theorem agentDomain2_0 : ProtocolAgentDomain agent2_0 := by
   refine ⟨AssetControllerFixtures.ordered4, AssetControllerFixtures.bounded4, AssetControllerFixtures.parents4, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree4, AssetControllerFixtures.ranks4, ?_, ?_⟩
   · intro rank bound; rfl
@@ -431,7 +656,7 @@ theorem agentDomain2_0 : ProtocolAgentDomain agent2_0 := by
     have small : rank < 4 := bound
     have checked : ∀ rank : Fin 4, (AssetControllerFixtures.chainFacts4 rank.val).registry = (AssetControllerFixtures.receipts4).registry rank.val ∧ (AssetControllerFixtures.chainFacts4 rank.val).ordinal = AssetControllerFixtures.positions4 rank.val ∧ AssetControllerFixtures.positions4 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def agent2_1 : ProtocolAgent := ⟨AssetFixtures.spec2_1, AssetControllerFixtures.receipts5, AssetControllerFixtures.positions5, AssetControllerFixtures.operationTime5, AssetControllerFixtures.chainFacts5, AssetControllerFixtures.documents5, AssetControllerFixtures.methods5, 2⟩
+def agent2_1 : ProtocolAgent := ⟨AssetFixtures.spec2_1, AssetControllerFixtures.receipts5, AssetControllerFixtures.positions5, 1788998460000, AssetControllerFixtures.operationTime5, AssetControllerFixtures.chainFacts5, AssetControllerFixtures.documents5, AssetControllerFixtures.methods5, 2⟩
 theorem agentDomain2_1 : ProtocolAgentDomain agent2_1 := by
   refine ⟨AssetControllerFixtures.ordered5, AssetControllerFixtures.bounded5, AssetControllerFixtures.parents5, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree5, AssetControllerFixtures.ranks5, ?_, ?_⟩
   · intro rank bound; rfl
@@ -439,9 +664,9 @@ theorem agentDomain2_1 : ProtocolAgentDomain agent2_1 := by
     have small : rank < 2 := bound
     have checked : ∀ rank : Fin 2, (AssetControllerFixtures.chainFacts5 rank.val).registry = (AssetControllerFixtures.receipts5).registry rank.val ∧ (AssetControllerFixtures.chainFacts5 rank.val).ordinal = AssetControllerFixtures.positions5 rank.val ∧ AssetControllerFixtures.positions5 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def asset2 : ProtocolAsset := ⟨AssetFixtures.graph2, AssetFixtures.receipts2, AssetFixtures.positions2, (fun i => [1789000200000, 1789002000000, 1789001400000, 1788999120000, 1789001400000, 1789000800000, 1789000200000, 1789000200000, 1789000200000, 1789001400000, 1789000800000, 1789000200000].getD i (0)), AssetFixtures.chainFacts2⟩
+def asset2 : ProtocolAsset := ⟨AssetFixtures.graph2, AssetFixtures.receipts2, AssetFixtures.positions2, 1788999120000, AssetFixtures.chainFacts2⟩
 theorem assetDomain2 : ProtocolAssetDomain asset2 := by
-  refine ⟨AssetFixtures.ordered2, AssetFixtures.bounded2, AssetFixtures.parents2, by decide, by decide, (by intro operation nonroot; rfl), AssetFixtures.ranks2, ?_⟩
+  refine ⟨AssetFixtures.ordered2, AssetFixtures.bounded2, AssetFixtures.parents2, by decide, by decide, AssetFixtures.ranks2, ?_⟩
   intro rank bound
   have small : rank < 13 := bound
   have checked : ∀ rank : Fin 13, (AssetFixtures.chainFacts2 rank.val).registry = (AssetFixtures.receipts2).registry rank.val ∧ (AssetFixtures.chainFacts2 rank.val).ordinal = AssetFixtures.positions2 rank.val ∧ AssetFixtures.positions2 rank.val ≠ [] := by decide
@@ -504,8 +729,24 @@ theorem same2_0_2 : SameProtocolEvidence evidence2_0_0 evidence2_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_0_0 i) (evidence2_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_0_0 evidence2_0_2 sources2_0 same2_0_2
-example : (reconcileProtocol world2 evidence2_0_0 empty2).map (fun result => assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_0_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) := by decide
+example : (reconcileProtocol world2 evidence2_0_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_0_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_0_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_0_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_0_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_0_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_0_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_0_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_0_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_0_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_0_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_0_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence2_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_1_0 else AssetFixtures.agents2_1_0 i.val
 def evidence2_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_1_1 else AssetFixtures.agents2_1_1 i.val
 def evidence2_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_1_2 else AssetFixtures.agents2_1_2 i.val
@@ -525,8 +766,24 @@ theorem same2_1_2 : SameProtocolEvidence evidence2_1_0 evidence2_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_1_0 i) (evidence2_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_1_0 evidence2_1_2 sources2_1 same2_1_2
-example : (reconcileProtocol world2 evidence2_1_0 empty2).map (fun result => assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_1_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) := by decide
+example : (reconcileProtocol world2 evidence2_1_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_1_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_1_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_1_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_1_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_1_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_1_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_1_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_1_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_1_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_1_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_1_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence2_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_2_0 else AssetFixtures.agents2_2_0 i.val
 def evidence2_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_2_1 else AssetFixtures.agents2_2_1 i.val
 def evidence2_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_2_2 else AssetFixtures.agents2_2_2 i.val
@@ -546,8 +803,24 @@ theorem same2_2_2 : SameProtocolEvidence evidence2_2_0 evidence2_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_2_0 i) (evidence2_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_2_0 evidence2_2_2 sources2_2 same2_2_2
-example : (reconcileProtocol world2 evidence2_2_0 empty2).map (fun result => assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_2_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) := by decide
+example : (reconcileProtocol world2 evidence2_2_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_2_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_2_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_2_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_2_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_2_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_2_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_2_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_2_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_2_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_2_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_2_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence2_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_3_0 else AssetFixtures.agents2_3_0 i.val
 def evidence2_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_3_1 else AssetFixtures.agents2_3_1 i.val
 def evidence2_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_3_2 else AssetFixtures.agents2_3_2 i.val
@@ -567,8 +840,24 @@ theorem same2_3_2 : SameProtocolEvidence evidence2_3_0 evidence2_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_3_0 i) (evidence2_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_3_0 evidence2_3_2 sources2_3 same2_3_2
-example : (reconcileProtocol world2 evidence2_3_0 empty2).map (fun result => assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_3_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) := by decide
+example : (reconcileProtocol world2 evidence2_3_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_3_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_3_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_3_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_3_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_3_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_3_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_3_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_3_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_3_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_3_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_3_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence2_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_4_0 else AssetFixtures.agents2_4_0 i.val
 def evidence2_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_4_1 else AssetFixtures.agents2_4_1 i.val
 def evidence2_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_4_2 else AssetFixtures.agents2_4_2 i.val
@@ -588,8 +877,24 @@ theorem same2_4_2 : SameProtocolEvidence evidence2_4_0 evidence2_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_4_0 i) (evidence2_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_4_0 evidence2_4_2 sources2_4 same2_4_2
-example : (reconcileProtocol world2 evidence2_4_0 empty2).map (fun result => assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_4_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) := by decide
+example : (reconcileProtocol world2 evidence2_4_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_4_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_4_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_4_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_4_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_4_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_4_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_4_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_4_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_4_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_4_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_4_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence2_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_5_0 else AssetFixtures.agents2_5_0 i.val
 def evidence2_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_5_1 else AssetFixtures.agents2_5_1 i.val
 def evidence2_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_5_2 else AssetFixtures.agents2_5_2 i.val
@@ -609,8 +914,24 @@ theorem same2_5_2 : SameProtocolEvidence evidence2_5_0 evidence2_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_5_0 i) (evidence2_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_5_0 evidence2_5_2 sources2_5 same2_5_2
-example : (reconcileProtocol world2 evidence2_5_0 empty2).map (fun result => assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_5_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) := by decide
+example : (reconcileProtocol world2 evidence2_5_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_5_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_5_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_5_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_5_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_5_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_5_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_5_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_5_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_5_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_5_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_5_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
 def evidence2_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_6_0 else AssetFixtures.agents2_6_0 i.val
 def evidence2_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_6_1 else AssetFixtures.agents2_6_1 i.val
 def evidence2_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources2_6_2 else AssetFixtures.agents2_6_2 i.val
@@ -630,9 +951,25 @@ theorem same2_6_2 : SameProtocolEvidence evidence2_6_0 evidence2_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence2_6_0 i) (evidence2_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world2 evidence2_6_0 evidence2_6_2 sources2_6 same2_6_2
-example : (reconcileProtocol world2 evidence2_6_0 empty2).map (fun result => assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_6_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (assetResult AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) := by decide
-def agent3_0 : ProtocolAgent := ⟨AssetFixtures.spec3_0, AssetControllerFixtures.receipts6, AssetControllerFixtures.positions6, AssetControllerFixtures.operationTime6, AssetControllerFixtures.chainFacts6, AssetControllerFixtures.documents6, AssetControllerFixtures.methods6, 2⟩
+example : (reconcileProtocol world2 evidence2_6_0 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_6_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_6_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_6_0) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_6_1 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_6_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_6_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_6_1) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world2 evidence2_6_2 empty2).map (fun result => List.ofFn (protocolResult world2 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs2 0 AssetFixtures.spec2_0 (AssetFixtures.agents2_6_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_0 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs2 1 AssetFixtures.spec2_1 (AssetFixtures.agents2_6_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent2_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) (chainOwner (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)) AssetFixtures.graph2.size AssetFixtures.records2_6_2) ((coldAssetModel AssetFixtures.graph2 (assetAnchors AssetFixtures.graph2 AssetFixtures.receipts2)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph2 AssetFixtures.receipts2 (asset2.operationTime 4) AssetFixtures.chainFacts2 records)))
+  let result3 ← some none
+  pure [result0, result1, result2, result3]) := by decide
+def agent3_0 : ProtocolAgent := ⟨AssetFixtures.spec3_0, AssetControllerFixtures.receipts6, AssetControllerFixtures.positions6, 1788998460000, AssetControllerFixtures.operationTime6, AssetControllerFixtures.chainFacts6, AssetControllerFixtures.documents6, AssetControllerFixtures.methods6, 2⟩
 theorem agentDomain3_0 : ProtocolAgentDomain agent3_0 := by
   refine ⟨AssetControllerFixtures.ordered6, AssetControllerFixtures.bounded6, AssetControllerFixtures.parents6, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree6, AssetControllerFixtures.ranks6, ?_, ?_⟩
   · intro rank bound; rfl
@@ -640,7 +977,7 @@ theorem agentDomain3_0 : ProtocolAgentDomain agent3_0 := by
     have small : rank < 4 := bound
     have checked : ∀ rank : Fin 4, (AssetControllerFixtures.chainFacts6 rank.val).registry = (AssetControllerFixtures.receipts6).registry rank.val ∧ (AssetControllerFixtures.chainFacts6 rank.val).ordinal = AssetControllerFixtures.positions6 rank.val ∧ AssetControllerFixtures.positions6 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def agent3_1 : ProtocolAgent := ⟨AssetFixtures.spec3_1, AssetControllerFixtures.receipts7, AssetControllerFixtures.positions7, AssetControllerFixtures.operationTime7, AssetControllerFixtures.chainFacts7, AssetControllerFixtures.documents7, AssetControllerFixtures.methods7, 2⟩
+def agent3_1 : ProtocolAgent := ⟨AssetFixtures.spec3_1, AssetControllerFixtures.receipts7, AssetControllerFixtures.positions7, 1788998460000, AssetControllerFixtures.operationTime7, AssetControllerFixtures.chainFacts7, AssetControllerFixtures.documents7, AssetControllerFixtures.methods7, 2⟩
 theorem agentDomain3_1 : ProtocolAgentDomain agent3_1 := by
   refine ⟨AssetControllerFixtures.ordered7, AssetControllerFixtures.bounded7, AssetControllerFixtures.parents7, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree7, AssetControllerFixtures.ranks7, ?_, ?_⟩
   · intro rank bound; rfl
@@ -648,9 +985,9 @@ theorem agentDomain3_1 : ProtocolAgentDomain agent3_1 := by
     have small : rank < 2 := bound
     have checked : ∀ rank : Fin 2, (AssetControllerFixtures.chainFacts7 rank.val).registry = (AssetControllerFixtures.receipts7).registry rank.val ∧ (AssetControllerFixtures.chainFacts7 rank.val).ordinal = AssetControllerFixtures.positions7 rank.val ∧ AssetControllerFixtures.positions7 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def asset3 : ProtocolAsset := ⟨AssetFixtures.graph3, AssetFixtures.receipts3, AssetFixtures.positions3, (fun i => [1789000200000, 1789001400000, 1789002000000, 1789000200000, 1788999120000, 1789001400000, 1789000800000, 1789000200000, 1789000800000, 1789000200000, 1789000200000, 1789001400000].getD i (0)), AssetFixtures.chainFacts3⟩
+def asset3 : ProtocolAsset := ⟨AssetFixtures.graph3, AssetFixtures.receipts3, AssetFixtures.positions3, 1788999120000, AssetFixtures.chainFacts3⟩
 theorem assetDomain3 : ProtocolAssetDomain asset3 := by
-  refine ⟨AssetFixtures.ordered3, AssetFixtures.bounded3, AssetFixtures.parents3, by decide, by decide, (by intro operation nonroot; rfl), AssetFixtures.ranks3, ?_⟩
+  refine ⟨AssetFixtures.ordered3, AssetFixtures.bounded3, AssetFixtures.parents3, by decide, by decide, AssetFixtures.ranks3, ?_⟩
   intro rank bound
   have small : rank < 13 := bound
   have checked : ∀ rank : Fin 13, (AssetFixtures.chainFacts3 rank.val).registry = (AssetFixtures.receipts3).registry rank.val ∧ (AssetFixtures.chainFacts3 rank.val).ordinal = AssetFixtures.positions3 rank.val ∧ AssetFixtures.positions3 rank.val ≠ [] := by decide
@@ -713,8 +1050,24 @@ theorem same3_0_2 : SameProtocolEvidence evidence3_0_0 evidence3_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_0_0 i) (evidence3_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_0_0 evidence3_0_2 sources3_0 same3_0_2
-example : (reconcileProtocol world3 evidence3_0_0 empty3).map (fun result => assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_0_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) := by decide
+example : (reconcileProtocol world3 evidence3_0_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_0_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_0_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_0_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_0_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_0_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_0_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_0_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_0_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_0_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_0_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_0_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence3_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_1_0 else AssetFixtures.agents3_1_0 i.val
 def evidence3_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_1_1 else AssetFixtures.agents3_1_1 i.val
 def evidence3_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_1_2 else AssetFixtures.agents3_1_2 i.val
@@ -734,8 +1087,24 @@ theorem same3_1_2 : SameProtocolEvidence evidence3_1_0 evidence3_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_1_0 i) (evidence3_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_1_0 evidence3_1_2 sources3_1 same3_1_2
-example : (reconcileProtocol world3 evidence3_1_0 empty3).map (fun result => assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_1_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) := by decide
+example : (reconcileProtocol world3 evidence3_1_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_1_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_1_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_1_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_1_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_1_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_1_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_1_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_1_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_1_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_1_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_1_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence3_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_2_0 else AssetFixtures.agents3_2_0 i.val
 def evidence3_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_2_1 else AssetFixtures.agents3_2_1 i.val
 def evidence3_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_2_2 else AssetFixtures.agents3_2_2 i.val
@@ -755,8 +1124,24 @@ theorem same3_2_2 : SameProtocolEvidence evidence3_2_0 evidence3_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_2_0 i) (evidence3_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_2_0 evidence3_2_2 sources3_2 same3_2_2
-example : (reconcileProtocol world3 evidence3_2_0 empty3).map (fun result => assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_2_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) := by decide
+example : (reconcileProtocol world3 evidence3_2_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_2_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_2_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_2_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_2_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_2_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_2_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_2_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_2_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_2_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_2_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_2_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence3_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_3_0 else AssetFixtures.agents3_3_0 i.val
 def evidence3_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_3_1 else AssetFixtures.agents3_3_1 i.val
 def evidence3_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_3_2 else AssetFixtures.agents3_3_2 i.val
@@ -776,8 +1161,24 @@ theorem same3_3_2 : SameProtocolEvidence evidence3_3_0 evidence3_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_3_0 i) (evidence3_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_3_0 evidence3_3_2 sources3_3 same3_3_2
-example : (reconcileProtocol world3 evidence3_3_0 empty3).map (fun result => assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_3_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) := by decide
+example : (reconcileProtocol world3 evidence3_3_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_3_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_3_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_3_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_3_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_3_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_3_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_3_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_3_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_3_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_3_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_3_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence3_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_4_0 else AssetFixtures.agents3_4_0 i.val
 def evidence3_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_4_1 else AssetFixtures.agents3_4_1 i.val
 def evidence3_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_4_2 else AssetFixtures.agents3_4_2 i.val
@@ -797,8 +1198,24 @@ theorem same3_4_2 : SameProtocolEvidence evidence3_4_0 evidence3_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_4_0 i) (evidence3_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_4_0 evidence3_4_2 sources3_4 same3_4_2
-example : (reconcileProtocol world3 evidence3_4_0 empty3).map (fun result => assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_4_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) := by decide
+example : (reconcileProtocol world3 evidence3_4_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_4_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_4_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_4_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_4_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_4_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_4_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_4_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_4_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_4_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_4_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_4_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence3_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_5_0 else AssetFixtures.agents3_5_0 i.val
 def evidence3_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_5_1 else AssetFixtures.agents3_5_1 i.val
 def evidence3_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_5_2 else AssetFixtures.agents3_5_2 i.val
@@ -818,8 +1235,24 @@ theorem same3_5_2 : SameProtocolEvidence evidence3_5_0 evidence3_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_5_0 i) (evidence3_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_5_0 evidence3_5_2 sources3_5 same3_5_2
-example : (reconcileProtocol world3 evidence3_5_0 empty3).map (fun result => assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_5_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) := by decide
+example : (reconcileProtocol world3 evidence3_5_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_5_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_5_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_5_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_5_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_5_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_5_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_5_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_5_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_5_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_5_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_5_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence3_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_6_0 else AssetFixtures.agents3_6_0 i.val
 def evidence3_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_6_1 else AssetFixtures.agents3_6_1 i.val
 def evidence3_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources3_6_2 else AssetFixtures.agents3_6_2 i.val
@@ -839,9 +1272,25 @@ theorem same3_6_2 : SameProtocolEvidence evidence3_6_0 evidence3_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence3_6_0 i) (evidence3_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world3 evidence3_6_0 evidence3_6_2 sources3_6 same3_6_2
-example : (reconcileProtocol world3 evidence3_6_0 empty3).map (fun result => assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_6_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (assetResult AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) := by decide
-def agent4_0 : ProtocolAgent := ⟨AssetFixtures.spec4_0, AssetControllerFixtures.receipts8, AssetControllerFixtures.positions8, AssetControllerFixtures.operationTime8, AssetControllerFixtures.chainFacts8, AssetControllerFixtures.documents8, AssetControllerFixtures.methods8, 2⟩
+example : (reconcileProtocol world3 evidence3_6_0 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_6_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_6_0) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_6_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_6_1 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_6_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_6_1) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_6_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world3 evidence3_6_2 empty3).map (fun result => List.ofFn (protocolResult world3 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs3 1 AssetFixtures.spec3_1 (AssetFixtures.agents3_6_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_1 records)))
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) (chainOwner (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)) AssetFixtures.graph3.size AssetFixtures.records3_6_2) ((coldAssetModel AssetFixtures.graph3 (assetAnchors AssetFixtures.graph3 AssetFixtures.receipts3)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph3 AssetFixtures.receipts3 (asset3.operationTime 4) AssetFixtures.chainFacts3 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs3 3 AssetFixtures.spec3_0 (AssetFixtures.agents3_6_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent3_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+def agent4_0 : ProtocolAgent := ⟨AssetFixtures.spec4_0, AssetControllerFixtures.receipts8, AssetControllerFixtures.positions8, 1788998460000, AssetControllerFixtures.operationTime8, AssetControllerFixtures.chainFacts8, AssetControllerFixtures.documents8, AssetControllerFixtures.methods8, 2⟩
 theorem agentDomain4_0 : ProtocolAgentDomain agent4_0 := by
   refine ⟨AssetControllerFixtures.ordered8, AssetControllerFixtures.bounded8, AssetControllerFixtures.parents8, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree8, AssetControllerFixtures.ranks8, ?_, ?_⟩
   · intro rank bound; rfl
@@ -849,7 +1298,7 @@ theorem agentDomain4_0 : ProtocolAgentDomain agent4_0 := by
     have small : rank < 0 := bound
     have checked : ∀ rank : Fin 0, (AssetControllerFixtures.chainFacts8 rank.val).registry = (AssetControllerFixtures.receipts8).registry rank.val ∧ (AssetControllerFixtures.chainFacts8 rank.val).ordinal = AssetControllerFixtures.positions8 rank.val ∧ AssetControllerFixtures.positions8 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def agent4_1 : ProtocolAgent := ⟨AssetFixtures.spec4_1, AssetControllerFixtures.receipts9, AssetControllerFixtures.positions9, AssetControllerFixtures.operationTime9, AssetControllerFixtures.chainFacts9, AssetControllerFixtures.documents9, AssetControllerFixtures.methods9, 2⟩
+def agent4_1 : ProtocolAgent := ⟨AssetFixtures.spec4_1, AssetControllerFixtures.receipts9, AssetControllerFixtures.positions9, 1788998460000, AssetControllerFixtures.operationTime9, AssetControllerFixtures.chainFacts9, AssetControllerFixtures.documents9, AssetControllerFixtures.methods9, 2⟩
 theorem agentDomain4_1 : ProtocolAgentDomain agent4_1 := by
   refine ⟨AssetControllerFixtures.ordered9, AssetControllerFixtures.bounded9, AssetControllerFixtures.parents9, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree9, AssetControllerFixtures.ranks9, ?_, ?_⟩
   · intro rank bound; rfl
@@ -857,9 +1306,9 @@ theorem agentDomain4_1 : ProtocolAgentDomain agent4_1 := by
     have small : rank < 0 := bound
     have checked : ∀ rank : Fin 0, (AssetControllerFixtures.chainFacts9 rank.val).registry = (AssetControllerFixtures.receipts9).registry rank.val ∧ (AssetControllerFixtures.chainFacts9 rank.val).ordinal = AssetControllerFixtures.positions9 rank.val ∧ AssetControllerFixtures.positions9 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def asset4 : ProtocolAsset := ⟨AssetFixtures.graph4, AssetFixtures.receipts4, AssetFixtures.positions4, (fun i => [1788999120000, 1789000200000, 1789000200000, 1789001400000, 1789000800000, 1789001400000, 1789001400000, 1789000200000, 1789002000000, 1789000200000, 1789000200000, 1789000800000].getD i (0)), AssetFixtures.chainFacts4⟩
+def asset4 : ProtocolAsset := ⟨AssetFixtures.graph4, AssetFixtures.receipts4, AssetFixtures.positions4, 1788999120000, AssetFixtures.chainFacts4⟩
 theorem assetDomain4 : ProtocolAssetDomain asset4 := by
-  refine ⟨AssetFixtures.ordered4, AssetFixtures.bounded4, AssetFixtures.parents4, by decide, by decide, (by intro operation nonroot; rfl), AssetFixtures.ranks4, ?_⟩
+  refine ⟨AssetFixtures.ordered4, AssetFixtures.bounded4, AssetFixtures.parents4, by decide, by decide, AssetFixtures.ranks4, ?_⟩
   intro rank bound
   have small : rank < 0 := bound
   have checked : ∀ rank : Fin 0, (AssetFixtures.chainFacts4 rank.val).registry = (AssetFixtures.receipts4).registry rank.val ∧ (AssetFixtures.chainFacts4 rank.val).ordinal = AssetFixtures.positions4 rank.val ∧ AssetFixtures.positions4 rank.val ≠ [] := by decide
@@ -922,8 +1371,24 @@ theorem same4_0_2 : SameProtocolEvidence evidence4_0_0 evidence4_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_0_0 i) (evidence4_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_0_0 evidence4_0_2 sources4_0 same4_0_2
-example : (reconcileProtocol world4 evidence4_0_0 empty4).map (fun result => assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_0_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) := by decide
+example : (reconcileProtocol world4 evidence4_0_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_0_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_0_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_0_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_0_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_0_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_0_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_0_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_0_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_0_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_0_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_0_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence4_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_1_0 else AssetFixtures.agents4_1_0 i.val
 def evidence4_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_1_1 else AssetFixtures.agents4_1_1 i.val
 def evidence4_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_1_2 else AssetFixtures.agents4_1_2 i.val
@@ -943,8 +1408,24 @@ theorem same4_1_2 : SameProtocolEvidence evidence4_1_0 evidence4_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_1_0 i) (evidence4_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_1_0 evidence4_1_2 sources4_1 same4_1_2
-example : (reconcileProtocol world4 evidence4_1_0 empty4).map (fun result => assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_1_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) := by decide
+example : (reconcileProtocol world4 evidence4_1_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_1_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_1_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_1_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_1_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_1_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_1_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_1_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_1_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_1_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_1_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_1_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence4_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_2_0 else AssetFixtures.agents4_2_0 i.val
 def evidence4_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_2_1 else AssetFixtures.agents4_2_1 i.val
 def evidence4_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_2_2 else AssetFixtures.agents4_2_2 i.val
@@ -964,8 +1445,24 @@ theorem same4_2_2 : SameProtocolEvidence evidence4_2_0 evidence4_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_2_0 i) (evidence4_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_2_0 evidence4_2_2 sources4_2 same4_2_2
-example : (reconcileProtocol world4 evidence4_2_0 empty4).map (fun result => assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_2_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) := by decide
+example : (reconcileProtocol world4 evidence4_2_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_2_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_2_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_2_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_2_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_2_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_2_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_2_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_2_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_2_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_2_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_2_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence4_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_3_0 else AssetFixtures.agents4_3_0 i.val
 def evidence4_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_3_1 else AssetFixtures.agents4_3_1 i.val
 def evidence4_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_3_2 else AssetFixtures.agents4_3_2 i.val
@@ -985,8 +1482,24 @@ theorem same4_3_2 : SameProtocolEvidence evidence4_3_0 evidence4_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_3_0 i) (evidence4_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_3_0 evidence4_3_2 sources4_3 same4_3_2
-example : (reconcileProtocol world4 evidence4_3_0 empty4).map (fun result => assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_3_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) := by decide
+example : (reconcileProtocol world4 evidence4_3_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_3_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_3_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_3_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_3_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_3_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_3_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_3_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_3_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_3_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_3_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_3_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence4_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_4_0 else AssetFixtures.agents4_4_0 i.val
 def evidence4_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_4_1 else AssetFixtures.agents4_4_1 i.val
 def evidence4_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_4_2 else AssetFixtures.agents4_4_2 i.val
@@ -1006,8 +1519,24 @@ theorem same4_4_2 : SameProtocolEvidence evidence4_4_0 evidence4_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_4_0 i) (evidence4_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_4_0 evidence4_4_2 sources4_4 same4_4_2
-example : (reconcileProtocol world4 evidence4_4_0 empty4).map (fun result => assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_4_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) := by decide
+example : (reconcileProtocol world4 evidence4_4_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_4_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_4_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_4_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_4_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_4_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_4_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_4_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_4_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_4_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_4_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_4_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence4_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_5_0 else AssetFixtures.agents4_5_0 i.val
 def evidence4_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_5_1 else AssetFixtures.agents4_5_1 i.val
 def evidence4_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_5_2 else AssetFixtures.agents4_5_2 i.val
@@ -1027,8 +1556,24 @@ theorem same4_5_2 : SameProtocolEvidence evidence4_5_0 evidence4_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_5_0 i) (evidence4_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_5_0 evidence4_5_2 sources4_5 same4_5_2
-example : (reconcileProtocol world4 evidence4_5_0 empty4).map (fun result => assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_5_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) := by decide
+example : (reconcileProtocol world4 evidence4_5_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_5_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_5_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_5_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_5_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_5_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_5_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_5_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_5_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_5_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_5_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_5_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence4_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_6_0 else AssetFixtures.agents4_6_0 i.val
 def evidence4_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_6_1 else AssetFixtures.agents4_6_1 i.val
 def evidence4_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 0 then AssetFixtures.sources4_6_2 else AssetFixtures.agents4_6_2 i.val
@@ -1048,9 +1593,25 @@ theorem same4_6_2 : SameProtocolEvidence evidence4_6_0 evidence4_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence4_6_0 i) (evidence4_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world4 evidence4_6_0 evidence4_6_2 sources4_6 same4_6_2
-example : (reconcileProtocol world4 evidence4_6_0 empty4).map (fun result => assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4) (result.assets ⟨0, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_6_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (assetResult AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) := by decide
-def agent5_0 : ProtocolAgent := ⟨AssetFixtures.spec5_0, AssetControllerFixtures.receipts10, AssetControllerFixtures.positions10, AssetControllerFixtures.operationTime10, AssetControllerFixtures.chainFacts10, AssetControllerFixtures.documents10, AssetControllerFixtures.methods10, 2⟩
+example : (reconcileProtocol world4 evidence4_6_0 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_6_0) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_6_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_6_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_6_1 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_6_1) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_6_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_6_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world4 evidence4_6_2 empty4).map (fun result => List.ofFn (protocolResult world4 result)) = (do
+  let result0 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) (chainOwner (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)) AssetFixtures.graph4.size AssetFixtures.records4_6_2) ((coldAssetModel AssetFixtures.graph4 (assetAnchors AssetFixtures.graph4 AssetFixtures.receipts4)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph4 AssetFixtures.receipts4 (asset4.operationTime 4) AssetFixtures.chainFacts4 records)))
+  let result1 ← (controllerSourceStop AssetFixtures.inputs4 1 AssetFixtures.spec4_0 (AssetFixtures.agents4_6_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_0 records)))
+  let result2 ← some none
+  let result3 ← (controllerSourceStop AssetFixtures.inputs4 3 AssetFixtures.spec4_1 (AssetFixtures.agents4_6_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent4_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+def agent5_0 : ProtocolAgent := ⟨AssetFixtures.spec5_0, AssetControllerFixtures.receipts10, AssetControllerFixtures.positions10, 1788998460000, AssetControllerFixtures.operationTime10, AssetControllerFixtures.chainFacts10, AssetControllerFixtures.documents10, AssetControllerFixtures.methods10, 2⟩
 theorem agentDomain5_0 : ProtocolAgentDomain agent5_0 := by
   refine ⟨AssetControllerFixtures.ordered10, AssetControllerFixtures.bounded10, AssetControllerFixtures.parents10, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree10, AssetControllerFixtures.ranks10, ?_, ?_⟩
   · intro rank bound; rfl
@@ -1058,7 +1619,7 @@ theorem agentDomain5_0 : ProtocolAgentDomain agent5_0 := by
     have small : rank < 0 := bound
     have checked : ∀ rank : Fin 0, (AssetControllerFixtures.chainFacts10 rank.val).registry = (AssetControllerFixtures.receipts10).registry rank.val ∧ (AssetControllerFixtures.chainFacts10 rank.val).ordinal = AssetControllerFixtures.positions10 rank.val ∧ AssetControllerFixtures.positions10 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def agent5_1 : ProtocolAgent := ⟨AssetFixtures.spec5_1, AssetControllerFixtures.receipts11, AssetControllerFixtures.positions11, AssetControllerFixtures.operationTime11, AssetControllerFixtures.chainFacts11, AssetControllerFixtures.documents11, AssetControllerFixtures.methods11, 2⟩
+def agent5_1 : ProtocolAgent := ⟨AssetFixtures.spec5_1, AssetControllerFixtures.receipts11, AssetControllerFixtures.positions11, 1788998460000, AssetControllerFixtures.operationTime11, AssetControllerFixtures.chainFacts11, AssetControllerFixtures.documents11, AssetControllerFixtures.methods11, 2⟩
 theorem agentDomain5_1 : ProtocolAgentDomain agent5_1 := by
   refine ⟨AssetControllerFixtures.ordered11, AssetControllerFixtures.bounded11, AssetControllerFixtures.parents11, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree11, AssetControllerFixtures.ranks11, ?_, ?_⟩
   · intro rank bound; rfl
@@ -1066,9 +1627,9 @@ theorem agentDomain5_1 : ProtocolAgentDomain agent5_1 := by
     have small : rank < 0 := bound
     have checked : ∀ rank : Fin 0, (AssetControllerFixtures.chainFacts11 rank.val).registry = (AssetControllerFixtures.receipts11).registry rank.val ∧ (AssetControllerFixtures.chainFacts11 rank.val).ordinal = AssetControllerFixtures.positions11 rank.val ∧ AssetControllerFixtures.positions11 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def asset5 : ProtocolAsset := ⟨AssetFixtures.graph5, AssetFixtures.receipts5, AssetFixtures.positions5, (fun i => [1789001400000, 1789000200000, 1789000200000, 1789000200000, 1789000200000, 1789000800000, 1789000200000, 1789002000000, 1789000800000, 1789001400000, 1788999120000, 1789001400000].getD i (0)), AssetFixtures.chainFacts5⟩
+def asset5 : ProtocolAsset := ⟨AssetFixtures.graph5, AssetFixtures.receipts5, AssetFixtures.positions5, 1788999120000, AssetFixtures.chainFacts5⟩
 theorem assetDomain5 : ProtocolAssetDomain asset5 := by
-  refine ⟨AssetFixtures.ordered5, AssetFixtures.bounded5, AssetFixtures.parents5, by decide, by decide, (by intro operation nonroot; rfl), AssetFixtures.ranks5, ?_⟩
+  refine ⟨AssetFixtures.ordered5, AssetFixtures.bounded5, AssetFixtures.parents5, by decide, by decide, AssetFixtures.ranks5, ?_⟩
   intro rank bound
   have small : rank < 0 := bound
   have checked : ∀ rank : Fin 0, (AssetFixtures.chainFacts5 rank.val).registry = (AssetFixtures.receipts5).registry rank.val ∧ (AssetFixtures.chainFacts5 rank.val).ordinal = AssetFixtures.positions5 rank.val ∧ AssetFixtures.positions5 rank.val ≠ [] := by decide
@@ -1131,8 +1692,24 @@ theorem same5_0_2 : SameProtocolEvidence evidence5_0_0 evidence5_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_0_0 i) (evidence5_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_0_0 evidence5_0_2 sources5_0 same5_0_2
-example : (reconcileProtocol world5 evidence5_0_0 empty5).map (fun result => assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_0_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) := by decide
+example : (reconcileProtocol world5 evidence5_0_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_0_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_0_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_0_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_0_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_0_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_0_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_0_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_0_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_0_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_0_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_0_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence5_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_1_0 else AssetFixtures.agents5_1_0 i.val
 def evidence5_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_1_1 else AssetFixtures.agents5_1_1 i.val
 def evidence5_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_1_2 else AssetFixtures.agents5_1_2 i.val
@@ -1152,8 +1729,24 @@ theorem same5_1_2 : SameProtocolEvidence evidence5_1_0 evidence5_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_1_0 i) (evidence5_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_1_0 evidence5_1_2 sources5_1 same5_1_2
-example : (reconcileProtocol world5 evidence5_1_0 empty5).map (fun result => assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_1_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) := by decide
+example : (reconcileProtocol world5 evidence5_1_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_1_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_1_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_1_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_1_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_1_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_1_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_1_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_1_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_1_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_1_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_1_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence5_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_2_0 else AssetFixtures.agents5_2_0 i.val
 def evidence5_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_2_1 else AssetFixtures.agents5_2_1 i.val
 def evidence5_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_2_2 else AssetFixtures.agents5_2_2 i.val
@@ -1173,8 +1766,24 @@ theorem same5_2_2 : SameProtocolEvidence evidence5_2_0 evidence5_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_2_0 i) (evidence5_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_2_0 evidence5_2_2 sources5_2 same5_2_2
-example : (reconcileProtocol world5 evidence5_2_0 empty5).map (fun result => assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_2_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) := by decide
+example : (reconcileProtocol world5 evidence5_2_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_2_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_2_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_2_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_2_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_2_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_2_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_2_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_2_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_2_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_2_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_2_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence5_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_3_0 else AssetFixtures.agents5_3_0 i.val
 def evidence5_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_3_1 else AssetFixtures.agents5_3_1 i.val
 def evidence5_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_3_2 else AssetFixtures.agents5_3_2 i.val
@@ -1194,8 +1803,24 @@ theorem same5_3_2 : SameProtocolEvidence evidence5_3_0 evidence5_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_3_0 i) (evidence5_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_3_0 evidence5_3_2 sources5_3 same5_3_2
-example : (reconcileProtocol world5 evidence5_3_0 empty5).map (fun result => assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_3_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) := by decide
+example : (reconcileProtocol world5 evidence5_3_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_3_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_3_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_3_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_3_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_3_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_3_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_3_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_3_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_3_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_3_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_3_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence5_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_4_0 else AssetFixtures.agents5_4_0 i.val
 def evidence5_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_4_1 else AssetFixtures.agents5_4_1 i.val
 def evidence5_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_4_2 else AssetFixtures.agents5_4_2 i.val
@@ -1215,8 +1840,24 @@ theorem same5_4_2 : SameProtocolEvidence evidence5_4_0 evidence5_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_4_0 i) (evidence5_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_4_0 evidence5_4_2 sources5_4 same5_4_2
-example : (reconcileProtocol world5 evidence5_4_0 empty5).map (fun result => assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_4_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) := by decide
+example : (reconcileProtocol world5 evidence5_4_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_4_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_4_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_4_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_4_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_4_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_4_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_4_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_4_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_4_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_4_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_4_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence5_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_5_0 else AssetFixtures.agents5_5_0 i.val
 def evidence5_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_5_1 else AssetFixtures.agents5_5_1 i.val
 def evidence5_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_5_2 else AssetFixtures.agents5_5_2 i.val
@@ -1236,8 +1877,24 @@ theorem same5_5_2 : SameProtocolEvidence evidence5_5_0 evidence5_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_5_0 i) (evidence5_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_5_0 evidence5_5_2 sources5_5 same5_5_2
-example : (reconcileProtocol world5 evidence5_5_0 empty5).map (fun result => assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_5_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) := by decide
+example : (reconcileProtocol world5 evidence5_5_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_5_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_5_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_5_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_5_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_5_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_5_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_5_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_5_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_5_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_5_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_5_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence5_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_6_0 else AssetFixtures.agents5_6_0 i.val
 def evidence5_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_6_1 else AssetFixtures.agents5_6_1 i.val
 def evidence5_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 2 then AssetFixtures.sources5_6_2 else AssetFixtures.agents5_6_2 i.val
@@ -1257,9 +1914,25 @@ theorem same5_6_2 : SameProtocolEvidence evidence5_6_0 evidence5_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence5_6_0 i) (evidence5_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world5 evidence5_6_0 evidence5_6_2 sources5_6 same5_6_2
-example : (reconcileProtocol world5 evidence5_6_0 empty5).map (fun result => assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5) (result.assets ⟨2, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_6_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (assetResult AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) := by decide
-def agent6_0 : ProtocolAgent := ⟨AssetFixtures.spec6_0, AssetControllerFixtures.receipts12, AssetControllerFixtures.positions12, AssetControllerFixtures.operationTime12, AssetControllerFixtures.chainFacts12, AssetControllerFixtures.documents12, AssetControllerFixtures.methods12, 2⟩
+example : (reconcileProtocol world5 evidence5_6_0 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_6_0 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_6_0) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_6_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_6_1 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_6_1 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_6_1) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_6_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world5 evidence5_6_2 empty5).map (fun result => List.ofFn (protocolResult world5 result)) = (do
+  let result0 ← (controllerSourceStop AssetFixtures.inputs5 0 AssetFixtures.spec5_0 (AssetFixtures.agents5_6_2 0)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_0 records)))
+  let result1 ← some none
+  let result2 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) (chainOwner (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)) AssetFixtures.graph5.size AssetFixtures.records5_6_2) ((coldAssetModel AssetFixtures.graph5 (assetAnchors AssetFixtures.graph5 AssetFixtures.receipts5)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph5 AssetFixtures.receipts5 (asset5.operationTime 4) AssetFixtures.chainFacts5 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs5 3 AssetFixtures.spec5_1 (AssetFixtures.agents5_6_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent5_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+def agent6_0 : ProtocolAgent := ⟨AssetFixtures.spec6_0, AssetControllerFixtures.receipts12, AssetControllerFixtures.positions12, 1788998460000, AssetControllerFixtures.operationTime12, AssetControllerFixtures.chainFacts12, AssetControllerFixtures.documents12, AssetControllerFixtures.methods12, 2⟩
 theorem agentDomain6_0 : ProtocolAgentDomain agent6_0 := by
   refine ⟨AssetControllerFixtures.ordered12, AssetControllerFixtures.bounded12, AssetControllerFixtures.parents12, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree12, AssetControllerFixtures.ranks12, ?_, ?_⟩
   · intro rank bound; rfl
@@ -1267,7 +1940,7 @@ theorem agentDomain6_0 : ProtocolAgentDomain agent6_0 := by
     have small : rank < 0 := bound
     have checked : ∀ rank : Fin 0, (AssetControllerFixtures.chainFacts12 rank.val).registry = (AssetControllerFixtures.receipts12).registry rank.val ∧ (AssetControllerFixtures.chainFacts12 rank.val).ordinal = AssetControllerFixtures.positions12 rank.val ∧ AssetControllerFixtures.positions12 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def agent6_1 : ProtocolAgent := ⟨AssetFixtures.spec6_1, AssetControllerFixtures.receipts13, AssetControllerFixtures.positions13, AssetControllerFixtures.operationTime13, AssetControllerFixtures.chainFacts13, AssetControllerFixtures.documents13, AssetControllerFixtures.methods13, 2⟩
+def agent6_1 : ProtocolAgent := ⟨AssetFixtures.spec6_1, AssetControllerFixtures.receipts13, AssetControllerFixtures.positions13, 1788998460000, AssetControllerFixtures.operationTime13, AssetControllerFixtures.chainFacts13, AssetControllerFixtures.documents13, AssetControllerFixtures.methods13, 2⟩
 theorem agentDomain6_1 : ProtocolAgentDomain agent6_1 := by
   refine ⟨AssetControllerFixtures.ordered13, AssetControllerFixtures.bounded13, AssetControllerFixtures.parents13, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree13, AssetControllerFixtures.ranks13, ?_, ?_⟩
   · intro rank bound; rfl
@@ -1275,9 +1948,9 @@ theorem agentDomain6_1 : ProtocolAgentDomain agent6_1 := by
     have small : rank < 0 := bound
     have checked : ∀ rank : Fin 0, (AssetControllerFixtures.chainFacts13 rank.val).registry = (AssetControllerFixtures.receipts13).registry rank.val ∧ (AssetControllerFixtures.chainFacts13 rank.val).ordinal = AssetControllerFixtures.positions13 rank.val ∧ AssetControllerFixtures.positions13 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def asset6 : ProtocolAsset := ⟨AssetFixtures.graph6, AssetFixtures.receipts6, AssetFixtures.positions6, (fun i => [1789002000000, 1789001400000, 1789001400000, 1788999120000, 1789000200000, 1789000200000, 1789000200000, 1789000800000, 1789000200000, 1789001400000, 1789000800000, 1789000200000].getD i (0)), AssetFixtures.chainFacts6⟩
+def asset6 : ProtocolAsset := ⟨AssetFixtures.graph6, AssetFixtures.receipts6, AssetFixtures.positions6, 1788999120000, AssetFixtures.chainFacts6⟩
 theorem assetDomain6 : ProtocolAssetDomain asset6 := by
-  refine ⟨AssetFixtures.ordered6, AssetFixtures.bounded6, AssetFixtures.parents6, by decide, by decide, (by intro operation nonroot; rfl), AssetFixtures.ranks6, ?_⟩
+  refine ⟨AssetFixtures.ordered6, AssetFixtures.bounded6, AssetFixtures.parents6, by decide, by decide, AssetFixtures.ranks6, ?_⟩
   intro rank bound
   have small : rank < 0 := bound
   have checked : ∀ rank : Fin 0, (AssetFixtures.chainFacts6 rank.val).registry = (AssetFixtures.receipts6).registry rank.val ∧ (AssetFixtures.chainFacts6 rank.val).ordinal = AssetFixtures.positions6 rank.val ∧ AssetFixtures.positions6 rank.val ≠ [] := by decide
@@ -1340,8 +2013,24 @@ theorem same6_0_2 : SameProtocolEvidence evidence6_0_0 evidence6_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_0_0 i) (evidence6_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_0_0 evidence6_0_2 sources6_0 same6_0_2
-example : (reconcileProtocol world6 evidence6_0_0 empty6).map (fun result => assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_0_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) := by decide
+example : (reconcileProtocol world6 evidence6_0_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_0_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_0_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_0_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_0_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_0_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_0_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_0_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_0_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_0_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_0_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_0_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence6_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_1_0 else AssetFixtures.agents6_1_0 i.val
 def evidence6_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_1_1 else AssetFixtures.agents6_1_1 i.val
 def evidence6_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_1_2 else AssetFixtures.agents6_1_2 i.val
@@ -1361,8 +2050,24 @@ theorem same6_1_2 : SameProtocolEvidence evidence6_1_0 evidence6_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_1_0 i) (evidence6_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_1_0 evidence6_1_2 sources6_1 same6_1_2
-example : (reconcileProtocol world6 evidence6_1_0 empty6).map (fun result => assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_1_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) := by decide
+example : (reconcileProtocol world6 evidence6_1_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_1_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_1_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_1_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_1_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_1_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_1_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_1_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_1_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_1_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_1_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_1_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence6_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_2_0 else AssetFixtures.agents6_2_0 i.val
 def evidence6_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_2_1 else AssetFixtures.agents6_2_1 i.val
 def evidence6_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_2_2 else AssetFixtures.agents6_2_2 i.val
@@ -1382,8 +2087,24 @@ theorem same6_2_2 : SameProtocolEvidence evidence6_2_0 evidence6_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_2_0 i) (evidence6_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_2_0 evidence6_2_2 sources6_2 same6_2_2
-example : (reconcileProtocol world6 evidence6_2_0 empty6).map (fun result => assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_2_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) := by decide
+example : (reconcileProtocol world6 evidence6_2_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_2_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_2_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_2_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_2_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_2_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_2_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_2_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_2_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_2_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_2_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_2_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence6_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_3_0 else AssetFixtures.agents6_3_0 i.val
 def evidence6_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_3_1 else AssetFixtures.agents6_3_1 i.val
 def evidence6_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_3_2 else AssetFixtures.agents6_3_2 i.val
@@ -1403,8 +2124,24 @@ theorem same6_3_2 : SameProtocolEvidence evidence6_3_0 evidence6_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_3_0 i) (evidence6_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_3_0 evidence6_3_2 sources6_3 same6_3_2
-example : (reconcileProtocol world6 evidence6_3_0 empty6).map (fun result => assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_3_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) := by decide
+example : (reconcileProtocol world6 evidence6_3_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_3_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_3_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_3_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_3_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_3_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_3_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_3_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_3_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_3_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_3_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_3_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence6_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_4_0 else AssetFixtures.agents6_4_0 i.val
 def evidence6_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_4_1 else AssetFixtures.agents6_4_1 i.val
 def evidence6_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_4_2 else AssetFixtures.agents6_4_2 i.val
@@ -1424,8 +2161,24 @@ theorem same6_4_2 : SameProtocolEvidence evidence6_4_0 evidence6_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_4_0 i) (evidence6_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_4_0 evidence6_4_2 sources6_4 same6_4_2
-example : (reconcileProtocol world6 evidence6_4_0 empty6).map (fun result => assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_4_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) := by decide
+example : (reconcileProtocol world6 evidence6_4_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_4_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_4_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_4_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_4_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_4_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_4_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_4_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_4_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_4_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_4_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_4_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence6_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_5_0 else AssetFixtures.agents6_5_0 i.val
 def evidence6_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_5_1 else AssetFixtures.agents6_5_1 i.val
 def evidence6_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_5_2 else AssetFixtures.agents6_5_2 i.val
@@ -1445,8 +2198,24 @@ theorem same6_5_2 : SameProtocolEvidence evidence6_5_0 evidence6_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_5_0 i) (evidence6_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_5_0 evidence6_5_2 sources6_5 same6_5_2
-example : (reconcileProtocol world6 evidence6_5_0 empty6).map (fun result => assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_5_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) := by decide
+example : (reconcileProtocol world6 evidence6_5_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_5_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_5_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_5_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_5_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_5_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_5_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_5_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_5_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_5_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_5_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_5_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence6_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_6_0 else AssetFixtures.agents6_6_0 i.val
 def evidence6_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_6_1 else AssetFixtures.agents6_6_1 i.val
 def evidence6_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources6_6_2 else AssetFixtures.agents6_6_2 i.val
@@ -1466,9 +2235,25 @@ theorem same6_6_2 : SameProtocolEvidence evidence6_6_0 evidence6_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence6_6_0 i) (evidence6_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world6 evidence6_6_0 evidence6_6_2 sources6_6 same6_6_2
-example : (reconcileProtocol world6 evidence6_6_0 empty6).map (fun result => assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_6_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (assetResult AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) := by decide
-def agent7_0 : ProtocolAgent := ⟨AssetFixtures.spec7_0, AssetControllerFixtures.receipts14, AssetControllerFixtures.positions14, AssetControllerFixtures.operationTime14, AssetControllerFixtures.chainFacts14, AssetControllerFixtures.documents14, AssetControllerFixtures.methods14, 2⟩
+example : (reconcileProtocol world6 evidence6_6_0 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_6_0) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_6_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_6_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_6_1 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_6_1) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_6_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_6_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world6 evidence6_6_2 empty6).map (fun result => List.ofFn (protocolResult world6 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) (chainOwner (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)) AssetFixtures.graph6.size AssetFixtures.records6_6_2) ((coldAssetModel AssetFixtures.graph6 (assetAnchors AssetFixtures.graph6 AssetFixtures.receipts6)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph6 AssetFixtures.receipts6 (asset6.operationTime 4) AssetFixtures.chainFacts6 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs6 2 AssetFixtures.spec6_1 (AssetFixtures.agents6_6_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs6 3 AssetFixtures.spec6_0 (AssetFixtures.agents6_6_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent6_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+def agent7_0 : ProtocolAgent := ⟨AssetFixtures.spec7_0, AssetControllerFixtures.receipts14, AssetControllerFixtures.positions14, 1788998460000, AssetControllerFixtures.operationTime14, AssetControllerFixtures.chainFacts14, AssetControllerFixtures.documents14, AssetControllerFixtures.methods14, 2⟩
 theorem agentDomain7_0 : ProtocolAgentDomain agent7_0 := by
   refine ⟨AssetControllerFixtures.ordered14, AssetControllerFixtures.bounded14, AssetControllerFixtures.parents14, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree14, AssetControllerFixtures.ranks14, ?_, ?_⟩
   · intro rank bound; rfl
@@ -1476,7 +2261,7 @@ theorem agentDomain7_0 : ProtocolAgentDomain agent7_0 := by
     have small : rank < 4 := bound
     have checked : ∀ rank : Fin 4, (AssetControllerFixtures.chainFacts14 rank.val).registry = (AssetControllerFixtures.receipts14).registry rank.val ∧ (AssetControllerFixtures.chainFacts14 rank.val).ordinal = AssetControllerFixtures.positions14 rank.val ∧ AssetControllerFixtures.positions14 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def agent7_1 : ProtocolAgent := ⟨AssetFixtures.spec7_1, AssetControllerFixtures.receipts15, AssetControllerFixtures.positions15, AssetControllerFixtures.operationTime15, AssetControllerFixtures.chainFacts15, AssetControllerFixtures.documents15, AssetControllerFixtures.methods15, 2⟩
+def agent7_1 : ProtocolAgent := ⟨AssetFixtures.spec7_1, AssetControllerFixtures.receipts15, AssetControllerFixtures.positions15, 1788998460000, AssetControllerFixtures.operationTime15, AssetControllerFixtures.chainFacts15, AssetControllerFixtures.documents15, AssetControllerFixtures.methods15, 2⟩
 theorem agentDomain7_1 : ProtocolAgentDomain agent7_1 := by
   refine ⟨AssetControllerFixtures.ordered15, AssetControllerFixtures.bounded15, AssetControllerFixtures.parents15, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree15, AssetControllerFixtures.ranks15, ?_, ?_⟩
   · intro rank bound; rfl
@@ -1484,9 +2269,9 @@ theorem agentDomain7_1 : ProtocolAgentDomain agent7_1 := by
     have small : rank < 2 := bound
     have checked : ∀ rank : Fin 2, (AssetControllerFixtures.chainFacts15 rank.val).registry = (AssetControllerFixtures.receipts15).registry rank.val ∧ (AssetControllerFixtures.chainFacts15 rank.val).ordinal = AssetControllerFixtures.positions15 rank.val ∧ AssetControllerFixtures.positions15 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def asset7 : ProtocolAsset := ⟨AssetFixtures.graph7, AssetFixtures.receipts7, AssetFixtures.positions7, (fun i => [1789000800000, 1789000200000, 1789000200000, 1789000200000, 1789000800000, 1789000200000, 1789000200000, 1789001400000, 1789001400000, 1788999120000, 1789002000000, 1789001400000].getD i (0)), AssetFixtures.chainFacts7⟩
+def asset7 : ProtocolAsset := ⟨AssetFixtures.graph7, AssetFixtures.receipts7, AssetFixtures.positions7, 1788999120000, AssetFixtures.chainFacts7⟩
 theorem assetDomain7 : ProtocolAssetDomain asset7 := by
-  refine ⟨AssetFixtures.ordered7, AssetFixtures.bounded7, AssetFixtures.parents7, by decide, by decide, (by intro operation nonroot; rfl), AssetFixtures.ranks7, ?_⟩
+  refine ⟨AssetFixtures.ordered7, AssetFixtures.bounded7, AssetFixtures.parents7, by decide, by decide, AssetFixtures.ranks7, ?_⟩
   intro rank bound
   have small : rank < 13 := bound
   have checked : ∀ rank : Fin 13, (AssetFixtures.chainFacts7 rank.val).registry = (AssetFixtures.receipts7).registry rank.val ∧ (AssetFixtures.chainFacts7 rank.val).ordinal = AssetFixtures.positions7 rank.val ∧ AssetFixtures.positions7 rank.val ≠ [] := by decide
@@ -1549,8 +2334,24 @@ theorem same7_0_2 : SameProtocolEvidence evidence7_0_0 evidence7_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_0_0 i) (evidence7_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_0_0 evidence7_0_2 sources7_0 same7_0_2
-example : (reconcileProtocol world7 evidence7_0_0 empty7).map (fun result => assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7) (result.assets ⟨3, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_0_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) := by decide
+example : (reconcileProtocol world7 evidence7_0_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_0_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_0_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_0_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_0_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_0_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_0_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_0_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_0_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_0_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_0_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_0_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence7_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_1_0 else AssetFixtures.agents7_1_0 i.val
 def evidence7_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_1_1 else AssetFixtures.agents7_1_1 i.val
 def evidence7_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_1_2 else AssetFixtures.agents7_1_2 i.val
@@ -1570,8 +2371,24 @@ theorem same7_1_2 : SameProtocolEvidence evidence7_1_0 evidence7_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_1_0 i) (evidence7_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_1_0 evidence7_1_2 sources7_1 same7_1_2
-example : (reconcileProtocol world7 evidence7_1_0 empty7).map (fun result => assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7) (result.assets ⟨3, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_1_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) := by decide
+example : (reconcileProtocol world7 evidence7_1_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_1_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_1_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_1_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_1_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_1_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_1_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_1_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_1_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_1_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_1_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_1_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence7_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_2_0 else AssetFixtures.agents7_2_0 i.val
 def evidence7_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_2_1 else AssetFixtures.agents7_2_1 i.val
 def evidence7_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_2_2 else AssetFixtures.agents7_2_2 i.val
@@ -1591,8 +2408,24 @@ theorem same7_2_2 : SameProtocolEvidence evidence7_2_0 evidence7_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_2_0 i) (evidence7_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_2_0 evidence7_2_2 sources7_2 same7_2_2
-example : (reconcileProtocol world7 evidence7_2_0 empty7).map (fun result => assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7) (result.assets ⟨3, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_2_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) := by decide
+example : (reconcileProtocol world7 evidence7_2_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_2_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_2_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_2_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_2_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_2_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_2_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_2_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_2_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_2_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_2_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_2_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence7_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_3_0 else AssetFixtures.agents7_3_0 i.val
 def evidence7_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_3_1 else AssetFixtures.agents7_3_1 i.val
 def evidence7_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_3_2 else AssetFixtures.agents7_3_2 i.val
@@ -1612,8 +2445,24 @@ theorem same7_3_2 : SameProtocolEvidence evidence7_3_0 evidence7_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_3_0 i) (evidence7_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_3_0 evidence7_3_2 sources7_3 same7_3_2
-example : (reconcileProtocol world7 evidence7_3_0 empty7).map (fun result => assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7) (result.assets ⟨3, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_3_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) := by decide
+example : (reconcileProtocol world7 evidence7_3_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_3_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_3_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_3_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_3_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_3_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_3_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_3_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_3_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_3_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_3_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_3_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence7_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_4_0 else AssetFixtures.agents7_4_0 i.val
 def evidence7_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_4_1 else AssetFixtures.agents7_4_1 i.val
 def evidence7_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_4_2 else AssetFixtures.agents7_4_2 i.val
@@ -1633,8 +2482,24 @@ theorem same7_4_2 : SameProtocolEvidence evidence7_4_0 evidence7_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_4_0 i) (evidence7_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_4_0 evidence7_4_2 sources7_4 same7_4_2
-example : (reconcileProtocol world7 evidence7_4_0 empty7).map (fun result => assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7) (result.assets ⟨3, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_4_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) := by decide
+example : (reconcileProtocol world7 evidence7_4_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_4_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_4_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_4_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_4_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_4_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_4_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_4_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_4_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_4_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_4_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_4_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence7_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_5_0 else AssetFixtures.agents7_5_0 i.val
 def evidence7_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_5_1 else AssetFixtures.agents7_5_1 i.val
 def evidence7_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_5_2 else AssetFixtures.agents7_5_2 i.val
@@ -1654,8 +2519,24 @@ theorem same7_5_2 : SameProtocolEvidence evidence7_5_0 evidence7_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_5_0 i) (evidence7_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_5_0 evidence7_5_2 sources7_5 same7_5_2
-example : (reconcileProtocol world7 evidence7_5_0 empty7).map (fun result => assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7) (result.assets ⟨3, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_5_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) := by decide
+example : (reconcileProtocol world7 evidence7_5_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_5_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_5_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_5_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_5_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_5_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_5_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_5_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_5_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_5_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_5_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_5_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence7_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_6_0 else AssetFixtures.agents7_6_0 i.val
 def evidence7_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_6_1 else AssetFixtures.agents7_6_1 i.val
 def evidence7_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 3 then AssetFixtures.sources7_6_2 else AssetFixtures.agents7_6_2 i.val
@@ -1675,9 +2556,25 @@ theorem same7_6_2 : SameProtocolEvidence evidence7_6_0 evidence7_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence7_6_0 i) (evidence7_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world7 evidence7_6_0 evidence7_6_2 sources7_6 same7_6_2
-example : (reconcileProtocol world7 evidence7_6_0 empty7).map (fun result => assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7) (result.assets ⟨3, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_6_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (assetResult AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) := by decide
-def agent8_0 : ProtocolAgent := ⟨AssetFixtures.spec8_0, AssetControllerFixtures.receipts16, AssetControllerFixtures.positions16, AssetControllerFixtures.operationTime16, AssetControllerFixtures.chainFacts16, AssetControllerFixtures.documents16, AssetControllerFixtures.methods16, 2⟩
+example : (reconcileProtocol world7 evidence7_6_0 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_6_0 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_6_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_6_0) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_6_1 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_6_1 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_6_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_6_1) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world7 evidence7_6_2 empty7).map (fun result => List.ofFn (protocolResult world7 result)) = (do
+  let result0 ← some none
+  let result1 ← (controllerSourceStop AssetFixtures.inputs7 1 AssetFixtures.spec7_1 (AssetFixtures.agents7_6_2 1)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_1 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs7 2 AssetFixtures.spec7_0 (AssetFixtures.agents7_6_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent7_0 records)))
+  let result3 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) (chainOwner (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)) AssetFixtures.graph7.size AssetFixtures.records7_6_2) ((coldAssetModel AssetFixtures.graph7 (assetAnchors AssetFixtures.graph7 AssetFixtures.receipts7)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph7 AssetFixtures.receipts7 (asset7.operationTime 4) AssetFixtures.chainFacts7 records)))
+  pure [result0, result1, result2, result3]) := by decide
+def agent8_0 : ProtocolAgent := ⟨AssetFixtures.spec8_0, AssetControllerFixtures.receipts16, AssetControllerFixtures.positions16, 1788998460000, AssetControllerFixtures.operationTime16, AssetControllerFixtures.chainFacts16, AssetControllerFixtures.documents16, AssetControllerFixtures.methods16, 2⟩
 theorem agentDomain8_0 : ProtocolAgentDomain agent8_0 := by
   refine ⟨AssetControllerFixtures.ordered16, AssetControllerFixtures.bounded16, AssetControllerFixtures.parents16, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree16, AssetControllerFixtures.ranks16, ?_, ?_⟩
   · intro rank bound; rfl
@@ -1685,7 +2582,7 @@ theorem agentDomain8_0 : ProtocolAgentDomain agent8_0 := by
     have small : rank < 4 := bound
     have checked : ∀ rank : Fin 4, (AssetControllerFixtures.chainFacts16 rank.val).registry = (AssetControllerFixtures.receipts16).registry rank.val ∧ (AssetControllerFixtures.chainFacts16 rank.val).ordinal = AssetControllerFixtures.positions16 rank.val ∧ AssetControllerFixtures.positions16 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def agent8_1 : ProtocolAgent := ⟨AssetFixtures.spec8_1, AssetControllerFixtures.receipts17, AssetControllerFixtures.positions17, AssetControllerFixtures.operationTime17, AssetControllerFixtures.chainFacts17, AssetControllerFixtures.documents17, AssetControllerFixtures.methods17, 2⟩
+def agent8_1 : ProtocolAgent := ⟨AssetFixtures.spec8_1, AssetControllerFixtures.receipts17, AssetControllerFixtures.positions17, 1788998460000, AssetControllerFixtures.operationTime17, AssetControllerFixtures.chainFacts17, AssetControllerFixtures.documents17, AssetControllerFixtures.methods17, 2⟩
 theorem agentDomain8_1 : ProtocolAgentDomain agent8_1 := by
   refine ⟨AssetControllerFixtures.ordered17, AssetControllerFixtures.bounded17, AssetControllerFixtures.parents17, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree17, AssetControllerFixtures.ranks17, ?_, ?_⟩
   · intro rank bound; rfl
@@ -1693,9 +2590,9 @@ theorem agentDomain8_1 : ProtocolAgentDomain agent8_1 := by
     have small : rank < 2 := bound
     have checked : ∀ rank : Fin 2, (AssetControllerFixtures.chainFacts17 rank.val).registry = (AssetControllerFixtures.receipts17).registry rank.val ∧ (AssetControllerFixtures.chainFacts17 rank.val).ordinal = AssetControllerFixtures.positions17 rank.val ∧ AssetControllerFixtures.positions17 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def asset8 : ProtocolAsset := ⟨AssetFixtures.graph8, AssetFixtures.receipts8, AssetFixtures.positions8, (fun i => [1789000200000, 1789000800000, 1789000200000, 1788999120000, 1789000200000, 1789000200000, 1789001400000, 1789000200000, 1789002000000, 1789001400000, 1789000800000, 1789001400000].getD i (0)), AssetFixtures.chainFacts8⟩
+def asset8 : ProtocolAsset := ⟨AssetFixtures.graph8, AssetFixtures.receipts8, AssetFixtures.positions8, 1788999120000, AssetFixtures.chainFacts8⟩
 theorem assetDomain8 : ProtocolAssetDomain asset8 := by
-  refine ⟨AssetFixtures.ordered8, AssetFixtures.bounded8, AssetFixtures.parents8, by decide, by decide, (by intro operation nonroot; rfl), AssetFixtures.ranks8, ?_⟩
+  refine ⟨AssetFixtures.ordered8, AssetFixtures.bounded8, AssetFixtures.parents8, by decide, by decide, AssetFixtures.ranks8, ?_⟩
   intro rank bound
   have small : rank < 13 := bound
   have checked : ∀ rank : Fin 13, (AssetFixtures.chainFacts8 rank.val).registry = (AssetFixtures.receipts8).registry rank.val ∧ (AssetFixtures.chainFacts8 rank.val).ordinal = AssetFixtures.positions8 rank.val ∧ AssetFixtures.positions8 rank.val ≠ [] := by decide
@@ -1758,8 +2655,24 @@ theorem same8_0_2 : SameProtocolEvidence evidence8_0_0 evidence8_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_0_0 i) (evidence8_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_0_0 evidence8_0_2 sources8_0 same8_0_2
-example : (reconcileProtocol world8 evidence8_0_0 empty8).map (fun result => assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_0_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) := by decide
+example : (reconcileProtocol world8 evidence8_0_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_0_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_0_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_0_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_0_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_0_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_0_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_0_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_0_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_0_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_0_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_0_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence8_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_1_0 else AssetFixtures.agents8_1_0 i.val
 def evidence8_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_1_1 else AssetFixtures.agents8_1_1 i.val
 def evidence8_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_1_2 else AssetFixtures.agents8_1_2 i.val
@@ -1779,8 +2692,24 @@ theorem same8_1_2 : SameProtocolEvidence evidence8_1_0 evidence8_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_1_0 i) (evidence8_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_1_0 evidence8_1_2 sources8_1 same8_1_2
-example : (reconcileProtocol world8 evidence8_1_0 empty8).map (fun result => assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_1_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) := by decide
+example : (reconcileProtocol world8 evidence8_1_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_1_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_1_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_1_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_1_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_1_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_1_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_1_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_1_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_1_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_1_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_1_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence8_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_2_0 else AssetFixtures.agents8_2_0 i.val
 def evidence8_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_2_1 else AssetFixtures.agents8_2_1 i.val
 def evidence8_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_2_2 else AssetFixtures.agents8_2_2 i.val
@@ -1800,8 +2729,24 @@ theorem same8_2_2 : SameProtocolEvidence evidence8_2_0 evidence8_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_2_0 i) (evidence8_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_2_0 evidence8_2_2 sources8_2 same8_2_2
-example : (reconcileProtocol world8 evidence8_2_0 empty8).map (fun result => assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_2_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) := by decide
+example : (reconcileProtocol world8 evidence8_2_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_2_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_2_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_2_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_2_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_2_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_2_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_2_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_2_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_2_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_2_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_2_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence8_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_3_0 else AssetFixtures.agents8_3_0 i.val
 def evidence8_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_3_1 else AssetFixtures.agents8_3_1 i.val
 def evidence8_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_3_2 else AssetFixtures.agents8_3_2 i.val
@@ -1821,8 +2766,24 @@ theorem same8_3_2 : SameProtocolEvidence evidence8_3_0 evidence8_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_3_0 i) (evidence8_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_3_0 evidence8_3_2 sources8_3 same8_3_2
-example : (reconcileProtocol world8 evidence8_3_0 empty8).map (fun result => assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_3_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) := by decide
+example : (reconcileProtocol world8 evidence8_3_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_3_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_3_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_3_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_3_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_3_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_3_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_3_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_3_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_3_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_3_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_3_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence8_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_4_0 else AssetFixtures.agents8_4_0 i.val
 def evidence8_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_4_1 else AssetFixtures.agents8_4_1 i.val
 def evidence8_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_4_2 else AssetFixtures.agents8_4_2 i.val
@@ -1842,8 +2803,24 @@ theorem same8_4_2 : SameProtocolEvidence evidence8_4_0 evidence8_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_4_0 i) (evidence8_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_4_0 evidence8_4_2 sources8_4 same8_4_2
-example : (reconcileProtocol world8 evidence8_4_0 empty8).map (fun result => assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_4_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) := by decide
+example : (reconcileProtocol world8 evidence8_4_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_4_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_4_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_4_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_4_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_4_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_4_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_4_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_4_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_4_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_4_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_4_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence8_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_5_0 else AssetFixtures.agents8_5_0 i.val
 def evidence8_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_5_1 else AssetFixtures.agents8_5_1 i.val
 def evidence8_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_5_2 else AssetFixtures.agents8_5_2 i.val
@@ -1863,8 +2840,24 @@ theorem same8_5_2 : SameProtocolEvidence evidence8_5_0 evidence8_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_5_0 i) (evidence8_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_5_0 evidence8_5_2 sources8_5 same8_5_2
-example : (reconcileProtocol world8 evidence8_5_0 empty8).map (fun result => assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_5_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) := by decide
+example : (reconcileProtocol world8 evidence8_5_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_5_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_5_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_5_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_5_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_5_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_5_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_5_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_5_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_5_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_5_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_5_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence8_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_6_0 else AssetFixtures.agents8_6_0 i.val
 def evidence8_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_6_1 else AssetFixtures.agents8_6_1 i.val
 def evidence8_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources8_6_2 else AssetFixtures.agents8_6_2 i.val
@@ -1884,9 +2877,25 @@ theorem same8_6_2 : SameProtocolEvidence evidence8_6_0 evidence8_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence8_6_0 i) (evidence8_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world8 evidence8_6_0 evidence8_6_2 sources8_6 same8_6_2
-example : (reconcileProtocol world8 evidence8_6_0 empty8).map (fun result => assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_6_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (assetResult AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) := by decide
-def agent9_0 : ProtocolAgent := ⟨AssetFixtures.spec9_0, AssetControllerFixtures.receipts18, AssetControllerFixtures.positions18, AssetControllerFixtures.operationTime18, AssetControllerFixtures.chainFacts18, AssetControllerFixtures.documents18, AssetControllerFixtures.methods18, 2⟩
+example : (reconcileProtocol world8 evidence8_6_0 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_6_0) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_6_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_6_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_6_1 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_6_1) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_6_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_6_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world8 evidence8_6_2 empty8).map (fun result => List.ofFn (protocolResult world8 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) (chainOwner (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)) AssetFixtures.graph8.size AssetFixtures.records8_6_2) ((coldAssetModel AssetFixtures.graph8 (assetAnchors AssetFixtures.graph8 AssetFixtures.receipts8)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph8 AssetFixtures.receipts8 (asset8.operationTime 4) AssetFixtures.chainFacts8 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs8 2 AssetFixtures.spec8_0 (AssetFixtures.agents8_6_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_0 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs8 3 AssetFixtures.spec8_1 (AssetFixtures.agents8_6_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent8_1 records)))
+  pure [result0, result1, result2, result3]) := by decide
+def agent9_0 : ProtocolAgent := ⟨AssetFixtures.spec9_0, AssetControllerFixtures.receipts18, AssetControllerFixtures.positions18, 1788998460000, AssetControllerFixtures.operationTime18, AssetControllerFixtures.chainFacts18, AssetControllerFixtures.documents18, AssetControllerFixtures.methods18, 2⟩
 theorem agentDomain9_0 : ProtocolAgentDomain agent9_0 := by
   refine ⟨AssetControllerFixtures.ordered18, AssetControllerFixtures.bounded18, AssetControllerFixtures.parents18, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree18, AssetControllerFixtures.ranks18, ?_, ?_⟩
   · intro rank bound; rfl
@@ -1894,7 +2903,7 @@ theorem agentDomain9_0 : ProtocolAgentDomain agent9_0 := by
     have small : rank < 0 := bound
     have checked : ∀ rank : Fin 0, (AssetControllerFixtures.chainFacts18 rank.val).registry = (AssetControllerFixtures.receipts18).registry rank.val ∧ (AssetControllerFixtures.chainFacts18 rank.val).ordinal = AssetControllerFixtures.positions18 rank.val ∧ AssetControllerFixtures.positions18 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def agent9_1 : ProtocolAgent := ⟨AssetFixtures.spec9_1, AssetControllerFixtures.receipts19, AssetControllerFixtures.positions19, AssetControllerFixtures.operationTime19, AssetControllerFixtures.chainFacts19, AssetControllerFixtures.documents19, AssetControllerFixtures.methods19, 2⟩
+def agent9_1 : ProtocolAgent := ⟨AssetFixtures.spec9_1, AssetControllerFixtures.receipts19, AssetControllerFixtures.positions19, 1788998460000, AssetControllerFixtures.operationTime19, AssetControllerFixtures.chainFacts19, AssetControllerFixtures.documents19, AssetControllerFixtures.methods19, 2⟩
 theorem agentDomain9_1 : ProtocolAgentDomain agent9_1 := by
   refine ⟨AssetControllerFixtures.ordered19, AssetControllerFixtures.bounded19, AssetControllerFixtures.parents19, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree19, AssetControllerFixtures.ranks19, ?_, ?_⟩
   · intro rank bound; rfl
@@ -1902,9 +2911,9 @@ theorem agentDomain9_1 : ProtocolAgentDomain agent9_1 := by
     have small : rank < 0 := bound
     have checked : ∀ rank : Fin 0, (AssetControllerFixtures.chainFacts19 rank.val).registry = (AssetControllerFixtures.receipts19).registry rank.val ∧ (AssetControllerFixtures.chainFacts19 rank.val).ordinal = AssetControllerFixtures.positions19 rank.val ∧ AssetControllerFixtures.positions19 rank.val ≠ [] := by decide
     exact checked ⟨rank, small⟩
-def asset9 : ProtocolAsset := ⟨AssetFixtures.graph9, AssetFixtures.receipts9, AssetFixtures.positions9, (fun i => [1789000200000, 1789001400000, 1789000200000, 1789000200000, 1788999120000, 1789000200000, 1789001400000, 1789000200000, 1789000800000, 1789002000000, 1789000800000, 1789001400000].getD i (0)), AssetFixtures.chainFacts9⟩
+def asset9 : ProtocolAsset := ⟨AssetFixtures.graph9, AssetFixtures.receipts9, AssetFixtures.positions9, 1788999120000, AssetFixtures.chainFacts9⟩
 theorem assetDomain9 : ProtocolAssetDomain asset9 := by
-  refine ⟨AssetFixtures.ordered9, AssetFixtures.bounded9, AssetFixtures.parents9, by decide, by decide, (by intro operation nonroot; rfl), AssetFixtures.ranks9, ?_⟩
+  refine ⟨AssetFixtures.ordered9, AssetFixtures.bounded9, AssetFixtures.parents9, by decide, by decide, AssetFixtures.ranks9, ?_⟩
   intro rank bound
   have small : rank < 0 := bound
   have checked : ∀ rank : Fin 0, (AssetFixtures.chainFacts9 rank.val).registry = (AssetFixtures.receipts9).registry rank.val ∧ (AssetFixtures.chainFacts9 rank.val).ordinal = AssetFixtures.positions9 rank.val ∧ AssetFixtures.positions9 rank.val ≠ [] := by decide
@@ -1967,8 +2976,24 @@ theorem same9_0_2 : SameProtocolEvidence evidence9_0_0 evidence9_0_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_0_0 i) (evidence9_0_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_0_0 evidence9_0_2 sources9_0 same9_0_2
-example : (reconcileProtocol world9 evidence9_0_0 empty9).map (fun result => assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_0_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) := by decide
+example : (reconcileProtocol world9 evidence9_0_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_0_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_0_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_0_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_0_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_0_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_0_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_0_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_0_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_0_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_0_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_0_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence9_1_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_1_0 else AssetFixtures.agents9_1_0 i.val
 def evidence9_1_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_1_1 else AssetFixtures.agents9_1_1 i.val
 def evidence9_1_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_1_2 else AssetFixtures.agents9_1_2 i.val
@@ -1988,8 +3013,24 @@ theorem same9_1_2 : SameProtocolEvidence evidence9_1_0 evidence9_1_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_1_0 i) (evidence9_1_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_1_0 evidence9_1_2 sources9_1 same9_1_2
-example : (reconcileProtocol world9 evidence9_1_0 empty9).map (fun result => assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_1_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) := by decide
+example : (reconcileProtocol world9 evidence9_1_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_1_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_1_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_1_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_1_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_1_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_1_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_1_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_1_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_1_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_1_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_1_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence9_2_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_2_0 else AssetFixtures.agents9_2_0 i.val
 def evidence9_2_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_2_1 else AssetFixtures.agents9_2_1 i.val
 def evidence9_2_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_2_2 else AssetFixtures.agents9_2_2 i.val
@@ -2009,8 +3050,24 @@ theorem same9_2_2 : SameProtocolEvidence evidence9_2_0 evidence9_2_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_2_0 i) (evidence9_2_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_2_0 evidence9_2_2 sources9_2 same9_2_2
-example : (reconcileProtocol world9 evidence9_2_0 empty9).map (fun result => assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_2_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) := by decide
+example : (reconcileProtocol world9 evidence9_2_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_2_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_2_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_2_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_2_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_2_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_2_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_2_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_2_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_2_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_2_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_2_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence9_3_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_3_0 else AssetFixtures.agents9_3_0 i.val
 def evidence9_3_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_3_1 else AssetFixtures.agents9_3_1 i.val
 def evidence9_3_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_3_2 else AssetFixtures.agents9_3_2 i.val
@@ -2030,8 +3087,24 @@ theorem same9_3_2 : SameProtocolEvidence evidence9_3_0 evidence9_3_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_3_0 i) (evidence9_3_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_3_0 evidence9_3_2 sources9_3 same9_3_2
-example : (reconcileProtocol world9 evidence9_3_0 empty9).map (fun result => assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_3_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) := by decide
+example : (reconcileProtocol world9 evidence9_3_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_3_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_3_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_3_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_3_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_3_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_3_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_3_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_3_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_3_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_3_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_3_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence9_4_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_4_0 else AssetFixtures.agents9_4_0 i.val
 def evidence9_4_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_4_1 else AssetFixtures.agents9_4_1 i.val
 def evidence9_4_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_4_2 else AssetFixtures.agents9_4_2 i.val
@@ -2051,8 +3124,24 @@ theorem same9_4_2 : SameProtocolEvidence evidence9_4_0 evidence9_4_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_4_0 i) (evidence9_4_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_4_0 evidence9_4_2 sources9_4 same9_4_2
-example : (reconcileProtocol world9 evidence9_4_0 empty9).map (fun result => assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_4_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) := by decide
+example : (reconcileProtocol world9 evidence9_4_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_4_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_4_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_4_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_4_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_4_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_4_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_4_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_4_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_4_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_4_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_4_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence9_5_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_5_0 else AssetFixtures.agents9_5_0 i.val
 def evidence9_5_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_5_1 else AssetFixtures.agents9_5_1 i.val
 def evidence9_5_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_5_2 else AssetFixtures.agents9_5_2 i.val
@@ -2072,8 +3161,24 @@ theorem same9_5_2 : SameProtocolEvidence evidence9_5_0 evidence9_5_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_5_0 i) (evidence9_5_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_5_0 evidence9_5_2 sources9_5 same9_5_2
-example : (reconcileProtocol world9 evidence9_5_0 empty9).map (fun result => assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_5_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) := by decide
+example : (reconcileProtocol world9 evidence9_5_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_5_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_5_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_5_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_5_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_5_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_5_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_5_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_5_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_5_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_5_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_5_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 def evidence9_6_0 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_6_0 else AssetFixtures.agents9_6_0 i.val
 def evidence9_6_1 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_6_1 else AssetFixtures.agents9_6_1 i.val
 def evidence9_6_2 : ProtocolEvidence 4 Nat := fun i => if i.val = 1 then AssetFixtures.sources9_6_2 else AssetFixtures.agents9_6_2 i.val
@@ -2093,6 +3198,22 @@ theorem same9_6_2 : SameProtocolEvidence evidence9_6_0 evidence9_6_2 := by
   have checked : ∀ i : Fin 4, sameAgentSourceCheck (evidence9_6_0 i) (evidence9_6_2 i) = true := by decide
   exact fun i => same_sources_of_check _ _ (checked i)
 example := protocol_sources_shared world9 evidence9_6_0 evidence9_6_2 sources9_6 same9_6_2
-example : (reconcileProtocol world9 evidence9_6_0 empty9).map (fun result => assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9) (result.assets ⟨1, by decide⟩)) =
-  (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_6_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (assetResult AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) := by decide
+example : (reconcileProtocol world9 evidence9_6_0 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_6_0) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_6_0 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_6_0 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_6_1 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_6_1) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_6_1 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_6_1 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
+example : (reconcileProtocol world9 evidence9_6_2 empty9).map (fun result => List.ofFn (protocolResult world9 result)) = (do
+  let result0 ← some none
+  let result1 ← (stopWhenStable (rankedPass (coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) (chainOwner (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)) AssetFixtures.graph9.size AssetFixtures.records9_6_2) ((coldAssetModel AssetFixtures.graph9 (assetAnchors AssetFixtures.graph9 AssetFixtures.receipts9)).size + 3) []).map (fun records => some (Sum.inr (assetReceiptResult AssetFixtures.graph9 AssetFixtures.receipts9 (asset9.operationTime 4) AssetFixtures.chainFacts9 records)))
+  let result2 ← (controllerSourceStop AssetFixtures.inputs9 2 AssetFixtures.spec9_1 (AssetFixtures.agents9_6_2 2)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_1 records)))
+  let result3 ← (controllerSourceStop AssetFixtures.inputs9 3 AssetFixtures.spec9_0 (AssetFixtures.agents9_6_2 3)).map (fun records => some (Sum.inl (protocolAgentResult 4 agent9_0 records)))
+  pure [result0, result1, result2, result3]) := by decide
 end Archon.ProtocolFixtures

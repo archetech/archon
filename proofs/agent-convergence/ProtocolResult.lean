@@ -5,23 +5,32 @@ namespace Archon
 
 /-- Decoding preserves the complete document and an explicit deactivation bit,
 including the distinction between a deleted DID and missing genesis. -/
-def protocolAgentResult (spec : ProtocolAgent) (records : ProtocolHistory α) :=
+def protocolAgentResult (localRegistry : Nat) (spec : ProtocolAgent) (records : ProtocolHistory α) :=
   let core := spec.core
   let a := componentAnchors core.graph core.patch core.registry core.initialRegistry spec.receipts
   let result := agentResult core.graph core.patch core.initialRegistry core.emptyData core.initialData a
     (expectedRegistry (componentRegistry core.graph core.patch core.registry core.initialRegistry))
-    spec.operationTime spec.chainFacts records
+    (spec.operationTime localRegistry) spec.chainFacts records
   (result.1, result.2.1.map (fun state => (componentResult spec.documents spec.deletedDocument state,
     match state.authority with | .active _ => false | .deleted => true)), result.2.2)
 
+abbrev ProtocolDIDResult := Option (Sum
+  (List Nat × Option ((Nat × Nat × Nat) × Bool) × List AgentReceiptView)
+  ((List Nat × Option (Option AssetDocument × Nat × Nat)) × List AgentReceiptView))
+
+-- Share the concrete equality instance instead of repeatedly expanding the
+-- nested component/receipt product while checking finite family results.
+set_option synthInstance.maxSize 2048 in
+instance : DecidableEq ProtocolDIDResult := inferInstance
+
 /-- Each immutable DID kind has exactly one semantic result. Opaque component
 atoms are shared decoded JSON values, not verification-method identifiers. -/
-def protocolResult (w : ProtocolModel n) (records : ProtocolRecords n α) (i : Fin n) :=
+def protocolResult (w : ProtocolModel n) (records : ProtocolRecords n α) (i : Fin n) : ProtocolDIDResult :=
   match w.dids i with
   | none => none
-  | some (.agent spec) => some (Sum.inl (protocolAgentResult spec (records.agents i)))
+  | some (.agent spec) => some (Sum.inl (protocolAgentResult w.localRegistry spec (records.agents i)))
   | some (.asset spec) => some (Sum.inr (assetReceiptResult spec.graph spec.receipts
-      spec.operationTime spec.chainFacts (records.assets i)))
+      (spec.operationTime w.localRegistry) spec.chainFacts (records.assets i)))
 
 def SameProtocolEvidence (left right : ProtocolEvidence n α) : Prop :=
   ∀ i, SameAgentSources (left i) (right i)
@@ -50,13 +59,13 @@ theorem protocol_agent_result_agrees [DecidableEq α] (w : ProtocolModel n) (dom
     (lrecords rrecords : ProtocolHistory α)
     (ls : protocolAgentStop w left i = some lrecords)
     (rs : protocolAgentStop w right i = some rrecords) :
-    protocolAgentResult spec lrecords = protocolAgentResult spec rrecords := by
+    protocolAgentResult w.localRegistry spec lrecords = protocolAgentResult w.localRegistry spec rrecords := by
   have found : w.agent i.val = some spec := by simp [ProtocolModel.agent, i.isLt, entry]
   have table : w.controllers.table i.val = some spec.core := by rw [protocol_controller_table, found]; rfl
   have valid := domain.agents i.val spec found
   obtain ⟨lr, rr, lstop, rstop, _, _, equal⟩ := integrated_agent_convergence
     spec.core.graph spec.core.patch spec.core.registry spec.core.initialRegistry spec.core.emptyData
-    spec.core.initialData spec.receipts spec.operationTime spec.chainFacts valid.ordered valid.bounded
+    spec.core.initialData spec.receipts (spec.operationTime w.localRegistry) spec.chainFacts valid.ordered valid.bounded
     (left i) (right i) (same i)
   have lstop' : protocolAgentStop w left i = some lr := by
     simp only [protocolAgentStop, table]
@@ -93,7 +102,7 @@ theorem protocol_results_agree [DecidableEq α] (w : ProtocolModel n) (domain : 
       have valid := domain.assets i spec asset
       have equal := asset_sources_same_receipt_result spec.graph spec.receipts w.controllers.table
         (protocolControllerViews w lr.agents) (protocolControllerViews w rr.agents) controllers
-        w.unanchored w.localRegistry spec.operationTime spec.chainFacts valid.ordered valid.bounded
+        w.unanchored w.localRegistry (spec.operationTime w.localRegistry) spec.chainFacts valid.ordered valid.bounded
         (left i) (right i) (same i)
       have lstop := lassets i
       have rstop := rassets i

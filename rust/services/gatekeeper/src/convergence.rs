@@ -1672,7 +1672,7 @@ async fn convergence_assets_with_controller_recovery() {
     }
 }
 
-// C2 audit: signed local receipt clocks must not decide asset authorization.
+// Local receipt normalization preserves signed history and repairs authorization.
 #[tokio::test]
 async fn convergence_local_receipt_clock_audit() {
     let vectors: Value = serde_json::from_str(include_str!(
@@ -1681,6 +1681,8 @@ async fn convergence_local_receipt_clock_audit() {
     .unwrap();
     for vector in vectors.as_array().unwrap() {
         let mut outcomes = Vec::new();
+        let did = vector["did"].as_str().unwrap();
+        let asset_did = vector["assetDid"].as_str().unwrap();
         for order in vector["orders"].as_array().unwrap() {
             let (mut state, _directory) = crate::tests::make_state(JsonDb {
                 backend: DbBackend::Memory,
@@ -1710,9 +1712,112 @@ async fn convergence_local_receipt_clock_audit() {
                 crate::import_batch_impl(&state, &[vector["asset"].clone()]).await;
                 crate::process_events_impl(&state).await;
                 let store = state.store.lock().await;
-                outcomes.push(store.get_events(vector["assetDid"].as_str().unwrap()).len());
+                let accepted = store.get_events(did);
+                assert_eq!(accepted.len(), 3);
+                for (index, event) in accepted.iter().enumerate() {
+                    assert_eq!(event.operation, vector["events"][index]["operation"]);
+                    assert_eq!(event.opid, Some(crate::generate_json_cid(&event.operation).unwrap()));
+                    let time = if event.operation["type"] == "create" {
+                        &event.operation["created"]
+                    } else {
+                        &event.operation["proof"]["created"]
+                    };
+                    assert_eq!(event.time, time.as_str().unwrap());
+                }
+                outcomes.push(store.get_events(asset_did).len());
             }
+            crate::import_batch_impl(&state, &[vector["deletion"].clone()]).await;
+            crate::process_events_impl(&state).await;
+            let store = state.store.lock().await;
+            let deleted = store.get_events(did);
+            assert_eq!(deleted.len(), 4);
+            assert_eq!(deleted[3].operation, vector["deletion"]["operation"]);
+            assert_eq!(deleted[3].time, vector["deletion"]["operation"]["proof"]["created"].as_str().unwrap());
         }
-        assert_eq!(outcomes, vec![0, 0, 1, 1], "local receipt audit changed");
+        assert_eq!(outcomes, vec![0, 0, 0, 0]);
+        let mut db = JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        };
+        let retained: Vec<_> = [0, 1, 4].iter().map(|index| {
+            let mut value = vector["events"][*index].clone();
+            value["did"] = json!(did);
+            value["opid"] = json!(crate::generate_json_cid(&value["operation"]).unwrap());
+            crate::value_to_event_record(&value)
+        }).collect();
+        let mut asset = vector["asset"].clone();
+        asset["did"] = json!(asset_did);
+        asset["opid"] = json!(crate::generate_json_cid(&asset["operation"]).unwrap());
+        let asset = crate::value_to_event_record(&asset);
+        db.set_candidates(did, retained.clone()).unwrap();
+        db.set_events(did, retained.clone()).unwrap();
+        db.set_candidates(asset_did, vec![asset.clone()]).unwrap();
+        db.set_events(asset_did, vec![asset]).unwrap();
+        let (state, _directory) = crate::tests::make_state(db);
+        crate::history::ensure_history_ready(&state).await.unwrap();
+        let store = state.store.lock().await;
+        assert!(store.get_events(asset_did).is_empty());
+        let candidates = store.get_candidates().unwrap();
+        assert_eq!(candidates[did].len(), retained.len());
+        for (old, repaired) in retained.iter().zip(&candidates[did]) {
+            assert_eq!(old.operation, repaired.operation);
+            assert_eq!(old.opid, repaired.opid);
+            assert_eq!(old.ordinal, repaired.ordinal);
+            let time = if repaired.operation["type"] == "create" {
+                &repaired.operation["created"]
+            } else {
+                &repaired.operation["proof"]["created"]
+            };
+            assert_eq!(repaired.time, time.as_str().unwrap());
+        }
+    }
+}
+
+// C2 blocker: local registration metadata currently supplies chain context.
+#[tokio::test]
+async fn convergence_local_registration_metadata_audit() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/local-registration-counterexample.json"
+    ))
+    .unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let mut outcomes = Vec::new();
+        for order in [[0, 1], [1, 0]] {
+            let (state, _directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            for event in vector["events"].as_array().unwrap() {
+                crate::import_batch_impl(&state, &[event.clone()]).await;
+                crate::process_events_impl(&state).await;
+            }
+            for index in order {
+                crate::import_batch_impl(&state, &[vector["receipts"][index].clone()]).await;
+                crate::process_events_impl(&state).await;
+            }
+            let data = serde_json::from_value(
+                serde_json::to_value(&state.store.lock().await.data).unwrap(),
+            ).unwrap();
+            let (state, _restart) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data,
+                redis_connection: None,
+            });
+            crate::history::ensure_history_ready(&state).await.unwrap();
+            let store = state.store.lock().await;
+            let agents = store.get_events(vector["did"].as_str().unwrap());
+            assert_eq!(agents.len(), 3);
+            for (index, event) in agents.iter().enumerate() {
+                assert_eq!(event.operation, vector["events"][index]["operation"]);
+            }
+            let did = vector["assetDid"].as_str().unwrap();
+            let candidates = store.get_candidates().unwrap();
+            assert_eq!(candidates[did].len(), 1);
+            assert_eq!(candidates[did][0].operation, vector["receipts"][0]["operation"]);
+            outcomes.push(store.get_events(did).len());
+        }
+        assert_eq!(outcomes, vec![0, 1]);
     }
 }

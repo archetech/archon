@@ -5,7 +5,7 @@ namespace Archon
 
 /-- The producer/decoder contract for a normalized source key. An authoritative
 anchor belongs to this operation and registry. A receipt without an anchor may
-only claim an unanchored registry: a chain hint is relayed as local, not confirmed.
+only claim an unanchored registry: a chain hint is relayed as Hyperswarm, not confirmed.
 Wrong-chain positioned receipts remain permitted. -/
 def ProtocolSourceKey (size : Nat) (receiptSize : Nat) (owner registry : Nat → Nat)
     (unanchored : Nat → Bool) (key : AgentReceiptKey) : Prop :=

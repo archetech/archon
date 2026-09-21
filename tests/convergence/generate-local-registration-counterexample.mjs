@@ -1,4 +1,4 @@
-// Synthetic keys and valid signed operations for the local receipt-clock audit.
+// Synthetic keys and valid signed operations for the unanchored registration-metadata audit.
 import Cipher from '../../packages/cipher/dist/esm/cipher-node.js';
 import { generateCID } from '../../packages/ipfs/dist/esm/utils.js';
 import { writeFileSync } from 'node:fs';
@@ -19,7 +19,7 @@ for (const legacy of [false, true]) {
             proofValue: Buffer.from(cipher.signHash(hash, keys[key].privateJwk), 'hex').toString('base64url') } };
     }
     const genesis = sign({ type: 'create', created: date(1),
-        registration: { version: 1, type: 'agent', registry: 'local' }, publicJwk: keys[0].publicJwk }, 0, 2, '#key-1');
+        registration: { version: 1, type: 'agent', registry: 'BTC:signet' }, publicJwk: keys[0].publicJwk }, 0, 1, '#key-1');
     const did = 'did:cid:' + await cid(genesis);
     const parent = sign({ type: 'update', did, previd: await cid(genesis),
         doc: { didDocumentData: { parent: true } } }, 0, 1, did + '#key-1');
@@ -27,15 +27,12 @@ for (const legacy of [false, true]) {
         id: did, verificationMethod: [{ id: '#key-1', controller: did,
             type: 'EcdsaSecp256k1VerificationKey2019', publicKeyJwk: keys[1].publicJwk }],
     } } }, 0, 2, did + '#key-1');
-    const asset = sign({ type: 'create', created: date(3),
+    const asset = sign({ type: 'create', created: date(1),
         registration: { version: 1, type: 'asset', registry: 'local' }, controller: did, data: {} }, 0, 3, did + '#key-1');
-    const deletion = sign({ type: 'delete', did, previd: await cid(rotation) }, 1, 5, did + '#key-1');
-    const hint = operation => ({ registry: 'local', time: operation.proof.created, operation });
-    const events = [hint(genesis), hint(parent),
-        { registry: 'local', ordinal: [1], time: date(2), operation: rotation },
-        { registry: 'local', ordinal: [2], time: date(2), operation: parent },
-        { registry: 'local', ordinal: [3], time: date(4), operation: rotation }];
-    vectors.push({ legacy, did, assetDid: 'did:cid:' + await cid(asset), asset: hint(asset), deletion: { ...hint(deletion), time: date(7) }, events,
-        orders: [[0, 1, 2, 3, 4], [0, 1, 4, 3, 2]] });
+    const chain = (operation, height) => ({ registry: 'BTC:signet', time: date(height), ordinal: [height, 0, 0], registration: { height, txid: 'audit', batch: 'audit', opidx: 0 }, operation });
+    const plain = { registry: 'local', time: date(1), operation: asset };
+    const registered = { ...plain, ordinal: [3, 0, 0], registration: { height: 3, txid: 'audit', batch: 'audit', opidx: 0 } };
+    vectors.push({ legacy, did, assetDid: 'did:cid:' + await cid(asset), events: [chain(genesis, 1), chain(parent, 1), chain(rotation, 2)], receipts: [plain, registered] });
+
 }
-writeFileSync('tests/convergence/local-receipt-counterexample.json', JSON.stringify(vectors, null, 2) + '\n');
+writeFileSync('tests/convergence/local-registration-counterexample.json', JSON.stringify(vectors, null, 2) + '\n');

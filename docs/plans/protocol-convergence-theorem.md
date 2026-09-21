@@ -6,21 +6,42 @@ agent and asset proofs over an arbitrary finite family of DIDs. This is a theore
 about the protocol model, with signed TypeScript/Rust correspondence tests; it is
 not universal verification of either implementation.
 
-## C2 blocker: local receipt clocks
+## Local receipt-clock correction
 
-The signed `local-receipt-counterexample.json` uses ordinary import in both proof
-formats. The same local rotation is delivered with September 2 and September 4
-receipt times in opposite orders. The candidate journal keeps the first local
-observation; replay retains that clock. An old-key local asset dated September 3
-is rejected in one order and accepted in the other. Operations and their canonical
-identities are identical. This is an admitted-input counterexample, not an
-observed production incident.
+The C2 audit reproduced opposite asset verdicts from the same signed local
+operations, with both proof formats and both Gatekeepers. A September 2 rotation
+was retained with a September 4 receipt time in one delivery order, admitting an
+old-key asset dated September 3; the other order rejected it. This was an admitted
+input counterexample, not an observed production incident.
 
-The direct local producer uses intrinsic clocks, but that is insufficient to
-exclude these imported receipts. Consequently the local-clock source contract
-below is not established for the admitted protocol domain. The frozen roadmap
-requires an explicit decision before extending normalization to local receipts;
-C2/C3 and release of the final claim are blocked until that decision and fix.
+On 2026-09-21 the maintainer approved normalizing local receipt clocks to the
+existing local producer rule: `operation.created` for creation and `proof.created`
+for updates/deletions. Both ports now normalize at import and candidate recovery,
+then reconstruct histories and dependent asset authorization. Signed regressions
+check actual retained agent operations, intrinsic clocks, deletion and recovery
+from an old accepted projection. The creation fixture deliberately has different
+creation and proof times. Operation bytes, IDs and ordinals remain intact.
+
+The final model derives its unanchored clock with `protocolOperationTime` from
+those complete-operation fields and the immutable creation/registry identity.
+There is no independent receipt-clock table, root exception or assumed equality
+of node-local timestamps in the final protocol input.
+
+## Remaining C2 blocker: unanchored registration metadata
+
+After the clock correction, an additional signed ordinary-import audit found
+that `controllerForEvent`/`controller_for_event` can treat `registration` on a
+local receipt as chain context. With an anchored controller, a local asset whose
+creation precedes its proof time can select different historical keys depending
+on whether the first retained receipt carries that field. The same signed asset
+is rejected in one order and accepted in the other, persisting across replay.
+`local-registration-counterexample.json` isolates the case with real signatures.
+
+The composed model uses proof-time authorization for sources without a chain
+anchor. That domain boundary is not yet enforced by production controller
+selection. C2/C3 remain open pending the explicit decision to restrict chain
+context to actual chain registries (recommended) or reject this metadata on
+unanchored receipts. The local-clock normalization itself is approved and fixed.
 
 ## Exact claim
 
@@ -99,24 +120,22 @@ one finite fixture happens to satisfy.
 | Authoritative chain facts | Registry, complete nonempty ordinal, block time and registration presence belong to the fixed chain view. The receipt-class registry/position projections are checked. Same registry/ordinal/CID is one ordering class with the same authoritative facts, not a uniqueness assumption about ordinals. Conflicting chain views are different input snapshots. |
 | Ordinal admission | Both ordinary import and replay require nonempty chain positions after #1236. `ProtocolSources` checks that an anchor is in range, belongs to the source operation and registry, and denotes a chain registry. Unpositioned local/Hyperswarm/pin remain permitted. A chain relay is downgraded to a gossip hint before this domain. Wrong-chain positioned receipts remain permitted provisional evidence. |
 | Receipt ordering | `RegistryCidRanks` and `AssetCidRanks` interpret registry-local ordinal then canonical CID. Tied positions for distinct operations are admitted. Repeated identical operation/position classes share ranks; different anchors remain distinct. Only predecessor-registry anchors receive chain priority. Unanchored and wrong-chain evidence uses canonical CID priority. |
-| Unanchored clock | Hyperswarm and pin clocks are normalized to `proof.created` at import and retained-candidate recovery. Local producer clocks are operation-intrinsic: creation `created`, update/deletion `proof.created` (Gatekeeper specification §8.1–8.2). This does not assume equal local arrival times. The local import/recovery gap described above currently prevents applying this contract to every admitted local receipt. Asset operation clocks are tied to the graph's proof-time projection. |
+| Unanchored clock | Hyperswarm and pin clocks are normalized to `proof.created` at import and retained-candidate recovery. Local producer clocks are operation-intrinsic: creation `created`, update/deletion `proof.created` (Gatekeeper specification §8.1–8.2). This does not assume equal local arrival times. Both ports now enforce the local clock rule at ordinary import and recovery too; the separate registration-context gap is described above. Agent/asset receipt clocks are derived from creation and proof fields, including genesis. |
 | Registry configuration | Nodes agree on registry-name projection and classification; these are not a closed supported-chain allowlist. Local/Hyperswarm/pin have no chain priority. The separate local-owner/nonlocal-asset creation restriction remains active. |
 | Same retained evidence | Same operation/registry/anchor-class key sets per DID. Arrival order, duplicate count and arbitrary bookkeeping may differ. The source-admission contract is preserved by this equivalence. Candidate retention is separate from accepted projection: rejected/deferred evidence is reconsidered. Equal operation bytes with different known anchors do not meet this premise. |
 | Complete reconciliation | Independent agents precede assets; assets cannot control agents or other assets. The theorem executes this schedule over any finite family and proves termination. Dynamic imports must eventually invoke complete reconciliation after evidence settles. |
 
-The local-clock condition comes from the documented direct-operation producer,
-not a new normalization policy: TypeScript `createDID`/`updateDID` and Rust's
+The local-clock condition now follows from the approved import/recovery normalization as well as the documented direct-operation producer: TypeScript `createDID`/`updateDID` and Rust's
 matching producer paths set those intrinsic values. Public relays normalize
 exported events to Hyperswarm hints; Hyperswarm and pin normalize their clocks at
-Gatekeeper. The local counterexample above must be resolved before this source contract can
-support the target claim; it cannot simply be excluded as privileged input. The fixed authoritative-chain
+Gatekeeper. The signed local counterexample is repaired rather than excluded as privileged input. The fixed authoritative-chain
 premise likewise does not authenticate an arbitrary submitted timestamp.
 
 The implementation architecture remains the audited A/B architecture: mediators
 produce chain positions; Gatekeeper normalizes and journals candidates; event
 authorization selects historical controllers; low-level verification receives the
 selected document; reconstruction publishes agents before dependent assets.
-No authorization policy, receipt preference or runtime safeguard changes here.
+The approved local-clock normalization is the only runtime protocol change.
 The paused #1156 relationship-permission rule remains paused.
 
 ## C3 checked bridge and CI
@@ -125,15 +144,16 @@ The paused #1156 relationship-permission rule remains paused.
 B3. It builds finite typed families containing both agents, the asset and a missing
 owner slot, checks complete graph/document/receipt/source contracts, and applies
 `protocol_convergence` to all 70 evidence stages. It checks three delivery orders
-per stage and evaluates the actual composed execution against the independently
-kernel-checked B3 complete asset result. This ties execution of the agent phase to
+per stage and evaluates every DID’s full semantic result in every order against the independently
+stopped A/B components, including agent documents/deactivation and both receipt views. This ties execution of the agent phase to
 asset execution, not just two unrelated result tables. Agent migrations and the
 broader 42 A4 scenarios retain their existing integrated signed bridge.
 
 The existing TypeScript and Rust suites exercise those signed scenarios through
 ordinary import, repeat import and actual JSON-storage reopen, including dependent
-revocation/recovery. Generator rejection and table-reordering tests remain part of
-the bridge. CI regenerates signed vectors, checks generated Lean files, runs both
+revocation/recovery. Generator rejection tests remain part of the bridge. CI also regenerates
+reordered operation/event tables and compiles all three resulting Lean modules,
+so successful string generation alone does not establish the reordering contract. CI regenerates signed vectors, checks generated Lean files, runs both
 ports, builds the final theorem and audits its transitive axioms. Only `propext`
 and `Quot.sound` are allowed; no `sorry`, `native_decide` or choice axiom is used.
 

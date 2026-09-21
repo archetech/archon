@@ -91,10 +91,7 @@ theorem protocol_agent_execution [DecidableEq α] (w : ProtocolModel n) (domain 
   have equal := Option.some.inj (stop.symm.trans stopped)
   exact ⟨final, by simpa only [equal] using root, by simpa only [equal] using executed⟩
 
-abbrev ProtocolSemanticResult (n : Nat) :=
-  Fin n → Option (Sum
-    (List Nat × Option ((Nat × Nat × Nat) × Bool) × List AgentReceiptView)
-    ((List Nat × Option (Option AssetDocument × Nat × Nat)) × List AgentReceiptView))
+abbrev ProtocolSemanticResult (n : Nat) := Fin n → ProtocolDIDResult
 
 /-- A semantic result is canonical exactly when every equivalent finite delivery
 and every prior published projection reconstruct to it and really stop. -/
