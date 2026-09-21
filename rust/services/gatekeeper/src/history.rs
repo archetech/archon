@@ -13,18 +13,40 @@ use crate::{
     generate_json_cid, update_search_doc, AppState, EventRecord, GatekeeperDb, JsonDb, SearchIndex,
 };
 
+// Storage enumerates suffixes; a signed creation may specify another prefix.
+// Keep the storage suffix so misaddressed evidence is rejected, not relocated.
+fn stored_target(config: &crate::Config, did: &str, events: &[EventRecord]) -> String {
+    let suffix = did.rsplit(':').next().unwrap_or(did);
+    if let Some(event) = events.first().filter(|event| event.operation["type"] == "create") {
+        let prefix = event.operation.pointer("/registration/prefix").and_then(Value::as_str)
+            .unwrap_or(&config.did_prefix);
+        let expected = format!("{prefix}:{suffix}");
+        if expected != did && generate_json_cid(&event.operation).ok().as_deref() == Some(suffix) {
+            return expected;
+        }
+    }
+    did.to_string()
+}
+
 // Derive the TypeScript numeric-key reference from content, never a peer opid.
 // Existing predecessor verification still checks the referenced operation's CID.
-fn normalize_candidate_event(store: &mut JsonDb, event: &mut EventRecord) -> Result<()> {
-    crate::events::normalize_event_time(event);
+fn normalize_candidate_event(store: &mut JsonDb, config: &crate::Config, did: &str, event: &mut EventRecord) -> Result<bool> {
     let canonical = generate_json_cid(&event.operation)?;
+    let Ok(target) = crate::proofs::operation_target(config, &event.operation, &canonical) else {
+        return Ok(false);
+    };
+    if target != did || event.did.as_ref().is_some_and(|claimed| claimed != &target) {
+        return Ok(false);
+    }
+    event.did = Some(target);
+    crate::events::normalize_event_time(event);
     if let Some(alias) = crate::proofs::typescript_numeric_cid(&event.operation) {
         if alias != canonical && store.get_operation(&alias).is_none() {
             store.add_operation(&alias, event.operation.clone())?;
         }
     }
     event.opid = Some(canonical);
-    Ok(())
+    Ok(true)
 }
 
 pub(crate) fn candidate_key(event: &EventRecord) -> String {
@@ -56,6 +78,16 @@ fn preferred_candidates(events: Vec<EventRecord>) -> Vec<EventRecord> {
         }
     }
     retained
+}
+
+fn normalize_candidates(store: &mut JsonDb, config: &crate::Config, did: &str, events: Vec<EventRecord>) -> Result<Vec<EventRecord>> {
+    let mut valid = Vec::with_capacity(events.len());
+    for mut event in events {
+        if normalize_candidate_event(store, config, did, &mut event)? {
+            valid.push(event);
+        }
+    }
+    Ok(preferred_candidates(valid))
 }
 
 fn index_candidates(
@@ -99,29 +131,24 @@ async fn retain_candidates_with_histories(
     let mut store = state.store.lock().await;
     if cache.is_none() {
         let mut candidates = store.get_candidates()?;
-        for current in store.list_dids(&state.config.did_prefix, None) {
-            if !candidates.contains_key(&current) {
-                let mut events = histories
-                    .map(|items| items.get(&current).cloned().unwrap_or_default())
-                    .unwrap_or_else(|| store.get_events(&current));
-                for event in &mut events {
-                    normalize_candidate_event(&mut store, event)?;
-                }
+        let stored = histories.map(|items| items.keys().cloned().collect())
+            .unwrap_or_else(|| store.list_dids(&state.config.did_prefix, None));
+        for listed in stored {
+            if !candidates.contains_key(&listed) {
+                let events = histories
+                    .map(|items| items.get(&listed).cloned().unwrap_or_default())
+                    .unwrap_or_else(|| store.get_events(&listed));
+                let current = stored_target(&state.config, &listed, &events);
+                if candidates.contains_key(&current) { continue; }
+                let events = normalize_candidates(&mut store, &state.config, &current, events)?;
                 store.set_candidates(&current, events.clone())?;
                 candidates.insert(current, events);
             }
         }
         for (key, events) in &mut candidates {
-            let mut changed = false;
-            for event in events.iter_mut() {
-                let previous = (event.opid.clone(), event.time.clone());
-                normalize_candidate_event(&mut store, event)?;
-                changed |= event.opid != previous.0 || event.time != previous.1;
-            }
-            let count = events.len();
-            *events = preferred_candidates(std::mem::take(events));
-            changed |= events.len() != count;
-            if changed {
+            let previous = events.clone();
+            *events = normalize_candidates(&mut store, &state.config, key, std::mem::take(events))?;
+            if *events != previous {
                 store.set_candidates(key, events.clone())?;
             }
             index_candidates(&mut dependents, key, events);
@@ -136,10 +163,7 @@ async fn retain_candidates_with_histories(
             .unwrap_or_else(|| store.get_events(did)),
     );
     events.extend(incoming);
-    for event in &mut events {
-        normalize_candidate_event(&mut store, event)?;
-    }
-    let events = preferred_candidates(events);
+    let events = normalize_candidates(&mut store, &state.config, did, events)?;
     let changed = candidates.get(did) != Some(&events);
     if changed {
         store.set_candidates(did, events.clone())?;
@@ -188,18 +212,29 @@ pub(crate) async fn ensure_history_ready(state: &AppState) -> Result<()> {
         return Ok(());
     }
     tracing::info!("Gatekeeper history recovery: loading candidate journal and DID list");
-    let mut dids: Vec<_> = {
+    let (mut dids, journal_dids): (Vec<_>, HashSet<_>) = {
         let store = state.store.lock().await;
         let mut dids: HashSet<_> = store.get_candidates()?.into_keys().collect();
-        dids.extend(store.list_dids(&state.config.did_prefix, None));
-        dids.into_iter().collect()
+        let journal_dids = dids.clone();
+        let suffixes: HashSet<_> = dids.iter().map(|did| did.rsplit(':').next().unwrap_or(did).to_string()).collect();
+        dids.extend(store.list_dids(&state.config.did_prefix, None).into_iter()
+            .filter(|did| !suffixes.contains(did.rsplit(':').next().unwrap_or(did))));
+        (dids.into_iter().collect(), journal_dids)
     };
     dids.sort();
     // Journal all existing projections before rebuilding any of them. A single
     // startup projection avoids replaying each controller's dependents again
     // when the outer DID scan reaches them.
     let mut loading = ProgressLogger::new("history loading", dids.len());
-    let histories = state.store.lock().await.get_histories(&dids)?;
+    let histories: HashMap<_, _> = state.store.lock().await.get_histories(&dids)?.into_iter()
+        .flat_map(|(did, events)| {
+            let target = stored_target(&state.config, &did, &events);
+            if target != did && journal_dids.contains(&did) {
+                vec![(did, events.clone()), (target, events)]
+            } else { vec![(target, events)] }
+        }).collect();
+    dids = histories.keys().cloned().collect();
+    dids.sort();
     loading.update(dids.len());
     let mut preparing = ProgressLogger::new("candidate preparation", dids.len());
     for (index, did) in dids.iter().enumerate() {
@@ -288,6 +323,15 @@ async fn rebuild_histories(
             })
             .collect()
     };
+    let mut genesis_targets = HashMap::new();
+    if histories.is_some() {
+        for (did, events) in &candidates {
+            if events.iter().any(|event| event.operation["type"] == "create") {
+                genesis_targets.insert(did.rsplit(':').next().unwrap_or(did).to_string(), did.clone());
+            }
+        }
+    }
+    let mut aliases = HashSet::new();
     let mut data = JsonDbFile::default();
     if histories.is_some() {
         // Startup retained and canonicalized every candidate before replay.
@@ -313,6 +357,17 @@ async fn rebuild_histories(
             let events = histories
                 .map(|items| items.get(&key).cloned().unwrap_or_default())
                 .unwrap_or_else(|| store.get_events(&key));
+            let suffix = key.rsplit(':').next().unwrap_or(&key);
+            let mut owner = genesis_targets.get(suffix).cloned();
+            if owner.is_none() {
+                if let Some(event) = events.first().filter(|event| event.operation["type"] == "create") {
+                    let prefix = event.operation.pointer("/registration/prefix").and_then(Value::as_str)
+                        .unwrap_or(&state.config.did_prefix);
+                    let expected = format!("{prefix}:{suffix}");
+                    if expected != key && generate_json_cid(&event.operation)? == suffix { owner = Some(expected); }
+                }
+            }
+            if owner.is_some_and(|owner| owner != key) { aliases.insert(key.clone()); }
             for event in events.iter().chain(cache.get(&key).into_iter().flatten()) {
                 if let Some(previd) = event.operation.get("previd").and_then(Value::as_str) {
                     if references.insert(previd.to_string()) && !data.ops.contains_key(previd) {
@@ -344,6 +399,8 @@ async fn rebuild_histories(
                 .insert(key.rsplit(':').next().unwrap_or(&key).to_string(), events);
         }
     }
+    // Replaying/deleting an alias would modify the canonical CID's storage too.
+    targets.retain(|target| !aliases.contains(target));
     // Start affected projections empty, so replay does not inherit an
     // arrival-dependent accepted branch from the previous materialization.
     for target in &targets {

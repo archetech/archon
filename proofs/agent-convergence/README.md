@@ -20,6 +20,18 @@ Their “next” lists are historical, not additional completion criteria. Unive
 TypeScript/Rust refinement and the other explicitly separate projects remain
 outside the protocol-proof scope.
 
+The model assumes each DID has one content-addressed genesis and every receipt
+belongs to its operation's target. Issue #1248 found that runtime envelope routing
+did not enforce that admission boundary: misaddressed signed genesis operations
+could produce order-dependent histories. Both importers now reject contradictory
+targets before deduplication and repair them out of stored evidence. The final
+agent/asset fixture bridge checks explicit envelope targets as well as its existing
+genesis and signed-successor identity checks; negative generator tests cover all
+three operation kinds. Shared signed `event-target-vectors.json` exercise ordinary
+imports, direct submission, storage-key validation, custom prefixes and durable
+restart in both ports. These admission tests close the demonstrated runtime gap;
+they do not turn the existing protocol theorem into universal runtime refinement.
+
 ## Earlier agent-only results
 
 This Lean project proves a bounded specification and an operational replay

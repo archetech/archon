@@ -27,16 +27,26 @@ pub(crate) fn is_valid_did(did: &str) -> bool {
 }
 
 pub(crate) fn infer_event_did(config: &Config, event: &Value) -> Result<String> {
-    if let Some(did) = event.get("did").and_then(Value::as_str) {
-        return Ok(did.to_string());
-    }
-
     let operation = event.get("operation").context("missing event.operation")?;
-    if let Some(did) = operation.get("did").and_then(Value::as_str) {
-        return Ok(did.to_string());
-    }
+    let cid = if operation["type"] == "create" { generate_json_cid(operation)? } else { String::new() };
+    let did = operation_target(config, operation, &cid)?;
+    anyhow::ensure!(event.get("did").is_none_or(|claimed| claimed.as_str() == Some(&did)),
+        "event DID does not match operation target");
+    Ok(did)
+}
 
-    generate_did_from_operation(config, operation)
+// The canonical CID is supplied by normalization, never trusted from an envelope.
+pub(crate) fn operation_target(config: &Config, operation: &Value, cid: &str) -> Result<String> {
+    match operation["type"].as_str() {
+        Some("create") => {
+            let prefix = operation.pointer("/registration/prefix").and_then(Value::as_str)
+                .unwrap_or(&config.did_prefix);
+            Ok(format!("{prefix}:{cid}"))
+        }
+        Some("update" | "delete") => operation["did"].as_str().filter(|did| !did.is_empty())
+            .map(str::to_owned).context("missing operation DID"),
+        _ => anyhow::bail!("invalid operation type"),
+    }
 }
 
 pub(crate) fn ensure_event_opid(event: &mut Value) -> Result<String> {

@@ -268,6 +268,12 @@ pub(crate) async fn authorize_operation(
             };
             validate_predecessor(state, operation, &current).await?;
             let genesis = creation_registration(state, did).await;
+            if let Some(registration) = &genesis {
+                let prefix = registration.get("prefix").and_then(Value::as_str).unwrap_or(&state.config.did_prefix);
+                if did != format!("{}:{}", prefix, did.rsplit(':').next().unwrap_or(did)) {
+                    return Ok(false);
+                }
+            }
             let kind = genesis
                 .as_ref()
                 .and_then(|value| value.get("type"))

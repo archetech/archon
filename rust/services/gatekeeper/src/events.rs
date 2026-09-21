@@ -391,7 +391,7 @@ pub(crate) async fn import_batch_impl(state: &AppState, batch: &[Value]) -> Impo
     // the lock acquisition here keeps parity with that cost model.
     let mut accepted: Vec<(String, EventRecord)> = Vec::with_capacity(batch.len());
     for event in batch {
-        if !verify_event_shape(event) {
+        if !verify_event_shape(event) || infer_event_did(&state.config, event).is_err() {
             if trace {
                 warn!("import_batch rejected malformed event {}", summarize_value_event(event));
             }

@@ -36,7 +36,11 @@ export function assetGraph(v, names = assetRegistryNames([v])) {
     };
     const components = v.operations.map((_, i) => structural(i));
     const expected = v.operations.map((_, i) => components[i === root ? i : parents[i]]?.didDocumentRegistration.registry ?? '');
-    const owners = v.events.map(e => v.operations.findIndex(op => isDeepStrictEqual(op, e.operation)));
+    const owners = v.events.map(e => {
+        const owner = v.operations.findIndex(op => isDeepStrictEqual(op, e.operation));
+        if (owner >= 0) assert(e.did === undefined || e.did === v.did, 'receipt DID must match operation target');
+        return owner;
+    });
     const controllerVectors = v.controllers.map(c => ({ ...c, keys: v.keys, scenarios: [],
         events: v.events.filter(e => c.operations.some(op => isDeepStrictEqual(op, e.operation))) }));
     const controllers = controllerVectors.map(c => integratedAgentGraph(c, names));

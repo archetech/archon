@@ -934,7 +934,7 @@ cannot fall back to the incomplete copy. Recovery applies the same preference.
 
 ```
 for event in events:
-    if !verify_event_shape(event):           // §8.4
+    if !verify_event_shape(event) or !valid_event_target(event): // §8.5
         rejected += 1; continue
 
     key := event.registry + "/" + canonicalOperationCID(event.operation)
@@ -986,7 +986,20 @@ recovers even if repeated imports are suppressed by the in-memory seen set.
 
 ### 8.4 `importEvent(event)` per-event flow
 
-Imports first persist the candidate event, then run the insertion algorithm below and replay the affected DID and its transitive dependents. Imports and direct submissions serialize history mutations. Replay uses a separate working view and invokes the same insertion/authorization algorithm; it never trusts a previous authorization verdict merely because it was once accepted.
+Imports validate the operation-derived target before queue deduplication and candidate persistence, then run the insertion algorithm below and replay the affected DID and its transitive dependents. Imports and direct submissions serialize history mutations. Replay uses a separate working view and invokes the same insertion/authorization algorithm; it never trusts a previous authorization verdict merely because it was once accepted.
+
+Candidate recovery checks both the envelope DID and the history key against the
+operation-derived target. Mismatched evidence is discarded before deduplication,
+dependency indexing and replay; accepted projections are rebuilt without it.
+It is not moved into another DID's history. Backends enumerate CID suffixes, so
+recovery preserves an explicit signed creation prefix and avoids enumerating the
+same journaled history again under the configured default prefix. Signed operation
+bytes and content-backed predecessor aliases remain unchanged.
+Because physical histories are keyed by CID suffix, replay excludes a rejected
+prefix alias from publication when that suffix belongs to a canonical genesis.
+Deleting the alias's empty projection would otherwise erase the canonical history.
+Direct and imported successors must name the genesis's full DID; alternate-prefix
+resolution remains a read alias.
 
 Local/gossip candidates retain the first observation of each canonical operation per registry; fresh peer receipt timestamps and ordinals do not add authorization evidence. Anchored candidates retain their distinct chain positions. After startup recovery, a merged import that changes neither retained candidates nor accepted history skips reconciliation and leaves status and verification caches intact. New evidence and changed anchors still reconcile normally.
 
@@ -998,9 +1011,9 @@ TypeScript's isolated replay copies event rows while sharing read-only operation
 payloads and memoizing their canonical IDs for that replay only. Resolution
 detaches its result before removing deprecated fields, preserving signed bytes.
 Independent agent histories replay in bounded groups of 32; the agent phase
-finishes before the asset phase. Histories with mixed-type or misaddressed
-retained evidence remain at their original sequential positions instead of
-joining parallel groups. Assets then replay in bounded groups,
+finishes before the asset phase. Target validation removes misaddressed retained
+evidence before classifying these histories; mixed-type evidence still keeps a
+history at its original sequential position. Assets then replay in bounded groups,
 preserving each DID's internal candidate order and publishing
 only after reconstruction completes. This relies on self-controlled agents
 and agent-only asset controllers, which are enforced during authorization.
@@ -1026,7 +1039,9 @@ rewritten to IPFS merely because a gossip wrapper omitted its operation ID.
 The following is the insertion algorithm reused during replay:
 
 ```
-1. normalize event.did, canonical event.opid, and unanchored event.time from the operation
+1. derive target from canonical creation CID/prefix, or signed update/delete operation.did
+   reject a supplied event.did that differs; fill an omitted event.did with the target
+   normalize canonical event.opid and unanchored event.time from the operation
    select the preferred retained same-position chain receipt before authorization
 2. acquire per-DID lock
 3. current = store.get_events(did); derive any missing canonical operation IDs
@@ -1126,6 +1141,9 @@ operation.type ∈ { create, update, delete }
   - update: did, doc with at least one of { didDocument, didDocumentData, didDocumentRegistration };
             if doc.didDocument.id is set it MUST equal operation.did
   - delete: did
+target := create ? applicableMethodPrefix + ":" + canonicalOperationCID(operation) : operation.did
+if event.did is supplied it MUST equal target
+    // creation.operation.did and peer-supplied event.opid cannot override creation identity
 ```
 
 ### 8.6 Ordinal comparison

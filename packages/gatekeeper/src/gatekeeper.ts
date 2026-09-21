@@ -576,6 +576,9 @@ export default class Gatekeeper implements GatekeeperInterface {
             const current = previous ?? await this.resolveDIDAt(operation.did);
             await this.validatePredecessor(operation, current);
             const genesis = await this.creationRegistration(operation.did);
+            // Storage/read aliases share a CID key, but cannot authorize a
+            // successor for a different full DID than that genesis defines.
+            if (genesis && operation.did !== `${genesis.prefix || this.didPrefix}:${operation.did!.split(':').pop()}`) return false;
             const type = genesis?.type;
             if (!this.verifyProofFormat(operation.proof)) throw new InvalidOperationError('proof');
             if (!type || current.didDocumentMetadata?.deactivated) return this.verifyUpdateOperation(operation, current);
@@ -1535,20 +1538,27 @@ export default class Gatekeeper implements GatekeeperInterface {
             // A journal write precedes projection writes. Rebuild on startup so
             // an interrupted publication cannot leave dependent state stale.
             const dids = new Set(Object.keys(await this.db.getCandidates()));
-            for (const key of await this.db.getAllKeys()) dids.add(`${this.didPrefix}:${key}`);
-            const targets = [...dids].sort();
+            const journalDids = new Set(dids);
+            const suffixes = new Set([...dids].map(did => did.split(':').pop()));
+            for (const key of await this.db.getAllKeys()) {
+                if (!suffixes.has(key)) dids.add(`${this.didPrefix}:${key}`);
+            }
+            const loadingTargets = [...dids].sort();
             // Retain every projection before replaying any history. Rebuild
             // each DID once, rather than once per controller plus once itself.
             const histories = new Map<string, GatekeeperEvent[]>();
-            const loading = new ProgressLogger('history loading', targets.length);
+            const loading = new ProgressLogger('history loading', loadingTargets.length);
             // Bound outstanding reads while allowing network backends to serve
             // a batch without a round trip for every DID in sequence.
-            for (let offset = 0; offset < targets.length; offset += 64) {
-                await Promise.all(targets.slice(offset, offset + 64).map(async did => {
-                    histories.set(did, await this.db.getEvents(did));
+            for (let offset = 0; offset < loadingTargets.length; offset += 64) {
+                await Promise.all(loadingTargets.slice(offset, offset + 64).map(async did => {
+                    const events = await this.db.getEvents(did);
+                    if (journalDids.has(did)) histories.set(did, events);
+                    histories.set(await this.storedTarget(did, events), events);
                 }));
-                loading.update(histories.size);
+                loading.update(Math.min(offset + 64, loadingTargets.length));
             }
+            const targets = [...histories.keys()].sort();
             const preparing = new ProgressLogger('candidate preparation', targets.length);
             for (const [index, did] of targets.entries()) {
                 await this.retainCandidates(did, [], histories);
@@ -1565,7 +1575,30 @@ export default class Gatekeeper implements GatekeeperInterface {
         return result;
     }
 
-    private async normalizeEvent(event: GatekeeperEvent): Promise<void> {
+    // Backends enumerate CID suffixes. Restore a signed custom prefix without
+    // changing the storage suffix or trusting a stored envelope's target.
+    private async storedTarget(did: string, events: GatekeeperEvent[]): Promise<string> {
+        const operation = events[0]?.operation;
+        const suffix = did.split(':').pop();
+        if (operation?.type !== 'create') return did;
+        const expected = `${operation.registration?.prefix || this.didPrefix}:${suffix}`;
+        return expected !== did && await this.generateCID(operation) === suffix ? expected : did;
+    }
+
+    private eventTarget(event: GatekeeperEvent, opid: string): string | undefined {
+        const { operation } = event;
+        const did = operation.type === 'create'
+            ? `${operation.registration?.prefix || this.didPrefix}:${opid}`
+            : operation.type === 'update' || operation.type === 'delete' ? operation.did : undefined;
+        return typeof did === 'string' && did.length > 0
+            && (event.did === undefined || event.did === did) ? did : undefined;
+    }
+
+    private async normalizeEvent(event: GatekeeperEvent, target?: string): Promise<boolean> {
+        const cid = await this.generateCID(event.operation);
+        const did = this.eventTarget(event, cid);
+        if (!did || (target !== undefined && did !== target)) return false;
+        event.did = did;
         // Normalize envelopes at import/recovery, including older mediator and
         // restored events. Resolution consumes the stored event time uniformly.
         if (event.registry === 'local' && event.operation.type === 'create' && event.operation.created) {
@@ -1574,7 +1607,6 @@ export default class Gatekeeper implements GatekeeperInterface {
         else if ((event.registry === 'local' || event.registry === 'hyperswarm' || event.registry === PIN_QUEUE) && event.operation.proof) {
             event.time = event.operation.proof.created;
         }
-        const cid = await this.generateCID(event.operation);
         if (event.opid !== cid && !this.candidateHistory?.[event.did ?? '']?.some(known => known.opid === cid)) {
             await this.generateCID(event.operation, true);
         }
@@ -1588,6 +1620,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             if (!await this.db.getOperation(alias)) await this.db.addOperation(alias, event.operation);
         }
         event.opid = cid;
+        return true;
     }
 
     // CID ingress caches fetched content under its retrieval CID. Preserve signed
@@ -1617,6 +1650,14 @@ export default class Gatekeeper implements GatekeeperInterface {
         return [...unique.values()];
     }
 
+    private async normalizeCandidates(did: string, events: GatekeeperEvent[]): Promise<GatekeeperEvent[]> {
+        const valid = [];
+        for (const event of events) {
+            if (await this.normalizeEvent(event, did)) valid.push(event);
+        }
+        return this.preferredCandidates(valid);
+    }
+
     private candidateHistory?: Record<string, GatekeeperEvent[]>;
     private dependents = new Map<string, Set<string>>();
 
@@ -1636,18 +1677,20 @@ export default class Gatekeeper implements GatekeeperInterface {
             const candidates = await this.db.getCandidates();
             // Upgrade existing databases once, not on every import. Subsequent
             // direct submissions and imports journal only the changed DID.
-            for (const key of await this.db.getAllKeys()) {
-                const currentDid = `${this.didPrefix}:${key}`;
-                if (!candidates[currentDid]) {
-                    candidates[currentDid] = copyJSON(histories?.get(currentDid) ?? await this.db.getEvents(currentDid));
-                    for (const event of candidates[currentDid]) await this.normalizeEvent(event);
+            const stored = histories ? [...histories.keys()] : (await this.db.getAllKeys()).map(key => `${this.didPrefix}:${key}`);
+            for (const listedDid of stored) {
+                if (!candidates[listedDid]) {
+                    const events = copyJSON(histories?.get(listedDid) ?? await this.db.getEvents(listedDid));
+                    const currentDid = await this.storedTarget(listedDid, events);
+                    if (candidates[currentDid]) continue;
+                    candidates[currentDid] = events;
+                    candidates[currentDid] = await this.normalizeCandidates(currentDid, candidates[currentDid]);
                     await this.db.setCandidates(currentDid, candidates[currentDid]);
                 }
             }
             for (const [key, events] of Object.entries(candidates)) {
                 const previous = JSON.stringify(events);
-                for (const event of events) await this.normalizeEvent(event);
-                const retained = this.preferredCandidates(events);
+                const retained = await this.normalizeCandidates(key, events);
                 if (JSON.stringify(retained) !== previous) await this.db.setCandidates(key, retained);
                 candidates[key] = retained;
                 this.indexCandidates(key, retained);
@@ -1661,8 +1704,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             return { candidates, changed: false };
         }
         const events = [...(candidates[did] ?? []), ...copyJSON(histories?.get(did) ?? await this.db.getEvents(did)), ...incoming];
-        for (const event of events) await this.normalizeEvent(event);
-        const retained = this.preferredCandidates(events);
+        const retained = await this.normalizeCandidates(did, events);
         const changed = this.cipher.canonicalizeJSON(candidates[did] ?? []) !== this.cipher.canonicalizeJSON(retained);
         if (changed) await this.db.setCandidates(did, retained);
         candidates[did] = retained;
@@ -1706,12 +1748,32 @@ export default class Gatekeeper implements GatekeeperInterface {
         const snapshot = histories ? new ProgressLogger('replay snapshot', targets.length) : undefined;
         const staged = new Map<string, GatekeeperEvent[]>();
         const original = new Map<string, string>();
+        const genesisTargets = new Map<string, string>();
+        if (histories) {
+            for (const [did, events] of Object.entries(candidates)) {
+                if (events.some(event => event.operation.type === 'create')) genesisTargets.set(did.split(':').pop()!, did);
+            }
+        }
         for (const [index, target] of targets.entries()) {
             const events = histories?.get(target) ?? await this.db.getEvents(target);
+            const suffix = target.split(':').pop()!;
+            let owner = genesisTargets.get(suffix);
+            const create = events[0]?.operation;
+            if (!owner && create?.type === 'create') {
+                const expected = `${create.registration?.prefix || this.didPrefix}:${suffix}`;
+                if (expected !== target && await this.generateCID(create) === suffix) owner = expected;
+            }
+            // Publishing an empty rejected alias would delete the canonical
+            // history too: the backends key both names by the same CID suffix.
+            if (owner && owner !== target) {
+                snapshot?.update(index + 1);
+                continue;
+            }
             staged.set(target, []);
             original.set(target, this.cipher.canonicalizeJSON(events));
             snapshot?.update(index + 1);
         }
+        targets = [...staged.keys()];
         // Reuse the ordinary event authorization/import algorithm against an
         // isolated view. Readers never observe a DID half way through replay.
         const db = this.db;
@@ -1839,8 +1901,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         await this.ensureHistoryReady();
         if (!await this.verifyEvent(event)) return ImportStatus.REJECTED;
         event = copyJSON(event);
-        event.did ??= event.operation.did ?? await this.generateDID(event.operation);
-        await this.normalizeEvent(event);
+        if (!await this.normalizeEvent(event)) return ImportStatus.REJECTED;
         return this.withHistoryLock(async () => {
             const { candidates, changed } = await this.retainCandidates(event.did!, [event]);
             event = candidates[event.did!].find(known => this.candidateKey(known) === this.candidateKey(event)) ?? event;
@@ -1866,16 +1927,8 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         try {
-            if (!event.did) {
-                if (event.operation.did) {
-                    event.did = event.operation.did;
-                }
-                else {
-                    event.did = await this.generateDID(event.operation);
-                }
-            }
-
-            const did = event.did;
+            if (!await this.normalizeEvent(event)) return ImportStatus.REJECTED;
+            const did = event.did!;
 
             const expectedRegistryForIndex = (events: GatekeeperEvent[], index: number): string | undefined => {
                 if (index <= 0) {
@@ -1904,8 +1957,6 @@ export default class Gatekeeper implements GatekeeperInterface {
                         e.opid = await this.generateCID(e.operation, true);
                     }
                 }
-
-                await this.normalizeEvent(event);
 
                 const opMatch = currentEvents.find(item => item.opid === event.opid);
 
@@ -2027,7 +2078,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             while (event) {
                 i += 1;
 
-                event.did ??= event.operation.did ?? await this.generateDID(event.operation);
+                event.did ??= event.operation.type === 'create' ? await this.generateDID(event.operation) : event.operation.did;
                 const status = await this.importEvent(event);
 
                 if (status === ImportStatus.ADDED) {
@@ -2196,7 +2247,9 @@ export default class Gatekeeper implements GatekeeperInterface {
             return false;
         }
 
-        return true;
+        // Reject contradictory routing before importBatch records its dedup key.
+        const opid = operation.type === 'create' ? await this.generateCID(operation) : '';
+        return this.eventTarget(event, opid) !== undefined;
     }
 
     // Events handed in from a peer or restored export cannot vouch that a
