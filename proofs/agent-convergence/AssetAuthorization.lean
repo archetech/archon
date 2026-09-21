@@ -68,6 +68,7 @@ structure AssetGraph where
   patch : Nat → ComponentPatch Nat Nat
   /-- Proposed DID document is checked even on deletion, before discarding it. -/
   proposed : Nat → Option Nat
+  rootNoProposal : proposed root = none
   shape : Nat → Bool
   proofTime : Nat → Int
   named : Nat → Nat

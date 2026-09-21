@@ -39,6 +39,7 @@ def asset : AssetGraph where
   depth := id
   deletion := fun i => i == 2
   rootNotDeleted := by decide
+  rootNoProposal := by decide
   documents := fun i => ⟨100 + i, if i = 0 then 10 else 11⟩
   proposed := fun i => if i = 1 then some 1 else none
   patch := fun i => if i = 1 then ⟨some 4, none⟩ else ⟨none, none⟩
