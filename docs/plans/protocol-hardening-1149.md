@@ -517,3 +517,15 @@ bridge evidence. Next combine registry reconstruction and this
 representation with predecessor-document authorization. Unanchored migrations,
 deletions in the registry model, dynamic assets, full metadata/codecs, retention,
 and universal runtime refinement remain open. No production behavior changes.
+
+
+### Final protocol composition (C1–C3)
+
+C1 is implemented at the model boundary; the signed local-clock counterexample
+blocks C2/C3 pending the explicit normalization decision.
+`protocol_convergence` composes actual finite agent and asset reconstruction,
+proves a unique full semantic result and full-record stopping, and is independent
+of stale published projections. `protocol_eventual_convergence` covers settled
+evidence. The [final audit](protocol-convergence-theorem.md) records all premises,
+source contracts, checked signed-family instances, and the unchanged boundary to
+universal implementation refinement. No runtime protocol behavior changes.

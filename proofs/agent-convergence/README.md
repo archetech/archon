@@ -1,20 +1,31 @@
-# Provisional agent-history convergence (#1199, #1201, #1203, #1205, #1207, #1209, #1211, #1213)
+# Archon protocol convergence
 
-The authoritative remaining roadmap is the [protocol convergence completion contract](../../docs/plans/protocol-convergence-completion.md): three fixed deliverables with ten acceptance criteria. The sections below record completed increments and their individual limits; their historical “next” lists do not add prerequisites to that contract.
+The [frozen completion contract](../../docs/plans/protocol-convergence-completion.md)
+has A1–A4 and B1–B3 complete. C1 is implemented; C2 found a signed local-receipt
+clock counterexample that blocks release of the final claim (C3). `Archon.protocol_convergence` proves a unique complete semantic result and
+actual terminating reconstruction for any finite family of agents and assets
+with the same retained protocol evidence. Arrival order, duplicate count,
+first-observation bookkeeping and previously published projections may differ.
 
-The integrated full-record extension is documented in
-[the A2–A4 audit](../../docs/plans/agent-convergence-full-records.md).
-`Archon.integrated_agent_convergence` combines A1's derived authorization with
-cold full-record stopping, complete component state, and the confirmed receipt
-view under its source-clock contract. The approved pin proof-time correction
-closes the signed receipt-clock counterexample; A2–A4 are complete at this boundary. B1–B3 (asset/controller selection and its signed bridge) are now complete at the
-model/bridge boundary. C1–C3 (protocol composition) remain open.
+The result includes operation histories, complete DID components, deactivation
+and the authorization-relevant receipt view. Assets consume the histories returned
+by the completed agent replay phase. `protocol_eventual_convergence` covers
+reconciliation after evidence settles. See the [final theorem and premise audit](../../docs/plans/protocol-convergence-theorem.md)
+for the exact contracts, dependencies and signed runtime bridge. CI builds the
+endpoint and permits only `propext` and `Quot.sound` transitively.
+
+The sections below retain the earlier theorem inventory and historical limits.
+Their “next” lists are historical, not additional completion criteria. Universal
+TypeScript/Rust refinement and the other explicitly separate projects remain
+outside the protocol-proof scope.
+
+## Earlier agent-only results
 
 This Lean project proves a bounded specification and an operational replay
 model of Archon's canonical-CID successor rule. It changes no runtime code. It uses Lean's standard library only;
 there is no Mathlib dependency.
 
-The main result is:
+The original agent-only result is:
 
 > For one fixed agent model with finite, acyclic authorized predecessor edges,
 > the same retained operation evidence determines the same unique complete

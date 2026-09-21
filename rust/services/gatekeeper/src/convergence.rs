@@ -1671,3 +1671,48 @@ async fn convergence_assets_with_controller_recovery() {
         }
     }
 }
+
+// C2 audit: signed local receipt clocks must not decide asset authorization.
+#[tokio::test]
+async fn convergence_local_receipt_clock_audit() {
+    let vectors: Value = serde_json::from_str(include_str!(
+        "../../../../tests/convergence/local-receipt-counterexample.json"
+    ))
+    .unwrap();
+    for vector in vectors.as_array().unwrap() {
+        let mut outcomes = Vec::new();
+        for order in vector["orders"].as_array().unwrap() {
+            let (mut state, _directory) = crate::tests::make_state(JsonDb {
+                backend: DbBackend::Memory,
+                data: JsonDbFile::default(),
+                redis_connection: None,
+            });
+            for index in order.as_array().unwrap() {
+                crate::import_batch_impl(
+                    &state,
+                    &[vector["events"][index.as_u64().unwrap() as usize].clone()],
+                )
+                .await;
+                crate::process_events_impl(&state).await;
+            }
+            for _ in 0..2 {
+                let data = serde_json::from_value(
+                    serde_json::to_value(&state.store.lock().await.data).unwrap(),
+                )
+                .unwrap();
+                let (restarted, _restart_directory) = crate::tests::make_state(JsonDb {
+                    backend: DbBackend::Memory,
+                    data,
+                    redis_connection: None,
+                });
+                state = restarted;
+                crate::history::ensure_history_ready(&state).await.unwrap();
+                crate::import_batch_impl(&state, &[vector["asset"].clone()]).await;
+                crate::process_events_impl(&state).await;
+                let store = state.store.lock().await;
+                outcomes.push(store.get_events(vector["assetDid"].as_str().unwrap()).len());
+            }
+        }
+        assert_eq!(outcomes, vec![0, 0, 1, 1], "local receipt audit changed");
+    }
+}

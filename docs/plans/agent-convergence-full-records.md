@@ -2,7 +2,8 @@
 
 This completes the agent-model integration criteria in the
 [fixed completion contract](protocol-convergence-completion.md). The asset/controller
-proof (B1–B3) and protocol composition (C1–C3) remain open. This is a proof of the
+proof (B1–B3) is complete. C1 is implemented; the [C2 audit](protocol-convergence-theorem.md)
+found a local-receipt clock gap that blocks release of C2/C3. This is a proof of the
 protocol model with a signed executable bridge, not universal verification of the
 TypeScript or Rust programs.
 
@@ -31,7 +32,9 @@ The signed regression checks equal rejected asset verdicts and repair of a store
 pre-fix projection that had incorrectly accepted the asset, in both proof formats.
 Operation bytes, canonical IDs, and ordinals are preserved.
 
-This closes the clock-contract gap. Pin migration and repeated pin receipt cases
+This closes the pin clock-contract gap. The later C2 audit identified a separate
+local-receipt clock gap; the operation-clock table below is not yet established
+for all admitted local imports. Pin migration and repeated pin receipt cases
 also participate in the integrated source/model/runtime bridge below.
 
 ## Result and dependencies

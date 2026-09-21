@@ -1,0 +1,388 @@
+[
+  {
+    "legacy": false,
+    "did": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq",
+    "assetDid": "did:cid:bagaaierafyuuqx2p3cr436y3ssg6uhwydui4j2m77dq3iqisxnrwl5c6fa6q",
+    "asset": {
+      "registry": "local",
+      "time": "2026-09-03T00:00:00Z",
+      "operation": {
+        "type": "create",
+        "created": "2026-09-03T00:00:00Z",
+        "registration": {
+          "version": 1,
+          "type": "asset",
+          "registry": "local"
+        },
+        "controller": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq",
+        "data": {},
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-03T00:00:00Z",
+          "verificationMethod": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "IFd3V9yNmEkVwEFbPgD18wvdF4UXElFPU2KDYzVEdmAWrTe3Lc3Naybmnf5sejvHvVQFgukrA8wPTFld6iLsBg"
+        }
+      }
+    },
+    "events": [
+      {
+        "registry": "local",
+        "time": "2026-09-01T00:00:00Z",
+        "operation": {
+          "type": "create",
+          "created": "2026-09-01T00:00:00Z",
+          "registration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "local"
+          },
+          "publicJwk": {
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "Jcv_WooMPF4moNkMGUNL3P4x156E47fghZ0yph62GTg",
+            "y": "rPyvSTDP3ng_wD3i-EkHGzsd1OcaVT9YsD4OL-aliF4"
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:00Z",
+            "verificationMethod": "#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "0ZEnjMLCKqqewLNAlwxipU7gV-1yvCBfUXosoOnPE0kO24Cfe74cvwM7Nh3sFZh5TsKvNAHfgGo1rrkXj24YnQ"
+          }
+        }
+      },
+      {
+        "registry": "local",
+        "time": "2026-09-01T00:00:00Z",
+        "operation": {
+          "type": "update",
+          "did": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq",
+          "previd": "bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq",
+          "doc": {
+            "didDocumentData": {
+              "parent": true
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "YbxElJ7YmFnjDWEsCujUsneXx9lsYnjS8fCVH7daDEt69Li2xcoBoylNpkZ4GW2jPHRYjQC4Sp2OvBDVD058yQ"
+          }
+        }
+      },
+      {
+        "registry": "local",
+        "ordinal": [
+          1
+        ],
+        "time": "2026-09-02T00:00:00Z",
+        "operation": {
+          "type": "update",
+          "did": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq",
+          "previd": "bagaaiera7iyw26ffdyhp7xslreguoyzul4ubdp26uoqzprgs7dpwkf4j567a",
+          "doc": {
+            "didDocument": {
+              "id": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq",
+              "verificationMethod": [
+                {
+                  "id": "#key-1",
+                  "controller": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq",
+                  "type": "EcdsaSecp256k1VerificationKey2019",
+                  "publicKeyJwk": {
+                    "kty": "EC",
+                    "crv": "secp256k1",
+                    "x": "HlZ3VjfbzSx5pVmENdHBg7ljFTIzIJTezP660Zs0a8I",
+                    "y": "8X8SUMgJsFmXLrZh8QdbWjhnkrAgZapYeuYtMwbo1zg"
+                  }
+                }
+              ]
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-02T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "Qd_wSDfHWqtIzg1pUb0MdMz6-_-PV2iwlkwMPyvWgycBbo22t0phJqvM3jKYoKOiVD5bz0EyHia_Tj5Jy6CpcA"
+          }
+        }
+      },
+      {
+        "registry": "local",
+        "ordinal": [
+          2
+        ],
+        "time": "2026-09-02T00:00:00Z",
+        "operation": {
+          "type": "update",
+          "did": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq",
+          "previd": "bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq",
+          "doc": {
+            "didDocumentData": {
+              "parent": true
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-01T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "YbxElJ7YmFnjDWEsCujUsneXx9lsYnjS8fCVH7daDEt69Li2xcoBoylNpkZ4GW2jPHRYjQC4Sp2OvBDVD058yQ"
+          }
+        }
+      },
+      {
+        "registry": "local",
+        "ordinal": [
+          3
+        ],
+        "time": "2026-09-04T00:00:00Z",
+        "operation": {
+          "type": "update",
+          "did": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq",
+          "previd": "bagaaiera7iyw26ffdyhp7xslreguoyzul4ubdp26uoqzprgs7dpwkf4j567a",
+          "doc": {
+            "didDocument": {
+              "id": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq",
+              "verificationMethod": [
+                {
+                  "id": "#key-1",
+                  "controller": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq",
+                  "type": "EcdsaSecp256k1VerificationKey2019",
+                  "publicKeyJwk": {
+                    "kty": "EC",
+                    "crv": "secp256k1",
+                    "x": "HlZ3VjfbzSx5pVmENdHBg7ljFTIzIJTezP660Zs0a8I",
+                    "y": "8X8SUMgJsFmXLrZh8QdbWjhnkrAgZapYeuYtMwbo1zg"
+                  }
+                }
+              ]
+            }
+          },
+          "proof": {
+            "type": "DataIntegrityProof",
+            "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+            "created": "2026-09-02T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaierazifr5nxw25spk6727qdfdicbeznaohawtmxl5mae55bql4x37puq#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "Qd_wSDfHWqtIzg1pUb0MdMz6-_-PV2iwlkwMPyvWgycBbo22t0phJqvM3jKYoKOiVD5bz0EyHia_Tj5Jy6CpcA"
+          }
+        }
+      }
+    ],
+    "orders": [
+      [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      [
+        0,
+        1,
+        4,
+        3,
+        2
+      ]
+    ]
+  },
+  {
+    "legacy": true,
+    "did": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva",
+    "assetDid": "did:cid:bagaaierase2tueuadqhf76wqojpiialfmtzsxxuam2mgnefb6gqu4fskzzfa",
+    "asset": {
+      "registry": "local",
+      "time": "2026-09-03T00:00:00Z",
+      "operation": {
+        "type": "create",
+        "created": "2026-09-03T00:00:00Z",
+        "registration": {
+          "version": 1,
+          "type": "asset",
+          "registry": "local"
+        },
+        "controller": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva",
+        "data": {},
+        "proof": {
+          "type": "EcdsaSecp256k1Signature2019",
+          "created": "2026-09-03T00:00:00Z",
+          "verificationMethod": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "UL_yrmYsLMklnyAz9kiv3YI2cYa44kEcFv6F-8k0Or8akozYqZt-vqXhf8JxXXE88CQtkuedmf7wAzCkMqzZKQ"
+        }
+      }
+    },
+    "events": [
+      {
+        "registry": "local",
+        "time": "2026-09-01T00:00:00Z",
+        "operation": {
+          "type": "create",
+          "created": "2026-09-01T00:00:00Z",
+          "registration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "local"
+          },
+          "publicJwk": {
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "Jcv_WooMPF4moNkMGUNL3P4x156E47fghZ0yph62GTg",
+            "y": "rPyvSTDP3ng_wD3i-EkHGzsd1OcaVT9YsD4OL-aliF4"
+          },
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-09-01T00:00:00Z",
+            "verificationMethod": "#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "bpzRQDXa29fXLnWXo8JpPewZ8DbGdBHwHpjEUekA0jlHwT6rkdHubc2swJJdfmU3U3b1wkaL__qyJ1UjhMKGpA"
+          }
+        }
+      },
+      {
+        "registry": "local",
+        "time": "2026-09-01T00:00:00Z",
+        "operation": {
+          "type": "update",
+          "did": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva",
+          "previd": "bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva",
+          "doc": {
+            "didDocumentData": {
+              "parent": true
+            }
+          },
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-09-01T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "BeACVatXhqOE1jwEKuqoY9bHI4l_slqJGxruLTLkq0VQlzz__YBvNvARirk-qQVeLmu5sMr7DCG3KExW9Bzs7A"
+          }
+        }
+      },
+      {
+        "registry": "local",
+        "ordinal": [
+          1
+        ],
+        "time": "2026-09-02T00:00:00Z",
+        "operation": {
+          "type": "update",
+          "did": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva",
+          "previd": "bagaaieraqt5bo4t2dyxxoa7g75ggaoanh7hhdqixs2cw7fmuczannnl3h5va",
+          "doc": {
+            "didDocument": {
+              "id": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva",
+              "verificationMethod": [
+                {
+                  "id": "#key-1",
+                  "controller": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva",
+                  "type": "EcdsaSecp256k1VerificationKey2019",
+                  "publicKeyJwk": {
+                    "kty": "EC",
+                    "crv": "secp256k1",
+                    "x": "HlZ3VjfbzSx5pVmENdHBg7ljFTIzIJTezP660Zs0a8I",
+                    "y": "8X8SUMgJsFmXLrZh8QdbWjhnkrAgZapYeuYtMwbo1zg"
+                  }
+                }
+              ]
+            }
+          },
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-09-02T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "OCveoxWGE0wR8WsFRfkdLo5B1_oKxXt3u4dk-CZ58odEA0bzLhjJVwIDvNThLFj6oNhal6DI8IVIHJ-YHmA3qg"
+          }
+        }
+      },
+      {
+        "registry": "local",
+        "ordinal": [
+          2
+        ],
+        "time": "2026-09-02T00:00:00Z",
+        "operation": {
+          "type": "update",
+          "did": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva",
+          "previd": "bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva",
+          "doc": {
+            "didDocumentData": {
+              "parent": true
+            }
+          },
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-09-01T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "BeACVatXhqOE1jwEKuqoY9bHI4l_slqJGxruLTLkq0VQlzz__YBvNvARirk-qQVeLmu5sMr7DCG3KExW9Bzs7A"
+          }
+        }
+      },
+      {
+        "registry": "local",
+        "ordinal": [
+          3
+        ],
+        "time": "2026-09-04T00:00:00Z",
+        "operation": {
+          "type": "update",
+          "did": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva",
+          "previd": "bagaaieraqt5bo4t2dyxxoa7g75ggaoanh7hhdqixs2cw7fmuczannnl3h5va",
+          "doc": {
+            "didDocument": {
+              "id": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva",
+              "verificationMethod": [
+                {
+                  "id": "#key-1",
+                  "controller": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva",
+                  "type": "EcdsaSecp256k1VerificationKey2019",
+                  "publicKeyJwk": {
+                    "kty": "EC",
+                    "crv": "secp256k1",
+                    "x": "HlZ3VjfbzSx5pVmENdHBg7ljFTIzIJTezP660Zs0a8I",
+                    "y": "8X8SUMgJsFmXLrZh8QdbWjhnkrAgZapYeuYtMwbo1zg"
+                  }
+                }
+              ]
+            }
+          },
+          "proof": {
+            "type": "EcdsaSecp256k1Signature2019",
+            "created": "2026-09-02T00:00:00Z",
+            "verificationMethod": "did:cid:bagaaieraq6qcz2yrwlbzpuss7d5aortzvbh62jc4tjgfxm3izbuoinyleuva#key-1",
+            "proofPurpose": "capabilityInvocation",
+            "proofValue": "OCveoxWGE0wR8WsFRfkdLo5B1_oKxXt3u4dk-CZ58odEA0bzLhjJVwIDvNThLFj6oNhal6DI8IVIHJ-YHmA3qg"
+          }
+        }
+      }
+    ],
+    "orders": [
+      [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      [
+        0,
+        1,
+        4,
+        3,
+        2
+      ]
+    ]
+  }
+]

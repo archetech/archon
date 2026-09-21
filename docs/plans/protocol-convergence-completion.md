@@ -140,7 +140,7 @@ forks, repeated/earlier/tied anchors, missing predecessors, unconfirmed suffixes
 and cold/late-genesis replay in both ports. The signed pin audit led to the approved proof-time normalization rule; both ports
 now converge on asset verdicts and repair stored pre-fix projections. Lean checks source normalization and
 independently evaluates the expected components and authorization views. General
-runtime refinement remains outside this contract. B is completed below; C remains open.
+runtime refinement remains outside this contract. B is completed below; C2/C3 are blocked by the signed local-clock audit.
 
 ### B. Asset/controller convergence
 
@@ -187,7 +187,7 @@ not universal executable refinement. See the [audit](asset-controller-convergenc
 
 ### C. Close the protocol theorem
 
-- [ ] **C1 — Composition:** compose A and B into `protocol_convergence` over any
+- [x] **C1 — Composition:** compose A and B into `protocol_convergence` over any
   finite set of agent/asset DIDs. Prove uniqueness, complete modeled reconciliation
   termination, arrival-order/duplicate independence, and reconstruction independent
   of a stale accepted projection. State the eventual-settled-evidence corollary.
@@ -200,6 +200,14 @@ not universal executable refinement. See the [audit](asset-controller-convergenc
   `propext`/`Quot.sound` allowlist and no admitted proofs. Document its exact inputs,
   output equality, assumptions, theorem dependencies, and finite runtime bridge.
   Close #1215 when A1–C3 are satisfied; do not hold it open for the separate work below.
+
+C1's composed theorem and settled-evidence corollary are implemented locally.
+C2 found an admitted signed local-receipt counterexample: two orders retain
+different timestamps for the same local key rotation, causing opposite asset
+verdicts. Local producers use intrinsic operation times, but import/recovery does
+not enforce that contract. C2 and C3 remain open pending the explicit protocol
+decision and correction; the Lean source-clock premise must not conceal this gap.
+See the [final audit](protocol-convergence-theorem.md).
 
 ## Separate work, not prerequisites for this claim
 
