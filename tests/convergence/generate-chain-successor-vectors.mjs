@@ -23,7 +23,7 @@ for (const legacy of [false, true]) {
     const operations = [genesis, a, b, update(await cid(a), 'a-child'), update(await cid(b), 'b-child')];
     const ids = await Promise.all(operations.map(cid));
     const hint = (operation, index) => ({ operation, registry: 'hyperswarm', time: operation.proof.created, ordinal: [index] });
-    const chain = (operation, index) => ({ operation, registry: 'BTC:signet', time: '2026-09-02T00:00:00Z', ordinal: [100, index, 0], registration: { height: 100, txid: 'tx' + index, batch: 'batch', opidx: 0 } });
+    const chain = (operation, index) => ({ operation, registry: 'BTC:signet', time: '2026-09-02T00:00:00Z', ordinal: [100, index, 0], registration: { height: 100, index, txid: 'tx' + index, batch: 'batch', opidx: 0 } });
     for (const mode of ['provisional', 'chain-priority', 'earlier-repeat']) {
         const events = operations.map(hint);
         events.push(chain(genesis, 40));

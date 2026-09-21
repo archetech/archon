@@ -80,12 +80,24 @@ export interface GetDIDOptions {
 export interface GatekeeperEvent {
     registry: string;
     time: string;
-    /** Chain registries require nonempty, nonnegative safe integers; optional for local, hyperswarm, and pin. */
+    /** Chain positions: [height, index, ...registryPosition, opidx], all nonnegative safe integers. */
     ordinal?: number[];
     operation: Operation;
     did?: string;
     opid?: string;
     registration?: DidRegistration;
+}
+
+/** Chain-specific wire contract. Unanchored events use GatekeeperEvent. */
+export interface ChainEvent extends GatekeeperEvent {
+    ordinal: [number, number, number, ...number[]];
+    registration: ChainRegistration;
+}
+
+/** A chain batch supplies the position prefix; CID ingress appends opidx. */
+export interface ChainBatchMetadata extends BatchMetadata {
+    ordinal: [number, number, ...number[]];
+    registration: ChainBatchRegistration;
 }
 
 export interface CheckDIDsOptions {
@@ -208,6 +220,22 @@ export interface DrawbridgeInterface extends GatekeeperInterface {
     getDidCommEndpoint(): Promise<string | undefined>;
     zapLightning(adminKey: string, did: string, amount: number, memo?: string): Promise<LightningPayment>;
     getLightningPayments(adminKey: string): Promise<LightningPaymentRecord[]>;
+}
+
+/** Complete chain batch evidence. Position integers share JavaScript's safe range.
+ * ordinal is [height, index, ...registryPosition]; Gatekeeper appends opidx.
+ * Required for chain CID imports; local, Hyperswarm and pin are unanchored.
+ */
+export interface ChainBatchRegistration {
+    height: number;
+    index: number;
+    txid: string;
+    batch: string;
+}
+
+/** Complete event evidence; opidx is the original index in the batch CID list. */
+export interface ChainRegistration extends ChainBatchRegistration {
+    opidx: number;
 }
 
 export interface DidRegistration {

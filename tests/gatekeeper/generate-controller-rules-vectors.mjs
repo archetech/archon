@@ -31,7 +31,7 @@ const cases=[
     ['agent create external controller',sign({type:'create',created:t,registration:{version:1,type:'agent',registry:'BTC:signet'},publicJwk:keyA.publicJwk,controller:b},keyA),false],
     ['asset create asset controller',sign({type:'create',created:t,registration:{version:1,type:'asset',registry:'BTC:signet'},controller:asset,data:'nested'},keyA,`${asset}#key-1`),false],
 ];
-const event=async(op,height)=>({did:op.did??await g.generateDID(op),opid:await g.generateCID(op),operation:op,registry:'BTC:signet',time:t,ordinal:[height,0],registration:{height,index:0,txid:`tx${height}`,batch:`batch${height}`}});
+const event=async(op,height)=>({did:op.did??await g.generateDID(op),opid:await g.generateCID(op),operation:op,registry:'BTC:signet',time:t,ordinal:[height,0,0],registration:{height,index:0,opidx:0,txid:`tx${height}`,batch:`batch${height}`}});
 const metadata = await update(a,createA,{didDocumentRegistration:{version:1,type:'agent',registry:'BTC:signet'}});
 cases.push(['agent external controller after metadata replacement',await update(a,metadata,{didDocument:{...root,controller:b}}),false,[await event(metadata,6)]]);
 cases.push(['agent self controller after metadata replacement',await update(a,metadata,{didDocument:{...root,controller:a}}),true,[await event(metadata,6)]]);

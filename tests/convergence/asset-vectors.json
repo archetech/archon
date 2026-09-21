@@ -4982,7 +4982,7 @@
           "index": 1,
           "txid": "BTC:signet-tx-1",
           "batch": "BTC:signet-batch-1",
-          "opidx": 1
+          "opidx": 0
         }
       },
       {
@@ -5469,7 +5469,7 @@
           "index": 8,
           "txid": "BTC:signet-tx-30",
           "batch": "BTC:signet-batch-30",
-          "opidx": 8
+          "opidx": 0
         }
       },
       {
@@ -5504,7 +5504,7 @@
           "index": 9,
           "txid": "BTC:signet-tx-30",
           "batch": "BTC:signet-batch-30",
-          "opidx": 9
+          "opidx": 0
         }
       },
       {
@@ -5533,7 +5533,7 @@
           "index": 10,
           "txid": "ETH:sepolia-tx-50",
           "batch": "ETH:sepolia-batch-50",
-          "opidx": 10
+          "opidx": 0
         }
       },
       {
@@ -5584,7 +5584,7 @@
           "index": 11,
           "txid": "BTC:signet-tx-30",
           "batch": "BTC:signet-batch-30",
-          "opidx": 11
+          "opidx": 0
         }
       },
       {
@@ -7509,7 +7509,7 @@
           "index": 1,
           "txid": "ZEC:testnet-tx-1",
           "batch": "ZEC:testnet-batch-1",
-          "opidx": 1
+          "opidx": 0
         }
       },
       {
@@ -7996,7 +7996,7 @@
           "index": 8,
           "txid": "BTC:signet-tx-30",
           "batch": "BTC:signet-batch-30",
-          "opidx": 8
+          "opidx": 0
         }
       },
       {
@@ -8031,7 +8031,7 @@
           "index": 9,
           "txid": "BTC:signet-tx-30",
           "batch": "BTC:signet-batch-30",
-          "opidx": 9
+          "opidx": 0
         }
       },
       {
@@ -8060,7 +8060,7 @@
           "index": 10,
           "txid": "ETH:sepolia-tx-50",
           "batch": "ETH:sepolia-batch-50",
-          "opidx": 10
+          "opidx": 0
         }
       },
       {
@@ -8111,7 +8111,7 @@
           "index": 11,
           "txid": "BTC:signet-tx-30",
           "batch": "BTC:signet-batch-30",
-          "opidx": 11
+          "opidx": 0
         }
       },
       {
@@ -16301,7 +16301,7 @@
           "index": 1,
           "txid": "BTC:signet-tx-1",
           "batch": "BTC:signet-batch-1",
-          "opidx": 1
+          "opidx": 0
         }
       },
       {
@@ -16776,7 +16776,7 @@
           "index": 8,
           "txid": "BTC:signet-tx-30",
           "batch": "BTC:signet-batch-30",
-          "opidx": 8
+          "opidx": 0
         }
       },
       {
@@ -16810,7 +16810,7 @@
           "index": 9,
           "txid": "BTC:signet-tx-30",
           "batch": "BTC:signet-batch-30",
-          "opidx": 9
+          "opidx": 0
         }
       },
       {
@@ -16838,7 +16838,7 @@
           "index": 10,
           "txid": "ETH:sepolia-tx-50",
           "batch": "ETH:sepolia-batch-50",
-          "opidx": 10
+          "opidx": 0
         }
       },
       {
@@ -16888,7 +16888,7 @@
           "index": 11,
           "txid": "BTC:signet-tx-30",
           "batch": "BTC:signet-batch-30",
-          "opidx": 11
+          "opidx": 0
         }
       },
       {
@@ -18780,7 +18780,7 @@
           "index": 1,
           "txid": "ZEC:testnet-tx-1",
           "batch": "ZEC:testnet-batch-1",
-          "opidx": 1
+          "opidx": 0
         }
       },
       {
@@ -19255,7 +19255,7 @@
           "index": 8,
           "txid": "BTC:signet-tx-30",
           "batch": "BTC:signet-batch-30",
-          "opidx": 8
+          "opidx": 0
         }
       },
       {
@@ -19289,7 +19289,7 @@
           "index": 9,
           "txid": "BTC:signet-tx-30",
           "batch": "BTC:signet-batch-30",
-          "opidx": 9
+          "opidx": 0
         }
       },
       {
@@ -19317,7 +19317,7 @@
           "index": 10,
           "txid": "ETH:sepolia-tx-50",
           "batch": "ETH:sepolia-batch-50",
-          "opidx": 10
+          "opidx": 0
         }
       },
       {
@@ -19367,7 +19367,7 @@
           "index": 11,
           "txid": "BTC:signet-tx-30",
           "batch": "BTC:signet-batch-30",
-          "opidx": 11
+          "opidx": 0
         }
       },
       {

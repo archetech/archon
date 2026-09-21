@@ -75,17 +75,17 @@ theorem sources0_0 : ProtocolSources world0 evidence0_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_0_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
 def raw0_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_0_0 i)
+  protocolReceiptsOfSources world0 evidence0_0_0 i
 theorem normalized0_0_0 : normalizeProtocolEvidence raw0_0_0 = evidence0_0_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_0_0 i = evidence0_0_0 i := by decide
   exact funext checked
 def raw0_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_0_1 i)
+  protocolReceiptsOfSources world0 evidence0_0_1 i
 theorem normalized0_0_1 : normalizeProtocolEvidence raw0_0_1 = evidence0_0_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_0_1 i = evidence0_0_1 i := by decide
   exact funext checked
 def raw0_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_0_2 i)
+  protocolReceiptsOfSources world0 evidence0_0_2 i
 theorem normalized0_0_2 : normalizeProtocolEvidence raw0_0_2 = evidence0_0_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_0_2 i = evidence0_0_2 i := by decide
   exact funext checked
@@ -148,17 +148,17 @@ theorem sources0_1 : ProtocolSources world0 evidence0_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_1_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
 def raw0_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_1_0 i)
+  protocolReceiptsOfSources world0 evidence0_1_0 i
 theorem normalized0_1_0 : normalizeProtocolEvidence raw0_1_0 = evidence0_1_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_1_0 i = evidence0_1_0 i := by decide
   exact funext checked
 def raw0_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_1_1 i)
+  protocolReceiptsOfSources world0 evidence0_1_1 i
 theorem normalized0_1_1 : normalizeProtocolEvidence raw0_1_1 = evidence0_1_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_1_1 i = evidence0_1_1 i := by decide
   exact funext checked
 def raw0_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_1_2 i)
+  protocolReceiptsOfSources world0 evidence0_1_2 i
 theorem normalized0_1_2 : normalizeProtocolEvidence raw0_1_2 = evidence0_1_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_1_2 i = evidence0_1_2 i := by decide
   exact funext checked
@@ -221,17 +221,17 @@ theorem sources0_2 : ProtocolSources world0 evidence0_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_2_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
 def raw0_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_2_0 i)
+  protocolReceiptsOfSources world0 evidence0_2_0 i
 theorem normalized0_2_0 : normalizeProtocolEvidence raw0_2_0 = evidence0_2_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_2_0 i = evidence0_2_0 i := by decide
   exact funext checked
 def raw0_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_2_1 i)
+  protocolReceiptsOfSources world0 evidence0_2_1 i
 theorem normalized0_2_1 : normalizeProtocolEvidence raw0_2_1 = evidence0_2_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_2_1 i = evidence0_2_1 i := by decide
   exact funext checked
 def raw0_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_2_2 i)
+  protocolReceiptsOfSources world0 evidence0_2_2 i
 theorem normalized0_2_2 : normalizeProtocolEvidence raw0_2_2 = evidence0_2_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_2_2 i = evidence0_2_2 i := by decide
   exact funext checked
@@ -294,17 +294,17 @@ theorem sources0_3 : ProtocolSources world0 evidence0_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_3_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
 def raw0_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_3_0 i)
+  protocolReceiptsOfSources world0 evidence0_3_0 i
 theorem normalized0_3_0 : normalizeProtocolEvidence raw0_3_0 = evidence0_3_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_3_0 i = evidence0_3_0 i := by decide
   exact funext checked
 def raw0_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_3_1 i)
+  protocolReceiptsOfSources world0 evidence0_3_1 i
 theorem normalized0_3_1 : normalizeProtocolEvidence raw0_3_1 = evidence0_3_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_3_1 i = evidence0_3_1 i := by decide
   exact funext checked
 def raw0_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_3_2 i)
+  protocolReceiptsOfSources world0 evidence0_3_2 i
 theorem normalized0_3_2 : normalizeProtocolEvidence raw0_3_2 = evidence0_3_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_3_2 i = evidence0_3_2 i := by decide
   exact funext checked
@@ -367,17 +367,17 @@ theorem sources0_4 : ProtocolSources world0 evidence0_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_4_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
 def raw0_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_4_0 i)
+  protocolReceiptsOfSources world0 evidence0_4_0 i
 theorem normalized0_4_0 : normalizeProtocolEvidence raw0_4_0 = evidence0_4_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_4_0 i = evidence0_4_0 i := by decide
   exact funext checked
 def raw0_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_4_1 i)
+  protocolReceiptsOfSources world0 evidence0_4_1 i
 theorem normalized0_4_1 : normalizeProtocolEvidence raw0_4_1 = evidence0_4_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_4_1 i = evidence0_4_1 i := by decide
   exact funext checked
 def raw0_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_4_2 i)
+  protocolReceiptsOfSources world0 evidence0_4_2 i
 theorem normalized0_4_2 : normalizeProtocolEvidence raw0_4_2 = evidence0_4_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_4_2 i = evidence0_4_2 i := by decide
   exact funext checked
@@ -440,17 +440,17 @@ theorem sources0_5 : ProtocolSources world0 evidence0_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_5_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
 def raw0_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_5_0 i)
+  protocolReceiptsOfSources world0 evidence0_5_0 i
 theorem normalized0_5_0 : normalizeProtocolEvidence raw0_5_0 = evidence0_5_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_5_0 i = evidence0_5_0 i := by decide
   exact funext checked
 def raw0_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_5_1 i)
+  protocolReceiptsOfSources world0 evidence0_5_1 i
 theorem normalized0_5_1 : normalizeProtocolEvidence raw0_5_1 = evidence0_5_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_5_1 i = evidence0_5_1 i := by decide
   exact funext checked
 def raw0_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_5_2 i)
+  protocolReceiptsOfSources world0 evidence0_5_2 i
 theorem normalized0_5_2 : normalizeProtocolEvidence raw0_5_2 = evidence0_5_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_5_2 i = evidence0_5_2 i := by decide
   exact funext checked
@@ -513,17 +513,17 @@ theorem sources0_6 : ProtocolSources world0 evidence0_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence0_6_0 i, protocolSourceValid world0 i source.key = true := by decide
   exact checked
 def raw0_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_6_0 i)
+  protocolReceiptsOfSources world0 evidence0_6_0 i
 theorem normalized0_6_0 : normalizeProtocolEvidence raw0_6_0 = evidence0_6_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_6_0 i = evidence0_6_0 i := by decide
   exact funext checked
 def raw0_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world0 evidence0_6_1 i)
+  protocolReceiptsOfSources world0 evidence0_6_1 i
 theorem normalized0_6_1 : normalizeProtocolEvidence raw0_6_1 = evidence0_6_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_6_1 i = evidence0_6_1 i := by decide
   exact funext checked
 def raw0_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world0 evidence0_6_2 i)
+  protocolReceiptsOfSources world0 evidence0_6_2 i
 theorem normalized0_6_2 : normalizeProtocolEvidence raw0_6_2 = evidence0_6_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw0_6_2 i = evidence0_6_2 i := by decide
   exact funext checked
@@ -648,17 +648,17 @@ theorem sources1_0 : ProtocolSources world1 evidence1_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_0_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
 def raw1_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_0_0 i)
+  protocolReceiptsOfSources world1 evidence1_0_0 i
 theorem normalized1_0_0 : normalizeProtocolEvidence raw1_0_0 = evidence1_0_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_0_0 i = evidence1_0_0 i := by decide
   exact funext checked
 def raw1_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_0_1 i)
+  protocolReceiptsOfSources world1 evidence1_0_1 i
 theorem normalized1_0_1 : normalizeProtocolEvidence raw1_0_1 = evidence1_0_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_0_1 i = evidence1_0_1 i := by decide
   exact funext checked
 def raw1_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_0_2 i)
+  protocolReceiptsOfSources world1 evidence1_0_2 i
 theorem normalized1_0_2 : normalizeProtocolEvidence raw1_0_2 = evidence1_0_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_0_2 i = evidence1_0_2 i := by decide
   exact funext checked
@@ -721,17 +721,17 @@ theorem sources1_1 : ProtocolSources world1 evidence1_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_1_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
 def raw1_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_1_0 i)
+  protocolReceiptsOfSources world1 evidence1_1_0 i
 theorem normalized1_1_0 : normalizeProtocolEvidence raw1_1_0 = evidence1_1_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_1_0 i = evidence1_1_0 i := by decide
   exact funext checked
 def raw1_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_1_1 i)
+  protocolReceiptsOfSources world1 evidence1_1_1 i
 theorem normalized1_1_1 : normalizeProtocolEvidence raw1_1_1 = evidence1_1_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_1_1 i = evidence1_1_1 i := by decide
   exact funext checked
 def raw1_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_1_2 i)
+  protocolReceiptsOfSources world1 evidence1_1_2 i
 theorem normalized1_1_2 : normalizeProtocolEvidence raw1_1_2 = evidence1_1_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_1_2 i = evidence1_1_2 i := by decide
   exact funext checked
@@ -794,17 +794,17 @@ theorem sources1_2 : ProtocolSources world1 evidence1_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_2_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
 def raw1_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_2_0 i)
+  protocolReceiptsOfSources world1 evidence1_2_0 i
 theorem normalized1_2_0 : normalizeProtocolEvidence raw1_2_0 = evidence1_2_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_2_0 i = evidence1_2_0 i := by decide
   exact funext checked
 def raw1_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_2_1 i)
+  protocolReceiptsOfSources world1 evidence1_2_1 i
 theorem normalized1_2_1 : normalizeProtocolEvidence raw1_2_1 = evidence1_2_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_2_1 i = evidence1_2_1 i := by decide
   exact funext checked
 def raw1_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_2_2 i)
+  protocolReceiptsOfSources world1 evidence1_2_2 i
 theorem normalized1_2_2 : normalizeProtocolEvidence raw1_2_2 = evidence1_2_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_2_2 i = evidence1_2_2 i := by decide
   exact funext checked
@@ -867,17 +867,17 @@ theorem sources1_3 : ProtocolSources world1 evidence1_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_3_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
 def raw1_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_3_0 i)
+  protocolReceiptsOfSources world1 evidence1_3_0 i
 theorem normalized1_3_0 : normalizeProtocolEvidence raw1_3_0 = evidence1_3_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_3_0 i = evidence1_3_0 i := by decide
   exact funext checked
 def raw1_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_3_1 i)
+  protocolReceiptsOfSources world1 evidence1_3_1 i
 theorem normalized1_3_1 : normalizeProtocolEvidence raw1_3_1 = evidence1_3_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_3_1 i = evidence1_3_1 i := by decide
   exact funext checked
 def raw1_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_3_2 i)
+  protocolReceiptsOfSources world1 evidence1_3_2 i
 theorem normalized1_3_2 : normalizeProtocolEvidence raw1_3_2 = evidence1_3_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_3_2 i = evidence1_3_2 i := by decide
   exact funext checked
@@ -940,17 +940,17 @@ theorem sources1_4 : ProtocolSources world1 evidence1_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_4_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
 def raw1_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_4_0 i)
+  protocolReceiptsOfSources world1 evidence1_4_0 i
 theorem normalized1_4_0 : normalizeProtocolEvidence raw1_4_0 = evidence1_4_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_4_0 i = evidence1_4_0 i := by decide
   exact funext checked
 def raw1_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_4_1 i)
+  protocolReceiptsOfSources world1 evidence1_4_1 i
 theorem normalized1_4_1 : normalizeProtocolEvidence raw1_4_1 = evidence1_4_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_4_1 i = evidence1_4_1 i := by decide
   exact funext checked
 def raw1_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_4_2 i)
+  protocolReceiptsOfSources world1 evidence1_4_2 i
 theorem normalized1_4_2 : normalizeProtocolEvidence raw1_4_2 = evidence1_4_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_4_2 i = evidence1_4_2 i := by decide
   exact funext checked
@@ -1013,17 +1013,17 @@ theorem sources1_5 : ProtocolSources world1 evidence1_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_5_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
 def raw1_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_5_0 i)
+  protocolReceiptsOfSources world1 evidence1_5_0 i
 theorem normalized1_5_0 : normalizeProtocolEvidence raw1_5_0 = evidence1_5_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_5_0 i = evidence1_5_0 i := by decide
   exact funext checked
 def raw1_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_5_1 i)
+  protocolReceiptsOfSources world1 evidence1_5_1 i
 theorem normalized1_5_1 : normalizeProtocolEvidence raw1_5_1 = evidence1_5_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_5_1 i = evidence1_5_1 i := by decide
   exact funext checked
 def raw1_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_5_2 i)
+  protocolReceiptsOfSources world1 evidence1_5_2 i
 theorem normalized1_5_2 : normalizeProtocolEvidence raw1_5_2 = evidence1_5_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_5_2 i = evidence1_5_2 i := by decide
   exact funext checked
@@ -1086,17 +1086,17 @@ theorem sources1_6 : ProtocolSources world1 evidence1_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence1_6_0 i, protocolSourceValid world1 i source.key = true := by decide
   exact checked
 def raw1_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_6_0 i)
+  protocolReceiptsOfSources world1 evidence1_6_0 i
 theorem normalized1_6_0 : normalizeProtocolEvidence raw1_6_0 = evidence1_6_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_6_0 i = evidence1_6_0 i := by decide
   exact funext checked
 def raw1_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world1 evidence1_6_1 i)
+  protocolReceiptsOfSources world1 evidence1_6_1 i
 theorem normalized1_6_1 : normalizeProtocolEvidence raw1_6_1 = evidence1_6_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_6_1 i = evidence1_6_1 i := by decide
   exact funext checked
 def raw1_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world1 evidence1_6_2 i)
+  protocolReceiptsOfSources world1 evidence1_6_2 i
 theorem normalized1_6_2 : normalizeProtocolEvidence raw1_6_2 = evidence1_6_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw1_6_2 i = evidence1_6_2 i := by decide
   exact funext checked
@@ -1221,17 +1221,17 @@ theorem sources2_0 : ProtocolSources world2 evidence2_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_0_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
 def raw2_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_0_0 i)
+  protocolReceiptsOfSources world2 evidence2_0_0 i
 theorem normalized2_0_0 : normalizeProtocolEvidence raw2_0_0 = evidence2_0_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_0_0 i = evidence2_0_0 i := by decide
   exact funext checked
 def raw2_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_0_1 i)
+  protocolReceiptsOfSources world2 evidence2_0_1 i
 theorem normalized2_0_1 : normalizeProtocolEvidence raw2_0_1 = evidence2_0_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_0_1 i = evidence2_0_1 i := by decide
   exact funext checked
 def raw2_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_0_2 i)
+  protocolReceiptsOfSources world2 evidence2_0_2 i
 theorem normalized2_0_2 : normalizeProtocolEvidence raw2_0_2 = evidence2_0_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_0_2 i = evidence2_0_2 i := by decide
   exact funext checked
@@ -1294,17 +1294,17 @@ theorem sources2_1 : ProtocolSources world2 evidence2_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_1_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
 def raw2_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_1_0 i)
+  protocolReceiptsOfSources world2 evidence2_1_0 i
 theorem normalized2_1_0 : normalizeProtocolEvidence raw2_1_0 = evidence2_1_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_1_0 i = evidence2_1_0 i := by decide
   exact funext checked
 def raw2_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_1_1 i)
+  protocolReceiptsOfSources world2 evidence2_1_1 i
 theorem normalized2_1_1 : normalizeProtocolEvidence raw2_1_1 = evidence2_1_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_1_1 i = evidence2_1_1 i := by decide
   exact funext checked
 def raw2_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_1_2 i)
+  protocolReceiptsOfSources world2 evidence2_1_2 i
 theorem normalized2_1_2 : normalizeProtocolEvidence raw2_1_2 = evidence2_1_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_1_2 i = evidence2_1_2 i := by decide
   exact funext checked
@@ -1367,17 +1367,17 @@ theorem sources2_2 : ProtocolSources world2 evidence2_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_2_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
 def raw2_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_2_0 i)
+  protocolReceiptsOfSources world2 evidence2_2_0 i
 theorem normalized2_2_0 : normalizeProtocolEvidence raw2_2_0 = evidence2_2_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_2_0 i = evidence2_2_0 i := by decide
   exact funext checked
 def raw2_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_2_1 i)
+  protocolReceiptsOfSources world2 evidence2_2_1 i
 theorem normalized2_2_1 : normalizeProtocolEvidence raw2_2_1 = evidence2_2_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_2_1 i = evidence2_2_1 i := by decide
   exact funext checked
 def raw2_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_2_2 i)
+  protocolReceiptsOfSources world2 evidence2_2_2 i
 theorem normalized2_2_2 : normalizeProtocolEvidence raw2_2_2 = evidence2_2_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_2_2 i = evidence2_2_2 i := by decide
   exact funext checked
@@ -1440,17 +1440,17 @@ theorem sources2_3 : ProtocolSources world2 evidence2_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_3_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
 def raw2_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_3_0 i)
+  protocolReceiptsOfSources world2 evidence2_3_0 i
 theorem normalized2_3_0 : normalizeProtocolEvidence raw2_3_0 = evidence2_3_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_3_0 i = evidence2_3_0 i := by decide
   exact funext checked
 def raw2_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_3_1 i)
+  protocolReceiptsOfSources world2 evidence2_3_1 i
 theorem normalized2_3_1 : normalizeProtocolEvidence raw2_3_1 = evidence2_3_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_3_1 i = evidence2_3_1 i := by decide
   exact funext checked
 def raw2_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_3_2 i)
+  protocolReceiptsOfSources world2 evidence2_3_2 i
 theorem normalized2_3_2 : normalizeProtocolEvidence raw2_3_2 = evidence2_3_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_3_2 i = evidence2_3_2 i := by decide
   exact funext checked
@@ -1513,17 +1513,17 @@ theorem sources2_4 : ProtocolSources world2 evidence2_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_4_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
 def raw2_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_4_0 i)
+  protocolReceiptsOfSources world2 evidence2_4_0 i
 theorem normalized2_4_0 : normalizeProtocolEvidence raw2_4_0 = evidence2_4_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_4_0 i = evidence2_4_0 i := by decide
   exact funext checked
 def raw2_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_4_1 i)
+  protocolReceiptsOfSources world2 evidence2_4_1 i
 theorem normalized2_4_1 : normalizeProtocolEvidence raw2_4_1 = evidence2_4_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_4_1 i = evidence2_4_1 i := by decide
   exact funext checked
 def raw2_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_4_2 i)
+  protocolReceiptsOfSources world2 evidence2_4_2 i
 theorem normalized2_4_2 : normalizeProtocolEvidence raw2_4_2 = evidence2_4_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_4_2 i = evidence2_4_2 i := by decide
   exact funext checked
@@ -1586,17 +1586,17 @@ theorem sources2_5 : ProtocolSources world2 evidence2_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_5_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
 def raw2_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_5_0 i)
+  protocolReceiptsOfSources world2 evidence2_5_0 i
 theorem normalized2_5_0 : normalizeProtocolEvidence raw2_5_0 = evidence2_5_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_5_0 i = evidence2_5_0 i := by decide
   exact funext checked
 def raw2_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_5_1 i)
+  protocolReceiptsOfSources world2 evidence2_5_1 i
 theorem normalized2_5_1 : normalizeProtocolEvidence raw2_5_1 = evidence2_5_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_5_1 i = evidence2_5_1 i := by decide
   exact funext checked
 def raw2_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_5_2 i)
+  protocolReceiptsOfSources world2 evidence2_5_2 i
 theorem normalized2_5_2 : normalizeProtocolEvidence raw2_5_2 = evidence2_5_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_5_2 i = evidence2_5_2 i := by decide
   exact funext checked
@@ -1659,17 +1659,17 @@ theorem sources2_6 : ProtocolSources world2 evidence2_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence2_6_0 i, protocolSourceValid world2 i source.key = true := by decide
   exact checked
 def raw2_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_6_0 i)
+  protocolReceiptsOfSources world2 evidence2_6_0 i
 theorem normalized2_6_0 : normalizeProtocolEvidence raw2_6_0 = evidence2_6_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_6_0 i = evidence2_6_0 i := by decide
   exact funext checked
 def raw2_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world2 evidence2_6_1 i)
+  protocolReceiptsOfSources world2 evidence2_6_1 i
 theorem normalized2_6_1 : normalizeProtocolEvidence raw2_6_1 = evidence2_6_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_6_1 i = evidence2_6_1 i := by decide
   exact funext checked
 def raw2_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world2 evidence2_6_2 i)
+  protocolReceiptsOfSources world2 evidence2_6_2 i
 theorem normalized2_6_2 : normalizeProtocolEvidence raw2_6_2 = evidence2_6_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw2_6_2 i = evidence2_6_2 i := by decide
   exact funext checked
@@ -1725,63 +1725,6 @@ example : (reconcileProtocol world2 (normalizeProtocolEvidence raw2_6_2) empty2)
   pure [result0, result1, result2, result3]) := by
   rw [normalized2_6_2]
   decide
-def incompleteAgent2_0 : ProtocolAgent := { agent2_0 with chainFacts := fun rank => { agent2_0.chainFacts rank with registration := false } }
-theorem incompleteAgentDomain2_0 : ProtocolAgentDomain incompleteAgent2_0 :=
-  { agentDomain2_0 with facts := agentDomain2_0.facts }
-def incompleteAgent2_1 : ProtocolAgent := { agent2_1 with chainFacts := fun rank => { agent2_1.chainFacts rank with registration := false } }
-theorem incompleteAgentDomain2_1 : ProtocolAgentDomain incompleteAgent2_1 :=
-  { agentDomain2_1 with facts := agentDomain2_1.facts }
-def incompleteAsset2 : ProtocolAsset := { asset2 with chainFacts := fun rank => { asset2.chainFacts rank with registration := false } }
-theorem incompleteAssetDomain2 : ProtocolAssetDomain incompleteAsset2 :=
-  { assetDomain2 with facts := assetDomain2.facts }
-def incompleteWorld2 : ProtocolModel 4 := ⟨fun i => [some (.agent incompleteAgent2_0), some (.agent incompleteAgent2_1), some (.asset incompleteAsset2), none].getD i.val none, AssetFixtures.unanchored, 4⟩
-theorem incompleteDomain2 : ProtocolDomain incompleteWorld2 := by
-  apply protocol_domain_of_slots
-  · intro i spec entry
-    have cases : i.val = 0 ∨ i.val = 1 ∨ i.val = 2 ∨ i.val = 3 := by omega
-    rcases cases with h | h | h | h
-    all_goals simp only [incompleteWorld2, h, List.getD_cons_zero, List.getD_cons_succ] at entry
-    all_goals simp only [Option.some.injEq, ProtocolDID.agent.injEq, reduceCtorEq] at entry
-    all_goals first | contradiction | subst spec
-    all_goals first | exact incompleteAgentDomain2_0 | exact incompleteAgentDomain2_1
-  · intro i spec entry
-    have cases : i.val = 0 ∨ i.val = 1 ∨ i.val = 2 ∨ i.val = 3 := by omega
-    rcases cases with h | h | h | h
-    all_goals simp only [incompleteWorld2, h, List.getD_cons_zero, List.getD_cons_succ] at entry
-    all_goals simp only [Option.some.injEq, ProtocolDID.asset.injEq, reduceCtorEq] at entry
-    all_goals first | contradiction | subst spec
-    all_goals exact incompleteAssetDomain2
-  · intro i spec entry rank bound
-    have cases : i.val = 0 ∨ i.val = 1 ∨ i.val = 2 ∨ i.val = 3 := by omega
-    rcases cases with h | h | h | h
-    all_goals simp only [incompleteWorld2, h, List.getD_cons_zero, List.getD_cons_succ] at entry
-    all_goals simp only [Option.some.injEq, ProtocolDID.agent.injEq, reduceCtorEq] at entry
-    all_goals first | contradiction | subst spec
-    · have small : rank < 4 := bound
-      have checked : ∀ rank : Fin 4, (AssetControllerFixtures.receipts4).chain ((AssetControllerFixtures.receipts4).registry rank.val) = !AssetFixtures.unanchored ((AssetControllerFixtures.receipts4).registry rank.val) := by decide
-      exact checked ⟨rank, small⟩
-    · have small : rank < 2 := bound
-      have checked : ∀ rank : Fin 2, (AssetControllerFixtures.receipts5).chain ((AssetControllerFixtures.receipts5).registry rank.val) = !AssetFixtures.unanchored ((AssetControllerFixtures.receipts5).registry rank.val) := by decide
-      exact checked ⟨rank, small⟩
-  · intro i spec entry rank bound
-    have cases : i.val = 0 ∨ i.val = 1 ∨ i.val = 2 ∨ i.val = 3 := by omega
-    rcases cases with h | h | h | h
-    all_goals simp only [incompleteWorld2, h, List.getD_cons_zero, List.getD_cons_succ] at entry
-    all_goals simp only [Option.some.injEq, ProtocolDID.asset.injEq, reduceCtorEq] at entry
-    all_goals first | contradiction | subst spec
-    all_goals have small : rank < 13 := bound
-    all_goals have checked : ∀ rank : Fin 13, (AssetFixtures.receipts2).chain ((AssetFixtures.receipts2).registry rank.val) = !AssetFixtures.unanchored ((AssetFixtures.receipts2).registry rank.val) := by decide
-    all_goals exact checked ⟨rank, small⟩
-def incompleteEmpty2 : ProtocolRecords 4 Nat := ⟨fun _ => [], fun _ => []⟩
-def incompleteRaw2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  (raw2_6_0 i).map fun receipt => { receipt with chain := withoutRegistration receipt.chain }
-theorem incompleteSources2 : ProtocolReceiptSources incompleteWorld2 incompleteRaw2 := by
-  have checked : ∀ i : Fin 4, ∀ receipt ∈ incompleteRaw2 i, ProtocolReceiptValid incompleteWorld2 i (incompleteRaw2 i) receipt := by decide
-  exact checked
-example := protocol_convergence incompleteWorld2 incompleteDomain2 incompleteRaw2 incompleteSources2
-example : ∀ i : Fin 4, ∀ receipt ∈ incompleteRaw2 i,
-    withoutRegistration (protocolChainFacts incompleteWorld2 i receipt.source.key) =
-    withoutRegistration (protocolChainFacts world2 i receipt.source.key) := by decide
 def agent3_0 : ProtocolAgent := ⟨AssetFixtures.spec3_0, AssetControllerFixtures.receipts6, AssetControllerFixtures.positions6, 1788998460000, AssetControllerFixtures.operationTime6, AssetControllerFixtures.chainFacts6, AssetControllerFixtures.documents6, AssetControllerFixtures.methods6, 2⟩
 theorem agentDomain3_0 : ProtocolAgentDomain agent3_0 := by
   refine ⟨AssetControllerFixtures.ordered6, AssetControllerFixtures.bounded6, AssetControllerFixtures.parents6, by decide, by decide, by decide, by decide, AssetControllerFixtures.methods_agree6, AssetControllerFixtures.ranks6, ?_, ?_⟩
@@ -1851,17 +1794,17 @@ theorem sources3_0 : ProtocolSources world3 evidence3_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_0_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
 def raw3_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_0_0 i)
+  protocolReceiptsOfSources world3 evidence3_0_0 i
 theorem normalized3_0_0 : normalizeProtocolEvidence raw3_0_0 = evidence3_0_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_0_0 i = evidence3_0_0 i := by decide
   exact funext checked
 def raw3_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_0_1 i)
+  protocolReceiptsOfSources world3 evidence3_0_1 i
 theorem normalized3_0_1 : normalizeProtocolEvidence raw3_0_1 = evidence3_0_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_0_1 i = evidence3_0_1 i := by decide
   exact funext checked
 def raw3_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_0_2 i)
+  protocolReceiptsOfSources world3 evidence3_0_2 i
 theorem normalized3_0_2 : normalizeProtocolEvidence raw3_0_2 = evidence3_0_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_0_2 i = evidence3_0_2 i := by decide
   exact funext checked
@@ -1924,17 +1867,17 @@ theorem sources3_1 : ProtocolSources world3 evidence3_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_1_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
 def raw3_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_1_0 i)
+  protocolReceiptsOfSources world3 evidence3_1_0 i
 theorem normalized3_1_0 : normalizeProtocolEvidence raw3_1_0 = evidence3_1_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_1_0 i = evidence3_1_0 i := by decide
   exact funext checked
 def raw3_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_1_1 i)
+  protocolReceiptsOfSources world3 evidence3_1_1 i
 theorem normalized3_1_1 : normalizeProtocolEvidence raw3_1_1 = evidence3_1_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_1_1 i = evidence3_1_1 i := by decide
   exact funext checked
 def raw3_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_1_2 i)
+  protocolReceiptsOfSources world3 evidence3_1_2 i
 theorem normalized3_1_2 : normalizeProtocolEvidence raw3_1_2 = evidence3_1_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_1_2 i = evidence3_1_2 i := by decide
   exact funext checked
@@ -1997,17 +1940,17 @@ theorem sources3_2 : ProtocolSources world3 evidence3_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_2_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
 def raw3_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_2_0 i)
+  protocolReceiptsOfSources world3 evidence3_2_0 i
 theorem normalized3_2_0 : normalizeProtocolEvidence raw3_2_0 = evidence3_2_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_2_0 i = evidence3_2_0 i := by decide
   exact funext checked
 def raw3_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_2_1 i)
+  protocolReceiptsOfSources world3 evidence3_2_1 i
 theorem normalized3_2_1 : normalizeProtocolEvidence raw3_2_1 = evidence3_2_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_2_1 i = evidence3_2_1 i := by decide
   exact funext checked
 def raw3_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_2_2 i)
+  protocolReceiptsOfSources world3 evidence3_2_2 i
 theorem normalized3_2_2 : normalizeProtocolEvidence raw3_2_2 = evidence3_2_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_2_2 i = evidence3_2_2 i := by decide
   exact funext checked
@@ -2070,17 +2013,17 @@ theorem sources3_3 : ProtocolSources world3 evidence3_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_3_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
 def raw3_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_3_0 i)
+  protocolReceiptsOfSources world3 evidence3_3_0 i
 theorem normalized3_3_0 : normalizeProtocolEvidence raw3_3_0 = evidence3_3_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_3_0 i = evidence3_3_0 i := by decide
   exact funext checked
 def raw3_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_3_1 i)
+  protocolReceiptsOfSources world3 evidence3_3_1 i
 theorem normalized3_3_1 : normalizeProtocolEvidence raw3_3_1 = evidence3_3_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_3_1 i = evidence3_3_1 i := by decide
   exact funext checked
 def raw3_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_3_2 i)
+  protocolReceiptsOfSources world3 evidence3_3_2 i
 theorem normalized3_3_2 : normalizeProtocolEvidence raw3_3_2 = evidence3_3_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_3_2 i = evidence3_3_2 i := by decide
   exact funext checked
@@ -2143,17 +2086,17 @@ theorem sources3_4 : ProtocolSources world3 evidence3_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_4_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
 def raw3_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_4_0 i)
+  protocolReceiptsOfSources world3 evidence3_4_0 i
 theorem normalized3_4_0 : normalizeProtocolEvidence raw3_4_0 = evidence3_4_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_4_0 i = evidence3_4_0 i := by decide
   exact funext checked
 def raw3_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_4_1 i)
+  protocolReceiptsOfSources world3 evidence3_4_1 i
 theorem normalized3_4_1 : normalizeProtocolEvidence raw3_4_1 = evidence3_4_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_4_1 i = evidence3_4_1 i := by decide
   exact funext checked
 def raw3_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_4_2 i)
+  protocolReceiptsOfSources world3 evidence3_4_2 i
 theorem normalized3_4_2 : normalizeProtocolEvidence raw3_4_2 = evidence3_4_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_4_2 i = evidence3_4_2 i := by decide
   exact funext checked
@@ -2216,17 +2159,17 @@ theorem sources3_5 : ProtocolSources world3 evidence3_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_5_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
 def raw3_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_5_0 i)
+  protocolReceiptsOfSources world3 evidence3_5_0 i
 theorem normalized3_5_0 : normalizeProtocolEvidence raw3_5_0 = evidence3_5_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_5_0 i = evidence3_5_0 i := by decide
   exact funext checked
 def raw3_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_5_1 i)
+  protocolReceiptsOfSources world3 evidence3_5_1 i
 theorem normalized3_5_1 : normalizeProtocolEvidence raw3_5_1 = evidence3_5_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_5_1 i = evidence3_5_1 i := by decide
   exact funext checked
 def raw3_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_5_2 i)
+  protocolReceiptsOfSources world3 evidence3_5_2 i
 theorem normalized3_5_2 : normalizeProtocolEvidence raw3_5_2 = evidence3_5_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_5_2 i = evidence3_5_2 i := by decide
   exact funext checked
@@ -2289,17 +2232,17 @@ theorem sources3_6 : ProtocolSources world3 evidence3_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence3_6_0 i, protocolSourceValid world3 i source.key = true := by decide
   exact checked
 def raw3_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_6_0 i)
+  protocolReceiptsOfSources world3 evidence3_6_0 i
 theorem normalized3_6_0 : normalizeProtocolEvidence raw3_6_0 = evidence3_6_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_6_0 i = evidence3_6_0 i := by decide
   exact funext checked
 def raw3_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world3 evidence3_6_1 i)
+  protocolReceiptsOfSources world3 evidence3_6_1 i
 theorem normalized3_6_1 : normalizeProtocolEvidence raw3_6_1 = evidence3_6_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_6_1 i = evidence3_6_1 i := by decide
   exact funext checked
 def raw3_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world3 evidence3_6_2 i)
+  protocolReceiptsOfSources world3 evidence3_6_2 i
 theorem normalized3_6_2 : normalizeProtocolEvidence raw3_6_2 = evidence3_6_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw3_6_2 i = evidence3_6_2 i := by decide
   exact funext checked
@@ -2424,17 +2367,17 @@ theorem sources4_0 : ProtocolSources world4 evidence4_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_0_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
 def raw4_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_0_0 i)
+  protocolReceiptsOfSources world4 evidence4_0_0 i
 theorem normalized4_0_0 : normalizeProtocolEvidence raw4_0_0 = evidence4_0_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_0_0 i = evidence4_0_0 i := by decide
   exact funext checked
 def raw4_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_0_1 i)
+  protocolReceiptsOfSources world4 evidence4_0_1 i
 theorem normalized4_0_1 : normalizeProtocolEvidence raw4_0_1 = evidence4_0_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_0_1 i = evidence4_0_1 i := by decide
   exact funext checked
 def raw4_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_0_2 i)
+  protocolReceiptsOfSources world4 evidence4_0_2 i
 theorem normalized4_0_2 : normalizeProtocolEvidence raw4_0_2 = evidence4_0_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_0_2 i = evidence4_0_2 i := by decide
   exact funext checked
@@ -2497,17 +2440,17 @@ theorem sources4_1 : ProtocolSources world4 evidence4_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_1_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
 def raw4_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_1_0 i)
+  protocolReceiptsOfSources world4 evidence4_1_0 i
 theorem normalized4_1_0 : normalizeProtocolEvidence raw4_1_0 = evidence4_1_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_1_0 i = evidence4_1_0 i := by decide
   exact funext checked
 def raw4_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_1_1 i)
+  protocolReceiptsOfSources world4 evidence4_1_1 i
 theorem normalized4_1_1 : normalizeProtocolEvidence raw4_1_1 = evidence4_1_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_1_1 i = evidence4_1_1 i := by decide
   exact funext checked
 def raw4_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_1_2 i)
+  protocolReceiptsOfSources world4 evidence4_1_2 i
 theorem normalized4_1_2 : normalizeProtocolEvidence raw4_1_2 = evidence4_1_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_1_2 i = evidence4_1_2 i := by decide
   exact funext checked
@@ -2570,17 +2513,17 @@ theorem sources4_2 : ProtocolSources world4 evidence4_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_2_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
 def raw4_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_2_0 i)
+  protocolReceiptsOfSources world4 evidence4_2_0 i
 theorem normalized4_2_0 : normalizeProtocolEvidence raw4_2_0 = evidence4_2_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_2_0 i = evidence4_2_0 i := by decide
   exact funext checked
 def raw4_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_2_1 i)
+  protocolReceiptsOfSources world4 evidence4_2_1 i
 theorem normalized4_2_1 : normalizeProtocolEvidence raw4_2_1 = evidence4_2_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_2_1 i = evidence4_2_1 i := by decide
   exact funext checked
 def raw4_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_2_2 i)
+  protocolReceiptsOfSources world4 evidence4_2_2 i
 theorem normalized4_2_2 : normalizeProtocolEvidence raw4_2_2 = evidence4_2_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_2_2 i = evidence4_2_2 i := by decide
   exact funext checked
@@ -2643,17 +2586,17 @@ theorem sources4_3 : ProtocolSources world4 evidence4_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_3_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
 def raw4_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_3_0 i)
+  protocolReceiptsOfSources world4 evidence4_3_0 i
 theorem normalized4_3_0 : normalizeProtocolEvidence raw4_3_0 = evidence4_3_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_3_0 i = evidence4_3_0 i := by decide
   exact funext checked
 def raw4_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_3_1 i)
+  protocolReceiptsOfSources world4 evidence4_3_1 i
 theorem normalized4_3_1 : normalizeProtocolEvidence raw4_3_1 = evidence4_3_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_3_1 i = evidence4_3_1 i := by decide
   exact funext checked
 def raw4_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_3_2 i)
+  protocolReceiptsOfSources world4 evidence4_3_2 i
 theorem normalized4_3_2 : normalizeProtocolEvidence raw4_3_2 = evidence4_3_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_3_2 i = evidence4_3_2 i := by decide
   exact funext checked
@@ -2716,17 +2659,17 @@ theorem sources4_4 : ProtocolSources world4 evidence4_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_4_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
 def raw4_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_4_0 i)
+  protocolReceiptsOfSources world4 evidence4_4_0 i
 theorem normalized4_4_0 : normalizeProtocolEvidence raw4_4_0 = evidence4_4_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_4_0 i = evidence4_4_0 i := by decide
   exact funext checked
 def raw4_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_4_1 i)
+  protocolReceiptsOfSources world4 evidence4_4_1 i
 theorem normalized4_4_1 : normalizeProtocolEvidence raw4_4_1 = evidence4_4_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_4_1 i = evidence4_4_1 i := by decide
   exact funext checked
 def raw4_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_4_2 i)
+  protocolReceiptsOfSources world4 evidence4_4_2 i
 theorem normalized4_4_2 : normalizeProtocolEvidence raw4_4_2 = evidence4_4_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_4_2 i = evidence4_4_2 i := by decide
   exact funext checked
@@ -2789,17 +2732,17 @@ theorem sources4_5 : ProtocolSources world4 evidence4_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_5_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
 def raw4_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_5_0 i)
+  protocolReceiptsOfSources world4 evidence4_5_0 i
 theorem normalized4_5_0 : normalizeProtocolEvidence raw4_5_0 = evidence4_5_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_5_0 i = evidence4_5_0 i := by decide
   exact funext checked
 def raw4_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_5_1 i)
+  protocolReceiptsOfSources world4 evidence4_5_1 i
 theorem normalized4_5_1 : normalizeProtocolEvidence raw4_5_1 = evidence4_5_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_5_1 i = evidence4_5_1 i := by decide
   exact funext checked
 def raw4_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_5_2 i)
+  protocolReceiptsOfSources world4 evidence4_5_2 i
 theorem normalized4_5_2 : normalizeProtocolEvidence raw4_5_2 = evidence4_5_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_5_2 i = evidence4_5_2 i := by decide
   exact funext checked
@@ -2862,17 +2805,17 @@ theorem sources4_6 : ProtocolSources world4 evidence4_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence4_6_0 i, protocolSourceValid world4 i source.key = true := by decide
   exact checked
 def raw4_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_6_0 i)
+  protocolReceiptsOfSources world4 evidence4_6_0 i
 theorem normalized4_6_0 : normalizeProtocolEvidence raw4_6_0 = evidence4_6_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_6_0 i = evidence4_6_0 i := by decide
   exact funext checked
 def raw4_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world4 evidence4_6_1 i)
+  protocolReceiptsOfSources world4 evidence4_6_1 i
 theorem normalized4_6_1 : normalizeProtocolEvidence raw4_6_1 = evidence4_6_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_6_1 i = evidence4_6_1 i := by decide
   exact funext checked
 def raw4_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world4 evidence4_6_2 i)
+  protocolReceiptsOfSources world4 evidence4_6_2 i
 theorem normalized4_6_2 : normalizeProtocolEvidence raw4_6_2 = evidence4_6_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw4_6_2 i = evidence4_6_2 i := by decide
   exact funext checked
@@ -2997,17 +2940,17 @@ theorem sources5_0 : ProtocolSources world5 evidence5_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_0_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
 def raw5_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_0_0 i)
+  protocolReceiptsOfSources world5 evidence5_0_0 i
 theorem normalized5_0_0 : normalizeProtocolEvidence raw5_0_0 = evidence5_0_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_0_0 i = evidence5_0_0 i := by decide
   exact funext checked
 def raw5_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_0_1 i)
+  protocolReceiptsOfSources world5 evidence5_0_1 i
 theorem normalized5_0_1 : normalizeProtocolEvidence raw5_0_1 = evidence5_0_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_0_1 i = evidence5_0_1 i := by decide
   exact funext checked
 def raw5_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_0_2 i)
+  protocolReceiptsOfSources world5 evidence5_0_2 i
 theorem normalized5_0_2 : normalizeProtocolEvidence raw5_0_2 = evidence5_0_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_0_2 i = evidence5_0_2 i := by decide
   exact funext checked
@@ -3070,17 +3013,17 @@ theorem sources5_1 : ProtocolSources world5 evidence5_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_1_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
 def raw5_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_1_0 i)
+  protocolReceiptsOfSources world5 evidence5_1_0 i
 theorem normalized5_1_0 : normalizeProtocolEvidence raw5_1_0 = evidence5_1_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_1_0 i = evidence5_1_0 i := by decide
   exact funext checked
 def raw5_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_1_1 i)
+  protocolReceiptsOfSources world5 evidence5_1_1 i
 theorem normalized5_1_1 : normalizeProtocolEvidence raw5_1_1 = evidence5_1_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_1_1 i = evidence5_1_1 i := by decide
   exact funext checked
 def raw5_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_1_2 i)
+  protocolReceiptsOfSources world5 evidence5_1_2 i
 theorem normalized5_1_2 : normalizeProtocolEvidence raw5_1_2 = evidence5_1_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_1_2 i = evidence5_1_2 i := by decide
   exact funext checked
@@ -3143,17 +3086,17 @@ theorem sources5_2 : ProtocolSources world5 evidence5_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_2_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
 def raw5_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_2_0 i)
+  protocolReceiptsOfSources world5 evidence5_2_0 i
 theorem normalized5_2_0 : normalizeProtocolEvidence raw5_2_0 = evidence5_2_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_2_0 i = evidence5_2_0 i := by decide
   exact funext checked
 def raw5_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_2_1 i)
+  protocolReceiptsOfSources world5 evidence5_2_1 i
 theorem normalized5_2_1 : normalizeProtocolEvidence raw5_2_1 = evidence5_2_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_2_1 i = evidence5_2_1 i := by decide
   exact funext checked
 def raw5_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_2_2 i)
+  protocolReceiptsOfSources world5 evidence5_2_2 i
 theorem normalized5_2_2 : normalizeProtocolEvidence raw5_2_2 = evidence5_2_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_2_2 i = evidence5_2_2 i := by decide
   exact funext checked
@@ -3216,17 +3159,17 @@ theorem sources5_3 : ProtocolSources world5 evidence5_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_3_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
 def raw5_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_3_0 i)
+  protocolReceiptsOfSources world5 evidence5_3_0 i
 theorem normalized5_3_0 : normalizeProtocolEvidence raw5_3_0 = evidence5_3_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_3_0 i = evidence5_3_0 i := by decide
   exact funext checked
 def raw5_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_3_1 i)
+  protocolReceiptsOfSources world5 evidence5_3_1 i
 theorem normalized5_3_1 : normalizeProtocolEvidence raw5_3_1 = evidence5_3_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_3_1 i = evidence5_3_1 i := by decide
   exact funext checked
 def raw5_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_3_2 i)
+  protocolReceiptsOfSources world5 evidence5_3_2 i
 theorem normalized5_3_2 : normalizeProtocolEvidence raw5_3_2 = evidence5_3_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_3_2 i = evidence5_3_2 i := by decide
   exact funext checked
@@ -3289,17 +3232,17 @@ theorem sources5_4 : ProtocolSources world5 evidence5_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_4_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
 def raw5_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_4_0 i)
+  protocolReceiptsOfSources world5 evidence5_4_0 i
 theorem normalized5_4_0 : normalizeProtocolEvidence raw5_4_0 = evidence5_4_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_4_0 i = evidence5_4_0 i := by decide
   exact funext checked
 def raw5_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_4_1 i)
+  protocolReceiptsOfSources world5 evidence5_4_1 i
 theorem normalized5_4_1 : normalizeProtocolEvidence raw5_4_1 = evidence5_4_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_4_1 i = evidence5_4_1 i := by decide
   exact funext checked
 def raw5_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_4_2 i)
+  protocolReceiptsOfSources world5 evidence5_4_2 i
 theorem normalized5_4_2 : normalizeProtocolEvidence raw5_4_2 = evidence5_4_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_4_2 i = evidence5_4_2 i := by decide
   exact funext checked
@@ -3362,17 +3305,17 @@ theorem sources5_5 : ProtocolSources world5 evidence5_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_5_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
 def raw5_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_5_0 i)
+  protocolReceiptsOfSources world5 evidence5_5_0 i
 theorem normalized5_5_0 : normalizeProtocolEvidence raw5_5_0 = evidence5_5_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_5_0 i = evidence5_5_0 i := by decide
   exact funext checked
 def raw5_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_5_1 i)
+  protocolReceiptsOfSources world5 evidence5_5_1 i
 theorem normalized5_5_1 : normalizeProtocolEvidence raw5_5_1 = evidence5_5_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_5_1 i = evidence5_5_1 i := by decide
   exact funext checked
 def raw5_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_5_2 i)
+  protocolReceiptsOfSources world5 evidence5_5_2 i
 theorem normalized5_5_2 : normalizeProtocolEvidence raw5_5_2 = evidence5_5_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_5_2 i = evidence5_5_2 i := by decide
   exact funext checked
@@ -3435,17 +3378,17 @@ theorem sources5_6 : ProtocolSources world5 evidence5_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence5_6_0 i, protocolSourceValid world5 i source.key = true := by decide
   exact checked
 def raw5_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_6_0 i)
+  protocolReceiptsOfSources world5 evidence5_6_0 i
 theorem normalized5_6_0 : normalizeProtocolEvidence raw5_6_0 = evidence5_6_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_6_0 i = evidence5_6_0 i := by decide
   exact funext checked
 def raw5_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world5 evidence5_6_1 i)
+  protocolReceiptsOfSources world5 evidence5_6_1 i
 theorem normalized5_6_1 : normalizeProtocolEvidence raw5_6_1 = evidence5_6_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_6_1 i = evidence5_6_1 i := by decide
   exact funext checked
 def raw5_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world5 evidence5_6_2 i)
+  protocolReceiptsOfSources world5 evidence5_6_2 i
 theorem normalized5_6_2 : normalizeProtocolEvidence raw5_6_2 = evidence5_6_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw5_6_2 i = evidence5_6_2 i := by decide
   exact funext checked
@@ -3570,17 +3513,17 @@ theorem sources6_0 : ProtocolSources world6 evidence6_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_0_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
 def raw6_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_0_0 i)
+  protocolReceiptsOfSources world6 evidence6_0_0 i
 theorem normalized6_0_0 : normalizeProtocolEvidence raw6_0_0 = evidence6_0_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_0_0 i = evidence6_0_0 i := by decide
   exact funext checked
 def raw6_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_0_1 i)
+  protocolReceiptsOfSources world6 evidence6_0_1 i
 theorem normalized6_0_1 : normalizeProtocolEvidence raw6_0_1 = evidence6_0_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_0_1 i = evidence6_0_1 i := by decide
   exact funext checked
 def raw6_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_0_2 i)
+  protocolReceiptsOfSources world6 evidence6_0_2 i
 theorem normalized6_0_2 : normalizeProtocolEvidence raw6_0_2 = evidence6_0_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_0_2 i = evidence6_0_2 i := by decide
   exact funext checked
@@ -3643,17 +3586,17 @@ theorem sources6_1 : ProtocolSources world6 evidence6_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_1_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
 def raw6_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_1_0 i)
+  protocolReceiptsOfSources world6 evidence6_1_0 i
 theorem normalized6_1_0 : normalizeProtocolEvidence raw6_1_0 = evidence6_1_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_1_0 i = evidence6_1_0 i := by decide
   exact funext checked
 def raw6_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_1_1 i)
+  protocolReceiptsOfSources world6 evidence6_1_1 i
 theorem normalized6_1_1 : normalizeProtocolEvidence raw6_1_1 = evidence6_1_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_1_1 i = evidence6_1_1 i := by decide
   exact funext checked
 def raw6_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_1_2 i)
+  protocolReceiptsOfSources world6 evidence6_1_2 i
 theorem normalized6_1_2 : normalizeProtocolEvidence raw6_1_2 = evidence6_1_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_1_2 i = evidence6_1_2 i := by decide
   exact funext checked
@@ -3716,17 +3659,17 @@ theorem sources6_2 : ProtocolSources world6 evidence6_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_2_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
 def raw6_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_2_0 i)
+  protocolReceiptsOfSources world6 evidence6_2_0 i
 theorem normalized6_2_0 : normalizeProtocolEvidence raw6_2_0 = evidence6_2_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_2_0 i = evidence6_2_0 i := by decide
   exact funext checked
 def raw6_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_2_1 i)
+  protocolReceiptsOfSources world6 evidence6_2_1 i
 theorem normalized6_2_1 : normalizeProtocolEvidence raw6_2_1 = evidence6_2_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_2_1 i = evidence6_2_1 i := by decide
   exact funext checked
 def raw6_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_2_2 i)
+  protocolReceiptsOfSources world6 evidence6_2_2 i
 theorem normalized6_2_2 : normalizeProtocolEvidence raw6_2_2 = evidence6_2_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_2_2 i = evidence6_2_2 i := by decide
   exact funext checked
@@ -3789,17 +3732,17 @@ theorem sources6_3 : ProtocolSources world6 evidence6_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_3_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
 def raw6_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_3_0 i)
+  protocolReceiptsOfSources world6 evidence6_3_0 i
 theorem normalized6_3_0 : normalizeProtocolEvidence raw6_3_0 = evidence6_3_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_3_0 i = evidence6_3_0 i := by decide
   exact funext checked
 def raw6_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_3_1 i)
+  protocolReceiptsOfSources world6 evidence6_3_1 i
 theorem normalized6_3_1 : normalizeProtocolEvidence raw6_3_1 = evidence6_3_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_3_1 i = evidence6_3_1 i := by decide
   exact funext checked
 def raw6_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_3_2 i)
+  protocolReceiptsOfSources world6 evidence6_3_2 i
 theorem normalized6_3_2 : normalizeProtocolEvidence raw6_3_2 = evidence6_3_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_3_2 i = evidence6_3_2 i := by decide
   exact funext checked
@@ -3862,17 +3805,17 @@ theorem sources6_4 : ProtocolSources world6 evidence6_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_4_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
 def raw6_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_4_0 i)
+  protocolReceiptsOfSources world6 evidence6_4_0 i
 theorem normalized6_4_0 : normalizeProtocolEvidence raw6_4_0 = evidence6_4_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_4_0 i = evidence6_4_0 i := by decide
   exact funext checked
 def raw6_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_4_1 i)
+  protocolReceiptsOfSources world6 evidence6_4_1 i
 theorem normalized6_4_1 : normalizeProtocolEvidence raw6_4_1 = evidence6_4_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_4_1 i = evidence6_4_1 i := by decide
   exact funext checked
 def raw6_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_4_2 i)
+  protocolReceiptsOfSources world6 evidence6_4_2 i
 theorem normalized6_4_2 : normalizeProtocolEvidence raw6_4_2 = evidence6_4_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_4_2 i = evidence6_4_2 i := by decide
   exact funext checked
@@ -3935,17 +3878,17 @@ theorem sources6_5 : ProtocolSources world6 evidence6_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_5_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
 def raw6_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_5_0 i)
+  protocolReceiptsOfSources world6 evidence6_5_0 i
 theorem normalized6_5_0 : normalizeProtocolEvidence raw6_5_0 = evidence6_5_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_5_0 i = evidence6_5_0 i := by decide
   exact funext checked
 def raw6_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_5_1 i)
+  protocolReceiptsOfSources world6 evidence6_5_1 i
 theorem normalized6_5_1 : normalizeProtocolEvidence raw6_5_1 = evidence6_5_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_5_1 i = evidence6_5_1 i := by decide
   exact funext checked
 def raw6_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_5_2 i)
+  protocolReceiptsOfSources world6 evidence6_5_2 i
 theorem normalized6_5_2 : normalizeProtocolEvidence raw6_5_2 = evidence6_5_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_5_2 i = evidence6_5_2 i := by decide
   exact funext checked
@@ -4008,17 +3951,17 @@ theorem sources6_6 : ProtocolSources world6 evidence6_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence6_6_0 i, protocolSourceValid world6 i source.key = true := by decide
   exact checked
 def raw6_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_6_0 i)
+  protocolReceiptsOfSources world6 evidence6_6_0 i
 theorem normalized6_6_0 : normalizeProtocolEvidence raw6_6_0 = evidence6_6_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_6_0 i = evidence6_6_0 i := by decide
   exact funext checked
 def raw6_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world6 evidence6_6_1 i)
+  protocolReceiptsOfSources world6 evidence6_6_1 i
 theorem normalized6_6_1 : normalizeProtocolEvidence raw6_6_1 = evidence6_6_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_6_1 i = evidence6_6_1 i := by decide
   exact funext checked
 def raw6_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world6 evidence6_6_2 i)
+  protocolReceiptsOfSources world6 evidence6_6_2 i
 theorem normalized6_6_2 : normalizeProtocolEvidence raw6_6_2 = evidence6_6_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw6_6_2 i = evidence6_6_2 i := by decide
   exact funext checked
@@ -4143,17 +4086,17 @@ theorem sources7_0 : ProtocolSources world7 evidence7_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_0_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
 def raw7_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_0_0 i)
+  protocolReceiptsOfSources world7 evidence7_0_0 i
 theorem normalized7_0_0 : normalizeProtocolEvidence raw7_0_0 = evidence7_0_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_0_0 i = evidence7_0_0 i := by decide
   exact funext checked
 def raw7_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_0_1 i)
+  protocolReceiptsOfSources world7 evidence7_0_1 i
 theorem normalized7_0_1 : normalizeProtocolEvidence raw7_0_1 = evidence7_0_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_0_1 i = evidence7_0_1 i := by decide
   exact funext checked
 def raw7_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_0_2 i)
+  protocolReceiptsOfSources world7 evidence7_0_2 i
 theorem normalized7_0_2 : normalizeProtocolEvidence raw7_0_2 = evidence7_0_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_0_2 i = evidence7_0_2 i := by decide
   exact funext checked
@@ -4216,17 +4159,17 @@ theorem sources7_1 : ProtocolSources world7 evidence7_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_1_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
 def raw7_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_1_0 i)
+  protocolReceiptsOfSources world7 evidence7_1_0 i
 theorem normalized7_1_0 : normalizeProtocolEvidence raw7_1_0 = evidence7_1_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_1_0 i = evidence7_1_0 i := by decide
   exact funext checked
 def raw7_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_1_1 i)
+  protocolReceiptsOfSources world7 evidence7_1_1 i
 theorem normalized7_1_1 : normalizeProtocolEvidence raw7_1_1 = evidence7_1_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_1_1 i = evidence7_1_1 i := by decide
   exact funext checked
 def raw7_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_1_2 i)
+  protocolReceiptsOfSources world7 evidence7_1_2 i
 theorem normalized7_1_2 : normalizeProtocolEvidence raw7_1_2 = evidence7_1_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_1_2 i = evidence7_1_2 i := by decide
   exact funext checked
@@ -4289,17 +4232,17 @@ theorem sources7_2 : ProtocolSources world7 evidence7_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_2_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
 def raw7_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_2_0 i)
+  protocolReceiptsOfSources world7 evidence7_2_0 i
 theorem normalized7_2_0 : normalizeProtocolEvidence raw7_2_0 = evidence7_2_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_2_0 i = evidence7_2_0 i := by decide
   exact funext checked
 def raw7_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_2_1 i)
+  protocolReceiptsOfSources world7 evidence7_2_1 i
 theorem normalized7_2_1 : normalizeProtocolEvidence raw7_2_1 = evidence7_2_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_2_1 i = evidence7_2_1 i := by decide
   exact funext checked
 def raw7_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_2_2 i)
+  protocolReceiptsOfSources world7 evidence7_2_2 i
 theorem normalized7_2_2 : normalizeProtocolEvidence raw7_2_2 = evidence7_2_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_2_2 i = evidence7_2_2 i := by decide
   exact funext checked
@@ -4362,17 +4305,17 @@ theorem sources7_3 : ProtocolSources world7 evidence7_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_3_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
 def raw7_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_3_0 i)
+  protocolReceiptsOfSources world7 evidence7_3_0 i
 theorem normalized7_3_0 : normalizeProtocolEvidence raw7_3_0 = evidence7_3_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_3_0 i = evidence7_3_0 i := by decide
   exact funext checked
 def raw7_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_3_1 i)
+  protocolReceiptsOfSources world7 evidence7_3_1 i
 theorem normalized7_3_1 : normalizeProtocolEvidence raw7_3_1 = evidence7_3_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_3_1 i = evidence7_3_1 i := by decide
   exact funext checked
 def raw7_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_3_2 i)
+  protocolReceiptsOfSources world7 evidence7_3_2 i
 theorem normalized7_3_2 : normalizeProtocolEvidence raw7_3_2 = evidence7_3_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_3_2 i = evidence7_3_2 i := by decide
   exact funext checked
@@ -4435,17 +4378,17 @@ theorem sources7_4 : ProtocolSources world7 evidence7_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_4_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
 def raw7_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_4_0 i)
+  protocolReceiptsOfSources world7 evidence7_4_0 i
 theorem normalized7_4_0 : normalizeProtocolEvidence raw7_4_0 = evidence7_4_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_4_0 i = evidence7_4_0 i := by decide
   exact funext checked
 def raw7_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_4_1 i)
+  protocolReceiptsOfSources world7 evidence7_4_1 i
 theorem normalized7_4_1 : normalizeProtocolEvidence raw7_4_1 = evidence7_4_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_4_1 i = evidence7_4_1 i := by decide
   exact funext checked
 def raw7_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_4_2 i)
+  protocolReceiptsOfSources world7 evidence7_4_2 i
 theorem normalized7_4_2 : normalizeProtocolEvidence raw7_4_2 = evidence7_4_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_4_2 i = evidence7_4_2 i := by decide
   exact funext checked
@@ -4508,17 +4451,17 @@ theorem sources7_5 : ProtocolSources world7 evidence7_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_5_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
 def raw7_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_5_0 i)
+  protocolReceiptsOfSources world7 evidence7_5_0 i
 theorem normalized7_5_0 : normalizeProtocolEvidence raw7_5_0 = evidence7_5_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_5_0 i = evidence7_5_0 i := by decide
   exact funext checked
 def raw7_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_5_1 i)
+  protocolReceiptsOfSources world7 evidence7_5_1 i
 theorem normalized7_5_1 : normalizeProtocolEvidence raw7_5_1 = evidence7_5_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_5_1 i = evidence7_5_1 i := by decide
   exact funext checked
 def raw7_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_5_2 i)
+  protocolReceiptsOfSources world7 evidence7_5_2 i
 theorem normalized7_5_2 : normalizeProtocolEvidence raw7_5_2 = evidence7_5_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_5_2 i = evidence7_5_2 i := by decide
   exact funext checked
@@ -4581,17 +4524,17 @@ theorem sources7_6 : ProtocolSources world7 evidence7_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence7_6_0 i, protocolSourceValid world7 i source.key = true := by decide
   exact checked
 def raw7_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_6_0 i)
+  protocolReceiptsOfSources world7 evidence7_6_0 i
 theorem normalized7_6_0 : normalizeProtocolEvidence raw7_6_0 = evidence7_6_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_6_0 i = evidence7_6_0 i := by decide
   exact funext checked
 def raw7_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world7 evidence7_6_1 i)
+  protocolReceiptsOfSources world7 evidence7_6_1 i
 theorem normalized7_6_1 : normalizeProtocolEvidence raw7_6_1 = evidence7_6_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_6_1 i = evidence7_6_1 i := by decide
   exact funext checked
 def raw7_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world7 evidence7_6_2 i)
+  protocolReceiptsOfSources world7 evidence7_6_2 i
 theorem normalized7_6_2 : normalizeProtocolEvidence raw7_6_2 = evidence7_6_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw7_6_2 i = evidence7_6_2 i := by decide
   exact funext checked
@@ -4716,17 +4659,17 @@ theorem sources8_0 : ProtocolSources world8 evidence8_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_0_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
 def raw8_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_0_0 i)
+  protocolReceiptsOfSources world8 evidence8_0_0 i
 theorem normalized8_0_0 : normalizeProtocolEvidence raw8_0_0 = evidence8_0_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_0_0 i = evidence8_0_0 i := by decide
   exact funext checked
 def raw8_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_0_1 i)
+  protocolReceiptsOfSources world8 evidence8_0_1 i
 theorem normalized8_0_1 : normalizeProtocolEvidence raw8_0_1 = evidence8_0_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_0_1 i = evidence8_0_1 i := by decide
   exact funext checked
 def raw8_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_0_2 i)
+  protocolReceiptsOfSources world8 evidence8_0_2 i
 theorem normalized8_0_2 : normalizeProtocolEvidence raw8_0_2 = evidence8_0_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_0_2 i = evidence8_0_2 i := by decide
   exact funext checked
@@ -4789,17 +4732,17 @@ theorem sources8_1 : ProtocolSources world8 evidence8_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_1_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
 def raw8_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_1_0 i)
+  protocolReceiptsOfSources world8 evidence8_1_0 i
 theorem normalized8_1_0 : normalizeProtocolEvidence raw8_1_0 = evidence8_1_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_1_0 i = evidence8_1_0 i := by decide
   exact funext checked
 def raw8_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_1_1 i)
+  protocolReceiptsOfSources world8 evidence8_1_1 i
 theorem normalized8_1_1 : normalizeProtocolEvidence raw8_1_1 = evidence8_1_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_1_1 i = evidence8_1_1 i := by decide
   exact funext checked
 def raw8_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_1_2 i)
+  protocolReceiptsOfSources world8 evidence8_1_2 i
 theorem normalized8_1_2 : normalizeProtocolEvidence raw8_1_2 = evidence8_1_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_1_2 i = evidence8_1_2 i := by decide
   exact funext checked
@@ -4862,17 +4805,17 @@ theorem sources8_2 : ProtocolSources world8 evidence8_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_2_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
 def raw8_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_2_0 i)
+  protocolReceiptsOfSources world8 evidence8_2_0 i
 theorem normalized8_2_0 : normalizeProtocolEvidence raw8_2_0 = evidence8_2_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_2_0 i = evidence8_2_0 i := by decide
   exact funext checked
 def raw8_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_2_1 i)
+  protocolReceiptsOfSources world8 evidence8_2_1 i
 theorem normalized8_2_1 : normalizeProtocolEvidence raw8_2_1 = evidence8_2_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_2_1 i = evidence8_2_1 i := by decide
   exact funext checked
 def raw8_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_2_2 i)
+  protocolReceiptsOfSources world8 evidence8_2_2 i
 theorem normalized8_2_2 : normalizeProtocolEvidence raw8_2_2 = evidence8_2_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_2_2 i = evidence8_2_2 i := by decide
   exact funext checked
@@ -4935,17 +4878,17 @@ theorem sources8_3 : ProtocolSources world8 evidence8_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_3_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
 def raw8_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_3_0 i)
+  protocolReceiptsOfSources world8 evidence8_3_0 i
 theorem normalized8_3_0 : normalizeProtocolEvidence raw8_3_0 = evidence8_3_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_3_0 i = evidence8_3_0 i := by decide
   exact funext checked
 def raw8_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_3_1 i)
+  protocolReceiptsOfSources world8 evidence8_3_1 i
 theorem normalized8_3_1 : normalizeProtocolEvidence raw8_3_1 = evidence8_3_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_3_1 i = evidence8_3_1 i := by decide
   exact funext checked
 def raw8_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_3_2 i)
+  protocolReceiptsOfSources world8 evidence8_3_2 i
 theorem normalized8_3_2 : normalizeProtocolEvidence raw8_3_2 = evidence8_3_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_3_2 i = evidence8_3_2 i := by decide
   exact funext checked
@@ -5008,17 +4951,17 @@ theorem sources8_4 : ProtocolSources world8 evidence8_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_4_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
 def raw8_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_4_0 i)
+  protocolReceiptsOfSources world8 evidence8_4_0 i
 theorem normalized8_4_0 : normalizeProtocolEvidence raw8_4_0 = evidence8_4_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_4_0 i = evidence8_4_0 i := by decide
   exact funext checked
 def raw8_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_4_1 i)
+  protocolReceiptsOfSources world8 evidence8_4_1 i
 theorem normalized8_4_1 : normalizeProtocolEvidence raw8_4_1 = evidence8_4_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_4_1 i = evidence8_4_1 i := by decide
   exact funext checked
 def raw8_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_4_2 i)
+  protocolReceiptsOfSources world8 evidence8_4_2 i
 theorem normalized8_4_2 : normalizeProtocolEvidence raw8_4_2 = evidence8_4_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_4_2 i = evidence8_4_2 i := by decide
   exact funext checked
@@ -5081,17 +5024,17 @@ theorem sources8_5 : ProtocolSources world8 evidence8_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_5_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
 def raw8_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_5_0 i)
+  protocolReceiptsOfSources world8 evidence8_5_0 i
 theorem normalized8_5_0 : normalizeProtocolEvidence raw8_5_0 = evidence8_5_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_5_0 i = evidence8_5_0 i := by decide
   exact funext checked
 def raw8_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_5_1 i)
+  protocolReceiptsOfSources world8 evidence8_5_1 i
 theorem normalized8_5_1 : normalizeProtocolEvidence raw8_5_1 = evidence8_5_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_5_1 i = evidence8_5_1 i := by decide
   exact funext checked
 def raw8_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_5_2 i)
+  protocolReceiptsOfSources world8 evidence8_5_2 i
 theorem normalized8_5_2 : normalizeProtocolEvidence raw8_5_2 = evidence8_5_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_5_2 i = evidence8_5_2 i := by decide
   exact funext checked
@@ -5154,17 +5097,17 @@ theorem sources8_6 : ProtocolSources world8 evidence8_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence8_6_0 i, protocolSourceValid world8 i source.key = true := by decide
   exact checked
 def raw8_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_6_0 i)
+  protocolReceiptsOfSources world8 evidence8_6_0 i
 theorem normalized8_6_0 : normalizeProtocolEvidence raw8_6_0 = evidence8_6_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_6_0 i = evidence8_6_0 i := by decide
   exact funext checked
 def raw8_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world8 evidence8_6_1 i)
+  protocolReceiptsOfSources world8 evidence8_6_1 i
 theorem normalized8_6_1 : normalizeProtocolEvidence raw8_6_1 = evidence8_6_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_6_1 i = evidence8_6_1 i := by decide
   exact funext checked
 def raw8_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world8 evidence8_6_2 i)
+  protocolReceiptsOfSources world8 evidence8_6_2 i
 theorem normalized8_6_2 : normalizeProtocolEvidence raw8_6_2 = evidence8_6_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw8_6_2 i = evidence8_6_2 i := by decide
   exact funext checked
@@ -5289,17 +5232,17 @@ theorem sources9_0 : ProtocolSources world9 evidence9_0_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_0_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
 def raw9_0_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_0_0 i)
+  protocolReceiptsOfSources world9 evidence9_0_0 i
 theorem normalized9_0_0 : normalizeProtocolEvidence raw9_0_0 = evidence9_0_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_0_0 i = evidence9_0_0 i := by decide
   exact funext checked
 def raw9_0_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_0_1 i)
+  protocolReceiptsOfSources world9 evidence9_0_1 i
 theorem normalized9_0_1 : normalizeProtocolEvidence raw9_0_1 = evidence9_0_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_0_1 i = evidence9_0_1 i := by decide
   exact funext checked
 def raw9_0_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_0_2 i)
+  protocolReceiptsOfSources world9 evidence9_0_2 i
 theorem normalized9_0_2 : normalizeProtocolEvidence raw9_0_2 = evidence9_0_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_0_2 i = evidence9_0_2 i := by decide
   exact funext checked
@@ -5362,17 +5305,17 @@ theorem sources9_1 : ProtocolSources world9 evidence9_1_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_1_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
 def raw9_1_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_1_0 i)
+  protocolReceiptsOfSources world9 evidence9_1_0 i
 theorem normalized9_1_0 : normalizeProtocolEvidence raw9_1_0 = evidence9_1_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_1_0 i = evidence9_1_0 i := by decide
   exact funext checked
 def raw9_1_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_1_1 i)
+  protocolReceiptsOfSources world9 evidence9_1_1 i
 theorem normalized9_1_1 : normalizeProtocolEvidence raw9_1_1 = evidence9_1_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_1_1 i = evidence9_1_1 i := by decide
   exact funext checked
 def raw9_1_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_1_2 i)
+  protocolReceiptsOfSources world9 evidence9_1_2 i
 theorem normalized9_1_2 : normalizeProtocolEvidence raw9_1_2 = evidence9_1_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_1_2 i = evidence9_1_2 i := by decide
   exact funext checked
@@ -5435,17 +5378,17 @@ theorem sources9_2 : ProtocolSources world9 evidence9_2_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_2_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
 def raw9_2_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_2_0 i)
+  protocolReceiptsOfSources world9 evidence9_2_0 i
 theorem normalized9_2_0 : normalizeProtocolEvidence raw9_2_0 = evidence9_2_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_2_0 i = evidence9_2_0 i := by decide
   exact funext checked
 def raw9_2_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_2_1 i)
+  protocolReceiptsOfSources world9 evidence9_2_1 i
 theorem normalized9_2_1 : normalizeProtocolEvidence raw9_2_1 = evidence9_2_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_2_1 i = evidence9_2_1 i := by decide
   exact funext checked
 def raw9_2_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_2_2 i)
+  protocolReceiptsOfSources world9 evidence9_2_2 i
 theorem normalized9_2_2 : normalizeProtocolEvidence raw9_2_2 = evidence9_2_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_2_2 i = evidence9_2_2 i := by decide
   exact funext checked
@@ -5508,17 +5451,17 @@ theorem sources9_3 : ProtocolSources world9 evidence9_3_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_3_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
 def raw9_3_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_3_0 i)
+  protocolReceiptsOfSources world9 evidence9_3_0 i
 theorem normalized9_3_0 : normalizeProtocolEvidence raw9_3_0 = evidence9_3_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_3_0 i = evidence9_3_0 i := by decide
   exact funext checked
 def raw9_3_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_3_1 i)
+  protocolReceiptsOfSources world9 evidence9_3_1 i
 theorem normalized9_3_1 : normalizeProtocolEvidence raw9_3_1 = evidence9_3_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_3_1 i = evidence9_3_1 i := by decide
   exact funext checked
 def raw9_3_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_3_2 i)
+  protocolReceiptsOfSources world9 evidence9_3_2 i
 theorem normalized9_3_2 : normalizeProtocolEvidence raw9_3_2 = evidence9_3_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_3_2 i = evidence9_3_2 i := by decide
   exact funext checked
@@ -5581,17 +5524,17 @@ theorem sources9_4 : ProtocolSources world9 evidence9_4_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_4_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
 def raw9_4_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_4_0 i)
+  protocolReceiptsOfSources world9 evidence9_4_0 i
 theorem normalized9_4_0 : normalizeProtocolEvidence raw9_4_0 = evidence9_4_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_4_0 i = evidence9_4_0 i := by decide
   exact funext checked
 def raw9_4_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_4_1 i)
+  protocolReceiptsOfSources world9 evidence9_4_1 i
 theorem normalized9_4_1 : normalizeProtocolEvidence raw9_4_1 = evidence9_4_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_4_1 i = evidence9_4_1 i := by decide
   exact funext checked
 def raw9_4_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_4_2 i)
+  protocolReceiptsOfSources world9 evidence9_4_2 i
 theorem normalized9_4_2 : normalizeProtocolEvidence raw9_4_2 = evidence9_4_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_4_2 i = evidence9_4_2 i := by decide
   exact funext checked
@@ -5654,17 +5597,17 @@ theorem sources9_5 : ProtocolSources world9 evidence9_5_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_5_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
 def raw9_5_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_5_0 i)
+  protocolReceiptsOfSources world9 evidence9_5_0 i
 theorem normalized9_5_0 : normalizeProtocolEvidence raw9_5_0 = evidence9_5_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_5_0 i = evidence9_5_0 i := by decide
   exact funext checked
 def raw9_5_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_5_1 i)
+  protocolReceiptsOfSources world9 evidence9_5_1 i
 theorem normalized9_5_1 : normalizeProtocolEvidence raw9_5_1 = evidence9_5_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_5_1 i = evidence9_5_1 i := by decide
   exact funext checked
 def raw9_5_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_5_2 i)
+  protocolReceiptsOfSources world9 evidence9_5_2 i
 theorem normalized9_5_2 : normalizeProtocolEvidence raw9_5_2 = evidence9_5_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_5_2 i = evidence9_5_2 i := by decide
   exact funext checked
@@ -5727,17 +5670,17 @@ theorem sources9_6 : ProtocolSources world9 evidence9_6_0 := by
   have checked : ∀ i : Fin 4, ∀ source ∈ evidence9_6_0 i, protocolSourceValid world9 i source.key = true := by decide
   exact checked
 def raw9_6_0 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_6_0 i)
+  protocolReceiptsOfSources world9 evidence9_6_0 i
 theorem normalized9_6_0 : normalizeProtocolEvidence raw9_6_0 = evidence9_6_0 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_6_0 i = evidence9_6_0 i := by decide
   exact funext checked
 def raw9_6_1 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts true (protocolReceiptsOfSources world9 evidence9_6_1 i)
+  protocolReceiptsOfSources world9 evidence9_6_1 i
 theorem normalized9_6_1 : normalizeProtocolEvidence raw9_6_1 = evidence9_6_1 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_6_1 i = evidence9_6_1 i := by decide
   exact funext checked
 def raw9_6_2 : ProtocolReceiptEvidence 4 Nat := fun i =>
-  withIncompleteProtocolReceipts false (protocolReceiptsOfSources world9 evidence9_6_2 i)
+  protocolReceiptsOfSources world9 evidence9_6_2 i
 theorem normalized9_6_2 : normalizeProtocolEvidence raw9_6_2 = evidence9_6_2 := by
   have checked : ∀ i : Fin 4, normalizeProtocolEvidence raw9_6_2 i = evidence9_6_2 i := by decide
   exact funext checked

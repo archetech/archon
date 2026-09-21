@@ -29,7 +29,7 @@ for (const legacy of [false, true]) {
     } } }, 0, 2, did + '#key-1');
     const asset = sign({ type: 'create', created: date(1),
         registration: { version: 1, type: 'asset', registry: 'BTC:signet' }, controller: did, data: {} }, 0, 3, did + '#key-1');
-    const chain = (operation, height) => ({ registry: 'BTC:signet', time: date(height), ordinal: [height, 0, 0], registration: { height, txid: 'audit', batch: 'audit', opidx: 0 }, operation });
+    const chain = (operation, height) => ({ registry: 'BTC:signet', time: date(height), ordinal: [height, 0, 0], registration: { height, index: 0, txid: 'audit', batch: 'audit', opidx: 0 }, operation });
     const lateAsset = sign({ type: 'create', created: date(1),
         registration: { version: 1, type: 'asset', registry: 'BTC:signet' }, controller: did, data: {} }, 0, 1, did + '#key-1');
     const lateComplete = chain(lateAsset, 3);
@@ -41,7 +41,7 @@ for (const legacy of [false, true]) {
     vectors.push({ legacy, did, assetDid: 'did:cid:' + await cid(asset),
         lateAssetDid: 'did:cid:' + await cid(lateAsset), lateReceipts: [lateIncomplete, lateComplete],
         events: [chain(parent, 1), chain(rotation, 2)], genesis: [plain, registered],
-        asset: { ...chain(asset, 1), ordinal: [1, 1, 0] } });
+        asset: { ...chain(asset, 1), ordinal: [1, 1, 0], registration: { ...chain(asset, 1).registration, index: 1 } } });
 
 }
 writeFileSync('tests/convergence/chain-registration-counterexample.json', JSON.stringify(vectors, null, 2) + '\n');

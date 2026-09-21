@@ -9,7 +9,7 @@ test('final bridge checks typed family, source admission and actual composed exe
     const code = generateProtocolFixtures(vectors);
     for (const expression of ['ProtocolAgentDomain', 'ProtocolAssetDomain', 'ProtocolSources',
         'protocol_convergence', 'reconcileProtocol', 'methods_agree', 'sameAgentSourceCheck',
-        'incompleteSources', 'incompleteWorld', 'ProtocolReceiptSources']) assert(code.includes(expression));
+        'ProtocolReceiptValid', 'ProtocolReceiptSources']) assert(code.includes(expression));
 });
 test('final bridge preserves source-table independence', () => {
     const v = reorderedProtocolVector(vectors.find(v => v.mode === 'chain'));
@@ -17,6 +17,8 @@ test('final bridge preserves source-table independence', () => {
 });
 for (const [name, change] of [
     ['controller signature', v => { v.controllers[0].signatureValid[0] = v.keys.map(() => false); }],
+    ['missing registration', v => { delete v.events.find(e => e.registry.includes(':')).registration; }],
+    ['inconsistent registration', v => { v.events.find(e => e.registry.includes(':')).registration.index++; }],
     ['missing ordinal', v => { delete v.events.find(e => e.registry.includes(':')).ordinal; }],
     ['detached payload', v => { v.stages[0].components.didDocumentData = { bad: true }; }],
     ['different retained evidence', v => { v.stages[0].orders[1].pop(); }],

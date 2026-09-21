@@ -1,3 +1,4 @@
+import type { ChainBatchMetadata } from '@didcid/clients/gatekeeper-types';
 import BtcClient, { Block, BlockHeader, MempoolEntry } from 'bitcoin-core';
 import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/clients/gatekeeper';
@@ -11,7 +12,6 @@ import { planAnchor } from './batch.js';
 import { toFeeRate } from './fee.js';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem, BlockVerbosity } from './types.js';
-import { DidRegistration } from '@didcid/gatekeeper/types';
 import express from 'express';
 import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
@@ -710,7 +710,7 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
 
     const cids = batch.ops;
 
-    const metadata = {
+    const metadata: ChainBatchMetadata = {
         registry: REGISTRY,
         time: item.time,
         ordinal: [item.height, item.index],
@@ -719,7 +719,7 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
             index: item.index,
             txid: item.txid,
             batch: item.did,
-        } as DidRegistration,
+        },
     };
 
     let update: DiscoveredItem = { ...item };

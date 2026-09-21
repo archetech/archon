@@ -716,12 +716,31 @@ the production audit and approved version-1 compatibility decision. Malformed
 registrations previously accepted by older implementations are rejected on replay;
 none were found in the audited production history. Version 2 remains disabled.
 
-At the same canonical operation, chain registry and ordinal, a receipt carrying
-registration metadata takes precedence over a metadata-free copy before
-authorization. Incomplete copies remain usable when no richer copy is known;
-later enrichment reauthorizes the operation and dependent histories. An
-unauthorized richer receipt cannot fall back to the incomplete copy's proof-time
-context. This preference is shared by import, candidate recovery and replay.
+### Complete chain receipts
+
+A chain event MUST contain a valid registry name, an RFC 3339 authoritative block
+`time`, and complete `registration`: `height`, `index`, `txid`, `batch`, `opidx`.
+Position fields are nonnegative safe integers. `txid` and `batch` are nonempty
+strings supplied by the mediator; `batch` identifies the anchored batch DID.
+
+The ordinal contract is `[height, index, ...registryPosition, opidx]`: its first
+two components MUST equal registration `height` and `index`, and its last MUST
+equal `opidx`. Additional registry-specific position components, if any, remain
+part of lexicographic ordering. Bundled Bitcoin, Zcash, Ethereum and Solana
+mediators use `[height, index, opidx]`. Registry names remain open; this rule does
+not introduce an allowlist.
+
+CID batch ingress requires the corresponding prefix `[height, index,
+...registryPosition]` and `height`, `index`, `txid`, `batch` metadata before fetching
+content. Gatekeeper appends each CID's **original list index**, including gaps for
+unavailable entries, and derives `opidx` itself. Malformed batch metadata fails
+explicitly; malformed chain events are rejected at admission and per-event replay.
+There is no incomplete-chain-receipt category or richer-copy preference.
+
+Local, Hyperswarm and pin remain unanchored. Peer relay converts chain claims to
+unconfirmed Hyperswarm hints before admission, so signed operations without
+complete anchor evidence can still propagate. This does not make controller
+history complete or authorization final; delayed evidence still triggers replay.
 
 ### Implementation boundary: event authorization and proof verification
 

@@ -29,7 +29,7 @@ for (const legacy of [false, true]) {
     } } }, 0, 2, did + '#key-1');
     const asset = sign({ type: 'create', created: date(1),
         registration: { version: 1, type: 'asset', registry: 'local' }, controller: did, data: {} }, 0, 3, did + '#key-1');
-    const chain = (operation, height) => ({ registry: 'BTC:signet', time: date(height), ordinal: [height, 0, 0], registration: { height, txid: 'audit', batch: 'audit', opidx: 0 }, operation });
+    const chain = (operation, height) => ({ registry: 'BTC:signet', time: date(height), ordinal: [height, 0, 0], registration: { height, index: 0, txid: 'audit', batch: 'audit', opidx: 0 }, operation });
     const plain = { registry: 'local', time: date(1), operation: asset };
     const registered = { ...plain, ordinal: [3, 0, 0], registration: { height: 3, txid: 'audit', batch: 'audit', opidx: 0 } };
     vectors.push({ legacy, did, assetDid: 'did:cid:' + await cid(asset), events: [chain(genesis, 1), chain(parent, 1), chain(rotation, 2)], receipts: [plain, registered] });

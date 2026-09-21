@@ -34,11 +34,13 @@
         "time": "2026-01-01T00:01:30.000Z",
         "ordinal": [
           90,
+          0,
           0
         ],
         "registration": {
           "height": 90,
           "index": 0,
+          "opidx": 0,
           "txid": "tx90",
           "batch": "batch90"
         }
@@ -68,11 +70,13 @@
         "time": "2026-01-01T00:02:00.000Z",
         "ordinal": [
           120,
+          0,
           0
         ],
         "registration": {
           "height": 120,
           "index": 0,
+          "opidx": 0,
           "txid": "tx120",
           "batch": "batch120"
         }
@@ -105,11 +109,13 @@
         "time": "2026-01-01T00:02:30.000Z",
         "ordinal": [
           150,
+          0,
           0
         ],
         "registration": {
           "height": 150,
           "index": 0,
+          "opidx": 0,
           "txid": "tx150",
           "batch": "batch150"
         }
@@ -137,11 +143,13 @@
       "time": "2026-01-01T00:05:00.000Z",
       "ordinal": [
         300,
+        0,
         0
       ],
       "registration": {
         "height": 300,
         "index": 0,
+        "opidx": 0,
         "txid": "tx300",
         "batch": "batch300"
       }
@@ -165,11 +173,13 @@
       "time": "2026-01-01T00:05:00.000Z",
       "ordinal": [
         300,
+        0,
         0
       ],
       "registration": {
         "height": 300,
         "index": 0,
+        "opidx": 0,
         "txid": "tx300",
         "batch": "batch300"
       }
@@ -204,11 +214,13 @@
         "time": "2026-01-01T00:01:40.000Z",
         "ordinal": [
           100,
+          0,
           0
         ],
         "registration": {
           "height": 100,
           "index": 0,
+          "opidx": 0,
           "txid": "tx100",
           "batch": "batch100"
         }
@@ -238,11 +250,13 @@
         "time": "2026-01-01T00:01:50.000Z",
         "ordinal": [
           110,
+          0,
           0
         ],
         "registration": {
           "height": 110,
           "index": 0,
+          "opidx": 0,
           "txid": "tx110",
           "batch": "batch110"
         }
@@ -297,11 +311,13 @@
       "time": "2026-01-01T00:03:20.000Z",
       "ordinal": [
         200,
+        0,
         0
       ],
       "registration": {
         "height": 200,
         "index": 0,
+        "opidx": 0,
         "txid": "tx200",
         "batch": "batch200"
       }
@@ -328,11 +344,13 @@
       "time": "2026-01-01T00:05:00.000Z",
       "ordinal": [
         300,
+        0,
         0
       ],
       "registration": {
         "height": 300,
         "index": 0,
+        "opidx": 0,
         "txid": "tx300",
         "batch": "batch300"
       }
@@ -359,11 +377,13 @@
       "time": "2026-01-01T00:06:40.000Z",
       "ordinal": [
         400,
+        0,
         0
       ],
       "registration": {
         "height": 400,
         "index": 0,
+        "opidx": 0,
         "txid": "tx400",
         "batch": "batch400"
       }
@@ -390,11 +410,13 @@
       "time": "2026-01-01T00:05:00.000Z",
       "ordinal": [
         300,
+        0,
         0
       ],
       "registration": {
         "height": 300,
         "index": 0,
+        "opidx": 0,
         "txid": "tx300",
         "batch": "batch300"
       }
@@ -421,11 +443,13 @@
       "time": "2026-01-01T00:06:40.000Z",
       "ordinal": [
         400,
+        0,
         0
       ],
       "registration": {
         "height": 400,
         "index": 0,
+        "opidx": 0,
         "txid": "tx400",
         "batch": "batch400"
       }
@@ -452,11 +476,13 @@
       "time": "2026-01-01T00:02:30.000Z",
       "ordinal": [
         150,
+        0,
         0
       ],
       "registration": {
         "height": 150,
         "index": 0,
+        "opidx": 0,
         "txid": "tx150",
         "batch": "batch150"
       }
@@ -515,11 +541,13 @@
       "time": "2026-01-01T00:03:20.000Z",
       "ordinal": [
         200,
+        0,
         0
       ],
       "registration": {
         "height": 200,
         "index": 0,
+        "opidx": 0,
         "txid": "tx200",
         "batch": "batch200"
       }
@@ -573,11 +601,13 @@
       "time": "2026-01-01T00:04:10.000Z",
       "ordinal": [
         250,
+        0,
         0
       ],
       "registration": {
         "height": 250,
         "index": 0,
+        "opidx": 0,
         "txid": "tx250",
         "batch": "batch250"
       }
@@ -616,13 +646,15 @@
           "time": "2026-01-01T00:01:40.000Z",
           "ordinal": [
             100,
+            0,
             0
           ],
           "registration": {
             "height": 100,
             "index": 0,
             "txid": "tx100",
-            "batch": "batch100"
+            "batch": "batch100",
+            "opidx": 0
           }
         },
         {
@@ -650,13 +682,15 @@
           "time": "2026-01-01T00:01:50.000Z",
           "ordinal": [
             110,
+            0,
             0
           ],
           "registration": {
             "height": 110,
             "index": 0,
             "txid": "tx110",
-            "batch": "batch110"
+            "batch": "batch110",
+            "opidx": 0
           }
         }
       ]
@@ -697,11 +731,13 @@
         "time": "2026-01-01T00:01:30.000Z",
         "ordinal": [
           90,
+          0,
           0
         ],
         "registration": {
           "height": 90,
           "index": 0,
+          "opidx": 0,
           "txid": "tx90",
           "batch": "batch90"
         }
@@ -731,11 +767,13 @@
         "time": "2026-01-01T00:02:00.000Z",
         "ordinal": [
           120,
+          0,
           0
         ],
         "registration": {
           "height": 120,
           "index": 0,
+          "opidx": 0,
           "txid": "tx120",
           "batch": "batch120"
         }
@@ -768,11 +806,13 @@
         "time": "2026-01-01T00:02:30.000Z",
         "ordinal": [
           150,
+          0,
           0
         ],
         "registration": {
           "height": 150,
           "index": 0,
+          "opidx": 0,
           "txid": "tx150",
           "batch": "batch150"
         }
@@ -800,11 +840,13 @@
       "time": "2026-01-01T00:05:00.000Z",
       "ordinal": [
         300,
+        0,
         0
       ],
       "registration": {
         "height": 300,
         "index": 0,
+        "opidx": 0,
         "txid": "tx300",
         "batch": "batch300"
       }
@@ -828,11 +870,13 @@
       "time": "2026-01-01T00:05:00.000Z",
       "ordinal": [
         300,
+        0,
         0
       ],
       "registration": {
         "height": 300,
         "index": 0,
+        "opidx": 0,
         "txid": "tx300",
         "batch": "batch300"
       }
@@ -867,11 +911,13 @@
         "time": "2026-01-01T00:01:40.000Z",
         "ordinal": [
           100,
+          0,
           0
         ],
         "registration": {
           "height": 100,
           "index": 0,
+          "opidx": 0,
           "txid": "tx100",
           "batch": "batch100"
         }
@@ -901,11 +947,13 @@
         "time": "2026-01-01T00:01:50.000Z",
         "ordinal": [
           110,
+          0,
           0
         ],
         "registration": {
           "height": 110,
           "index": 0,
+          "opidx": 0,
           "txid": "tx110",
           "batch": "batch110"
         }
@@ -960,11 +1008,13 @@
       "time": "2026-01-01T00:03:20.000Z",
       "ordinal": [
         200,
+        0,
         0
       ],
       "registration": {
         "height": 200,
         "index": 0,
+        "opidx": 0,
         "txid": "tx200",
         "batch": "batch200"
       }
@@ -991,11 +1041,13 @@
       "time": "2026-01-01T00:05:00.000Z",
       "ordinal": [
         300,
+        0,
         0
       ],
       "registration": {
         "height": 300,
         "index": 0,
+        "opidx": 0,
         "txid": "tx300",
         "batch": "batch300"
       }
@@ -1022,11 +1074,13 @@
       "time": "2026-01-01T00:06:40.000Z",
       "ordinal": [
         400,
+        0,
         0
       ],
       "registration": {
         "height": 400,
         "index": 0,
+        "opidx": 0,
         "txid": "tx400",
         "batch": "batch400"
       }
@@ -1053,11 +1107,13 @@
       "time": "2026-01-01T00:05:00.000Z",
       "ordinal": [
         300,
+        0,
         0
       ],
       "registration": {
         "height": 300,
         "index": 0,
+        "opidx": 0,
         "txid": "tx300",
         "batch": "batch300"
       }
@@ -1084,11 +1140,13 @@
       "time": "2026-01-01T00:06:40.000Z",
       "ordinal": [
         400,
+        0,
         0
       ],
       "registration": {
         "height": 400,
         "index": 0,
+        "opidx": 0,
         "txid": "tx400",
         "batch": "batch400"
       }
@@ -1115,11 +1173,13 @@
       "time": "2026-01-01T00:02:30.000Z",
       "ordinal": [
         150,
+        0,
         0
       ],
       "registration": {
         "height": 150,
         "index": 0,
+        "opidx": 0,
         "txid": "tx150",
         "batch": "batch150"
       }
@@ -1178,11 +1238,13 @@
       "time": "2026-01-01T00:03:20.000Z",
       "ordinal": [
         200,
+        0,
         0
       ],
       "registration": {
         "height": 200,
         "index": 0,
+        "opidx": 0,
         "txid": "tx200",
         "batch": "batch200"
       }
@@ -1236,11 +1298,13 @@
       "time": "2026-01-01T00:04:10.000Z",
       "ordinal": [
         250,
+        0,
         0
       ],
       "registration": {
         "height": 250,
         "index": 0,
+        "opidx": 0,
         "txid": "tx250",
         "batch": "batch250"
       }

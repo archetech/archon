@@ -1,5 +1,6 @@
 //! Cross-port checks against the restricted executable convergence model.
 mod event_targets;
+mod chain_metadata;
 use std::collections::BTreeSet;
 
 use serde_json::{json, Value};
@@ -143,10 +144,10 @@ async fn convergence_delivery_permutations_match_restricted_model() {
                     let mut event = json!({
                         "operation": operation, "registry": registry,
                         "time": operation["proof"]["created"],
-                        "ordinal": [1000 + ordinal, 0]
+                        "ordinal": [1000 + ordinal, 0, 0]
                     });
                     if vector["transport"] == "BTC:signet" || (vector["transport"] == "foreign-anchor" && index == 2) {
-                        event["registration"] = json!({ "height": 1000 + index, "txid": format!("tx{index}"), "batch": "batch", "opidx": 0 });
+                        event["registration"] = json!({ "height": 1000 + ordinal, "index": 0, "txid": format!("tx{index}"), "batch": "batch", "opidx": 0 });
                     }
                     event
                 })
@@ -1077,7 +1078,7 @@ async fn convergence_chain_ordinals_required() {
             "registry": "SOL:devnet", "time": "2026-09-01T00:00:00Z",
             "ordinal": [100, 0, 0], "operation": vector["operations"][0],
             "opid": vector["ids"][0], "did": did,
-            "registration": {"height": 100, "txid": "ordinal-audit", "batch": did, "opidx": 0}
+            "registration": {"height": 100, "index": 0, "txid": "ordinal-audit", "batch": did, "opidx": 0}
         });
         for ordinal in [
             None,
@@ -1205,6 +1206,8 @@ async fn convergence_chain_ordinals_required() {
             .unwrap();
         let mut metadata = genesis.clone();
         metadata["ordinal"] = serde_json::from_str("[1099511627776, 1.0]").unwrap();
+        metadata["registration"]["height"] = json!(1_099_511_627_776u64);
+        metadata["registration"]["index"] = json!(1);
         let response = crate::api::import_batch_by_cids(
             axum::extract::State(state.clone()),
             axum::http::HeaderMap::from_iter([(

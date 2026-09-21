@@ -259,6 +259,6 @@ These rules apply to coding agents working in this repository.
 
 - A fixed authoritative chain snapshot does not by itself justify identical optional registration-metadata presence on repeated receipts. Audit same-position incomplete/complete copies through candidate deduplication, controller anchoring and replay before treating them as one semantic receipt class.
 
-- Prefer metadata-bearing receipts at the same canonical operation/chain registry/ordinal before authorization, including candidate recovery; a rejected richer copy cannot fall back to incomplete proof-time authority. Bind proof receipt metadata to received copies and derive completeness before agent/asset replay.
+- Chain receipts require complete registration metadata consistent with ordinal before queue deduplication and per-event replay. CID ingress validates batch metadata before fetching and derives opidx from the original CID-list index. Keep malformed-receipt rejection separate from unconfirmed relay and missing controller history; do not add storage repair without production evidence.
 
-- Decoded proof models can combine immutable chain facts with evidence-derived metadata. Keep those roles explicit and check incomplete-only theorem instances against identical physical chain facts; do not remove a required authorization binding to admit a mismatched decoded model.
+- Bind decoded proof receipt headers to authoritative chain facts and require complete chain metadata in the final convergence theorem. The signed bridge must check ordinal/registration agreement; do not revive incomplete-only protocol instances or weaken the authorization binding.

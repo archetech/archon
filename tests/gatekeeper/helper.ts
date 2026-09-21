@@ -1,5 +1,5 @@
 import CipherNode from '@didcid/cipher/node';
-import { Operation, DidCidDocument } from '@didcid/gatekeeper/types';
+import { Operation, DidCidDocument, GatekeeperEvent } from '@didcid/gatekeeper/types';
 import Gatekeeper from '@didcid/gatekeeper';
 import type { EcdsaJwkPair } from '@didcid/cipher/types';
 import { base64url } from 'multiformats/bases/base64';
@@ -7,6 +7,13 @@ import { base64url } from 'multiformats/bases/base64';
 function hexToBase64url(hex: string): string {
     const bytes = Buffer.from(hex, 'hex');
     return base64url.baseEncode(bytes);
+}
+
+// Produce the complete receipt a chain mediator would supply for a test event.
+export function anchorEvent(event: GatekeeperEvent, registry: string, height: number, index = 0): void {
+    event.registry = registry;
+    event.ordinal = [height, index, 0];
+    event.registration = { height, index, opidx: 0, txid: `tx${height}`, batch: `batch${height}` };
 }
 
 export default class TestHelper {

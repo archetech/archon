@@ -94,7 +94,7 @@ it('reconsiders a duplicate operation discovered at an earlier chain position', 
         await g.processEvents();
     }
     await importEvents(vector.base);
-    const late = { ...vector.rotation, ordinal: [350, 0], time: '2026-01-01T00:05:50Z',
+    const late = { ...vector.rotation, ordinal: [350, 0, 0], time: '2026-01-01T00:05:50Z',
         registration: { ...vector.rotation.registration!, height: 350 } };
     await importEvents([late, vector.old]);
     expect((await g.resolveDID(vector.asset, { confirm: true })).didDocumentData).toBe('retired');

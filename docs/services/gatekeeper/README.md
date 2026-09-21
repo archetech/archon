@@ -312,12 +312,16 @@ carries the legacy form — and a node MUST select the payload from the proof's 
   "operation": Operation,
   "opid": "<CID>",                            // optional locally; required for IPFS-backed events
   "did": "did:cid:...",                        // optional; inferred from operation if missing
-  "registration": DidRegistration | undefined  // batch metadata, optional
+  "registration": ChainRegistration | undefined // required for chain registries
 }
 ```
 
-Chain-registry receipts require a nonempty `ordinal` array of nonnegative safe
-integers (0 through 9007199254740991), so both ports compare the same positions.
+Chain-registry receipts require complete `ChainRegistration` and ordinal
+`[height, index, ...registryPosition, opidx]`, with at least three nonnegative safe
+integers (0 through 9007199254740991). The first two and last components must
+match registration `height`, `index`, and `opidx`. `txid` and `batch` must be
+nonempty strings. CID batch metadata uses `ChainBatchRegistration` and the
+position prefix (at least height and index); Gatekeeper supplies opidx.
 Missing, `null`, non-array, empty, and malformed-member ordinals are rejected
 before queueing or candidate storage. CID imports validate the batch position
 before appending the operation index. Non-string CID entries are skipped without
@@ -916,25 +920,22 @@ Used by `/dids/import`, `/batch/import`, `/batch/import/cids`, and
 `/events/process`.
 
 Historical controller selection uses chain context only when an event has
-registration metadata and belongs to a chain registry. Local, Hyperswarm and pin
+complete, position-consistent registration metadata and belongs to a chain registry. Local, Hyperswarm and pin
 receipts always select the controller at the operation's `proof.created`, even
 if their envelopes include registration metadata or ordinals. Those fields stay
 in retained evidence but do not confer chain authority. Startup reconstruction
 uses the same rule and reauthorizes previously accepted dependent assets.
 
-Same-position chain candidates are identified by canonical operation CID,
-registry and complete ordinal. Prefer a copy carrying `registration` over one
-without it, before authorization; event time belongs to the chain facts rather
-than arrival identity. Incomplete copies alone remain admitted. Enrichment can
-replace an accepted same-position receipt only after reauthorization, and must
-replay affected histories. Once the richer copy is known, a rejected operation
-cannot fall back to the incomplete copy. Recovery applies the same preference.
+Chain receipts require complete, position-consistent registration metadata; see
+[the chain receipt contract](../../scheme.md#complete-chain-receipts). Validation
+runs before queue deduplication and in per-event replay. Metadata-free copies
+are rejected rather than preferred or replaced according to arrival history.
 
 ### 8.1 `importBatch(events)`
 
 ```
 for event in events:
-    if !verify_event_shape(event) or !valid_event_target(event): // §8.5
+    if !verify_event_shape(event) or !valid_event_target(event) or !valid_chain_metadata(event): // §8.5
         rejected += 1; continue
 
     key := event.registry + "/" + canonicalOperationCID(event.operation)
@@ -1039,9 +1040,7 @@ The following is the insertion algorithm reused during replay:
        expectedRegistry = expected_registry_for_index(current, index_of_match)
        earlierAnchor = expectedRegistry is a chain registry and event.registry == expectedRegistry
            and both ordinals exist and compare_ordinals(event.ordinal, current[match].ordinal) < 0
-       richerAnchor = incoming and current refer to the same chain position
-           and incoming has registration metadata and current does not
-       if current[match].registry == expectedRegistry and not earlierAnchor and not richerAnchor: return MERGED
+       if current[match].registry == expectedRegistry and not earlierAnchor: return MERGED
        if event.registry == expectedRegistry:
            previous = selected predecessor document, or none for creation
            authorize_operation(event.operation, previous, event)
@@ -1109,7 +1108,7 @@ dependents; retaining a losing candidate does not make its receipt order authori
 Controller anchoring eligibility is derived only from the confirmed prefix.
 Walk predecessor registry changes from genesis; stop at the first successor whose
 receipt registry does not match. Matching chain receipts establish anchoring
-only when all such receipts carry registration metadata. A wrong-registry genesis
+only when all such receipts carry complete, position-consistent registration metadata. A wrong-registry genesis
 receipt is ignored for this test even though genesis itself is admitted. Pin
 receipts are followed as expected-registry confirmations but never count as chain
 receipts, so missing pin registration metadata does not disqualify a later chain
@@ -1133,6 +1132,7 @@ operation.type ∈ { create, update, delete }
   - delete: did
 target := create ? applicableMethodPrefix + ":" + canonicalOperationCID(operation) : operation.did
 if event.did is supplied it MUST equal target
+chain events require complete registration matching ordinal (see scheme chain receipt contract)
     // creation.operation.did and peer-supplied event.opid cannot override creation identity
 ```
 

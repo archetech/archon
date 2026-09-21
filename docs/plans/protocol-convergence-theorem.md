@@ -74,33 +74,23 @@ replay choose representations differently, without a shared deterministic policy
 not an observed production incident. The fixed chain snapshot supplies the same
 time and position in both orders; optional metadata completeness is the difference.
 
-On 2026-09-21 the maintainer approved preferring the metadata-bearing copy at
-the same operation/registry/chain position before authorization and replay.
-Both Gatekeepers now preserve that preferred candidate during ingress and recovery,
-reauthorize enriched confirmations, and prevent incomplete copies from erasing it.
-Incomplete-only receipts remain admitted. Signed cases check both dependent-asset
-recovery and rejection when the richer receipt is unauthorized; rejection cannot
-fall back to the weaker receipt's proof-time context.
+The initial C2 fix preferred a metadata-bearing copy over an incomplete copy at
+the same position. Issue #1249 supersedes that policy: bundled mediators always
+produce complete metadata, and incomplete chain receipts are now rejected at
+admission and per-event replay. The original signed counterexample now checks
+rejection before deduplication and the same asset verdict in both delivery orders.
 
-`ProtocolReceipts.lean` makes this preprocessing part of the proof input.
-`ProtocolReceipt` exposes decoded chain headers separately from bookkeeping.
-`ProtocolReceiptSources` binds registry/ordinal/time to the fixed chain facts and
-binds canonical metadata presence to `metadataAvailable`, an existential over the
-actual received copies. `normalizeProtocolReceipts` filters weaker copies before
-controller/asset authorization. Same receipt evidence derives the same completeness
-and normalized source keys. The public `protocol_convergence` requires that
-binding and composes normalization with `protocol_normalized_convergence`; it no
-longer assumes identical optional metadata presence on every raw copy.
+`ProtocolReceipts.lean` requires complete decoded chain headers through
+`ProtocolReceiptValid`. It binds each header directly to the fixed model chain
+facts; a chain header's registration flag must be true. Receipt normalization is
+now a projection of source records, with no metadata-availability calculation or
+richer-copy filtering. The public `protocol_convergence` requires this premise
+and composes projection with `protocol_normalized_convergence`.
 
-`ProtocolModel` is a decoded evidence model, not just the physical blockchain
-snapshot. Its `chainFacts.registration` field must be false for incomplete-only
-evidence and true after enrichment. Registry, ordinal and block time remain fixed;
-`withoutRegistration` projects exactly those authoritative fields. Changing the
-available metadata changes this derived model field, as intended, and can change
-authorization. The generated `incompleteWorld` example applies the top-level
-theorem to metadata-free receipts alone and checks that all their physical chain
-facts equal the richer world's. Dropping the completeness binding would instead
-let authorization read a flag unrelated to the received evidence.
+The signed decoder checks field completeness and agreement with the ordinal.
+Incomplete-only fixture worlds have been removed because those inputs are no
+longer in the admitted domain. Local, Hyperswarm and pin remain unanchored; missing
+controller history is still provisional evidence, not incomplete receipt metadata.
 
 ## Exact claim
 
@@ -139,7 +129,7 @@ absent specification. Only agent slots can enter the controller table; unknown
 owners and asset DIDs cannot authorize assets. Agent graphs have self-controlled
 predecessor-key authority and no external controller dependency.
 
-`normalizeProtocolEvidence` first selects the richer copies; `reconcileProtocol` then executes every agent replay with `collectFinite`, then executes
+`normalizeProtocolEvidence` projects the admitted complete receipts; `reconcileProtocol` then executes every agent replay with `collectFinite`, then executes
 every asset replay using **the histories that the agent phase returned**. Each
 replay starts empty and uses the existing full-record `stopWhenStable` loop,
 including late genesis, suffix replacement, confirmation changes and duplicate
@@ -194,9 +184,9 @@ The implementation architecture remains the audited A/B architecture: mediators
 produce chain positions; Gatekeeper normalizes and journals candidates; event
 authorization selects historical controllers; low-level verification receives the
 selected document; reconstruction publishes agents before dependent assets.
-The three approved runtime corrections normalize local clocks, require an actual
-chain registry for chain-based controller selection, and select richer same-position
-receipts before authorization.
+The runtime corrections normalize local clocks and require an actual chain
+registry for chain-based controller selection. Under #1249, complete chain-receipt
+admission replaces the earlier same-position metadata-enrichment rule.
 The paused #1156 relationship-permission rule remains paused.
 
 ## C3 checked bridge and CI

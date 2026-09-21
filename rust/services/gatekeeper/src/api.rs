@@ -672,7 +672,7 @@ pub(crate) async fn import_batch_by_cids(
         if crate::is_unanchored_registry(registry) {
             crate::proofs::valid_unanchored_ordinal(metadata.get("ordinal"))
         } else {
-            crate::proofs::valid_chain_ordinal(metadata.get("ordinal"))
+            crate::proofs::has_chain_metadata(metadata.get("ordinal"), metadata.get("registration"), true)
         }
     });
     if !has_registry || !has_time || !has_ordinal || !chain_position {

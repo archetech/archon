@@ -14,7 +14,7 @@ import TestHelper from './helper.ts';
 const fixture = JSON.parse(readFileSync('tests/gatekeeper/operation-identity-vectors.json', 'utf8'));
 
 function event(operation: Operation, height: number): GatekeeperEvent {
-    return { operation, registry: 'BTC:signet', time: '2026-04-11T13:00:00Z', ordinal: [height, 0], registration: { height, index: 0, txid: `tx${height}`, batch: `batch${height}` } };
+    return { operation, registry: 'BTC:signet', time: '2026-04-11T13:00:00Z', ordinal: [height, 0, 0], registration: { height, index: 0, opidx: 0, txid: `tx${height}`, batch: `batch${height}` } };
 }
 const vector = fixture as { did: string; createCid: string; updateCid: string; aliasCid: string } & Record<'create' | 'update' | 'variant' | 'successor' | 'aliasSuccessor', Operation>;
 
@@ -108,7 +108,7 @@ it.each(['successor', 'aliasSuccessor'] as const)('canonicalizes fetched operati
     expect(alias).not.toBe(vector.updateCid);
     const { operation: _, ...metadata } = event(vector.update, 200);
     void _;
-    await g.importBatchByCids([alias], { ...metadata, ordinal: [200] });
+    await g.importBatchByCids([alias], { ...metadata, ordinal: [200, 0] });
     await g.processEvents();
     expect((await g.resolveDID(vector.did)).didDocumentMetadata?.versionId).toBe(vector.updateCid);
     g = new Gatekeeper({ db, ipfs });
@@ -142,7 +142,7 @@ it.each([DbJson, DbSqlite])('retains retrieval aliases in %s across storage rest
         let g = new Gatekeeper({ db, ipfs });
         await g.importEvent(event(vector.create, 100));
         const cid = await ipfs.addJSON(vector.update);
-        await g.importBatchByCids([cid], { registry: 'BTC:signet', time: '2026-04-11T13:00:00Z', ordinal: [200], registration: { height: 200, index: 0, txid: 'tx', batch: 'batch' } });
+        await g.importBatchByCids([cid], { registry: 'BTC:signet', time: '2026-04-11T13:00:00Z', ordinal: [200, 0], registration: { height: 200, index: 0, opidx: 0, txid: 'tx', batch: 'batch' } });
         await g.processEvents();
         await db.stop();
         db = new Database('identity', folder);
