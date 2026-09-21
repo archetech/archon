@@ -1003,4 +1003,6 @@ not a claim that every synthetic provisional event exists as a stored receipt.
 
 ## Asset reconciliation (B2)
 
+`integrated_asset_convergence` reconstructs controller histories from A3 source evidence, proves those reconstructions terminate, and consumes the ordinal/CID ordering contract in the asset result theorem. Equal authorizing histories/verdicts are not endpoint premises.
+
 `AssetAuthorization`, `AssetComponents`, `AssetReplay`, `AssetExecution` and `AssetPriority` derive receipt-specific owner authorization, complete asset components and registry priority, then prove full-record reconciliation termination and unique results from converged agent histories. `asset_source_execution` proves successful nonempty execution from an actually authorized retained creation. `asset_selected_authorized` traces every selected record to a valid retained source; `asset_reconsidered` covers recovery of earlier rejected/deferred evidence. All named results are axiom-audited. The [B1–B3 audit](../../docs/plans/asset-controller-convergence.md) records source, shape, signature and component-decoding contracts. The signed B3 bridge and protocol-wide C1–C3 composition remain open.

@@ -166,9 +166,10 @@ including the whole-prefix anchoring check and proof-time fallback. Named-method
 verification rejects missing/deleted controllers. The [architecture audit](asset-controller-convergence.md)
 records both ports and the existing source contracts.
 
-B2 is implemented by `asset_reconciliation_converges`, `asset_source_execution`,
+B2 is implemented by `integrated_asset_convergence`, `asset_source_execution`,
 and the authorization/provenance/component/priority lemmas in `Asset*.lean`.
-Asset verdicts are derived per receipt from B1 and the signed predecessor owner;
+The endpoint derives controller histories from shared A3 source evidence and requires
+the ordinal/CID ordering contract. Asset verdicts are derived per receipt from B1 and the signed predecessor owner;
 reconciliation considers the whole retained journal and proves actual full-record
 stopping and successful component execution. The signed B3 bridge remains open;
 synthetic kernel examples are not runtime correspondence proofs.

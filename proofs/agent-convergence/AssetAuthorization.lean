@@ -10,6 +10,7 @@ structure ControllerSpec where
   graph : DocumentGraph
   patch : Nat → ComponentPatch Nat Nat
   initialData : Nat
+  emptyData : Nat
   initialRegistry : Nat
   registry : Nat → Nat
 
@@ -19,7 +20,7 @@ abbrev ControllerHistories := Nat → List AgentReceiptView
 def selectedOwner (table : ControllerTable) (histories : ControllerHistories)
     (unanchored : Nat → Bool) (owner : Nat) (request : ControllerRequest) :
     Option (ComponentState Nat Nat) :=
-  (table owner).bind fun spec => selectController spec.graph spec.patch 0 spec.initialData
+  (table owner).bind fun spec => selectController spec.graph spec.patch spec.emptyData spec.initialData
     spec.initialRegistry spec.registry unanchored request (histories owner)
 
 def ownerRegistry (table : ControllerTable) (histories : ControllerHistories)
@@ -55,11 +56,14 @@ structure AssetGraph where
   root : Nat
   initialDocument : Nat
   initialData : Nat
+  emptyData : Nat
   initialRegistry : Nat
   registry : Nat → Nat
   parent : Nat → Option Nat
   depth : Nat → Nat
   deletion : Nat → Bool
+  /-- The root is decoded from a creation, never from a deletion. -/
+  rootNotDeleted : deletion root = false
   documents : Nat → AssetDocument
   patch : Nat → ComponentPatch Nat Nat
   /-- Proposed DID document is checked even on deletion, before discarding it. -/

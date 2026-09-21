@@ -16,6 +16,7 @@ def controller : ControllerSpec where
     signatureValid := fun _ _ => true }
   patch := fun _ => ⟨none, none⟩
   initialData := 0
+  emptyData := 0
   initialRegistry := 1
   registry := id
 
@@ -31,11 +32,13 @@ def asset : AssetGraph where
   root := 0
   initialDocument := 0
   initialData := 3
+  emptyData := 0
   initialRegistry := 1
   registry := id
   parent := fun i => if i = 0 then none else some (i - 1)
   depth := id
   deletion := fun i => i == 2
+  rootNotDeleted := by decide
   documents := fun i => ⟨100 + i, if i = 0 then 10 else 11⟩
   proposed := fun i => if i = 1 then some 1 else none
   patch := fun i => if i = 1 then ⟨some 4, none⟩ else ⟨none, none⟩

@@ -10,7 +10,7 @@ def assetComponentStep (g : AssetGraph) (i : Nat) (before : ComponentState Nat N
     Option (ComponentState Nat Nat) :=
   (advanceAgent (assetStructure g) i before.authority).map fun next =>
     match next with
-    | .deleted => ⟨next, 0, before.registration⟩
+    | .deleted => ⟨next, g.emptyData, before.registration⟩
     | .active _ => ⟨next, (g.patch i).data.getD before.data,
         (g.patch i).registration.getD before.registration⟩
 
