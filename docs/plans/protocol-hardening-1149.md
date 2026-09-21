@@ -524,7 +524,10 @@ and universal runtime refinement remain open. No production behavior changes.
 C1–C3 are implemented at the model/bridge boundary in #1241. The three
 2026-09-21 approved corrections resolve the signed C2 counterexamples in both
 ports: intrinsic local clocks, chain-based controller selection only for actual
-chain registries, and richer same-position receipts before authorization. Direct submission, import and old-projection recovery
+chain registries, and initially richer same-position receipts before authorization.
+Issue #1249 replaces that enrichment rule with required complete, consistent chain
+metadata at ingress and per-event replay, and simplifies the final proof receipt
+premise accordingly. Direct submission, import and old-projection recovery
 are covered by signed regressions.
 `protocol_convergence` composes actual finite agent and asset reconstruction,
 proves a unique full semantic result and full-record stopping, and is independent

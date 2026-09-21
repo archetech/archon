@@ -206,10 +206,11 @@ corollary include receipt normalization before agent/asset reconciliation. The
 2026-09-21 maintainer decisions resolve the signed C2 counterexamples: intrinsic
 local clocks; chain context only for chain registries; and preference for
 metadata-bearing copies at the same operation/registry/chain position before
-authorization. Incomplete copies remain accepted when no richer copy is known.
-Both ports test recovery and rejection without fallback to a weaker receipt.
-The top-level theorem binds decoded headers and derives metadata completeness
-from received copies, and its shared signed bridge includes both copy orders.
+authorization. Issue #1249 supersedes that last rule: both ports reject incomplete
+or inconsistent chain receipts before deduplication and during per-event replay.
+The top-level theorem now binds complete decoded headers directly to chain facts,
+and the shared signed bridge checks metadata/ordinal agreement. The original
+incomplete/complete-copy regression checks rejection and order-independent asset verdicts.
 The [final audit](protocol-convergence-theorem.md) records the exact premises,
 theorem dependencies, bridge and unchanged completion criteria.
 
