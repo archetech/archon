@@ -1,20 +1,55 @@
-# Provisional agent-history convergence (#1199, #1201, #1203, #1205, #1207, #1209, #1211, #1213)
+# Archon protocol convergence
 
-The authoritative remaining roadmap is the [protocol convergence completion contract](../../docs/plans/protocol-convergence-completion.md): three fixed deliverables with ten acceptance criteria. The sections below record completed increments and their individual limits; their historical “next” lists do not add prerequisites to that contract.
+The [frozen completion contract](../../docs/plans/protocol-convergence-completion.md)
+has A1–A4, B1–B3 and C1–C3 implemented. The approved clock, chain-context
+and complete-chain-receipt admission resolve the signed C2 counterexamples; see the
+final audit below. `Archon.protocol_convergence` proves a unique complete semantic result and
+actual terminating reconstruction for any finite family of agents and assets
+with the same retained protocol evidence. Arrival order, duplicate count,
+first-observation bookkeeping and previously published projections may differ.
 
-The integrated full-record extension is documented in
-[the A2–A4 audit](../../docs/plans/agent-convergence-full-records.md).
-`Archon.integrated_agent_convergence` combines A1's derived authorization with
-cold full-record stopping, complete component state, and the confirmed receipt
-view under its source-clock contract. The approved pin proof-time correction
-closes the signed receipt-clock counterexample; A2–A4 are complete at this boundary. B1–B3 (asset/controller selection and its signed bridge) are now complete at the
-model/bridge boundary. C1–C3 (protocol composition) remain open.
+The result includes operation histories, complete DID components, deactivation
+and the authorization-relevant receipt view. Assets consume the histories returned
+by the completed agent replay phase. `protocol_eventual_convergence` covers
+reconciliation after evidence settles. See the [final theorem and premise audit](../../docs/plans/protocol-convergence-theorem.md)
+for the exact contracts, dependencies and signed runtime bridge. CI builds the
+endpoint and permits only `propext` and `Quot.sound` transitively.
+
+The sections below retain the earlier theorem inventory and historical limits.
+Their “next” lists are historical, not additional completion criteria. Universal
+TypeScript/Rust refinement and the other explicitly separate projects remain
+outside the protocol-proof scope.
+
+The model assumes each DID has one content-addressed genesis and every receipt
+belongs to its operation's target. Issue #1248 found that runtime envelope routing
+did not enforce that admission boundary: misaddressed signed genesis operations
+could produce order-dependent histories. Both importers now reject contradictory
+targets before deduplication and apply the same check during replay. The final
+agent/asset fixture bridge checks explicit envelope targets as well as its existing
+genesis and signed-successor identity checks; negative generator tests cover all
+three operation kinds. Shared signed `event-target-vectors.json` exercise ordinary
+imports, direct submission, replay, custom prefixes and durable
+restart in both ports. These admission tests close the demonstrated runtime gap;
+they do not turn the existing protocol theorem into universal runtime refinement.
+
+Issue #1249 removes incomplete chain receipts from the admitted domain.
+`ProtocolReceiptValid` now binds a complete decoded chain header directly to the
+model's chain facts. Receipt projection is a simple map: the richer-copy filter,
+metadata-availability lemmas and incomplete-only fixture worlds are removed.
+The signed decoder checks all required fields and ordinal agreement. Existing
+controller-selection lemmas may describe a broader historical model; the final
+protocol theorem's receipt premise excludes incomplete chain headers. This
+narrows admission without asserting complete controller history or changing the
+signature, chain-trust, or executable-refinement assumptions.
+
+## Earlier agent-only results
 
 This Lean project proves a bounded specification and an operational replay
-model of Archon's canonical-CID successor rule. It changes no runtime code. It uses Lean's standard library only;
+model of Archon's canonical-CID successor rule. The original agent-only increments changed no runtime code. The final protocol
+composition includes the approved local receipt-clock correction. It uses Lean's standard library only;
 there is no Mathlib dependency.
 
-The main result is:
+The original agent-only result is:
 
 > For one fixed agent model with finite, acyclic authorized predecessor edges,
 > the same retained operation evidence determines the same unique complete
@@ -999,13 +1034,13 @@ not a claim that every synthetic provisional event exists as a stored receipt.
 
 ## Controller selection (B1)
 
-`ControllerSelection.lean` derives historical controller components and named-method authorization from A3’s converged confirmed receipt view. It models strict same-chain ordinals, inclusive cross-chain time, whole-prefix anchoring, selected-registry fallback, genesis admission and missing/deleted controllers. `controller_selection_same_sources` composes selection with shared source evidence, without assuming equal authorizing documents. See the [B1–B3 audit](../../docs/plans/asset-controller-convergence.md). B1 is merged in #1238. B2 is merged in #1239; the B3 bridge is described below. C1–C3 remain open.
+`ControllerSelection.lean` derives historical controller components and named-method authorization from A3’s converged confirmed receipt view. It models strict same-chain ordinals, inclusive cross-chain time, whole-prefix anchoring, selected-registry fallback, genesis admission and missing/deleted controllers. `controller_selection_same_sources` composes selection with shared source evidence, without assuming equal authorizing documents. See the [B1–B3 audit](../../docs/plans/asset-controller-convergence.md). B1 is merged in #1238. B2 is merged in #1239; the B3 bridge is described below. C1–C3 are implemented in #1241 with receipt normalization and the final audit.
 
 ## Asset reconciliation (B2)
 
 `integrated_asset_convergence` reconstructs controller histories from A3 source evidence, proves those reconstructions terminate, and consumes the ordinal/CID ordering contract in the asset result theorem. Equal authorizing histories/verdicts are not endpoint premises.
 
-`AssetAuthorization`, `AssetComponents`, `AssetReplay`, `AssetExecution` and `AssetPriority` derive receipt-specific owner authorization, complete asset components and registry priority, then prove full-record reconciliation termination and unique results from converged agent histories. `asset_source_execution` proves successful nonempty execution from an actually authorized retained creation. `asset_selected_authorized` traces every selected record to a valid retained source; `asset_reconsidered` covers recovery of earlier rejected/deferred evidence. All named results are axiom-audited. The [B1–B3 audit](../../docs/plans/asset-controller-convergence.md) records source, shape, signature and component-decoding contracts. The signed B3 bridge is described below; protocol-wide C1–C3 composition remains open.
+`AssetAuthorization`, `AssetComponents`, `AssetReplay`, `AssetExecution` and `AssetPriority` derive receipt-specific owner authorization, complete asset components and registry priority, then prove full-record reconciliation termination and unique results from converged agent histories. `asset_source_execution` proves successful nonempty execution from an actually authorized retained creation. `asset_selected_authorized` traces every selected record to a valid retained source; `asset_reconsidered` covers recovery of earlier rejected/deferred evidence. All named results are axiom-audited. The [B1–B3 audit](../../docs/plans/asset-controller-convergence.md) records source, shape, signature and component-decoding contracts. The signed B3 bridge is described below; protocol-wide C1–C3 are implemented in #1241 with receipt normalization and the final audit.
 
 
 ## Signed asset/controller bridge (B3)
@@ -1019,5 +1054,5 @@ TypeScript and Rust run the same 70 evidence scenarios and 10 staged recovery ca
 in three delivery orders, including repeated import and real JSON database reopen.
 Generator rejection/reordering tests protect the translation. CI regenerates signed
 sources and checks both generated modules. B1–B3 are complete at this boundary;
-C1–C3 remain open. See the [audit](../../docs/plans/asset-controller-convergence.md)
+C1–C3 are implemented in #1241 with receipt normalization and the final audit. See the [audit](../../docs/plans/asset-controller-convergence.md)
 for source-decoding, signature and finite-correspondence assumptions.

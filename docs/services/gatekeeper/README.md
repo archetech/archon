@@ -312,12 +312,16 @@ carries the legacy form — and a node MUST select the payload from the proof's 
   "operation": Operation,
   "opid": "<CID>",                            // optional locally; required for IPFS-backed events
   "did": "did:cid:...",                        // optional; inferred from operation if missing
-  "registration": DidRegistration | undefined  // batch metadata, optional
+  "registration": ChainRegistration | undefined // required for chain registries
 }
 ```
 
-Chain-registry receipts require a nonempty `ordinal` array of nonnegative safe
-integers (0 through 9007199254740991), so both ports compare the same positions.
+Chain-registry receipts require complete `ChainRegistration` and ordinal
+`[height, index, ...registryPosition, opidx]`, with at least three nonnegative safe
+integers (0 through 9007199254740991). The first two and last components must
+match registration `height`, `index`, and `opidx`. `txid` and `batch` must be
+nonempty strings. CID batch metadata uses `ChainBatchRegistration` and the
+position prefix (at least height and index); Gatekeeper supplies opidx.
 Missing, `null`, non-array, empty, and malformed-member ordinals are rejected
 before queueing or candidate storage. CID imports validate the batch position
 before appending the operation index. Non-string CID entries are skipped without
@@ -329,6 +333,12 @@ array of nonnegative safe integers; only those unanchored registries may use an
 empty array. The CID-import API still requires `BatchMetadata.ordinal` for every
 registry. A nonempty CID list yielding no importable events returns zero
 queued/processed/rejected counts and the current queue total.
+Before journaling and during stored-candidate recovery, normalize `local` creation
+receipts to `operation.created`, and `local` update/deletion receipts to
+`operation.proof.created`. Hyperswarm and pin receipts use `proof.created` for all
+operation kinds. Preserve operation bytes, canonical IDs and ordinals. Rebuild
+accepted histories and dependent assets after repairing stored clocks; an old
+receipt timestamp must not decide historical authorization.
 The signed operation and its CID do not change. Peer/export imports are first
 converted to Hyperswarm hints, so they do not need a chain ordinal and cannot
 assert chain confirmation. Bundled chain mediators already supply positions.
@@ -743,8 +753,10 @@ field to the operation's `proof.created`. Gatekeeper normalizes Hyperswarm and p
 envelopes on import and during candidate recovery, covering older mediators,
 HTTP history imports, and existing databases. It corrects envelope timestamps
 without changing operation bytes, IDs, or ordinals. Both ordinary and verified
-resolution consume these corrected events. Local and anchored event timestamps
-retain their sources; chain ordinals retain precedence for same-registry
+resolution consume these corrected events. Gatekeeper also normalizes local
+creation receipts to `operation.created` and local update/deletion receipts to
+`proof.created`, including stored-candidate recovery. Anchored receipts keep their
+authoritative chain times; chain ordinals retain precedence for same-registry
 anchored authorization.
 
 `previd` establishes predecessor order. The time cutoff selects a prefix, even
@@ -907,11 +919,23 @@ each other's effects when computing `previd`.
 Used by `/dids/import`, `/batch/import`, `/batch/import/cids`, and
 `/events/process`.
 
+Historical controller selection uses chain context only when an event has
+complete, position-consistent registration metadata and belongs to a chain registry. Local, Hyperswarm and pin
+receipts always select the controller at the operation's `proof.created`, even
+if their envelopes include registration metadata or ordinals. Those fields stay
+in retained evidence but do not confer chain authority. Startup reconstruction
+uses the same rule and reauthorizes previously accepted dependent assets.
+
+Chain receipts require complete, position-consistent registration metadata; see
+[the chain receipt contract](../../scheme.md#complete-chain-receipts). Validation
+runs before queue deduplication and in per-event replay. Metadata-free copies
+are rejected rather than preferred or replaced according to arrival history.
+
 ### 8.1 `importBatch(events)`
 
 ```
 for event in events:
-    if !verify_event_shape(event):           // §8.4
+    if !verify_event_shape(event) or !valid_event_target(event) or !valid_chain_metadata(event): // §8.5
         rejected += 1; continue
 
     key := event.registry + "/" + canonicalOperationCID(event.operation)
@@ -963,7 +987,10 @@ recovers even if repeated imports are suppressed by the in-memory seen set.
 
 ### 8.4 `importEvent(event)` per-event flow
 
-Imports first persist the candidate event, then run the insertion algorithm below and replay the affected DID and its transitive dependents. Imports and direct submissions serialize history mutations. Replay uses a separate working view and invokes the same insertion/authorization algorithm; it never trusts a previous authorization verdict merely because it was once accepted.
+Imports validate the operation-derived target before queue deduplication and candidate persistence, then run the insertion algorithm below and replay the affected DID and its transitive dependents. Imports and direct submissions serialize history mutations. Replay uses a separate working view and invokes the same insertion/authorization algorithm; it never trusts a previous authorization verdict merely because it was once accepted.
+
+The per-event replay importer applies the same envelope target check. This rule
+adds no storage migration or candidate-journal cleanup.
 
 Local/gossip candidates retain the first observation of each canonical operation per registry; fresh peer receipt timestamps and ordinals do not add authorization evidence. Anchored candidates retain their distinct chain positions. After startup recovery, a merged import that changes neither retained candidates nor accepted history skips reconciliation and leaves status and verification caches intact. New evidence and changed anchors still reconcile normally.
 
@@ -1003,7 +1030,10 @@ rewritten to IPFS merely because a gossip wrapper omitted its operation ID.
 The following is the insertion algorithm reused during replay:
 
 ```
-1. normalize event.did and canonical event.opid from the operation
+1. derive target from canonical creation CID/prefix, or signed update/delete operation.did
+   reject a supplied event.did that differs; fill an omitted event.did with the target
+   normalize canonical event.opid and unanchored event.time from the operation
+   select the preferred retained same-position chain receipt before authorization
 2. acquire per-DID lock
 3. current = store.get_events(did); derive any missing canonical operation IDs
 4. if any current event has opid == event.opid:
@@ -1078,7 +1108,7 @@ dependents; retaining a losing candidate does not make its receipt order authori
 Controller anchoring eligibility is derived only from the confirmed prefix.
 Walk predecessor registry changes from genesis; stop at the first successor whose
 receipt registry does not match. Matching chain receipts establish anchoring
-only when all such receipts carry registration metadata. A wrong-registry genesis
+only when all such receipts carry complete, position-consistent registration metadata. A wrong-registry genesis
 receipt is ignored for this test even though genesis itself is admitted. Pin
 receipts are followed as expected-registry confirmations but never count as chain
 receipts, so missing pin registration metadata does not disqualify a later chain
@@ -1100,6 +1130,10 @@ operation.type ∈ { create, update, delete }
   - update: did, doc with at least one of { didDocument, didDocumentData, didDocumentRegistration };
             if doc.didDocument.id is set it MUST equal operation.did
   - delete: did
+target := create ? applicableMethodPrefix + ":" + canonicalOperationCID(operation) : operation.did
+if event.did is supplied it MUST equal target
+chain events require complete registration matching ordinal (see scheme chain receipt contract)
+    // creation.operation.did and peer-supplied event.opid cannot override creation identity
 ```
 
 ### 8.6 Ordinal comparison

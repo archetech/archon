@@ -1,0 +1,256 @@
+[
+  {
+    "name": "absent"
+  },
+  {
+    "name": "null",
+    "registration": null
+  },
+  {
+    "name": "empty",
+    "registration": {}
+  },
+  {
+    "name": "array",
+    "registration": []
+  },
+  {
+    "name": "string",
+    "registration": "anchor"
+  },
+  {
+    "name": "missing-height",
+    "registration": {
+      "index": 0,
+      "opidx": 0,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "missing-index",
+    "registration": {
+      "height": 1,
+      "opidx": 0,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "missing-opidx",
+    "registration": {
+      "height": 1,
+      "index": 0,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "missing-txid",
+    "registration": {
+      "height": 1,
+      "index": 0,
+      "opidx": 0,
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "missing-batch",
+    "registration": {
+      "height": 1,
+      "index": 0,
+      "opidx": 0,
+      "txid": "audit"
+    }
+  },
+  {
+    "name": "height-mismatch",
+    "registration": {
+      "height": 4,
+      "index": 0,
+      "opidx": 0,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "height-string",
+    "registration": {
+      "height": "0",
+      "index": 0,
+      "opidx": 0,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "height-fraction",
+    "registration": {
+      "height": 0.5,
+      "index": 0,
+      "opidx": 0,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "height-negative",
+    "registration": {
+      "height": -1,
+      "index": 0,
+      "opidx": 0,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "height-unsafe",
+    "registration": {
+      "height": 9007199254740992,
+      "index": 0,
+      "opidx": 0,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "index-mismatch",
+    "registration": {
+      "height": 1,
+      "index": 4,
+      "opidx": 0,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "index-string",
+    "registration": {
+      "height": 1,
+      "index": "0",
+      "opidx": 0,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "index-fraction",
+    "registration": {
+      "height": 1,
+      "index": 0.5,
+      "opidx": 0,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "index-negative",
+    "registration": {
+      "height": 1,
+      "index": -1,
+      "opidx": 0,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "index-unsafe",
+    "registration": {
+      "height": 1,
+      "index": 9007199254740992,
+      "opidx": 0,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "opidx-mismatch",
+    "registration": {
+      "height": 1,
+      "index": 0,
+      "opidx": 4,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "opidx-string",
+    "registration": {
+      "height": 1,
+      "index": 0,
+      "opidx": "0",
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "opidx-fraction",
+    "registration": {
+      "height": 1,
+      "index": 0,
+      "opidx": 0.5,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "opidx-negative",
+    "registration": {
+      "height": 1,
+      "index": 0,
+      "opidx": -1,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "opidx-unsafe",
+    "registration": {
+      "height": 1,
+      "index": 0,
+      "opidx": 9007199254740992,
+      "txid": "audit",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "batch-empty",
+    "registration": {
+      "height": 1,
+      "index": 0,
+      "opidx": 0,
+      "txid": "audit",
+      "batch": ""
+    }
+  },
+  {
+    "name": "batch-number",
+    "registration": {
+      "height": 1,
+      "index": 0,
+      "opidx": 0,
+      "txid": "audit",
+      "batch": 7
+    }
+  },
+  {
+    "name": "txid-empty",
+    "registration": {
+      "height": 1,
+      "index": 0,
+      "opidx": 0,
+      "txid": "",
+      "batch": "audit"
+    }
+  },
+  {
+    "name": "txid-number",
+    "registration": {
+      "height": 1,
+      "index": 0,
+      "opidx": 0,
+      "txid": 7,
+      "batch": "audit"
+    }
+  }
+]

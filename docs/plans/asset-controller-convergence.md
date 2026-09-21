@@ -1,6 +1,6 @@
 # Asset/controller convergence (B1–B3)
 
-This document covers the B1–B3 work area of the fixed [completion contract](protocol-convergence-completion.md). A1–A4 are merged in #1237. B1 is merged in #1238. B2 is merged in #1239. B3 is complete at the signed-bridge boundary in this change. C1–C3 remain separate fixed criteria.
+This document covers the B1–B3 work area of the fixed [completion contract](protocol-convergence-completion.md). A1–A4 are merged in #1237. B1 is merged in #1238. B2 is merged in #1239. B3 is complete at the signed-bridge boundary in this change. C1–C3 are implemented in the [final theorem work](protocol-convergence-theorem.md), including the approved clock, chain-context and richer-receipt corrections.
 
 ## Architecture audit
 
@@ -60,4 +60,4 @@ Coverage includes owner transfers, prospective owners that are missing or are as
 
 Generator rejection tests cover malformed roots, missing predecessors, detached receipts, bad signature-table dimensions, invalid agent genesis signatures, missing asset owners, incorrect expected payload/deletion metadata and unequal evidence. Reordering paired operation/ID/signature tables or event tables with remapped deliveries preserves successful generation. CI regenerates source signatures before checking both generated Lean modules, runs both runtime bridges, and builds proofs under the existing axiom allowlist.
 
-This is finite correspondence coverage for the B1/B2 source model. It does not prove universal TypeScript/Rust refinement, signature primitives, arbitrary JSON decoding, storage/concurrency correctness or global family scheduling. C1–C3 remain the unchanged remaining roadmap.
+This is finite correspondence coverage for the B1/B2 source model. It does not prove universal TypeScript/Rust refinement, signature primitives, arbitrary JSON decoding, storage/concurrency correctness or global family scheduling. C1–C3 compose and audit that boundary in the [final theorem](protocol-convergence-theorem.md).

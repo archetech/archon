@@ -517,3 +517,22 @@ bridge evidence. Next combine registry reconstruction and this
 representation with predecessor-document authorization. Unanchored migrations,
 deletions in the registry model, dynamic assets, full metadata/codecs, retention,
 and universal runtime refinement remain open. No production behavior changes.
+
+
+### Final protocol composition (C1–C3)
+
+C1–C3 are implemented at the model/bridge boundary in #1241. The three
+2026-09-21 approved corrections resolve the signed C2 counterexamples in both
+ports: intrinsic local clocks, chain-based controller selection only for actual
+chain registries, and initially richer same-position receipts before authorization.
+Issue #1249 replaces that enrichment rule with required complete, consistent chain
+metadata at ingress and per-event replay, and simplifies the final proof receipt
+premise accordingly. Direct submission, import and old-projection recovery
+are covered by signed regressions.
+`protocol_convergence` composes actual finite agent and asset reconstruction,
+proves a unique full semantic result and full-record stopping, and is independent
+of stale published projections. `protocol_eventual_convergence` covers settled
+evidence. The [final audit](protocol-convergence-theorem.md) records all premises,
+source contracts, checked signed-family instances, and the unchanged boundary to
+universal implementation refinement. Local import/recovery now uses creation `created` and update/deletion `proof.created`;
+operation bytes, IDs and ordinals are preserved.

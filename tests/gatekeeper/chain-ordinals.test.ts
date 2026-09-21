@@ -13,7 +13,7 @@ const malformedUnanchored = malformed.filter(ordinal => ordinal !== undefined &&
 it.each(vectors.filter((_, i) => i % 2 === 0))('requires chain positions through import and restart (legacy=$legacy)', async vector => {
     const genesis: GatekeeperEvent = { registry: 'SOL:devnet', time: '2026-09-01T00:00:00Z',
         ordinal: [100, 0, 0], operation: vector.operations[0], opid: vector.ids[0], did: vector.did,
-        registration: { height: 100, txid: 'ordinal-audit', batch: vector.did, opidx: 0 } };
+        registration: { height: 100, index: 0, txid: 'ordinal-audit', batch: vector.did, opidx: 0 } };
     for (const ordinal of malformed) {
         const db = new DbMemory('chain-ordinals');
         const ipfs = new MemoryClient();
@@ -47,7 +47,7 @@ it.each(vectors.filter((_, i) => i % 2 === 0))('requires chain positions through
     const positionedDb = new DbMemory('large-position');
     const positioned = new Gatekeeper({ db: positionedDb, ipfs: new MemoryClient() });
     await positionedDb.addOperation(vector.ids[0], vector.operations[0]);
-    await positioned.importBatchByCids([null, vector.ids[0]] as never, { ...genesis, ordinal: [2 ** 40, 1.0] });
+    await positioned.importBatchByCids([null, vector.ids[0]] as never, { ...genesis, ordinal: [2 ** 40, 1.0], registration: { ...genesis.registration!, height: 2 ** 40, index: 1 } });
     await positioned.processEvents();
     expect((await positionedDb.getEvents(vector.did))[0].ordinal).toEqual([2 ** 40, 1, 1]);
     expect((await positionedDb.getEvents(vector.did))[0].registration?.opidx).toBe(1);

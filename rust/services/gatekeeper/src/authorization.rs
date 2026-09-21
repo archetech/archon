@@ -52,7 +52,7 @@ async fn is_anchored(state: &AppState, did: &str, registry: Option<&str>) -> boo
         if Some(event.registry.as_str()) == expected
             && !is_unanchored_registry(&event.registry)
         {
-            if event.registration.is_none() {
+            if !crate::proofs::record_has_chain_metadata(event) {
                 return false;
             }
             anchored = true;
@@ -95,7 +95,9 @@ async fn controller_for_event(
     operation: &Value,
     event: Option<&EventRecord>,
 ) -> Result<Value> {
-    if let Some(event) = event.filter(|event| event.registration.is_some()) {
+    if let Some(event) = event.filter(|event| {
+        !is_unanchored_registry(&event.registry) && crate::proofs::record_has_chain_metadata(event)
+    }) {
         let doc = resolve_local_doc_async(
             state,
             controller_did,

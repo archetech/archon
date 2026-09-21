@@ -56,6 +56,15 @@ and [registration validation](#registration-validation) apply to every transitio
 
 ### Transition table
 
+An event envelope cannot choose the operation's target. A creation targets the
+DID derived from the complete canonical creation operation and its method prefix;
+an update or deletion targets its signed `operation.did`. If `event.did` is
+present it MUST equal that target; otherwise Gatekeeper derives it. A creation's
+extraneous `operation.did`, if present, does not override content-derived identity.
+Gatekeeper rejects mismatched envelopes before queue deduplication or candidate
+persistence. The same target check applies when replaying events.
+Retrieval-CID aliases remain content references and cannot override target identity.
+
 | Transition | Predecessor and authority | Result | Registry for confirmation |
 | --- | --- | --- | --- |
 | Create agent | No predecessor state. Verify the creation proof with `publicJwk`; the proof names `#key-1`. An explicit creation `controller` is invalid. | Derive the DID from the complete canonical creation operation; initialize an agent document with its key. The agent controls itself. | Initial `registration.registry`. Genesis is resolvable from its seed before registry publication. |
@@ -554,7 +563,7 @@ An operation on an asset — create, update, or delete — is authorized by a ke
 
 - For the controller's events on the operation's registry, the cutoff is the **ordinal**: only events the chain committed strictly before the operation's are applied. Every event in a block shares the block's time, so time cannot order a rotation against an operation committed earlier in the same block, and a later block may carry an earlier timestamp; the ordinal is the chain's order.
 - For the controller's events on any other registry, the cutoff is the operation's **block time**, since ordinals do not compare across registries.
-- This applies only when the controller's own confirmed history is chain-anchored — every event confirming it on its registry carries the position the chain assigned. Otherwise, controller selection uses the asset operation's `proof.created` cutoff. For controller events on `hyperswarm` or `pin`, compare that cutoff with each controller operation's own `proof.created`, never its node-local receipt time. Events on other registries retain their existing event-time/chain-position rules.
+- Chain-based selection requires an event on an actual chain registry with registration metadata. Local, Hyperswarm and pin receipts always use proof-time authorization, even if their envelopes carry registration metadata or ordinals. The chain rule also applies only when the controller's own confirmed history is chain-anchored — every event confirming it on its registry carries the position the chain assigned. Otherwise, controller selection uses the asset operation's `proof.created` cutoff. For controller events on `hyperswarm` or `pin`, compare that cutoff with each controller operation's own `proof.created`. Local events use `created` for creation and `proof.created` for updates/deletions. Gatekeeper enforces these intrinsic clocks at import and stored-candidate recovery; node-local receipt time does not choose historical authority. Chain events retain their authoritative event-time/chain-position rules.
 
 The anchoring check walks the controller's confirmed prefix using each version's
 predecessor registry, stopping at the first non-confirming successor. Only
@@ -706,6 +715,32 @@ The [registration hardening record](plans/registration-hardening-1158.md) docume
 the production audit and approved version-1 compatibility decision. Malformed
 registrations previously accepted by older implementations are rejected on replay;
 none were found in the audited production history. Version 2 remains disabled.
+
+### Complete chain receipts
+
+A chain event MUST contain a valid registry name, an RFC 3339 authoritative block
+`time`, and complete `registration`: `height`, `index`, `txid`, `batch`, `opidx`.
+Position fields are nonnegative safe integers. `txid` and `batch` are nonempty
+strings supplied by the mediator; `batch` identifies the anchored batch DID.
+
+The ordinal contract is `[height, index, ...registryPosition, opidx]`: its first
+two components MUST equal registration `height` and `index`, and its last MUST
+equal `opidx`. Additional registry-specific position components, if any, remain
+part of lexicographic ordering. Bundled Bitcoin, Zcash, Ethereum and Solana
+mediators use `[height, index, opidx]`. Registry names remain open; this rule does
+not introduce an allowlist.
+
+CID batch ingress requires the corresponding prefix `[height, index,
+...registryPosition]` and `height`, `index`, `txid`, `batch` metadata before fetching
+content. Gatekeeper appends each CID's **original list index**, including gaps for
+unavailable entries, and derives `opidx` itself. Malformed batch metadata fails
+explicitly; malformed chain events are rejected at admission and per-event replay.
+There is no incomplete-chain-receipt category or richer-copy preference.
+
+Local, Hyperswarm and pin remain unanchored. Peer relay converts chain claims to
+unconfirmed Hyperswarm hints before admission, so signed operations without
+complete anchor evidence can still propagate. This does not make controller
+history complete or authorization final; delayed evidence still triggers replay.
 
 ### Implementation boundary: event authorization and proof verification
 

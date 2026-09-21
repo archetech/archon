@@ -27,16 +27,16 @@ pub(crate) fn is_valid_did(did: &str) -> bool {
 }
 
 pub(crate) fn infer_event_did(config: &Config, event: &Value) -> Result<String> {
-    if let Some(did) = event.get("did").and_then(Value::as_str) {
-        return Ok(did.to_string());
-    }
-
     let operation = event.get("operation").context("missing event.operation")?;
-    if let Some(did) = operation.get("did").and_then(Value::as_str) {
-        return Ok(did.to_string());
-    }
-
-    generate_did_from_operation(config, operation)
+    let did = match operation["type"].as_str() {
+        Some("create") => generate_did_from_operation(config, operation)?,
+        Some("update" | "delete") => operation["did"].as_str().filter(|did| !did.is_empty())
+            .context("missing operation DID")?.to_string(),
+        _ => anyhow::bail!("invalid operation type"),
+    };
+    anyhow::ensure!(event.get("did").is_none_or(|claimed| claimed.as_str() == Some(&did)),
+        "event DID does not match operation target");
+    Ok(did)
 }
 
 pub(crate) fn ensure_event_opid(event: &mut Value) -> Result<String> {
@@ -80,6 +80,23 @@ pub(crate) fn valid_unanchored_ordinal(value: Option<&Value>) -> bool {
     })
 }
 
+// Keep batch prefixes extensible: registry-specific components may occur
+// between index and the operation index appended by CID ingress.
+pub(crate) fn has_chain_metadata(ordinal: Option<&Value>, registration: Option<&Value>, batch: bool) -> bool {
+    if !valid_chain_ordinal(ordinal) { return false; }
+    let items = ordinal.and_then(Value::as_array).unwrap();
+    if items.len() < if batch { 2 } else { 3 } { return false; }
+    let Some(anchor) = registration.and_then(Value::as_object) else { return false; };
+    anchor.get("height").and_then(ordinal_component) == ordinal_component(&items[0])
+        && anchor.get("index").and_then(ordinal_component) == ordinal_component(&items[1])
+        && ["txid", "batch"].iter().all(|key| anchor.get(*key).and_then(Value::as_str).is_some_and(|s| !s.is_empty()))
+        && (batch || anchor.get("opidx").and_then(ordinal_component) == items.last().and_then(ordinal_component))
+}
+
+pub(crate) fn record_has_chain_metadata(event: &crate::EventRecord) -> bool {
+    has_chain_metadata(event.ordinal.as_ref().map(|items| serde_json::json!(items)).as_ref(), event.registration.as_ref(), false)
+}
+
 pub(crate) fn verify_event_shape(event: &Value) -> bool {
     let Some(registry) = event.get("registry").and_then(Value::as_str) else {
         return false;
@@ -91,7 +108,7 @@ pub(crate) fn verify_event_shape(event: &Value) -> bool {
     let valid_ordinal = if crate::is_unanchored_registry(registry) {
         event.get("ordinal").is_none() || valid_unanchored_ordinal(event.get("ordinal"))
     } else {
-        valid_chain_ordinal(event.get("ordinal"))
+        has_chain_metadata(event.get("ordinal"), event.get("registration"), false)
     };
     if !valid_ordinal {
         return false;

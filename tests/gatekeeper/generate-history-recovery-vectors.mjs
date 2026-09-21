@@ -23,7 +23,7 @@ for(const registry of ['BTC:signet','ETH:sepolia']) {
     const controllerDoc=(await g.resolveDID(controller)).didDocument;
     controllerDoc.verificationMethod[0].publicKeyJwk=k2.publicJwk;
     const rotationOp=sign({type:'update',did:controller,previd:await g.generateCID(create),doc:{didDocument:controllerDoc}},k1,`${controller}#key-1`);
-    const event=async (op,chain,height)=>({did:op.did??await g.generateDID(op),opid:await g.generateCID(op),operation:op,registry:chain,time:T(height),ordinal:[height,0],registration:{height,index:0,txid:`tx${height}`,batch:`batch${height}`}});
+    const event=async (op,chain,height)=>({did:op.did??await g.generateDID(op),opid:await g.generateCID(op),operation:op,registry:chain,time:T(height),ordinal:[height,0,0],registration:{height,index:0,opidx:0,txid:`tx${height}`,batch:`batch${height}`}});
     const assetCid=await g.generateCID(assetOp);
     const update=async(key,data,prev=assetCid)=>sign({type:'update',did:asset,previd:prev,doc:{didDocumentData:data}},key,`${controller}#key-1`);
     const old=await update(k1,'retired'), fresh=await update(k2,'new-key'), early=await update(k1,'before-rotation');

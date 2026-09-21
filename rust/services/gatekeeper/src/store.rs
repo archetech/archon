@@ -272,9 +272,11 @@ pub(crate) fn event_record_to_value(event: &EventRecord) -> Value {
         "registry": event.registry,
         "time": event.time,
         "operation": event.operation,
-        "opid": event.opid,
-        "did": event.did
+        "opid": event.opid
     });
+    if let Some(did) = &event.did {
+        val["did"] = json!(did);
+    }
     if let Some(ordinal) = &event.ordinal {
         val["ordinal"] = json!(ordinal);
     }

@@ -389,6 +389,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 0,
           "txid": "BTC:signet-tx0",
           "batch": "batch",
           "opidx": 0
@@ -427,6 +428,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 50,
           "txid": "BTC:signet-tx50",
           "batch": "batch",
           "opidx": 0
@@ -465,6 +467,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 30,
           "txid": "BTC:signet-tx30",
           "batch": "batch",
           "opidx": 0
@@ -503,6 +506,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 1,
           "txid": "ZEC:testnet-tx1",
           "batch": "batch",
           "opidx": 0
@@ -536,6 +540,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 1,
           "txid": "BTC:signet-tx1",
           "batch": "batch",
           "opidx": 0
@@ -569,6 +574,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 500,
           "txid": "ZEC:testnet-tx500",
           "batch": "batch",
           "opidx": 0
@@ -602,6 +608,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 10,
           "txid": "ETH:sepolia-tx10",
           "batch": "batch",
           "opidx": 0
@@ -640,6 +647,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 600,
           "txid": "ZEC:testnet-tx600",
           "batch": "batch",
           "opidx": 0
@@ -673,6 +681,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 2,
           "txid": "BTC:signet-tx2",
           "batch": "batch",
           "opidx": 0
@@ -1217,6 +1226,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 0,
           "txid": "BTC:signet-tx0",
           "batch": "batch",
           "opidx": 0
@@ -1255,6 +1265,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 50,
           "txid": "BTC:signet-tx50",
           "batch": "batch",
           "opidx": 0
@@ -1293,6 +1304,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 30,
           "txid": "BTC:signet-tx30",
           "batch": "batch",
           "opidx": 0
@@ -1331,6 +1343,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 1,
           "txid": "ZEC:testnet-tx1",
           "batch": "batch",
           "opidx": 0
@@ -1364,6 +1377,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 1,
           "txid": "BTC:signet-tx1",
           "batch": "batch",
           "opidx": 0
@@ -1397,6 +1411,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 500,
           "txid": "ZEC:testnet-tx500",
           "batch": "batch",
           "opidx": 0
@@ -1430,6 +1445,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 10,
           "txid": "ETH:sepolia-tx10",
           "batch": "batch",
           "opidx": 0
@@ -1468,6 +1484,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 600,
           "txid": "ZEC:testnet-tx600",
           "batch": "batch",
           "opidx": 0
@@ -1501,6 +1518,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 2,
           "txid": "BTC:signet-tx2",
           "batch": "batch",
           "opidx": 0
@@ -1539,6 +1557,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 10,
           "txid": "BTC:signet-tx10",
           "batch": "batch",
           "opidx": 0
@@ -2078,6 +2097,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 0,
           "txid": "BTC:signet-tx0",
           "batch": "batch",
           "opidx": 0
@@ -2115,6 +2135,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 50,
           "txid": "BTC:signet-tx50",
           "batch": "batch",
           "opidx": 0
@@ -2152,6 +2173,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 30,
           "txid": "BTC:signet-tx30",
           "batch": "batch",
           "opidx": 0
@@ -2189,6 +2211,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 1,
           "txid": "ZEC:testnet-tx1",
           "batch": "batch",
           "opidx": 0
@@ -2221,6 +2244,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 1,
           "txid": "BTC:signet-tx1",
           "batch": "batch",
           "opidx": 0
@@ -2253,6 +2277,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 500,
           "txid": "ZEC:testnet-tx500",
           "batch": "batch",
           "opidx": 0
@@ -2285,6 +2310,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 10,
           "txid": "ETH:sepolia-tx10",
           "batch": "batch",
           "opidx": 0
@@ -2322,6 +2348,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 600,
           "txid": "ZEC:testnet-tx600",
           "batch": "batch",
           "opidx": 0
@@ -2354,6 +2381,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 2,
           "txid": "BTC:signet-tx2",
           "batch": "batch",
           "opidx": 0
@@ -2883,6 +2911,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 0,
           "txid": "BTC:signet-tx0",
           "batch": "batch",
           "opidx": 0
@@ -2920,6 +2949,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 50,
           "txid": "BTC:signet-tx50",
           "batch": "batch",
           "opidx": 0
@@ -2957,6 +2987,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 30,
           "txid": "BTC:signet-tx30",
           "batch": "batch",
           "opidx": 0
@@ -2994,6 +3025,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 1,
           "txid": "ZEC:testnet-tx1",
           "batch": "batch",
           "opidx": 0
@@ -3026,6 +3058,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 1,
           "txid": "BTC:signet-tx1",
           "batch": "batch",
           "opidx": 0
@@ -3058,6 +3091,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 500,
           "txid": "ZEC:testnet-tx500",
           "batch": "batch",
           "opidx": 0
@@ -3090,6 +3124,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 10,
           "txid": "ETH:sepolia-tx10",
           "batch": "batch",
           "opidx": 0
@@ -3127,6 +3162,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 600,
           "txid": "ZEC:testnet-tx600",
           "batch": "batch",
           "opidx": 0
@@ -3159,6 +3195,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 2,
           "txid": "BTC:signet-tx2",
           "batch": "batch",
           "opidx": 0
@@ -3196,6 +3233,7 @@
         ],
         "registration": {
           "height": 100,
+          "index": 10,
           "txid": "BTC:signet-tx10",
           "batch": "batch",
           "opidx": 0

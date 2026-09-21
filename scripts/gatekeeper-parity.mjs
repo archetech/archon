@@ -642,7 +642,7 @@ async function runBackdatingParity() {
         })));
         const imported = agree(`backdating parity: commit block ${height}`, await both(post('/api/v1/batch/import/cids', {
             cids,
-            metadata: { registry: 'BTC:signet', time, ordinal: [height], registration: { height, index: 0, txid: `tx${height}`, batch: `b${height}` } },
+            metadata: { registry: 'BTC:signet', time, ordinal: [height, 0], registration: { height, index: 0, txid: `tx${height}`, batch: `b${height}` } },
         })));
         if (imported.body.rejected !== 0) {
             throw new Error(`backdating parity: block ${height} import rejected ${imported.body.rejected} operation(s) before processing`);
@@ -962,7 +962,7 @@ async function runOperationIdentityParity() {
     };
     const commit = async (cid, height) => {
         const results = await both(post('/api/v1/batch/import/cids', { cids: [cid], metadata: {
-            registry: 'BTC:signet', time: '2026-04-11T13:00:00Z', ordinal: [height],
+            registry: 'BTC:signet', time: '2026-04-11T13:00:00Z', ordinal: [height, 0],
             registration: { height, index: 0, txid: `tx${height}`, batch: `batch${height}` },
         } }));
         for (const result of results) {
@@ -1063,7 +1063,7 @@ async function runConvergenceParity() {
                     const time = operation.proof.created;
                     await both(post('/api/v1/block/BTC:signet', { height, hash: `block${height}`, time: Math.floor(Date.parse(time) / 1000) }));
                     await both(post('/api/v1/batch/import/cids', { cids: [pinned.body], metadata: {
-                        registry: 'BTC:signet', time, ordinal: [height],
+                        registry: 'BTC:signet', time, ordinal: [height, 0],
                         registration: { height, index: 0, txid: `tx${height}`, batch: `batch${height}` },
                     } }));
                 } else {
