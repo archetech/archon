@@ -1,6 +1,6 @@
 name = "archonAgentConvergence"
 version = "0.1.0"
-defaultTargets = ["ControllerSelectionExamples", "ControllerSelection", "IntegratedAgentConvergence", "AgentSourceRecords", "ReceiptViews", "AgentReceiptViews", "AgentColdRecords", "ColdInterleaved", "IntegratedAgentFixtures", "AgentFullRecords", "InterleavedRecords", "AgentConvergence", "OperationalReplay", "Fixtures", "AxiomAudit", "EventRecords", "RecordFixtures", "FullReplay", "SerializedReplay", "AgentAuthorization", "AgentFixtures", "DocumentAuthorization", "DocumentFixtures", "AgentComponents", "ComponentFixtures", "ChainAnchors", "ChainAnchorFixtures", "ChainSuccessors", "ChainSuccessorFixtures", "InterleavedReplay", "InterleavedFixtures", "InterleavedBound", "PriorityProjection", "PriorityFixtures", "InterleavedAuthorization", "InterleavedDocumentFixtures", "ChainDocuments", "ChainDocumentFixtures", "RegistryAncestry", "RegistryFixtures", "RegistryAnchors", "RegistryPriority", "RegistryInterleaved", "RegistryInterleavedFixtures", "AgentRegistry", "AgentRegistryExamples", "AgentEventProjection"]
+defaultTargets = ["IntegratedAssetConvergence", "AssetPriority", "AssetExamples", "AssetAuthorization", "AssetComponents", "AssetReplay", "AssetExecution", "ControllerSelectionExamples", "ControllerSelection", "IntegratedAgentConvergence", "AgentSourceRecords", "ReceiptViews", "AgentReceiptViews", "AgentColdRecords", "ColdInterleaved", "IntegratedAgentFixtures", "AgentFullRecords", "InterleavedRecords", "AgentConvergence", "OperationalReplay", "Fixtures", "AxiomAudit", "EventRecords", "RecordFixtures", "FullReplay", "SerializedReplay", "AgentAuthorization", "AgentFixtures", "DocumentAuthorization", "DocumentFixtures", "AgentComponents", "ComponentFixtures", "ChainAnchors", "ChainAnchorFixtures", "ChainSuccessors", "ChainSuccessorFixtures", "InterleavedReplay", "InterleavedFixtures", "InterleavedBound", "PriorityProjection", "PriorityFixtures", "InterleavedAuthorization", "InterleavedDocumentFixtures", "ChainDocuments", "ChainDocumentFixtures", "RegistryAncestry", "RegistryFixtures", "RegistryAnchors", "RegistryPriority", "RegistryInterleaved", "RegistryInterleavedFixtures", "AgentRegistry", "AgentRegistryExamples", "AgentEventProjection"]
 
 [[lean_lib]]
 name = "AgentConvergence"
@@ -143,3 +143,24 @@ name = "ControllerSelection"
 
 [[lean_lib]]
 name = "ControllerSelectionExamples"
+
+[[lean_lib]]
+name = "AssetAuthorization"
+
+[[lean_lib]]
+name = "AssetComponents"
+
+[[lean_lib]]
+name = "AssetReplay"
+
+[[lean_lib]]
+name = "AssetExecution"
+
+[[lean_lib]]
+name = "AssetExamples"
+
+[[lean_lib]]
+name = "AssetPriority"
+
+[[lean_lib]]
+name = "IntegratedAssetConvergence"
