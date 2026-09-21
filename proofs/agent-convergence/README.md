@@ -996,3 +996,7 @@ A2–A4: ranks still need their protocol-domain/ordinal interpretation; complete
 semantic metadata and stopping remain to be composed; signed cross-port fixtures
 must validate normalization. The normalized list is an ordering representation,
 not a claim that every synthetic provisional event exists as a stored receipt.
+
+## Controller selection (B1)
+
+`ControllerSelection.lean` derives historical controller components and named-method authorization from A3’s converged confirmed receipt view. It models strict same-chain ordinals, inclusive cross-chain time, whole-prefix anchoring, selected-registry fallback, genesis admission and missing/deleted controllers. `controller_selection_same_sources` composes selection with shared source evidence, without assuming equal authorizing documents. See the [B1–B3 audit](../../docs/plans/asset-controller-convergence.md). B2/B3 and C1–C3 remain open.

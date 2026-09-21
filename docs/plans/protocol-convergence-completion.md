@@ -144,7 +144,7 @@ runtime refinement remains outside this contract. B and C remain open.
 
 ### B. Asset/controller convergence
 
-- [ ] **B1 — Controller selection:** derive the authorizing agent version from the
+- [x] **B1 — Controller selection:** derive the authorizing agent version from the
   converged agent history using same-chain ordinal, cross-registry block-time,
   and operation-proof-time fallback rules. Include confirmed-prefix selection,
   controller rotation/deletion, and missing controller evidence. Historical
@@ -159,6 +159,13 @@ runtime refinement remains outside this contract. B and C remain open.
 - [ ] **B3 — Asset bridge:** shared signed cross-port cases instantiate these rules,
   including transfers, late rotations, earlier anchors, revocation/recovery of
   previously accepted/rejected candidates, and restart from retained evidence.
+
+B1 is implemented in `ControllerSelection.lean`: the confirmed-prefix and
+historical cutoff rules derive controller components from A3's source result,
+including the whole-prefix anchoring check and proof-time fallback. Named-method
+verification rejects missing/deleted controllers. The [architecture audit](asset-controller-convergence.md)
+records both ports and the existing source contracts. B2 and the signed B3 bridge
+remain open; synthetic kernel examples are not runtime correspondence proofs.
 
 ### C. Close the protocol theorem
 
