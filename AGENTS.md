@@ -170,6 +170,8 @@ These rules apply to coding agents working in this repository.
 
 - In convergence models, derive an agent operation's signing authority from its signed predecessor chain. Deletion makes that predecessor terminal; it does not prevent a preferred sibling from replacing a deleted branch through an earlier live predecessor. Keep signature-oracle assumptions distinct from executable verification claims.
 
+- Include new generated vectors in the CI freshness diff, not just the generation commands. Imported method entries are untyped JSON; uniqueness checks must match both ports on non-string IDs without broadening method-shape validation.
+
 - Reject duplicate verification-method IDs after the same relative/absolute normalization used by key lookup, against the document DID (including asset documents). Check replacements in shared authorization; preserve distinct names, shared public keys, and same-name rotation.
 
 - When modeling multiple verification methods, keep normalized method identity separate from public-key identity: a method can retain its name while replacing its key. Model current version-1 named-method lookup without inventing relationship-membership enforcement while #1156 is paused.

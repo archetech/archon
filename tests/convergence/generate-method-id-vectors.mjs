@@ -32,6 +32,8 @@ for (const legacy of [false, true]) {
             ['shared-key', [method('#key-1', 0), method('#key-2', 0)], true, '#key-2', 0],
             ['rotation', [method('#key-1', 1)], true, '#key-1', 1],
         ];
+        // Asset keys are published content, not the authority for asset updates.
+        if (asset) cases.push(['non-string-id', [method(true, 0)], true]);
         for (const [name, methods, accepted, named, key] of cases) {
             for (const reverse of accepted ? [false] : [false, true]) {
                 const verificationMethod = reverse ? [...methods].reverse() : methods;

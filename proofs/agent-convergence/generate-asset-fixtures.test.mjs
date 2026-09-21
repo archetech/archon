@@ -56,3 +56,14 @@ test('rejects duplicate methods published by an asset', () => {
     doc.verificationMethod = [{ id: '#key-1' }, { id: doc.id + '#key-1' }];
     assert.throws(() => assetGraph(v), /Duplicate normalized/);
 });
+
+test('method-ID uniqueness ignores non-string asset method IDs like the runtime', () => {
+    const v = structuredClone(vectors[0]);
+    const operation = v.operations.find(op => op.doc?.didDocument);
+    const before = JSON.stringify(operation);
+    operation.doc.didDocument.verificationMethod = [{ id: true }];
+    for (const event of v.events) {
+        if (JSON.stringify(event.operation) === before) event.operation = structuredClone(operation);
+    }
+    assert.doesNotThrow(() => assetGraph(v));
+});

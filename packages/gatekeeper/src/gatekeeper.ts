@@ -597,7 +597,8 @@ export default class Gatekeeper implements GatekeeperInterface {
             if (!next || next.id !== operation.did) return false;
             const methods = next.verificationMethod;
             if (Array.isArray(methods)) {
-                const ids = methods.map(method => absoluteKeyId(method.id, next.id)).filter(id => id !== undefined);
+                const ids = methods.map(method => typeof method?.id === 'string' ? absoluteKeyId(method.id, next.id) : undefined)
+                    .filter(id => id !== undefined);
                 if (new Set(ids).size !== ids.length) return false;
             }
             let authority: DidCidDocument;
