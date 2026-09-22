@@ -187,7 +187,7 @@ function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { b
     return (
         <Box sx={{ width: "100%", overflowX: "hidden" }}>
             {showResolveField && <Button sx={{ mt: 1 }} disabled={!keymaster || !(formDid.trim() || currentDid)}
-                onClick={() => setRepairTarget(formDid.trim() || currentDid)}>Check / Repair DID</Button>}
+                onClick={() => setRepairTarget(formDid.trim() || currentDid)}>Repair...</Button>}
             {repairTarget && keymaster && <DIDRepairDialog did={repairTarget} checkDID={checkDID} repairDID={repairDID}
                 onClose={() => setRepairTarget(null)} onRepaired={() => currentDid ? resolveDID(currentDid) : undefined} />}
 

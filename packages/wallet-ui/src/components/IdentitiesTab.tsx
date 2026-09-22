@@ -1042,7 +1042,7 @@ function IdentitiesTab() {
                                         { label: "Rename", onClick: handleRenameId, icon: <DriveFileRenameOutline fontSize="small" /> },
                                         { label: "Backup", onClick: backupId, icon: <SaveAltOutlined fontSize="small" /> },
                                         { label: "Recover", onClick: handleRecoverId, icon: <RestoreOutlined fontSize="small" /> },
-                                        { label: "Check / Repair DID", onClick: () => setRepairOpen(true) },
+                                        { label: "Repair...", onClick: () => setRepairOpen(true) },
                                         { label: "Rotate keys", onClick: rotateKeys, icon: <LoopOutlined fontSize="small" /> },
                                         { label: "Migrate registry", onClick: () => setMigrateOpen(true), icon: <SwapHorizOutlined fontSize="small" /> },
                                         { label: "Remove identity", onClick: handleRemoveId, icon: <DeleteOutline fontSize="small" />, destructive: true },

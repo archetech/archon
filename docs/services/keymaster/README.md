@@ -540,10 +540,10 @@ owning that DID or having a wallet; names and aliases need the wallet that
 holds them. Both TypeScript and Python Keymaster expose the same feature
 (`checkDID`/`repairDID`, `check_did`/`repair_did`).
 
-Wallets expose **Check / Repair DID** in the identity actions menu and in the
+Wallets expose **Repair...** in the identity actions menu and in the
 DID viewer. In the standalone clients, use the button under **Identities**,
 or enter any agent/asset DID or alias under **Aliases** and choose
-**Check / Repair DID**. All surfaces use the same dialog:
+**Repair...**. All surfaces use the same dialog:
 
 1. Opening it checks the latest document without submitting an operation.
 2. Review the findings and proposed component replacements. Healthy documents

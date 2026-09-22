@@ -5102,7 +5102,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         </Grid>
                                         <Grid item>
                                             <Button variant="contained" onClick={() => setRepairTarget(currentDID)} disabled={!currentDID}>
-                                                Check / Repair DID
+                                                Repair...
                                             </Button>
                                         </Grid>
                                         <Grid item>
@@ -5488,7 +5488,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                     {tab === 'aliases' &&
                         <Box>
                             <Button sx={{ mb: 2 }} onClick={() => setRepairTarget(aliasRepairTarget)}
-                                disabled={!aliasRepairTarget}>Check / Repair DID</Button>
+                                disabled={!aliasRepairTarget}>Repair...</Button>
                             <TableContainer component={Paper} style={{ maxHeight: '400px', overflow: 'auto' }}>
                                 <Table stickyHeader style={{ width: '1000px', tableLayout: 'fixed' }}>
                                     <colgroup>
