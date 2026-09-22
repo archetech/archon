@@ -10,7 +10,7 @@ type Props = {
     checkDID: (did: string) => Promise<CheckDIDResult>;
     repairDID: (did: string) => Promise<RepairDIDResult>;
     onClose: () => void;
-    onRepaired?: () => void | Promise<void>;
+    onRepaired?: (did: string) => void | Promise<void>;
 };
 
 // Shared by wallets and standalone clients; all repair decisions remain in Keymaster.
@@ -54,7 +54,7 @@ export default function DIDRepairDialog({ did, checkDID, repairDID, onClose, onR
             if (current !== request.current) return;
             setReport(result);
             if (result.submitted) {
-                try { await onRepaired?.(); }
+                try { await onRepaired?.(result.did); }
                 catch { if (current === request.current) setError('Repair accepted, but the background document view could not be refreshed.'); }
             }
         } catch (e: any) {

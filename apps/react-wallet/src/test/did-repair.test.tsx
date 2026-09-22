@@ -28,7 +28,7 @@ describe('shared DID repair dialog', () => {
         await user.click(screen.getByRole('button', { name: 'Repair DID' }));
         await screen.findByText('Repair accepted; awaiting confirmation.');
         expect(repairDID).toHaveBeenCalledExactlyOnceWith(did);
-        expect(onRepaired).toHaveBeenCalledOnce();
+        expect(onRepaired).toHaveBeenCalledExactlyOnceWith(did);
         expect(screen.getByRole('button', { name: 'Repair DID' })).toBeDisabled();
     });
 
@@ -67,7 +67,7 @@ describe('shared DID repair dialog', () => {
     );
 
     it('checks an asset controller separately and never repairs the asset implicitly', async () => {
-        const { checkDID, repairDID, user } = mount({ ...healthy, did: 'did:cid:asset', type: 'asset',
+        const { checkDID, repairDID, onRepaired, user } = mount({ ...healthy, did: 'did:cid:asset', type: 'asset',
             issues: [{ code: 'controller-needs-repair', message: 'Check and repair the controlling agent separately.', relatedDid: did }] });
         await screen.findByText('Check and repair the controlling agent separately.');
         expect(screen.getByRole('button', { name: 'Repair DID' })).toBeDisabled();
@@ -78,6 +78,7 @@ describe('shared DID repair dialog', () => {
         expect(repairDID).not.toHaveBeenCalled();
         await user.click(screen.getByRole('button', { name: 'Repair DID' }));
         expect(repairDID).toHaveBeenCalledExactlyOnceWith(did);
+        expect(onRepaired).toHaveBeenCalledExactlyOnceWith(did);
     });
 
     it('ignores inspection results after the target is edited', async () => {

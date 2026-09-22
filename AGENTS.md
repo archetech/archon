@@ -289,4 +289,4 @@ These rules apply to coding agents working in this repository.
 
 - Asset repair reports must preserve why controller repair is unavailable; recommend a separate controller repair only when that controller report has `canRepair: true`.
 
-- Wallet and demo-client DID repair must use the shared `@didcid/wallet-ui/did-repair` dialog with injected Keymaster callbacks. Keep repair decisions in Keymaster, discard stale inspection results when the target changes, and require an explicit repair action after displaying proposed changes.
+- Wallet and demo-client DID repair must use the shared `@didcid/wallet-ui/did-repair` dialog with injected Keymaster callbacks. Keep repair decisions in Keymaster, discard stale inspection results when the target changes, and require an explicit repair action after displaying proposed changes. Alias inspection must retain the resolved canonical DID separately from document names and editable inputs; post-repair refreshes use the repaired DID rather than another tab’s selection.
