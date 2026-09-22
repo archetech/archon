@@ -130,3 +130,56 @@ test('reports pending chain updates separately from accepted repairs', async () 
     expect(await keymaster.checkDID(did)).toMatchObject({ confirmed: false, canRepair: false });
     await expect(keymaster.repairDID(did)).rejects.toThrow('confirmed');
 });
+
+test('keeps non-fragment method IDs distinct during inspection, repair and rotation', async () => {
+    const did = await damagedAgent();
+    const document = (await keymaster.resolveDID(did)).didDocument!;
+    document.verificationMethod!.push({ ...document.verificationMethod![0], id: 'keys/op#key-1' });
+    document.capabilityInvocation = ['keys/op#key-1'];
+    await keymaster.updateDID(did, { didDocument: document });
+    expect((await keymaster.checkDID(did)).issues.map(issue => issue.code)).toEqual(['missing-operation-permission']);
+    await keymaster.repairDID(did);
+    await keymaster.rotateKeys();
+    const after = (await keymaster.resolveDID(did)).didDocument!;
+    expect(after.capabilityInvocation).toEqual(['keys/op#key-1', '#key-2']);
+    expect(after.verificationMethod![1]).toEqual(document.verificationMethod![1]);
+    after.capabilityInvocation!.push('#key-1');
+    await keymaster.updateDID(did, { didDocument: after });
+    expect((await keymaster.checkDID(did)).issues.map(issue => issue.code)).toEqual(['stale-operation-permissions']);
+    await keymaster.repairDID(did);
+    expect((await keymaster.resolveDID(did)).didDocument!.capabilityInvocation).toEqual(['keys/op#key-1', '#key-2']);
+});
+
+test('reports a non-fragment relative signing method as unsupported instead of promising repair', async () => {
+    const did = await damagedAgent();
+    const document = (await keymaster.resolveDID(did)).didDocument!;
+    document.verificationMethod![0].id = 'keys/op#key-1';
+    await keymaster.updateDID(did, { didDocument: document });
+    expect(await keymaster.checkDID(did)).toMatchObject({ canRepair: false, changes: null,
+        issues: [{ code: 'unsupported-operation-key' }] });
+});
+
+test('repairs with an older wallet key when the agent returns to that key', async () => {
+    const did = await damagedAgent();
+    const original = (await keymaster.resolveDID(did)).didDocument!;
+    await keymaster.rotateKeys();
+    await keymaster.updateDID(did, { didDocument: original });
+    expect((await keymaster.loadWallet()).ids.Alice.index).toBe(1);
+    expect((await keymaster.checkDID(did)).canRepair).toBe(true);
+    expect((await keymaster.repairDID(did)).submitted).toBe(true);
+});
+
+test('a rotation during repair is rejected by the predecessor check and leaves the rotation intact', async () => {
+    const did = await damagedAgent();
+    const getBlock = gatekeeper.getBlock.bind(gatekeeper);
+    gatekeeper.getBlock = async (...args) => {
+        gatekeeper.getBlock = getBlock;
+        await keymaster.rotateKeys();
+        return getBlock(...args);
+    };
+    await expect(keymaster.repairDID(did)).rejects.toThrow('previd');
+    const document = (await keymaster.resolveDID(did)).didDocument!;
+    expect(document.verificationMethod![0].id).toBe('#key-2');
+    expect(document.capabilityInvocation).toEqual(['#removed']);
+    expect((await keymaster.repairDID(did)).submitted).toBe(true);
+});

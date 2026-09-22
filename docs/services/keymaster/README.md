@@ -556,7 +556,11 @@ operations with the first verification method. A repair requires the wallet's
 usable signing key to match that method and the current document to be
 confirmed. It preserves valid permissions, other methods and relationships,
 data and registration. It does not grant every published key operation
-authority. Relative and absolute references identify the same local method.
+authority. Only `#fragment` references expand against the document DID;
+other method IDs remain distinct, matching Gatekeeper. A non-fragment relative
+operation-signing method is reported as unsupported rather than repairable.
+Both wallets search their derived keys for the confirmed operation key,
+including older keys still retained by the wallet.
 Rotation retitles existing operation permissions along with authentication
 and assertion references; it does not silently repair omitted permissions.
 
@@ -566,7 +570,9 @@ asset's controller has a problem, the report identifies that agent as
 an asset with no applicable repair.
 
 `repair-did` is the explicit mutation action. It checks again and signs an
-ordinary update against the inspected version. Its report adds `submitted`:
+ordinary update against the inspected version. If that version changes while
+repair is being prepared or signed, Gatekeeper rejects the stale predecessor;
+check the latest document and retry. Its report adds `submitted`:
 `false` for a no-op and `true` when Gatekeeper accepts the update. Check
 `confirmed` separately: an accepted chain-registry update can still be
 pending anchoring. Repeating repair after the changes are present is a no-op.

@@ -99,14 +99,6 @@ def _proofs_of(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return [p for p in (proof if isinstance(proof, list) else [proof]) if isinstance(p, dict)]
 
 
-def _key_fragment(ref: Any) -> str | None:
-    """The fragment of a verification method reference."""
-    if not isinstance(ref, str):
-        return None
-
-    return ref.split("#")[-1] if "#" in ref else ref
-
-
 def _absolute_key_id(ref: Any, did: str) -> str | None:
     """A verification method reference as a whole DID URL.
 
@@ -119,7 +111,7 @@ def _absolute_key_id(ref: Any, did: str) -> str | None:
     if not isinstance(ref, str):
         return None
 
-    return ref if ":" in ref else f"{did}#{_key_fragment(ref)}"
+    return f"{did}{ref}" if ref.startswith("#") else ref
 
 
 class KeymasterError(Exception):
@@ -1261,7 +1253,16 @@ class Keymaster:
     async def fetch_key_pair(self, name: str | None = None) -> dict[str, dict[str, str]] | None:
         wallet = await self.load_wallet()
         id_info = await self.fetch_id_info(name, wallet)
-        return await self.derive_key_pair(id_info["account"], id_info.get("index", 0), wallet)
+        document = await self.resolve_did(id_info["did"], {"confirm": "true"})
+        public_key = await self.get_public_key_jwk(document)
+        # Match TypeScript: a confirmed history can select an older wallet key
+        # after a reorganization or an ordinary update restoring that key.
+        for index in range(id_info.get("index", 0), -1, -1):
+            keypair = await self.derive_key_pair(id_info["account"], index, wallet)
+            if (keypair["publicJwk"].get("x") == public_key.get("x")
+                    and keypair["publicJwk"].get("y") == public_key.get("y")):
+                return keypair
+        return None
 
     async def decrypt_with_derived_keys(
         self,
@@ -2167,6 +2168,12 @@ class Keymaster:
             result["issues"].append({"code": "missing-operation-key", "message": "No operation-signing method is published."})
             return result
         target = _absolute_key_id(signer["id"], did)
+        if not target or not target.startswith("did:") or "#" not in target:
+            result["issues"].append({
+                "code": "unsupported-operation-key",
+                "message": "The operation-signing method must be a DID URL or a #fragment reference.",
+            })
+            return result
         published = {_absolute_key_id(vm.get("id"), did) for vm in methods}
         refs = document.get("capabilityInvocation") or []
         valid = [ref for ref in refs if _absolute_key_id(ref, did) in published]

@@ -1701,6 +1701,11 @@ export default class Keymaster implements KeymasterInterface {
             return result;
         }
         const target = this.absoluteKeyId(signer.id, did);
+        if (!target.startsWith('did:') || !target.includes('#')) {
+            result.issues.push({ code: 'unsupported-operation-key',
+                message: 'The operation-signing method must be a DID URL or a #fragment reference.' });
+            return result;
+        }
         const published = new Set(methods.flatMap(vm => vm.id ? [this.absoluteKeyId(vm.id, did)] : []));
         const refs = document.capabilityInvocation || [];
         const valid = refs.filter(ref => published.has(this.absoluteKeyId(ref, did)));
@@ -3050,12 +3055,8 @@ export default class Keymaster implements KeymasterInterface {
     // which publishDidComm writes). Both forms resolve against the document's
     // own DID, so comparing whole DID URLs keeps a method controlled by another
     // DID -- `did:other:123#key-1` -- from matching the local `#key-1`.
-    private keyFragment(id: string): string {
-        return id.includes('#') ? id.split('#').pop()! : id;
-    }
-
     private absoluteKeyId(ref: string, did: string): string {
-        return ref.includes(':') ? ref : `${did}#${this.keyFragment(ref)}`;
+        return ref.startsWith('#') ? `${did}${ref}` : ref;
     }
 
     private findVerificationMethod(doc: DidCidDocument, kid: string) {

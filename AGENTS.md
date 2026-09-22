@@ -284,3 +284,5 @@ These rules apply to coding agents working in this repository.
 - Keymaster CLI additions must also have MCP tool mappings in `packages/mcp-server/src/tools.ts`; run `tests/mcp-server` alongside CLI parity tests. Mark writes as mutating so read-only MCP configurations omit them.
 
 - Test encoded aliases through real HTTP routing, not only SDK URLs or direct handlers. FastAPI matches decoded paths, so endpoints supporting slash-containing aliases need a `path` converter and dispatch coverage.
+
+- Keymaster method-ID comparison must match Gatekeeper: expand only leading `#` references. Python operation signing must search retained wallet derivations for the confirmed public key, as TypeScript does; the newest wallet index need not be the active key.

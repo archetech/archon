@@ -91,3 +91,47 @@ def test_deactivated_and_unconfirmed(testbed):
     assert run(testbed.keymaster.check_did(did))["canRepair"] is False
     metadata["deactivated"] = True
     assert run(testbed.keymaster.check_did(did))["issues"][0]["code"] == "deactivated"
+
+
+def test_non_fragment_ids_are_distinct(testbed):
+    km = testbed.keymaster
+    did = damaged_agent(testbed)
+    document = run(km.resolve_did(did))["didDocument"]
+    document["verificationMethod"].append({**document["verificationMethod"][0], "id": "keys/op#key-1"})
+    document["capabilityInvocation"] = ["keys/op#key-1"]
+    run(km.update_did(did, {"didDocument": document}))
+    assert [issue["code"] for issue in run(km.check_did(did))["issues"]] == ["missing-operation-permission"]
+    run(km.repair_did(did))
+    run(km.rotate_keys())
+    after = run(km.resolve_did(did))["didDocument"]
+    assert after["capabilityInvocation"] == ["keys/op#key-1", "#key-2"]
+    assert after["verificationMethod"][1] == document["verificationMethod"][1]
+    after["capabilityInvocation"].append("#key-1")
+    run(km.update_did(did, {"didDocument": after}))
+    assert [issue["code"] for issue in run(km.check_did(did))["issues"]] == ["stale-operation-permissions"]
+    run(km.repair_did(did))
+    assert run(km.resolve_did(did))["didDocument"]["capabilityInvocation"] == ["keys/op#key-1", "#key-2"]
+
+
+def test_non_fragment_signer_is_not_repairable(testbed):
+    km = testbed.keymaster
+    did = damaged_agent(testbed)
+    document = run(km.resolve_did(did))["didDocument"]
+    document["verificationMethod"][0]["id"] = "keys/op#key-1"
+    run(km.update_did(did, {"didDocument": document}))
+    report = run(km.check_did(did))
+    assert report["canRepair"] is False
+    assert report["issues"][0]["code"] == "unsupported-operation-key"
+
+
+def test_repair_with_older_wallet_key(testbed):
+    km = testbed.keymaster
+    did = damaged_agent(testbed)
+    original = run(km.resolve_did(did))["didDocument"]
+    run(km.rotate_keys())
+    run(km.update_did(did, {"didDocument": original}))
+    assert run(km.load_wallet())["ids"]["Alice"]["index"] == 1
+    assert run(km.check_did(did))["canRepair"] is True
+    assert run(km.repair_did(did))["submitted"] is True
+    keypair = run(km.fetch_key_pair(did))
+    assert keypair["publicJwk"] == original["verificationMethod"][0]["publicKeyJwk"]
