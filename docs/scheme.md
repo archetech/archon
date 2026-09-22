@@ -175,7 +175,7 @@ To create an agent DID, the client must sign and submit a "create" operation to 
 > carry the legacy `EcdsaSecp256k1Signature2019` label and the signature that
 > goes with it — the payload is the operation alone. Both remain accepted, and
 > the DIDs shown derive from these exact bytes. For the proof a node emits now,
-> and the payload it signs, see [Cryptosuites](#cryptosuites).
+> and the payload it signs, see the [current-suite example](#archon-ecdsa-secp256k1-jcs-2026).
 
 Example
 ```json
@@ -814,6 +814,40 @@ with any `proof` member removed.
    `eddsa-jcs-2022`.
 4. Sign with secp256k1 ECDSA, producing a 64-byte compact `r || s` signature.
 5. `proofValue` is that signature, base64url-encoded (unpadded).
+
+This create-agent operation uses the current suite. It was signed with the
+synthetic private key consisting of 32 bytes of `0x4a` (for reproducibility,
+not for use as an identity). The proof configuration has no `@context`, because
+the operation has none. The [checked example](../tests/docs/scheme-current-proof.test.ts)
+verifies the signature and the resulting DID against Gatekeeper.
+
+```json
+{
+    "type": "create",
+    "created": "2026-09-22T00:00:00.000Z",
+    "registration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm"
+    },
+    "publicJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "OSd_CMNPrDPDsV5YoWajZol2ZUGeXD8hR3XubkcWcX4",
+        "y": "yBLNwQllxyR5Omgo9b7LmJEfd1pGNiZZqzgqafZ4Qcs"
+    },
+    "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+        "created": "2026-09-22T00:00:00.001Z",
+        "verificationMethod": "#key-1",
+        "proofPurpose": "capabilityInvocation",
+        "proofValue": "esafZoTsLCbrza6GTFuca4sFFHT4S4FJFT9KwBqNhMQXneC5gPgjdNraDML2UXZ0xHf4XScAFm-MZjV_jFsUFw"
+    }
+}
+```
+
+Its DID is `did:cid:bagaaiera7apdjgpe7jleguoioddew7oqqxn2iqlsowktnbnqksf7bpzuntka`.
 
 Including the configuration in the signed payload is what makes `created` and
 `proofPurpose` unforgeable. A verifier must also reject a proof whose `@context`
