@@ -1283,6 +1283,76 @@
         }
       }
     },
+    "/did/{id}/check": {
+      "get": {
+        "summary": "Inspect known DID document problems without changing it.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inspection report with issues, proposed changes, repair eligibility and confirmation status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "report": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid DID or repair unavailable."
+          }
+        }
+      }
+    },
+    "/did/{id}/repair": {
+      "post": {
+        "summary": "Explicitly apply supported DID document repairs using the wallet operation key.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Inspection report with issues, proposed changes, repair eligibility and confirmation status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "report": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid DID or repair unavailable."
+          }
+        }
+      }
+    },
     "/ids/current": {
       "get": {
         "summary": "Retrieve the current ID name.",

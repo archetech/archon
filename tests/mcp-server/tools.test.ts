@@ -171,6 +171,8 @@ function mockRuntime(overrides: Record<string, unknown> = {}) {
         removeId: jest.fn<any>().mockResolvedValue(true),
         renameId: jest.fn<any>().mockResolvedValue(true),
         rotateKeys: jest.fn<any>().mockResolvedValue(true),
+        checkDID: jest.fn<any>().mockResolvedValue({ did: 'did:cid:alice', issues: [], changes: null, canRepair: false, confirmed: true }),
+        repairDID: jest.fn<any>().mockResolvedValue({ did: 'did:cid:alice', issues: [], changes: null, canRepair: false, confirmed: true, submitted: false }),
         revokeDID: jest.fn<any>().mockResolvedValue(true),
         changeRegistry: jest.fn<any>().mockResolvedValue(true),
         encryptMessage: jest.fn<any>().mockResolvedValue('did:cid:encrypted'),
@@ -389,6 +391,25 @@ describe('mcp server tools', () => {
             expect(server.tools.has(tool)).toBe(false);
         }
         expect(runtime.keymaster.createId).not.toHaveBeenCalled();
+    });
+
+    it('inspects a DID without writing and requires confirmation to repair it', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        const report = expectOk(await server.tools.get('archon_check_did')!.handler({ did: 'Alice' }));
+        expect(report).toMatchObject({ canRepair: false, confirmed: true });
+        expect(runtime.keymaster.checkDID).toHaveBeenCalledWith('Alice');
+        expect(runtime.keymaster.repairDID).not.toHaveBeenCalled();
+
+        const rejected = await server.tools.get('archon_repair_did')!.handler({ did: 'Alice' });
+        expect(expectFail(rejected)).toContain('Invalid literal value');
+        expect(runtime.keymaster.repairDID).not.toHaveBeenCalled();
+
+        const repaired = expectOk(await server.tools.get('archon_repair_did')!.handler({ did: 'Alice', confirm: true }));
+        expect(repaired).toMatchObject({ submitted: false });
+        expect(runtime.keymaster.repairDID).toHaveBeenCalledWith('Alice');
     });
 
     it('requires explicit confirmation for destructive tools', async () => {

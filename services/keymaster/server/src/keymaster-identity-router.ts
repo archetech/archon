@@ -172,6 +172,72 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
 
     /**
      * @swagger
+     * /did/{id}/check:
+     *   get:
+     *     summary: Inspect known DID document problems without changing it.
+     *     parameters:
+     *       - in: path
+     *         name: id
+     *         required: true
+     *         schema:
+     *           type: string
+     *     responses:
+     *       200:
+     *         description: Inspection report with issues, proposed changes, repair eligibility and confirmation status.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 report:
+     *                   type: object
+     *       400:
+     *         description: Invalid DID or repair unavailable.
+     */
+    router.get('/did/:id/check', async (req, res) => {
+        try {
+            const report = await getKeymaster().checkDID(req.params.id);
+            res.json({ report });
+        } catch (error: any) {
+            sendError(res, error);
+        }
+    });
+
+    /**
+     * @swagger
+     * /did/{id}/repair:
+     *   post:
+     *     summary: Explicitly apply supported DID document repairs using the wallet operation key.
+     *     parameters:
+     *       - in: path
+     *         name: id
+     *         required: true
+     *         schema:
+     *           type: string
+     *     responses:
+     *       200:
+     *         description: Inspection report with issues, proposed changes, repair eligibility and confirmation status.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 report:
+     *                   type: object
+     *       400:
+     *         description: Invalid DID or repair unavailable.
+     */
+    router.post('/did/:id/repair', async (req, res) => {
+        try {
+            const report = await getKeymaster().repairDID(req.params.id);
+            res.json({ report });
+        } catch (error: any) {
+            sendError(res, error);
+        }
+    });
+
+    /**
+     * @swagger
      * /did/{id}:
      *   delete:
      *     summary: Revoke a DID.

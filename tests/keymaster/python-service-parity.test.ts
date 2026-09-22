@@ -20,7 +20,8 @@ type Route = string; // "PROTECTED POST /didcomm/send"
 // Express `:name` and FastAPI `{name}` mean the same thing; the name itself is
 // local to each flavor and carries no contract.
 function normalize(path: string): string {
-    return path.replace(/:[A-Za-z_][A-Za-z0-9_]*/g, ':param').replace(/\{[A-Za-z_][A-Za-z0-9_]*\}/g, ':param');
+    return path.replace(/\{[A-Za-z_][A-Za-z0-9_]*(?::path)?\}/g, ':param')
+        .replace(/:[A-Za-z_][A-Za-z0-9_]*/g, ':param');
 }
 
 // Which file defines each `createXRouter` mount. Found by looking for the

@@ -3,7 +3,7 @@ import requests
 import json
 import sys
 import time
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 _base_url = os.environ.get("ARCHON_KEYMASTER_URL", "http://localhost:4226")
 _keymaster_api = _base_url + "/api/v1"
@@ -299,6 +299,16 @@ def decrypt_mnemonic():
 def list_registries():
     response = proxy_request("GET", f"{_keymaster_api}/registries")
     return response["registries"]
+
+
+def check_did(name):
+    response = proxy_request("GET", f"{_keymaster_api}/did/{quote(name, safe='')}/check")
+    return response["report"]
+
+
+def repair_did(name):
+    response = proxy_request("POST", f"{_keymaster_api}/did/{quote(name, safe='')}/repair")
+    return response["report"]
 
 
 def resolve_did(name, options=None):

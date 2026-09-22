@@ -36,6 +36,8 @@ import {
     AddressCheckResult,
     ResolvedAddressInfo,
     CheckWalletResult,
+    CheckDIDResult,
+    RepairDIDResult,
     CreateAssetOptions,
     EncryptedMessage,
     FileAssetOptions,
@@ -1379,7 +1381,7 @@ export default class Keymaster implements KeymasterInterface {
         const doc = await this.resolveDID(id.did, { confirm: true });
         const keyFragment = doc.didDocument?.verificationMethod?.[0]?.id || '#key-1';
 
-        return { verificationMethod: `${id.did}${keyFragment}`, keypair };
+        return { verificationMethod: this.absoluteKeyId(keyFragment, id.did), keypair };
     }
 
     async addProof<T extends object>(
@@ -1658,9 +1660,116 @@ export default class Keymaster implements KeymasterInterface {
         return false;
     }
 
+    async checkDID(id: string): Promise<CheckDIDResult> {
+        const did = await this.lookupDID(id);
+        return this.inspectDID(did, await this.resolveDID(did));
+    }
+
+    private async inspectDID(did: string, current: DidCidDocument): Promise<CheckDIDResult> {
+        const result: CheckDIDResult = {
+            did,
+            type: current.didDocumentRegistration?.type,
+            versionId: current.didDocumentMetadata?.versionId,
+            confirmed: current.didDocumentMetadata?.confirmed === true,
+            issues: [], changes: null, canRepair: false,
+        };
+        if (current.didDocumentMetadata?.deactivated) {
+            result.issues.push({ code: 'deactivated', message: 'Deactivated DIDs cannot be repaired.' });
+            return result;
+        }
+        const document = current.didDocument;
+        if (result.type === 'asset') {
+            const controller = document?.controller;
+            if (controller) {
+                const agent = await this.checkDID(controller);
+                if (agent.issues.length) {
+                    result.issues.push({
+                        code: agent.canRepair ? 'controller-needs-repair' : 'controller-repair-unavailable',
+                        relatedDid: controller,
+                        message: agent.canRepair ? 'Check and repair the controlling agent separately.'
+                            : `Controller repair unavailable: ${agent.reason || agent.issues.map(issue => issue.message).join(' ')}`,
+                    });
+                }
+            }
+            return result;
+        }
+        if (result.type !== 'agent' || !document) {
+            return result;
+        }
+        // Keymaster signs operations with the first verification method. Other
+        // published credential/encryption keys do not gain operation authority.
+        const methods = document.verificationMethod || [];
+        const signer = methods[0];
+        if (!signer?.id) {
+            result.issues.push({ code: 'missing-operation-key', message: 'No operation-signing method is published.' });
+            return result;
+        }
+        const target = this.absoluteKeyId(signer.id, did);
+        if (!target.startsWith('did:') || !target.includes('#')) {
+            result.issues.push({ code: 'unsupported-operation-key',
+                message: 'The operation-signing method must be a DID URL or a #fragment reference.' });
+            return result;
+        }
+        const published = new Set(methods.flatMap(vm => vm.id ? [this.absoluteKeyId(vm.id, did)] : []));
+        const refs = document.capabilityInvocation || [];
+        const valid = refs.filter(ref => published.has(this.absoluteKeyId(ref, did)));
+        if (valid.length !== refs.length) {
+            result.issues.push({ code: 'stale-operation-permissions', message: 'Remove capabilityInvocation references to unpublished methods.' });
+        }
+        if (!valid.some(ref => this.absoluteKeyId(ref, did) === target)) {
+            result.issues.push({ code: 'missing-operation-permission', message: 'Authorize the operation-signing method in capabilityInvocation.' });
+            valid.push(signer.id);
+        }
+        if (!result.issues.length) {
+            return result;
+        }
+        if (!result.confirmed) {
+            result.reason = 'Wait for the current document to be confirmed before repairing it.';
+            return result;
+        }
+        try {
+            const keypair = await this.fetchKeyPair(did);
+            const key = signer.publicKeyJwk;
+            if (!keypair || key?.kty !== 'EC' || key.crv !== 'secp256k1'
+                || key.x !== keypair.publicJwk.x || key.y !== keypair.publicJwk.y) {
+                result.reason = 'The wallet cannot sign with the current operation key.';
+                return result;
+            }
+        } catch {
+            result.reason = 'The current operation-signing key is unavailable in this wallet.';
+            return result;
+        }
+        result.changes = { didDocument: { ...document, capabilityInvocation: valid } };
+        result.canRepair = true;
+        return result;
+    }
+
+    async repairDID(id: string): Promise<RepairDIDResult> {
+        const did = await this.lookupDID(id);
+        const current = await this.resolveDID(did);
+        const report = await this.inspectDID(did, current);
+        if (!report.issues.length) {
+            return { ...report, submitted: false };
+        }
+        if (!report.canRepair || !report.changes) {
+            throw new KeymasterError(report.reason || report.issues[0].message);
+        }
+        // Sign against the inspected predecessor, never overwrite a newer
+        // document by re-resolving its predecessor after preparing the repair.
+        const submitted = await this.updateFromDocument(did, report.changes, current);
+        if (!submitted) {
+            throw new KeymasterError('DID repair was not accepted.');
+        }
+        return { ...await this.checkDID(did), submitted };
+    }
+
     async updateDID(id: string, doc: DidCidDocument): Promise<boolean> {
         const did = await this.lookupDID(id);
         const current = await this.resolveDID(did);
+        return this.updateFromDocument(did, doc, current);
+    }
+
+    private async updateFromDocument(did: string, doc: DidCidDocument, current: DidCidDocument): Promise<boolean> {
         const previd = current.didDocumentMetadata?.versionId;
 
         // Strip metadata fields from the update doc
@@ -2225,6 +2334,9 @@ export default class Keymaster implements KeymasterInterface {
                     vm => isRotated(vm.id) ? vmethod : vm),
                 authentication: retitle(doc.didDocument.authentication),
                 assertionMethod: retitle(doc.didDocument.assertionMethod),
+                ...(doc.didDocument.capabilityInvocation !== undefined && {
+                    capabilityInvocation: retitle(doc.didDocument.capabilityInvocation),
+                }),
             };
 
             ok = await this.updateDID(id.did, { didDocument: updatedDidDocument });
@@ -2947,12 +3059,8 @@ export default class Keymaster implements KeymasterInterface {
     // which publishDidComm writes). Both forms resolve against the document's
     // own DID, so comparing whole DID URLs keeps a method controlled by another
     // DID -- `did:other:123#key-1` -- from matching the local `#key-1`.
-    private keyFragment(id: string): string {
-        return id.includes('#') ? id.split('#').pop()! : id;
-    }
-
     private absoluteKeyId(ref: string, did: string): string {
-        return ref.includes(':') ? ref : `${did}#${this.keyFragment(ref)}`;
+        return ref.startsWith('#') ? `${did}${ref}` : ref;
     }
 
     private findVerificationMethod(doc: DidCidDocument, kid: string) {

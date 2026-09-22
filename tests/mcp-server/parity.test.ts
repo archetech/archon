@@ -30,6 +30,7 @@ describe('mcp server CLI parity', () => {
     it('requires confirmation or reveal arguments for high-risk catalog entries', () => {
         const guardedInputs: Record<string, Record<string, unknown>> = {
             archon_revoke_did: { did: 'did:cid:alice' },
+            archon_repair_did: { did: 'did:cid:alice' },
             archon_revoke_credential: { did: 'did:cid:credential' },
             archon_remove_id: { name: 'alice' },
             archon_new_wallet: {},

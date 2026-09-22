@@ -197,6 +197,7 @@ describe('wallet-optional command policy', () => {
         'import-wallet': /newWallet\(/,
         'restore-wallet-file': /saveWallet\(/,
         'list-registries': null,
+        'check-did': null,
     };
     const READS_THE_WALLET = /\.(loadWallet|mutateWallet|decryptMnemonic)\(/;
 
@@ -219,6 +220,7 @@ describe('wallet-optional command policy', () => {
         'import-wallet': /new_wallet\(/,
         'restore-wallet-file': /save_wallet\(/,
         'list-registries': null,
+        'check-did': null,
     };
     const PY_READS_THE_WALLET = /\.(load_wallet|decrypt_mnemonic)\(/;
 

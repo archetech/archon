@@ -19,6 +19,8 @@ from .keymaster_sdk import (
     check_address,
     check_lightning_payment,
     check_wallet,
+    check_did,
+    repair_did,
     clone_asset,
     connect,
     create,

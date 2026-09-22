@@ -9,6 +9,8 @@ import {
     AddressCheckResult,
     ResolvedAddressInfo,
     CheckWalletResult,
+    CheckDIDResult,
+    RepairDIDResult,
     CreateAssetOptions,
     DidCommReceivedMessage,
     DidCommUnpackResult,
@@ -850,6 +852,24 @@ export default class KeymasterClient implements KeymasterInterface {
             return response.data.payments;
         }
         catch (error) {
+            throwError(error);
+        }
+    }
+
+    async checkDID(id: string): Promise<CheckDIDResult> {
+        try {
+            const response = await this.axios.get(`${this.API}/did/${encodeURIComponent(id)}/check`);
+            return response.data.report;
+        } catch (error) {
+            throwError(error);
+        }
+    }
+
+    async repairDID(id: string): Promise<RepairDIDResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/did/${encodeURIComponent(id)}/repair`);
+            return response.data.report;
+        } catch (error) {
             throwError(error);
         }
     }

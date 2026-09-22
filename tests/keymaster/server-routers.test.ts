@@ -188,6 +188,8 @@ const ROUTES: Array<[Method, string, number]> = [
     ['POST', '/groups/item/remove', 400],
     ['POST', '/groups/item/test', 400],
     // identity
+    ['GET', '/did/test-id/check', 400],
+    ['POST', '/did/test-id/repair', 400],
     ['GET', '/did/test-id', 404],
     ['DELETE', '/did/test-id', 400],
     ['PUT', '/did/test-id', 400],
@@ -634,3 +636,15 @@ describe('keymaster admin key startup check', () => {
     });
 });
 
+
+
+test.each(['Alice / backup', 'Alice/check', 'Alice/repair', 'did:cid:alice'])(
+    'DID repair routes preserve encoded identifier %s', async identifier => {
+        const { app, keymaster } = mount();
+        const path = `/did/${encodeURIComponent(identifier)}`;
+        expect((await request(app).get(`${path}/check`)).status).toBe(200);
+        expect((await request(app).post(`${path}/repair`)).status).toBe(200);
+        expect(keymaster.checkDID).toHaveBeenCalledWith(identifier);
+        expect(keymaster.repairDID).toHaveBeenCalledWith(identifier);
+    },
+);

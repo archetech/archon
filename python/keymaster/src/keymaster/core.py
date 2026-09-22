@@ -99,14 +99,6 @@ def _proofs_of(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return [p for p in (proof if isinstance(proof, list) else [proof]) if isinstance(p, dict)]
 
 
-def _key_fragment(ref: Any) -> str | None:
-    """The fragment of a verification method reference."""
-    if not isinstance(ref, str):
-        return None
-
-    return ref.split("#")[-1] if "#" in ref else ref
-
-
 def _absolute_key_id(ref: Any, did: str) -> str | None:
     """A verification method reference as a whole DID URL.
 
@@ -119,7 +111,7 @@ def _absolute_key_id(ref: Any, did: str) -> str | None:
     if not isinstance(ref, str):
         return None
 
-    return ref if ":" in ref else f"{did}#{_key_fragment(ref)}"
+    return f"{did}{ref}" if ref.startswith("#") else ref
 
 
 class KeymasterError(Exception):
@@ -1261,7 +1253,16 @@ class Keymaster:
     async def fetch_key_pair(self, name: str | None = None) -> dict[str, dict[str, str]] | None:
         wallet = await self.load_wallet()
         id_info = await self.fetch_id_info(name, wallet)
-        return await self.derive_key_pair(id_info["account"], id_info.get("index", 0), wallet)
+        document = await self.resolve_did(id_info["did"], {"confirm": "true"})
+        public_key = await self.get_public_key_jwk(document)
+        # Match TypeScript: a confirmed history can select an older wallet key
+        # after a reorganization or an ordinary update restoring that key.
+        for index in range(id_info.get("index", 0), -1, -1):
+            keypair = await self.derive_key_pair(id_info["account"], index, wallet)
+            if (keypair["publicJwk"].get("x") == public_key.get("x")
+                    and keypair["publicJwk"].get("y") == public_key.get("y")):
+                return keypair
+        return None
 
     async def decrypt_with_derived_keys(
         self,
@@ -1886,7 +1887,7 @@ class Keymaster:
         doc = await self.resolve_did(id_info["did"], {"confirm": "true"})
         verification_methods = doc.get("didDocument", {}).get("verificationMethod") or []
         key_fragment = verification_methods[0].get("id", "#key-1") if verification_methods else "#key-1"
-        return {"verificationMethod": f"{id_info['did']}{key_fragment}", "keypair": keypair}
+        return {"verificationMethod": _absolute_key_id(key_fragment, id_info["did"]), "keypair": keypair}
 
     def _sign_proof_value(self, digest: Any, keypair: dict[str, Any]) -> str:
         """A non-serializable object reaches canonicalization as a raise, which
@@ -2129,9 +2130,101 @@ class Keymaster:
 
         return False
 
+    async def check_did(self, identifier: str) -> dict[str, Any]:
+        did = await self.lookup_did(identifier)
+        return await self._inspect_did(did, await self.resolve_did(did))
+
+    async def _inspect_did(self, did: str, current: dict[str, Any]) -> dict[str, Any]:
+        metadata = current.get("didDocumentMetadata") or {}
+        result: dict[str, Any] = {
+            "did": did, "confirmed": metadata.get("confirmed") is True,
+            "issues": [], "changes": None, "canRepair": False,
+        }
+        kind = current.get("didDocumentRegistration", {}).get("type")
+        if kind is not None:
+            result["type"] = kind
+        if metadata.get("versionId") is not None:
+            result["versionId"] = metadata["versionId"]
+        if metadata.get("deactivated"):
+            result["issues"].append({"code": "deactivated", "message": "Deactivated DIDs cannot be repaired."})
+            return result
+        document = current.get("didDocument") or {}
+        if kind == "asset":
+            controller = document.get("controller")
+            if controller:
+                agent = await self.check_did(controller)
+                if agent["issues"]:
+                    result["issues"].append({
+                        "code": "controller-needs-repair" if agent["canRepair"] else "controller-repair-unavailable",
+                        "relatedDid": controller,
+                        "message": ("Check and repair the controlling agent separately." if agent["canRepair"] else
+                                    "Controller repair unavailable: " + (agent.get("reason") or
+                                        " ".join(issue["message"] for issue in agent["issues"]))),
+                    })
+            return result
+        if kind != "agent" or not document:
+            return result
+        # Keymaster signs operations with the first method, not every published key.
+        methods = document.get("verificationMethod") or []
+        signer = methods[0] if methods else {}
+        if not signer.get("id"):
+            result["issues"].append({"code": "missing-operation-key", "message": "No operation-signing method is published."})
+            return result
+        target = _absolute_key_id(signer["id"], did)
+        if not target or not target.startswith("did:") or "#" not in target:
+            result["issues"].append({
+                "code": "unsupported-operation-key",
+                "message": "The operation-signing method must be a DID URL or a #fragment reference.",
+            })
+            return result
+        published = {_absolute_key_id(vm.get("id"), did) for vm in methods}
+        refs = document.get("capabilityInvocation") or []
+        valid = [ref for ref in refs if _absolute_key_id(ref, did) in published]
+        if len(valid) != len(refs):
+            result["issues"].append({"code": "stale-operation-permissions", "message": "Remove capabilityInvocation references to unpublished methods."})
+        if not any(_absolute_key_id(ref, did) == target for ref in valid):
+            result["issues"].append({"code": "missing-operation-permission", "message": "Authorize the operation-signing method in capabilityInvocation."})
+            valid.append(signer["id"])
+        if not result["issues"]:
+            return result
+        if not result["confirmed"]:
+            result["reason"] = "Wait for the current document to be confirmed before repairing it."
+            return result
+        try:
+            keypair = await self.fetch_key_pair(did)
+            key = signer.get("publicKeyJwk") or {}
+            if (not keypair or key.get("kty") != "EC" or key.get("crv") != "secp256k1"
+                    or key.get("x") != keypair["publicJwk"].get("x")
+                    or key.get("y") != keypair["publicJwk"].get("y")):
+                result["reason"] = "The wallet cannot sign with the current operation key."
+                return result
+        except Exception:
+            result["reason"] = "The current operation-signing key is unavailable in this wallet."
+            return result
+        result["changes"] = {"didDocument": {**document, "capabilityInvocation": valid}}
+        result["canRepair"] = True
+        return result
+
+    async def repair_did(self, identifier: str) -> dict[str, Any]:
+        did = await self.lookup_did(identifier)
+        current = await self.resolve_did(did)
+        report = await self._inspect_did(did, current)
+        if not report["issues"]:
+            return {**report, "submitted": False}
+        if not report["canRepair"] or not report["changes"]:
+            raise KeymasterError(report.get("reason") or report["issues"][0]["message"])
+        # Keep the inspected predecessor when signing the ordinary update.
+        submitted = await self._update_from_document(did, report["changes"], current)
+        if not submitted:
+            raise KeymasterError("DID repair was not accepted.")
+        return {**await self.check_did(did), "submitted": submitted}
+
     async def update_did(self, identifier: str, doc: dict[str, Any]) -> bool:
         did = await self.lookup_did(identifier)
         current = await self.resolve_did(did)
+        return await self._update_from_document(did, doc, current)
+
+    async def _update_from_document(self, did: str, doc: dict[str, Any], current: dict[str, Any]) -> bool:
         registry = current.get("didDocumentRegistration", {}).get("registry")
         block = await self.gatekeeper.get_block(registry) if registry else None
         payload = {
@@ -2610,6 +2703,8 @@ class Keymaster:
                 "authentication": retitle(did_document.get("authentication")),
                 "assertionMethod": retitle(did_document.get("assertionMethod")),
             }
+            if "capabilityInvocation" in did_document:
+                updated_doc["capabilityInvocation"] = retitle(did_document["capabilityInvocation"])
             ok = await self.update_did(id_info["did"], {"didDocument": updated_doc})
             if ok:
                 id_info["index"] = next_index
