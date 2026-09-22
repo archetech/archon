@@ -5,6 +5,8 @@ import { isIP, type LookupFunction } from 'node:net';
 import { Agent } from 'undici';
 import { fetchPublicHttps as followPublicRedirects, isPrivateHostname } from './net.js';
 
+export { isPrivateHostname } from './net.js';
+
 export const publicLookup: LookupFunction = (hostname, options, callback) => {
     lookup(hostname, { all: true }, (error, addresses) => {
         if (error) { callback(error, '', 0); return; }

@@ -11,6 +11,4 @@ export interface KeymasterOptions {
     cipher: Cipher;
     defaultRegistry?: string;
     maxAliasLength?: number;
-    // Node hosts inject socket-level DNS protection; browsers retain URL checks.
-    fetchPublicHttps?: (target: string, init?: RequestInit) => Promise<Response>;
 }

@@ -260,8 +260,8 @@ const MAX_REDIRECTS = 3;
 // fetch would simply have handed the response back.
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
-// Portable HTTPS/hostname guard; Node hosts supply the DNS-pinned transport
-// from net-node. Checking only the first URL is not enough: `fetch` follows
+// Portable HTTPS/hostname guard; package exports select the DNS-pinned
+// net-node transport automatically in Node. Checking only the first URL is not enough: `fetch` follows
 // redirects on its own, so a public host answering 302 with a Location of
 // http://169.254.169.254/ reaches the address the check exists to keep out.
 export async function fetchPublicHttps(target: string, init?: RequestInit, fetcher: typeof fetch = fetch): Promise<Response> {

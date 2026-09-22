@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { fetchPublicHttps } from '@didcid/common/net-node';
 import { program } from 'commander';
 import fs from 'fs';
 import path from 'path';
@@ -2499,7 +2498,7 @@ async function run() {
         // No provisioning here: of the allowlisted commands, most create or
         // replace a wallet themselves and one needs none at all. The two whose
         // handlers assume a wallet exists provision in the handler.
-        keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase, fetchPublicHttps });
+        keymaster = new Keymaster({ gatekeeper, wallet, cipher, defaultRegistry, passphrase });
 
         // Only once it is known to open this wallet. Saving a mistyped one
         // would suppress every future prompt and leave no way back in but

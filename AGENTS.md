@@ -296,3 +296,5 @@ These rules apply to coding agents working in this repository.
 - For internal L402 exemptions, trace both the Drawbridge validator and the upstream credentials sent by each Keymaster service runtime. Use an explicit upstream credential rather than automatically forwarding the local admin secret to a configurable remote URL. Match the configured admin key, never a source address; wrong keys must retain the normal paid path, and exemption metrics must not include secrets.
 
 - Caller-controlled public HTTPS requests must validate the destinations used by the connection, not perform a DNS preflight followed by another hostname lookup. Keep Host and TLS identity intact, revalidate redirects, reject mixed private/public DNS answers, and keep Node-only transports out of browser bundles. Test a real blocked connection as well as mocked redirect flows.
+
+- Select platform-specific public HTTPS transports through package conditional exports so Node consumers receive DNS protection by default without Keymaster constructor injection. Verify both Node ESM/CommonJS and browser bundle resolution.

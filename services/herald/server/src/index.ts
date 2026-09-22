@@ -1,4 +1,3 @@
-import { fetchPublicHttps } from '@didcid/common/net-node';
 import express from 'express';
 import session from 'express-session';
 import morgan from 'morgan';
@@ -201,7 +200,6 @@ app.listen(HOST_PORT, '0.0.0.0', async () => {
         const cipher = new CipherNode();
 
         ctx.keymaster = new Keymaster({
-            fetchPublicHttps,
             gatekeeper,
             wallet,
             cipher,
