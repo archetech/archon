@@ -14,6 +14,7 @@ import { fetch as socksFetch } from 'undici';
 
 import { isPrivateHostname } from '@didcid/common/net';
 import { fetchPublicHttpsOnce } from '@didcid/common/net-node';
+import type { probeOnion } from '@didcid/common/tor-node';
 import { LightningPaymentError } from './errors.js';
 import type * as clnModule from './lightning.js';
 import type * as lnbitsModule from './lnbits.js';
@@ -134,6 +135,7 @@ export interface AppDeps {
     // Reads the Tor hidden-service hostname. A function so the file is not a
     // hard dependency of building the app.
     readTorHostname: () => Promise<string>;
+    probeOnion: typeof probeOnion;
 }
 
 // SOCKS-dispatched requests deliberately bypass globalThis.fetch, so a test
@@ -170,12 +172,11 @@ export function createApp(deps: AppDeps): Express {
         try {
             const onion = (await deps.readTorHostname()).trim();
             if (onion) {
-                cachedPublicHost = `http://${onion}:${config.drawbridgePort}`;
-                logger.info({ publicHost: cachedPublicHost }, 'Resolved public host from Tor hostname');
-                return cachedPublicHost;
+                await deps.probeOnion(onion, config.drawbridgePort, config.torProxy);
+                return `http://${onion}:${config.drawbridgePort}`;
             }
         } catch {
-            // File not available yet
+            // A persisted hostname is not proof that its hidden service is up.
         }
 
         return undefined;

@@ -63,7 +63,7 @@ public endpoint (`/invoice/:did`).
 | `POST` | `/api/v1/lightning/pay` | yes | `{ adminKey, bolt11 }` → `{ paymentHash }`. |
 | `POST` | `/api/v1/lightning/payment` | yes | `{ invoiceKey, paymentHash }` → `LightningPaymentStatus & { paymentHash }`. |
 | `POST` | `/api/v1/lightning/payments` | yes | `{ adminKey }` → `{ payments: LnbitsPayment[] }`. |
-| `POST` | `/api/v1/lightning/publish` | yes | `{ did, invoiceKey }` — stores the mapping via `store.savePublishedLightning(did, invoiceKey)`. Returns `{ ok: true, publicHost }`. Does NOT modify the DID document (the DID-document service entry is added client-side by Keymaster). Returns HTTP 503 if `publicHost` is not yet available. |
+| `POST` | `/api/v1/lightning/publish` | yes | `{ did, invoiceKey }` — stores the mapping via `store.savePublishedLightning(did, invoiceKey)`. Returns `{ ok: true, publicHost }`. Does NOT modify the DID document (the DID-document service entry is added client-side by Keymaster). Returns HTTP 503 if `publicHost` is unavailable, including when its persisted Tor hostname cannot be reached through the SOCKS proxy. |
 | `DELETE` | `/api/v1/lightning/publish/:did` | yes | Removes the mapping. |
 | `POST` | `/api/v1/lightning/zap` | yes | `{ adminKey, did, amount, memo? }`. Resolves recipient (DID or LUD-16 address), requests an invoice, and pays it via LNbits. See [§4](#4-zap-flow). |
 | `POST` | `/api/v1/l402/invoice` | yes | `{ amountSat, memo? }` — creates a CLN invoice for L402. Returns the full `LightningInvoice` shape `{ paymentRequest, paymentHash, amountSat, expiry, label }`. |
@@ -290,7 +290,7 @@ Redis instance is shared with the reference TypeScript service.
 | `ARCHON_LIGHTNING_MEDIATOR_PUBLIC_HOST` | empty | External URL the mediator advertises (overrides onion discovery). |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | empty | Preferred over `PUBLIC_HOST` if set. |
 | `ARCHON_DRAWBRIDGE_PORT` | `4222` | Used for internal shortcut in zap. |
-| `ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY` | empty | SOCKS5 proxy for `.onion` lookups. Expected form: `host:port`. If set but malformed (split yields empty host or port), the mediator falls back to `localhost:9050`. |
+| `ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY` | empty | SOCKS5 proxy for `.onion` lookups and for verifying the fallback public onion before a new Lightning publication. Expected form: `host:port`. Bundled compose sets `tor:9050`. |
 | `GIT_COMMIT` | `unknown` | Build commit. |
 
 ### 6.3 Public host resolution

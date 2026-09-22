@@ -162,6 +162,7 @@ function build(overrides: Partial<AppDeps> = {}) {
         readTorHostname: async () => {
             throw new Error('no tor hostname');
         },
+        probeOnion: jest.fn<any>().mockResolvedValue(undefined),
         ...overrides,
     };
 
@@ -444,9 +445,28 @@ describe('publish routes', () => {
         expect((await post(own.app, '/api/v1/lightning/publish', { did: 'did:cid:a', invoiceKey: 'k' })).body.publicHost)
             .toBe('https://own.example');
 
-        const onion = build({ readTorHostname: async () => 'abcdef.onion\n' });
+        const onionHost = `${'a'.repeat(56)}.onion`;
+        const onion = build({ readTorHostname: async () => `${onionHost}\n`, config: baseConfig({ torProxy: 'tor:9050' }) });
         expect((await post(onion.app, '/api/v1/lightning/publish', { did: 'did:cid:a', invoiceKey: 'k' })).body.publicHost)
-            .toBe('http://abcdef.onion:4222');
+            .toBe(`http://${onionHost}:4222`);
+        expect(onion.deps.probeOnion).toHaveBeenCalledWith(onionHost, 4222, 'tor:9050');
+    });
+
+    it('refuses to publish a persisted onion when Tor cannot reach it, then retries', async () => {
+        const onionHost = `${'a'.repeat(56)}.onion`;
+        const probe = jest.fn<any>().mockRejectedValueOnce(new Error('Tor unavailable'))
+            .mockResolvedValue(undefined);
+        const { app, store } = build({
+            config: baseConfig({ torProxy: 'tor:9050' }),
+            readTorHostname: async () => onionHost,
+            probeOnion: probe,
+        });
+        const failed = await post(app, '/api/v1/lightning/publish', { did: 'did:cid:a', invoiceKey: 'k' });
+        expect(failed.status).toBe(503);
+        expect(store.published.size).toBe(0);
+        const recovered = await post(app, '/api/v1/lightning/publish', { did: 'did:cid:a', invoiceKey: 'k' });
+        expect(recovered.body.publicHost).toBe(`http://${onionHost}:4222`);
+        expect(probe).toHaveBeenCalledTimes(2);
     });
 
     it('stores and removes the published invoice key', async () => {

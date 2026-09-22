@@ -298,3 +298,5 @@ These rules apply to coding agents working in this repository.
 - Caller-controlled public HTTPS requests must validate the destinations used by the connection, not perform a DNS preflight followed by another hostname lookup. Keep Host and TLS identity intact, revalidate redirects, reject mixed private/public DNS answers, and keep Node-only transports out of browser bundles. Test a real blocked connection as well as mocked redirect flows.
 
 - Select platform-specific public HTTPS transports through package conditional exports so Node consumers receive DNS protection by default without Keymaster constructor injection. Verify both Node ESM/CommonJS and browser bundle resolution.
+
+- A Tor hidden-service hostname file survives container exits. Before publishing its onion for DIDComm or Lightning, prove that a bounded SOCKS connection reaches that hidden service; report reachability separately from Gatekeeper readiness and configured capabilities.

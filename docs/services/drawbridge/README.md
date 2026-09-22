@@ -82,7 +82,7 @@ Binds to `${ARCHON_BIND_ADDRESS}:${ARCHON_DRAWBRIDGE_PORT}` (default
 | `GET` | `/api/v1/version` | `{ version, commit }` (commit is `GIT_COMMIT` sliced to 7 chars; the sentinel string `"unknown"` is returned when `GIT_COMMIT` is unset). |
 | `GET` | `/api/v1/capabilities` | `{ didcomm, lightning, names }` — which optional services this node offers (each `true` iff its downstream URL is configured). Reflects node *intent* (config), not live health. See [Optional services](#optional-services). |
 | `GET` | `/api/v1/status` | `{ service: "drawbridge", upstream: GatekeeperStatus, uptime: <seconds>, memoryUsage: <node memUsage> }`. HTTP 502 if Gatekeeper is unreachable. |
-| `GET` | `/api/v1/didcomm-endpoint` | `{ endpoint: <string\|null> }` — this node's public DIDComm relay endpoint for `publish-didcomm` auto-discovery: `<ARCHON_DRAWBRIDGE_PUBLIC_HOST>/didcomm`, else the Tor onion fronting this node, else `null`. |
+| `GET` | `/api/v1/didcomm-endpoint` | `{ endpoint: <string\|null> }` — this node's public DIDComm relay endpoint for `publish-didcomm` auto-discovery: `<ARCHON_DRAWBRIDGE_PUBLIC_HOST>/didcomm`, else the Tor onion only when a SOCKS connection to its hidden service succeeds, else `null`. |
 | `POST` | `/api/v1/l402/pay` | Final step of L402 flow. Body: `{ paymentHash }`. Marks the matching macaroon as paid + returns the bearer credential. See [§4.4](#44-payment-completion). |
 | `GET` | `/invoice/:did` | Forwarded to lightning-mediator's `/invoice/:did`. Returns `{ paymentRequest, paymentHash, ... }`. Used by external zappers to pay any DID that has published a Lightning service. **501** if Lightning is disabled. |
 | `*` | `/didcomm/**` | Forwarded to the local DIDComm relay (path prefix `/didcomm` stripped). Carries the relay's own routes (mailbox `messages/*`, signed-`challenge`, egress `deliver`). Not paywalled — DIDComm authenticates with its own signed challenge. **501** if DIDComm is disabled. `application/didcomm-encrypted+json` bodies are captured as text and forwarded verbatim. |
@@ -91,6 +91,19 @@ Binds to `${ARCHON_BIND_ADDRESS}:${ARCHON_DRAWBRIDGE_PORT}` (default
 | `GET` | `/explorer/**` | Forwarded to the node's own DID explorer. **501** if the explorer is disabled. Unlike the routes above, the `/explorer` prefix is **not** stripped: the explorer's bundle is built with `base=/explorer/` and the app is mounted there, so the prefix has to survive the hop or its asset URLs point somewhere the upstream no longer answers. |
 | `*` | `/1.0/identifiers/**` | Forwarded verbatim to the Gatekeeper's standards-conformant DID resolution / dereferencing surface (`/1.0/identifiers/:did`, `/:did/data`, `/:did/registration`; see [Gatekeeper spec §2.6](../gatekeeper/README.md)). **Not paywalled** — public DID resolution for interop with universal resolvers, which do not speak L402. Proxied unchanged (no prefix stripped), so the Gatekeeper's resolution triple, raw dereferenced resources, and status/error shapes pass through intact. |
 | `GET` | `/metrics` | Prometheus exposition. |
+
+When using the bundled Tor onion, Drawbridge probes a SOCKS connection to
+its published hidden service every 60 seconds. The
+`drawbridge_public_onion_reachable` gauge is `1` when reachable, `0` when the
+hostname file exists but the onion cannot be reached, and `-1` when no hostname
+is published (or an explicit public host is configured). Changes between these
+states are logged. A `0` means DIDComm and Lightning endpoints already present
+in DID documents may be unreachable; restarting Tor with its existing keys
+restores the same onion. Check that `tor` is in `COMPOSE_PROFILES` and the Tor
+container is running. Each DIDComm endpoint discovery runs a fresh probe with
+a five-second timeout. The periodic check keeps the metric current between
+discovery requests. It does not alter
+`/ready` or the config-only `/capabilities` response.
 
 ### 2.1.1 Rate limiting on the public routes
 
@@ -552,6 +565,7 @@ shared with the reference TypeScript service.
 | `ARCHON_DIDCOMM_URL` | `http://localhost:4236` | Upstream DIDComm relay proxied at `/didcomm`. Set **empty** to disable DIDComm (capability `didcomm:false`, `/didcomm` → 501). *The bundled compose defaults this **empty** (DIDComm is opt-in, off by default); enabling requires the `didcomm` profile **and** setting this URL.* |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | empty | Public base URL this node is reachable at (clearnet host or Tor onion). Used by `/didcomm-endpoint` to advertise `<host>/didcomm`. |
 | `ARCHON_DRAWBRIDGE_TOR_HOSTNAME_FILE` | `/data/tor/hostname` | When `PUBLIC_HOST` is empty, `/didcomm-endpoint` falls back to the Tor onion read from this shared hidden-service hostname file. |
+| `ARCHON_DRAWBRIDGE_TOR_PROXY` | `tor:9050` | SOCKS5 proxy used to check that the published hidden service is reachable. Set to the Docker network address for bundled Tor. |
 | `ARCHON_REDIS_URL` | `redis://localhost:6379` | Macaroon/payment/rate-limit store. |
 | `ARCHON_ADMIN_API_KEY` | empty | Required for L402 admin routes. Empty → admin routes 403. |
 | `ARCHON_DRAWBRIDGE_L402_ENABLED` | `false` | When `false`, all proxy routes open. |
