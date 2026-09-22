@@ -10,6 +10,7 @@ stubs, so this file just imports the real framework normally (#1109).
 
 import sys
 from pathlib import Path
+from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -56,3 +57,32 @@ def test_unknown_id_dispatches_to_404():
 
 def test_wallet_not_found_dispatches_to_404():
     assert _client().get("/no-wallet").status_code == 404
+
+
+def test_did_repair_routes_accept_encoded_slashes(monkeypatch):
+    calls = []
+    report = {"did": "did:cid:alice", "issues": [], "canRepair": False}
+
+    async def check(identifier):
+        calls.append(("check", identifier))
+        return report
+
+    async def repair(identifier):
+        calls.append(("repair", identifier))
+        return {**report, "submitted": False}
+
+    monkeypatch.setattr(app_module.service, "check_did", check)
+    monkeypatch.setattr(app_module.service, "repair_did", repair)
+    app = FastAPI()
+    app.include_router(app_module.protected_api)
+    app.dependency_overrides[app_module.require_admin_key] = lambda: None
+    client = TestClient(app)
+    for identifier in ["Alice / backup", "Alice/check", "Alice/repair", "did:cid:alice"]:
+        path = f"/api/v1/did/{quote(identifier, safe='')}"
+        checked = client.get(f"{path}/check")
+        repaired = client.post(f"{path}/repair")
+        assert checked.status_code == 200
+        assert checked.json() == {"report": report}
+        assert repaired.status_code == 200
+        assert repaired.json() == {"report": {**report, "submitted": False}}
+        assert calls[-2:] == [("check", identifier), ("repair", identifier)]

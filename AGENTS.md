@@ -282,3 +282,5 @@ These rules apply to coding agents working in this repository.
 - DID document repair must use the wallet's actual operation-signing method, preserve valid permissions and unrelated components, and sign against the inspected predecessor. Normalize method IDs before constructing proofs; absolute IDs must not be prefixed with the DID again. Keep repair explicit, and maintain capabilityInvocation references during rotation in both Keymasters.
 
 - Keymaster CLI additions must also have MCP tool mappings in `packages/mcp-server/src/tools.ts`; run `tests/mcp-server` alongside CLI parity tests. Mark writes as mutating so read-only MCP configurations omit them.
+
+- Test encoded aliases through real HTTP routing, not only SDK URLs or direct handlers. FastAPI matches decoded paths, so endpoints supporting slash-containing aliases need a `path` converter and dispatch coverage.

@@ -636,3 +636,15 @@ describe('keymaster admin key startup check', () => {
     });
 });
 
+
+
+test.each(['Alice / backup', 'Alice/check', 'Alice/repair', 'did:cid:alice'])(
+    'DID repair routes preserve encoded identifier %s', async identifier => {
+        const { app, keymaster } = mount();
+        const path = `/did/${encodeURIComponent(identifier)}`;
+        expect((await request(app).get(`${path}/check`)).status).toBe(200);
+        expect((await request(app).post(`${path}/repair`)).status).toBe(200);
+        expect(keymaster.checkDID).toHaveBeenCalledWith(identifier);
+        expect(keymaster.repairDID).toHaveBeenCalledWith(identifier);
+    },
+);
