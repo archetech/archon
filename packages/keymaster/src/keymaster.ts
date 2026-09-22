@@ -212,6 +212,7 @@ const MULTIKEY_CONTEXT = 'https://w3id.org/security/multikey/v1';
 const ARCHON_SECP256K1_CRYPTOSUITE = 'archon-ecdsa-secp256k1-jcs-2026';
 
 export default class Keymaster implements KeymasterInterface {
+    private readonly fetchPublicHttps: typeof fetchPublicHttps;
     private passphrase: string;
     private gatekeeper: GatekeeperInterface;
     private db: WalletBase;
@@ -248,6 +249,7 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('options.passphrase');
         }
 
+        this.fetchPublicHttps = options.fetchPublicHttps || fetchPublicHttps;
         this.passphrase = options.passphrase;
         this.gatekeeper = options.gatekeeper;
         this.db = options.wallet;
@@ -1958,7 +1960,7 @@ export default class Keymaster implements KeymasterInterface {
         const timeout = setTimeout(() => controller.abort(), REMOTE_NAME_LOOKUP_TIMEOUT_MS);
 
         try {
-            const response = await fetchPublicHttps(url.toString(), { signal: controller.signal });
+            const response = await this.fetchPublicHttps(url.toString(), { signal: controller.signal });
 
             if (!response.ok) {
                 return null;
@@ -2466,7 +2468,7 @@ export default class Keymaster implements KeymasterInterface {
 
         for (const endpoint of this.addressApiEndpoints(domain, path)) {
             try {
-                const response = await fetchPublicHttps(endpoint, init);
+                const response = await this.fetchPublicHttps(endpoint, init);
 
                 if (response.ok) {
                     return response;
@@ -2495,7 +2497,7 @@ export default class Keymaster implements KeymasterInterface {
 
         for (const endpoint of this.addressApiEndpoints(domain, 'challenge')) {
             try {
-                const response = await fetchPublicHttps(endpoint);
+                const response = await this.fetchPublicHttps(endpoint);
 
                 if (!response.ok) {
                     lastError = await this.getResponseError(response, lastError);
@@ -2530,7 +2532,7 @@ export default class Keymaster implements KeymasterInterface {
     private async fetchAddressRelayAgent(domain: string): Promise<string | null> {
         for (const endpoint of this.addressApiEndpoints(domain, 'config')) {
             try {
-                const response = await fetchPublicHttps(endpoint);
+                const response = await this.fetchPublicHttps(endpoint);
 
                 if (!response.ok) {
                     continue;
@@ -2597,7 +2599,7 @@ export default class Keymaster implements KeymasterInterface {
     async importAddress(domain: string): Promise<Record<string, AddressInfo>> {
         const normalizedDomain = this.normalizeAddressDomain(domain);
         const current = await this.fetchIdInfo();
-        const response = await fetchPublicHttps(`https://${normalizedDomain}/.well-known/names`);
+        const response = await this.fetchPublicHttps(`https://${normalizedDomain}/.well-known/names`);
 
         if (!response.ok) {
             throw new KeymasterError(await this.getResponseError(response, 'Failed to import addresses'));
@@ -2641,7 +2643,7 @@ export default class Keymaster implements KeymasterInterface {
 
         let response: Response;
         try {
-            response = await fetchPublicHttps(`https://${parsed.domain}/.well-known/names/${encodeURIComponent(parsed.name)}`);
+            response = await this.fetchPublicHttps(`https://${parsed.domain}/.well-known/names/${encodeURIComponent(parsed.name)}`);
         }
         catch {
             return {

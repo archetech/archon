@@ -260,13 +260,11 @@ const MAX_REDIRECTS = 3;
 // fetch would simply have handed the response back.
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
-// Fetches over https, refusing any hop that is not https or that points at a
-// private target. Checking only the first URL is not enough: `fetch` follows
+// Portable HTTPS/hostname guard; Node hosts supply the DNS-pinned transport
+// from net-node. Checking only the first URL is not enough: `fetch` follows
 // redirects on its own, so a public host answering 302 with a Location of
 // http://169.254.169.254/ reaches the address the check exists to keep out.
-// The Lightning LUD-16 path already walks redirects this way for the scheme;
-// this adds the target check that path does not have.
-export async function fetchPublicHttps(target: string, init?: RequestInit): Promise<Response> {
+export async function fetchPublicHttps(target: string, init?: RequestInit, fetcher: typeof fetch = fetch): Promise<Response> {
     let current = target;
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -280,13 +278,14 @@ export async function fetchPublicHttps(target: string, init?: RequestInit): Prom
             throw new Error(`refusing request to private address ${url.hostname}`);
         }
 
-        const response = await fetch(current, { ...init, redirect: 'manual' });
+        const response = await fetcher(current, { ...init, redirect: 'manual' });
 
         if (!REDIRECT_STATUSES.has(response.status)) {
             return response;
         }
 
         const location = response.headers.get('location');
+        await response.body?.cancel();
 
         if (!location) {
             throw new Error(`redirect with no location from ${url.host}`);

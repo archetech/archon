@@ -1,3 +1,4 @@
+import { fetchPublicHttps } from '@didcid/common/net-node';
 import path from 'path';
 import CipherNode from '@didcid/cipher/node';
 import DrawbridgeClient from '@didcid/clients/drawbridge';
@@ -40,6 +41,7 @@ export async function createArchonRuntime(config: McpServerConfig): Promise<Arch
     });
     const cipher = new CipherNode();
     const keymaster = new Keymaster({
+        fetchPublicHttps,
         gatekeeper: node,
         wallet,
         cipher,

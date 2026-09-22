@@ -1,3 +1,4 @@
+import { fetchPublicHttps } from '@didcid/common/net-node';
 import { readFile } from 'fs/promises';
 import express from 'express';
 import cors from 'cors';
@@ -305,6 +306,7 @@ const server = app.listen(port, config.bindAddress, async () => {
     const defaultRegistry = config.defaultRegistry;
 
     keymaster = new Keymaster({
+        fetchPublicHttps,
         gatekeeper,
         wallet,
         cipher,

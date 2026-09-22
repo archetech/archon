@@ -156,9 +156,11 @@ Detected by `did.includes('@') && !did.startsWith('did:')`. Flow:
 
 1. Parse `<name>@<domain>`, construct
    `https://<domain>/.well-known/lnurlp/<urlencode(name)>`.
-2. Fetch the LNURL-pay endpoint JSON. Destinations are **not** filtered by
-   address; the scheme is what is enforced, and it is enforced across
-   redirects — each hop must be `https:`, at most 5 hops. Reject if
+2. Fetch the LNURL-pay endpoint JSON. Each hop must be public `https:`, at most
+   5 redirects. Literal private addresses and DNS answers containing any private
+   IPv4/IPv6 destination are rejected. DNS validation runs in the socket lookup,
+   so the connection uses those validated answers without a second resolution;
+   the original hostname remains the TLS and Host identity. Reject if
    `status === "ERROR"` or missing `callback`.
 3. Validate the callback URL is `https:`. It comes from the remote response,
    so it is attacker-influenced; the same per-hop rule applies when fetching

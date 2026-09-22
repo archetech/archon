@@ -14,6 +14,7 @@ const config = {
         utils: 'dist/esm/utils.js',
         errors: 'dist/esm/errors.js',
         net: 'dist/esm/net.js',
+        'net-node': 'dist/esm/net-node.js',
         'process-guards': 'dist/esm/process-guards.js'
     },
     output: {
