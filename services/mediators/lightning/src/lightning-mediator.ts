@@ -172,11 +172,10 @@ export function createApp(deps: AppDeps): Express {
         try {
             const onion = (await deps.readTorHostname()).trim();
             if (onion) {
-                await deps.probeOnion(onion, config.drawbridgePort, config.torProxy);
                 return `http://${onion}:${config.drawbridgePort}`;
             }
         } catch {
-            // A persisted hostname is not proof that its hidden service is up.
+            // File not available yet.
         }
 
         return undefined;
@@ -391,6 +390,17 @@ export function createApp(deps: AppDeps): Express {
                     error: 'Lightning public host is not available yet',
                 });
                 return;
+            }
+
+            // Only publication needs live Tor reachability. Invoice handling
+            // uses the hostname to recognize our own endpoint for local routing.
+            if (!config.drawbridgePublicHost && !config.publicHost) {
+                try {
+                    await deps.probeOnion(new URL(publicHost).hostname, config.drawbridgePort, config.torProxy);
+                } catch {
+                    res.status(503).json({ error: 'Lightning public onion is unreachable' });
+                    return;
+                }
             }
 
             await store.savePublishedLightning(did, invoiceKey);

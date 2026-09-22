@@ -6,6 +6,7 @@ type State = -1 | 0 | 1;
 export class OnionReachability {
     private state: State = -1;
     private hostname: string | null = null;
+    private checkedAt = 0;
     private inFlight: Promise<void> | undefined;
     private timer: ReturnType<typeof setInterval> | undefined;
 
@@ -51,11 +52,13 @@ export class OnionReachability {
         }
         this.state = state;
         this.hostname = hostname;
+        this.checkedAt = Date.now();
         this.options.onState(state);
     }
 
     async verifiedHostname(): Promise<string | null> {
-        await this.refresh();
+        // Public discovery requests cannot each start an independent Tor circuit.
+        if (!this.checkedAt || Date.now() - this.checkedAt >= 30_000) await this.refresh();
         return this.state === 1 ? this.hostname : null;
     }
 

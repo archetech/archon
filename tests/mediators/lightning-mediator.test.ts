@@ -782,6 +782,20 @@ describe('zap to a DID', () => {
         expect(socksSpy).not.toHaveBeenCalled();
     });
 
+    it('uses the saved onion only for local invoice routing, without probing Tor', async () => {
+        const onion = `${'a'.repeat(56)}.onion`;
+        jest.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({ paymentRequest: 'lnbc1did' }));
+        const probe = jest.fn<any>().mockRejectedValue(new Error('Tor is down'));
+        const { app } = build({
+            ...withService(`http://${onion}/invoice`),
+            readTorHostname: async () => onion,
+            probeOnion: probe,
+        });
+        const response = await zap(app, { adminKey: 'k', did: 'did:cid:bob', amount: 100 });
+        expect(response.status).toBe(200);
+        expect(probe).not.toHaveBeenCalled();
+    });
+
     it('sends a genuine onion endpoint through the SOCKS proxy, not the built-in fetch', async () => {
         // socksDispatcher is built on undici >= 7 and Node's own fetch hands it
         // a v6-era handler it rejects in milliseconds -- which reads like an

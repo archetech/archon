@@ -64,6 +64,12 @@ public endpoint (`/invoice/:did`).
 | `POST` | `/api/v1/lightning/payment` | yes | `{ invoiceKey, paymentHash }` → `LightningPaymentStatus & { paymentHash }`. |
 | `POST` | `/api/v1/lightning/payments` | yes | `{ adminKey }` → `{ payments: LnbitsPayment[] }`. |
 | `POST` | `/api/v1/lightning/publish` | yes | `{ did, invoiceKey }` — stores the mapping via `store.savePublishedLightning(did, invoiceKey)`. Returns `{ ok: true, publicHost }`. Does NOT modify the DID document (the DID-document service entry is added client-side by Keymaster). Returns HTTP 503 if `publicHost` is unavailable, including when its persisted Tor hostname cannot be reached through the SOCKS proxy. |
+
+The mediator checks the fallback onion only while publishing a new Lightning
+endpoint. When paying an invoice, it may read the hostname file to recognize
+its own onion and route internally; that routing check does not probe Tor.
+Drawbridge separately monitors the shared public ingress and checks it before
+returning a DIDComm endpoint. Neither service waits on the other to check Tor.
 | `DELETE` | `/api/v1/lightning/publish/:did` | yes | Removes the mapping. |
 | `POST` | `/api/v1/lightning/zap` | yes | `{ adminKey, did, amount, memo? }`. Resolves recipient (DID or LUD-16 address), requests an invoice, and pays it via LNbits. See [§4](#4-zap-flow). |
 | `POST` | `/api/v1/l402/invoice` | yes | `{ amountSat, memo? }` — creates a CLN invoice for L402. Returns the full `LightningInvoice` shape `{ paymentRequest, paymentHash, amountSat, expiry, label }`. |

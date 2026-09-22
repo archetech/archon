@@ -100,9 +100,10 @@ is published (or an explicit public host is configured). Changes between these
 states are logged. A `0` means DIDComm and Lightning endpoints already present
 in DID documents may be unreachable; restarting Tor with its existing keys
 restores the same onion. Check that `tor` is in `COMPOSE_PROFILES` and the Tor
-container is running. Each DIDComm endpoint discovery runs a fresh probe with
-a five-second timeout. The periodic check keeps the metric current between
-discovery requests. It does not alter
+container is running. DIDComm endpoint discovery reuses a result for at most
+30 seconds so public requests cannot trigger an unbounded number of Tor circuits.
+The probe has a five-second timeout, and the periodic check keeps the metric
+current between discovery requests. It does not alter
 `/ready` or the config-only `/capabilities` response.
 
 ### 2.1.1 Rate limiting on the public routes

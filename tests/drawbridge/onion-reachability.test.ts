@@ -17,6 +17,8 @@ it('reports a stale hostname as down and recovers when Tor becomes reachable', a
     expect(onState).toHaveBeenLastCalledWith(0);
     expect(onTransition).toHaveBeenCalledWith(0, expect.any(Error));
     expect(probe).toHaveBeenCalledWith(onion, 4222, 'tor:9050');
+    await monitor.verifiedHostname();
+    expect(probe).toHaveBeenCalledTimes(1);
 
     await monitor.refresh();
     expect(await monitor.verifiedHostname()).toBe(onion);
