@@ -300,3 +300,5 @@ These rules apply to coding agents working in this repository.
 - Select platform-specific public HTTPS transports through package conditional exports so Node consumers receive DNS protection by default without Keymaster constructor injection. Verify both Node ESM/CommonJS and browser bundle resolution.
 
 - A Tor hidden-service hostname file survives container exits. Before publishing its onion for DIDComm or Lightning, prove that a bounded SOCKS connection reaches that hidden service; report reachability separately from Gatekeeper readiness and configured capabilities.
+
+- Current-suite operation examples in `docs/scheme.md` must have their proof signature and canonical operation CID checked against Gatekeeper; never relabel a legacy proof or edit a derived DID without recomputing the signed bytes.
