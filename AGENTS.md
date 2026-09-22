@@ -280,3 +280,5 @@ These rules apply to coding agents working in this repository.
 - Bind decoded proof receipt headers to authoritative chain facts and require complete chain metadata in the final convergence theorem. The signed bridge must check ordinal/registration agreement; do not revive incomplete-only protocol instances or weaken the authorization binding.
 
 - DID document repair must use the wallet's actual operation-signing method, preserve valid permissions and unrelated components, and sign against the inspected predecessor. Normalize method IDs before constructing proofs; absolute IDs must not be prefixed with the DID again. Keep repair explicit, and maintain capabilityInvocation references during rotation in both Keymasters.
+
+- Keymaster CLI additions must also have MCP tool mappings in `packages/mcp-server/src/tools.ts`; run `tests/mcp-server` alongside CLI parity tests. Mark writes as mutating so read-only MCP configurations omit them.

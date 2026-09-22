@@ -66,6 +66,11 @@ Use `"encoding": "utf8"` when passing plain text directly. This inline shape is 
 
 Destructive tools require `"confirm": true`, secret-revealing tools require `"reveal": true`, and Lightning payment/broadcast tools require `"confirmPayment": true`.
 
+Use `archon_check_did` with `{ "did": "Alice" }` to inspect a DID or wallet alias.
+Apply a supported repair explicitly with `archon_repair_did` and
+`{ "did": "Alice", "confirm": true }`. Inspection never submits an operation;
+repair reports `submitted` separately from `confirmed`.
+
 Set `ARCHON_MCP_READ_ONLY=true` to omit mutating tools from the advertised MCP tool list.
 
 ### Structured inputs
