@@ -28,6 +28,16 @@ describe('DrawbridgeClient', () => {
         expect(client.url).toBe(DrawbridgeURL);
     });
 
+    it('sends the configured admin key on upstream reads and writes', async () => {
+        const upstream = nock(DrawbridgeURL, { reqheaders: { 'X-Archon-Admin-Key': 'node-secret' } })
+            .get('/api/v1/registries').reply(200, ['local'])
+            .post('/api/v1/did', { type: 'create' }).reply(200, 'did:cid:new');
+        const client = await DrawbridgeClient.create({ url: DrawbridgeURL, apiKey: 'node-secret' });
+        expect(await client.listRegistries()).toEqual(['local']);
+        expect(await client.createDID({ type: 'create' })).toBe('did:cid:new');
+        expect(upstream.isDone()).toBe(true);
+    });
+
     it('returns lightning support status and treats failures as unsupported', async () => {
         nock(DrawbridgeURL)
             .get(Endpoints.lightning.supported)

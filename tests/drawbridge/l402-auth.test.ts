@@ -183,6 +183,52 @@ describe('Drawbridge L402 mediator integration', () => {
         mockGetPriceForOperation.mockReturnValue(undefined);
     });
 
+    it('exempts a matching admin key without invoices, payment verification, or usage charges', async () => {
+        const store = createMockStore();
+        const onAdminBypass = jest.fn();
+        const onChallenge = jest.fn();
+        const options = { ...createOptions(store), adminApiKey: 'node-secret', hooks: { onAdminBypass, onChallenge } };
+        const next = jest.fn();
+        const res = createMockResponse();
+        await createL402Middleware(options)({
+            method: 'POST', path: '/api/v1/did',
+            headers: { 'x-archon-admin-key': 'node-secret' },
+        } as any, res as any, next);
+        expect(next).toHaveBeenCalledTimes(1);
+        expect(onAdminBypass).toHaveBeenCalledTimes(1);
+        expect(onChallenge).not.toHaveBeenCalled();
+        expect(mockCreateL402Invoice).not.toHaveBeenCalled();
+        expect(mockVerifyMacaroon).not.toHaveBeenCalled();
+        expect(store.recordRequest).not.toHaveBeenCalled();
+        expect(store.saveMacaroon).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['node-secret', undefined],
+        ['node-secret', ''],
+        ['node-secret', 'x'],
+        ['node-secret', 'wrongsecret'],
+        ['node-secret', 'é'.repeat(11)],
+        ['', 'node-secret'],
+        ['', ''],
+    ])('keeps L402 challenges when configured key %p does not authenticate header %p', async (adminApiKey, header) => {
+        const options = { ...createOptions(createMockStore()), adminApiKey, hooks: { onAdminBypass: jest.fn() } };
+        mockCreateL402Invoice.mockResolvedValue({
+            paymentRequest: 'lnbc1challenge', paymentHash: 'a'.repeat(64), amountSat: 10,
+            expiry: 3600, label: 'invoice-1',
+        });
+        mockSavePendingL402Invoice.mockResolvedValue({ ok: true });
+        const res = createMockResponse();
+        const next = jest.fn();
+        await createL402Middleware(options)({
+            method: 'POST', path: '/api/v1/did', headers: { 'x-archon-admin-key': header }, ip: '127.0.0.1',
+        } as any, res as any, next);
+        expect(res.statusCode).toBe(402);
+        expect(next).not.toHaveBeenCalled();
+        expect(options.hooks.onAdminBypass).not.toHaveBeenCalled();
+        expect(mockCreateL402Invoice).toHaveBeenCalledTimes(1);
+    });
+
     it('issues a challenge and saves pending invoice state through lightning-mediator', async () => {
         const store = createMockStore();
         const options = createOptions(store);
@@ -226,11 +272,12 @@ describe('Drawbridge L402 mediator integration', () => {
 
     it('skips L402 for unprotected routes', async () => {
         const store = createMockStore();
-        const middleware = createL402Middleware(createOptions(store));
+        const onAdminBypass = jest.fn();
+        const middleware = createL402Middleware({ ...createOptions(store), adminApiKey: 'node-secret', hooks: { onAdminBypass } });
         const req = {
             method: 'GET',
             path: '/api/v1/status',
-            headers: {},
+            headers: { 'x-archon-admin-key': 'node-secret' },
         } as any;
         const res = createMockResponse();
         const next = jest.fn<any>();
@@ -239,6 +286,7 @@ describe('Drawbridge L402 mediator integration', () => {
 
         expect(next).toHaveBeenCalledTimes(1);
         expect(mockCreateL402Invoice).not.toHaveBeenCalled();
+        expect(onAdminBypass).not.toHaveBeenCalled();
     });
 
     it('skips L402 when subscription auth already succeeded', async () => {
@@ -524,9 +572,9 @@ describe('Drawbridge L402 mediator integration', () => {
         });
     });
 
-    it('passes authenticated requests through and increments usage on successful finish', async () => {
+    it.each([undefined, 'wrong-key'])('accepts paid requests with admin header %p and records usage', async adminHeader => {
         const store = createMockStore();
-        const options = createOptions(store);
+        const options = { ...createOptions(store), adminApiKey: 'node-secret' };
         const successHook = jest.fn<any>();
         options.hooks = { onMacaroonVerification: successHook };
         const middleware = createL402Middleware(options);
@@ -537,6 +585,7 @@ describe('Drawbridge L402 mediator integration', () => {
             headers: {
                 authorization: 'L402 serialized-macaroon:proof',
                 'x-did': 'did:test:alice',
+                'x-archon-admin-key': adminHeader,
             },
             ip: '127.0.0.1',
         } as any;

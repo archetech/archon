@@ -153,8 +153,9 @@ Constant-time comparison is used.
 
 ### 2.3 Authenticated proxy routes
 
-The following all require auth (subscription header **or** valid L402
-bearer). On 402 challenge, the response is HTTP 402 with a
+When L402 is enabled, protected routes require a matching admin key, a valid
+L402 bearer, or the explicitly enabled subscription stub. Public read exceptions
+are listed in [§3.2](#32-bypass-routes). On 402 challenge, the response is HTTP 402 with a
 `WWW-Authenticate: L402 macaroon="<base64>", invoice="<bolt11>"` header
 and a JSON body with the same fields.
 
@@ -244,8 +245,32 @@ The label does NOT include the `/api/v1` prefix.
 
 ## 3. Authentication
 
-By default, protected routes are guarded by **L402 auth** alone: the
-L402 middleware looks for an `Authorization: L402 <macaroon>:<preimage>`
+Protected routes first accept a nonempty `X-Archon-Admin-Key` matching
+Drawbridge’s `ARCHON_ADMIN_API_KEY`, using the same constant-time comparison
+as its admin routes. This exemption grants no new administrative capability:
+holders of this key already administer the paywall. Exempt requests create no
+invoice and consume no paid quota. They increment
+`drawbridge_l402_admin_bypasses_total`; public bypass routes do not.
+
+Both Keymaster service runtimes can send an explicitly configured upstream
+credential. To combine server-side DIDComm and L402 with the bundled Compose:
+
+```dotenv
+ARCHON_KEYMASTER_GATEKEEPER_URL=http://drawbridge:4222
+ARCHON_KEYMASTER_GATEKEEPER_API_KEY=${ARCHON_ADMIN_API_KEY}
+```
+
+Compose maps the latter to `ARCHON_GATEKEEPER_API_KEY` inside Keymaster. Outside
+Compose, set `ARCHON_GATEKEEPER_URL` and `ARCHON_GATEKEEPER_API_KEY` directly.
+The upstream key defaults to empty; Keymaster never automatically forwards its
+own admin key to a potentially remote upstream. Configure this credential only
+for a trusted endpoint. Browser wallets do not receive the exemption automatically.
+
+An empty server key never enables exemption. A missing or incorrect header
+continues through the ordinary payment flow, including accepting a valid L402
+bearer; it does not cause an admin-auth rejection on proxy routes.
+
+For other requests, the L402 middleware looks for an `Authorization: L402 <macaroon>:<preimage>`
 header. If valid, the request proceeds. Otherwise it issues a 402
 challenge.
 
@@ -560,6 +585,7 @@ SIGTERM/SIGINT → close HTTP listener → disconnect Redis → exit 0.
 | --- | --- | --- |
 | `drawbridge_http_requests_total` | counter | `method`, `route`, `status` |
 | `drawbridge_http_request_duration_seconds` | histogram (buckets: `0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5`) | `method`, `route` |
+| `drawbridge_l402_admin_bypasses_total` | counter | none |
 | `drawbridge_l402_challenges_total` | counter | `did_known` (`"true"`/`"false"`) |
 | `drawbridge_l402_verifications_total` | counter | `result` (`"success"`/`"failure"`) |
 | `drawbridge_version_info` | gauge | `version`, `commit` |
@@ -590,7 +616,8 @@ No log lines are contractual for downstream consumers.
 - Image: `ghcr.io/archetech/drawbridge`
 - Compose: [docker/compose/drawbridge.yml](../../../docker/compose/drawbridge.yml)
 
-No dedicated unit tests. Validation is end-to-end via:
+Unit and router tests live in `tests/drawbridge/`, including internal admin-key
+exemption, payment fallback, and admin-route rejection. Additional validation:
 
 - The CLI test suite (which exercises a Drawbridge in front of the
   Gatekeeper container during PR builds).

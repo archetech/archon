@@ -294,6 +294,7 @@ const server = app.listen(port, config.bindAddress, async () => {
 
     await gatekeeper.connect({
         url: config.gatekeeperURL,
+        apiKey: config.gatekeeperApiKey,
         waitUntilReady: true,
         intervalSeconds: 5,
         chatty: true,

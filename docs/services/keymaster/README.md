@@ -1170,6 +1170,8 @@ labels.
 | --- | --- | --- |
 | `ARCHON_KEYMASTER_PORT` | `4226` | HTTP listen port. |
 | `ARCHON_BIND_ADDRESS` | `0.0.0.0` | HTTP bind address. |
+| `ARCHON_GATEKEEPER_API_KEY` | unset | Optional `X-Archon-Admin-Key` sent to the configured trusted upstream; a matching Drawbridge key bypasses L402. Never defaults to the local admin key. |
+| `ARCHON_KEYMASTER_GATEKEEPER_API_KEY` | unset | Compose-only mapping to `ARCHON_GATEKEEPER_API_KEY`; set to `${ARCHON_ADMIN_API_KEY}` only when the upstream is your trusted Drawbridge. |
 | `ARCHON_GATEKEEPER_URL` | `http://localhost:4224` | Gatekeeper base URL. |
 | `ARCHON_KEYMASTER_GATEKEEPER_URL` | unset | Compose-only override for Keymaster's internal `ARCHON_GATEKEEPER_URL`; set to `http://drawbridge:4222` when server-side DIDComm should use Drawbridge's `/didcomm` gateway. |
 | `ARCHON_NODE_ID` | empty | Required. Name of the canonical agent ID this server provisions on startup. |

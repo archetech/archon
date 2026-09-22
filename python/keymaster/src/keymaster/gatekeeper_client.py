@@ -7,10 +7,13 @@ import httpx
 
 
 class GatekeeperClient:
-    def __init__(self, base_url: str):
+    def __init__(self, base_url: str, api_key: str | None = None):
         api = base_url.rstrip("/")
         self.url = api
-        self._client = httpx.AsyncClient(base_url=f"{api}/api/v1", timeout=30.0)
+        self._client = httpx.AsyncClient(
+            base_url=f"{api}/api/v1", timeout=30.0,
+            headers={"X-Archon-Admin-Key": api_key} if api_key else {},
+        )
 
     async def close(self) -> None:
         await self._client.aclose()

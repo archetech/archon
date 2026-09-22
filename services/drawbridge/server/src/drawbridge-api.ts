@@ -40,6 +40,11 @@ const l402ChallengesTotal = new Counter({
     labelNames: ['did_known'],
 });
 
+const l402AdminBypassesTotal = new Counter({
+    name: 'drawbridge_l402_admin_bypasses_total',
+    help: 'Total protected requests exempted from L402 by a valid admin key',
+});
+
 const l402VerificationsTotal = new Counter({
     name: 'drawbridge_l402_verifications_total',
     help: 'Total L402 macaroon verifications',
@@ -354,6 +359,7 @@ async function main() {
 
     // Initialize L402 options
     const l402Options: L402Options = {
+        adminApiKey: config.adminApiKey,
         rootSecret: config.macaroonSecret,
         location: `http://localhost:${config.port}`,
         lightningMediatorUrl: config.lightningMediatorURL,
@@ -367,6 +373,7 @@ async function main() {
         store,
         pricing: loadPricingFromEnv(),
         hooks: {
+            onAdminBypass: () => l402AdminBypassesTotal.inc(),
             onChallenge: (didKnown) => l402ChallengesTotal.inc({ did_known: String(didKnown) }),
             onMacaroonVerification: (result) => l402VerificationsTotal.inc({ result }),
         },
