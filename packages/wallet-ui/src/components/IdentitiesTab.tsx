@@ -7,6 +7,7 @@ import { Badge, Create, DriveFileRenameOutline, Image, Login, LoopOutlined, Perm
 import PageHeader from "./layout/PageHeader";
 import Section from "./layout/Section";
 import EmptyState from "./layout/EmptyState";
+import DIDRepairDialog from "./DIDRepairDialog";
 import ActionMenu from "./layout/ActionMenu";
 import { useWalletData } from "../hooks/useWalletData";
 import { useIsDarkMode } from "../hooks/useIsTabletUp";
@@ -83,6 +84,15 @@ function IdentitiesTab() {
     const [avatarCandidateLoading, setAvatarCandidateLoading] = useState<boolean>(false);
     const [avatarCandidateError, setAvatarCandidateError] = useState<string>("");
     const { keymaster, gatekeeperUrl } = useWalletContext();
+    const [repairOpen, setRepairOpen] = useState(false);
+    const checkDID = useCallback(async (did: string) => {
+        if (!keymaster) throw new Error('Wallet is unavailable');
+        return keymaster.checkDID(did);
+    }, [keymaster]);
+    const repairDID = useCallback(async (did: string) => {
+        if (!keymaster) throw new Error('Wallet is unavailable');
+        return keymaster.repairDID(did);
+    }, [keymaster]);
     const darkMode = useIsDarkMode();
     const { setError, setSuccess } = useSnackbar();
     const { refreshAll, resetCurrentID } = useWalletData();
@@ -1016,6 +1026,8 @@ function IdentitiesTab() {
                 </DialogActions>
             </Dialog>
 
+            {repairOpen && keymaster && currentDID && <DIDRepairDialog did={currentDID} checkDID={checkDID} repairDID={repairDID}
+                onClose={() => setRepairOpen(false)} onRepaired={refreshCurrentIdDocs} />}
             <Box sx={{ width: '100%' }}>
                 <PageHeader
                     title="Identities"
@@ -1030,6 +1042,7 @@ function IdentitiesTab() {
                                         { label: "Rename", onClick: handleRenameId, icon: <DriveFileRenameOutline fontSize="small" /> },
                                         { label: "Backup", onClick: backupId, icon: <SaveAltOutlined fontSize="small" /> },
                                         { label: "Recover", onClick: handleRecoverId, icon: <RestoreOutlined fontSize="small" /> },
+                                        { label: "Check / Repair DID", onClick: () => setRepairOpen(true) },
                                         { label: "Rotate keys", onClick: rotateKeys, icon: <LoopOutlined fontSize="small" /> },
                                         { label: "Migrate registry", onClick: () => setMigrateOpen(true), icon: <SwapHorizOutlined fontSize="small" /> },
                                         { label: "Remove identity", onClick: handleRemoveId, icon: <DeleteOutline fontSize="small" />, destructive: true },

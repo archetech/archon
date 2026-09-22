@@ -1,3 +1,4 @@
+import DIDRepairDialog from '@didcid/wallet-ui/did-repair';
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
     Alert,
@@ -182,6 +183,9 @@ function formatAddedDate(value) {
 }
 
 function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning, hasDidComm, serverUrl, onServerUrlChange }) {
+    const [repairTarget, setRepairTarget] = useState(null);
+    const checkDID = useCallback(did => keymaster.checkDID(did), [keymaster]);
+    const repairDID = useCallback(did => keymaster.repairDID(did), [keymaster]);
     const [tab, setTab] = useState(null);
     const [currentId, setCurrentId] = useState('');
     const [saveId, setSaveId] = useState('');
@@ -5068,6 +5072,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             </Button>
                                         </Grid>
                                         <Grid item>
+                                            <Button variant="contained" onClick={() => setRepairTarget(currentDID)} disabled={!currentDID}>
+                                                Check / Repair DID
+                                            </Button>
+                                        </Grid>
+                                        <Grid item>
                                             <Button variant="contained" color="primary" onClick={rotateKeys}>
                                                 Rotate keys
                                             </Button>
@@ -5449,6 +5458,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                     }
                     {tab === 'aliases' &&
                         <Box>
+                            <Button sx={{ mb: 2 }} onClick={() => setRepairTarget(aliasDID.trim() || alias.trim() || selectedName)}
+                                disabled={!aliasDID.trim() && !alias.trim() && !selectedName}>Check / Repair DID</Button>
                             <TableContainer component={Paper} style={{ maxHeight: '400px', overflow: 'auto' }}>
                                 <Table stickyHeader style={{ width: '1000px', tableLayout: 'fixed' }}>
                                     <colgroup>
@@ -8517,6 +8528,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                             </Typography>
                         </Box>
                     }
+                    {repairTarget && <DIDRepairDialog did={repairTarget} checkDID={checkDID} repairDID={repairDID}
+                        onClose={() => setRepairTarget(null)} onRepaired={refreshResolvedDocs} />}
                     <LoginDialog
                         open={editLoginOpen}
                         onClose={() => setEditLoginOpen(false)}

@@ -538,8 +538,26 @@ keymaster repair-did Alice
 `check-did` performs no document writes. Direct DID inspection works without
 owning that DID or having a wallet; names and aliases need the wallet that
 holds them. Both TypeScript and Python Keymaster expose the same feature
-(`checkDID`/`repairDID`, `check_did`/`repair_did`). Wallet and demo-client buttons
-are the remaining UI work in #1258.
+(`checkDID`/`repairDID`, `check_did`/`repair_did`).
+
+Wallets expose **Check / Repair DID** in the identity actions menu and in the
+DID viewer. In the standalone clients, use the button under **Identities**,
+or enter any agent/asset DID or alias under **Aliases** and choose
+**Check / Repair DID**. All surfaces use the same dialog:
+
+1. Opening it checks the latest document without submitting an operation.
+2. Review the findings and proposed component replacements. Healthy documents
+   need no repair; unavailable repairs include an explanation.
+3. For an asset with a controller problem, **Check controller DID** inspects
+   that agent separately. It does not repair either DID automatically.
+4. **Repair DID** explicitly submits the supported repair. The result separates
+   acceptance from confirmation; an anchored-registry update may still await
+   confirmation. Use **Check DID** again to refresh the status.
+
+Changing the target clears its old report and requires a fresh check before
+repair. A failed submission also requires another check. The dialog always
+inspects the latest state even if the underlying viewer displays an older
+version.
 
 The report contains `did`, `type`, `versionId`, `confirmed`, `issues`,
 `changes`, and `canRepair`, with a `reason` when signing authority or
