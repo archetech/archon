@@ -18,7 +18,7 @@ def _build_wallet_store() -> JsonWalletStore | RedisWalletStore:
 
 service = KeymasterService(
     settings,
-    GatekeeperClient(settings.gatekeeper_url),
+    GatekeeperClient(settings.gatekeeper_url, api_key=settings.gatekeeper_api_key),
     _build_wallet_store(),
 )
 

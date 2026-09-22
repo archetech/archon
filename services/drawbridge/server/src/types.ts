@@ -127,6 +127,7 @@ export interface OperationPricingConfig {
 
 // L402 middleware configuration
 export interface L402Options {
+    adminApiKey?: string;
     rootSecret: string;
     location: string;
     lightningMediatorUrl: string;
@@ -140,6 +141,7 @@ export interface L402Options {
     store: DrawbridgeStore;
     pricing?: OperationPricingConfig;
     hooks?: {
+        onAdminBypass?: () => void;
         onChallenge?: (didKnown: boolean) => void;
         onMacaroonVerification?: (result: 'success' | 'failure') => void;
     };

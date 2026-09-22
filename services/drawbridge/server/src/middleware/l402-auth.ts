@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import { randomBytes } from 'crypto';
+import { ARCHON_ADMIN_HEADER, matchesAdminKey } from '../v1-admin.js';
 import { createMacaroon, verifyMacaroon, extractCaveats, getMacaroonId, verifyPreimage } from '../macaroon.js';
 import { checkLimit, checkAndRecordRequest } from '../rate-limiter.js';
 import {
@@ -63,6 +64,12 @@ export function createL402Middleware(options: L402Options): RequestHandler {
         const path = req.path;
 
         if (!isProtectedRoute(req.method, path)) {
+            next();
+            return;
+        }
+
+        if (matchesAdminKey(req.headers[ARCHON_ADMIN_HEADER], options.adminApiKey)) {
+            options.hooks?.onAdminBypass?.();
             next();
             return;
         }

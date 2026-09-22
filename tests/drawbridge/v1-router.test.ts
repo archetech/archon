@@ -3,6 +3,8 @@ import express from 'express';
 import request from 'supertest';
 
 import { createV1Router } from '../../services/drawbridge/server/src/v1-router.ts';
+import { createAuthMiddleware } from '../../services/drawbridge/server/src/middleware/auth.ts';
+import type { L402Options } from '../../services/drawbridge/server/src/types.ts';
 import defaultConfig from '../../services/drawbridge/server/src/config.ts';
 
 type Method = 'GET' | 'POST';
@@ -36,6 +38,7 @@ function createMockGatekeeper() {
 function mount(overrides: {
     config?: Record<string, unknown>;
     didCommEndpoint?: string | null;
+    l402Options?: L402Options;
 } = {}) {
     const gatekeeper = createMockGatekeeper();
     const config = { ...defaultConfig, adminApiKey: adminKey, ...overrides.config };
@@ -53,8 +56,8 @@ function mount(overrides: {
         gatekeeper: gatekeeper as any,
         config: config as any,
         logger: { error: jest.fn(), info: jest.fn() } as any,
-        l402Options: {} as any,
-        authMiddleware: [],
+        l402Options: overrides.l402Options || {} as any,
+        authMiddleware: overrides.l402Options ? createAuthMiddleware(overrides.l402Options) : [],
         getServiceVersion: () => '9.9.9',
         serviceCommit: 'abc1234',
         resolveDidCommEndpoint: async () => ('didCommEndpoint' in overrides
@@ -397,5 +400,31 @@ describe('drawbridge v1 lightning proxy', () => {
 
         expect(response.status).toBe(502);
         expect(response.body).toEqual({ error: 'Upstream lightning mediator error' });
+    });
+});
+
+// Exercise the production router and auth chain; successful internal requests
+// must not need a Lightning mediator or Redis payment store.
+describe('Drawbridge internal L402 exemption', () => {
+    it.each([
+        ['post', '/api/v1/did', 'createDID', { type: 'create' }, 'did:cid:new'],
+        ['post', '/api/v1/ipfs/json', 'addJSON', { hello: 'world' }, 'cid-json'],
+        ['get', '/api/v1/registries', 'listRegistries', undefined, ['local']],
+    ] as const)('allows an authenticated internal %s %s', async (method, path, upstream, body, expected) => {
+        const onAdminBypass = jest.fn();
+        const { app, gatekeeper } = mount({ l402Options: {
+            adminApiKey: adminKey, hooks: { onAdminBypass },
+            rootSecret: 'test-secret', location: 'http://drawbridge.test',
+            lightningMediatorUrl: 'http://unavailable.test',
+            defaults: { amountSat: 10, expirySeconds: 3600, scopes: [] },
+            rateLimitRequests: 100, rateLimitWindowSeconds: 60,
+            store: {} as L402Options['store'],
+        } });
+        const call = request(app)[method](path).set('X-Archon-Admin-Key', adminKey);
+        const response = await (body ? call.send(body) : call);
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual(expected);
+        expect(gatekeeper[upstream]).toHaveBeenCalledTimes(1);
+        expect(onAdminBypass).toHaveBeenCalledTimes(1);
     });
 });
