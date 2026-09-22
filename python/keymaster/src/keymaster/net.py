@@ -6,13 +6,15 @@ unless the target is checked: the classic payload is a cloud metadata address
 such as ``169.254.169.254``, reachable from inside a container and happy to
 hand out credentials (#252).
 
-Mirrors ``packages/keymaster/src/net.ts``. Both ports served this surface with
+Mirrors ``packages/common/src/net.ts`` and its Node transport. Both ports served this surface with
 no target check at all on the public paths, so they are fixed together.
 """
 
 from __future__ import annotations
 
+import asyncio
 import ipaddress
+import socket
 from typing import Any, Optional
 
 import httpx
@@ -138,6 +140,19 @@ def is_private_hostname(hostname: str) -> bool:
     return any(host.endswith(suffix) for suffix in BLOCKED_SUFFIXES)
 
 
+async def resolve_public_addresses(host: str, port: int, timeout: float) -> list[str]:
+    # getaddrinfo follows CNAMEs and returns final IPv4/IPv6 destinations. Reject
+    # mixed public/private answers rather than relying on address-selection order.
+    answers = await asyncio.wait_for(
+        asyncio.get_running_loop().getaddrinfo(host, port, type=socket.SOCK_STREAM),
+        timeout=timeout,
+    )
+    addresses = list(dict.fromkeys(answer[4][0] for answer in answers))
+    if not addresses or any(is_private_hostname(address) for address in addresses):
+        raise ValueError(f"refusing DNS resolution to private address for {host}")
+    return addresses
+
+
 async def fetch_public_https(
     method: str,
     url: str,
@@ -145,35 +160,44 @@ async def fetch_public_https(
     json_body: Any | None = None,
     timeout: float = 30.0,
 ) -> httpx.Response:
-    """Fetch over https, refusing any hop that is not https or is private.
-
-    Checking only the first URL is not enough: httpx follows redirects when
-    asked to, so a public host answering 302 with a Location of
-    ``http://169.254.169.254/`` reaches the address the check exists to keep
-    out. Every hop is therefore re-checked.
-    """
+    """Validate every hop and connect to a validated IP, retaining Host/TLS identity."""
     current = url
+    for _ in range(MAX_REDIRECTS + 1):
+        parsed = httpx.URL(current)
+        if parsed.scheme != "https":
+            raise ValueError(f"refusing non-https request to {parsed.host}")
+        if is_private_hostname(parsed.host):
+            raise ValueError(f"refusing request to private address {parsed.host}")
 
-    async with httpx.AsyncClient(timeout=timeout, follow_redirects=False) as client:
-        for _ in range(MAX_REDIRECTS + 1):
-            parsed = httpx.URL(current)
-
-            if parsed.scheme != "https":
-                raise ValueError(f"refusing non-https request to {parsed.host}")
-
-            if is_private_hostname(parsed.host):
-                raise ValueError(f"refusing request to private address {parsed.host}")
-
-            response = await client.request(method, current, headers=headers, json=json_body)
-
-            if response.status_code not in REDIRECT_STATUSES:
-                return response
-
-            location = response.headers.get("location")
-
-            if not location:
-                raise ValueError(f"redirect with no location from {parsed.host}")
-
-            current = str(parsed.join(location))
+        deadline = asyncio.get_running_loop().time() + timeout
+        addresses = await resolve_public_addresses(parsed.host, parsed.port or 443, timeout)
+        request_headers = httpx.Headers(headers)
+        request_headers["Host"] = httpx.Request(method, parsed).headers["Host"]
+        # A fresh client prevents pooling TLS sessions/cookies by the substituted
+        # IP across distinct hostnames. Proxies must not re-resolve the hostname.
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False, trust_env=False) as client:
+            for index, address in enumerate(addresses):
+                try:
+                    remaining = deadline - asyncio.get_running_loop().time()
+                    if remaining <= 0:
+                        raise httpx.ConnectTimeout("public HTTPS connection timeout")
+                    response = await client.request(
+                        method, parsed.copy_with(host=address), headers=request_headers, json=json_body,
+                        timeout=remaining,
+                        # Public httpcore extension keeps certificate verification
+                        # and SNI against the original hostname, not the pinned IP.
+                        # https://www.encode.io/httpcore/extensions/#sni_hostname
+                        extensions={"sni_hostname": parsed.host},
+                    )
+                    break
+                except (httpx.ConnectError, httpx.ConnectTimeout):
+                    if index == len(addresses) - 1:
+                        raise
+        if response.status_code not in REDIRECT_STATUSES:
+            return response
+        location = response.headers.get("location")
+        if not location:
+            raise ValueError(f"redirect with no location from {parsed.host}")
+        current = str(parsed.join(location))
 
     raise ValueError(f"too many redirects ({MAX_REDIRECTS})")

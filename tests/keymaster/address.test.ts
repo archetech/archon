@@ -161,7 +161,7 @@ describe('importAddress', () => {
         });
         // redirect: 'manual' is part of the contract, not incidental: following a
         // redirect would land on a host the private-target check never saw (#252).
-        expect(globalThis.fetch).toHaveBeenCalledWith('https://archon.social/.well-known/names', { redirect: 'manual' });
+        expect(globalThis.fetch).toHaveBeenCalledWith('https://archon.social/.well-known/names', { redirect: 'manual', dispatcher: expect.anything() });
     });
 });
 
@@ -196,7 +196,7 @@ describe('checkAddress', () => {
         });
         // redirect: 'manual' is part of the contract, not incidental: following a
         // redirect would land on a host the private-target check never saw (#252).
-        expect(globalThis.fetch).toHaveBeenCalledWith('https://archon.social/.well-known/names/alice', { redirect: 'manual' });
+        expect(globalThis.fetch).toHaveBeenCalledWith('https://archon.social/.well-known/names/alice', { redirect: 'manual', dispatcher: expect.anything() });
     });
 
     it('should report when a domain does not appear to support names', async () => {
@@ -258,7 +258,7 @@ describe('addAddress', () => {
             retries: 5,
             delay: 1000,
         });
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', { redirect: 'manual' });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', { redirect: 'manual', dispatcher: expect.anything() });
         expect(globalThis.fetch).toHaveBeenNthCalledWith(
             2,
             'https://archon.social/names/api/name',
@@ -301,7 +301,7 @@ describe('addAddress', () => {
                 ...info,
             },
         });
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(3, 'https://archon.social/names/api/config', { redirect: 'manual' });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(3, 'https://archon.social/names/api/config', { redirect: 'manual', dispatcher: expect.anything() });
     });
 
     it('should not treat a Herald service DID as an email relay unless relay is advertised', async () => {
@@ -355,8 +355,8 @@ describe('addAddress', () => {
             retries: 5,
             delay: 1000,
         });
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', { redirect: 'manual' });
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(2, 'https://archon.social/api/challenge', { redirect: 'manual' });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', { redirect: 'manual', dispatcher: expect.anything() });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(2, 'https://archon.social/api/challenge', { redirect: 'manual', dispatcher: expect.anything() });
         expect(globalThis.fetch).toHaveBeenNthCalledWith(
             3,
             'https://archon.social/names/api/name',
@@ -392,8 +392,8 @@ describe('addAddress', () => {
             retries: 5,
             delay: 1000,
         });
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', { redirect: 'manual' });
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(2, 'https://archon.social/api/challenge', { redirect: 'manual' });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', { redirect: 'manual', dispatcher: expect.anything() });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(2, 'https://archon.social/api/challenge', { redirect: 'manual', dispatcher: expect.anything() });
         expect(globalThis.fetch).toHaveBeenNthCalledWith(
             3,
             'https://archon.social/names/api/name',
@@ -435,7 +435,7 @@ describe('removeAddress', () => {
             retries: 5,
             delay: 1000,
         });
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', { redirect: 'manual' });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', { redirect: 'manual', dispatcher: expect.anything() });
         expect(globalThis.fetch).toHaveBeenNthCalledWith(
             2,
             'https://archon.social/names/api/name',
@@ -524,8 +524,8 @@ describe('removeAddress', () => {
             retries: 5,
             delay: 1000,
         });
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', { redirect: 'manual' });
-        expect(globalThis.fetch).toHaveBeenNthCalledWith(2, 'https://archon.social/api/challenge', { redirect: 'manual' });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(1, 'https://archon.social/names/api/challenge', { redirect: 'manual', dispatcher: expect.anything() });
+        expect(globalThis.fetch).toHaveBeenNthCalledWith(2, 'https://archon.social/api/challenge', { redirect: 'manual', dispatcher: expect.anything() });
         expect(globalThis.fetch).toHaveBeenNthCalledWith(
             3,
             'https://archon.social/names/api/name',

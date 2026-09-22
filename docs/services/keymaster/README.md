@@ -622,6 +622,20 @@ not enforced; clients SHOULD use ASCII identifiers.
 An "address" is an external `name@domain` Lightning address (LUD-16) that
 the wallet has chosen to track for sending zaps.
 
+Remote names, address discovery, and name-service API requests require public
+HTTPS destinations on every redirect hop. The `@didcid/common/net` package export
+automatically selects the DNS-protected transport in Node, including third-party
+Keymaster embeddings, without constructor configuration. DNS answers are
+validated inside the socket lookup, preserving the original Host and TLS
+hostname. Browser builds select the portable URL/hostname checks; browser
+JavaScript cannot validate or pin DNS/socket destinations.
+
+Python validates all resolved IPv4/IPv6 answers, connects directly to a validated
+IP, and keeps the original Host header and TLS certificate hostname. Mixed
+public/private or empty DNS answers fail closed. Each redirect is resolved and
+validated again; Python's guarded requests ignore environment proxies so a
+proxy cannot independently resolve the destination. TLS verification stays on.
+
 | Route | Behavior |
 | --- | --- |
 | `GET /api/v1/addresses` | `{ "addresses": { "<address>": StoredAddressInfo, ... } }` |

@@ -13,6 +13,7 @@ import { socksDispatcher } from 'fetch-socks';
 import { fetch as socksFetch } from 'undici';
 
 import { isPrivateHostname } from '@didcid/common/net';
+import { fetchPublicHttpsOnce } from '@didcid/common/net-node';
 import { LightningPaymentError } from './errors.js';
 import type * as clnModule from './lightning.js';
 import type * as lnbitsModule from './lnbits.js';
@@ -49,12 +50,6 @@ function normalizePath(path: string): string {
         .replace(/\/invoice\/(?:did:[^/]+|did%3[aA][^/]+)/g, '/invoice/:did');
 }
 
-// No address filter on outbound fetches. The one that used to live here matched
-// hostnames with a literal regex, so `127.0.0.1.nip.io` -- or any name an
-// attacker controls that points inward -- passed it while honest LAN use did
-// not. What remains, at each call site, is the scheme requirement, which keeps
-// plaintext internal services out of reach. Matches the DIDComm relay; see #645.
-
 // Checking the scheme is worthless if a redirect can undo it: fetch follows
 // redirects by default, and 307/308 preserve method and body, so an https
 // endpoint answering `307 -> http://redis:6379` reaches the plaintext service
@@ -82,12 +77,13 @@ async function fetchHttpsOnly(target: string, init?: RequestInit): Promise<Respo
             throw new Error(`refusing hop to private address ${url.hostname}`);
         }
 
-        const response = await fetch(current, { ...init, redirect: 'manual' });
+        const response = await fetchPublicHttpsOnce(current, { ...init, redirect: 'manual' });
         if (response.status < 300 || response.status >= 400) {
             return response;
         }
 
         const location = response.headers.get('location');
+        await response.body?.cancel();
         if (!location) {
             throw new Error(`redirect with no location from ${new URL(current).host}`);
         }

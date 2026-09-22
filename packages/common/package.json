@@ -30,14 +30,27 @@
       "types": "./dist/types/errors.d.ts"
     },
     "./net": {
+      "types": "./dist/types/net.d.ts",
+      "browser": {
+        "import": "./dist/esm/net.js",
+        "require": "./dist/cjs/net.cjs"
+      },
+      "node": {
+        "import": "./dist/esm/net-node.js",
+        "require": "./dist/cjs/net-node.cjs"
+      },
       "import": "./dist/esm/net.js",
-      "require": "./dist/cjs/net.cjs",
-      "types": "./dist/types/net.d.ts"
+      "require": "./dist/cjs/net.cjs"
     },
     "./process-guards": {
       "import": "./dist/esm/process-guards.js",
       "require": "./dist/cjs/process-guards.cjs",
       "types": "./dist/types/process-guards.d.ts"
+    },
+    "./net-node": {
+      "import": "./dist/esm/net-node.js",
+      "require": "./dist/cjs/net-node.cjs",
+      "types": "./dist/types/net-node.d.ts"
     }
   },
   "typesVersions": {
@@ -53,6 +66,9 @@
       ],
       "process-guards": [
         "./dist/types/process-guards.d.ts"
+      ],
+      "net-node": [
+        "./dist/types/net-node.d.ts"
       ]
     }
   },
@@ -73,5 +89,8 @@
     "@rollup/plugin-commonjs": "^28.0.3",
     "@rollup/plugin-node-resolve": "^16.0.1",
     "rollup": "^4.63.3"
+  },
+  "dependencies": {
+    "undici": "^6.28.0"
   }
 }
