@@ -3,7 +3,7 @@ import JsonView from "@uiw/react-json-view";
 import { jsonViewTheme } from "./layout/jsonViewTheme";
 import { useWalletContext } from "../contexts/WalletProvider";
 import { Alert, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl, FormControlLabel, FormLabel, MenuItem, Paper, Radio, RadioGroup, Select, Tab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tabs, TextField, Typography } from "@mui/material";
-import { Badge, Create, DriveFileRenameOutline, Image, Login, LoopOutlined, PermIdentity, RestoreOutlined, SaveAltOutlined, SwapHorizOutlined, DeleteOutline } from "@mui/icons-material";
+import { Badge, BuildOutlined, Create, DriveFileRenameOutline, Image, Login, LoopOutlined, PermIdentity, RestoreOutlined, SaveAltOutlined, SwapHorizOutlined, DeleteOutline } from "@mui/icons-material";
 import PageHeader from "./layout/PageHeader";
 import Section from "./layout/Section";
 import EmptyState from "./layout/EmptyState";
@@ -1042,7 +1042,7 @@ function IdentitiesTab() {
                                         { label: "Rename", onClick: handleRenameId, icon: <DriveFileRenameOutline fontSize="small" /> },
                                         { label: "Backup", onClick: backupId, icon: <SaveAltOutlined fontSize="small" /> },
                                         { label: "Recover", onClick: handleRecoverId, icon: <RestoreOutlined fontSize="small" /> },
-                                        { label: "Repair...", onClick: () => setRepairOpen(true) },
+                                        { label: "Repair...", onClick: () => setRepairOpen(true), icon: <BuildOutlined fontSize="small" /> },
                                         { label: "Rotate keys", onClick: rotateKeys, icon: <LoopOutlined fontSize="small" /> },
                                         { label: "Migrate registry", onClick: () => setMigrateOpen(true), icon: <SwapHorizOutlined fontSize="small" /> },
                                         { label: "Remove identity", onClick: handleRemoveId, icon: <DeleteOutline fontSize="small" />, destructive: true },
