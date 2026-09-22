@@ -1,3 +1,4 @@
+import DIDRepairDialog from '@didcid/wallet-ui/did-repair';
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
     Alert,
@@ -182,6 +183,9 @@ function formatAddedDate(value) {
 }
 
 function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning, hasDidComm, serverUrl, onServerUrlChange }) {
+    const [repairTarget, setRepairTarget] = useState(null);
+    const checkDID = useCallback(did => keymaster.checkDID(did), [keymaster]);
+    const repairDID = useCallback(did => keymaster.repairDID(did), [keymaster]);
     const [tab, setTab] = useState(null);
     const [currentId, setCurrentId] = useState('');
     const [saveId, setSaveId] = useState('');
@@ -202,6 +206,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [aliasList, setAliasList] = useState(null);
     const [alias, setAlias] = useState('');
     const [aliasDID, setAliasDID] = useState('');
+    const [aliasRepairTarget, setAliasRepairTarget] = useState('');
+    const [resolvedAliasDID, setResolvedAliasDID] = useState('');
     const [selectedName, setSelectedName] = useState('');
     const [aliasIsOwned, setAliasIsOwned] = useState(false);
     const [aliasDocs, setAliasDocs] = useState('');
@@ -1043,6 +1049,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             setMnemonicString('');
             setWalletString('');
             setSelectedName('');
+            setResolvedAliasDID('');
+            setAliasRepairTarget('');
             setSelectedHeld('');
             setSelectedIssued('');
             setDmailBody('');
@@ -1138,6 +1146,26 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             }
         } catch (error) {
             // ignore — tabs will refresh on next visit
+        }
+    }
+
+    async function refreshRepairedDocs(did) {
+        const refreshIdentity = did === currentDID;
+        const refreshAlias = did === resolvedAliasDID;
+        if (!refreshIdentity && !refreshAlias) return;
+        const docs = await keymaster.resolveDID(did);
+        const serialized = JSON.stringify(docs, null, 4);
+        const versions = docs.didDocumentMetadata?.version ?? 1;
+        if (refreshIdentity) {
+            setDocsString(serialized);
+            setDocsVersion(versions);
+            setDocsVersionMax(versions);
+        }
+        if (refreshAlias) {
+            setAliasDocs(serialized);
+            setAliasIsOwned(!!docs.didDocumentMetadata?.isOwned);
+            setAliasDocsVersion(versions);
+            setAliasDocsVersionMax(versions);
         }
     }
 
@@ -1906,6 +1934,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         setAlias('');
         setAliasDID('');
         setAliasDocs('');
+        setResolvedAliasDID('');
+        setAliasRepairTarget('');
         setAddressInput('');
         setAddressDomain('');
         setSelectedAddress('');
@@ -2097,6 +2127,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     function clearAliasFields() {
+        setAliasRepairTarget(resolvedAliasDID);
         setAlias('');
         setAliasDID('');
     }
@@ -2329,6 +2360,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 return;
             }
             setSelectedName(trimmedName);
+            setResolvedAliasDID(did);
+            setAliasRepairTarget(did);
             if (alias.trim()) {
                 setAliasDID(did);
             }
@@ -5068,6 +5101,11 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                             </Button>
                                         </Grid>
                                         <Grid item>
+                                            <Button variant="contained" onClick={() => setRepairTarget(currentDID)} disabled={!currentDID}>
+                                                Repair...
+                                            </Button>
+                                        </Grid>
+                                        <Grid item>
                                             <Button variant="contained" color="primary" onClick={rotateKeys}>
                                                 Rotate keys
                                             </Button>
@@ -5449,6 +5487,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                     }
                     {tab === 'aliases' &&
                         <Box>
+                            <Button sx={{ mb: 2 }} onClick={() => setRepairTarget(aliasRepairTarget)}
+                                disabled={!aliasRepairTarget}>Repair...</Button>
                             <TableContainer component={Paper} style={{ maxHeight: '400px', overflow: 'auto' }}>
                                 <Table stickyHeader style={{ width: '1000px', tableLayout: 'fixed' }}>
                                     <colgroup>
@@ -5464,7 +5504,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                     size="small"
                                                     fullWidth
                                                     value={alias}
-                                                    onChange={(e) => setAlias(e.target.value)}
+                                                    onChange={(e) => { setAlias(e.target.value); setAliasRepairTarget(e.target.value.trim()); }}
                                                     inputProps={{ maxLength: 32 }}
                                                 />
                                             </TableCell>
@@ -5474,7 +5514,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                     size="small"
                                                     fullWidth
                                                     value={aliasDID}
-                                                    onChange={(e) => setAliasDID(e.target.value.trim())}
+                                                    onChange={(e) => { setAliasDID(e.target.value.trim()); setAliasRepairTarget(e.target.value.trim()); }}
                                                     inputProps={{ maxLength: 80 }}
                                                 />
                                             </TableCell>
@@ -8517,6 +8557,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                             </Typography>
                         </Box>
                     }
+                    {repairTarget && <DIDRepairDialog did={repairTarget} checkDID={checkDID} repairDID={repairDID}
+                        onClose={() => setRepairTarget(null)} onRepaired={refreshRepairedDocs} />}
                     <LoginDialog
                         open={editLoginOpen}
                         onClose={() => setEditLoginOpen(false)}

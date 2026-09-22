@@ -6,7 +6,8 @@
   "type": "module",
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./did-repair": "./src/components/DIDRepairDialog.tsx"
   },
   "peerDependencies": {
     "@mui/icons-material": "^7.3.9",

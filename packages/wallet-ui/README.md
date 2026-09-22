@@ -71,3 +71,15 @@ is invisible to tooling and check both sides by hand.
 
 Anything importing `@capacitor/*`, `chrome.*`, or an app's own context. Those
 are host concerns; a shared component receives their results as props.
+
+## Shared DID repair dialog
+
+`@didcid/wallet-ui/did-repair` exports the standalone `DIDRepairDialog` used by
+both wallet hosts and `@didcid/keymaster-ui`. This entry point imports only
+React/MUI and type-only client contracts, so demo clients do not load wallet
+providers or Keymaster runtimes. The host supplies check/repair callbacks;
+Keymaster owns all repair decisions.
+
+Opening the dialog only checks the latest DID. A user must review the proposed
+changes and select Repair DID to submit an update. Related controller DIDs are
+checked separately, and accepted/pending/confirmed results stay distinct.

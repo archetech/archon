@@ -1,6 +1,7 @@
 import React, {
     CSSProperties,
     ReactNode,
+    useCallback,
     useEffect,
     useState
 } from "react";
@@ -8,6 +9,7 @@ import JsonView from '@uiw/react-json-view';
 import { jsonViewTheme } from "./layout/jsonViewTheme";
 import {
     Box,
+    Button,
     TextField,
     IconButton,
     Tooltip,
@@ -22,9 +24,11 @@ import { useWalletNavigation } from "../contexts/WalletNavigation";
 import { useIsDarkMode } from "../hooks/useIsTabletUp";
 import { useSnackbar } from "../contexts/SnackbarProvider";
 import { DidCidDocument } from "@didcid/gatekeeper/types";
+import DIDRepairDialog from "./DIDRepairDialog";
 import VersionNavigator from "./VersionNavigator";
 
 function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { browserTab: string, browserSubTab?: string, showResolveField?: boolean }) {
+    const [repairTarget, setRepairTarget] = useState<string | null>(null);
     const darkMode = useIsDarkMode();
     const [aliasDocs, setAliasDocs] = useState<Record<string, unknown> | undefined>(undefined);
     const [aliasDocsVersion, setAliasDocsVersion] = useState<number>(1);
@@ -33,6 +37,14 @@ function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { b
     const [currentDid, setCurrentDid] = useState<string>("");
     const { keymaster } = useWalletContext();
     const { setError } = useSnackbar();
+    const checkDID = useCallback(async (did: string) => {
+        if (!keymaster) throw new Error('Wallet is unavailable');
+        return keymaster.checkDID(did);
+    }, [keymaster]);
+    const repairDID = useCallback(async (did: string) => {
+        if (!keymaster) throw new Error('Wallet is unavailable');
+        return keymaster.repairDID(did);
+    }, [keymaster]);
     const { openView, pendingView, clearPendingView } = useWalletNavigation();
     const [canDecrypt, setCanDecrypt] = useState(false);
     const [decryptedCache, setDecryptedCache] = useState<Record<string, unknown> | null>(null);
@@ -174,6 +186,11 @@ function JsonViewer({ browserTab, browserSubTab, showResolveField = false }: { b
 
     return (
         <Box sx={{ width: "100%", overflowX: "hidden" }}>
+            {showResolveField && <Button sx={{ mt: 1 }} disabled={!keymaster || !(formDid.trim() || currentDid)}
+                onClick={() => setRepairTarget(formDid.trim() || currentDid)}>Repair...</Button>}
+            {repairTarget && keymaster && <DIDRepairDialog did={repairTarget} checkDID={checkDID} repairDID={repairDID}
+                onClose={() => setRepairTarget(null)} onRepaired={async did => { setFormDid(did); await resolveDID(did); }} />}
+
             {(showResolveField || aliasDocsVersionMax > 1) && (
                 <Box
                     sx={{
