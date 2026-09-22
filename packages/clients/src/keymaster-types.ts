@@ -409,6 +409,22 @@ export interface NodeCapabilities {
     [capability: string]: boolean;
 }
 
+/** Inspection is read-only; changes replace only the indicated document component. */
+export interface CheckDIDResult {
+    did: string;
+    type?: string;
+    versionId?: string;
+    confirmed: boolean;
+    issues: { code: string; message: string; relatedDid?: string }[];
+    changes: DidCidDocument | null;
+    canRepair: boolean;
+    reason?: string;
+}
+
+export interface RepairDIDResult extends CheckDIDResult {
+    submitted: boolean;
+}
+
 export interface KeymasterInterface {
     // Wallet
     loadWallet(): Promise<WalletFile>;
@@ -504,6 +520,8 @@ export interface KeymasterInterface {
     getLightningPayments(name?: string): Promise<LightningPaymentRecord[]>;
 
     // DIDs
+    checkDID(did: string): Promise<CheckDIDResult>;
+    repairDID(did: string): Promise<RepairDIDResult>;
     resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument>;
     updateDID(id: string, doc: DidCidDocument): Promise<boolean>;
 

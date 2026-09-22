@@ -188,6 +188,8 @@ const ROUTES: Array<[Method, string, number]> = [
     ['POST', '/groups/item/remove', 400],
     ['POST', '/groups/item/test', 400],
     // identity
+    ['GET', '/did/test-id/check', 400],
+    ['POST', '/did/test-id/repair', 400],
     ['GET', '/did/test-id', 404],
     ['DELETE', '/did/test-id', 400],
     ['PUT', '/did/test-id', 400],

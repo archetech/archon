@@ -505,6 +505,28 @@ program
 
 // DID commands
 program
+    .command('check-did <did>')
+    .description('Inspect known DID document problems without changing it')
+    .action(async (did) => {
+        try {
+            console.log(JSON.stringify(await keymaster.checkDID(did), null, 4));
+        } catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('repair-did <did>')
+    .description('Apply supported repairs to a DID document')
+    .action(async (did) => {
+        try {
+            console.log(JSON.stringify(await keymaster.repairDID(did), null, 4));
+        } catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
     .command('resolve-did <did> [confirm]')
     .description('Return document associated with DID')
     .action(async (did, confirm) => {
@@ -2458,7 +2480,7 @@ async function run() {
         const cipher = new CipherNode();
 
         // Commands in this allowlist can run before a local wallet exists.
-        const walletOptionalCommands = ['create-wallet', 'new-wallet', 'create-id', 'import-wallet', 'restore-wallet-file', 'list-registries'];
+        const walletOptionalCommands = ['create-wallet', 'new-wallet', 'create-id', 'import-wallet', 'restore-wallet-file', 'list-registries', 'check-did'];
         const commandName = process.argv[2];
         const walletOptional = !commandName || walletOptionalCommands.includes(commandName);
 

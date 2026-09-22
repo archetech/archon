@@ -5247,3 +5247,17 @@ describe('getLightningPayments', () => {
         }
     });
 });
+
+describe('DID document repair', () => {
+    it('uses distinct inspection and mutation endpoints and preserves reports', async () => {
+        const id = 'Alice / backup';
+        const report = { did: 'did:cid:alice', issues: [], changes: null, canRepair: false, confirmed: true };
+        const scope = nock(KeymasterURL)
+            .get(`/api/v1/did/${encodeURIComponent(id)}/check`).reply(200, { report })
+            .post(`/api/v1/did/${encodeURIComponent(id)}/repair`).reply(200, { report: { ...report, submitted: false } });
+        const client = await KeymasterClient.create({ url: KeymasterURL });
+        expect(await client.checkDID(id)).toEqual(report);
+        expect(await client.repairDID(id)).toEqual({ ...report, submitted: false });
+        expect(scope.isDone()).toBe(true);
+    });
+});

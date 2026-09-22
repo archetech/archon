@@ -476,11 +476,13 @@ identity for asset-creating operations that don't take an explicit owner.
 | `GET /api/v1/ids/current` | `{ "current": string | undefined }` |
 | `PUT /api/v1/ids/current` | Body: `{ "name": string }`. Sets the active ID. Returns `{ "ok": boolean }`. |
 
-Resolution endpoints proxied through to Gatekeeper:
+DID resolution and document operations:
 
 | Route | Behavior |
 | --- | --- |
 | `GET /api/v1/did/:id` | Body-less; query params match Gatekeeper's `/did/:did` (`versionTime`, `versionSequence`, `confirm`, `verify`). Accepts a DID **or** a wallet alias / ID name; resolves the alias first, then forwards to Gatekeeper. Returns `{ "docs": DidCidDocument }`. |
+| `GET /api/v1/did/:id/check` | Read-only inspection. Returns `{ "report": CheckDIDResult }`. |
+| `POST /api/v1/did/:id/repair` | Explicitly submit a supported repair. Returns `{ "report": RepairDIDResult }`. |
 | `PUT /api/v1/did/:id` | Body: `{ "doc": DidCidDocument }`. Submits an `update` operation signing it with the ID's key. Returns `{ "ok": boolean }`. |
 | `DELETE /api/v1/did/:id` | Submits a `delete` operation. Returns `{ "ok": boolean }`. |
 | `POST /api/v1/agents/:id/test` | Tests whether the given DID resolves to a valid agent. Returns `{ "test": boolean }`. |
@@ -519,6 +521,58 @@ because its DID is the CID of that operation including the proof. Its updates,
 and the wallet backup asset, use the suite above like everything else.
 
 ---
+
+### 5.2 Checking and repairing DID documents
+
+All three CLIs expose `check-did <did>` and `repair-did <did>`. The argument
+can also be a wallet identity name or alias. For example:
+
+```sh
+keymaster check-did Alice
+keymaster repair-did Alice
+# Service-backed CLI:
+./scripts/archon-cli.js check-did Alice
+./scripts/archon-cli.js repair-did Alice
+```
+
+`check-did` performs no document writes. Direct DID inspection works without
+owning that DID or having a wallet; names and aliases need the wallet that
+holds them. Both TypeScript and Python Keymaster expose the same feature
+(`checkDID`/`repairDID`, `check_did`/`repair_did`). Wallet and demo-client buttons
+are the remaining UI work in #1258.
+
+The report contains `did`, `type`, `versionId`, `confirmed`, `issues`,
+`changes`, and `canRepair`, with a `reason` when signing authority or
+confirmation prevents repair. `issues` entries contain `code`, `message`,
+and optionally `relatedDid`. `changes` is the proposed component replacement,
+or `null` when there is no applicable repair this wallet can submit.
+Unresolvable DIDs return an error; deactivated DIDs report that repair is
+unavailable. An empty issues list means **no known applicable problems**.
+
+The first supported repair handles agent operation permissions: missing
+`capabilityInvocation` membership for Keymaster's operation-signing method
+and dangling references to unpublished methods. Keymaster currently signs
+operations with the first verification method. A repair requires the wallet's
+usable signing key to match that method and the current document to be
+confirmed. It preserves valid permissions, other methods and relationships,
+data and registration. It does not grant every published key operation
+authority. Relative and absolute references identify the same local method.
+Rotation retitles existing operation permissions along with authentication
+and assertion references; it does not silently repair omitted permissions.
+
+Assets do not gain signing permissions from their published methods. If an
+asset's controller has a problem, the report identifies that agent as
+`relatedDid`; repair it explicitly instead. No operation is submitted for
+an asset with no applicable repair.
+
+`repair-did` is the explicit mutation action. It checks again and signs an
+ordinary update against the inspected version. Its report adds `submitted`:
+`false` for a no-op and `true` when Gatekeeper accepts the update. Check
+`confirmed` separately: an accepted chain-registry update can still be
+pending anchoring. Repeating repair after the changes are present is a no-op.
+Unavailable repairs return an error. These wallet tools do not change
+Gatekeeper acceptance or enable relationship enforcement under #1156.
+
 
 ## 6. Aliases and addresses
 

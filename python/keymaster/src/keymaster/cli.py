@@ -393,6 +393,7 @@ WALLET_OPTIONAL_COMMANDS = {
     "import-wallet",
     "restore-wallet-file",
     "list-registries",
+    "check-did",
 }
 
 
@@ -544,6 +545,14 @@ async def cmd_rotate_keys(km: Keymaster, args: argparse.Namespace) -> None:
 
 
 # DID -------------------------------------------------------------------------
+
+async def cmd_check_did(km: Keymaster, args: argparse.Namespace) -> None:
+    _print_json(await km.check_did(args.did))
+
+
+async def cmd_repair_did(km: Keymaster, args: argparse.Namespace) -> None:
+    _print_json(await km.repair_did(args.did))
+
 
 async def cmd_resolve_did(km: Keymaster, args: argparse.Namespace) -> None:
     try:
@@ -1438,6 +1447,10 @@ def build_parser() -> argparse.ArgumentParser:
     add("rotate-keys", "Generates new set of keys for current ID", cmd_rotate_keys)
 
     # DID
+    sp = add("check-did", "Inspect known DID document problems without changing it", cmd_check_did)
+    sp.add_argument("did")
+    sp = add("repair-did", "Apply supported repairs to a DID document", cmd_repair_did)
+    sp.add_argument("did")
     sp = add("resolve-did", "Return document associated with DID", cmd_resolve_did)
     sp.add_argument("did")
     sp.add_argument("confirm", nargs="?")

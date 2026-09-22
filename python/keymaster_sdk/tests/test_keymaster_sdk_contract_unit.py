@@ -384,3 +384,21 @@ def test_didcomm_wrappers_forward_expected_requests(monkeypatch):
          {"json": {"ids": ["id-1", "id-2"], "options": {"name": "Bob"}}}),
         ("POST", "http://unit.test/api/v1/didcomm/mediate", {"json": {"options": {"name": "Mediator"}}}),
     ]
+
+
+def test_did_repair_endpoints(monkeypatch):
+    calls = []
+    report = {"did": "did:cid:alice", "issues": [], "canRepair": False}
+
+    def proxy(method, url):
+        calls.append((method, url))
+        return {"report": report}
+
+    monkeypatch.setattr(sdk, "proxy_request", proxy)
+    monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
+    assert sdk.check_did("Alice / backup") == report
+    assert sdk.repair_did("Alice / backup") == report
+    assert calls == [
+        ("GET", "http://unit.test/api/v1/did/Alice%20%2F%20backup/check"),
+        ("POST", "http://unit.test/api/v1/did/Alice%20%2F%20backup/repair"),
+    ]

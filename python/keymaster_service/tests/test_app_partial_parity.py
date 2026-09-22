@@ -1723,3 +1723,22 @@ def test_keymaster_error_dispatches_to_the_400_handler_not_500():
 def test_wallet_not_found_maps_to_404():
     response = run(app_module.keymaster_not_found_handler(app_module.Request(), WalletNotFoundError("empty")))
     assert response.status_code == 404
+
+
+def test_did_repair_handlers(monkeypatch):
+    calls = []
+    report = {"did": "did:cid:alice", "issues": [], "canRepair": False}
+
+    async def check(identifier):
+        calls.append(("check", identifier))
+        return report
+
+    async def repair(identifier):
+        calls.append(("repair", identifier))
+        return {**report, "submitted": False}
+
+    monkeypatch.setattr(app_module.service, "check_did", check)
+    monkeypatch.setattr(app_module.service, "repair_did", repair)
+    assert run(app_module.check_did("Alice")) == {"report": report}
+    assert run(app_module.repair_did("Alice")) == {"report": {**report, "submitted": False}}
+    assert calls == [("check", "Alice"), ("repair", "Alice")]

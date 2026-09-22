@@ -446,6 +446,16 @@ async def resolve_did(identifier: str, request: Request) -> dict[str, Any]:
     return {"docs": await service.resolve_did(identifier, parse_resolve_options(request) or None)}
 
 
+@protected_api.get("/did/{identifier}/check")
+async def check_did(identifier: str) -> dict[str, Any]:
+    return {"report": await service.check_did(identifier)}
+
+
+@protected_api.post("/did/{identifier}/repair")
+async def repair_did(identifier: str) -> dict[str, Any]:
+    return {"report": await service.repair_did(identifier)}
+
+
 @protected_api.put("/did/{identifier}")
 async def update_did(identifier: str, body: dict[str, Any]) -> dict[str, bool]:
     return {"ok": await service.update_did(identifier, body["doc"])}

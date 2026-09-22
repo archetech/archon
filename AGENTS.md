@@ -278,3 +278,5 @@ These rules apply to coding agents working in this repository.
 - Chain receipts require complete registration metadata consistent with ordinal before queue deduplication and per-event replay. CID ingress validates batch metadata before fetching and derives opidx from the original CID-list index. Keep malformed-receipt rejection separate from unconfirmed relay and missing controller history; do not add storage repair without production evidence.
 
 - Bind decoded proof receipt headers to authoritative chain facts and require complete chain metadata in the final convergence theorem. The signed bridge must check ordinal/registration agreement; do not revive incomplete-only protocol instances or weaken the authorization binding.
+
+- DID document repair must use the wallet's actual operation-signing method, preserve valid permissions and unrelated components, and sign against the inspected predecessor. Normalize method IDs before constructing proofs; absolute IDs must not be prefixed with the DID again. Keep repair explicit, and maintain capabilityInvocation references during rotation in both Keymasters.
