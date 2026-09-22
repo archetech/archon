@@ -135,3 +135,28 @@ def test_repair_with_older_wallet_key(testbed):
     assert run(km.repair_did(did))["submitted"] is True
     keypair = run(km.fetch_key_pair(did))
     assert keypair["publicJwk"] == original["verificationMethod"][0]["publicKeyJwk"]
+
+
+@pytest.mark.parametrize("state", ["deactivated", "unsupported-operation-key", "uncontrolled"])
+def test_asset_reports_unavailable_controller_repair(testbed, state):
+    km = testbed.keymaster
+    agent = damaged_agent(testbed)
+    asset = run(km.create_asset({"keep": True}, {"registry": "local"}))
+    if state == "deactivated":
+        run(km.revoke_did(agent))
+    elif state == "unsupported-operation-key":
+        document = run(km.resolve_did(agent))["didDocument"]
+        document["verificationMethod"][0]["id"] = "keys/op#key-1"
+        run(km.update_did(agent, {"didDocument": document}))
+    else:
+        km = Keymaster(gatekeeper=testbed.gatekeeper, wallet_store=FakeWalletStore(), passphrase="test")
+    controller = run(km.check_did(agent))
+    report = run(km.check_did(asset))
+    assert controller["canRepair"] is False
+    assert report["canRepair"] is False
+    assert report["changes"] is None
+    assert report["issues"][0]["code"] == "controller-repair-unavailable"
+    assert report["issues"][0]["relatedDid"] == agent
+    assert (controller.get("reason") or controller["issues"][0]["message"]) in report["issues"][0]["message"]
+    with pytest.raises(KeymasterError, match="Controller repair unavailable"):
+        run(km.repair_did(asset))

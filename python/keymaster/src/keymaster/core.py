@@ -2155,8 +2155,11 @@ class Keymaster:
                 agent = await self.check_did(controller)
                 if agent["issues"]:
                     result["issues"].append({
-                        "code": "controller-needs-repair", "relatedDid": controller,
-                        "message": "Check and repair the controlling agent separately.",
+                        "code": "controller-needs-repair" if agent["canRepair"] else "controller-repair-unavailable",
+                        "relatedDid": controller,
+                        "message": ("Check and repair the controlling agent separately." if agent["canRepair"] else
+                                    "Controller repair unavailable: " + (agent.get("reason") or
+                                        " ".join(issue["message"] for issue in agent["issues"]))),
                     })
             return result
         if kind != "agent" or not document:

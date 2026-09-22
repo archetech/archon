@@ -286,3 +286,5 @@ These rules apply to coding agents working in this repository.
 - Test encoded aliases through real HTTP routing, not only SDK URLs or direct handlers. FastAPI matches decoded paths, so endpoints supporting slash-containing aliases need a `path` converter and dispatch coverage.
 
 - Keymaster method-ID comparison must match Gatekeeper: expand only leading `#` references. Python operation signing must search retained wallet derivations for the confirmed public key, as TypeScript does; the newest wallet index need not be the active key.
+
+- Asset repair reports must preserve why controller repair is unavailable; recommend a separate controller repair only when that controller report has `canRepair: true`.

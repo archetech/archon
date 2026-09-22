@@ -1683,8 +1683,12 @@ export default class Keymaster implements KeymasterInterface {
             if (controller) {
                 const agent = await this.checkDID(controller);
                 if (agent.issues.length) {
-                    result.issues.push({ code: 'controller-needs-repair', relatedDid: controller,
-                        message: 'Check and repair the controlling agent separately.' });
+                    result.issues.push({
+                        code: agent.canRepair ? 'controller-needs-repair' : 'controller-repair-unavailable',
+                        relatedDid: controller,
+                        message: agent.canRepair ? 'Check and repair the controlling agent separately.'
+                            : `Controller repair unavailable: ${agent.reason || agent.issues.map(issue => issue.message).join(' ')}`,
+                    });
                 }
             }
             return result;

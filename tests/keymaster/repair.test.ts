@@ -183,3 +183,26 @@ test('a rotation during repair is rejected by the predecessor check and leaves t
     expect(document.capabilityInvocation).toEqual(['#removed']);
     expect((await keymaster.repairDID(did)).submitted).toBe(true);
 });
+
+test.each(['deactivated', 'unsupported-operation-key', 'uncontrolled'])(
+    'asset inspection explains an unavailable controller repair (%s)', async state => {
+        const agent = await damagedAgent();
+        const asset = await keymaster.createAsset({ keep: true }, { registry: 'local' });
+        if (state === 'deactivated') {
+            await keymaster.revokeDID(agent);
+        } else if (state === 'unsupported-operation-key') {
+            const document = (await keymaster.resolveDID(agent)).didDocument!;
+            document.verificationMethod![0].id = 'keys/op#key-1';
+            await keymaster.updateDID(agent, { didDocument: document });
+        } else {
+            keymaster = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'test' });
+        }
+        const controller = await keymaster.checkDID(agent);
+        const report = await keymaster.checkDID(asset);
+        expect(controller.canRepair).toBe(false);
+        expect(report).toMatchObject({ canRepair: false, changes: null,
+            issues: [{ code: 'controller-repair-unavailable', relatedDid: agent }] });
+        expect(report.issues[0].message).toContain(controller.reason || controller.issues[0].message);
+        await expect(keymaster.repairDID(asset)).rejects.toThrow('Controller repair unavailable');
+    },
+);

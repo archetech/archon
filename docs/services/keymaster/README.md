@@ -566,7 +566,9 @@ and assertion references; it does not silently repair omitted permissions.
 
 Assets do not gain signing permissions from their published methods. If an
 asset's controller has a problem, the report identifies that agent as
-`relatedDid`; repair it explicitly instead. No operation is submitted for
+`relatedDid`. It recommends a separate repair only when this wallet can
+perform it; otherwise `controller-repair-unavailable` explains why, including
+deactivation or unavailable signing authority. No operation is submitted for
 an asset with no applicable repair.
 
 `repair-did` is the explicit mutation action. It checks again and signs an
