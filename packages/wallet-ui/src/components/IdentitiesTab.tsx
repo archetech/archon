@@ -1027,7 +1027,7 @@ function IdentitiesTab() {
             </Dialog>
 
             {repairOpen && keymaster && currentDID && <DIDRepairDialog did={currentDID} checkDID={checkDID} repairDID={repairDID}
-                onClose={() => setRepairOpen(false)} onRepaired={refreshCurrentIdDocs} />}
+                onClose={() => setRepairOpen(false)} onRepaired={did => did === currentDID ? refreshCurrentIdDocs() : undefined} />}
             <Box sx={{ width: '100%' }}>
                 <PageHeader
                     title="Identities"
