@@ -14,6 +14,7 @@ import { fetch as socksFetch } from 'undici';
 
 import { isPrivateHostname } from '@didcid/common/net';
 import { fetchPublicHttpsOnce } from '@didcid/common/net-node';
+import type { probeOnion } from '@didcid/common/tor-node';
 import { LightningPaymentError } from './errors.js';
 import type * as clnModule from './lightning.js';
 import type * as lnbitsModule from './lnbits.js';
@@ -134,6 +135,7 @@ export interface AppDeps {
     // Reads the Tor hidden-service hostname. A function so the file is not a
     // hard dependency of building the app.
     readTorHostname: () => Promise<string>;
+    probeOnion: typeof probeOnion;
 }
 
 // SOCKS-dispatched requests deliberately bypass globalThis.fetch, so a test
@@ -170,12 +172,10 @@ export function createApp(deps: AppDeps): Express {
         try {
             const onion = (await deps.readTorHostname()).trim();
             if (onion) {
-                cachedPublicHost = `http://${onion}:${config.drawbridgePort}`;
-                logger.info({ publicHost: cachedPublicHost }, 'Resolved public host from Tor hostname');
-                return cachedPublicHost;
+                return `http://${onion}:${config.drawbridgePort}`;
             }
         } catch {
-            // File not available yet
+            // File not available yet.
         }
 
         return undefined;
@@ -390,6 +390,17 @@ export function createApp(deps: AppDeps): Express {
                     error: 'Lightning public host is not available yet',
                 });
                 return;
+            }
+
+            // Only publication needs live Tor reachability. Invoice handling
+            // uses the hostname to recognize our own endpoint for local routing.
+            if (!config.drawbridgePublicHost && !config.publicHost) {
+                try {
+                    await deps.probeOnion(new URL(publicHost).hostname, config.drawbridgePort, config.torProxy);
+                } catch {
+                    res.status(503).json({ error: 'Lightning public onion is unreachable' });
+                    return;
+                }
             }
 
             await store.savePublishedLightning(did, invoiceKey);

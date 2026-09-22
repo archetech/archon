@@ -8,6 +8,7 @@ import pino from 'pino';
 import GatekeeperClient from '@didcid/clients/gatekeeper';
 
 import { createApp, type Resolver } from './lightning-mediator.js';
+import { probeOnion } from '@didcid/common/tor-node';
 import config from './config.js';
 import * as cln from './lightning.js';
 import * as lnbits from './lnbits.js';
@@ -94,6 +95,7 @@ async function main(): Promise<void> {
         readiness: buildReadinessStatus,
         version,
         readTorHostname: () => readFile(TOR_HOSTNAME_FILE, 'utf-8'),
+        probeOnion,
     });
 
     app.listen(config.port, config.bindAddress, () => {

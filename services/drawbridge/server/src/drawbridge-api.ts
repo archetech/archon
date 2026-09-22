@@ -14,6 +14,7 @@ import { createAuthMiddleware } from './middleware/auth.js';
 import { loadPricingFromEnv } from './pricing.js';
 import { createV1Router } from './v1-router.js';
 import { ARCHON_ADMIN_HEADER } from './v1-admin.js';
+import { OnionReachability } from './onion-reachability.js';
 import type { L402Options, DrawbridgeStore } from './types.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info' });
@@ -57,6 +58,24 @@ const drawbridgeVersionInfo = new Gauge({
     labelNames: ['version', 'commit'],
 });
 
+// -1: no onion advertised; 0: hostname exists but Tor cannot reach it; 1: reachable.
+const publicOnionReachable = new Gauge({
+    name: 'drawbridge_public_onion_reachable',
+    help: 'Reachability of the advertised Tor hidden service (-1 absent, 0 down, 1 up)',
+});
+
+const onionReachability = new OnionReachability({
+    hostnameFile: config.torHostnameFile,
+    proxy: config.torProxy,
+    port: config.port,
+    onState: state => publicOnionReachable.set(state),
+    onTransition: (state, error) => {
+        if (state === 0) logger.warn({ err: error }, 'Published Tor onion is unreachable');
+        if (state === 1) logger.info('Published Tor onion is reachable');
+        if (state === -1) logger.info('No Tor onion hostname is published');
+    },
+});
+
 let serviceVersion = 'unknown';
 const serviceCommit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
 
@@ -70,29 +89,15 @@ readFile(new URL('../package.json', import.meta.url), 'utf-8').then(data => {
 
 // Public DIDComm relay endpoint advertised by publishDidComm: an explicit
 // public host, else the Tor onion that fronts this Drawbridge (the same hidden
-// service used for the Lightning endpoint). Cached on first success; returns
-// null until resolvable (the onion hostname file may not exist yet).
-let cachedDidCommEndpoint: string | undefined;
+// service used for the Lightning endpoint). The hostname file persists when
+// Tor dies, so the onion must pass an actual SOCKS connection before publication.
 
 async function resolveDidCommEndpoint(): Promise<string | null> {
-    if (cachedDidCommEndpoint) {
-        return cachedDidCommEndpoint;
-    }
     if (config.publicHost) {
-        cachedDidCommEndpoint = `${config.publicHost.replace(/\/+$/, '')}/didcomm`;
-        return cachedDidCommEndpoint;
+        return `${config.publicHost.replace(/\/+$/, '')}/didcomm`;
     }
-    try {
-        const onion = (await readFile(config.torHostnameFile, 'utf-8')).trim();
-        if (onion) {
-            cachedDidCommEndpoint = `http://${onion}:${config.port}/didcomm`;
-            return cachedDidCommEndpoint;
-        }
-    }
-    catch {
-        // Tor hostname not published yet — retry on a later request.
-    }
-    return null;
+    const onion = await onionReachability.verifiedHostname();
+    return onion ? `http://${onion}:${config.port}/didcomm` : null;
 }
 
 function normalizePath(path: string): string {
@@ -561,11 +566,13 @@ async function main() {
     const server = app.listen(config.port, config.bindAddress, () => {
         logger.info(`Drawbridge v${serviceVersion} (${serviceCommit}) running on ${config.bindAddress}:${config.port}`);
         logger.info(`Proxying to Gatekeeper at ${config.gatekeeperURL}`);
+        if (!config.publicHost) onionReachability.start();
     });
 
     // Graceful shutdown
     const shutdown = async () => {
         logger.info('Shutting down Drawbridge...');
+        onionReachability.stop();
         server.close(async () => {
             try {
                 await (store as any).disconnect?.();

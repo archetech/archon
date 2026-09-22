@@ -41,6 +41,7 @@ const config = {
     // When publicHost is unset, the DIDComm endpoint falls back to the Tor onion
     // fronting this Drawbridge, read from this shared hidden-service hostname file.
     torHostnameFile: process.env.ARCHON_DRAWBRIDGE_TOR_HOSTNAME_FILE || '/data/tor/hostname',
+    torProxy: process.env.ARCHON_DRAWBRIDGE_TOR_PROXY ?? 'tor:9050',
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',
 
     // L402
