@@ -27,28 +27,31 @@ function harness(initial: Record<string, any> = {}) {
         addBlock: jest.fn(async () => true),
         getGenesis: jest.fn(async () => ({ didDocumentData: {} })),
     };
+    const logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
+    const schedule = jest.fn();
     const source = ts.createSourceFile('ethereum.ts',
         readFileSync('services/mediators/ethereum/src/ethereum-mediator.ts', 'utf8'), ts.ScriptTarget.Latest, true);
-    const names = ['getFinalizedHeight', 'resolveScanStart', 'scanBlocks', 'syncBlocks', 'importBatch',
+    const names = ['importLoop', 'getFinalizedHeight', 'resolveScanStart', 'scanBlocks', 'syncBlocks', 'importBatch',
         'importBatches', 'retryFailedImports', 'isFullyProcessed', 'sameItem', 'updateDiscoveredItems',
         'shouldRecordBlockCheckpoint', 'addBlock', 'formatSyncProgress', 'parseArchonLog', 'discoveredKey'];
     const functions = source.statements.filter(ts.isFunctionDeclaration).filter(fn => names.includes(fn.name?.text ?? ''));
     expect(functions).toHaveLength(names.length);
     const api = runInNewContext(ts.transpileModule(
         functions.map(fn => fn.getText(source)).join('\n') +
-        '\n({getFinalizedHeight, resolveScanStart, scanBlocks, syncBlocks, importBatch, importBatches, retryFailedImports})',
+        '\n({importLoop, getFinalizedHeight, resolveScanStart, scanBlocks, syncBlocks, importBatch, importBatches, retryFailedImports})',
         { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } },
     ).outputText, {
         provider, gatekeeper, rescanStart, Number, REGISTRY: 'ETH:mainnet', CHECKPOINT_BLOCK_INTERVAL: 10,
-        config: { startBlock: 90, logChunkSize: 20, contractAddress: 'registry' },
+        importRunning: false, setTimeout: schedule,
+        config: { importInterval: 1, startBlock: 90, logChunkSize: 20, contractAddress: 'registry' },
         loadDb: async () => structuredClone(state),
         jsonPersister: { updateDb: async (mutate: (db: any) => void) => { mutate(state); } },
         registryInterface: { getEvent: () => ({ topicHash: 'topic' }), parseLog: (log: any) => log.parsed },
         isValidDID: () => true,
-        console: { log() {}, warn() {}, error() {} }, formatError: String,
+        console: logger, formatError: String,
         ethereumImportErrors: { inc() {} },
     });
-    return { api, provider, gatekeeper, state: () => structuredClone(state),
+    return { api, provider, gatekeeper, logger, schedule, state: () => structuredClone(state),
         setFinalized: (height: number | null) => { finalized = height; },
         restart: () => { state = JSON.parse(JSON.stringify(state)); } };
 }
@@ -107,7 +110,7 @@ it('waits across restart for the legacy cursor to finalize without withdrawing r
     const h = harness({ finalizedImports: undefined, height: 120, hash: 'block120',
         discovered: [{ height: 99 }, { height: 110, imported: { queued: 1 } }] });
     const before = h.state();
-    await expect(h.api.scanBlocks()).rejects.toThrow('Waiting for Ethereum finality');
+    await expect(h.api.scanBlocks()).resolves.toBe(false);
     await h.api.syncBlocks();
     expect(h.state()).toEqual(before);
     expect(h.gatekeeper.addBlock).not.toHaveBeenCalled();
@@ -181,7 +184,40 @@ it('waits without mutation when the legacy cursor and configured start are above
     const h = harness({ finalizedImports: undefined, height: 120, hash: 'block120', discovered: [{ height: 85 }] });
     h.setFinalized(80);
     const before = h.state();
-    await expect(h.api.scanBlocks()).rejects.toThrow('Waiting for Ethereum finality');
+    await expect(h.api.scanBlocks()).resolves.toBe(false);
     expect(h.gatekeeper.rewindRegistry).not.toHaveBeenCalled();
     expect(h.state()).toEqual(before);
+});
+
+it('logs legacy finality waiting as info and skips imports until the next cycle can validate the cursor', async () => {
+    const h = harness({ finalizedImports: undefined, height: 120, hash: 'block120',
+        discovered: [{ did: 'did:cid:old', height: 99 }, { did: 'did:cid:retry', height: 99, error: 'unavailable' }] });
+    const before = h.state();
+    await h.api.syncBlocks();
+    await h.api.importLoop();
+    expect(h.logger.log).toHaveBeenCalledWith('Waiting for Ethereum finality to reach scan cursor 120 (finalized 100)');
+    expect(h.logger.error).not.toHaveBeenCalled();
+    expect(h.state()).toEqual(before);
+    expect(h.gatekeeper.getGenesis).not.toHaveBeenCalled();
+    expect(h.provider.getLogs).not.toHaveBeenCalled();
+    expect(h.gatekeeper.addBlock).not.toHaveBeenCalled();
+    expect(h.schedule).toHaveBeenCalledWith(expect.any(Function), 60000);
+
+    h.setFinalized(121);
+    await h.api.importLoop();
+    expect(h.state()).toMatchObject({ height: 121, finalizedImports: true });
+    expect(h.gatekeeper.getGenesis.mock.calls.map(call => (call as any)[0])).toEqual(['did:cid:old', 'did:cid:retry']);
+    expect(h.logger.error).not.toHaveBeenCalled();
+});
+
+it.each(['regression', 'rpc'])('keeps %s failures at error level in sync and import loops', async failure => {
+    const h = harness({ height: 120, hash: 'block120' });
+    const message = failure === 'rpc' ? 'RPC offline' : 'Finalized Ethereum head is behind the scan cursor';
+    if (failure === 'rpc') h.provider.getBlock.mockRejectedValue(new Error(message));
+    await h.api.syncBlocks();
+    await h.api.importLoop();
+    expect(h.logger.error).toHaveBeenCalledTimes(2);
+    expect(h.logger.error).toHaveBeenLastCalledWith(`Error in importLoop during scanBlocks: Error: ${message}`);
+    expect(h.gatekeeper.getGenesis).not.toHaveBeenCalled();
+    expect(h.schedule).toHaveBeenCalledWith(expect.any(Function), 60000);
 });

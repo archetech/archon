@@ -255,7 +255,7 @@ it('Ethereum waits for finality before recovering a demonstrated legacy reorg', 
     const api = mediator('ethereum', gatekeeper, persisted);
     await api.importBatch(item);
     expect((await gatekeeper.resolveDID(fixture.targetDid)).didDocumentMetadata?.confirmed).toBe(true);
-    await expect(api.resolveScanStart(99)).rejects.toThrow('Waiting for Ethereum finality');
+    await expect(api.resolveScanStart(99)).resolves.toBeNull();
     expect((await gatekeeper.resolveDID(fixture.targetDid)).didDocumentMetadata?.confirmed).toBe(true);
     expect(persisted.height).toBe(100);
     expect(await api.resolveScanStart(100)).toBe(100);

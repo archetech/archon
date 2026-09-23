@@ -13,3 +13,7 @@
 - Ethereum discovery, checkpoint sync, and persisted batch retries must use the RPC finalized boundary, with no latest/safe/confirmation-depth fallback. During the finalized-import transition, preserve existing receipts and wait for finality to reach the legacy cursor; withdraw a suffix only after demonstrating a cursor-hash mismatch. Later finalized-history rollback stops imports. Outbound mined-transaction tracking remains independent of import finality.
 
 - Describe Ethereum scan-cursor metrics neutrally: a preserved legacy cursor can be ahead of finality during upgrade, so it must not be labeled as a finalized height.
+
+- Expected Ethereum legacy-cursor finality waits are informational and must pause checkpoint sync and the entire import cycle, including retries. Keep finalized-history regressions and RPC failures as errors.
+
+- Changes to mediator scan/recovery return contracts must update both focused finality tests and shared `tests/mediators/chain-reorg.test.ts` coverage; search all callers before validating the change.
