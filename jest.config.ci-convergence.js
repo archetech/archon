@@ -1,6 +1,8 @@
 import config, { convergenceTestPathPattern } from './jest.config.js';
 
-export default {
+const convergenceConfig = {
     ...config,
     testRegex: convergenceTestPathPattern,
 };
+
+export default convergenceConfig;

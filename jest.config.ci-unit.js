@@ -1,6 +1,8 @@
 import config, { convergenceTestPathPattern } from './jest.config.js';
 
-export default {
+const unitConfig = {
     ...config,
     testPathIgnorePatterns: [...config.testPathIgnorePatterns, convergenceTestPathPattern],
 };
+
+export default unitConfig;
