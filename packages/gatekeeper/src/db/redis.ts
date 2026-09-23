@@ -265,6 +265,34 @@ export default class DbRedis implements GatekeeperDb {
     }
 
 
+    async removeBlocks(registry: string, fromHeight: number): Promise<void> {
+        if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
+        const heights = await this.redis.hgetall(this.heightMapKey(registry));
+        const transaction = this.redis.multi();
+        let cursor = '0';
+        do {
+            const [next, keys] = await this.redis.scan(cursor, 'MATCH', this.blockKey(registry, '*'), 'COUNT', 100);
+            cursor = next;
+            if (keys.length) {
+                const bodies = await this.redis.mget(...keys);
+                bodies.forEach((body, index) => {
+                    if (body && JSON.parse(body).height >= fromHeight) transaction.del(keys[index]);
+                });
+            }
+        } while (cursor !== '0');
+        let maxHeight = -1;
+        for (const [height, hash] of Object.entries(heights)) {
+            if (Number(height) >= fromHeight) {
+                transaction.hdel(this.heightMapKey(registry), height);
+                transaction.del(this.blockKey(registry, hash));
+            } else maxHeight = Math.max(maxHeight, Number(height));
+        }
+        if (maxHeight < 0) transaction.del(this.maxHeightKey(registry));
+        else transaction.set(this.maxHeightKey(registry), maxHeight);
+        const result = await transaction.exec();
+        if (!result || result.some(([error]) => error)) throw new Error('Failed to remove blocks');
+    }
+
     async addBlock(registry: string, blockInfo: BlockInfo): Promise<boolean> {
         if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
         const { hash, height } = blockInfo;

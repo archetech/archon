@@ -32,6 +32,7 @@ export interface GatekeeperDb {
     getQueue(registry: string): Promise<Operation[]>;
     clearQueue(registry: string, batch: Operation[]): Promise<boolean>;
     addBlock(registry: string, blockInfo: BlockInfo): Promise<boolean>;
+    removeBlocks(registry: string, fromHeight: number): Promise<void>;
     getBlock(registry: string, blockId?: BlockId): Promise<BlockInfo | null>;
     addOperation(opid: string, op: Operation): Promise<void>;
     getOperation(opid: string): Promise<Operation | null>;

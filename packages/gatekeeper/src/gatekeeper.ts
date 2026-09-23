@@ -978,14 +978,16 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
 
             const opid = await this.generateCID(operation, true);
-            await this.db.addEvent(did, {
+            const event: GatekeeperEvent = {
                 registry: 'local',
                 time: operation.created!,
                 ordinal: [0],
                 operation,
                 opid,
                 did
-            });
+            };
+            await this.retainCandidates(did, [event]);
+            await this.db.addEvent(did, event);
 
             await this.queueOperation(registry, operation, {
                 skipPin: Boolean(operation.registration?.validUntil)
@@ -1351,14 +1353,16 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         return this.withDidLock(operation.did, async () => {
             const opid = await this.generateCID(operation, true);
-            await this.db.addEvent(operation.did!, {
+            const event: GatekeeperEvent = {
                 registry: 'local',
                 time: operation.proof?.created || '',
                 ordinal: [0],
                 operation,
                 opid,
                 did: operation.did
-            });
+            };
+            await this.retainCandidates(operation.did!, [event]);
+            await this.db.addEvent(operation.did!, event);
 
             await this.queueOperation(registry, operation, {
                 skipPin: Boolean(doc.didDocumentRegistration?.validUntil)
@@ -1596,7 +1600,9 @@ export default class Gatekeeper implements GatekeeperInterface {
             && (isLocallyStampedRegistry(event.registry) || this.cipher.canonicalizeJSON(known) === this.cipher.canonicalizeJSON(event))))) {
             return { candidates, changed: false };
         }
-        const events = [...(candidates[did] ?? []), ...copyJSON(histories?.get(did) ?? await this.db.getEvents(did)), ...incoming];
+        // Once journaled, projections cannot add evidence back (notably after a rewind).
+        // Pre-journal histories were migrated above; new evidence arrives explicitly.
+        const events = [...(candidates[did] ?? []), ...incoming];
         for (const event of events) await this.normalizeEvent(event);
         const retained = preferredCandidates(events);
         const changed = this.cipher.canonicalizeJSON(candidates[did] ?? []) !== this.cipher.canonicalizeJSON(retained);
@@ -2260,6 +2266,51 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         return this.db.addBlock(registry, block)
+    }
+
+    async rewindRegistry(registry: string, fromHeight: number): Promise<boolean> {
+        if (!isValidRegistryName(registry) || isUnanchoredRegistry(registry)
+            || !Number.isSafeInteger(fromHeight) || fromHeight < 0) {
+            throw new InvalidParameterError('registry/fromHeight');
+        }
+        await this.ensureHistoryReady();
+        if (this.isProcessingEvents) throw new Error('Gatekeeper is processing events; retry rewind');
+        this.isProcessingEvents = true;
+        try {
+            return await this.withHistoryLock(async () => {
+                const withdrawn = (event: GatekeeperEvent) => event.registry === registry
+                    && (event.registration?.height ?? -1) >= fromHeight;
+                this.eventsQueue = this.eventsQueue.flatMap(event => withdrawn(event) ? relayHints([event]) : [event]);
+                const candidates = this.candidateHistory!;
+                const affected = new Set<string>();
+                for (const [did, events] of Object.entries(candidates)) {
+                    if (!events.some(withdrawn)) continue;
+                    const retained = preferredCandidates(events.map(event => {
+                        const retained = withdrawn(event) ? relayHints([event])[0] : event;
+                        normalizeEventTime(retained);
+                        return retained;
+                    }));
+                    // The journal is authoritative if publication is interrupted.
+                    await this.db.setCandidates(did, retained);
+                    candidates[did] = retained;
+                    affected.add(did);
+                }
+                await this.db.removeBlocks(registry, fromHeight);
+                // Previously seen anchors in the rescanned range must be eligible again.
+                for (const key of Object.keys(this.eventsSeen)) delete this.eventsSeen[key];
+                const pending = [...affected];
+                for (const did of pending) for (const dependent of this.dependents.get(did) ?? []) {
+                    if (!affected.has(dependent)) { affected.add(dependent); pending.push(dependent); }
+                }
+                await this.rebuildHistories([...affected], candidates);
+                return true;
+            });
+        } catch (error) {
+            this.historyReady = undefined;
+            throw error;
+        } finally {
+            this.isProcessingEvents = false;
+        }
     }
 
     async addText(text: string): Promise<string> {

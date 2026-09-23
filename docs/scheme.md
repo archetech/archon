@@ -757,6 +757,13 @@ unconfirmed Hyperswarm hints before admission, so signed operations without
 complete anchor evidence can still propagate. This does not make controller
 history complete or authorization final; delayed evidence still triggers replay.
 
+Chain reorganization invalidates the affected chain receipts, not the signed
+operation bytes. The trusted mediator withdraws the rescanned suffix before
+committing its new scan position, clears orphaned discovered batches, and imports
+replacement evidence. Gatekeeper retains withdrawn operations as unconfirmed
+hints and replays affected histories, including dependent asset authorization.
+An orphaned anchor must not continue to supply confirmation or ordering priority.
+
 ### Implementation boundary: event authorization and proof verification
 
 Import and verified replay share event authorization: select the target state the operation chains from, select the authorizing controller document under the rules above, then verify the operation against that document. Confirmation replacements and competing events use the predecessor state, not the latest document. Direct submissions have no trusted event position and retain the historical `proof.created` selection. Predecessor validation uses the target DID's selected previous version, separately from the agent document selected to verify the signature. Direct updates and deletions must reference the current head before any operation storage or queue write. Import may select an earlier predecessor when considering a competing branch; an unavailable predecessor remains deferred and may become applicable when its history arrives. Verified resolution uses the same predecessor validation. No signed predecessor reference is rewritten.

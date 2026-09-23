@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import ZecRpcClient from '../../services/mediators/zcash/src/rpc.ts';
+import { rescanStart } from '../../services/mediators/zcash/src/rewind.ts';
 import { planScanStart } from '../../services/mediators/zcash/src/reorg.ts';
 import { BlockVerbosity, type MediatorDb } from '../../services/mediators/zcash/src/types.ts';
 
@@ -31,6 +32,7 @@ function harness(db = initial()) {
         .map(name => [`zcash${name}`, { set: (value: number) => { gauges[name] = value; } }]));
     const api = runInNewContext(ts.transpileModule(program, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, {
         zecClient, config, planScanStart, BlockVerbosity, Buffer, addBlock,
+        rescanStart, gatekeeper: { rewindRegistry: async () => true, getBlock: async (_registry: string, h: number) => ({ hash: `canonical-${h}` }) }, REGISTRY: 'ZEC:mainnet',
         chain: { header: (hash: string) => zecClient.getBlockHeader(hash), hashAt: (h: number) => zecClient.getBlockHash(h),
             txCount: async () => 1 },
         loadDb: async () => structuredClone(db),

@@ -246,6 +246,8 @@ pub(crate) async fn handle_did_operation(
     };
 
     normalize_event_time(&mut event);
+    crate::history::retain_candidates(state, &did, Some(event.clone())).await
+        .map_err(|error| error.to_string())?;
 
     let queue_registry = if op_type == "create" {
         payload

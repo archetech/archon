@@ -102,11 +102,8 @@ async fn retain_candidates_with_histories(
     }
     let candidates = cache.as_mut().expect("candidate cache initialized");
     let mut events = candidates.get(did).cloned().unwrap_or_default();
-    events.extend(
-        histories
-            .map(|items| items.get(did).cloned().unwrap_or_default())
-            .unwrap_or_else(|| store.get_events(did)),
-    );
+    // The journal is authoritative after migration; a stale projection cannot
+    // resurrect evidence withdrawn by a reorg.
     events.extend(incoming);
     for event in &mut events {
         normalize_candidate_event(&mut store, event)?;
@@ -119,6 +116,79 @@ async fn retain_candidates_with_histories(
     index_candidates(&mut dependents, did, &events);
     candidates.insert(did.to_string(), events);
     Ok(changed)
+}
+
+// Call with history_lock held and event processing excluded.
+pub(crate) async fn rewind_registry(
+    state: &AppState,
+    registry: &str,
+    from_height: u64,
+) -> Result<()> {
+    let withdrawn = |event: &EventRecord| {
+        event.registry == registry
+            && event
+                .registration
+                .as_ref()
+                .and_then(|r| crate::proofs::ordinal_component(&r["height"]))
+                .is_some_and(|h| h >= from_height)
+    };
+    let demote = |mut event: EventRecord| {
+        if withdrawn(&event) {
+            event.registry = "hyperswarm".to_string();
+            event.registration = None;
+            normalize_event_time(&mut event);
+        }
+        event
+    };
+    let result = async {
+        {
+            let mut queue = state.import_queue.lock().await;
+            *queue = queue.iter().cloned().map(&demote).collect();
+        }
+        let mut affected = HashSet::new();
+        {
+            let mut cache = state.candidate_history.lock().await;
+            let candidates = cache.as_mut().expect("history initialized");
+            for (did, events) in candidates.iter_mut() {
+                if !events.iter().any(&withdrawn) {
+                    continue;
+                }
+                let retained = preferred_candidates(events.iter().cloned().map(&demote).collect());
+                state
+                    .store
+                    .lock()
+                    .await
+                    .set_candidates(did, retained.clone())?;
+                *events = retained;
+                affected.insert(did.clone());
+            }
+        }
+        state
+            .store
+            .lock()
+            .await
+            .remove_blocks(registry, from_height)?;
+        state.events_seen.lock().await.clear();
+        {
+            let dependents = state.dependents.lock().await;
+            let mut pending: Vec<_> = affected.iter().cloned().collect();
+            while let Some(did) = pending.pop() {
+                for dependent in dependents.get(&did).into_iter().flatten() {
+                    if affected.insert(dependent.clone()) {
+                        pending.push(dependent.clone());
+                    }
+                }
+            }
+        }
+        rebuild_histories(state, affected.into_iter().collect(), None).await?;
+        Ok(())
+    }
+    .await;
+    *state.status_snapshot.lock().await = None;
+    if result.is_err() {
+        *state.history_ready.lock().await = false;
+    }
+    result
 }
 
 // Call with history_lock held. Remove the whole set before replaying dependents.

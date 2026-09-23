@@ -340,6 +340,15 @@ export default class GatekeeperClient implements GatekeeperInterface {
         }
     }
 
+    async rewindRegistry(registry: string, fromHeight: number): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/block/${registry}/rewind`, { fromHeight });
+            return response.data;
+        } catch (error) {
+            throwError(error);
+        }
+    }
+
     async getJSON(cid: string): Promise<object> {
         try {
             const response = await this.axios.get(`${this.API}/ipfs/json/${cid}`);

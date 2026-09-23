@@ -329,6 +329,13 @@ export default class DbSqlite implements GatekeeperDb {
         return rows.map(row => String(row.id));
     }
 
+    async removeBlocks(registry: string, fromHeight: number): Promise<void> {
+        if (!this.db) throw new Error(SQLITE_NOT_STARTED_ERROR);
+        await this.runExclusive(() => {
+            this.db!.prepare('DELETE FROM blocks WHERE registry = ? AND height >= ?').run(registry, fromHeight);
+        });
+    }
+
     async addBlock(registry: string, blockInfo: BlockInfo): Promise<boolean> {
         if (!this.db) {
             throw new Error(SQLITE_NOT_STARTED_ERROR);

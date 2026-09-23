@@ -471,6 +471,82 @@ impl JsonDb {
         Ok(self.data.candidates.clone())
     }
 
+    pub(crate) fn remove_blocks(&mut self, registry: &str, from_height: u64) -> Result<()> {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self.with_redis_connection(|conn, namespace| {
+                let mut cursor = 0u64;
+                let mut pipe = redis::pipe();
+                pipe.atomic();
+                loop {
+                    let (next, keys): (u64, Vec<String>) = redis::cmd("SCAN")
+                        .arg(cursor)
+                        .arg("MATCH")
+                        .arg(Self::redis_block_key(namespace, registry, "*"))
+                        .arg("COUNT")
+                        .arg(100)
+                        .query(conn)?;
+                    for key in keys {
+                        let body: Option<String> = conn.get(&key)?;
+                        if let Some(body) = body {
+                            let block: Value = serde_json::from_str(&body)?;
+                            if block["height"].as_u64().is_some_and(|h| h >= from_height) {
+                                pipe.cmd("DEL").arg(key).ignore();
+                            }
+                        }
+                    }
+                    cursor = next;
+                    if cursor == 0 {
+                        break;
+                    }
+                }
+                let map_key = Self::redis_height_map_key(namespace, registry);
+                let heights: HashMap<String, String> = conn.hgetall(&map_key)?;
+                let mut max_height: Option<u64> = None;
+                for height in heights.keys() {
+                    let value: u64 = height.parse()?;
+                    if value >= from_height {
+                        pipe.cmd("HDEL").arg(&map_key).arg(height).ignore();
+                    } else {
+                        max_height = Some(max_height.map_or(value, |previous| previous.max(value)));
+                    }
+                }
+                let max_key = Self::redis_max_height_key(namespace, registry);
+                if let Some(height) = max_height {
+                    pipe.cmd("SET").arg(max_key).arg(height).ignore();
+                } else {
+                    pipe.cmd("DEL").arg(max_key).ignore();
+                }
+                pipe.query::<()>(conn)?;
+                Ok(())
+            });
+        }
+        if let DbBackend::Sqlite { path } = &self.backend {
+            DbBackend::open_sqlite(path)?.execute(
+                "DELETE FROM blocks WHERE registry = ?1 AND height >= ?2",
+                params![registry, from_height as i64],
+            )?;
+            return Ok(());
+        }
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            self.mongo_client()?
+                .database(self.mongo_database_name()?)
+                .collection::<Document>("blocks")
+                .delete_many(
+                    doc! { "registry": registry, "height": { "$gte": from_height as i64 } },
+                )
+                .run()?;
+            return Ok(());
+        }
+        if let Some(blocks) = self.data.blocks.get_mut(registry) {
+            blocks.retain(|_, block| {
+                block["height"]
+                    .as_u64()
+                    .is_none_or(|height| height < from_height)
+            });
+        }
+        self.save()
+    }
+
     pub(crate) fn set_candidates(&mut self, did: &str, events: Vec<EventRecord>) -> Result<()> {
         if matches!(self.backend, DbBackend::Redis { .. }) {
             return self.with_redis_connection(|conn, namespace| {

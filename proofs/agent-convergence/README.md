@@ -1132,3 +1132,12 @@ signed controller/component/migration bridges remain in use, with additional
 ordinary-versus-verified full-result comparisons under historical bounds. This
 is an equivalence argument for the extracted interpretation, not a new universal
 runtime-refinement theorem or a change to the completed proof roadmap.
+
+### Chain reorganization boundary (#1270)
+
+The convergence theorem starts with common normalized retained evidence. It does
+not prove chain finality, mediator fork detection, or evidence withdrawal. Rewind
+removes invalidated chain receipts, retains their operations as unconfirmed hints,
+and replays the resulting evidence set with the existing selector. Shared signed
+TypeScript/Rust regressions cover branch changes, dependent authorization, and
+restart after journal persistence; these are finite implementation checks.

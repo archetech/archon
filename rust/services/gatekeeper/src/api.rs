@@ -1055,6 +1055,49 @@ pub(crate) async fn get_block_by_id(
     Json(json!(block)).into_response()
 }
 
+pub(crate) async fn rewind_registry(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(registry): Path<String>,
+    Json(payload): Json<Value>,
+) -> Response {
+    if let Some(response) = require_admin_key(&state, &headers) {
+        return response;
+    }
+    let from_height = payload
+        .get("fromHeight")
+        .and_then(crate::proofs::ordinal_component);
+    if !is_valid_registry(&registry)
+        || crate::event_policy::is_unanchored_registry(&registry)
+        || from_height.is_none_or(|height| height > 9_007_199_254_740_991)
+    {
+        return text_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Invalid registry/fromHeight",
+        );
+    }
+    if let Err(error) = crate::history::ensure_history_ready(&state).await {
+        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    }
+    {
+        let mut busy = state.processing_events.lock().await;
+        if *busy {
+            return text_error_response(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Gatekeeper is processing events; retry rewind",
+            );
+        }
+        *busy = true;
+    }
+    let _guard = state.history_lock.lock().await;
+    let result = crate::history::rewind_registry(&state, &registry, from_height.unwrap()).await;
+    *state.processing_events.lock().await = false;
+    match result {
+        Ok(()) => Json(json!(true)).into_response(),
+        Err(error) => text_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+    }
+}
+
 pub(crate) async fn add_block(
     State(state): State<AppState>,
     headers: HeaderMap,

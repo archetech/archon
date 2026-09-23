@@ -31,8 +31,8 @@ Walks the configured chain from `startBlock` forward via Zebra JSON-RPC,
 decoding every `OP_RETURN` output of every transparent transaction.
 When an `OP_RETURN` payload decodes as a valid `did:cid:...`, that
 transaction is recorded as a **discovered item** (height, index, time,
-txid, did). Handles reorgs by re-reading a bounded number of blocks
-(§2.4).
+txid, did). Handles reorgs by withdrawing orphaned evidence and rescanning
+from a surviving checkpoint (§2.4).
 
 Shielded inputs and outputs are ignored; the scanner only inspects
 transparent `vout[].scriptPubKey.asm` strings.
@@ -178,11 +178,21 @@ checkpoint checks and failed scan attempts, separately from batch-import errors.
 Reorgs are counted via the `zcash_reorgs_total` metric, once per rewind that is
 committed.
 
-A reorg deeper than the configured depth is not detected. Imports are
-idempotent at the Gatekeeper level
-(`importBatchByCids` with the same CIDs produces the same `processed`
-result), so any discovered items beyond the rewind point will be
-re-discovered and re-imported as the canonical chain is rescanned.
+The configured depth is the initial rewind range. Before committing it, the
+mediator checks the preceding stored Gatekeeper block against the canonical
+chain and searches backward to a surviving checkpoint (or the configured start).
+It calls Gatekeeper `rewindRegistry(registry, fromHeight)` and waits for success,
+then atomically removes discovered items in that suffix while saving the new
+scan position. A failed rewind leaves the old scan position and discovered list
+intact for retry. Rescanning discovers replacement anchors, including the case
+where an orphaned batch has no replacement.
+
+Gatekeeper withdraws chain receipts and block metadata in the suffix, retains
+the signed operations as unconfirmed Hyperswarm hints, and replays affected
+histories and controller dependents. Other registries and earlier anchors remain
+intact. The candidate journal takes precedence over stale accepted projections
+after an interrupted publication. A rewind is retryable and does not change
+batch DID resolution or key-rotation semantics.
 
 ---
 
@@ -387,7 +397,7 @@ No `/ready`, no CORS, no admin auth. No public client-facing routes.
 | `ARCHON_ZEC_FEE_ORACLE_URL` | empty | Optional remote fee oracle with mempool.space-compatible `{ fastestFee, halfHourFee, hourFee }` JSON. |
 | `ARCHON_ZEC_RBF_ENABLED` | `false` | Accepted for config parity. v1 logs a notice and never bumps. |
 | `ARCHON_ZEC_START_BLOCK` | `0` | Scan from this height. Set per-chain to skip pre-launch history. |
-| `ARCHON_ZEC_REORG_DEPTH` | `6` | Blocks to re-read after a reorg. Deep enough for a natural fork; a deeper one is not detected. |
+| `ARCHON_ZEC_REORG_DEPTH` | `6` | Initial rewind depth; extended backward if the preceding checkpoint did not survive. |
 | `ARCHON_ZEC_REIMPORT` | `true` | Clear per-item import state on startup. |
 | `ARCHON_ZEC_DB` | `json` | Storage backend. |
 | `ARCHON_ZEC_DB_NAME` | `<chain>` (`:` → `-`) | Database key / filename base. |
@@ -485,7 +495,7 @@ A conformant third implementation MUST:
 - Parse OP_RETURN payloads on transparent Zcash outputs and detect
   valid `did:cid:...` strings.
 - Ignore shielded inputs/outputs entirely.
-- Handle reorgs by rewinding a bounded number of blocks and re-reading
+- Handle reorgs by withdrawing affected Gatekeeper evidence, pruning discovered items, and re-reading
   them, adjusting `txnsScanned` accordingly, and treat a node that cannot
   answer as a reason to retry rather than as a reorg.
 - Persist the `MediatorDb` shape in §4, including the atomic

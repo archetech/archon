@@ -167,6 +167,7 @@ export interface GatekeeperInterface {
     getText(cid: string): Promise<string | null>;
     getBlock(registry: string, block?: BlockId): Promise<BlockInfo | null>;
     addBlock(registry: string, block: BlockInfo): Promise<boolean>;
+    rewindRegistry(registry: string, fromHeight: number): Promise<boolean>;
     generateDID(operation: Operation): Promise<string>;
     searchDocs(q: string): Promise<string[]>;
     queryDocs(where: Record<string, unknown>): Promise<string[]>;

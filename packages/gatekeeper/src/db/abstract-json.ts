@@ -190,6 +190,17 @@ export abstract class AbstractJson implements GatekeeperDb {
         return Object.keys(db.dids);
     }
 
+    async removeBlocks(registry: string, fromHeight: number): Promise<void> {
+        await this.runExclusive(async () => {
+            const db = this.loadDb();
+            const blocks = db.blocks?.[registry];
+            for (const [hash, block] of Object.entries(blocks ?? {})) {
+                if ((block as BlockInfo).height >= fromHeight) delete blocks[hash];
+            }
+            this.writeDb(db);
+        });
+    }
+
     async addBlock(registry: string, blockInfo: BlockInfo): Promise<boolean> {
         return this.runExclusive(async () => {
             const db = this.loadDb();
