@@ -37,9 +37,9 @@ function harness(name: typeof names[number], initial: Item[], failure: Failure) 
     const applied: number[] = [];
     const logs: Record<string, any>[] = [];
     const keymaster = {
-        resolveAsset: jest.fn(async (did: string) => {
+        resolveDID: jest.fn(async (did: string, options?: { versionSequence: number }) => {
             if (!available && failure === 'batch' && did === item(100).did) throw new Error('DID unavailable');
-            return { batch: { version: 1, ops: [cid] } };
+            return { didDocumentData: { batch: { version: 1, ops: [cid] } } };
         }),
     };
     const gatekeeper = {
@@ -151,7 +151,7 @@ describe.each(names)('%s unavailable batches', (name) => {
     it('retries incomplete CID fetches even when unrelated pending work is identified', async () => {
         const h = harness(name, [item(100)], 'batch');
         h.recover();
-        h.keymaster.resolveAsset.mockResolvedValue({ batch: { version: 1, ops: [cid, 'missing-cid'] } });
+        h.keymaster.resolveDID.mockResolvedValue({ didDocumentData: { batch: { version: 1, ops: [cid, 'missing-cid'] } } });
         h.gatekeeper.processEvents.mockResolvedValue({ pending: 2, pendingBatches: [] });
         await h.importBatches();
         expect(h.snapshot()[0].error).toMatch(/Incomplete batch: 1\/2/);
@@ -182,6 +182,22 @@ describe.each(names)('%s unavailable batches', (name) => {
         expect(restarted.snapshot()[0].error).toBeUndefined();
         expect(restarted.snapshot()[0].processed).toEqual({ pending: 0 });
         expect(restarted.snapshot()[1]).toEqual(first.snapshot()[1]);
+    });
+
+    it('reads the ordered CID list from the batch DID genesis', async () => {
+        const h = harness(name, [item(100)], 'batch');
+        h.recover();
+        const secondCid = await generateCID({ second: true });
+        h.keymaster.resolveDID.mockImplementation(async (_did, options) => ({ didDocumentData: {
+            batch: { version: 1, ops: options?.versionSequence === 1 ? [cid, secondCid] : [secondCid, cid] },
+        } }));
+        h.gatekeeper.importBatchByCids.mockResolvedValue({ queued: 2, processed: 0, rejected: 0, total: 2 });
+        await h.importBatches();
+        expect(h.keymaster.resolveDID).toHaveBeenCalledWith(item(100).did, { versionSequence: 1 });
+        expect(h.gatekeeper.importBatchByCids).toHaveBeenCalledWith([cid, secondCid], expect.objectContaining({
+            ordinal: [100, 0],
+            registration: expect.objectContaining({ batch: item(100).did }),
+        }));
     });
 
     it('does not let a reference that stays unavailable block newly discovered batches', async () => {

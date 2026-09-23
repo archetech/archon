@@ -126,8 +126,10 @@ The asset is owned by `ARCHON_NODE_ID`. Exporters register it to the
 When the scanner finds a transaction whose `OP_RETURN` is a valid DID,
 the import path:
 
-1. `asset = keymaster.resolveAsset(did)` — follow the DID document.
-2. Extract `asset.batch.ops[]`.
+1. `doc = keymaster.resolveDID(did, { versionSequence: 1 })` — resolve the
+   batch DID's genesis create operation, even if the asset was later updated.
+2. Extract `doc.didDocumentData.batch.ops[]` in its original order. Missing
+   genesis content remains retryable; later asset state is never substituted.
 3. Call `gatekeeper.importBatchByCids(ops, { registry: <chain>, time:
    block.time, ordinal: [height, index], registration: { height, index,
    txid, batch: did } })`.

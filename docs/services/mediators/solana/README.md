@@ -9,6 +9,12 @@ The mediator has two responsibilities:
 
 The memo payload intentionally does not validate Archon DID semantics. Gatekeeper remains the validation authority; Solana is used as a publication, ordering, and timestamping layer.
 
+An Archon memo commits to the batch DID's signed create operation. Import
+resolves that DID at `versionSequence: 1` and uses the ordered
+`didDocumentData.batch.ops` list from genesis. A later batch-asset update cannot
+change the operations or their `opidx` values for the existing anchor. Missing
+genesis content is retried rather than replaced with latest asset state.
+
 Each import cycle also syncs finalized Solana block checkpoints into Gatekeeper for every produced block whose block height is at least `ARCHON_SOL_START_BLOCK` and divisible by 100. The mediator uses Solana slots as an internal scan cursor, but Gatekeeper block records and DID registration metadata use produced block heights so independent nodes can derive the same lower-bound timestamps.
 
 Mediator metrics distinguish slot scan state from produced block heights:
