@@ -1,20 +1,10 @@
-// Reorg handling for a chain the mediator scans block by block.
-//
-// The local store keeps one {height, hash}, the last block read, so the depth
-// of a reorg cannot be measured from it. What can be done is bound the
-// response. Re-reading a fixed number of blocks is idempotent -- discovered
-// items are keyed by height, index, txid and DID -- and costs that many
-// blocks. Following the orphaned chain to find the fork point instead costs
-// whatever the node still holds of it, and yields nothing once it holds none
-// (#1063).
-//
-// The exact fork point is recoverable: every scanned block is sent to the
-// gatekeeper with its height, so its registry can be compared against the
-// chain. That trades a bounded local decision for a walk over two remote
-// services, and is not what this does.
+// Initial reorg scan plan for a chain the mediator scans block by block.
+// The local cursor detects a changed checkpoint but cannot locate the fork.
+// This helper proposes a rewind window; the caller verifies a surviving
+// Gatekeeper checkpoint, extends the window when needed, and withdraws
+// orphaned receipts before persisting this plan.
 
-// Deep enough to cover a natural reorg on either chain, which is one or two
-// blocks, with room to spare.
+// Initial window only; it does not limit the depth of recovery.
 export const DEFAULT_REORG_DEPTH = 6;
 
 // A depth below one would rewind to the reorged height itself: the handler

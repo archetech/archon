@@ -65,3 +65,14 @@ Unavailable content, incomplete CID results, processing failures, and batches
 with their own pending events remain retryable. Older Gatekeepers that omit
 `pendingBatches` retain the conservative global-pending behavior. Persisted
 “No progress” errors recover through the normal retry pass without database edits.
+
+## Reorganization recovery
+
+A changed scan-checkpoint hash triggers a rewind. The confirmation window is
+an initial range: the mediator checks stored Gatekeeper checkpoints backward
+until one still matches the canonical chain, or the configured start is reached.
+An unavailable canonical checkpoint pauses recovery. Before saving the new scan
+position, the mediator calls Gatekeeper `rewindRegistry` and removes discovered
+items in the rescanned suffix. Gatekeeper withdraws those receipts and blocks,
+retains signed operations as unconfirmed hints, and replays dependent histories.
+Failure leaves the old scan position in place so the operation is retried.

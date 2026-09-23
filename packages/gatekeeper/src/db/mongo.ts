@@ -253,6 +253,11 @@ export default class DbMongo implements GatekeeperDb {
         }
     }
 
+    async removeBlocks(registry: string, fromHeight: number): Promise<void> {
+        if (!this.db) throw new Error(MONGO_NOT_STARTED_ERROR);
+        await this.db.collection('blocks').deleteMany({ registry, height: { $gte: fromHeight } });
+    }
+
     async addBlock(registry: string, blockInfo: BlockInfo): Promise<boolean> {
         if (!this.db) {
             throw new Error(MONGO_NOT_STARTED_ERROR);

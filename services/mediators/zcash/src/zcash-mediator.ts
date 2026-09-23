@@ -1,3 +1,4 @@
+import { rescanStart } from './rewind.js';
 import type { ChainBatchMetadata } from '@didcid/clients/gatekeeper-types';
 import ZecRpcClient from './rpc.js';
 import type { Block, BlockVerbose, BlockHeader } from 'bitcoin-core';
@@ -265,10 +266,26 @@ async function resolveScanStart(blockCount: number): Promise<number | null> {
     }
 
     if ('commit' in decision) {
+        const from = await rescanStart(decision.from, config.startBlock,
+            height => gatekeeper.getBlock(REGISTRY, height), height => chain.hashAt(height));
+        const height = from - 1;
+        const checkpoint = height >= config.startBlock ? await gatekeeper.getBlock(REGISTRY, height) : null;
+        if (height >= config.startBlock && !checkpoint) throw new Error('Rewind checkpoint unavailable');
+        if (from !== decision.from) {
+            decision.commit.txnsScanned = 0;
+            decision.log += `; extended rescan to ${from}`;
+        }
+        decision.from = from;
+        // Retain the hash we verified, so another fork during recovery is detected next pass.
+        Object.assign(decision.commit, { height, hash: checkpoint?.hash || '',
+            time: checkpoint?.time ? new Date(checkpoint.time * 1000).toISOString() : '',
+            blocksScanned: Math.max(0, from - config.startBlock), blocksPending: blockCount - height });
+        if (!await gatekeeper.rewindRegistry(REGISTRY, decision.from)) throw new Error('Gatekeeper rewind failed');
         zcashReorgs.inc();
         console.log(decision.log);
         await jsonPersister.updateDb((data) => {
             Object.assign(data, decision.commit);
+            data.discovered = data.discovered.filter(item => item.height < decision.from);
         });
     }
 

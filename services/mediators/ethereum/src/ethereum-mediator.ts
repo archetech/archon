@@ -1,3 +1,4 @@
+import { rescanStart } from './rewind.js';
 import type { ChainBatchMetadata } from '@didcid/clients/gatekeeper-types';
 import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/clients/gatekeeper';
@@ -366,19 +367,29 @@ async function resolveScanStart(blockCount: number): Promise<number> {
     }
 
     const block = await provider.getBlock(db.height);
-    if (block?.hash === db.hash) {
+    if (!block?.hash) throw new Error(`Stored checkpoint unavailable: ${db.height}`);
+    if (block.hash === db.hash) {
         return db.height + 1;
     }
 
     ethereumReorgs.inc();
     console.log(`Reorg detected at height ${db.height}, rewinding ${config.confirmations} confirmed block(s)...`);
-    const rewindHeight = Math.max(config.startBlock, db.height - config.confirmations);
-    const rewindBlock = await provider.getBlock(rewindHeight);
+    const from = await rescanStart(Math.max(config.startBlock, db.height - config.confirmations + 1), config.startBlock,
+        height => gatekeeper.getBlock(REGISTRY, height), async height => {
+            const block = await provider.getBlock(height);
+            if (!block?.hash) throw new Error(`Canonical block unavailable: ${height}`);
+            return block.hash;
+        });
+    const rewindHeight = from - 1;
+    const rewindBlock = rewindHeight >= config.startBlock ? await gatekeeper.getBlock(REGISTRY, rewindHeight) : null;
+    if (rewindHeight >= config.startBlock && !rewindBlock) throw new Error('Rewind checkpoint unavailable');
+    if (!await gatekeeper.rewindRegistry(REGISTRY, from)) throw new Error('Gatekeeper rewind failed');
 
     await jsonPersister.updateDb((data) => {
+        data.discovered = data.discovered.filter(item => item.height <= rewindHeight);
         data.height = rewindHeight;
         data.hash = rewindBlock?.hash || '';
-        data.time = rewindBlock?.timestamp ? new Date(rewindBlock.timestamp * 1000).toISOString() : '';
+        data.time = rewindBlock?.time ? new Date(rewindBlock.time * 1000).toISOString() : '';
         data.blocksScanned = Math.max(0, rewindHeight - config.startBlock + 1);
         data.blockCount = blockCount;
         data.blocksPending = Math.max(0, blockCount - rewindHeight);

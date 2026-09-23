@@ -1027,6 +1027,13 @@ describe('getBlock', () => {
         expect(block).toStrictEqual(mockBlock);
     });
 
+    it('routes numeric height zero to the genesis block', async () => {
+        const genesis = { ...mockBlock, height: 0 };
+        nock(GatekeeperURL).get(`${Endpoints.block}/${mockRegistry}/0`).reply(200, genesis);
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+        expect(await gatekeeper.getBlock(mockRegistry, 0)).toStrictEqual(genesis);
+    });
+
     it('should throw exception on getBlock server error', async () => {
         nock(GatekeeperURL)
             .get(`${Endpoints.block}/${mockRegistry}/latest`)
@@ -1199,4 +1206,18 @@ describe('queryDocs', () => {
             expect(error.message).toBe(ServerError.message);
         }
     });
+});
+
+it('sends a registry rewind through the authenticated client transport', async () => {
+    const scope = nock(GatekeeperURL, { reqheaders: { 'X-Archon-Admin-Key': 'admin-test' } })
+        .post('/api/v1/block/BTC:signet/rewind', { fromHeight: 100 }).reply(200, 'true');
+    const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL, apiKey: 'admin-test' });
+    await expect(gatekeeper.rewindRegistry('BTC:signet', 100)).resolves.toBe(true);
+    expect(scope.isDone()).toBe(true);
+});
+
+it('propagates registry rewind failures for mediator retry', async () => {
+    nock(GatekeeperURL).post('/api/v1/block/BTC:signet/rewind').reply(500, ServerError);
+    const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+    await expect(gatekeeper.rewindRegistry('BTC:signet', 100)).rejects.toMatchObject(ServerError);
 });

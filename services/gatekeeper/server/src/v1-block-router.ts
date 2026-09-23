@@ -9,6 +9,40 @@ export function createBlockRouter(options: CreateV1RouterOptions): express.Route
 
     /**
      * @swagger
+     * /api/v1/block/{registry}/rewind:
+     *   post:
+     *     summary: Withdraw chain receipts and block metadata from a rescan height
+     *     tags: [Blocks]
+     *     parameters:
+     *       - in: path
+     *         name: registry
+     *         required: true
+     *         schema: { type: string }
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [fromHeight]
+     *             properties:
+     *               fromHeight: { type: integer, minimum: 0 }
+     *     responses:
+     *       200:
+     *         description: Evidence withdrawn and affected histories replayed
+     *       500:
+     *         description: Rewind failed or processing is busy; retry before advancing the scan
+     */
+    router.post('/block/:registry/rewind', requireAdminKey, async (req, res) => {
+        try {
+            res.json(await gatekeeper.rewindRegistry(req.params.registry as string, req.body.fromHeight));
+        } catch (error: any) {
+            res.status(500).send(error.toString());
+        }
+    });
+
+    /**
+     * @swagger
      * /api/v1/block/{registry}/latest:
      *   get:
      *     summary: Retrieve the latest block for a specific registry

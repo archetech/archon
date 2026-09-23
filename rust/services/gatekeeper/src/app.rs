@@ -23,7 +23,7 @@ use tracing::{info, warn};
 
 use crate::{
     api::{
-        add_block, api_not_found, clear_queue, conformant_dereference_data,
+        add_block, rewind_registry, api_not_found, clear_queue, conformant_dereference_data,
         conformant_dereference_registration, conformant_not_found, conformant_resolve_did,
         create_did, db_reset,
         db_verify, export_batch, export_dids, generate_did, get_block_by_id, get_latest_block,
@@ -42,6 +42,7 @@ pub(crate) struct AppState {
     pub(crate) client: Client,
     pub(crate) metrics: Arc<Metrics>,
     pub(crate) store: Arc<Mutex<JsonDb>>,
+    pub(crate) import_admission: Arc<tokio::sync::RwLock<()>>,
     pub(crate) import_queue: Arc<Mutex<Vec<EventRecord>>>,
     pub(crate) events_seen: Arc<Mutex<HashMap<String, bool>>>,
     pub(crate) verified_dids: Arc<Mutex<HashMap<String, bool>>>,
@@ -180,6 +181,7 @@ fn build_state(config: Config) -> Result<AppState> {
         metrics,
         store,
         import_queue: Arc::new(Mutex::new(Vec::new())),
+        import_admission: Arc::new(tokio::sync::RwLock::new(())),
         events_seen: Arc::new(Mutex::new(HashMap::new())),
         verified_dids: Arc::new(Mutex::new(HashMap::new())),
         supported_registries: Arc::new(Mutex::new(config.registries.clone())),
@@ -254,6 +256,7 @@ fn build_router(state: AppState) -> Router {
         .route("/block/:registry/latest", get(get_latest_block))
         .route("/block/:registry/:blockId", get(get_block_by_id))
         .route("/block/:registry", post(add_block))
+        .route("/block/:registry/rewind", post(rewind_registry))
         .route("/search", get(search_docs))
         .route("/query", post(query_docs))
         .layer(DefaultBodyLimit::max(json_limit));

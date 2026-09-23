@@ -27,7 +27,7 @@ Walks the configured chain from `startBlock` forward, decoding every
 `OP_RETURN` in every transaction. When an `OP_RETURN` payload decodes as
 a valid `did:cid:...`, that transaction is recorded as a
 **discovered item** (height, index, time, txid, did). Handles reorgs by
-re-reading a bounded number of blocks (§2.4).
+withdrawing orphaned evidence and rescanning from a surviving checkpoint (§2.4).
 
 ### 1.2 Import loop (read mode)
 
@@ -156,10 +156,21 @@ overwritten by a scan that never verified it.
 Reorgs are counted via the `satoshi_reorgs_total` metric, once per rewind that is
 committed.
 
-A reorg deeper than the configured depth is not detected. Any discovered items beyond the rewind point are re-discovered when the
-canonical chain is rescanned. Imports are idempotent at the Gatekeeper
-level (`importBatchByCids` with the same CIDs produces the same
-`processed` result).
+The configured depth is the initial rewind range. Before committing it, the
+mediator checks the preceding stored Gatekeeper block against the canonical
+chain and searches backward to a surviving checkpoint (or the configured start).
+It calls Gatekeeper `rewindRegistry(registry, fromHeight)` and waits for success,
+then atomically removes discovered items in that suffix while saving the new
+scan position. A failed rewind leaves the old scan position and discovered list
+intact for retry. Rescanning discovers replacement anchors, including the case
+where an orphaned batch has no replacement.
+
+Gatekeeper withdraws chain receipts and block metadata in the suffix, retains
+the signed operations as unconfirmed Hyperswarm hints, and replays affected
+histories and controller dependents. Other registries and earlier anchors remain
+intact. The candidate journal takes precedence over stale accepted projections
+after an interrupted publication. A rewind is retryable and does not change
+batch DID resolution or key-rotation semantics.
 
 ---
 
@@ -365,7 +376,7 @@ No `/ready`, no CORS, no admin auth. No public client-facing routes.
 | `ARCHON_SAT_FEE_ORACLE_URL` | empty | Optional remote fee oracle (e.g. mempool.space). |
 | `ARCHON_SAT_RBF_ENABLED` | `false` | Enable the replace-by-fee bump loop. |
 | `ARCHON_SAT_START_BLOCK` | `0` | Scan from this height. Set per-chain to skip pre-launch history. |
-| `ARCHON_SAT_REORG_DEPTH` | `6` | Blocks to re-read after a reorg. Deep enough for a natural fork; a deeper one is not detected. |
+| `ARCHON_SAT_REORG_DEPTH` | `6` | Initial rewind depth; extended backward if the preceding checkpoint did not survive. |
 | `ARCHON_SAT_REIMPORT` | `true` | Clear per-item import state on startup. |
 | `ARCHON_SAT_DB` | `json` | Storage backend. |
 | `ARCHON_SAT_DB_NAME` | `<chain>` (`:` → `-`) | Database key / filename base. |
@@ -458,7 +469,7 @@ expected block.
 A conformant third implementation MUST:
 
 - Parse OP_RETURN payloads and detect valid `did:cid:...` strings.
-- Handle reorgs by rewinding a bounded number of blocks and re-reading
+- Handle reorgs by withdrawing affected Gatekeeper evidence, pruning discovered items, and re-reading
   them, and treat a node that cannot answer as a reason to retry rather
   than as a reorg.
 - Persist the `MediatorDb` shape in §4, including the atomic

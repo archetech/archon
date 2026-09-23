@@ -51,6 +51,7 @@ function createMockGatekeeper() {
         getData: jest.fn<any>().mockResolvedValue(Buffer.from('bytes')),
         addDataStream: jest.fn<any>().mockResolvedValue('cid-stream'),
         getDataStream: jest.fn<any>().mockReturnValue(streamChunks(['streamed'])),
+        rewindRegistry: jest.fn<any>().mockResolvedValue(true),
         getBlock: jest.fn<any>().mockResolvedValue({ hash: 'abc', height: 7, time: 123 }),
         addBlock: jest.fn<any>().mockResolvedValue(true),
         searchDocs: jest.fn<any>().mockResolvedValue(['did:cid:abc']),
@@ -652,4 +653,15 @@ describe('startup admin key validation', () => {
         expect(result.fatal).toBeUndefined();
         expect(result.warning).toBeUndefined();
     });
+});
+
+it('requires admin authorization for chain rewind and propagates failure', async () => {
+    const { app, gatekeeper } = mount();
+    const path = '/api/v1/block/BTC:signet/rewind';
+    expect((await request(app).post(path).send({ fromHeight: 100 })).status).toBe(401);
+    expect(gatekeeper.rewindRegistry).not.toHaveBeenCalled();
+    expect((await request(app).post(path).set('X-Archon-Admin-Key', adminKey).send({ fromHeight: 100 })).body).toBe(true);
+    expect(gatekeeper.rewindRegistry).toHaveBeenCalledWith('BTC:signet', 100);
+    gatekeeper.rewindRegistry.mockRejectedValue(new Error('storage failure'));
+    expect((await request(app).post(path).set('X-Archon-Admin-Key', adminKey).send({ fromHeight: 100 })).status).toBe(500);
 });

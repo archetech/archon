@@ -45,7 +45,7 @@ Every node on a canonical Solana registry should scan the same registry address 
 | `ARCHON_SOL_CHAIN` | network derived | Gatekeeper registry name, e.g. `SOL:devnet` |
 | `ARCHON_SOL_NETWORK` | `mainnet-beta` | `mainnet-beta`, `devnet`, `testnet`, or `local` |
 | `ARCHON_SOL_RPC_URL` | network derived | Solana JSON-RPC endpoint |
-| `ARCHON_SOL_COMMITMENT` | `confirmed` | Solana commitment: `processed`, `confirmed`, or `finalized` |
+| `ARCHON_SOL_COMMITMENT` | `confirmed` | Commitment for transaction submission/pending tracking; imports always use `finalized` |
 | `ARCHON_SOL_MEMO_PROGRAM_ID` | Memo program | Solana Memo program ID to scan and publish to |
 | `ARCHON_SOL_START_BLOCK` | `0` | First produced block height to checkpoint and import/register |
 | `ARCHON_SOL_SIGNATURE_PAGE_LIMIT` | `100` | Signatures per `getSignaturesForAddress` page |
@@ -77,3 +77,13 @@ Unavailable content, incomplete CID results, processing failures, and batches
 with their own pending events remain retryable. Older Gatekeepers that omit
 `pendingBatches` retain the conservative global-pending behavior. Persisted
 “No progress” errors recover through the normal retry pass without database edits.
+
+## Import finality
+
+Discovery tips, signature listing, parsed transactions, and block retrieval all
+use `finalized`, independently of `ARCHON_SOL_COMMITMENT`. Gatekeeper therefore
+receives finalized Solana anchors; confirmed-only forks are not imported. This
+relies on Solana finality and does not provide recovery from a finalized-chain
+rollback. The setting still controls outbound transaction/pending tracking.
+Previously imported confirmed-only evidence is not automatically audited by
+this change; it prevents new discovery from using that weaker commitment.

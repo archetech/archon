@@ -48,10 +48,6 @@ let jsonPersister: MediatorDbInterface;
 let importRunning = false;
 let exportRunning = false;
 
-function transactionFinality(): Finality {
-    return config.commitment === 'finalized' ? 'finalized' : 'confirmed';
-}
-
 function formatError(error: unknown): string {
     if (error instanceof Error) {
         return error.stack || error.message;
@@ -397,7 +393,7 @@ async function addBlock(height: number, hash: string, time: number): Promise<voi
     await gatekeeper.addBlock(REGISTRY, { hash, height, time });
 }
 
-async function getSlotBlock(slot: number, finality: Finality = transactionFinality()): Promise<{ height: number; hash: string; time: number } | undefined> {
+async function getSlotBlock(slot: number, finality: Finality = 'finalized'): Promise<{ height: number; hash: string; time: number } | undefined> {
     const block = await connection.getBlock(slot, {
         commitment: finality,
         transactionDetails: 'none',
@@ -631,8 +627,8 @@ function memoFromInstruction(instruction: ParsedInstruction | PartiallyDecodedIn
 }
 
 async function scanSignatures(): Promise<void> {
-    const currentSlot = await connection.getSlot(config.commitment);
-    const currentBlockHeight = await connection.getBlockHeight(config.commitment);
+    const currentSlot = await connection.getSlot('finalized');
+    const currentBlockHeight = await connection.getBlockHeight('finalized');
     const db = await loadDb();
     const scanFloor = db.height > 0 ? Math.max(0, db.height - SLOT_OVERLAP) : 0;
 
@@ -655,7 +651,7 @@ async function scanSignatures(): Promise<void> {
         const signatures = await connection.getSignaturesForAddress(registryAddress, {
             limit: config.signaturePageLimit,
             before,
-        }, transactionFinality());
+        }, 'finalized');
 
         if (signatures.length === 0) {
             break;
@@ -685,7 +681,7 @@ async function scanSignatures(): Promise<void> {
 
     for (const candidate of candidates) {
         const tx = await connection.getParsedTransaction(candidate.signature, {
-            commitment: transactionFinality(),
+            commitment: 'finalized',
             maxSupportedTransactionVersion: 0,
         });
 

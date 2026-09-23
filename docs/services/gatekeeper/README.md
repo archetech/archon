@@ -1793,3 +1793,27 @@ assuming an older snapshot needs no canonical-ID repair. The benchmark reports
 wall time and database method counts; summed method durations include concurrent
 calls and must not be interpreted as additive wall time. It uses in-memory IPFS
 and does not seed blockchain metadata, so production timing can differ.
+
+### Chain reorganization recovery (`rewindRegistry`)
+
+`POST /api/v1/block/:registry/rewind` accepts `{ "fromHeight": 100 }` and requires
+`X-Archon-Admin-Key`. `registry` must be a chain registry; `fromHeight` must be a
+nonnegative safe integer. The successful response is `true`. The mediator must
+retry failures (including active imports or event processing) before advancing its
+checkpoint. Imports hold admission through CID fetching and queue insertion;
+rewind refuses to start while an import is active. During rewind, new imports
+receive a retryable error rather than being queued behind the withdrawal.
+
+For that registry at or above the inclusive height, Gatekeeper removes block
+metadata and converts retained/queued chain receipts into unconfirmed Hyperswarm
+hints. Signed operation bytes remain unchanged, hint time follows `proof.created`,
+and unaffected receipts—including other anchors of the same operation—remain.
+Changed histories and their controller dependents are replayed before success.
+Deduplication permits rediscovered anchors to be imported again.
+
+Candidate journals are authoritative after initial legacy-history migration.
+Rewind writes changed journals before publishing accepted histories, so startup
+must not merge stale projections back into an existing journal. If a request is
+interrupted, the mediator retries it while retaining its original scan position;
+completed journal writes survive recovery. This is evidence withdrawal, not a
+change to operation authorization or batch DID resolution.
