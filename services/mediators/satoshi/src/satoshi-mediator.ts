@@ -742,7 +742,16 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
         end();
     }
 
-    console.log(JSON.stringify(update, null, 4));
+    const { imported, processed, ...itemFields } = update;
+    console.log(JSON.stringify({
+        ...itemFields,
+        batchComplete: isFullyProcessed(update),
+        ...(imported && {
+            batchImport: { queued: imported.queued, alreadySeen: imported.processed, rejected: imported.rejected },
+            gatekeeperQueueAfterImport: imported.total,
+        }),
+        ...(processed && { gatekeeperProcessing: processed }),
+    }, null, 4));
     return update;
 }
 

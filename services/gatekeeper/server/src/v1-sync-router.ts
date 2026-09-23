@@ -155,16 +155,16 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
      *               properties:
      *                 queued:
      *                   type: integer
-     *                   description: Number of new, valid events that were queued.
+     *                   description: Number of new, valid events queued from this submitted batch.
      *                 processed:
      *                   type: integer
-     *                   description: Number of events recognized as duplicates.
+     *                   description: Number of submitted events recognized as duplicates.
      *                 rejected:
      *                   type: integer
-     *                   description: Number of events that failed validation.
+     *                   description: Number of submitted events that failed validation.
      *                 total:
      *                   type: integer
-     *                   description: The total event queue size after this import.
+     *                   description: Global inbound event queue size after import, including unrelated batches.
      *
      *       500:
      *         description: Internal Server Error.
@@ -266,12 +266,16 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
      *               properties:
      *                 queued:
      *                   type: number
+     *                   description: Number of new, valid events queued from this submitted batch.
      *                 processed:
      *                   type: number
+     *                   description: Number of submitted events recognized as duplicates.
      *                 rejected:
      *                   type: number
+     *                   description: Number of submitted events that failed validation.
      *                 total:
      *                   type: number
+     *                   description: Global inbound event queue size after import, including unrelated batches.
      */
     router.post('/batch/import/cids', requireAdminKey, async (req, res) => {
         try {
@@ -572,16 +576,16 @@ export function createSyncRouter(options: CreateV1RouterOptions): express.Router
      *                   properties:
      *                     added:
      *                       type: integer
-     *                       description: Number of newly imported events.
+     *                       description: Number of newly imported events across the global queue drain.
      *                     merged:
      *                       type: integer
-     *                       description: Number of duplicate events merged.
+     *                       description: Number of duplicate events merged across the global queue drain.
      *                     rejected:
      *                       type: integer
-     *                       description: Number of events that failed validation.
+     *                       description: Number of events that failed validation across the global queue drain.
      *                     pending:
      *                       type: integer
-     *                       description: Number of events still left in the queue after processing.
+     *                       description: Global inbound event queue size after processing, including unrelated batches.
      *                     pendingBatches:
      *                       type: array
      *                       items:

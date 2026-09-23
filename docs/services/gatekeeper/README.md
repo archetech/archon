@@ -458,11 +458,19 @@ size when the host OS exposes it (e.g. `/proc/self/status` on Linux).
 ImportBatchResult   = { queued, processed, rejected, total: <int> }
 ImportEventsResult  = { added, merged, rejected: <int> }
 ProcessEventsResult = { busy: true }
-                    | { added, merged, rejected, pending: <int> }
+                    | { added, merged, rejected, pending: <int>, pendingBatches?: string[] }
 VerifyDbResult      = { total, verified, expired, invalid: <int> }
 BlockInfo           = { height: <int>, hash: <string>, time: <unix-seconds> }
 BatchMetadata       = { registry, time, ordinal: number[], registration?: DidRegistration }
 ```
+
+In `ImportBatchResult`, `queued`, `processed`, and `rejected` count only the
+submitted batch; `total` is the **global inbound event queue size** after import.
+In `ProcessEventsResult`, `added`, `merged`, and `rejected` count work across the
+whole queue drained by that call, and `pending` is the **global inbound event
+queue size** afterward. Neither `total` nor `pending` counts only the caller's
+batch. Use `pendingBatches` to identify batches with deferred events (see
+[§8.2](#82-processevents-multi-pass)).
 
 ---
 
