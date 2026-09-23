@@ -1,0 +1,60 @@
+name: rust-mongodb-test
+
+on:
+  pull_request:
+    paths:
+      - 'rust/services/gatekeeper/**'
+      - 'tests/fixtures/chain-reorg.json'
+      - 'tests/gatekeeper/deterministic-vectors.json'
+      - '.github/workflows/rust-mongodb-test.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'rust/services/gatekeeper/**'
+      - 'tests/fixtures/chain-reorg.json'
+      - 'tests/gatekeeper/deterministic-vectors.json'
+      - '.github/workflows/rust-mongodb-test.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  mongodb:
+    name: Rust MongoDB startup and recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container: rust:1.90-trixie
+    services:
+      mongodb:
+        image: mongo:8.0
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      ARCHON_TEST_MONGODB_URL: mongodb://mongodb:27017
+      TOKIO_WORKER_THREADS: 2
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Cache Rust dependencies and test binaries
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+            rust/services/gatekeeper/target
+          key: rust-mongodb-${{ runner.os }}-1.90-${{ hashFiles('rust/services/gatekeeper/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            rust-mongodb-${{ runner.os }}-1.90-${{ hashFiles('rust/services/gatekeeper/Cargo.lock') }}-
+
+      - name: Test MongoDB startup, persistence, restart, and receipt recovery
+        run: >-
+          cargo test --locked --manifest-path rust/services/gatekeeper/Cargo.toml
+          -j 2 --test mongo_backend --test chain_reorg -- --test-threads=1
