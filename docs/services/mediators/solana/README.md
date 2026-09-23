@@ -4,14 +4,15 @@ The Solana mediator anchors Archon DID batches on Solana by publishing Archon-fo
 
 The mediator has two responsibilities:
 
-- **Import**: Scans Solana Memo program transactions for Archon batch memos, resolves discovered batch DIDs, and imports the signed operations into Gatekeeper.
+- **Import**: Scans Solana Memo program transactions for Archon batch memos, fetches immutable content for discovered batch DIDs, and imports the signed operations into Gatekeeper.
 - **Export**: Polls the Gatekeeper queue for the configured registry, creates an Archon batch DID on `pin` when that registry is available, falls back to `hyperswarm`, and asks the Solana wallet service to submit a memo transaction.
 
 The memo payload intentionally does not validate Archon DID semantics. Gatekeeper remains the validation authority; Solana is used as a publication, ordering, and timestamping layer.
 
 An Archon memo commits to the batch DID's signed create operation. Import
-resolves that DID at `versionSequence: 1` and uses the ordered
-`didDocumentData.batch.ops` list from genesis. A later batch-asset update cannot
+fetches the create operation by the DID's CID via Gatekeeper `getJSON` and uses
+the ordered `data.batch.ops` list, independently of publisher authorization history.
+A later batch-asset update cannot
 change the operations or their `opidx` values for the existing anchor. Missing
 genesis content is retried rather than replaced with latest asset state.
 

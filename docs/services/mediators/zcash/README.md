@@ -10,7 +10,7 @@ The canonical implementation is
 
 > **Related specs.** The zcash mediator reads from and writes to the
 > [Gatekeeper](../../gatekeeper/README.md) (DID queues, blocks,
-> `importBatchByCids`), resolves batch DIDs through the
+> `importBatchByCids`, CID-addressed batch content), publishes batches through
 > [Keymaster](../../keymaster/README.md), and delegates all Zcash signing
 > and UTXO management to the
 > [zcash-wallet](../zcash-wallet/README.md) service over HTTP.
@@ -39,7 +39,8 @@ transparent `vout[].scriptPubKey.asm` strings.
 
 ### 1.2 Import loop (read mode)
 
-For each discovered item, resolves the DID as an asset (expected shape:
+For each discovered item, fetches the asset create operation by the DID's CID
+and reads its `data` (expected shape:
 `{ batch: { version: 1, ops: [<CID>, ...] } }`), then calls
 `gatekeeper.importBatchByCids(cids, metadata)` with anchoring metadata
 derived from the Zcash transaction (`height`, `index`, `txid`, `batch`
@@ -140,9 +141,9 @@ registry when available, otherwise `hyperswarm`.
 When the scanner finds a transaction whose `OP_RETURN` is a valid DID,
 the import path:
 
-1. `doc = keymaster.resolveDID(did, { versionSequence: 1 })` — resolve the
-   batch DID's genesis create operation, even if the asset was later updated.
-2. Extract `doc.didDocumentData.batch.ops[]` in its original order. Missing
+1. `genesis = gatekeeper.getJSON(cid)` — fetch the immutable create operation
+   identified by the batch DID, independently of publisher authorization history.
+2. Extract `genesis.data.batch.ops[]` in its original order. Missing
    genesis content remains retryable; later asset state is never substituted.
 3. Call `gatekeeper.importBatchByCids(ops, { registry: <chain>, time:
    block.time, ordinal: [height, index], registration: { height, index,

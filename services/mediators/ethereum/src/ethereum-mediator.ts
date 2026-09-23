@@ -1,4 +1,4 @@
-import type { ChainBatchMetadata } from '@didcid/clients/gatekeeper-types';
+import type { ChainBatchMetadata, Operation } from '@didcid/clients/gatekeeper-types';
 import CipherNode from '@didcid/cipher/node';
 import GatekeeperClient from '@didcid/clients/gatekeeper';
 import KeymasterClient from '@didcid/clients/keymaster';
@@ -510,8 +510,11 @@ async function importBatch(item: DiscoveredItem, retry = false) {
         return;
     }
 
-    const doc = await keymaster.resolveDID(item.did, { versionSequence: 1 });
-    const batch = (doc.didDocumentData as { batch?: { version: number; ops: string[] } } | undefined)?.batch;
+    // The anchor commits to content, independently of the publisher's DID history.
+    const genesis = await gatekeeper.getJSON(item.did.slice('did:cid:'.length)) as Operation | null;
+    if (!genesis) throw new Error(`Batch content unavailable: ${item.did}`);
+    if (genesis.type !== 'create' || genesis.registration?.type !== 'asset') return;
+    const batch = (genesis.data as { batch?: { version: number; ops: string[] } } | undefined)?.batch;
 
     if (!batch || batch.version !== 1 || !Array.isArray(batch.ops) || batch.ops.length === 0) {
         return;

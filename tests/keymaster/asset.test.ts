@@ -47,8 +47,8 @@ describe('createAsset', () => {
             registration: { height: 100, index: 0, txid: 'tx', batch: batchDid },
         };
         const importGenesis = async () => {
-            const doc = await keymaster.resolveDID(batchDid, { versionSequence: 1 });
-            const ops = (doc.didDocumentData as typeof original).batch.ops;
+            const genesis = await gatekeeper.getJSON(batchDid.slice('did:cid:'.length)) as { data: typeof original };
+            const ops = genesis.data.batch.ops;
             await gatekeeper.importBatchByCids(ops, metadata);
             await gatekeeper.processEvents();
         };

@@ -733,8 +733,11 @@ strings supplied by the mediator; `batch` identifies the anchored batch DID.
 
 The batch DID identifies its signed create operation. Version-1 chain mediators
 MUST interpret the ordered `batch.ops` CID list from that create operation
-(`versionSequence: 1`). Later updates to the batch asset do not change which
-operations, or which `opidx` values, an existing chain anchor represents. If
+by fetching its CID-addressed content, independently of whether the batch
+asset is accepted under the publisher's available authorization history. The
+container must be an asset create operation with a version-1 batch list; its
+contents still undergo normal operation authorization. Later updates to the
+batch asset do not change which operations, or which `opidx` values, an existing chain anchor represents. If
 genesis content is unavailable, the mediator retries it; it does not use the
 latest asset state as a substitute.
 

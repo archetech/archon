@@ -36,13 +36,12 @@ function harness(name: typeof names[number], initial: Item[], failure: Failure) 
     const attempts: number[] = [];
     const applied: number[] = [];
     const logs: Record<string, any>[] = [];
-    const keymaster = {
-        resolveDID: jest.fn(async (did: string, options?: { versionSequence: number }) => {
-            if (!available && failure === 'batch' && did === item(100).did) throw new Error('DID unavailable');
-            return { didDocumentData: { batch: { version: 1, ops: [cid] } } };
-        }),
-    };
+    const keymaster = { resolveDID: jest.fn<() => Promise<unknown>>() };
     const gatekeeper = {
+        getJSON: jest.fn(async (batchCid: string) => {
+            if (!available && failure === 'batch' && batchCid === item(100).did.slice('did:cid:'.length)) throw new Error('Content unavailable');
+            return { type: 'create', registration: { type: 'asset' }, data: { batch: { version: 1, ops: [cid] } } };
+        }),
         importBatchByCids: jest.fn(async (_cids: string[], metadata: { ordinal: number[] }) => {
             const height = metadata.ordinal[0];
             attempts.push(height);
@@ -151,7 +150,7 @@ describe.each(names)('%s unavailable batches', (name) => {
     it('retries incomplete CID fetches even when unrelated pending work is identified', async () => {
         const h = harness(name, [item(100)], 'batch');
         h.recover();
-        h.keymaster.resolveDID.mockResolvedValue({ didDocumentData: { batch: { version: 1, ops: [cid, 'missing-cid'] } } });
+        h.gatekeeper.getJSON.mockResolvedValue({ type: 'create', registration: { type: 'asset' }, data: { batch: { version: 1, ops: [cid, 'missing-cid'] } } });
         h.gatekeeper.processEvents.mockResolvedValue({ pending: 2, pendingBatches: [] });
         await h.importBatches();
         expect(h.snapshot()[0].error).toMatch(/Incomplete batch: 1\/2/);
@@ -188,12 +187,14 @@ describe.each(names)('%s unavailable batches', (name) => {
         const h = harness(name, [item(100)], 'batch');
         h.recover();
         const secondCid = await generateCID({ second: true });
-        h.keymaster.resolveDID.mockImplementation(async (_did, options) => ({ didDocumentData: {
-            batch: { version: 1, ops: options?.versionSequence === 1 ? [cid, secondCid] : [secondCid, cid] },
-        } }));
+        h.keymaster.resolveDID.mockRejectedValue(new Error('Invalid DID: unknown'));
+        h.gatekeeper.getJSON.mockResolvedValue({ type: 'create', registration: { type: 'asset' }, data: {
+            batch: { version: 1, ops: [cid, secondCid] },
+        } });
         h.gatekeeper.importBatchByCids.mockResolvedValue({ queued: 2, processed: 0, rejected: 0, total: 2 });
         await h.importBatches();
-        expect(h.keymaster.resolveDID).toHaveBeenCalledWith(item(100).did, { versionSequence: 1 });
+        expect(h.gatekeeper.getJSON).toHaveBeenCalledWith(item(100).did.slice('did:cid:'.length));
+        expect(h.keymaster.resolveDID).not.toHaveBeenCalled();
         expect(h.gatekeeper.importBatchByCids).toHaveBeenCalledWith([cid, secondCid], expect.objectContaining({
             ordinal: [100, 0],
             registration: expect.objectContaining({ batch: item(100).did }),

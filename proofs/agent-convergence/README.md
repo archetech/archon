@@ -1132,3 +1132,14 @@ signed controller/component/migration bridges remain in use, with additional
 ordinary-versus-verified full-result comparisons under historical bounds. This
 is an equivalence argument for the extracted interpretation, not a new universal
 runtime-refinement theorem or a change to the completed proof roadmap.
+
+### Chain batch interpretation boundary (#1269)
+
+The convergence theorems assume common normalized operation evidence. Deriving
+that evidence from chain anchors is a mediator responsibility, outside the Lean
+model. Mediators read the immutable batch create operation by CID; even
+version-1 DID resolution is unsuitable because late publisher history can
+invalidate the batch asset. The signed `batch-publisher-history.json` regression
+covers the four mediator import functions with TypeScript and the corresponding
+Rust content/import HTTP routes, including restart. This is finite integration
+coverage, not a new universal mediator-refinement theorem.
