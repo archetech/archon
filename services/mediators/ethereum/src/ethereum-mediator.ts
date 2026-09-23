@@ -116,17 +116,17 @@ promClient.collectDefaultMetrics({ register });
 
 const ethereumBlockHeight = new promClient.Gauge({
     name: 'ethereum_block_height',
-    help: 'Current scanned finalized block height',
+    help: 'Persisted scan cursor block height',
 });
 
 const ethereumBlockCount = new promClient.Gauge({
     name: 'ethereum_block_count',
-    help: 'Latest observed finalized block height',
+    help: 'Persisted scan ceiling block height; finalized after the import-policy transition',
 });
 
 const ethereumBlocksPending = new promClient.Gauge({
     name: 'ethereum_blocks_pending',
-    help: 'Remaining finalized blocks to scan',
+    help: 'Persisted blocks remaining to scan; finalized after the import-policy transition',
 });
 
 const ethereumBlocksScanned = new promClient.Gauge({

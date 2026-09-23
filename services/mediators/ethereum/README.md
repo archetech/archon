@@ -77,6 +77,10 @@ imports and requires investigation. Finalized-chain rollback is outside the
 automatic recovery model. The existing canonical contract, ten-block checkpoint
 cadence, event positions, and timestamps remain unchanged.
 
-`ethereum_block_count` reports the observed finalized height;
-`ethereum_blocks_pending` reports finalized blocks remaining to scan.
+`ethereum_block_height` reports the persisted scan cursor, which can remain
+ahead of finality during the legacy upgrade wait.
+`ethereum_block_count` reports the persisted scan ceiling and
+`ethereum_blocks_pending` reports the stored backlog. During the upgrade wait,
+these retain their legacy values too; once the transition succeeds, the ceiling
+and backlog use finalized blocks.
 The ordinary `ethereum_reorgs_total` counter is removed.

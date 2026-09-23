@@ -363,16 +363,16 @@
       "targets": [
         {
           "expr": "ethereum_block_height{job=\"eth-mainnet-mediator\"}",
-          "legendFormat": "Scanned Height",
+          "legendFormat": "Scan Cursor",
           "refId": "A"
         },
         {
           "expr": "ethereum_block_count{job=\"eth-mainnet-mediator\"}",
-          "legendFormat": "Finalized Height",
+          "legendFormat": "Scan Ceiling",
           "refId": "B"
         }
       ],
-      "title": "Finalized Block Scan Progress",
+      "title": "Scan Cursor and Ceiling",
       "type": "timeseries"
     },
     {
