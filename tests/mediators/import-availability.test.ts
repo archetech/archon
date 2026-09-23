@@ -37,7 +37,7 @@ function harness(name: typeof names[number], initial: Item[], failure: Failure) 
     const applied: number[] = [];
     const logs: Record<string, any>[] = [];
     const keymaster = {
-        resolveDID: jest.fn(async (did: string, options: { versionSequence: number }) => {
+        resolveDID: jest.fn(async (did: string, options?: { versionSequence: number }) => {
             if (!available && failure === 'batch' && did === item(100).did) throw new Error('DID unavailable');
             return { didDocumentData: { batch: { version: 1, ops: [cid] } } };
         }),
@@ -189,7 +189,7 @@ describe.each(names)('%s unavailable batches', (name) => {
         h.recover();
         const secondCid = await generateCID({ second: true });
         h.keymaster.resolveDID.mockImplementation(async (_did, options) => ({ didDocumentData: {
-            batch: { version: 1, ops: options.versionSequence === 1 ? [cid, secondCid] : [secondCid, cid] },
+            batch: { version: 1, ops: options?.versionSequence === 1 ? [cid, secondCid] : [secondCid, cid] },
         } }));
         h.gatekeeper.importBatchByCids.mockResolvedValue({ queued: 2, processed: 0, rejected: 0, total: 2 });
         await h.importBatches();

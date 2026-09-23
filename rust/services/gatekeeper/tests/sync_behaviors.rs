@@ -103,8 +103,12 @@ async fn signed_batch_reorder_does_not_change_genesis_cid_order() -> Result<()> 
         ),
     )
     .await?;
-    let first_cid = first_did.strip_prefix("did:cid:").unwrap();
-    let second_cid = second_did.strip_prefix("did:cid:").unwrap();
+    let first_cid = first_did
+        .strip_prefix("did:cid:")
+        .expect("first asset DID must have did:cid: prefix");
+    let second_cid = second_did
+        .strip_prefix("did:cid:")
+        .expect("second asset DID must have did:cid: prefix");
     let genesis_ops = json!([first_cid, second_cid]);
     let batch_did = create_did(
         &service,
