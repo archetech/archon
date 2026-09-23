@@ -15,6 +15,30 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
 
     /**
      * @swagger
+     * /api/v1/did/{did}/genesis:
+     *   get:
+     *     summary: Retrieve the immutable create operation without asserting authorization
+     *     parameters:
+     *       - in: path
+     *         name: did
+     *         required: true
+     *         schema: { type: string }
+     *     responses:
+     *       200:
+     *         description: CID-verified create operation, including original data and proof
+     *       500:
+     *         description: Invalid DID, unavailable content, or invalid genesis
+     */
+    router.get('/did/:did/genesis', async (req, res) => {
+        try {
+            res.json(await gatekeeper.getGenesis(req.params.did as string));
+        } catch (error: any) {
+            res.status(500).send(error.toString());
+        }
+    });
+
+    /**
+     * @swagger
      * /api/v1/did:
      *   post:
      *     summary: Create, update, or delete a DID

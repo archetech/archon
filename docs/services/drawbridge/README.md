@@ -184,6 +184,7 @@ each route's contract.
 | `POST` | `/api/v1/did` |
 | `POST` | `/api/v1/did/generate` |
 | `GET` | `/api/v1/did/:did` (forwards `versionTime`/`versionSequence`/`confirm`/`verify` query params) |
+| `GET` | `/api/v1/did/:did/genesis` (immutable create operation; no publisher authorization claim) |
 | `POST` | `/api/v1/dids` |
 | `POST` | `/api/v1/dids/export` |
 | `POST/GET` | `/api/v1/ipfs/json[/:cid]` |

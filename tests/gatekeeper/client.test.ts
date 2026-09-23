@@ -1221,3 +1221,12 @@ it('propagates registry rewind failures for mediator retry', async () => {
     const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
     await expect(gatekeeper.rewindRegistry('BTC:signet', 100)).rejects.toMatchObject(ServerError);
 });
+
+describe('getGenesis', () => {
+    it('retrieves the original operation from the explicit genesis endpoint', async () => {
+        const operation = { type: 'create', data: { batch: { version: 1, ops: ['cid'] } }, proof: { proofValue: 'original' } };
+        nock(GatekeeperURL).get('/api/v1/did/did:cid:test/genesis').reply(200, operation);
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+        expect(await gatekeeper.getGenesis('did:cid:test')).toEqual(operation);
+    });
+});

@@ -188,6 +188,29 @@
         }
       }
     },
+    "/api/v1/did/{did}/genesis": {
+      "get": {
+        "summary": "Retrieve the immutable create operation without asserting authorization",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "did",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "CID-verified create operation, including original data and proof"
+          },
+          "500": {
+            "description": "Invalid DID, unavailable content, or invalid genesis"
+          }
+        }
+      }
+    },
     "/api/v1/did": {
       "post": {
         "summary": "Create, update, or delete a DID",

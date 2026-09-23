@@ -4,14 +4,16 @@ The Ethereum mediator anchors Archon DID batches on EVM chains through a canonic
 
 The mediator has two responsibilities:
 
-- **Import**: Scans confirmed `ArchonBatch` logs from the configured registry contract, resolves discovered batch DIDs, and imports the signed operations into Gatekeeper.
+- **Import**: Scans confirmed `ArchonBatch` logs from the configured registry contract, retrieves discovered batch genesis operations, and imports the signed operations into Gatekeeper.
 - **Export**: Polls the Gatekeeper queue for the configured registry, creates an Archon batch DID on `pin` when that registry is available, falls back to `hyperswarm`, and asks the Ethereum wallet service to submit an `anchorBatch` transaction.
 
 The smart contract intentionally does not validate Archon DID semantics. Gatekeeper remains the validation authority; Ethereum is used as a publication, ordering, and timestamping layer.
 
 An `ArchonBatch` anchor commits to the batch DID's signed create operation.
-Import resolves that DID at `versionSequence: 1` and uses the ordered
-`didDocumentData.batch.ops` list from genesis. A later batch-asset update cannot
+Import uses `gatekeeper.getGenesis(did)` and reads the ordered `data.batch.ops` list.
+Retrieval checks identity/shape without requiring publisher authorization or
+accepted DID history; contained operations are still authorized normally. A later
+batch-asset update cannot
 change the operations or their `opidx` values for the existing anchor. Missing
 genesis content is retried rather than replaced with latest asset state.
 

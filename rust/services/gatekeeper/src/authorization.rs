@@ -115,7 +115,7 @@ async fn creation_type(state: &AppState, did: &str) -> Option<String> {
 }
 
 // Registration replaces the whole component; omission is handled by the caller.
-fn valid_registration(value: &Value, genesis: Option<&Value>) -> bool {
+pub(crate) fn valid_registration(value: &Value, genesis: Option<&Value>) -> bool {
     let Some(registration) = value.as_object() else {
         return false;
     };

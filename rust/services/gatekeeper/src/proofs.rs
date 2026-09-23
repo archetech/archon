@@ -417,7 +417,7 @@ fn base64url_to_bytes(value: &str) -> Result<Vec<u8>> {
         .with_context(|| "invalid base64url")
 }
 
-fn public_jwk_to_sec1_bytes(public_jwk: &Value) -> Result<Vec<u8>> {
+pub(crate) fn public_jwk_to_sec1_bytes(public_jwk: &Value) -> Result<Vec<u8>> {
     if public_jwk.get("kty").and_then(Value::as_str) != Some("EC") {
         anyhow::bail!("Invalid operation: publicJwk");
     }

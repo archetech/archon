@@ -1141,3 +1141,13 @@ removes invalidated chain receipts, retains their operations as unconfirmed hint
 and replays the resulting evidence set with the existing selector. Shared signed
 TypeScript/Rust regressions cover branch changes, dependent authorization, and
 restart after journal persistence; these are finite implementation checks.
+
+### Immutable batch interpretation (#1269)
+
+Chain mediators retrieve batch create operations with `getGenesis`, independently
+of accepted publisher history. CID/shape checks preserve the original operation
+and ordered CID list; contained-operation authorization remains unchanged. Signed
+TypeScript mediator and Rust HTTP regressions exercise publisher rotation arriving
+before/after the anchor and restart. These finite tests address evidence derivation
+outside the theorem's common-normalized-evidence assumption; they do not add a
+universal mediator refinement or a publisher-authorization claim for retrieval.
