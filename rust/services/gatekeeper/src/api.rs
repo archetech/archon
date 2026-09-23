@@ -1886,29 +1886,32 @@ pub(crate) async fn get_genesis(
         return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid DID");
     }
     let cid = did.rsplit(':').next().unwrap();
+    let valid_genesis = |operation: &Value| {
+        let event = json!({ "registry": "local", "ordinal": [0],
+            "time": operation["created"], "operation": operation });
+        operation["type"] == "create"
+            && crate::authorization::valid_registration(&operation["registration"], None)
+            && (operation["registration"]["type"] != "agent"
+                || (crate::proofs::public_jwk_to_sec1_bytes(&operation["publicJwk"]).is_ok()
+                    && operation["proof"]["verificationMethod"] == "#key-1"))
+            && crate::proofs::verify_event_shape(&event)
+            && generate_did_from_operation(&state.config, operation)
+                .ok()
+                .as_deref() == Some(did.as_str())
+    };
     let cached = state.store.lock().await.get_operation(cid);
-    let operation = match cached {
-        Some(operation) => Some(operation),
-        None => fetch_ipfs_json(&state, cid).await,
+    let operation = match cached.filter(&valid_genesis) {
+        Some(operation) => operation,
+        None => {
+            let Some(operation) = fetch_ipfs_json(&state, cid).await else {
+                return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Genesis unavailable");
+            };
+            if !valid_genesis(&operation) {
+                return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid genesis");
+            }
+            operation
+        }
     };
-    let Some(operation) = operation else {
-        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Genesis unavailable");
-    };
-    let event = json!({ "registry": "local", "ordinal": [0],
-        "time": operation["created"], "operation": operation });
-    if operation["type"] != "create"
-        || !crate::authorization::valid_registration(&operation["registration"], None)
-        || (operation["registration"]["type"] == "agent"
-            && (crate::proofs::public_jwk_to_sec1_bytes(&operation["publicJwk"]).is_err()
-                || operation["proof"]["verificationMethod"] != "#key-1"))
-        || !crate::proofs::verify_event_shape(&event)
-        || generate_did_from_operation(&state.config, &operation)
-            .ok()
-            .as_deref()
-            != Some(did.as_str())
-    {
-        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid genesis");
-    }
     match crate::resolver::genesis_document(&did, &operation) {
         Ok(document) => Json(document).into_response(),
         Err(_) => text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid genesis"),

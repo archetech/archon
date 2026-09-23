@@ -73,3 +73,18 @@ it('uses cached content without IPFS or accepted history and returns an independ
     expect(fetch).not.toHaveBeenCalled();
     expect(await db.getAllKeys()).toEqual([]);
 });
+
+it('retries IPFS after CID ingress cached a mismatched operation', async () => {
+    const db = new Db('genesis-retry');
+    const ipfs = new MemoryClient();
+    const g = new Gatekeeper({ db, ipfs });
+    const cid = fixture.batchDid.split(':').pop();
+    const fetch = jest.spyOn(ipfs, 'getJSON').mockResolvedValue(fixture.publisher);
+    await g.importBatchByCids([cid], fixture.metadata);
+    expect(await db.getOperation(cid)).toEqual(fixture.publisher);
+    await expect(g.getGenesis(fixture.batchDid)).rejects.toThrow();
+    fetch.mockResolvedValue(fixture.batch);
+    expect(await g.getGenesis(fixture.batchDid)).toEqual(batchDocument);
+    expect(await db.getOperation(cid)).toEqual(fixture.publisher);
+    expect(await db.getAllKeys()).toEqual([]);
+});

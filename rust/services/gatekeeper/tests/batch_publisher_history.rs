@@ -6,7 +6,10 @@ use cid::Cid;
 use common::{respawn_service, TestService};
 use multihash_codetable::{Code, MultihashDigest};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 fn content_cid(value: &Value) -> String {
     Cid::new_v1(
@@ -87,10 +90,14 @@ async fn batch_content_survives_publisher_invalidation_and_restart() -> Result<(
     let wrong_cid = content_cid(&fixture["publisher"]);
     blocks.insert(wrong_cid.clone(), fixture["batch"].clone()); // Deliberately incorrect IPFS response.
                                                                 // Isolated CID-addressed IPFS responses reached through the real HTTP routes.
+    let blocks = Arc::new(Mutex::new(blocks));
+    let served_blocks = blocks.clone();
     let app = Router::new().route(
         "/block/get",
         post(move |Query(query): Query<HashMap<String, String>>| {
-            let body = blocks.get(query.get("arg").unwrap()).cloned();
+            let body = served_blocks
+                .lock().unwrap()
+                .get(query.get("arg").unwrap()).cloned();
             async move {
                 match body {
                     Some(body) => (axum::http::StatusCode::OK, Json(body)),
@@ -226,6 +233,34 @@ async fn batch_content_survives_publisher_invalidation_and_restart() -> Result<(
     for result in &results {
         assert_eq!(result, &results[0]);
     }
+    // A mismatched upstream response reaches the cache via ordinary CID ingress.
+    // Retrieval must retry the upstream after that content is corrected.
+    let retry_dir = tempfile::tempdir()?;
+    let retry_service = respawn_service("json", retry_dir.path(), &env).await?;
+    blocks.lock().unwrap()
+        .insert(batch_cid.clone(), fixture["publisher"].clone());
+    post_json(
+        &retry_service,
+        "batch/import/cids",
+        json!({"cids": [batch_cid], "metadata": fixture["metadata"]}),
+    )
+    .await?;
+    let response = retry_service
+        .client
+        .get(format!("{}/did/{batch_did}/genesis", retry_service.base_url))
+        .send()
+        .await?;
+    assert_eq!(response.status(), reqwest::StatusCode::INTERNAL_SERVER_ERROR);
+    blocks.lock().unwrap()
+        .insert(batch_cid.clone(), fixture["batch"].clone());
+    assert_eq!(
+        get_json(&retry_service, &format!("did/{batch_did}/genesis")).await?,
+        batch_document
+    );
+    assert_eq!(
+        get_json(&retry_service, &format!("did/{batch_did}")).await?["didResolutionMetadata"]["error"],
+        "notFound"
+    );
     // Populate only the content cache through ordinary CID ingress, then make
     // IPFS unavailable. Retrieval still does not require accepted DID history.
     let dir = tempfile::tempdir()?;

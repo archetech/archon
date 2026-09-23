@@ -7,3 +7,5 @@
 - Solana imports must use finalized commitment for tips, signature discovery, parsed transactions, and block retrieval regardless of the outbound transaction commitment setting.
 
 - Rewind exclusion must cover complete CID fetch/import requests, not just event processing or a queue snapshot. Test imports already in flight and arrivals during withdrawal; preserve retry behavior in both cases. Numeric block height zero must use `/0`, not `/latest`, in shared clients.
+
+- Genesis retrieval must validate cached operation shape and DID identity before accepting a cache hit. CID ingress can retain retrieval aliases, so an invalid cache hit must retry IPFS without rewriting historical aliases. Cover recovery through ordinary CID ingress with a corrected upstream response.

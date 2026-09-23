@@ -1825,7 +1825,9 @@ document: `didDocument`, initial `didDocumentData`, `didDocumentRegistration`,
 and creation metadata (plus `canonicalId` when a prefix is present). This public,
 read-only endpoint retrieves the create operation from the local operation cache
 or IPFS, checks its canonical identity against the DID, validates its ingress
-shape and registration, and materializes the initial document. Invalid identifiers,
+shape and registration, and materializes the initial document. A valid cache hit
+avoids IPFS; an invalid cached candidate falls back to IPFS and validates the
+fetched content without modifying the cache or accepted history. Invalid identifiers,
 unavailable content, mismatched content, and malformed creates fail the request.
 
 It does not resolve a controller, assert signature authorization, import a DID,
