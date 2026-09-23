@@ -1,3 +1,7 @@
+// Keep the slow, signed Gatekeeper convergence suites together when CI splits
+// the Jest run. The default config still runs every suite for local `npm test`.
+export const convergenceTestPathPattern = '/tests/gatekeeper/(?:agent-convergence|asset-convergence|chain-convergence|convergence|integrated-agent|chain-successors)\\.test\\.ts$';
+
 const config = {
     setupFiles: ['<rootDir>/tests/jest.setup.ts'],
     transform: {

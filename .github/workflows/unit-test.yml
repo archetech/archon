@@ -51,12 +51,85 @@ jobs:
         run: npm run typecheck
 
       - name: Run unit tests
-        run: npm test
+        run: npm run test:ci:unit
 
       # In-process DIDComm relay e2e, run isolated (out of the unit suite) so its
       # real sockets can't trip "import after teardown" in the shared run.
       - name: Run DIDComm relay e2e (isolated)
         run: npm run test:didcomm-e2e
+
+      - name: Upload unit coverage
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: unit-jest-coverage
+          path: coverage/coverage-final.json
+          if-no-files-found: error
+
+  convergence-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.23.2"
+
+      - name: Pin npm 10.9.2
+        run: npm install --global npm@10.9.2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run build
+
+      - name: Run convergence tests
+        run: npm run test:ci:convergence
+
+      - name: Upload convergence coverage
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: convergence-jest-coverage
+          path: coverage/coverage-final.json
+          if-no-files-found: error
+
+  coverage:
+    needs: [build-and-test, convergence-tests]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "22.23.2"
+
+      - name: Pin npm 10.9.2
+        run: npm install --global npm@10.9.2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download unit coverage
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: unit-jest-coverage
+          path: coverage-parts/unit
+
+      - name: Download convergence coverage
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: convergence-jest-coverage
+          path: coverage-parts/convergence
+
+      - name: Merge Jest coverage
+        run: node scripts/merge-jest-coverage.mjs coverage-parts/unit/coverage-final.json coverage-parts/convergence/coverage-final.json
 
       - name: Generate Code Coverage report
         id: code-coverage
