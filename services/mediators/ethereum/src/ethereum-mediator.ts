@@ -362,15 +362,17 @@ async function getFinalizedHeight(): Promise<number> {
     return block.number;
 }
 
-async function resolveScanStart(blockCount: number): Promise<number> {
+async function resolveScanStart(blockCount: number): Promise<number | null> {
     let db = await loadDb();
 
     // Legacy confirmation-depth imports can be ahead of finality. Keep them
     // intact until their existing cursor can be checked against finalized data.
     if (db.height > blockCount) {
-        throw new Error(db.finalizedImports
-            ? 'Finalized Ethereum head is behind the scan cursor'
-            : `Waiting for Ethereum finality to reach scan cursor ${db.height} (finalized ${blockCount})`);
+        if (db.finalizedImports) {
+            throw new Error('Finalized Ethereum head is behind the scan cursor');
+        }
+        console.log(`Waiting for Ethereum finality to reach scan cursor ${db.height} (finalized ${blockCount})`);
+        return null;
     }
     if (db.hash) {
         const block = await provider.getBlock(db.height);
@@ -432,16 +434,18 @@ function parseArchonLog(log: Log, timestamp: string): DiscoveredItem | undefined
     };
 }
 
-async function scanBlocks(): Promise<void> {
+// False pauses the entire import cycle while the legacy cursor awaits finality.
+async function scanBlocks(): Promise<boolean> {
     const blockCount = await getFinalizedHeight();
 
     console.log(`finalized scan height: ${blockCount}`);
 
     let start = await resolveScanStart(blockCount);
+    if (start === null) return false;
 
     if (config.startBlock > blockCount) {
         console.log(`Skipping ${REGISTRY} scan because start block ${config.startBlock} is ahead of finalized height ${blockCount}`);
-        return;
+        return true;
     }
 
     while (start <= blockCount) {
@@ -511,6 +515,7 @@ async function scanBlocks(): Promise<void> {
 
         start = end + 1;
     }
+    return true;
 }
 
 async function importBatch(item: DiscoveredItem, retry = false) {
@@ -883,7 +888,7 @@ async function importLoop(): Promise<void> {
     let stage = 'scanBlocks';
 
     try {
-        await scanBlocks();
+        if (!await scanBlocks()) return;
         stage = 'importBatches';
         await importBatches();
         stage = 'retryFailedImports';
@@ -969,7 +974,7 @@ async function waitForChain() {
 async function syncBlocks(): Promise<void> {
     try {
         const blockCount = await getFinalizedHeight();
-        await resolveScanStart(blockCount);
+        if (await resolveScanStart(blockCount) === null) return;
         const latest = await gatekeeper.getBlock(REGISTRY);
 
         console.log(`finalized sync height: ${blockCount}`);

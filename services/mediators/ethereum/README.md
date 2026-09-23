@@ -58,7 +58,9 @@ before finality.
 
 On upgrade, existing receipts and discoveries remain intact. If the legacy
 scan cursor is ahead of finality, scanning, checkpoint sync, and the import cycle
-wait until finality catches up. The mediator then checks the stored cursor hash.
+wait until finality catches up, logging the expected wait at info level. RPC
+failures and a finalized head falling behind an already-finalized cursor remain
+errors. The mediator then checks the stored cursor hash.
 A matching hash enables `finalizedImports: true` without withdrawal or rescanning.
 
 Only an actual hash mismatch triggers legacy reorg recovery: find a surviving
