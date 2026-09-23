@@ -56,15 +56,20 @@ submission, mined-transaction detection, and fee-bump timeout tracking still use
 the current head. A mined outbound transaction does not authorize an import
 before finality.
 
-On the first run against an older mediator database, the mediator withdraws
-Gatekeeper receipts and checkpoints above finality. If its old cursor is ahead
-of finality or on an orphaned branch, it finds a surviving checkpoint and
-withdraws that suffix too. Only after Gatekeeper withdrawal succeeds does it
-prune the corresponding discovered items, lower the cursor when needed, and
-persist `finalizedImports: true`. Preserved finalized discoveries keep their
-retry state; removed discoveries are scanned again as finality advances.
-Gatekeeper retains signed operations as unconfirmed hints and replays affected
-histories. A failed transition retries without committing the new cursor.
+On upgrade, existing receipts and discoveries remain intact. If the legacy
+scan cursor is ahead of finality, scanning, checkpoint sync, and the import cycle
+wait until finality catches up. The mediator then checks the stored cursor hash.
+A matching hash enables `finalizedImports: true` without withdrawal or rescanning.
+
+Only an actual hash mismatch triggers legacy reorg recovery: find a surviving
+checkpoint, withdraw the orphaned suffix through Gatekeeper, and prune its
+discoveries before committing the recovered cursor. Withdrawal failure leaves
+the cursor and discoveries intact for retry. Gatekeeper retains withdrawn signed
+operations as unconfirmed hints and replays affected histories. Persisted batch
+retries also check their own height against finality.
+
+Previously imported receipts may remain visible before finality during this
+transition; they are not removed merely because the import policy changed.
 
 After this transition, ordinary reorg recovery is disabled. A finalized head
 behind the persisted scan cursor, or a changed finalized cursor hash, stops

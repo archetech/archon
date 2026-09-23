@@ -350,8 +350,9 @@ Ethereum mediators record Gatekeeper block checkpoints for the configured start 
 
 Ethereum import RPC endpoints must support the `finalized` block tag. Discovery,
 checkpoint sync, and retries stop at that height with no confirmation-depth
-fallback; `ARCHON_ETH_CONFIRMATIONS` has been removed. The first startup
-withdraws the legacy unfinalized/orphaned suffix before enabling this policy.
+fallback; `ARCHON_ETH_CONFIRMATIONS` has been removed. On upgrade, existing receipts are
+preserved while imports wait for finality to reach the legacy cursor. Recovery
+is needed only if its block hash has changed.
 See [Ethereum finality and upgrade behavior](services/mediators/ethereum/README.md#finalized-imports-and-upgrade).
 
 

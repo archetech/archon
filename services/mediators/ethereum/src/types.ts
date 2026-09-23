@@ -22,7 +22,7 @@ export interface RegisteredItem {
 }
 
 export interface MediatorDb {
-    // Set only after withdrawing legacy unfinalized/orphaned receipts.
+    // Set after the legacy cursor reaches finality and its hash is checked.
     finalizedImports?: boolean;
     height: number;
     hash?: string;

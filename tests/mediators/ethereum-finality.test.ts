@@ -103,25 +103,30 @@ it('defers persisted discoveries and failed retries above finality across restar
     expect(h.gatekeeper.getGenesis.mock.calls.map(call => (call as any)[0])).toEqual(['did:cid:new', 'did:cid:retry']);
 });
 
-it('withdraws legacy receipts above finality before lowering the cursor and pruning discoveries', async () => {
+it('waits across restart for the legacy cursor to finalize without withdrawing receipts or discoveries', async () => {
     const h = harness({ finalizedImports: undefined, height: 120, hash: 'block120',
         discovered: [{ height: 99 }, { height: 110, imported: { queued: 1 } }] });
-    h.gatekeeper.rewindRegistry.mockRejectedValueOnce(new Error('offline'));
-    await expect(h.api.scanBlocks()).rejects.toThrow('offline');
-    expect(h.state()).toMatchObject({ height: 120, finalizedImports: undefined });
-    expect(h.state().discovered).toHaveLength(2);
-    await h.api.scanBlocks();
-    expect(h.gatekeeper.rewindRegistry).toHaveBeenLastCalledWith('ETH:mainnet', 101);
-    expect(h.state()).toMatchObject({ height: 100, hash: 'block100', finalizedImports: true, discovered: [{ height: 99 }] });
+    const before = h.state();
+    await expect(h.api.scanBlocks()).rejects.toThrow('Waiting for Ethereum finality');
+    await h.api.syncBlocks();
+    expect(h.state()).toEqual(before);
+    expect(h.gatekeeper.addBlock).not.toHaveBeenCalled();
+    expect(h.provider.getLogs).not.toHaveBeenCalled();
     h.restart();
+    h.setFinalized(120);
     await h.api.scanBlocks();
-    expect(h.gatekeeper.rewindRegistry).toHaveBeenCalledTimes(2);
+    expect(h.state()).toMatchObject({ height: 120, hash: 'block120', finalizedImports: true, discovered: before.discovered });
+    expect(h.gatekeeper.rewindRegistry).not.toHaveBeenCalled();
 });
 
 it('rewinds an orphaned legacy suffix below finality to a surviving checkpoint', async () => {
     const h = harness({ finalizedImports: undefined, height: 95, hash: 'orphan', discovered: [{ height: 95 }] });
     h.gatekeeper.getBlock.mockImplementation(async (_registry: string, height?: number) =>
         height === 90 ? { height, hash: 'block90', time: 1700000000 } : { height, hash: 'orphan', time: 1700000000 });
+    h.gatekeeper.rewindRegistry.mockRejectedValueOnce(new Error('offline'));
+    const before = h.state();
+    await expect(h.api.scanBlocks()).rejects.toThrow('offline');
+    expect(h.state()).toEqual(before);
     await h.api.scanBlocks();
     expect(h.gatekeeper.rewindRegistry).toHaveBeenCalledWith('ETH:mainnet', 91);
     expect(h.state().discovered).toEqual([]);
@@ -148,11 +153,11 @@ it('records finalized backlog before a failed log fetch', async () => {
     expect(h.state()).toMatchObject({ height: 90, blockCount: 100, blocksPending: 10 });
 });
 
-it('retains finalized legacy discoveries and withdraws the higher Gatekeeper suffix even with a lagging cursor', async () => {
+it('preserves legacy discoveries when the cursor is already finalized', async () => {
     const h = harness({ finalizedImports: undefined, discovered: [{ height: 95, error: 'unavailable' }, { height: 110 }] });
     await h.api.scanBlocks();
-    expect(h.gatekeeper.rewindRegistry).toHaveBeenCalledWith('ETH:mainnet', 101);
-    expect(h.state().discovered).toEqual([{ height: 95, error: 'unavailable' }]);
+    expect(h.gatekeeper.rewindRegistry).not.toHaveBeenCalled();
+    expect(h.state().discovered).toEqual([{ height: 95, error: 'unavailable' }, { height: 110 }]);
 });
 
 it('updates metrics when the configured start is above finality without scanning', async () => {
@@ -172,11 +177,11 @@ it('does not commit a scanned range when a finalized checkpoint is unavailable',
     expect(h.state().height).toBe(90);
 });
 
-it('withdraws the complete unfinalized legacy suffix even when finality is below the configured start', async () => {
+it('waits without mutation when the legacy cursor and configured start are above finality', async () => {
     const h = harness({ finalizedImports: undefined, height: 120, hash: 'block120', discovered: [{ height: 85 }] });
     h.setFinalized(80);
-    await h.api.scanBlocks();
-    expect(h.gatekeeper.rewindRegistry).toHaveBeenCalledWith('ETH:mainnet', 81);
-    expect(h.state()).toMatchObject({ height: 80, hash: '', finalizedImports: true, discovered: [] });
-    expect(h.provider.getLogs).not.toHaveBeenCalled();
+    const before = h.state();
+    await expect(h.api.scanBlocks()).rejects.toThrow('Waiting for Ethereum finality');
+    expect(h.gatekeeper.rewindRegistry).not.toHaveBeenCalled();
+    expect(h.state()).toEqual(before);
 });

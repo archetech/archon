@@ -365,50 +365,43 @@ async function getFinalizedHeight(): Promise<number> {
 async function resolveScanStart(blockCount: number): Promise<number> {
     let db = await loadDb();
 
-    // One-time transition from confirmation-depth imports. Withdraw the
-    // unfinalized suffix, including receipts already published to Gatekeeper.
-    if (!db.finalizedImports) {
-        let from = blockCount + 1;
-        if (db.hash || db.height > blockCount) {
-            const height = Math.min(db.height, blockCount);
-            const block = await provider.getBlock(height);
-            if (!block?.hash) throw new Error(`Stored checkpoint unavailable: ${height}`);
-            if (db.height > blockCount || block.hash !== db.hash) {
-                from = Math.min(from, await rescanStart(Math.min(db.height, blockCount + 1), config.startBlock,
-                    height => gatekeeper.getBlock(REGISTRY, height), async height => {
-                        const block = await provider.getBlock(height);
-                        if (!block?.hash) throw new Error(`Canonical block unavailable: ${height}`);
-                        return block.hash;
-                    }));
-            }
-        }
-        const rewindHeight = from - 1;
-        const rewindBlock = db.height >= from && rewindHeight >= config.startBlock
-            ? await gatekeeper.getBlock(REGISTRY, rewindHeight) : null;
-        if (db.height >= from && rewindHeight >= config.startBlock && !rewindBlock) {
-            throw new Error('Rewind checkpoint unavailable');
-        }
-        if (!await gatekeeper.rewindRegistry(REGISTRY, from)) throw new Error('Gatekeeper rewind failed');
-        await jsonPersister.updateDb((data) => {
-            data.discovered = data.discovered.filter(item => item.height < from);
-            if (data.height >= from) {
+    // Legacy confirmation-depth imports can be ahead of finality. Keep them
+    // intact until their existing cursor can be checked against finalized data.
+    if (db.height > blockCount) {
+        throw new Error(db.finalizedImports
+            ? 'Finalized Ethereum head is behind the scan cursor'
+            : `Waiting for Ethereum finality to reach scan cursor ${db.height} (finalized ${blockCount})`);
+    }
+    if (db.hash) {
+        const block = await provider.getBlock(db.height);
+        if (!block?.hash) throw new Error(`Stored checkpoint unavailable: ${db.height}`);
+        if (block.hash !== db.hash) {
+            if (db.finalizedImports) throw new Error('Finalized Ethereum history changed; automatic rollback is unsupported');
+            // Recover only a demonstrated reorg of legacy history.
+            const from = await rescanStart(db.height, config.startBlock,
+                height => gatekeeper.getBlock(REGISTRY, height), async height => {
+                    const block = await provider.getBlock(height);
+                    if (!block?.hash) throw new Error(`Canonical block unavailable: ${height}`);
+                    return block.hash;
+                });
+            const rewindHeight = from - 1;
+            const rewindBlock = rewindHeight >= config.startBlock
+                ? await gatekeeper.getBlock(REGISTRY, rewindHeight) : null;
+            if (rewindHeight >= config.startBlock && !rewindBlock) throw new Error('Rewind checkpoint unavailable');
+            if (!await gatekeeper.rewindRegistry(REGISTRY, from)) throw new Error('Gatekeeper rewind failed');
+            await jsonPersister.updateDb(data => {
+                data.discovered = data.discovered.filter(item => item.height < from);
                 data.height = rewindHeight;
                 data.hash = rewindBlock?.hash || '';
                 data.time = rewindBlock ? new Date(rewindBlock.time * 1000).toISOString() : '';
                 data.blocksScanned = Math.max(0, rewindHeight - config.startBlock + 1);
-            }
-            data.finalizedImports = true;
-        });
-        db = await loadDb();
-        console.log(`Finalized import policy enabled; withdrew legacy receipts from height ${from}`);
-    } else if (db.hash) {
-        if (db.height > blockCount) throw new Error('Finalized Ethereum head is behind the scan cursor');
-        const block = await provider.getBlock(db.height);
-        if (!block?.hash) throw new Error(`Stored checkpoint unavailable: ${db.height}`);
-        if (block.hash !== db.hash) throw new Error('Finalized Ethereum history changed; automatic rollback is unsupported');
+            });
+            db = await loadDb();
+        }
     }
 
     await jsonPersister.updateDb(data => {
+        data.finalizedImports = true;
         data.blockCount = blockCount;
         data.blocksPending = Math.max(0, blockCount - Math.max(data.height, config.startBlock - 1));
     });

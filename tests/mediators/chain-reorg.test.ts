@@ -247,7 +247,7 @@ it.each(['raw', 'CID'])('rejects rewind while a %s import is in flight', async k
     expect((await gatekeeper.resolveDID(fixture.targetDid)).didDocumentMetadata?.confirmed).toBe(false);
 });
 
-it('Ethereum upgrade withdraws already-imported receipts above finality and replays signed histories', async () => {
+it('Ethereum waits for finality before recovering a demonstrated legacy reorg', async () => {
     const { db, ipfs, gatekeeper } = await setup();
     const item = { ...fixture.metadata.registration, did: fixture.batchDid, time: fixture.metadata.time,
         batchHash: `0x${createHash('sha256').update(fixture.batchDid).digest('hex')}` };
@@ -255,7 +255,10 @@ it('Ethereum upgrade withdraws already-imported receipts above finality and repl
     const api = mediator('ethereum', gatekeeper, persisted);
     await api.importBatch(item);
     expect((await gatekeeper.resolveDID(fixture.targetDid)).didDocumentMetadata?.confirmed).toBe(true);
-    expect(await api.resolveScanStart(99)).toBe(100);
+    await expect(api.resolveScanStart(99)).rejects.toThrow('Waiting for Ethereum finality');
+    expect((await gatekeeper.resolveDID(fixture.targetDid)).didDocumentMetadata?.confirmed).toBe(true);
+    expect(persisted.height).toBe(100);
+    expect(await api.resolveScanStart(100)).toBe(100);
     expect(persisted).toMatchObject({ height: 99, finalizedImports: true, discovered: [] });
     for (const current of [gatekeeper, new Gatekeeper({ db, ipfs })]) {
         const resolved = await current.resolveDID(fixture.targetDid);
