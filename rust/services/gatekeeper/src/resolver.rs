@@ -130,47 +130,13 @@ pub(crate) async fn resolve_local_doc_async(
         .get("registration")
         .and_then(Value::as_object)
         .ok_or_else(|| not_found("missing registration"))?;
-    let did_type = registration
-        .get("type")
-        .and_then(Value::as_str)
-        .ok_or_else(|| not_found("missing registration.type"))?;
     let created = anchor_operation
         .get("created")
         .and_then(Value::as_str)
         .unwrap_or("")
         .to_string();
 
-    let initial_document = match did_type {
-        "agent" => {
-            let public_jwk = anchor_operation
-                .get("publicJwk")
-                .cloned()
-                .unwrap_or_else(|| json!({}));
-            json!({
-                "@context": ["https://www.w3.org/ns/did/v1"],
-                "id": did,
-                "verificationMethod": [{
-                    "id": "#key-1",
-                    "controller": did,
-                    "type": "EcdsaSecp256k1VerificationKey2019",
-                    "publicKeyJwk": public_jwk
-                }],
-                "authentication": ["#key-1"],
-                "assertionMethod": ["#key-1"],
-                // Operations claim capabilityInvocation, and a proof purpose
-                // the document does not grant is a safeguard nothing can check.
-                // This is the same key: an agent signs its own operations with
-                // it.
-                "capabilityInvocation": ["#key-1"]
-            })
-        }
-        "asset" => json!({
-            "@context": ["https://www.w3.org/ns/did/v1"],
-            "id": did,
-            "controller": anchor_operation.get("controller").cloned().unwrap_or(Value::Null)
-        }),
-        _ => return Err(not_found("unsupported registration.type")),
-    };
+    let initial_document = genesis_document(did, anchor_operation)?["didDocument"].clone();
 
     let canonical_id = anchor_operation
         .get("registration")
@@ -864,4 +830,60 @@ fn format_bytes(bytes: u64) -> String {
     }
 
     format!("{size:.2} {}", sizes[index])
+}
+
+/// Materialize genesis without resolving or authorizing its controller.
+pub(crate) fn genesis_document(did: &str, anchor_operation: &Value) -> Result<Value> {
+    let did_type = anchor_operation
+        .get("registration")
+        .and_then(|registration| registration.get("type"))
+        .and_then(Value::as_str)
+        .ok_or_else(|| not_found("missing registration.type"))?;
+    let initial_document = match did_type {
+        "agent" => {
+            let public_jwk = anchor_operation
+                .get("publicJwk")
+                .cloned()
+                .unwrap_or_else(|| json!({}));
+            json!({
+                "@context": ["https://www.w3.org/ns/did/v1"],
+                "id": did,
+                "verificationMethod": [{
+                    "id": "#key-1",
+                    "controller": did,
+                    "type": "EcdsaSecp256k1VerificationKey2019",
+                    "publicKeyJwk": public_jwk
+                }],
+                "authentication": ["#key-1"],
+                "assertionMethod": ["#key-1"],
+                // Operations claim capabilityInvocation, and a proof purpose
+                // the document does not grant is a safeguard nothing can check.
+                // This is the same key: an agent signs its own operations with
+                // it.
+                "capabilityInvocation": ["#key-1"]
+            })
+        }
+        "asset" => json!({
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": did,
+            "controller": anchor_operation.get("controller").cloned().unwrap_or(Value::Null)
+        }),
+        _ => return Err(not_found("unsupported registration.type")),
+    };
+
+    let mut metadata = json!({"created": anchor_operation["created"]});
+    if anchor_operation["registration"]["prefix"].is_string() {
+        metadata["canonicalId"] = json!(did);
+    }
+    let mut doc = json!({
+        "didDocument": initial_document,
+        "didDocumentMetadata": metadata,
+        "didDocumentRegistration": anchor_operation["registration"]
+    });
+    if anchor_operation["registration"]["type"] == "agent" {
+        doc["didDocumentData"] = json!({});
+    } else if let Some(data) = anchor_operation.get("data") {
+        doc["didDocumentData"] = data.clone();
+    }
+    Ok(doc)
 }

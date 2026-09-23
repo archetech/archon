@@ -491,6 +491,27 @@ export default class Gatekeeper implements GatekeeperInterface {
         return cid;
     }
 
+    // Content retrieval only: no controller lookup, history import, or authorization claim.
+    async getGenesis(did: string): Promise<DidCidDocument> {
+        if (!isValidDID(did)) throw new InvalidParameterError('did');
+        const cid = did.split(':').pop()!;
+        const validGenesis = async (operation: Operation | null): Promise<boolean> =>
+            !!operation && operation.type === 'create'
+            && this.validRegistration(operation.registration)
+            && (operation.registration?.type !== 'agent'
+                || (isWellFormedSecp256k1Jwk(operation.publicJwk)
+                    && operation.proof?.verificationMethod === '#key-1'))
+            && await this.verifyEvent({ registry: 'local', time: operation.created!, ordinal: [0], operation })
+            && await this.generateDID(operation) === did;
+
+        let operation = copyJSON(await this.db.getOperation(cid)) as Operation | null;
+        if (!await validGenesis(operation)) {
+            operation = copyJSON(await this.ipfs.getJSON(cid)) as Operation | null;
+            if (!await validGenesis(operation)) throw new InvalidOperationError('genesis');
+        }
+        return this.generateDoc(operation!, did);
+    }
+
     async generateDID(operation: Operation): Promise<string> {
         const cid = await this.generateCID(operation);
         const prefix = operation.registration?.prefix || this.didPrefix;

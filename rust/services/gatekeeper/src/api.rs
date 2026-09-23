@@ -1877,6 +1877,47 @@ pub(crate) async fn ipfs_add_json(
         .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
 }
 
+// Immutable content retrieval, independent of accepted histories and controller authority.
+pub(crate) async fn get_genesis(
+    State(state): State<AppState>,
+    Path(did): Path<String>,
+) -> Response {
+    if !crate::proofs::is_valid_did(&did) {
+        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid DID");
+    }
+    let cid = did.rsplit(':').next().unwrap();
+    let valid_genesis = |operation: &Value| {
+        let event = json!({ "registry": "local", "ordinal": [0],
+            "time": operation["created"], "operation": operation });
+        operation["type"] == "create"
+            && crate::authorization::valid_registration(&operation["registration"], None)
+            && (operation["registration"]["type"] != "agent"
+                || (crate::proofs::public_jwk_to_sec1_bytes(&operation["publicJwk"]).is_ok()
+                    && operation["proof"]["verificationMethod"] == "#key-1"))
+            && crate::proofs::verify_event_shape(&event)
+            && generate_did_from_operation(&state.config, operation)
+                .ok()
+                .as_deref() == Some(did.as_str())
+    };
+    let cached = state.store.lock().await.get_operation(cid);
+    let operation = match cached.filter(&valid_genesis) {
+        Some(operation) => operation,
+        None => {
+            let Some(operation) = fetch_ipfs_json(&state, cid).await else {
+                return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Genesis unavailable");
+            };
+            if !valid_genesis(&operation) {
+                return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid genesis");
+            }
+            operation
+        }
+    };
+    match crate::resolver::genesis_document(&did, &operation) {
+        Ok(document) => Json(document).into_response(),
+        Err(_) => text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid genesis"),
+    }
+}
+
 pub(crate) async fn ipfs_get_json(
     State(state): State<AppState>,
     Path(cid): Path<String>,

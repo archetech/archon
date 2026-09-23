@@ -127,6 +127,15 @@ export function createV1Router(options: CreateV1RouterOptions): express.Router {
         }
     });
 
+    v1router.get('/did/:did/genesis', ...authMiddleware, async (req, res) => {
+        try {
+            res.json(await gatekeeper.getGenesis(req.params.did as string));
+        } catch (error: any) {
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
+        }
+    });
+
     v1router.get('/did/:did', ...authMiddleware, async (req, res) => {
         try {
             const options: any = {};

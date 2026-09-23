@@ -27,7 +27,7 @@ use crate::{
         conformant_dereference_registration, conformant_not_found, conformant_resolve_did,
         create_did, db_reset,
         db_verify, export_batch, export_dids, generate_did, get_block_by_id, get_latest_block,
-        get_metrics, get_queue, import_batch, import_batch_by_cids, import_dids, ipfs_add_data,
+        get_metrics, get_genesis, get_queue, import_batch, import_batch_by_cids, import_dids, ipfs_add_data,
         ipfs_add_json, ipfs_add_stream, ipfs_add_text, ipfs_get_data, ipfs_get_json,
         ipfs_get_stream, ipfs_get_text, list_dids, not_found, process_events_route, query_docs,
         ready, registries, remove_dids, resolve_did, search_docs, status, version,
@@ -235,6 +235,7 @@ fn build_router(state: AppState) -> Router {
         .route("/did", post(create_did))
         .route("/did/generate", post(generate_did))
         .route("/did/:did", get(resolve_did))
+        .route("/did/:did/genesis", get(get_genesis))
         .route("/dids", post(list_dids))
         .route("/dids/", post(list_dids))
         .route("/dids/remove", post(remove_dids))

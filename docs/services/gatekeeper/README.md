@@ -1817,3 +1817,27 @@ must not merge stale projections back into an existing journal. If a request is
 interrupted, the mediator retries it while retaining its original scan position;
 completed journal writes survive recovery. This is evidence withdrawal, not a
 change to operation authorization or batch DID resolution.
+
+### Immutable genesis retrieval (`getGenesis`)
+
+`GET /api/v1/did/:did/genesis` (SDK: `getGenesis(did)`) returns the genesis DID
+document: `didDocument`, initial `didDocumentData`, `didDocumentRegistration`,
+and creation metadata (plus `canonicalId` when a prefix is present). This public,
+read-only endpoint retrieves the create operation from the local operation cache
+or IPFS, checks its canonical identity against the DID, validates its ingress
+shape and registration, and materializes the initial document. A valid cache hit
+avoids IPFS; an invalid cached candidate falls back to IPFS and validates the
+fetched content without modifying the cache or accepted history. Invalid identifiers,
+unavailable content, mismatched content, and malformed creates fail the request.
+
+It does not resolve a controller, assert signature authorization, import a DID,
+or modify accepted histories. It works without publisher history and for a
+genesis that ordinary resolution rejects. It adds no authorization, confirmation,
+or current-resolution metadata. Ordinary `resolveDID` and version-sequence
+semantics are unchanged.
+
+Chain mediators read `didDocumentData.batch.ops` to interpret the original CID
+list independently of publisher-history arrival order. The original signed
+operation remains retrievable by CID for provenance verification; its proof is
+not copied onto the generated document. Gatekeeper applies its normal
+authorization rules to each contained operation.

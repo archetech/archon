@@ -44,6 +44,7 @@ function createMockGatekeeper() {
         verifyDb: jest.fn<any>().mockResolvedValue({ total: 1, verified: 1, expired: 0, invalid: 0 }),
         processEvents: jest.fn<any>().mockResolvedValue({ added: 1, merged: 0, rejected: 0, pending: 0 }),
         addJSON: jest.fn<any>().mockResolvedValue('cid-json'),
+        getGenesis: jest.fn<any>().mockResolvedValue({ didDocument: { id: 'did:cid:test' }, didDocumentData: { batch: { version: 1, ops: ['cid'] } } }),
         getJSON: jest.fn<any>().mockResolvedValue({ hello: 'world' }),
         addText: jest.fn<any>().mockResolvedValue('cid-text'),
         getText: jest.fn<any>().mockResolvedValue('hello'),
@@ -163,6 +164,18 @@ describe('/api/v1 route handlers', () => {
             .set('X-Archon-Admin-Key', adminKey);
         expect(processed.status).toBe(200);
         expect(gatekeeper.processEvents).toHaveBeenCalled();
+    });
+
+    it('retrieves genesis publicly without resolving or importing it', async () => {
+        const { app, gatekeeper } = mount();
+        const response = await request(app).get('/api/v1/did/did:cid:test/genesis');
+        expect(response.status).toBe(200);
+        expect(response.body.didDocument.id).toBe('did:cid:test');
+        expect(gatekeeper.getGenesis).toHaveBeenCalledWith('did:cid:test');
+        expect(gatekeeper.resolveDID).not.toHaveBeenCalled();
+        expect(gatekeeper.importBatch).not.toHaveBeenCalled();
+        gatekeeper.getGenesis.mockRejectedValueOnce(new Error('Genesis unavailable'));
+        expect((await request(app).get('/api/v1/did/did:cid:test/genesis')).status).toBe(500);
     });
 
     it('exercises IPFS body parsing and retrieval routes', async () => {

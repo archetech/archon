@@ -18,6 +18,7 @@ function createMockGatekeeper() {
         listRegistries: jest.fn<any>().mockResolvedValue(['local']),
         createDID: jest.fn<any>().mockResolvedValue('did:cid:new'),
         generateDID: jest.fn<any>().mockResolvedValue('did:cid:generated'),
+        getGenesis: jest.fn<any>().mockResolvedValue({ didDocument: { id: 'did:cid:abc' } }),
         resolveDID: jest.fn<any>().mockResolvedValue({ didDocument: { id: 'did:cid:abc' } }),
         getDIDs: jest.fn<any>().mockResolvedValue(['did:cid:abc']),
         exportDIDs: jest.fn<any>().mockResolvedValue([[{ did: 'did:cid:abc' }]]),
@@ -211,6 +212,10 @@ describe('drawbridge v1 gatekeeper proxy routes', () => {
         const created = await request(app).post('/api/v1/did').send({ type: 'create' });
         expect(created.body).toBe('did:cid:new');
         expect(gatekeeper.createDID).toHaveBeenCalledWith({ type: 'create' });
+
+        const genesis = await request(app).get('/api/v1/did/did:cid:abc/genesis');
+        expect(genesis.body).toEqual({ didDocument: { id: 'did:cid:abc' } });
+        expect(gatekeeper.getGenesis).toHaveBeenCalledWith('did:cid:abc');
 
         const generated = await request(app).post('/api/v1/did/generate').send({ type: 'create' });
         expect(generated.body).toBe('did:cid:generated');

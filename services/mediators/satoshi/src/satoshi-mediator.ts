@@ -717,8 +717,8 @@ async function importBatch(item: DiscoveredItem, retry: boolean = false) {
         return;
     }
 
-    const doc = await keymaster.resolveDID(item.did, { versionSequence: 1 });
-    const batch = (doc.didDocumentData as { batch?: { version: number; ops: string[] } } | undefined)?.batch;
+    const genesis = await gatekeeper.getGenesis(item.did);
+    const batch = (genesis.didDocumentData as { batch?: { version: number; ops: string[] } } | undefined)?.batch;
 
     // Skip badly formatted batches
     if (!batch || batch.version !== 1 || !Array.isArray(batch.ops) || batch.ops.length === 0) {
