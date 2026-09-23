@@ -1381,6 +1381,25 @@ CREATE TABLE operations (opid TEXT PRIMARY KEY, operation TEXT NOT NULL);
 
 ### 10.7 MongoDB collection schema (reference)
 
+The Rust service uses the synchronous MongoDB driver behind Tokio
+`block_in_place` boundaries for initialization and every collection operation,
+including cursor iteration. The service runs on Tokio's multi-thread runtime;
+the synchronous store must not be invoked from a current-thread async runtime.
+This changes no collection schema.
+
+The `rust-mongodb-test` CI workflow runs the actual service against an isolated
+MongoDB 8.0 instance, covering startup, persistence/restart, queues, and chain
+receipt withdrawal/recovery. To run those checks locally, point
+`ARCHON_TEST_MONGODB_URL` at a disposable MongoDB instance and run:
+
+```sh
+cargo test --manifest-path rust/services/gatekeeper/Cargo.toml -j 2   --test mongo_backend --test chain_reorg -- --test-threads=1
+```
+
+These tests use the `archon` database and include destructive reset operations;
+never point them at a production MongoDB server.
+
+
 | Collection | Indexes |
 | --- | --- |
 | `dids` | `{ id: 1 }` |

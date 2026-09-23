@@ -454,19 +454,21 @@ impl JsonDb {
                 .collect();
         }
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let client = self.mongo_client()?;
-            let collection = client
-                .database(self.mongo_database_name()?)
-                .collection::<Document>("candidates");
-            let mut result = HashMap::new();
-            for row in collection.find(doc! {}).run()? {
-                let row = row?;
-                result.insert(
-                    row.get_str("id")?.to_string(),
-                    bson::from_bson(row.get("events").context("missing candidates")?.clone())?,
-                );
-            }
-            return Ok(result);
+            return tokio::task::block_in_place(|| {
+                let client = self.mongo_client()?;
+                let collection = client
+                    .database(self.mongo_database_name()?)
+                    .collection::<Document>("candidates");
+                let mut result = HashMap::new();
+                for row in collection.find(doc! {}).run()? {
+                    let row = row?;
+                    result.insert(
+                        row.get_str("id")?.to_string(),
+                        bson::from_bson(row.get("events").context("missing candidates")?.clone())?,
+                    );
+                }
+                return Ok(result);
+            });
         }
         Ok(self.data.candidates.clone())
     }
@@ -528,14 +530,16 @@ impl JsonDb {
             return Ok(());
         }
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            self.mongo_client()?
-                .database(self.mongo_database_name()?)
-                .collection::<Document>("blocks")
-                .delete_many(
-                    doc! { "registry": registry, "height": { "$gte": from_height as i64 } },
-                )
-                .run()?;
-            return Ok(());
+            return tokio::task::block_in_place(|| {
+                self.mongo_client()?
+                    .database(self.mongo_database_name()?)
+                    .collection::<Document>("blocks")
+                    .delete_many(
+                        doc! { "registry": registry, "height": { "$gte": from_height as i64 } },
+                    )
+                    .run()?;
+                return Ok(());
+            });
         }
         if let Some(blocks) = self.data.blocks.get_mut(registry) {
             blocks.retain(|_, block| {
@@ -565,17 +569,19 @@ impl JsonDb {
             return Ok(());
         }
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let client = self.mongo_client()?;
-            client
-                .database(self.mongo_database_name()?)
-                .collection::<Document>("candidates")
-                .update_one(
-                    doc! { "id": did },
-                    doc! { "$set": { "events": bson::to_bson(&events)? } },
-                )
-                .upsert(true)
-                .run()?;
-            return Ok(());
+            return tokio::task::block_in_place(|| {
+                let client = self.mongo_client()?;
+                client
+                    .database(self.mongo_database_name()?)
+                    .collection::<Document>("candidates")
+                    .update_one(
+                        doc! { "id": did },
+                        doc! { "$set": { "events": bson::to_bson(&events)? } },
+                    )
+                    .upsert(true)
+                    .run()?;
+                return Ok(());
+            });
         }
         self.data.candidates.insert(did.to_string(), events);
         self.save()
@@ -585,6 +591,9 @@ impl JsonDb {
         self.backend.save_state(&self.data)
     }
 
+    // The sync driver calls its own runtime's block_on, including when iterating
+    // cursors. Keep every Mongo branch inside block_in_place on the service's
+    // multi-thread Tokio runtime, not just client construction.
     fn mongo_client(&self) -> Result<MongoClient> {
         let DbBackend::Mongo { url, .. } = &self.backend else {
             anyhow::bail!("backend is not mongodb");
@@ -951,44 +960,46 @@ impl JsonDb {
         }
 
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let id = match Self::did_suffix(did) {
-                Ok(id) => id,
-                Err(_) => return Vec::new(),
-            };
-            let client = match self.mongo_client() {
-                Ok(client) => client,
-                Err(_) => return Vec::new(),
-            };
-            let database = match self.mongo_database_name() {
-                Ok(database) => database,
-                Err(_) => return Vec::new(),
-            };
-            let coll = client.database(database).collection::<Document>("dids");
-            let row = match coll.find_one(doc! { "id": &id }).run() {
-                Ok(row) => row,
-                Err(_) => return Vec::new(),
-            };
-            let Some(row) = row else {
-                return Vec::new();
-            };
-            let events = match row.get_array("events") {
-                Ok(events) => events.clone(),
-                Err(_) => return Vec::new(),
-            };
-            return events
-                .into_iter()
-                .filter_map(|item| {
-                    let mut event = bson::from_bson::<EventRecord>(item).ok()?;
-                    if event.operation.is_null() {
-                        if let Some(opid) = event.opid.as_ref() {
-                            if let Some(operation) = self.get_operation(opid) {
-                                event.operation = operation;
+            return tokio::task::block_in_place(|| {
+                let id = match Self::did_suffix(did) {
+                    Ok(id) => id,
+                    Err(_) => return Vec::new(),
+                };
+                let client = match self.mongo_client() {
+                    Ok(client) => client,
+                    Err(_) => return Vec::new(),
+                };
+                let database = match self.mongo_database_name() {
+                    Ok(database) => database,
+                    Err(_) => return Vec::new(),
+                };
+                let coll = client.database(database).collection::<Document>("dids");
+                let row = match coll.find_one(doc! { "id": &id }).run() {
+                    Ok(row) => row,
+                    Err(_) => return Vec::new(),
+                };
+                let Some(row) = row else {
+                    return Vec::new();
+                };
+                let events = match row.get_array("events") {
+                    Ok(events) => events.clone(),
+                    Err(_) => return Vec::new(),
+                };
+                return events
+                    .into_iter()
+                    .filter_map(|item| {
+                        let mut event = bson::from_bson::<EventRecord>(item).ok()?;
+                        if event.operation.is_null() {
+                            if let Some(opid) = event.opid.as_ref() {
+                                if let Some(operation) = self.get_operation(opid) {
+                                    event.operation = operation;
+                                }
                             }
                         }
-                    }
-                    Some(event)
-                })
-                .collect();
+                        Some(event)
+                    })
+                    .collect();
+            });
         }
 
         let suffix = match did.split(':').next_back() {
@@ -1068,25 +1079,27 @@ impl JsonDb {
         }
 
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let id = Self::did_suffix(did)?;
-            let client = self.mongo_client()?;
-            let database = self.mongo_database_name()?.to_string();
-            let coll = client.database(&database).collection::<Document>("dids");
-            let mut encoded = Vec::with_capacity(events.len());
-            for event in &events {
-                if let Some(opid) = event.opid.as_ref() {
-                    self.add_operation(opid, event.operation.clone())?;
+            return tokio::task::block_in_place(|| {
+                let id = Self::did_suffix(did)?;
+                let client = self.mongo_client()?;
+                let database = self.mongo_database_name()?.to_string();
+                let coll = client.database(&database).collection::<Document>("dids");
+                let mut encoded = Vec::with_capacity(events.len());
+                for event in &events {
+                    if let Some(opid) = event.opid.as_ref() {
+                        self.add_operation(opid, event.operation.clone())?;
+                    }
+                    encoded.push(Self::event_to_mongo_bson(event)?);
                 }
-                encoded.push(Self::event_to_mongo_bson(event)?);
-            }
-            coll.update_one(
-                doc! { "id": &id },
-                doc! { "$set": { "id": &id, "events": encoded } },
-            )
-            .upsert(true)
-            .run()
-            .context("failed to persist mongodb did events")?;
-            return Ok(());
+                coll.update_one(
+                    doc! { "id": &id },
+                    doc! { "$set": { "id": &id, "events": encoded } },
+                )
+                .upsert(true)
+                .run()
+                .context("failed to persist mongodb did events")?;
+                return Ok(());
+            });
         }
 
         let suffix = Self::did_suffix(did)?;
@@ -1120,16 +1133,18 @@ impl JsonDb {
         }
 
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let id = Self::did_suffix(did)?;
-            let client = self.mongo_client()?;
-            let database = self.mongo_database_name()?.to_string();
-            client
-                .database(&database)
-                .collection::<Document>("dids")
-                .delete_one(doc! { "id": &id })
-                .run()
-                .context("failed to delete mongodb did events")?;
-            return Ok(());
+            return tokio::task::block_in_place(|| {
+                let id = Self::did_suffix(did)?;
+                let client = self.mongo_client()?;
+                let database = self.mongo_database_name()?.to_string();
+                client
+                    .database(&database)
+                    .collection::<Document>("dids")
+                    .delete_one(doc! { "id": &id })
+                    .run()
+                    .context("failed to delete mongodb did events")?;
+                return Ok(());
+            });
         }
 
         let suffix = Self::did_suffix(did)?;
@@ -1179,25 +1194,27 @@ impl JsonDb {
         }
 
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let client = self.mongo_client()?;
-            let database = self.mongo_database_name()?.to_string();
-            let db = client.database(&database);
-            db.collection::<Document>("candidates")
-                .delete_many(doc! {})
-                .run()?;
-            db.collection::<Document>("dids")
-                .delete_many(doc! {})
-                .run()
-                .context("failed to clear mongodb dids")?;
-            db.collection::<Document>("queue")
-                .delete_many(doc! {})
-                .run()
-                .context("failed to clear mongodb queue")?;
-            db.collection::<Document>("operations")
-                .delete_many(doc! {})
-                .run()
-                .context("failed to clear mongodb operations")?;
-            return Ok(());
+            return tokio::task::block_in_place(|| {
+                let client = self.mongo_client()?;
+                let database = self.mongo_database_name()?.to_string();
+                let db = client.database(&database);
+                db.collection::<Document>("candidates")
+                    .delete_many(doc! {})
+                    .run()?;
+                db.collection::<Document>("dids")
+                    .delete_many(doc! {})
+                    .run()
+                    .context("failed to clear mongodb dids")?;
+                db.collection::<Document>("queue")
+                    .delete_many(doc! {})
+                    .run()
+                    .context("failed to clear mongodb queue")?;
+                db.collection::<Document>("operations")
+                    .delete_many(doc! {})
+                    .run()
+                    .context("failed to clear mongodb operations")?;
+                return Ok(());
+            });
         }
 
         self.data = JsonDbFile::default();
@@ -1229,16 +1246,18 @@ impl JsonDb {
         }
 
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let client = self.mongo_client()?;
-            let database = self.mongo_database_name()?.to_string();
-            let coll = client.database(&database).collection::<Document>("operations");
-            let mut op_doc = bson::to_document(&operation).context("failed to encode mongodb operation")?;
-            op_doc.insert("opid", opid);
-            coll.update_one(doc! { "opid": opid }, doc! { "$set": op_doc })
-                .upsert(true)
-                .run()
-                .context("failed to persist mongodb operation")?;
-            return Ok(());
+            return tokio::task::block_in_place(|| {
+                let client = self.mongo_client()?;
+                let database = self.mongo_database_name()?.to_string();
+                let coll = client.database(&database).collection::<Document>("operations");
+                let mut op_doc = bson::to_document(&operation).context("failed to encode mongodb operation")?;
+                op_doc.insert("opid", opid);
+                coll.update_one(doc! { "opid": opid }, doc! { "$set": op_doc })
+                    .upsert(true)
+                    .run()
+                    .context("failed to persist mongodb operation")?;
+                return Ok(());
+            });
         }
 
         self.data.ops.insert(opid.to_string(), operation.clone());
@@ -1277,16 +1296,18 @@ impl JsonDb {
         }
 
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let client = self.mongo_client().ok()?;
-            let database = self.mongo_database_name().ok()?.to_string();
-            let doc = client
-                .database(&database)
-                .collection::<Document>("operations")
-                .find_one(doc! { "opid": opid })
-                .projection(doc! { "_id": 0, "opid": 0 })
-                .run()
-                .ok()??;
-            return bson::from_document::<Value>(doc).ok();
+            return tokio::task::block_in_place(|| {
+                let client = self.mongo_client().ok()?;
+                let database = self.mongo_database_name().ok()?.to_string();
+                let doc = client
+                    .database(&database)
+                    .collection::<Document>("operations")
+                    .find_one(doc! { "opid": opid })
+                    .projection(doc! { "_id": 0, "opid": 0 })
+                    .run()
+                    .ok()??;
+                return bson::from_document::<Value>(doc).ok();
+            });
         }
 
         self.data.ops.get(opid).cloned()
@@ -1327,24 +1348,26 @@ impl JsonDb {
         }
 
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let client = self.mongo_client()?;
-            let database = self.mongo_database_name()?.to_string();
-            let coll = client.database(&database).collection::<Document>("queue");
-            let result = coll
-                .find_one_and_update(
-                    doc! { "id": registry },
-                    doc! { "$push": { "ops": bson::to_bson(&operation).context("failed to encode mongodb queue item")? } },
-                )
-                .upsert(true)
-                .return_document(mongodb::options::ReturnDocument::After)
-                .run()
-                .context("failed to persist mongodb queue")?;
-            let len = result
-                .as_ref()
-                .and_then(|doc| doc.get_array("ops").ok())
-                .map(|ops| ops.len())
-                .unwrap_or(0);
-            return Ok(len);
+            return tokio::task::block_in_place(|| {
+                let client = self.mongo_client()?;
+                let database = self.mongo_database_name()?.to_string();
+                let coll = client.database(&database).collection::<Document>("queue");
+                let result = coll
+                    .find_one_and_update(
+                        doc! { "id": registry },
+                        doc! { "$push": { "ops": bson::to_bson(&operation).context("failed to encode mongodb queue item")? } },
+                    )
+                    .upsert(true)
+                    .return_document(mongodb::options::ReturnDocument::After)
+                    .run()
+                    .context("failed to persist mongodb queue")?;
+                let len = result
+                    .as_ref()
+                    .and_then(|doc| doc.get_array("ops").ok())
+                    .map(|ops| ops.len())
+                    .unwrap_or(0);
+                return Ok(len);
+            });
         }
 
         let len = {
@@ -1395,35 +1418,37 @@ impl JsonDb {
         }
 
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let client = match self.mongo_client() {
-                Ok(client) => client,
-                Err(_) => return Vec::new(),
-            };
-            let database = match self.mongo_database_name() {
-                Ok(database) => database.to_string(),
-                Err(_) => return Vec::new(),
-            };
-            let row = match client
-                .database(&database)
-                .collection::<Document>("queue")
-                .find_one(doc! { "id": registry })
-                .run()
-            {
-                Ok(row) => row,
-                Err(_) => return Vec::new(),
-            };
-            let Some(row) = row else {
-                return Vec::new();
-            };
-            return row
-                .get_array("ops")
-                .ok()
-                .map(|ops| {
-                    ops.iter()
-                        .filter_map(|item| Self::value_from_bson(item).ok())
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
+            return tokio::task::block_in_place(|| {
+                let client = match self.mongo_client() {
+                    Ok(client) => client,
+                    Err(_) => return Vec::new(),
+                };
+                let database = match self.mongo_database_name() {
+                    Ok(database) => database.to_string(),
+                    Err(_) => return Vec::new(),
+                };
+                let row = match client
+                    .database(&database)
+                    .collection::<Document>("queue")
+                    .find_one(doc! { "id": registry })
+                    .run()
+                {
+                    Ok(row) => row,
+                    Err(_) => return Vec::new(),
+                };
+                let Some(row) = row else {
+                    return Vec::new();
+                };
+                return row
+                    .get_array("ops")
+                    .ok()
+                    .map(|ops| {
+                        ops.iter()
+                            .filter_map(|item| Self::value_from_bson(item).ok())
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default();
+            });
         }
 
         self.data.queue.get(registry).cloned().unwrap_or_default()
@@ -1500,18 +1525,20 @@ impl JsonDb {
         }
 
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let client = self.mongo_client()?;
-            let database = self.mongo_database_name()?.to_string();
-            client
-                .database(&database)
-                .collection::<Document>("queue")
-                .update_one(
-                    doc! { "id": registry },
-                    doc! { "$pull": { "ops": { "proof.proofValue": { "$in": bson::to_bson(&proof_values)? } } } },
-                )
-                .run()
-                .context("failed to clear mongodb queue entries")?;
-            return Ok(true);
+            return tokio::task::block_in_place(|| {
+                let client = self.mongo_client()?;
+                let database = self.mongo_database_name()?.to_string();
+                client
+                    .database(&database)
+                    .collection::<Document>("queue")
+                    .update_one(
+                        doc! { "id": registry },
+                        doc! { "$pull": { "ops": { "proof.proofValue": { "$in": bson::to_bson(&proof_values)? } } } },
+                    )
+                    .run()
+                    .context("failed to clear mongodb queue entries")?;
+                return Ok(true);
+            });
         }
 
         if let Some(queue) = self.data.queue.get_mut(registry) {
@@ -1607,19 +1634,21 @@ impl JsonDb {
         }
 
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let client = self.mongo_client()?;
-            let database = self.mongo_database_name()?.to_string();
-            let coll = client.database(&database).collection::<Document>("blocks");
-            let mut block_doc = bson::to_document(&block).context("failed to encode mongodb block")?;
-            block_doc.insert("registry", registry);
-            coll.update_one(
-                doc! { "registry": registry, "hash": &hash },
-                doc! { "$set": block_doc },
-            )
-            .upsert(true)
-            .run()
-            .context("failed to persist mongodb block")?;
-            return Ok(true);
+            return tokio::task::block_in_place(|| {
+                let client = self.mongo_client()?;
+                let database = self.mongo_database_name()?.to_string();
+                let coll = client.database(&database).collection::<Document>("blocks");
+                let mut block_doc = bson::to_document(&block).context("failed to encode mongodb block")?;
+                block_doc.insert("registry", registry);
+                coll.update_one(
+                    doc! { "registry": registry, "hash": &hash },
+                    doc! { "$set": block_doc },
+                )
+                .upsert(true)
+                .run()
+                .context("failed to persist mongodb block")?;
+                return Ok(true);
+            });
         }
 
         self.data
@@ -1707,29 +1736,31 @@ impl JsonDb {
         }
 
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let client = self.mongo_client().ok()?;
-            let database = self.mongo_database_name().ok()?.to_string();
-            let coll = client.database(&database).collection::<Document>("blocks");
-            let result = match block_id {
-                None => coll
-                    .find(doc! { "registry": registry })
-                    .sort(doc! { "height": -1 })
-                    .limit(1)
-                    .run()
-                    .ok()
-                    .and_then(|mut cursor| cursor.next().transpose().ok().flatten()),
-                Some(BlockLookup::Height(height)) => coll
-                    .find_one(doc! { "registry": registry, "height": height as i64 })
-                    .run()
-                    .ok()
-                    .flatten(),
-                Some(BlockLookup::Hash(hash)) => coll
-                    .find_one(doc! { "registry": registry, "hash": hash })
-                    .run()
-                    .ok()
-                    .flatten(),
-            }?;
-            return bson::from_document::<Value>(result).ok();
+            return tokio::task::block_in_place(|| {
+                let client = self.mongo_client().ok()?;
+                let database = self.mongo_database_name().ok()?.to_string();
+                let coll = client.database(&database).collection::<Document>("blocks");
+                let result = match block_id {
+                    None => coll
+                        .find(doc! { "registry": registry })
+                        .sort(doc! { "height": -1 })
+                        .limit(1)
+                        .run()
+                        .ok()
+                        .and_then(|mut cursor| cursor.next().transpose().ok().flatten()),
+                    Some(BlockLookup::Height(height)) => coll
+                        .find_one(doc! { "registry": registry, "height": height as i64 })
+                        .run()
+                        .ok()
+                        .flatten(),
+                    Some(BlockLookup::Hash(hash)) => coll
+                        .find_one(doc! { "registry": registry, "hash": hash })
+                        .run()
+                        .ok()
+                        .flatten(),
+                }?;
+                return bson::from_document::<Value>(result).ok();
+            });
         }
 
         let registry_blocks = self.data.blocks.get(registry)?;
@@ -1802,32 +1833,34 @@ impl JsonDb {
         }
 
         if matches!(self.backend, DbBackend::Mongo { .. }) {
-            let client = match self.mongo_client() {
-                Ok(client) => client,
-                Err(_) => return Vec::new(),
-            };
-            let database = match self.mongo_database_name() {
-                Ok(database) => database.to_string(),
-                Err(_) => return Vec::new(),
-            };
-            let rows = match client
-                .database(&database)
-                .collection::<Document>("dids")
-                .find(doc! {})
-                .run()
-            {
-                Ok(rows) => rows,
-                Err(_) => return Vec::new(),
-            };
-            let mut ids = rows
-                .filter_map(|row| row.ok())
-                .filter_map(|row| row.get_str("id").ok().map(ToString::to_string))
-                .collect::<Vec<_>>();
-            ids.sort();
-            return ids
-                .into_iter()
-                .map(|suffix| format!("{prefix}:{suffix}"))
-                .collect();
+            return tokio::task::block_in_place(|| {
+                let client = match self.mongo_client() {
+                    Ok(client) => client,
+                    Err(_) => return Vec::new(),
+                };
+                let database = match self.mongo_database_name() {
+                    Ok(database) => database.to_string(),
+                    Err(_) => return Vec::new(),
+                };
+                let rows = match client
+                    .database(&database)
+                    .collection::<Document>("dids")
+                    .find(doc! {})
+                    .run()
+                {
+                    Ok(rows) => rows,
+                    Err(_) => return Vec::new(),
+                };
+                let mut ids = rows
+                    .filter_map(|row| row.ok())
+                    .filter_map(|row| row.get_str("id").ok().map(ToString::to_string))
+                    .collect::<Vec<_>>();
+                ids.sort();
+                return ids
+                    .into_iter()
+                    .map(|suffix| format!("{prefix}:{suffix}"))
+                    .collect();
+            });
         }
 
         match requested {
@@ -2108,7 +2141,7 @@ impl DbBackend {
                 Ok(JsonDbFile::default())
             }
             Self::Redis { .. } => Ok(JsonDbFile::default()),
-            Self::Mongo { url, database, .. } => {
+            Self::Mongo { url, database, .. } => tokio::task::block_in_place(|| {
                 let client =
                     MongoClient::with_uri_str(url).context("failed to connect to mongodb")?;
                 let db = client.database(database);
@@ -2151,7 +2184,7 @@ impl DbBackend {
                     .run()
                     .context("failed to initialize mongodb op index")?;
                 Ok(JsonDbFile::default())
-            }
+            }),
         }
     }
 
@@ -2186,11 +2219,7 @@ impl DbBackend {
                     "full redis snapshot persistence is disabled for safety; refusing to rewrite namespace `{namespace}` containing {keyspace_size} keys"
                 )
             }
-            Self::Mongo { url, database, .. } => {
-                let client =
-                    MongoClient::with_uri_str(url).context("failed to connect to mongodb")?;
-                let _ = client.database(database);
-                let _ = data;
+            Self::Mongo { .. } => {
                 anyhow::bail!("mongodb snapshot persistence is disabled; use direct collection operations")
             }
         }
