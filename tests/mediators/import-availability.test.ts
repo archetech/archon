@@ -35,6 +35,7 @@ function harness(name: typeof names[number], initial: Item[], failure: Failure) 
     let processingHeight = 0;
     const attempts: number[] = [];
     const applied: number[] = [];
+    const logs: Record<string, any>[] = [];
     const keymaster = {
         resolveAsset: jest.fn(async (did: string) => {
             if (!available && failure === 'batch' && did === item(100).did) throw new Error('DID unavailable');
@@ -47,7 +48,7 @@ function harness(name: typeof names[number], initial: Item[], failure: Failure) 
             attempts.push(height);
             processingHeight = height;
             if (!available && height === 100 && failure === 'operation') throw new Error('Operation unavailable');
-            return { queued: 1, processed: 0, rejected: 0, total: 1 };
+            return { queued: 1, processed: 0, rejected: 0, total: 3 };
         }),
         processEvents: jest.fn(async () => {
             if (!available && processingHeight === 100 && failure === 'processing') throw new Error('Processing unavailable');
@@ -66,7 +67,9 @@ function harness(name: typeof names[number], initial: Item[], failure: Failure) 
     const code = ts.transpileModule(program, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
     const api = runInNewContext(code, {
         keymaster, gatekeeper, createHash, REGISTRY: `${name}:test`,
-        console: { log() {}, warn() {}, error() {} },
+        console: { log(message: string) {
+            try { logs.push(JSON.parse(message)); } catch { /* Other log messages are not JSON. */ }
+        }, warn() {}, error() {} },
         formatError: (error: unknown) => String(error),
         [`${name}ImportBatchDuration`]: { startTimer: () => () => {} },
         [`${name}ImportErrors`]: { inc() {} },
@@ -77,7 +80,7 @@ function harness(name: typeof names[number], initial: Item[], failure: Failure) 
             persisted = JSON.stringify(db);
         } },
     }) as { importBatches(): Promise<boolean>; retryFailedImports(): Promise<void> };
-    return { ...api, attempts, applied, keymaster, gatekeeper,
+    return { ...api, attempts, applied, logs, keymaster, gatekeeper,
         snapshot: () => (JSON.parse(persisted) as { discovered: Item[] }).discovered,
         recover: () => { available = true; },
     };
@@ -94,6 +97,15 @@ describe.each(names)('%s unavailable batches', (name) => {
             await h.retryFailedImports();
         }
         expect(h.attempts).toEqual([100, 200]);
+        const log = h.logs.find(record => record.did === item(100).did && record.batchImport);
+        expect(log).toMatchObject({
+            batchComplete: true,
+            batchImport: { queued: 1, alreadySeen: 0, rejected: 0 },
+            gatekeeperQueueAfterImport: 3,
+            gatekeeperProcessing: { pending: 2, pendingBatches: ['other-batch'] },
+        });
+        expect(log).not.toHaveProperty('imported');
+        expect(log).not.toHaveProperty('processed');
         const restarted = harness(name, h.snapshot(), 'batch');
         await restarted.importBatches();
         await restarted.retryFailedImports();
@@ -108,6 +120,7 @@ describe.each(names)('%s unavailable batches', (name) => {
         await h.importBatches();
         await h.retryFailedImports();
         expect(h.attempts).toEqual([100, 200, 100]);
+        expect(h.logs.find(record => record.did === item(100).did && record.batchImport)?.batchComplete).toBe(false);
         h.gatekeeper.processEvents.mockResolvedValue({ pending: 1, pendingBatches: ['other-batch'] });
         await h.importBatches();
         await h.importBatches();

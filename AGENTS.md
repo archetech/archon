@@ -302,3 +302,5 @@ These rules apply to coding agents working in this repository.
 - A Tor hidden-service hostname file survives container exits. Before publishing its onion for DIDComm or Lightning, prove that a bounded SOCKS connection reaches that hidden service; report reachability separately from Gatekeeper readiness and configured capabilities.
 
 - Current-suite operation examples in `docs/scheme.md` must have their proof signature and canonical operation CID checked against Gatekeeper; never relabel a legacy proof or edit a derived DID without recomputing the signed bytes.
+
+- Chain mediator batch logs should label `ImportBatchResult`'s submitted-batch counts separately from Gatekeeper's global queue and processing counts. Keep the raw imported/processed API responses in persisted discovered items so retry behavior does not change merely to improve logs.

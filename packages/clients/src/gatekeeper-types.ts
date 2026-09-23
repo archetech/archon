@@ -14,9 +14,12 @@ export interface OkpJwkPublic {
 }
 
 export interface ImportBatchResult {
+    /** Counts only the events submitted in this import call. */
     queued: number;
+    /** Submitted events already seen by this Gatekeeper, not newly processed here. */
     processed: number;
     rejected: number;
+    /** Global inbound event queue length after this import, including unrelated batches. */
     total: number;
 }
 
@@ -29,9 +32,11 @@ export interface BatchMetadata {
 
 export interface ProcessEventsResult {
     busy?: boolean;
+    /** Counts across the whole queue drained by this call, not one batch. */
     added?: number;
     merged?: number;
     rejected?: number;
+    /** Global inbound event queue length after processing. */
     pending?: number;
     /** Batch DIDs with pending events, from the same queue snapshot as pending. */
     pendingBatches?: string[];

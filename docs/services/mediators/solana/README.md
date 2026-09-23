@@ -63,6 +63,10 @@ processing result that has no pending events for that batch. Unrelated pending
 events do not trigger reimports. This records processing completion, not final
 authorization; retained history can still be replayed when missing evidence arrives.
 
+Batch import logs report `batchImport` and `batchComplete` for this batch;
+`gatekeeperQueueAfterImport` and `gatekeeperProcessing` describe the node-global
+inbound queue. Persisted `imported` and `processed` keep the raw API responses.
+
 Unavailable content, incomplete CID results, processing failures, and batches
 with their own pending events remain retryable. Older Gatekeepers that omit
 `pendingBatches` retain the conservative global-pending behavior. Persisted
