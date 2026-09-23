@@ -38,8 +38,8 @@ describe('createAsset', () => {
         await keymaster.createId('batch-owner', { registry: 'hyperswarm' });
         const firstDid = await keymaster.createAsset({ item: 'A' }, { registry: 'BTC:signet' });
         const secondDid = await keymaster.createAsset({ item: 'B' }, { registry: 'BTC:signet' });
-        const firstCid = (await db.getEvents(firstDid))[0].opid;
-        const secondCid = (await db.getEvents(secondDid))[0].opid;
+        const firstCid = (await db.getEvents(firstDid))[0].opid!;
+        const secondCid = (await db.getEvents(secondDid))[0].opid!;
         const original = { batch: { version: 1, ops: [firstCid, secondCid] } };
         const batchDid = await keymaster.createAsset(original, { registry: 'hyperswarm' });
         const metadata = {
