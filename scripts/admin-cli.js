@@ -30,6 +30,20 @@ program
     });
 
 program
+    .command('get-genesis <did>')
+    .description('Return the genesis DID document')
+    .action(async (did) => {
+        try {
+            const doc = await gatekeeper.getGenesis(did);
+            console.log(JSON.stringify(doc, null, 4));
+        }
+        catch (error) {
+            console.error(`cannot get genesis for ${did}: ${error.message}`);
+            process.exitCode = 1;
+        }
+    });
+
+program
     .command('verify-did <did>')
     .description('Return verified document associated with DID')
     .action(async (did, confirm) => {

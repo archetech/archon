@@ -1839,6 +1839,8 @@ change to operation authorization or batch DID resolution.
 
 ### Immutable genesis retrieval (`getGenesis`)
 
+Retrieve the genesis DID document with the admin CLI: `./admin get-genesis <did>`.
+
 `GET /api/v1/did/:did/genesis` (SDK: `getGenesis(did)`) returns the genesis DID
 document: `didDocument`, initial `didDocumentData`, `didDocumentRegistration`,
 and creation metadata (plus `canonicalId` when a prefix is present). This public,
