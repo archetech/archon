@@ -1912,11 +1912,12 @@ mod tests {
         tokio::task::yield_now().await;
         assert!(readers.iter().all(|reader| !reader.is_finished()));
         assert!(!background.is_finished());
-        crate::events::import_event_once(
-            &state,
-            serde_json::from_value(vector["rotation"].clone()).unwrap(),
-        )
-        .await;
+        let rotation: EventRecord = serde_json::from_value(vector["rotation"].clone()).unwrap();
+        // Simulate the ordinary importer's journal write while retaining the lock.
+        retain_candidates(&state, vector["controller"].as_str().unwrap(), Some(rotation.clone()))
+            .await
+            .unwrap();
+        crate::events::import_event_once(&state, rotation).await;
         reconcile_history(&state, vector["controller"].as_str().unwrap(), true)
             .await
             .unwrap();
