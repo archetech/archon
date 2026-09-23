@@ -17,7 +17,7 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
      * @swagger
      * /api/v1/did/{did}/genesis:
      *   get:
-     *     summary: Retrieve the immutable create operation without asserting authorization
+     *     summary: Retrieve the genesis DID document without asserting authorization
      *     parameters:
      *       - in: path
      *         name: did
@@ -25,7 +25,7 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
      *         schema: { type: string }
      *     responses:
      *       200:
-     *         description: CID-verified create operation, including original data and proof
+     *         description: Genesis DID document with initial data, registration, and creation metadata
      *       500:
      *         description: Invalid DID, unavailable content, or invalid genesis
      */

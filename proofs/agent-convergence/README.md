@@ -1144,7 +1144,7 @@ restart after journal persistence; these are finite implementation checks.
 
 ### Immutable batch interpretation (#1269)
 
-Chain mediators retrieve batch create operations with `getGenesis`, independently
+Chain mediators retrieve batch genesis DID documents with `getGenesis`, independently
 of accepted publisher history. CID/shape checks preserve the original operation
 and ordered CID list; contained-operation authorization remains unchanged. Signed
 TypeScript mediator and Rust HTTP regressions exercise publisher rotation arriving

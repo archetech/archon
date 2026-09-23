@@ -39,7 +39,7 @@ function harness(name: typeof names[number], initial: Item[], failure: Failure) 
     const gatekeeper = {
         getGenesis: jest.fn(async (did: string) => {
             if (!available && failure === 'batch' && did === item(100).did) throw new Error('Genesis unavailable');
-            return { data: { batch: { version: 1, ops: [cid] } } };
+            return { didDocumentData: { batch: { version: 1, ops: [cid] } } };
         }),
         importBatchByCids: jest.fn(async (_cids: string[], metadata: { ordinal: number[] }) => {
             const height = metadata.ordinal[0];
@@ -149,7 +149,7 @@ describe.each(names)('%s unavailable batches', (name) => {
     it('retries incomplete CID fetches even when unrelated pending work is identified', async () => {
         const h = harness(name, [item(100)], 'batch');
         h.recover();
-        h.gatekeeper.getGenesis.mockResolvedValue({ data: { batch: { version: 1, ops: [cid, 'missing-cid'] } } });
+        h.gatekeeper.getGenesis.mockResolvedValue({ didDocumentData: { batch: { version: 1, ops: [cid, 'missing-cid'] } } });
         h.gatekeeper.processEvents.mockResolvedValue({ pending: 2, pendingBatches: [] });
         await h.importBatches();
         expect(h.snapshot()[0].error).toMatch(/Incomplete batch: 1\/2/);
@@ -186,7 +186,7 @@ describe.each(names)('%s unavailable batches', (name) => {
         const h = harness(name, [item(100)], 'batch');
         h.recover();
         const secondCid = await generateCID({ second: true });
-        h.gatekeeper.getGenesis.mockResolvedValue({ data: {
+        h.gatekeeper.getGenesis.mockResolvedValue({ didDocumentData: {
             batch: { version: 1, ops: [cid, secondCid] },
         } });
         h.gatekeeper.importBatchByCids.mockResolvedValue({ queued: 2, processed: 0, rejected: 0, total: 2 });

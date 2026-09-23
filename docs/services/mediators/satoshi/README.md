@@ -126,9 +126,9 @@ The asset is owned by `ARCHON_NODE_ID`. Exporters register it to the
 When the scanner finds a transaction whose `OP_RETURN` is a valid DID,
 the import path:
 
-1. `genesis = gatekeeper.getGenesis(did)` — retrieve the CID-verified create
-   operation independently of publisher authorization or accepted DID history.
-2. Extract `genesis.data.batch.ops[]` in its original order. Missing
+1. `genesis = gatekeeper.getGenesis(did)` — retrieve the genesis DID
+   document independently of publisher authorization or accepted DID history.
+2. Extract `genesis.didDocumentData.batch.ops[]` in its original order. Missing
    genesis content remains retryable; later asset state is never substituted.
 3. Call `gatekeeper.importBatchByCids(ops, { registry: <chain>, time:
    block.time, ordinal: [height, index], registration: { height, index,

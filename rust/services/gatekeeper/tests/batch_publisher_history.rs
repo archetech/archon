@@ -105,6 +105,13 @@ async fn batch_content_survives_publisher_invalidation_and_restart() -> Result<(
         format!("http://{}", listener.local_addr()?),
     )];
     let server = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let batch_document = json!({
+        "didDocument": {"@context": ["https://www.w3.org/ns/did/v1"],
+            "id": batch_did, "controller": fixture["batch"]["controller"]},
+        "didDocumentMetadata": {"created": fixture["batch"]["created"]},
+        "didDocumentData": fixture["batch"]["data"],
+        "didDocumentRegistration": fixture["batch"]["registration"]
+    });
     let mut results = Vec::new();
     for rotation_first in [false, true] {
         let dir = tempfile::tempdir()?;
@@ -112,7 +119,7 @@ async fn batch_content_survives_publisher_invalidation_and_restart() -> Result<(
         // Genesis retrieval needs neither an accepted batch nor its publisher.
         assert_eq!(
             get_json(&service, &format!("did/{batch_did}/genesis")).await?,
-            fixture["batch"]
+            batch_document
         );
         assert_eq!(
             get_json(&service, &format!("did/{batch_did}")).await?["didResolutionMetadata"]
@@ -141,8 +148,8 @@ async fn batch_content_survives_publisher_invalidation_and_restart() -> Result<(
                 &service,
                 &format!("did/did:cid:{}/genesis", content_cid(&fixture["owner"]))
             )
-            .await?,
-            fixture["owner"]
+            .await?["didDocument"]["verificationMethod"][0]["publicKeyJwk"],
+            fixture["owner"]["publicJwk"]
         );
         let mut operations = vec![
             fixture["publisher"].clone(),
@@ -165,7 +172,7 @@ async fn batch_content_survives_publisher_invalidation_and_restart() -> Result<(
         post_json(
             &service,
             "batch/import/cids",
-            json!({"cids": invalid_batch["data"]["batch"]["ops"], "metadata": invalid_metadata}),
+            json!({"cids": invalid_batch["didDocumentData"]["batch"]["ops"], "metadata": invalid_metadata}),
         )
         .await?;
         let processed = post_json(&service, "events/process", Value::Null).await?;
@@ -174,12 +181,12 @@ async fn batch_content_survives_publisher_invalidation_and_restart() -> Result<(
             ingest(&service, vec![fixture["rotation"].clone()]).await?;
         }
         let genesis = get_json(&service, &format!("did/{batch_did}/genesis")).await?;
-        assert_eq!(genesis, fixture["batch"]);
+        assert_eq!(genesis, batch_document);
         post_json(
             &service,
             "batch/import/cids",
             json!({
-                "cids": genesis["data"]["batch"]["ops"], "metadata": fixture["metadata"]
+                "cids": genesis["didDocumentData"]["batch"]["ops"], "metadata": fixture["metadata"]
             }),
         )
         .await?;
@@ -197,7 +204,7 @@ async fn batch_content_survives_publisher_invalidation_and_restart() -> Result<(
             assert_eq!(invalid["didResolutionMetadata"]["error"], "notFound");
             assert_eq!(
                 get_json(current, &format!("did/{batch_did}/genesis")).await?,
-                fixture["batch"]
+                batch_document
             );
             let mut resolved = get_json(
                 current,
@@ -232,7 +239,7 @@ async fn batch_content_survives_publisher_invalidation_and_restart() -> Result<(
     server.abort();
     assert_eq!(
         get_json(&service, &format!("did/{batch_did}/genesis")).await?,
-        fixture["batch"]
+        batch_document
     );
     assert_eq!(
         get_json(&service, &format!("did/{batch_did}")).await?["didResolutionMetadata"]["error"],

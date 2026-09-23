@@ -492,7 +492,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     // Content retrieval only: no controller lookup, history import, or authorization claim.
-    async getGenesis(did: string): Promise<Operation> {
+    async getGenesis(did: string): Promise<DidCidDocument> {
         if (!isValidDID(did)) throw new InvalidParameterError('did');
         const cid = did.split(':').pop()!;
         const operation = copyJSON(await this.db.getOperation(cid) ?? await this.ipfs.getJSON(cid)) as Operation | null;
@@ -505,7 +505,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             || await this.generateDID(operation) !== did) {
             throw new InvalidOperationError('genesis');
         }
-        return operation;
+        return this.generateDoc(operation, did);
     }
 
     async generateDID(operation: Operation): Promise<string> {

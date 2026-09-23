@@ -6,12 +6,19 @@ import MemoryClient from '@didcid/ipfs/memory';
 
 const fixture = JSON.parse(readFileSync('tests/fixtures/batch-publisher-history.json', 'utf8'));
 
+const batchDocument = {
+    didDocument: { '@context': ['https://www.w3.org/ns/did/v1'], id: fixture.batchDid, controller: fixture.batch.controller },
+    didDocumentMetadata: { created: fixture.batch.created },
+    didDocumentData: fixture.batch.data,
+    didDocumentRegistration: fixture.batch.registration,
+};
+
 it('retrieves signed genesis with no publisher history, without importing it', async () => {
     const db = new Db('genesis');
     const ipfs = new MemoryClient();
     const g = new Gatekeeper({ db, ipfs });
     await ipfs.addJSON(fixture.batch, { canonical: true });
-    expect(await g.getGenesis(fixture.batchDid)).toEqual(fixture.batch);
+    expect(await g.getGenesis(fixture.batchDid)).toEqual(batchDocument);
     expect(await db.getAllKeys()).toEqual([]);
     expect(await db.getCandidates()).toEqual({});
     expect((await g.resolveDID(fixture.batchDid)).didResolutionMetadata?.error).toBe('notFound');
@@ -41,7 +48,12 @@ it('retrieves agent genesis but rejects malformed embedded keys', async () => {
     const ipfs = new MemoryClient();
     const g = new Gatekeeper({ db: new Db('genesis'), ipfs });
     const cid = await ipfs.addJSON(fixture.publisher, { canonical: true });
-    expect(await g.getGenesis(`did:cid:${cid}`)).toEqual(fixture.publisher);
+    const genesis = await g.getGenesis(`did:cid:${cid}`);
+    expect(genesis.didDocument?.id).toBe(`did:cid:${cid}`);
+    expect(genesis.didDocument?.verificationMethod?.[0].publicKeyJwk).toEqual(fixture.publisher.publicJwk);
+    expect(genesis.didDocument?.capabilityInvocation).toEqual(['#key-1']);
+    expect(genesis.didDocumentMetadata).toEqual({ created: fixture.publisher.created });
+    expect(genesis.didDocumentData).toEqual({});
     const malformed = { ...fixture.publisher, publicJwk: null };
     const badCid = await ipfs.addJSON(malformed, { canonical: true });
     await expect(g.getGenesis(`did:cid:${badCid}`)).rejects.toThrow();
@@ -55,9 +67,9 @@ it('uses cached content without IPFS or accepted history and returns an independ
     await db.addOperation(cid, structuredClone(fixture.batch));
     const fetch = jest.spyOn(ipfs, 'getJSON');
     const genesis = await g.getGenesis(fixture.batchDid);
-    expect(genesis).toEqual(fixture.batch);
-    genesis.proof!.proofValue = 'caller edit';
-    expect(await g.getGenesis(fixture.batchDid)).toEqual(fixture.batch);
+    expect(genesis).toEqual(batchDocument);
+    genesis.didDocument!.controller = 'caller edit';
+    expect(await g.getGenesis(fixture.batchDid)).toEqual(batchDocument);
     expect(fetch).not.toHaveBeenCalled();
     expect(await db.getAllKeys()).toEqual([]);
 });

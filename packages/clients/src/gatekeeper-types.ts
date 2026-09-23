@@ -144,7 +144,7 @@ export interface GatekeeperInterface {
     resetDb(): Promise<boolean>;
     verifyDb(options?: { chatty?: boolean }): Promise<VerifyDbResult>;
     createDID(operation: Operation): Promise<string>;
-    getGenesis(did: string): Promise<Operation>;
+    getGenesis(did: string): Promise<DidCidDocument>;
     resolveDID(did: string, options?: ResolveDIDOptions): Promise<DidCidDocument>;
     updateDID(operation: Operation): Promise<boolean>;
     deleteDID(operation: Operation): Promise<boolean>;

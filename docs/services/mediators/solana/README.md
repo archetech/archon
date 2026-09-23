@@ -10,7 +10,7 @@ The mediator has two responsibilities:
 The memo payload intentionally does not validate Archon DID semantics. Gatekeeper remains the validation authority; Solana is used as a publication, ordering, and timestamping layer.
 
 An Archon memo commits to the batch DID's signed create operation. Import
-uses `gatekeeper.getGenesis(did)` and reads the ordered `data.batch.ops` list.
+uses `gatekeeper.getGenesis(did)` and reads the ordered `didDocumentData.batch.ops` list.
 Retrieval checks identity/shape without requiring publisher authorization or
 accepted DID history; contained operations are still authorized normally. A later
 batch-asset update cannot

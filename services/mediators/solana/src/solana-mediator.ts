@@ -769,7 +769,7 @@ async function importBatch(item: DiscoveredItem, retry = false) {
     }
 
     const genesis = await gatekeeper.getGenesis(item.did);
-    const batch = (genesis.data as { batch?: { version: number; ops: string[] } } | undefined)?.batch;
+    const batch = (genesis.didDocumentData as { batch?: { version: number; ops: string[] } } | undefined)?.batch;
 
     if (!batch || batch.version !== 1 || !Array.isArray(batch.ops) || batch.ops.length === 0) {
         return;

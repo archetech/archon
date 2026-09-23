@@ -1909,7 +1909,10 @@ pub(crate) async fn get_genesis(
     {
         return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid genesis");
     }
-    Json(operation).into_response()
+    match crate::resolver::genesis_document(&did, &operation) {
+        Ok(document) => Json(document).into_response(),
+        Err(_) => text_error_response(StatusCode::INTERNAL_SERVER_ERROR, "Invalid genesis"),
+    }
 }
 
 pub(crate) async fn ipfs_get_json(

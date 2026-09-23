@@ -191,7 +191,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
         }
     }
 
-    async getGenesis(did: string): Promise<Operation> {
+    async getGenesis(did: string): Promise<DidCidDocument> {
         try {
             const response = await this.axios.get(`${this.API}/did/${did}/genesis`);
             return response.data;

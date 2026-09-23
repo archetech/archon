@@ -732,10 +732,10 @@ Position fields are nonnegative safe integers. `txid` and `batch` are nonempty
 strings supplied by the mediator; `batch` identifies the anchored batch DID.
 
 The batch DID identifies its signed create operation. Version-1 chain mediators
-MUST retrieve that create operation through `getGenesis(did)` and interpret its
-ordered `data.batch.ops` CID list. Genesis retrieval verifies the operation's CID
+MUST retrieve the genesis DID document through `getGenesis(did)` and interpret its
+ordered `didDocumentData.batch.ops` CID list. Genesis retrieval verifies the operation's CID
 and create-operation structure, without requiring publisher/controller
-history or an accepted batch DID. The original proof remains available for
+history or an accepted batch DID. The original signed operation remains retrievable by CID for proof
 inspection; retrieval does not assert publisher authorization. Every contained
 operation still undergoes normal Gatekeeper authorization. Later updates to the
 batch asset do not change which operations, or which `opidx` values, an existing chain anchor represents. If
