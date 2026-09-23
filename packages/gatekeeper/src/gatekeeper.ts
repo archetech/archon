@@ -2121,7 +2121,24 @@ export default class Gatekeeper implements GatekeeperInterface {
         return this.importBatch(hints);
     }
 
+    private activeImports = 0;
+    private isRewinding = false;
+
+    private async withImportAdmission<T>(action: () => Promise<T>): Promise<T> {
+        if (this.isRewinding) throw new Error('Gatekeeper is rewinding; retry import');
+        this.activeImports += 1;
+        try {
+            return await action();
+        } finally {
+            this.activeImports -= 1;
+        }
+    }
+
     async importBatch(batch: GatekeeperEvent[]): Promise<ImportBatchResult> {
+        return this.withImportAdmission(() => this.importBatchOnce(batch));
+    }
+
+    private async importBatchOnce(batch: GatekeeperEvent[]): Promise<ImportBatchResult> {
         if (!batch || !Array.isArray(batch) || batch.length < 1) {
             throw new InvalidParameterError('batch');
         }
@@ -2159,6 +2176,10 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     async importBatchByCids(cids: string[], metadata: BatchMetadata): Promise<ImportBatchResult> {
+        return this.withImportAdmission(() => this.importBatchByCidsOnce(cids, metadata));
+    }
+
+    private async importBatchByCidsOnce(cids: string[], metadata: BatchMetadata): Promise<ImportBatchResult> {
         if (!cids || !Array.isArray(cids) || cids.length < 1) {
             throw new InvalidParameterError('cids');
         }
@@ -2208,7 +2229,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         if (events.length === 0) {
             return { queued: 0, processed: 0, rejected: 0, total: this.eventsQueue.length };
         }
-        return this.importBatch(events);
+        return this.importBatchOnce(events);
     }
 
     async exportBatch(dids?: string[]): Promise<GatekeeperEvent[]> {
@@ -2274,7 +2295,9 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw new InvalidParameterError('registry/fromHeight');
         }
         await this.ensureHistoryReady();
+        if (this.activeImports) throw new Error('Gatekeeper is importing events; retry rewind');
         if (this.isProcessingEvents) throw new Error('Gatekeeper is processing events; retry rewind');
+        this.isRewinding = true;
         this.isProcessingEvents = true;
         try {
             return await this.withHistoryLock(async () => {
@@ -2310,6 +2333,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             throw error;
         } finally {
             this.isProcessingEvents = false;
+            this.isRewinding = false;
         }
     }
 

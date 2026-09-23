@@ -173,3 +173,75 @@ it('keeps the queue intact when rewind races with active event processing', asyn
     await gatekeeper.rewindRegistry(registry, 100);
     expect((await gatekeeper.resolveDID(fixture.targetDid)).didDocumentMetadata?.confirmed).toBe(false);
 });
+
+function barrier() {
+    let entered!: () => void;
+    let release!: () => void;
+    const started = new Promise<void>(resolve => { entered = resolve; });
+    const resume = new Promise<void>(resolve => { release = resolve; });
+    return { entered, release, started, resume };
+}
+
+it('rejects raw and CID imports throughout rewind publication', async () => {
+    const { db, gatekeeper } = await setup();
+    await gatekeeper.importBatchByCids([fixture.successors[1].cid], fixture.metadata);
+    await gatekeeper.processEvents();
+    const pause = barrier();
+    const remove = db.removeBlocks.bind(db);
+    jest.spyOn(db, 'removeBlocks').mockImplementationOnce(async (...args) => {
+        pause.entered();
+        await pause.resume;
+        return remove(...args);
+    });
+    const rewind = gatekeeper.rewindRegistry(registry, 100);
+    await pause.started;
+    try {
+        await expect(gatekeeper.importBatch([hint(fixture.successors[1].op)]))
+            .rejects.toThrow('rewinding');
+        await expect(gatekeeper.importBatchByCids([fixture.successors[1].cid], fixture.metadata))
+            .rejects.toThrow('rewinding');
+    } finally {
+        pause.release();
+        await rewind;
+    }
+    await gatekeeper.processEvents();
+    expect((await gatekeeper.resolveDID(fixture.targetDid)).didDocumentMetadata?.confirmed).toBe(false);
+    // Admission reopens for the mediator's replacement-chain imports.
+    await gatekeeper.importBatchByCids([fixture.successors[1].cid], fixture.metadata);
+    await gatekeeper.processEvents();
+    expect((await gatekeeper.resolveDID(fixture.targetDid)).didDocumentMetadata?.confirmed).toBe(true);
+});
+
+it.each(['raw', 'CID'])('rejects rewind while a %s import is in flight', async kind => {
+    const { db, gatekeeper } = await setup();
+    const pause = barrier();
+    if (kind === 'CID') {
+        const get = db.getOperation.bind(db);
+        jest.spyOn(db, 'getOperation').mockImplementationOnce(async cid => {
+            pause.entered();
+            await pause.resume;
+            return get(cid);
+        });
+    } else {
+        const verify = gatekeeper.verifyEvent.bind(gatekeeper);
+        jest.spyOn(gatekeeper, 'verifyEvent').mockImplementationOnce(async event => {
+            pause.entered();
+            await pause.resume;
+            return verify(event);
+        });
+    }
+    const importing = kind === 'CID'
+        ? gatekeeper.importBatchByCids([fixture.successors[1].cid], fixture.metadata)
+        : gatekeeper.importBatch([{ ...fixture.metadata, ordinal: [...fixture.metadata.ordinal, 0],
+            registration: { ...fixture.metadata.registration, opidx: 0 }, operation: fixture.successors[1].op }]);
+    await pause.started;
+    try {
+        await expect(gatekeeper.rewindRegistry(registry, 100)).rejects.toThrow('importing events');
+    } finally {
+        pause.release();
+        await importing;
+    }
+    await gatekeeper.rewindRegistry(registry, 100);
+    await gatekeeper.processEvents();
+    expect((await gatekeeper.resolveDID(fixture.targetDid)).didDocumentMetadata?.confirmed).toBe(false);
+});

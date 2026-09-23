@@ -452,6 +452,13 @@ pub(crate) async fn import_dids(
     if let Some(response) = require_admin_key(&state, &headers) {
         return response;
     }
+    // Hold admission through fetching/enqueueing or the complete rewind.
+    let Ok(_admission) = state.import_admission.try_read() else {
+        return text_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Gatekeeper is rewinding; retry import",
+        );
+    };
 
     let did_batches = match payload.as_array() {
         Some(items) => items,
@@ -588,6 +595,13 @@ pub(crate) async fn import_batch(
     if let Some(response) = require_admin_key(&state, &headers) {
         return response;
     }
+    // Hold admission through fetching/enqueueing or the complete rewind.
+    let Ok(_admission) = state.import_admission.try_read() else {
+        return text_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Gatekeeper is rewinding; retry import",
+        );
+    };
 
     let batch = match payload.as_array() {
         Some(items) if !items.is_empty() => items.to_vec(),
@@ -626,6 +640,13 @@ pub(crate) async fn import_batch_by_cids(
     if let Some(response) = require_admin_key(&state, &headers) {
         return response;
     }
+    // Hold admission through fetching/enqueueing or the complete rewind.
+    let Ok(_admission) = state.import_admission.try_read() else {
+        return text_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Gatekeeper is rewinding; retry import",
+        );
+    };
 
     let cids = match payload.get("cids").and_then(Value::as_array) {
         Some(items) if !items.is_empty() => items,
@@ -1064,6 +1085,13 @@ pub(crate) async fn rewind_registry(
     if let Some(response) = require_admin_key(&state, &headers) {
         return response;
     }
+    // Hold admission through fetching/enqueueing or the complete rewind.
+    let Ok(_admission) = state.import_admission.try_write() else {
+        return text_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Gatekeeper is importing or rewinding; retry rewind",
+        );
+    };
     let from_height = payload
         .get("fromHeight")
         .and_then(crate::proofs::ordinal_component);
@@ -2558,5 +2586,112 @@ mod admin_key_tests {
     #[test]
     fn accepts_the_configured_key() {
         assert!(check_admin_key(KEY, &headers_with(KEY)).is_none());
+    }
+}
+
+#[cfg(test)]
+mod rewind_admission_tests {
+    use super::*;
+    use crate::store::{DbBackend, JsonDbFile};
+
+    #[tokio::test]
+    async fn rewind_excludes_inflight_cid_fetches_and_late_imports() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../../../tests/fixtures/chain-reorg.json"))
+                .unwrap();
+        let (mut state, _directory) = crate::tests::make_state(crate::JsonDb {
+            backend: DbBackend::Memory,
+            data: JsonDbFile::default(),
+            redis_connection: None,
+        });
+        state.config.admin_api_key = "rewind-test-key".into();
+        let mut headers = HeaderMap::new();
+        headers.insert("x-archon-admin-key", "rewind-test-key".parse().unwrap());
+        let operations = [
+            &fixture["publisher"],
+            &fixture["owner"],
+            &fixture["target"],
+            &fixture["successors"][0]["op"],
+            &fixture["successors"][1]["op"],
+        ];
+        let hints: Vec<_> = operations
+            .iter()
+            .map(|operation| {
+                json!({
+                    "registry": "hyperswarm", "time": operation["proof"]["created"],
+                    "ordinal": [0], "operation": operation
+                })
+            })
+            .collect();
+        crate::import_batch_impl(&state, &hints).await;
+        crate::process_events_impl(&state).await;
+        let cid = fixture["successors"][1]["cid"].as_str().unwrap();
+        state
+            .store
+            .lock()
+            .await
+            .add_operation(cid, fixture["successors"][1]["op"].clone())
+            .unwrap();
+        let payload = json!({ "cids": [cid], "metadata": fixture["metadata"] });
+        let registry = fixture["metadata"]["registry"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let rewind = || {
+            rewind_registry(
+                State(state.clone()),
+                headers.clone(),
+                Path(registry.clone()),
+                Json(json!({"fromHeight": 100})),
+            )
+        };
+        let import =
+            || import_batch_by_cids(State(state.clone()), headers.clone(), Json(payload.clone()));
+
+        // Pause the actual CID handler at its cache read, after admission.
+        let store = state.store.lock().await;
+        let importing = import();
+        tokio::pin!(importing);
+        assert!(futures_util::poll!(importing.as_mut()).is_pending());
+        assert_eq!(rewind().await.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        drop(store);
+        assert_eq!(importing.await.status(), StatusCode::OK);
+        assert_eq!(rewind().await.status(), StatusCode::OK);
+        crate::process_events_impl(&state).await;
+        let did = fixture["targetDid"].as_str().unwrap();
+        let doc = crate::resolve_local_doc_async(&state, did, crate::ResolveOptions::default())
+            .await
+            .unwrap();
+        assert_eq!(doc["didDocumentMetadata"]["confirmed"], false);
+
+        // Reanchor, then pause withdrawal during journal persistence. All public
+        // ingress routes must refuse arrivals until that withdrawal finishes.
+        assert_eq!(import().await.status(), StatusCode::OK);
+        crate::process_events_impl(&state).await;
+        let store = state.store.lock().await;
+        let withdrawing = rewind();
+        tokio::pin!(withdrawing);
+        assert!(futures_util::poll!(withdrawing.as_mut()).is_pending());
+        assert_eq!(import().await.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(
+            import_batch(State(state.clone()), headers.clone(), Json(json!(hints)))
+                .await
+                .status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+        assert_eq!(
+            import_dids(State(state.clone()), headers.clone(), Json(json!([hints])))
+                .await
+                .status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+        drop(store);
+        assert_eq!(withdrawing.await.status(), StatusCode::OK);
+        crate::process_events_impl(&state).await;
+        let doc = crate::resolve_local_doc_async(&state, did, crate::ResolveOptions::default())
+            .await
+            .unwrap();
+        assert_eq!(doc["didDocumentMetadata"]["confirmed"], false);
+        assert_eq!(import().await.status(), StatusCode::OK);
     }
 }

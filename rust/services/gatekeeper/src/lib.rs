@@ -127,6 +127,7 @@ mod tests {
             metrics: Arc::new(Metrics::new(&config).expect("metrics should build")),
             store: Arc::new(Mutex::new(db)),
             import_queue: Arc::new(Mutex::new(Vec::new())),
+            import_admission: Arc::new(tokio::sync::RwLock::new(())),
             events_seen: Arc::new(Mutex::new(HashMap::new())),
             verified_dids: Arc::new(Mutex::new(HashMap::new())),
             supported_registries: Arc::new(Mutex::new(config.registries.clone())),

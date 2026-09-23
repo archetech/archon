@@ -1799,7 +1799,10 @@ and does not seed blockchain metadata, so production timing can differ.
 `POST /api/v1/block/:registry/rewind` accepts `{ "fromHeight": 100 }` and requires
 `X-Archon-Admin-Key`. `registry` must be a chain registry; `fromHeight` must be a
 nonnegative safe integer. The successful response is `true`. The mediator must
-retry failures (including busy event processing) before advancing its checkpoint.
+retry failures (including active imports or event processing) before advancing its
+checkpoint. Imports hold admission through CID fetching and queue insertion;
+rewind refuses to start while an import is active. During rewind, new imports
+receive a retryable error rather than being queued behind the withdrawal.
 
 For that registry at or above the inclusive height, Gatekeeper removes block
 metadata and converts retained/queued chain receipts into unconfirmed Hyperswarm
