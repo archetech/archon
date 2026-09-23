@@ -22,6 +22,8 @@ export interface RegisteredItem {
 }
 
 export interface MediatorDb {
+    // Set only after withdrawing legacy unfinalized/orphaned receipts.
+    finalizedImports?: boolean;
     height: number;
     hash?: string;
     time: string;

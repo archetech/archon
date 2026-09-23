@@ -18,7 +18,6 @@ export interface AppConfig {
     contractAddress: string;
     importInterval: number;
     exportInterval: number;
-    confirmations: number;
     logChunkSize: number;
     pendingTxTimeoutBlocks: number;
     minGasBalanceWei: bigint;
@@ -94,7 +93,6 @@ const config: AppConfig = {
     contractAddress: process.env.ARCHON_ETH_CONTRACT || '',
     importInterval: process.env.ARCHON_ETH_IMPORT_INTERVAL ? parseInt(process.env.ARCHON_ETH_IMPORT_INTERVAL) : 0,
     exportInterval: process.env.ARCHON_ETH_EXPORT_INTERVAL ? parseInt(process.env.ARCHON_ETH_EXPORT_INTERVAL) : 0,
-    confirmations: process.env.ARCHON_ETH_CONFIRMATIONS ? parseInt(process.env.ARCHON_ETH_CONFIRMATIONS) : 12,
     logChunkSize: process.env.ARCHON_ETH_LOG_CHUNK_SIZE ? parseInt(process.env.ARCHON_ETH_LOG_CHUNK_SIZE) : 2_000,
     pendingTxTimeoutBlocks: process.env.ARCHON_ETH_PENDING_TX_TIMEOUT_BLOCKS ? parseInt(process.env.ARCHON_ETH_PENDING_TX_TIMEOUT_BLOCKS) : 120,
     minGasBalanceWei: BigInt(process.env.ARCHON_ETH_MIN_GAS_BALANCE_WEI || '1000000000000000'),

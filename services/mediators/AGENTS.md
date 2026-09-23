@@ -9,3 +9,5 @@
 - Rewind exclusion must cover complete CID fetch/import requests, not just event processing or a queue snapshot. Test imports already in flight and arrivals during withdrawal; preserve retry behavior in both cases. Numeric block height zero must use `/0`, not `/latest`, in shared clients.
 
 - Genesis retrieval must validate cached operation shape and DID identity before accepting a cache hit. CID ingress can retain retrieval aliases, so an invalid cache hit must retry IPFS without rewriting historical aliases. Cover recovery through ordinary CID ingress with a corrected upstream response.
+
+- Ethereum discovery, checkpoint sync, and persisted batch retries must use the RPC finalized boundary, with no latest/safe/confirmation-depth fallback. Keep legacy suffix withdrawal limited to the one-time finalized-import transition; later finalized-history rollback stops imports. Outbound mined-transaction tracking remains independent of import finality.

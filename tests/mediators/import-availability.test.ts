@@ -64,6 +64,7 @@ function harness(name: typeof names[number], initial: Item[], failure: Failure) 
     const program = selected.map(fn => fn.getText(source)).join('\n') + '\n({ importBatches, retryFailedImports })';
     const code = ts.transpileModule(program, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText;
     const api = runInNewContext(code, {
+        getFinalizedHeight: async () => Number.MAX_SAFE_INTEGER,
         gatekeeper, createHash, REGISTRY: `${name}:test`,
         console: { log(message: string) {
             try { logs.push(JSON.parse(message)); } catch { /* Other log messages are not JSON. */ }

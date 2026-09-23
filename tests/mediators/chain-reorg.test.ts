@@ -37,6 +37,7 @@ function mediator(name: string, gatekeeper: Gatekeeper, persisted: any) {
     const program = functions.map(fn => fn.getText(source)).join('\n') + '\n({ resolveScanStart, importBatch })';
     const keymaster = new Keymaster({ gatekeeper, wallet: new Wallet(), cipher: new Cipher(), passphrase: 'test' });
     return runInNewContext(ts.transpileModule(program, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText, {
+        getFinalizedHeight: async () => Number.MAX_SAFE_INTEGER,
         gatekeeper, keymaster, createHash, REGISTRY: registry, planScanStart, rescanStart,
         config: { startBlock: 1, reorgDepth: 1, confirmations: 1 },
         chain: { header: async (hash: string) => ({ confirmations: hash === 'orphan' ? -1 : 1, time: 1000 }),
@@ -244,4 +245,21 @@ it.each(['raw', 'CID'])('rejects rewind while a %s import is in flight', async k
     await gatekeeper.rewindRegistry(registry, 100);
     await gatekeeper.processEvents();
     expect((await gatekeeper.resolveDID(fixture.targetDid)).didDocumentMetadata?.confirmed).toBe(false);
+});
+
+it('Ethereum upgrade withdraws already-imported receipts above finality and replays signed histories', async () => {
+    const { db, ipfs, gatekeeper } = await setup();
+    const item = { ...fixture.metadata.registration, did: fixture.batchDid, time: fixture.metadata.time,
+        batchHash: `0x${createHash('sha256').update(fixture.batchDid).digest('hex')}` };
+    const persisted: any = { height: 100, hash: 'orphan', txnsScanned: 1, discovered: [item] };
+    const api = mediator('ethereum', gatekeeper, persisted);
+    await api.importBatch(item);
+    expect((await gatekeeper.resolveDID(fixture.targetDid)).didDocumentMetadata?.confirmed).toBe(true);
+    expect(await api.resolveScanStart(99)).toBe(100);
+    expect(persisted).toMatchObject({ height: 99, finalizedImports: true, discovered: [] });
+    for (const current of [gatekeeper, new Gatekeeper({ db, ipfs })]) {
+        const resolved = await current.resolveDID(fixture.targetDid);
+        expect(resolved.didDocumentMetadata?.confirmed).toBe(false);
+        expect(resolved.didDocumentData).toEqual(fixture.successors[0].op.doc.didDocumentData);
+    }
 });
