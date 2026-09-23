@@ -22,6 +22,8 @@ export interface RegisteredItem {
 }
 
 export interface MediatorDb {
+    // Set after the legacy cursor reaches finality and its hash is checked.
+    finalizedImports?: boolean;
     height: number;
     hash?: string;
     time: string;

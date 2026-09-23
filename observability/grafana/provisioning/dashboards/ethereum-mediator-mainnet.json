@@ -363,16 +363,16 @@
       "targets": [
         {
           "expr": "ethereum_block_height{job=\"eth-mainnet-mediator\"}",
-          "legendFormat": "Scanned Height",
+          "legendFormat": "Scan Cursor",
           "refId": "A"
         },
         {
           "expr": "ethereum_block_count{job=\"eth-mainnet-mediator\"}",
-          "legendFormat": "Chain Height",
+          "legendFormat": "Scan Ceiling",
           "refId": "B"
         }
       ],
-      "title": "Blockchain Scan Progress",
+      "title": "Scan Cursor and Ceiling",
       "type": "timeseries"
     },
     {
@@ -675,14 +675,9 @@
           "expr": "rate(ethereum_import_errors_total{job=\"eth-mainnet-mediator\"}[5m])",
           "legendFormat": "Import Errors",
           "refId": "A"
-        },
-        {
-          "expr": "rate(ethereum_reorgs_total{job=\"eth-mainnet-mediator\"}[5m])",
-          "legendFormat": "Reorgs",
-          "refId": "B"
         }
       ],
-      "title": "Import Errors & Reorgs",
+      "title": "Import Errors",
       "type": "timeseries"
     },
     {

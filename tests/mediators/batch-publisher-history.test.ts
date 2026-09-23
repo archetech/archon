@@ -20,6 +20,7 @@ function importer(name: string, gatekeeper: Gatekeeper) {
         compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
     }).outputText;
     return runInNewContext(code, {
+        getFinalizedHeight: async () => Number.MAX_SAFE_INTEGER,
         gatekeeper, createHash, REGISTRY: fixture.metadata.registry,
         console: { log() {}, warn() {}, error() {} },
         formatError: (error: unknown) => String(error),

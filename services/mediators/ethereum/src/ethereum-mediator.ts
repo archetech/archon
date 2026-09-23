@@ -116,17 +116,17 @@ promClient.collectDefaultMetrics({ register });
 
 const ethereumBlockHeight = new promClient.Gauge({
     name: 'ethereum_block_height',
-    help: 'Current scanned block height',
+    help: 'Persisted scan cursor block height',
 });
 
 const ethereumBlockCount = new promClient.Gauge({
     name: 'ethereum_block_count',
-    help: 'Total blockchain height',
+    help: 'Persisted scan ceiling block height; finalized after the import-policy transition',
 });
 
 const ethereumBlocksPending = new promClient.Gauge({
     name: 'ethereum_blocks_pending',
-    help: 'Remaining confirmed blocks to scan',
+    help: 'Persisted blocks remaining to scan; finalized after the import-policy transition',
 });
 
 const ethereumBlocksScanned = new promClient.Gauge({
@@ -167,11 +167,6 @@ const ethereumExportLoopRunning = new promClient.Gauge({
 const ethereumImportErrors = new promClient.Counter({
     name: 'ethereum_import_errors_total',
     help: 'Failed import attempts',
-});
-
-const ethereumReorgs = new promClient.Counter({
-    name: 'ethereum_reorgs_total',
-    help: 'Chain reorganization events detected',
 });
 
 const ethereumAnchorFailures = new promClient.Counter({
@@ -359,43 +354,58 @@ function shouldRecordBlockCheckpoint(height: number): boolean {
     return height === config.startBlock || height % CHECKPOINT_BLOCK_INTERVAL === 0;
 }
 
+async function getFinalizedHeight(): Promise<number> {
+    const block = await provider.getBlock('finalized');
+    if (!block?.hash || !Number.isSafeInteger(block.number) || block.number < 0) {
+        throw new Error('Finalized Ethereum block unavailable');
+    }
+    return block.number;
+}
+
 async function resolveScanStart(blockCount: number): Promise<number> {
-    const db = await loadDb();
+    let db = await loadDb();
 
-    if (!db.hash) {
-        return db.height ? db.height + 1 : config.startBlock;
+    // Legacy confirmation-depth imports can be ahead of finality. Keep them
+    // intact until their existing cursor can be checked against finalized data.
+    if (db.height > blockCount) {
+        throw new Error(db.finalizedImports
+            ? 'Finalized Ethereum head is behind the scan cursor'
+            : `Waiting for Ethereum finality to reach scan cursor ${db.height} (finalized ${blockCount})`);
+    }
+    if (db.hash) {
+        const block = await provider.getBlock(db.height);
+        if (!block?.hash) throw new Error(`Stored checkpoint unavailable: ${db.height}`);
+        if (block.hash !== db.hash) {
+            if (db.finalizedImports) throw new Error('Finalized Ethereum history changed; automatic rollback is unsupported');
+            // Recover only a demonstrated reorg of legacy history.
+            const from = await rescanStart(db.height, config.startBlock,
+                height => gatekeeper.getBlock(REGISTRY, height), async height => {
+                    const block = await provider.getBlock(height);
+                    if (!block?.hash) throw new Error(`Canonical block unavailable: ${height}`);
+                    return block.hash;
+                });
+            const rewindHeight = from - 1;
+            const rewindBlock = rewindHeight >= config.startBlock
+                ? await gatekeeper.getBlock(REGISTRY, rewindHeight) : null;
+            if (rewindHeight >= config.startBlock && !rewindBlock) throw new Error('Rewind checkpoint unavailable');
+            if (!await gatekeeper.rewindRegistry(REGISTRY, from)) throw new Error('Gatekeeper rewind failed');
+            await jsonPersister.updateDb(data => {
+                data.discovered = data.discovered.filter(item => item.height < from);
+                data.height = rewindHeight;
+                data.hash = rewindBlock?.hash || '';
+                data.time = rewindBlock ? new Date(rewindBlock.time * 1000).toISOString() : '';
+                data.blocksScanned = Math.max(0, rewindHeight - config.startBlock + 1);
+            });
+            db = await loadDb();
+        }
     }
 
-    const block = await provider.getBlock(db.height);
-    if (!block?.hash) throw new Error(`Stored checkpoint unavailable: ${db.height}`);
-    if (block.hash === db.hash) {
-        return db.height + 1;
-    }
-
-    ethereumReorgs.inc();
-    console.log(`Reorg detected at height ${db.height}, rewinding ${config.confirmations} confirmed block(s)...`);
-    const from = await rescanStart(Math.max(config.startBlock, db.height - config.confirmations + 1), config.startBlock,
-        height => gatekeeper.getBlock(REGISTRY, height), async height => {
-            const block = await provider.getBlock(height);
-            if (!block?.hash) throw new Error(`Canonical block unavailable: ${height}`);
-            return block.hash;
-        });
-    const rewindHeight = from - 1;
-    const rewindBlock = rewindHeight >= config.startBlock ? await gatekeeper.getBlock(REGISTRY, rewindHeight) : null;
-    if (rewindHeight >= config.startBlock && !rewindBlock) throw new Error('Rewind checkpoint unavailable');
-    if (!await gatekeeper.rewindRegistry(REGISTRY, from)) throw new Error('Gatekeeper rewind failed');
-
-    await jsonPersister.updateDb((data) => {
-        data.discovered = data.discovered.filter(item => item.height <= rewindHeight);
-        data.height = rewindHeight;
-        data.hash = rewindBlock?.hash || '';
-        data.time = rewindBlock?.time ? new Date(rewindBlock.time * 1000).toISOString() : '';
-        data.blocksScanned = Math.max(0, rewindHeight - config.startBlock + 1);
+    await jsonPersister.updateDb(data => {
+        data.finalizedImports = true;
         data.blockCount = blockCount;
-        data.blocksPending = Math.max(0, blockCount - rewindHeight);
+        data.blocksPending = Math.max(0, blockCount - Math.max(data.height, config.startBlock - 1));
     });
-
-    return rewindHeight + 1;
+    return db.hash || db.height ? Math.max(config.startBlock, db.height + 1) : config.startBlock;
 }
 
 function parseArchonLog(log: Log, timestamp: string): DiscoveredItem | undefined {
@@ -423,17 +433,16 @@ function parseArchonLog(log: Log, timestamp: string): DiscoveredItem | undefined
 }
 
 async function scanBlocks(): Promise<void> {
-    const currentHeight = await provider.getBlockNumber();
-    const blockCount = Math.max(0, currentHeight - config.confirmations);
+    const blockCount = await getFinalizedHeight();
 
-    console.log(`current block height: ${currentHeight}, confirmed scan height: ${blockCount}`);
-
-    if (config.startBlock > blockCount) {
-        console.log(`Skipping ${REGISTRY} scan because start block ${config.startBlock} is ahead of confirmed height ${blockCount}`);
-        return;
-    }
+    console.log(`finalized scan height: ${blockCount}`);
 
     let start = await resolveScanStart(blockCount);
+
+    if (config.startBlock > blockCount) {
+        console.log(`Skipping ${REGISTRY} scan because start block ${config.startBlock} is ahead of finalized height ${blockCount}`);
+        return;
+    }
 
     while (start <= blockCount) {
         const end = Math.min(blockCount, start + config.logChunkSize - 1);
@@ -447,15 +456,13 @@ async function scanBlocks(): Promise<void> {
         });
 
         const blockCache = new Map<number, { hash: string; timestamp: number }>();
-        const getCachedBlock = async (height: number): Promise<{ hash: string; timestamp: number } | undefined> => {
+        const getCachedBlock = async (height: number): Promise<{ hash: string; timestamp: number }> => {
             const cached = blockCache.get(height);
             if (cached) {
                 return cached;
             }
             const block = await provider.getBlock(height);
-            if (!block?.hash) {
-                return undefined;
-            }
+            if (!block?.hash) throw new Error(`Finalized block unavailable: ${height}`);
             const value = { hash: block.hash, timestamp: block.timestamp };
             blockCache.set(height, value);
             return value;
@@ -465,9 +472,6 @@ async function scanBlocks(): Promise<void> {
 
         for (const log of logs) {
             const block = await getCachedBlock(log.blockNumber);
-            if (!block) {
-                continue;
-            }
             eventBlockNumbers.add(log.blockNumber);
             const timestamp = new Date(block.timestamp * 1000).toISOString();
             const item = parseArchonLog(log, timestamp);
@@ -488,9 +492,6 @@ async function scanBlocks(): Promise<void> {
                 continue;
             }
             const block = await getCachedBlock(height);
-            if (!block) {
-                continue;
-            }
             await addBlock(height, block.hash, block.timestamp);
         }
 
@@ -520,6 +521,8 @@ async function importBatch(item: DiscoveredItem, retry = false) {
     if (isFullyProcessed(item) && !retry) {
         return;
     }
+
+    if (item.height > await getFinalizedHeight()) return;
 
     const genesis = await gatekeeper.getGenesis(item.did);
     const batch = (genesis.didDocumentData as { batch?: { version: number; ops: string[] } } | undefined)?.batch;
@@ -965,14 +968,14 @@ async function waitForChain() {
 
 async function syncBlocks(): Promise<void> {
     try {
-        const currentHeight = await provider.getBlockNumber();
-        const blockCount = Math.max(0, currentHeight - config.confirmations);
+        const blockCount = await getFinalizedHeight();
+        await resolveScanStart(blockCount);
         const latest = await gatekeeper.getBlock(REGISTRY);
 
-        console.log(`current block height: ${currentHeight}, confirmed sync height: ${blockCount}`);
+        console.log(`finalized sync height: ${blockCount}`);
 
         if (config.startBlock > blockCount) {
-            console.log(`Skipping ${REGISTRY} sync because start block ${config.startBlock} is ahead of confirmed height ${blockCount}`);
+            console.log(`Skipping ${REGISTRY} sync because start block ${config.startBlock} is ahead of finalized height ${blockCount}`);
             return;
         }
 
@@ -1000,9 +1003,7 @@ async function syncBlocks(): Promise<void> {
                 continue;
             }
             const block = await provider.getBlock(height);
-            if (!block?.hash) {
-                continue;
-            }
+            if (!block?.hash) throw new Error(`Finalized block unavailable: ${height}`);
             console.log(`${height}/${blockCount} blocks (${formatSyncProgress(height, blockCount)}%)`);
             await addBlock(height, block.hash, block.timestamp);
         }

@@ -1151,3 +1151,17 @@ TypeScript mediator and Rust HTTP regressions exercise publisher rotation arrivi
 before/after the anchor and restart. These finite tests address evidence derivation
 outside the theorem's common-normalized-evidence assumption; they do not add a
 universal mediator refinement or a publisher-authorization claim for retrieval.
+
+### Ethereum finalized-import boundary (#1273)
+
+Ethereum discovery, checkpoint sync, and batch retries are bounded by the RPC
+finalized block. The transition from confirmation-depth imports preserves
+existing receipts and waits for the legacy cursor to finalize. Only a hash
+mismatch invokes the existing receipt-withdrawal API to recover an orphaned
+legacy suffix before committing the finalized-import policy. Until then,
+previously imported receipts may remain visible without being finalized. Subsequent finalized-history rollback is outside
+the automatic recovery model: an observed regression or cursor-hash change
+stops imports. Provider correctness and Ethereum consensus finality remain
+external assumptions; the Lean theorem does not prove either. Mediator tests
+exercise finality advancement, RPC failure, persisted retries, and the legacy
+transition, rather than extending the theorem's common-evidence premise.

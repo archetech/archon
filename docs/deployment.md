@@ -346,7 +346,15 @@ Ethereum support is optional. If enabled, the Ethereum registry anchors DID batc
 
 Mainnet uses the canonical `ETH:mainnet` contract. Sepolia is intended for testing. Future production L2 deployments should use a canonical contract on the chosen chain, with L2s such as Base, Optimism, or Arbitrum preferred when low anchoring cost matters.
 
-Ethereum mediators record Gatekeeper block checkpoints for the configured start block, every 10th confirmed block, and every block that contains an `ArchonBatch` event. This keeps timestamp bounds tight without storing every empty Ethereum block in Gatekeeper.
+Ethereum mediators record Gatekeeper block checkpoints for the configured start block, every 10th finalized block, and every block that contains an `ArchonBatch` event. This keeps timestamp bounds tight without storing every empty Ethereum block in Gatekeeper.
+
+Ethereum import RPC endpoints must support the `finalized` block tag. Discovery,
+checkpoint sync, and retries stop at that height with no confirmation-depth
+fallback; `ARCHON_ETH_CONFIRMATIONS` has been removed. On upgrade, existing receipts are
+preserved while imports wait for finality to reach the legacy cursor. Recovery
+is needed only if its block hash has changed.
+See [Ethereum finality and upgrade behavior](services/mediators/ethereum/README.md#finalized-imports-and-upgrade).
+
 
 ### Enable Ethereum Mainnet
 
@@ -386,7 +394,6 @@ ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,ETH:sepolia
 | `ARCHON_ETH_NETWORK` | `mainnet` | Ethereum network name |
 | `ARCHON_ETH_CHAIN_ID` | `1` | EVM chain ID |
 | `ARCHON_ETH_START_BLOCK` | `0` | Block height to start scanning |
-| `ARCHON_ETH_CONFIRMATIONS` | `12` | Confirmations before logs are imported |
 | `ARCHON_ETH_LOG_CHUNK_SIZE` | `2000` | Blocks per `eth_getLogs` request |
 | `ARCHON_ETH_IMPORT_INTERVAL` | `1` | Minutes between import scans; `0` disables importing |
 | `ARCHON_ETH_EXPORT_INTERVAL` | `1` | Minutes between export attempts; `0` makes the mediator read-only |
