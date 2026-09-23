@@ -8,6 +8,7 @@ import MemoryClient from '@didcid/ipfs/memory';
 
 let ipfs: MemoryClient;
 let gatekeeper: Gatekeeper;
+let db: DbJsonMemory;
 let wallet: WalletJsonMemory;
 let cipher: CipherNode;
 let keymaster: Keymaster;
@@ -24,7 +25,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
-    const db = new DbJsonMemory('test');
+    db = new DbJsonMemory('test');
     gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'BTC:signet'] });
     wallet = new WalletJsonMemory();
     cipher = new CipherNode();
@@ -33,6 +34,42 @@ beforeEach(async () => {
 });
 
 describe('createAsset', () => {
+    it.each([false, true])('keeps batch CID order when the anchor arrives before update: %s', async importBeforeUpdate => {
+        await keymaster.createId('batch-owner', { registry: 'hyperswarm' });
+        const firstDid = await keymaster.createAsset({ item: 'A' }, { registry: 'BTC:signet' });
+        const secondDid = await keymaster.createAsset({ item: 'B' }, { registry: 'BTC:signet' });
+        const firstCid = (await db.getEvents(firstDid))[0].opid;
+        const secondCid = (await db.getEvents(secondDid))[0].opid;
+        const original = { batch: { version: 1, ops: [firstCid, secondCid] } };
+        const batchDid = await keymaster.createAsset(original, { registry: 'hyperswarm' });
+        const metadata = {
+            registry: 'BTC:signet', time: new Date().toISOString(), ordinal: [100, 0],
+            registration: { height: 100, index: 0, txid: 'tx', batch: batchDid },
+        };
+        const importGenesis = async () => {
+            const doc = await keymaster.resolveDID(batchDid, { versionSequence: 1 });
+            const ops = (doc.didDocumentData as typeof original).batch.ops;
+            await gatekeeper.importBatchByCids(ops, metadata);
+            await gatekeeper.processEvents();
+        };
+        if (importBeforeUpdate) await importGenesis();
+        expect(await keymaster.mergeData(batchDid, { batch: { version: 1, ops: [secondCid, firstCid] } })).toBe(true);
+
+        expect((await keymaster.resolveDID(batchDid)).didDocumentData).toEqual({
+            batch: { version: 1, ops: [secondCid, firstCid] },
+        });
+        expect((await keymaster.resolveDID(batchDid, { versionSequence: 1 })).didDocumentData).toEqual(original);
+        expect((await gatekeeper.resolveDID(batchDid, { versionSequence: 1, verify: true })).didDocumentData).toEqual(original);
+
+        await importGenesis();
+        gatekeeper = new Gatekeeper({ db, ipfs, registries: ['local', 'hyperswarm', 'BTC:signet'] });
+        keymaster = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });
+        await importGenesis();
+        const candidates = await db.getCandidates();
+        expect(candidates[firstDid].find(event => event.registry === 'BTC:signet')?.registration?.opidx).toBe(0);
+        expect(candidates[secondDid].find(event => event.registry === 'BTC:signet')?.registration?.opidx).toBe(1);
+    });
+
     it('should create DID from an object anchor', async () => {
         const ownerDid = await keymaster.createId('Bob');
         const mockAnchor = { name: 'mockAnchor' };

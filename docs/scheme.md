@@ -731,6 +731,13 @@ A chain event MUST contain a valid registry name, an RFC 3339 authoritative bloc
 Position fields are nonnegative safe integers. `txid` and `batch` are nonempty
 strings supplied by the mediator; `batch` identifies the anchored batch DID.
 
+The batch DID identifies its signed create operation. Version-1 chain mediators
+MUST interpret the ordered `batch.ops` CID list from that create operation
+(`versionSequence: 1`). Later updates to the batch asset do not change which
+operations, or which `opidx` values, an existing chain anchor represents. If
+genesis content is unavailable, the mediator retries it; it does not use the
+latest asset state as a substitute.
+
 The ordinal contract is `[height, index, ...registryPosition, opidx]`: its first
 two components MUST equal registration `height` and `index`, and its last MUST
 equal `opidx`. Additional registry-specific position components, if any, remain

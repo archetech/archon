@@ -9,6 +9,12 @@ The mediator has two responsibilities:
 
 The smart contract intentionally does not validate Archon DID semantics. Gatekeeper remains the validation authority; Ethereum is used as a publication, ordering, and timestamping layer.
 
+An `ArchonBatch` anchor commits to the batch DID's signed create operation.
+Import resolves that DID at `versionSequence: 1` and uses the ordered
+`didDocumentData.batch.ops` list from genesis. A later batch-asset update cannot
+change the operations or their `opidx` values for the existing anchor. Missing
+genesis content is retried rather than replaced with latest asset state.
+
 ## Canonical contract
 
 Each public EVM registry should use one canonical contract address. For example, every `ETH:sepolia` node should scan the same Sepolia `ArchonRegistry` deployment. Custom deployments should use a distinct registry name or be clearly marked as non-canonical in node configuration.

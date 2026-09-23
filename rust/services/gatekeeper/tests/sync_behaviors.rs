@@ -74,6 +74,110 @@ async fn export_all_events(service: &common::TestService) -> Result<Vec<Value>> 
 }
 
 #[tokio::test]
+async fn signed_batch_reorder_does_not_change_genesis_cid_order() -> Result<()> {
+    let service = spawn_json().await?;
+    let agent_did = create_did(
+        &service,
+        create_agent_operation(7, "2026-04-11T12:00:00Z", "local"),
+    )
+    .await?;
+    let first_did = create_did(
+        &service,
+        create_asset_operation(
+            7,
+            &agent_did,
+            "2026-04-11T12:01:00Z",
+            "local",
+            json!({ "item": "A" }),
+        ),
+    )
+    .await?;
+    let second_did = create_did(
+        &service,
+        create_asset_operation(
+            7,
+            &agent_did,
+            "2026-04-11T12:02:00Z",
+            "local",
+            json!({ "item": "B" }),
+        ),
+    )
+    .await?;
+    let first_cid = first_did.strip_prefix("did:cid:").unwrap();
+    let second_cid = second_did.strip_prefix("did:cid:").unwrap();
+    let genesis_ops = json!([first_cid, second_cid]);
+    let batch_did = create_did(
+        &service,
+        create_asset_operation(
+            7,
+            &agent_did,
+            "2026-04-11T12:03:00Z",
+            "local",
+            json!({ "batch": { "version": 1, "ops": genesis_ops } }),
+        ),
+    )
+    .await?;
+    let mut batch_doc = resolve_did(&service, &batch_did).await?;
+    batch_doc["didDocumentData"]["batch"]["ops"] = json!([second_cid, first_cid]);
+    let version_id = batch_doc["didDocumentMetadata"]["versionId"]
+        .as_str()
+        .map(str::to_string);
+    let update = create_update_operation_signed_by(
+        7,
+        &batch_did,
+        &agent_did,
+        version_id.as_deref(),
+        "2026-04-11T12:04:00Z",
+        batch_doc,
+    );
+    let updated = service
+        .client
+        .post(format!("{}/did", service.base_url))
+        .json(&update)
+        .send()
+        .await?;
+    assert!(
+        updated.status().is_success(),
+        "signed batch update should succeed"
+    );
+
+    let latest = resolve_did(&service, &batch_did).await?;
+    assert_eq!(
+        latest["didDocumentData"]["batch"]["ops"],
+        json!([second_cid, first_cid])
+    );
+    let response = service
+        .client
+        .get(format!(
+            "{}/did/{}?versionSequence=1",
+            service.base_url, batch_did
+        ))
+        .send()
+        .await?;
+    assert!(response.status().is_success());
+    let genesis = response.json::<Value>().await?;
+    assert_eq!(
+        genesis["didDocumentData"]["batch"]["ops"],
+        json!([first_cid, second_cid])
+    );
+
+    let imported = admin_post(
+        &service,
+        "batch/import/cids",
+        json!({
+            "cids": genesis["didDocumentData"]["batch"]["ops"],
+            "metadata": {
+                "registry": "BTC:signet", "time": "2026-04-11T12:10:00Z", "ordinal": [100, 0],
+                "registration": { "height": 100, "index": 0, "txid": "tx", "batch": batch_did }
+            }
+        }),
+    )
+    .await?;
+    assert_eq!(imported["queued"], 2);
+    Ok(())
+}
+
+#[tokio::test]
 async fn sync_import_reports_processed_when_event_was_seen_before() -> Result<()> {
     let service = spawn_json().await?;
     let agent_op = create_agent_operation(7, "2026-04-11T12:00:00Z", "local");
