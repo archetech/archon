@@ -1,6 +1,6 @@
 {
   "name": "@didcid/common",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Archon common utilities",
   "type": "module",
   "main": "./dist/cjs/index.cjs",
@@ -99,7 +99,7 @@
     "rollup": "^4.63.3"
   },
   "dependencies": {
-    "undici": "^6.28.0",
-    "socks": "^2.8.7"
+    "socks": "^2.8.7",
+    "undici": "^6.28.0"
   }
 }

@@ -3,6 +3,99 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.6.4](https://github.com/archetech/archon/compare/@didcid/gatekeeper@0.2.0...@didcid/gatekeeper@0.6.4) (2026-09-24)
+
+
+### Bug Fixes
+
+* extract lightweight service clients ([#707](https://github.com/archetech/archon/issues/707)) ([94b1698](https://github.com/archetech/archon/commit/94b1698b6cbd633db6f5bf911aaac16c95ee4ee2))
+* **gatekeeper:** accelerate startup history recovery ([#1173](https://github.com/archetech/archon/issues/1173)) ([0418f40](https://github.com/archetech/archon/commit/0418f40f2f311ca7276e21b1554e9f24a02f5f15))
+* **gatekeeper:** Agree on field presence across both ports ([#1120](https://github.com/archetech/archon/issues/1120)) ([6e57ce7](https://github.com/archetech/archon/commit/6e57ce7f32234f028d643b953ef8e7c6fcdeb717))
+* **gatekeeper:** align operation CIDs with RFC 8785 ([84c65e9](https://github.com/archetech/archon/commit/84c65e9c80ff76bff06b5d5981a40358c9fb3713))
+* **gatekeeper:** Apply one timestamp grammar in both ports ([#1117](https://github.com/archetech/archon/issues/1117)) ([0aba9b8](https://github.com/archetech/archon/commit/0aba9b8b427d956615b4c7e2e9b3f14630033f6f))
+* **gatekeeper:** Authorize against the key the proof names ([#1132](https://github.com/archetech/archon/issues/1132)) ([319d0e5](https://github.com/archetech/archon/commit/319d0e5070d9f52e2bb506ac71944f689a2e18a1)), closes [#1130](https://github.com/archetech/archon/issues/1130)
+* **gatekeeper:** avoid repeated startup history reconstruction ([#1165](https://github.com/archetech/archon/issues/1165)) ([264e832](https://github.com/archetech/archon/commit/264e8320bfa8713356486ba7c396a63eb8febe9c))
+* **gatekeeper:** bind event targets to signed operations ([#1251](https://github.com/archetech/archon/issues/1251)) ([a3189da](https://github.com/archetech/archon/commit/a3189daf709b3a44720ef43f92f0a74933663b56))
+* **gatekeeper:** break equal anchored ordinal ties by operation CID ([1b71932](https://github.com/archetech/archon/commit/1b71932d238bec52f485e5f490fe0f2656a91ef7))
+* **gatekeeper:** cancel the save timer when stop() fails, and close the last coverage gaps ([#825](https://github.com/archetech/archon/issues/825)) ([d0bf91b](https://github.com/archetech/archon/commit/d0bf91bdfb68d5c3f7b2ca08cea8dc57d0d0ce6b)), closes [#822](https://github.com/archetech/archon/issues/822)
+* **gatekeeper:** derive controller anchoring from confirmed history ([1ba7ba7](https://github.com/archetech/archon/commit/1ba7ba710f684a524ef2b9966e89e98a9f259100))
+* **gatekeeper:** exportBatch includes DIDs promoted off `local` ([#799](https://github.com/archetech/archon/issues/799)) ([9f00cb8](https://github.com/archetech/archon/commit/9f00cb89ba6c7a2d575524c0005ab438519b6a15))
+* **gatekeeper:** Keep non-operations out of the operation store ([#1119](https://github.com/archetech/archon/issues/1119)) ([03683b6](https://github.com/archetech/archon/commit/03683b6d85b2202527a6909b187bc6a2c5c646ed))
+* **gatekeeper:** keep runtime replay and status scans responsive ([f3cc6be](https://github.com/archetech/archon/commit/f3cc6be901e3de20cefaf7db357a9b1d6bbe326a))
+* **gatekeeper:** reconsider earlier valid chain anchors ([#1217](https://github.com/archetech/archon/issues/1217)) ([2a20f50](https://github.com/archetech/archon/commit/2a20f504dc04d2ec4bc77f3f292e799ab4e2953f))
+* **gatekeeper:** Reject a backdated proof once the chain has committed the operation ([#1145](https://github.com/archetech/archon/issues/1145)) ([4ea2e8f](https://github.com/archetech/archon/commit/4ea2e8f87ce79a55db071cf96b977a6ae91a5ecb)), closes [#1131](https://github.com/archetech/archon/issues/1131) [#1136](https://github.com/archetech/archon/issues/1136) [#1134](https://github.com/archetech/archon/issues/1134) [#1148](https://github.com/archetech/archon/issues/1148)
+* **gatekeeper:** reject duplicate verification-method IDs ([be2a07b](https://github.com/archetech/archon/commit/be2a07bba030392ea35d19eceed26e19f4f88e24))
+* **gatekeeper:** require complete chain receipt metadata ([341a35f](https://github.com/archetech/archon/commit/341a35f2766bc52d42e2fdd20858f1641bb3b025))
+* **gatekeeper:** require ordinals on chain receipts ([72d04b6](https://github.com/archetech/archon/commit/72d04b64becf2329ae3d56fcbb8f6c75c3878bc4))
+* **gatekeeper:** Resolve the controller at the time an operation arrived ([#1134](https://github.com/archetech/archon/issues/1134)) ([93ede4e](https://github.com/archetech/archon/commit/93ede4e2ee102fdc5fc6a7f49e2138ccb0cc35f6)), closes [#1135](https://github.com/archetech/archon/issues/1135) [#1136](https://github.com/archetech/archon/issues/1136) [#1131](https://github.com/archetech/archon/issues/1131)
+* **gatekeeper:** revalidate authorization as controller history arrives ([#1155](https://github.com/archetech/archon/issues/1155)) ([8a5c9d7](https://github.com/archetech/archon/commit/8a5c9d79a77b999d6ae2cb92ba12b0b9a5054785))
+* **gatekeeper:** skip replay for unchanged sync duplicates ([#1167](https://github.com/archetech/archon/issues/1167)) ([24dcb13](https://github.com/archetech/archon/commit/24dcb13f90f1c5ab8d539b045b5ed55d31be1a2d))
+* **gatekeeper:** validate predecessors before submitting operations ([#1174](https://github.com/archetech/archon/issues/1174)) ([f205615](https://github.com/archetech/archon/commit/f205615d913f0331d97c661ce71719bcc6c197ea))
+* **gatekeeper:** validate registration transitions before acceptance ([#1181](https://github.com/archetech/archon/issues/1181)) ([b2a680e](https://github.com/archetech/archon/commit/b2a680e6f3fb6a82633d996f3051a1755c7daa95))
+* **hyperswarm:** use proof time for event timestamps ([#1186](https://github.com/archetech/archon/issues/1186)) ([70b1fe1](https://github.com/archetech/archon/commit/70b1fe13ca36845cd07d6ba9f8b45de9c697e184))
+* **mediators:** skip unavailable batches and retry later ([#1154](https://github.com/archetech/archon/issues/1154)) ([701bcca](https://github.com/archetech/archon/commit/701bccac17bd0beae983ddb2fa40b2706c38fd34))
+* **mediators:** stop retrying batches for unrelated pending events ([#1169](https://github.com/archetech/archon/issues/1169)) ([9147291](https://github.com/archetech/archon/commit/914729144b10667ab5a883076d6f420dd446158c))
+* Name the relationship an operation exercises, and the suite it signs under ([#1129](https://github.com/archetech/archon/issues/1129)) ([5d3d22b](https://github.com/archetech/archon/commit/5d3d22b435b0b11e6ad574a3965b2d82b95af0bc)), closes [#20](https://github.com/archetech/archon/issues/20) [#1127](https://github.com/archetech/archon/issues/1127)
+* **protocol:** select provisional successors by canonical CID ([#1198](https://github.com/archetech/archon/issues/1198)) ([d0bc7e5](https://github.com/archetech/archon/commit/d0bc7e5fff39f4c49ff7d70e18fcdf4e2f2bbb8d))
+* withdraw orphaned chain receipts during reorg recovery ([#1272](https://github.com/archetech/archon/issues/1272)) ([f0fa024](https://github.com/archetech/archon/commit/f0fa024df17b9d0e4332c9946fd2ac5b99209676))
+
+
+### Features
+
+* add Filecoin storage mediator ([#555](https://github.com/archetech/archon/issues/555)) ([50e1265](https://github.com/archetech/archon/commit/50e1265f939de089f22a4d0bea9b7745ef3eb8e1))
+* add immutable genesis document retrieval for anchored batches ([758fe72](https://github.com/archetech/archon/commit/758fe7249b8892e66fb713f1e74104e37e77af2f))
+* Allow pin as a DID registry ([#561](https://github.com/archetech/archon/issues/561)) ([fb90d66](https://github.com/archetech/archon/commit/fb90d6664ec9cf8a56f2a207a6652c6753b23fe8))
+* Bind the proof configuration into DID operation proofs ([#1127](https://github.com/archetech/archon/issues/1127)) ([a2c894e](https://github.com/archetech/archon/commit/a2c894e95bd370a0a06ddc8a260d56b3903c6a78)), closes [#1085](https://github.com/archetech/archon/issues/1085) [#1087](https://github.com/archetech/archon/issues/1087)
+* DIDComm Messaging v2 (Phases 0–7): TS + Python parity, transport, protocols, auto-discovery ([#633](https://github.com/archetech/archon/issues/633)) ([f53feef](https://github.com/archetech/archon/commit/f53feefc2a1e1fff1cc1ae86345dc1389de316c1)), closes [#key-1](https://github.com/archetech/archon/issues/key-1) [did#key-agreement-1](https://github.com/did/issues/key-agreement-1)
+* expand MCP server toward Keymaster CLI parity ([#606](https://github.com/archetech/archon/issues/606)) ([8021d44](https://github.com/archetech/archon/commit/8021d4486d28003408234c2f33993389965d1dd1))
+* **proofs:** complete agent convergence with pin proof time ([#1237](https://github.com/archetech/archon/issues/1237)) ([3be1f7e](https://github.com/archetech/archon/commit/3be1f7ed37d3dafc62339421987affb129534182))
+* **proofs:** complete protocol convergence model and receipt hardening ([561a443](https://github.com/archetech/archon/commit/561a44354314075ee3d808ad41c3fb0a8cbb473d))
+
+
+### Performance Improvements
+
+* **gatekeeper:** reuse replay snapshots during startup ([#1189](https://github.com/archetech/archon/issues/1189)) ([644b920](https://github.com/archetech/archon/commit/644b9208ac62f4512d637c15dad91ddb43dca3f5))
+
+
+### Reverts
+
+* Revert "fix(gatekeeper): Resolve the controller at the time an operation arrived (#1134)" (#1143) ([992e5b8](https://github.com/archetech/archon/commit/992e5b894b16be7fce038dd11a47e8df8aa5fde4)), closes [#1134](https://github.com/archetech/archon/issues/1134) [#1143](https://github.com/archetech/archon/issues/1143)
+
+
+
+# 0.8.0 (2026-05-15)
+
+
+### Bug Fixes
+
+* Better error message for missing wallet ([#53](https://github.com/archetech/archon/issues/53)) ([1a8dad0](https://github.com/archetech/archon/commit/1a8dad05a8a1eafb5d89e88224b913657d1f0530))
+* getVaultItem failed for small vault items ([#45](https://github.com/archetech/archon/issues/45)) ([a6fdd52](https://github.com/archetech/archon/commit/a6fdd5233ae2013879b28252d322e392211a59c2))
+* Show failed lightning payments ([#376](https://github.com/archetech/archon/issues/376)) ([7d3b24f](https://github.com/archetech/archon/commit/7d3b24faff2cf8a1800143079a3367f2cf1e873e))
+
+
+### Features
+
+* Add ARCHON_ADMIN_API_KEY support to CLI docker container ([#128](https://github.com/archetech/archon/issues/128)) ([#131](https://github.com/archetech/archon/issues/131)) ([8526717](https://github.com/archetech/archon/commit/8526717c50b6fb71b3812fe9cd7867051d134c53))
+* Add change-registry command to change a DID's registry ([#194](https://github.com/archetech/archon/issues/194)) ([0d258de](https://github.com/archetech/archon/commit/0d258def464394a9c49b6d07f7681c35cfda5721)), closes [#153](https://github.com/archetech/archon/issues/153)
+* Add decodeLightningInvoice to Keymaster ([#146](https://github.com/archetech/archon/issues/146)) ([2ed4139](https://github.com/archetech/archon/commit/2ed4139f3ae548b21ca509877f3b05d3ce68f1b6)), closes [#145](https://github.com/archetech/archon/issues/145)
+* Add getVersion() to KeymasterClient ([#219](https://github.com/archetech/archon/issues/219)) ([f06d89c](https://github.com/archetech/archon/commit/f06d89c8047d60c00611eef4b2a577b54ca6d6a6)), closes [#205](https://github.com/archetech/archon/issues/205)
+* Add Lightning tab to web clients ([#148](https://github.com/archetech/archon/issues/148)) ([73ed52e](https://github.com/archetech/archon/commit/73ed52ea0da92b391fa53a92ba2c671f91912bbd)), closes [#147](https://github.com/archetech/archon/issues/147) [#147](https://github.com/archetech/archon/issues/147) [#147](https://github.com/archetech/archon/issues/147) [#147](https://github.com/archetech/archon/issues/147)
+* Add Lightning wallet support via LNbits integration ([#136](https://github.com/archetech/archon/issues/136)) ([#140](https://github.com/archetech/archon/issues/140)) ([4d99d5a](https://github.com/archetech/archon/commit/4d99d5ab8da20897e5aecf8557b271c3b1779d45))
+* Add Lightning Zap tab and Publish toggle to web clients ([#161](https://github.com/archetech/archon/issues/161)) ([6357451](https://github.com/archetech/archon/commit/6357451083f464120b01348c889deb5c80bed05f)), closes [#159](https://github.com/archetech/archon/issues/159)
+* add zcash wallet and mediator services ([#517](https://github.com/archetech/archon/issues/517)) ([d898fab](https://github.com/archetech/archon/commit/d898fab47f71cdc4c718d977b007b51410da8b19))
+* Added update-credential to agent CLI ([#66](https://github.com/archetech/archon/issues/66)) ([002fce1](https://github.com/archetech/archon/commit/002fce1dcf2edb8c621eb77501cdf0abeed90484))
+* Adds CLI to keymaster package ([#39](https://github.com/archetech/archon/issues/39)) ([894ce73](https://github.com/archetech/archon/commit/894ce732f5beaca37bb90ace6b760b8e80aba3e9))
+* Adds get-property command to CLI ([#73](https://github.com/archetech/archon/issues/73)) ([310d7fe](https://github.com/archetech/archon/commit/310d7fe5d95976b8ca37ec12b7d6dc16cc52f65a))
+* Display Lightning payment history ([#164](https://github.com/archetech/archon/issues/164)) ([#165](https://github.com/archetech/archon/issues/165)) ([c8ec283](https://github.com/archetech/archon/commit/c8ec2835b0cde542c71e02fdb7fc55c3d46a81d1))
+* Lightning zap — send sats to a DID ([#155](https://github.com/archetech/archon/issues/155)) ([39d7ee3](https://github.com/archetech/archon/commit/39d7ee3242973ace494e45f636ca12fe78d911ab)), closes [#154](https://github.com/archetech/archon/issues/154)
+* move lightning payment filtering to client with full state display ([#237](https://github.com/archetech/archon/issues/237)) ([0eee4c0](https://github.com/archetech/archon/commit/0eee4c0987513d689a2a4eec3b7b088556be53b2)), closes [#236](https://github.com/archetech/archon/issues/236)
+* stream large file uploads/downloads for multi-GB video support ([#238](https://github.com/archetech/archon/issues/238)) ([eca94a0](https://github.com/archetech/archon/commit/eca94a06c041849a181a5a072728b9fe0c22bfae)), closes [#208](https://github.com/archetech/archon/issues/208)
+* Support mainnet registries ([#34](https://github.com/archetech/archon/issues/34)) ([a206c9e](https://github.com/archetech/archon/commit/a206c9e24f29fabec45f3cb239b8ba88f0525e6d))
+
+
+
+
+
 ## [0.6.3](https://github.com/archetech/archon/compare/@didcid/gatekeeper@0.2.0...@didcid/gatekeeper@0.6.3) (2026-08-26)
 
 
