@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.4.0](https://github.com/archetech/archon/compare/@didcid/ipfs@0.1.3...@didcid/ipfs@0.4.0) (2026-09-24)
+
+
+### Bug Fixes
+
+* **gatekeeper:** align operation CIDs with RFC 8785 ([84c65e9](https://github.com/archetech/archon/commit/84c65e9c80ff76bff06b5d5981a40358c9fb3713))
+* **ipfs:** Replace the Helia backend with an in-memory store ([#1079](https://github.com/archetech/archon/issues/1079)) ([7239257](https://github.com/archetech/archon/commit/72392571e6bf3644595b989963705a880f1a766d)), closes [#1078](https://github.com/archetech/archon/issues/1078)
+
+
+### Features
+
+* expand MCP server toward Keymaster CLI parity ([#606](https://github.com/archetech/archon/issues/606)) ([8021d44](https://github.com/archetech/archon/commit/8021d4486d28003408234c2f33993389965d1dd1))
+* stream large file uploads/downloads for multi-GB video support ([#238](https://github.com/archetech/archon/issues/238)) ([eca94a0](https://github.com/archetech/archon/commit/eca94a06c041849a181a5a072728b9fe0c22bfae)), closes [#208](https://github.com/archetech/archon/issues/208)
+
+
+
+
+
 ## [0.3.3](https://github.com/archetech/archon/compare/@didcid/ipfs@0.1.3...@didcid/ipfs@0.3.3) (2026-08-26)
 
 
