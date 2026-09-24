@@ -73,8 +73,14 @@ jobs:
           registry-url: "https://registry.npmjs.org"
 
       - name: Verify npm trusted publisher
+        env:
+          LEGACY_NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           node --input-type=module <<'JS'
+          const legacy = await fetch('https://registry.npmjs.org/-/whoami', {
+            headers: { Authorization: `Bearer ${process.env.LEGACY_NPM_TOKEN}` },
+          });
+          console.log(`Stored NPM_TOKEN authentication: HTTP ${legacy.status}`);
           const url = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
           url.searchParams.set('audience', 'npm:registry.npmjs.org');
           const identity = await fetch(url, {
