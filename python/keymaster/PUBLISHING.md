@@ -6,6 +6,24 @@ the `archon-keymaster` distribution on PyPI.
 Do not upload to TestPyPI or PyPI unless the release owner explicitly asks for
 publication.
 
+## Release checklist
+
+Start a release branch from current main. Keep `archon-keymaster` in lockstep
+with the published `@didcid/keymaster` npm version, and update both
+`python/keymaster/pyproject.toml` and the exact `archon-keymaster` dependency in
+`python/keymaster_service/pyproject.toml`. The service's own application version
+does not change as part of this library release.
+
+Use the existing workflow with `target=check`, then `target=testpypi`, then
+`target=pypi` on the same release commit. After publication, install that exact
+version from PyPI in a clean virtual environment, verify the version and CLI,
+and merge the release branch through a PR. The August 2026 release followed
+this sequence successfully (PR #951).
+
+This workflow publishes only `archon-keymaster`. Do not assume the SDK or service
+is included, or change publishing authentication based on the npm release:
+PyPI's trusted-publishing configuration is independent of npm's.
+
 ## GitHub Actions
 
 Use the manual `Publish Python Keymaster to PyPI` workflow for routine
