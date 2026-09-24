@@ -39,6 +39,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   publish:
@@ -49,6 +50,22 @@ jobs:
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout current release tags
+        if: ${{ github.event.inputs.version == 'current' }}
+        run: |
+          PACKAGE="${{ github.event.inputs.package }}"
+          if [ "$PACKAGE" = "all" ]; then
+            PACKAGE="@didcid/common"
+          fi
+
+          PACKAGE_DIR="${PACKAGE##*/}"
+          VERSION="$(node -p "require('./packages/${PACKAGE_DIR}/package.json').version")"
+          TAG="${PACKAGE}@${VERSION}"
+          RELEASE_COMMIT="$(git rev-list -n 1 "$TAG")"
+
+          echo "Publishing from $TAG at $RELEASE_COMMIT"
+          git checkout --detach "$RELEASE_COMMIT"
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
@@ -103,25 +120,11 @@ jobs:
             npx lerna version ${{ github.event.inputs.version }} --yes --no-private $FORCE_FLAG
           fi
 
-      - name: Checkout current release tags
-        if: ${{ github.event.inputs.version == 'current' }}
-        run: |
-          PACKAGE="${{ github.event.inputs.package }}"
-          if [ "$PACKAGE" = "all" ]; then
-            PACKAGE="@didcid/common"
-          fi
-
-          PACKAGE_DIR="${PACKAGE##*/}"
-          VERSION="$(node -p "require('./packages/${PACKAGE_DIR}/package.json').version")"
-          TAG="${PACKAGE}@${VERSION}"
-          RELEASE_COMMIT="$(git rev-list -n 1 "$TAG")"
-
-          echo "Publishing from $TAG at $RELEASE_COMMIT"
-          git checkout --detach "$RELEASE_COMMIT"
+      - name: Update publishing npm
+        run: npm install --global npm@11.15.0
 
       - name: Publish to NPM
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_ACCESS: public
         run: |
           # Detect a no-op publish from lerna's own output: when there is no
@@ -130,10 +133,14 @@ jobs:
           # unreliable here — it stays empty even on a successful publish.)
           set -o pipefail
           PUBLISH_LOG="$(mktemp)"
+          MODE=from-git
+          if [ "${{ github.event.inputs.version }}" = "current" ]; then
+            MODE=from-package
+          fi
           if [[ "${{ github.event.inputs.version }}" == pre* ]]; then
-            npx lerna publish from-git --dist-tag ${{ github.event.inputs.preid }} --yes --registry https://registry.npmjs.org 2>&1 | tee "$PUBLISH_LOG"
+            npx lerna publish "$MODE" --dist-tag ${{ github.event.inputs.preid }} --yes --registry https://registry.npmjs.org 2>&1 | tee "$PUBLISH_LOG"
           else
-            npx lerna publish from-git --yes --registry https://registry.npmjs.org 2>&1 | tee "$PUBLISH_LOG"
+            npx lerna publish "$MODE" --yes --registry https://registry.npmjs.org 2>&1 | tee "$PUBLISH_LOG"
           fi
 
           if ! grep -q "lerna success published" "$PUBLISH_LOG"; then

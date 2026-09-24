@@ -26,3 +26,15 @@ Do not count the workflow's `lerna run test` step as unit-test coverage: these
 packages have no test lifecycle scripts. Check the release PR's root unit and
 convergence CI separately. Keep lockfile operations on npm 10.9.2, and never print
 authentication credentials.
+
+## Trusted publishing recovery
+
+The token-based workflow lacked `id-token: write`, preventing Lerna's existing
+OIDC support from using the configured npm trusted publishers. The release
+workflow now grants that permission and does not supply `NPM_TOKEN` during
+publication. npm 10.9.2 remains pinned for installation and lockfiles; only the
+publish phase upgrades npm. Recovery checks out the tag before installation and
+building, then uses Lerna `from-package` to skip versions already published.
+The workflow filename and `production` environment stay unchanged to match npm's
+trusted publisher configuration. Verify a successful run before calling this
+recovery complete; do not infer that the old token expired from E404 alone.
