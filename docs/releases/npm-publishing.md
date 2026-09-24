@@ -1,40 +1,45 @@
 # npm release procedure
 
 Use a dedicated release branch from main and merge its version changes through a
-PR after publication. The successful 2026-08-26 release used the existing
-`npm-package-publish.yml` workflow with `package=all`, npm 10.9.2, Lerna and
-`NPM_TOKEN` in the production environment (run 33009816035, PR #950).
-Package versions are independent of the Archon application version.
+PR after publication. Package versions are independent of the Archon application
+version. Confirm the requested bump before dispatching the workflow.
 
-Confirm the requested bump before dispatching. A workflow run can successfully
-push its version commit and package tags even when publication fails. Preserve
-those versions and retry with `current`; never repeat the bump to recover a
-publication failure. The existing current mode builds before checking out the
-release tag, so dispatch from the tagged source commit, or a branch with identical
-build inputs. Keep workflow changes separate from an instruction to repeat the
-existing release process. Check the last successful run before proposing an
-authentication change; an npm E404 alone does not prove a token expired.
+The successful August 26 release used `npm-package-publish.yml`, `package=all`,
+npm 10.9.2, Lerna and `NPM_TOKEN` (run 33009816035, PR #950). Commit `0c5dae83`
+records that OIDC was disabled in May because per-package trusted publishers were
+not configured then. Consult the successful run AND this history before changing
+authentication; npm E404 alone does not establish token expiration.
 
-The 2026-09-24 minor release generated all seven package tags at `12fda06f`
-on `release/npm-minor-2026-09-24` in run 36033539172. Builds succeeded, but
-publication failed with npm E404 responses. Registry reads immediately afterward
-found none of the new versions. Resolve authentication before retrying and verify
-each package version and its `latest` dist-tag after success. This supersedes the
-unpublished patch release proposed in #1283; its old tags have been preserved.
+## September 24 release status
 
-Do not count the workflow's `lerna run test` step as unit-test coverage: these
-packages have no test lifecycle scripts. Check the release PR's root unit and
-convergence CI separately. Keep lockfile operations on npm 10.9.2, and never print
-authentication credentials.
+Run 36033539172 generated all seven minor-version tags at `12fda06f` on
+`release/npm-minor-2026-09-24`. Builds succeeded, but publication failed. Registry
+reads found none of the new versions. PR #1284 supersedes unpublished patch PR
+#1283; its old tags have been preserved.
 
-## Trusted publishing recovery
+The direct credential check in run 36034964815 established:
 
-The token-based workflow lacked `id-token: write`, preventing Lerna's existing
-OIDC support from using the configured npm trusted publishers. The release
-workflow now grants that permission and does not supply `NPM_TOKEN` during
-publication. npm 10.9.2 remains pinned for installation and lockfiles; only the
-publish phase upgrades npm. Recovery checks out the tag before installation and
-building, then uses Lerna `from-package` to skip versions already published.
-The workflow filename and `production` environment stay unchanged to match npm's
-trusted publisher configuration. Verify a successful run before calling this
-recovery complete; do not infer that the old token expired from E404 alone.
+- The repository's stored NPM_TOKEN receives HTTP 401 from npm's whoami endpoint.
+  This proves rejection of that credential; it does not distinguish expiration
+  from revocation or other credential configuration problems.
+- GitHub issues an OIDC identity, but npm's exchange endpoint returns HTTP 404:
+  `OIDC token exchange error - package not found` for @didcid/common. Package
+  settings must be checked before claiming trusted publishing is configured.
+
+The prepared workflow uses OIDC (`id-token: write`) without a publishing-token
+fallback. The npm trusted publisher must match `archetech/archon`, workflow
+`npm-package-publish.yml`, environment `production`, and permit publishing, for
+each public package. The diagnostic token check is read-only and outputs only
+HTTP status; never print credentials. This recovery is not yet verified working.
+
+## Recovery and validation
+
+A failed run can already have pushed its version commit and tags. Preserve them
+and retry with `version=current`, never another bump. Recovery checks out the
+release tag before installation/build and uses Lerna `from-package` to skip
+published versions. Keep npm 10.9.2 for lockfiles; the publishing phase upgrades
+npm separately. Verify every version and its `latest` dist-tag after publishing.
+
+Do not count `lerna run test` as unit coverage: these packages have no test
+lifecycle scripts. Check root unit and convergence CI separately. Do not merge
+the release PR until publication and verification succeed.
