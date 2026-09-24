@@ -26,19 +26,19 @@ The direct credential check in run 36034964815 established:
   `OIDC token exchange error - package not found` for @didcid/common. Package
   settings must be checked before claiming trusted publishing is configured.
 
-The prepared workflow uses OIDC (`id-token: write`) without a publishing-token
-fallback. The npm trusted publisher must match `archetech/archon`, workflow
-`npm-package-publish.yml`, environment `production`, and permit publishing, for
-each public package. The diagnostic token check is read-only and outputs only
-HTTP status; never print credentials. This recovery is not yet verified working.
+The maintainer confirmed that @didcid/common's trusted publisher settings were
+empty and chose to renew the repository NPM_TOKEN rather than configure OIDC.
+Publishing therefore uses npm 10.9.2 and token authentication only, matching the
+successful August release. Do not re-enable OIDC without a separate decision and
+verified per-package configuration. Never print credentials. The renewed token
+is awaiting a successful publish run.
 
 ## Recovery and validation
 
 A failed run can already have pushed its version commit and tags. Preserve them
 and retry with `version=current`, never another bump. Recovery checks out the
 release tag before installation/build and uses Lerna `from-package` to skip
-published versions. Keep npm 10.9.2 for lockfiles; the publishing phase upgrades
-npm separately. Verify every version and its `latest` dist-tag after publishing.
+published versions. Keep npm 10.9.2 for installation, lockfiles and token-based publishing. Verify every version and its `latest` dist-tag after publishing.
 
 Do not count `lerna run test` as unit coverage: these packages have no test
 lifecycle scripts. Check root unit and convergence CI separately. Do not merge
