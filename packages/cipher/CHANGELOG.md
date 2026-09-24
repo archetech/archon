@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.5.0](https://github.com/archetech/archon/compare/@didcid/cipher@0.1.3...@didcid/cipher@0.5.0) (2026-09-24)
+
+
+### Bug Fixes
+
+* **cipher:** Pin and document the Ed25519 verification rule (ports diverge on torsion keys) ([#1113](https://github.com/archetech/archon/issues/1113)) ([5aae3b3](https://github.com/archetech/archon/commit/5aae3b3d12e90338f30cdfa37d78bce6b7f7ed95)), closes [#1091](https://github.com/archetech/archon/issues/1091)
+* **gatekeeper:** accelerate startup history recovery ([#1173](https://github.com/archetech/archon/issues/1173)) ([0418f40](https://github.com/archetech/archon/commit/0418f40f2f311ca7276e21b1554e9f24a02f5f15))
+* Incorrect passphrase on react-wallet ([#97](https://github.com/archetech/archon/issues/97)) ([5ce0523](https://github.com/archetech/archon/commit/5ce05238ecb2dd6e5a4a647ab0429a9cf9bdb6a4))
+* **services:** Make a failed startup fatal instead of a logged line ([#1057](https://github.com/archetech/archon/issues/1057)) ([59ce2bf](https://github.com/archetech/archon/commit/59ce2bf44da8ebdef629aebb0a1c97b458756f1a)), closes [#1048](https://github.com/archetech/archon/issues/1048) [#1050](https://github.com/archetech/archon/issues/1050) [#1053](https://github.com/archetech/archon/issues/1053)
+
+
+### Features
+
+* Add nostr support ([#133](https://github.com/archetech/archon/issues/133)) ([3591d62](https://github.com/archetech/archon/commit/3591d6281bf29c5e98e761e7ad56a7abf78a4106)), closes [#87](https://github.com/archetech/archon/issues/87)
+* Adopt W3C JWE standard for encryption ([#90](https://github.com/archetech/archon/issues/90)) ([2321ca7](https://github.com/archetech/archon/commit/2321ca7fd6e074bac1f4b8fa7c12e58d4b45b181))
+* DIDComm Messaging v2 (Phases 0–7): TS + Python parity, transport, protocols, auto-discovery ([#633](https://github.com/archetech/archon/issues/633)) ([f53feef](https://github.com/archetech/archon/commit/f53feefc2a1e1fff1cc1ae86345dc1389de316c1)), closes [#key-1](https://github.com/archetech/archon/issues/key-1) [did#key-agreement-1](https://github.com/did/issues/key-agreement-1)
+* expand MCP server toward Keymaster CLI parity ([#606](https://github.com/archetech/archon/issues/606)) ([8021d44](https://github.com/archetech/archon/commit/8021d4486d28003408234c2f33993389965d1dd1))
+* **keymaster:** Credentials other DID methods can verify ([#1085](https://github.com/archetech/archon/issues/1085)) ([d6eb9a0](https://github.com/archetech/archon/commit/d6eb9a05caf9c41733643f9a8fe73f86a495b4b2)), closes [#key-agreement-1](https://github.com/archetech/archon/issues/key-agreement-1) [#key-1](https://github.com/archetech/archon/issues/key-1) [#1052](https://github.com/archetech/archon/issues/1052) [123#key-1](https://github.com/123/issues/key-1) [#key-assertion-1](https://github.com/archetech/archon/issues/key-assertion-1) [#key-assertion-1](https://github.com/archetech/archon/issues/key-assertion-1)
+* Store imported nostr nsec in wallet ([#397](https://github.com/archetech/archon/issues/397)) ([7a0a919](https://github.com/archetech/archon/commit/7a0a919f34ba9161dce25eaa528dccf3443840a4))
+
+
+
+
+
 ## [0.4.3](https://github.com/archetech/archon/compare/@didcid/cipher@0.1.3...@didcid/cipher@0.4.3) (2026-08-26)
 
 

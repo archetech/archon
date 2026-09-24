@@ -3,6 +3,28 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.4.0](https://github.com/archetech/archon/compare/@didcid/common@0.1.3...@didcid/common@0.4.0) (2026-09-24)
+
+
+### Bug Fixes
+
+* **keymaster:** Check the target of remote name lookups, on every path ([#943](https://github.com/archetech/archon/issues/943)) ([fba693b](https://github.com/archetech/archon/commit/fba693bb63d1ed856ce1d2ef5ca3509c7699ed4c)), closes [#252](https://github.com/archetech/archon/issues/252)
+* **keymaster:** Make wallet creation a decision, not a side effect of reading ([#1050](https://github.com/archetech/archon/issues/1050)) ([2890125](https://github.com/archetech/archon/commit/2890125ed2fac4c908c30d1a897caccfc78c5807)), closes [#1037](https://github.com/archetech/archon/issues/1037) [#1037](https://github.com/archetech/archon/issues/1037) [#1051](https://github.com/archetech/archon/issues/1051)
+* **network:** pin public HTTPS lookups to validated DNS destinations ([7a28c37](https://github.com/archetech/archon/commit/7a28c371af95f2db58c998657498d2d3393378a2))
+* **services:** Make a failed startup fatal instead of a logged line ([#1057](https://github.com/archetech/archon/issues/1057)) ([59ce2bf](https://github.com/archetech/archon/commit/59ce2bf44da8ebdef629aebb0a1c97b458756f1a)), closes [#1048](https://github.com/archetech/archon/issues/1048) [#1050](https://github.com/archetech/archon/issues/1050) [#1053](https://github.com/archetech/archon/issues/1053)
+* **tor:** detect unreachable published onion endpoints ([be76c6c](https://github.com/archetech/archon/commit/be76c6c297cf29decc729a7f3834ca72a5d466f4))
+
+
+### Features
+
+* Add Lightning wallet support via LNbits integration ([#136](https://github.com/archetech/archon/issues/136)) ([#140](https://github.com/archetech/archon/issues/140)) ([4d99d5a](https://github.com/archetech/archon/commit/4d99d5ab8da20897e5aecf8557b271c3b1779d45))
+* expand MCP server toward Keymaster CLI parity ([#606](https://github.com/archetech/archon/issues/606)) ([8021d44](https://github.com/archetech/archon/commit/8021d4486d28003408234c2f33993389965d1dd1))
+* **keymaster:** Credentials other DID methods can verify ([#1085](https://github.com/archetech/archon/issues/1085)) ([d6eb9a0](https://github.com/archetech/archon/commit/d6eb9a05caf9c41733643f9a8fe73f86a495b4b2)), closes [#key-agreement-1](https://github.com/archetech/archon/issues/key-agreement-1) [#key-1](https://github.com/archetech/archon/issues/key-1) [#1052](https://github.com/archetech/archon/issues/1052) [123#key-1](https://github.com/123/issues/key-1) [#key-assertion-1](https://github.com/archetech/archon/issues/key-assertion-1) [#key-assertion-1](https://github.com/archetech/archon/issues/key-assertion-1)
+
+
+
+
+
 ## [0.3.3](https://github.com/archetech/archon/compare/@didcid/common@0.1.3...@didcid/common@0.3.3) (2026-08-26)
 
 
