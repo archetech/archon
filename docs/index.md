@@ -10,6 +10,7 @@ Archon is a decentralized identity protocol implementing the W3C-compliant `did:
 - [DIDComm Messaging Support](didcomm-design.md) — design doc for adding standards-based DIDComm v2 messaging
 - [did:cid Technical Presentation](presentations/did-cid-technical-presentation.md) — slide outline, speaker notes, and prep checklist
 - [Gatekeeper Resolution Infographic](presentations/gatekeeper-resolution-infographic.md) — visual brief for operation import and DID document replay
+- [How Archon Works](presentations/how-archon-works.html) — three-minute animated walkthrough of DID creation, resolution, updates, and registries
 
 ## Operations
 
