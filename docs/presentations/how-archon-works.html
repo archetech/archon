@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How Archon Works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #e8ecf1;
+    --panel: #f6f8fb;
+    --ink: #141d2b;
+    --soft: #5b6879;
+    --line: #c6cfdb;
+    --cobalt: #2a4fc4;
+    --amber: #c97a12;
+    --bar: #141d2b;
+    --bar-text: #e8ecf1;
+    --bar-soft: #9aa6b8;
+  }
+  html, body { background: var(--paper); color: var(--ink); }
+  body { margin: 0; font: 15px/1.55 "IBM Plex Sans", system-ui, sans-serif; padding-inline: 16px; padding-block: 28px 48px; }
+  .wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+  header h1 { font: 800 clamp(30px, 5vw, 46px)/1.05 "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif; margin: 0; letter-spacing: -0.5px; text-wrap: balance; }
+  header p { margin: 8px 0 0; color: var(--soft); max-width: 62ch; }
+  header .eyebrow { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 1.5px; text-transform: uppercase; color: var(--cobalt); margin: 0 0 8px; }
+
+  .player { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--bar); box-shadow: 0 18px 50px -24px rgba(20, 29, 43, .45); outline: none; }
+  .player:focus-visible { box-shadow: 0 0 0 3px var(--cobalt); }
+  .player:fullscreen { display: flex; flex-direction: column; justify-content: center; border-radius: 0; }
+  .player:fullscreen .stage { max-height: calc(100vh - 120px); aspect-ratio: 16 / 9; margin: 0 auto; width: min(100%, calc((100vh - 120px) * 16 / 9)); }
+  .stage { position: relative; aspect-ratio: 16 / 9; max-width: 100%; background: var(--paper); }
+  canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+  .bigplay { position: absolute; inset: 0; margin: auto; width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--ink); color: var(--paper); display: grid; place-items: center; cursor: pointer; box-shadow: 0 10px 30px -8px rgba(20, 29, 43, .6); }
+  .bigplay svg { width: 30px; height: 30px; margin-left: 4px; }
+  .bigplay:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 3px; }
+
+  .caption { min-height: 3.4em; padding: 12px 20px; color: var(--bar-text); font-size: clamp(14px, 1.9vw, 18px); line-height: 1.45; display: flex; align-items: center; justify-content: center; text-align: center; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+  .caption span { max-width: 70ch; transition: opacity .25s; }
+
+  .controls { display: flex; align-items: center; gap: 14px; padding: 10px 16px 14px; color: var(--bar-text); }
+  .controls button { background: none; border: 0; color: inherit; width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; flex: none; }
+  .controls button:hover { background: rgba(255, 255, 255, .08); }
+  .controls button:focus-visible { outline: 2px solid #8ea6ff; }
+  .controls svg { width: 20px; height: 20px; }
+  .time { font: 500 13px "IBM Plex Mono", ui-monospace, monospace; color: var(--bar-soft); font-variant-numeric: tabular-nums; flex: none; }
+  .seek { position: relative; flex: 1; min-width: 0; height: 36px; display: flex; align-items: center; }
+  .seek input { width: 100%; margin: 0; appearance: none; -webkit-appearance: none; background: transparent; height: 36px; cursor: pointer; position: relative; z-index: 2; }
+  .seek input::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; margin-top: -5px; border: 0; }
+  .seek input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 0; }
+  .seek input:focus-visible { outline: 2px solid #8ea6ff; border-radius: 4px; }
+  .ticks { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+  .ticks i { position: absolute; top: 15px; width: 2px; height: 6px; background: var(--bar); }
+
+  .chapters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .chapters button { width: 100%; text-align: left; display: flex; gap: 10px; align-items: baseline; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
+  .chapters button:hover { border-color: var(--cobalt); }
+  .chapters button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  .chapters button[aria-current="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .chapters .n { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--cobalt); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .n { color: #8ea6ff; }
+  .chapters .t { font-weight: 600; flex: 1; }
+  .chapters .d { font: 400 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--soft); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .d { color: var(--bar-soft); }
+
+  details { border-top: 1px solid var(--line); padding-top: 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .transcript { max-width: 70ch; }
+  .transcript h3 { font: 700 17px "Bricolage Grotesque", system-ui, sans-serif; margin: 18px 0 4px; }
+  .transcript p { margin: 0 0 6px; color: var(--soft); }
+
+  @media (max-width: 560px) {
+    .controls { gap: 8px; padding-inline: 10px; }
+    .time { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">did:cid · three minutes</p>
+    <h1>How Archon works</h1>
+    <p>An animated walkthrough of the Archon identity protocol: how a DID is created for free, resolved by anyone, updated with signed operations, and ordered by registries. Everything on screen is drawn live with canvas code.</p>
+  </header>
+
+  <div class="player" id="player" tabindex="0" aria-label="Animation player. Space plays or pauses, arrow keys skip.">
+    <div class="stage">
+      <canvas id="cv" role="img" aria-label="Animated diagram of the Archon identity protocol. The caption below describes each scene."></canvas>
+      <button class="bigplay" id="bigplay" aria-label="Play animation" hidden>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+      </button>
+    </div>
+    <div class="caption"><span id="cap"></span></div>
+    <div class="controls">
+      <button id="pp" aria-label="Play"></button>
+      <div class="seek">
+        <input type="range" id="seek" min="0" max="180" step="0.05" value="0" aria-label="Seek">
+        <div class="ticks" id="ticks"></div>
+      </div>
+      <span class="time" id="time">0:00 / 3:00</span>
+      <button id="fs" aria-label="Full screen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <ol class="chapters" id="chapters"></ol>
+
+  <details>
+    <summary>Transcript</summary>
+    <div class="transcript" id="transcript"></div>
+  </details>
+</div>
+
+<script>
+(() => {
+  // ---------- palette & type ----------
+  const W = 1280, H = 720, TOTAL = 180;
+  const C = {
+    paper: '#e8ecf1', grid: '#dbe1e9', gridB: '#c6cfdb', panel: '#f6f8fb',
+    ink: '#141d2b', soft: '#5b6879', faint: '#8c98a8',
+    cobalt: '#2a4fc4', cobaltL: '#dde5fb',
+    amber: '#c97a12', amberL: '#fbecd3',
+    green: '#23835a', greenL: '#d6eee2',
+    red: '#c03b28', redL: '#f8dcd6'
+  };
+  const DISP = '"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif';
+  const SANS = '"IBM Plex Sans", system-ui, sans-serif';
+  const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
+  const DID = 'did:cid:bafkreig6rjxbv2aopv47dgxhnxepqpb4yrxf2nvzrhmhdqthojfdxuxjbe';
+  const CID = DID.slice(8);
+
+  // ---------- math ----------
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const p = (t, a, b) => clamp((t - a) / (b - a));
+  const e = (t, a, b) => ease(p(t, a, b));
+  const rnd = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+  const hx = c => { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  const mix = (a, b, t) => { const A = hx(a), B = hx(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], clamp(t)))).join(',')})`; };
+  const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
+  const scram = (s, pr, t, seed) => {
+    const k = Math.floor(pr * s.length); let out = '';
+    for (let i = 0; i < s.length; i++) out += i < k ? s[i] : B32[Math.floor(rnd(seed * 97 + i * 13 + Math.floor(t * 18)) * 32)];
+    return out;
+  };
+
+  // ---------- canvas ----------
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  let scale = 1;
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    const d = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.max(1, Math.round(r.width * d));
+    cv.height = Math.max(1, Math.round(r.width * 9 / 16 * d));
+    scale = cv.width / W;
+    render();
+  }
+
+  // ---------- drawing primitives ----------
+  function T(s, x, y, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.font = `${o.w || 400} ${o.s || 16}px ${o.f || SANS}`;
+    ctx.fillStyle = o.c || C.ink; ctx.textAlign = o.al || 'left'; ctx.textBaseline = o.b || 'alphabetic';
+    if (o.ls) ctx.letterSpacing = o.ls + 'px';
+    ctx.fillText(s, x, y); ctx.restore();
+  }
+  function tw(s, size, font = SANS, weight = 400) { ctx.save(); ctx.font = `${weight} ${size}px ${font}`; const w = ctx.measureText(s).width; ctx.restore(); return w; }
+  function box(x, y, w, h, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, o.r ?? 10);
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 1.5; if (o.dash) ctx.setLineDash(o.dash); ctx.stroke(); }
+    ctx.restore();
+  }
+  const cbox = (cx, cy, w, h, o) => box(cx - w / 2, cy - h / 2, w, h, o);
+  function pop(cx, cy, pr, fn) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.globalAlpha *= pr;
+    const s = lerp(.88, 1, pr);
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+    fn(); ctx.restore();
+  }
+  function arrowHead(x, y, a, c, s) {
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.lineTo(x - s * Math.cos(a - .45), y - s * Math.sin(a - .45));
+    ctx.lineTo(x - s * Math.cos(a + .45), y - s * Math.sin(a + .45));
+    ctx.closePath(); ctx.fillStyle = c; ctx.fill();
+  }
+  function arrow(x1, y1, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, x = lerp(x1, x2, pr), y = lerp(y1, y2, pr);
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(x, y, Math.atan2(y2 - y1, x2 - x1), c, o.hs || 10);
+    ctx.restore();
+  }
+  const qpt = (x1, y1, cx, cy, x2, y2, t) => { const u = 1 - t; return [u * u * x1 + 2 * u * t * cx + t * t * x2, u * u * y1 + 2 * u * t * cy + t * t * y2]; };
+  function qarrow(x1, y1, cx, cy, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, N = 36;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1);
+    let prev = [x1, y1], cur = prev;
+    for (let i = 1; i <= N; i++) { const tt = pr * i / N; prev = cur; cur = qpt(x1, y1, cx, cy, x2, y2, tt); ctx.lineTo(cur[0], cur[1]); }
+    ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(cur[0], cur[1], Math.atan2(cur[1] - prev[1], cur[0] - prev[0]), c, o.hs || 10);
+    ctx.restore();
+  }
+  function dot(x, y, r, c, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill(); ctx.restore(); }
+  function packet(x1, y1, x2, y2, pr, c, r = 6) { if (pr <= 0 || pr >= 1) return; dot(lerp(x1, x2, pr), lerp(y1, y2, pr), r, c); }
+  function check(x, y, s, pr, c = C.green) {
+    if (pr <= 0) return;
+    const a = [x - s * .5, y], b = [x - s * .12, y + s * .38], d = [x + s * .55, y - s * .42];
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]);
+    const p1 = clamp(pr / .35); ctx.lineTo(lerp(a[0], b[0], p1), lerp(a[1], b[1], p1));
+    if (pr > .35) { const p2 = clamp((pr - .35) / .65); ctx.lineTo(lerp(b[0], d[0], p2), lerp(b[1], d[1], p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function cross(x, y, s, pr, c = C.red) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .22; ctx.lineCap = 'round';
+    const p1 = clamp(pr / .5), p2 = clamp((pr - .5) / .5);
+    ctx.beginPath(); ctx.moveTo(x - s / 2, y - s / 2); ctx.lineTo(lerp(x - s / 2, x + s / 2, p1), lerp(y - s / 2, y + s / 2, p1));
+    if (p2 > 0) { ctx.moveTo(x + s / 2, y - s / 2); ctx.lineTo(lerp(x + s / 2, x - s / 2, p2), lerp(y - s / 2, y + s / 2, p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function person(x, y, s, c) {
+    ctx.save(); ctx.fillStyle = c;
+    ctx.beginPath(); ctx.arc(x, y - s * .28, s * .2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y + s * .4, s * .36, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function keyIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .14; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y, s * .3, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + s * .3, y); ctx.lineTo(x + s * 1.05, y);
+    ctx.moveTo(x + s * .75, y); ctx.lineTo(x + s * .75, y + s * .24);
+    ctx.moveTo(x + s * .98, y); ctx.lineTo(x + s * .98, y + s * .2);
+    ctx.stroke(); ctx.restore();
+  }
+  function lockIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = s * .13;
+    ctx.beginPath(); ctx.arc(x, y - s * .08, s * .26, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(x - s * .42, y - s * .1, s * .84, s * .6, s * .1); ctx.fill();
+    ctx.restore();
+  }
+  function db(x, y, w, h, c) {
+    const rx = w / 2, ry = h * .15, top = y - h / 2, bot = y + h / 2;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.fillStyle = C.panel;
+    ctx.beginPath(); ctx.moveTo(x - rx, top + ry); ctx.lineTo(x - rx, bot - ry);
+    ctx.ellipse(x, bot - ry, rx, ry, 0, Math.PI, 0, true);
+    ctx.lineTo(x + rx, top + ry); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI, true);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI); ctx.stroke();
+    ctx.restore();
+  }
+  function hexagon(x, y, r, rot, o = {}) {
+    ctx.save(); ctx.beginPath();
+    for (let i = 0; i < 6; i++) { const a = rot + i * Math.PI / 3; const px = x + r * Math.cos(a), py = y + r * Math.sin(a); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.closePath();
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 2; ctx.stroke(); }
+    ctx.restore();
+  }
+  function pill(cx, cy, text, o = {}) {
+    const s = o.s || 15, pad = o.pad || 14, w = tw(text, s, o.f || SANS, o.w || 600) + pad * 2, h = s + 16;
+    pop(cx, cy, o.pr ?? 1, () => {
+      cbox(cx, cy, w, h, { fill: o.bg || C.panel, stroke: o.stroke || C.gridB, r: h / 2 });
+      T(text, cx, cy + 1, { s, w: o.w || 600, f: o.f || SANS, c: o.c || C.ink, al: 'center', b: 'middle' });
+    });
+  }
+  function codeLine(s, x, y, n, fs) {
+    const re = /("(?:[^"\\]|\\.)*"\s*:)|("(?:[^"\\]|\\.)*")|([{}\[\],])|(\b\d+\b)|([^"{}\[\],]+?(?=["{}\[\],]|\b\d+\b|$))/g;
+    ctx.save(); ctx.font = `400 ${fs}px ${MONO}`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    let m, cx = x, used = 0;
+    while ((m = re.exec(s)) && used < n) {
+      if (!m[0]) { re.lastIndex++; continue; }
+      const tok = m[0];
+      ctx.fillStyle = m[1] ? C.soft : m[2] ? C.cobalt : m[3] ? C.faint : m[4] ? C.amber : C.ink;
+      const show = tok.slice(0, n - used); used += tok.length;
+      ctx.fillText(show, cx, y); cx += ctx.measureText(show).width;
+    }
+    ctx.restore();
+  }
+  function card(x, y, w, title, lines, pr, o = {}) {
+    const fs = o.fs || 14, lh = o.lh || 22, top = 30 + 24;
+    const h = top + (lines.length - 1) * lh + 18;
+    const ly = i => y + top + i * lh;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    box(x, y, w, h, { fill: C.panel, stroke: C.gridB, r: 12 });
+    ctx.beginPath(); ctx.roundRect(x, y, w, 30, [12, 12, 0, 0]); ctx.fillStyle = o.hc || C.ink; ctx.fill();
+    T(title.toUpperCase(), x + 16, y + 20, { f: MONO, s: 12, w: 500, c: C.paper, ls: 1.2 });
+    let n = Math.floor(pr * lines.reduce((a, l) => a + l.length, 0));
+    lines.forEach((l, i) => {
+      const hl = o.hl && o.hl[i];
+      if (hl && hl[1] > 0) { ctx.save(); ctx.globalAlpha *= hl[1]; ctx.fillStyle = hl[0]; ctx.fillRect(x + 6, ly(i) - fs - 2, w - 12, lh); ctx.restore(); }
+      if (n > 0) { codeLine(l, x + 16, ly(i), n, fs); n -= l.length; }
+    });
+    ctx.restore();
+    return { h, ly };
+  }
+
+  // ---------- ambient network ----------
+  const NET = Array.from({ length: 46 }, (_, i) => ({ x: rnd(i * 3 + 1) * W, y: rnd(i * 3 + 2) * H, ph: rnd(i * 3 + 3) * 6.28 }));
+  function network(t, a) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    const P = NET.map(q => [q.x + Math.sin(t * .3 + q.ph) * 16, q.y + Math.cos(t * .25 + q.ph) * 12]);
+    ctx.lineWidth = 1;
+    for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+      const d = Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1]);
+      if (d < 175) { ctx.strokeStyle = `rgba(90,110,140,${(1 - d / 175) * .45})`; ctx.beginPath(); ctx.moveTo(P[i][0], P[i][1]); ctx.lineTo(P[j][0], P[j][1]); ctx.stroke(); }
+    }
+    P.forEach((q, i) => dot(q[0], q[1], i % 7 === 0 ? 4 : 2.5, i % 7 === 0 ? C.cobalt : C.faint, .8));
+    ctx.restore();
+  }
+
+  function background() {
+    ctx.fillStyle = C.paper; ctx.fillRect(0, 0, W, H);
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 40) { ctx.strokeStyle = x % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = x % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += 40) { ctx.strokeStyle = y % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = y % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+
+  function heading(n, title, t) {
+    const a = e(t, 0, .8);
+    T(`${String(n).padStart(2, '0')} / 09`, 56, 58, { f: MONO, s: 13, w: 500, c: C.cobalt, a, ls: 1.5 });
+    T(title, 56 + lerp(-12, 0, a), 94, { f: DISP, s: 32, w: 700, a });
+  }
+
+  // ---------- scene 1: intro ----------
+  function s1(t) {
+    network(t, .55);
+    const g = ctx.createRadialGradient(640, 330, 40, 640, 330, 520);
+    g.addColorStop(0, 'rgba(232,236,241,0.97)'); g.addColorStop(1, 'rgba(232,236,241,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const sc = lerp(.97, 1, e(t, 0, 2.5));
+    ctx.save(); ctx.translate(640, 290); ctx.scale(sc, sc);
+    T('Archon', 0, 0, { f: DISP, s: 140, w: 800, al: 'center', b: 'middle', ls: -2 });
+    ctx.restore();
+    T('Identity you create, control and prove yourself', 640, 388, { s: 25, c: C.soft, al: 'center', a: e(t, .8, 2.3) });
+    const da = e(t, 3, 3.8);
+    if (da > 0) {
+      cbox(640, 468, 820, 54, { fill: C.panel, stroke: C.gridB, r: 27, a: da });
+      ctx.save(); ctx.globalAlpha *= da;
+      const s = scram(DID, e(t, 3.6, 8.5), t, 1);
+      T(s, 640, 469, { f: MONO, s: 21, w: 500, c: C.cobalt, al: 'center', b: 'middle' });
+      ctx.restore();
+    }
+    const tags = [['W3C DID standard', 470], ['DIF-recommended method', 666], ['Peer-to-peer', 846]];
+    tags.forEach(([s, x], i) => pill(x, 552, s, { pr: e(t, 8.8 + i * .35, 9.4 + i * .35), s: 14, c: C.soft }));
+  }
+
+  // ---------- scene 2: the problem ----------
+  function coin(x, y) {
+    dot(x, y, 11, C.amber); ctx.save(); ctx.strokeStyle = C.amberL; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, 6, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+  }
+  function clock(x, y, r, t) {
+    ctx.save(); ctx.strokeStyle = C.ink; ctx.lineWidth = 2.5; ctx.fillStyle = C.panel;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.lineCap = 'round';
+    const a1 = t * 2.2 - Math.PI / 2, a2 = t * .18 - Math.PI / 2;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a1) * r * .75, y + Math.sin(a1) * r * .75); ctx.stroke();
+    ctx.lineWidth = 3.5; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a2) * r * .5, y + Math.sin(a2) * r * .5); ctx.stroke();
+    ctx.restore();
+  }
+  function s2(t) {
+    heading(2, 'The problem', t);
+    const bad = e(t, 5, 6.5);
+    const cx = 320, cy = 390;
+    T('Accounts on a platform', cx, 160, { s: 17, w: 600, c: C.soft, al: 'center', a: e(t, .3, 1) });
+    for (let i = 0; i < 6; i++) {
+      const ang = (i * 60 + 30) * Math.PI / 180, ux = cx + Math.cos(ang) * 230, uy = cy + Math.sin(ang) * 150;
+      const ap = e(t, .3 + i * .2, 1.1 + i * .2); if (ap <= 0) continue;
+      const col = mix(C.cobalt, C.faint, bad);
+      ctx.save(); ctx.globalAlpha *= ap * (1 - bad * .55); ctx.strokeStyle = col; ctx.lineWidth = 2;
+      if (bad > 0) ctx.setLineDash([5, 9]);
+      ctx.beginPath(); ctx.moveTo(ux, uy); ctx.lineTo(lerp(ux, cx, ap), lerp(uy, cy, ap)); ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.globalAlpha *= ap; person(ux, uy + 4, 40, col); ctx.restore();
+    }
+    cbox(cx, cy, 220, 92, { fill: mix(C.panel, C.redL, bad), stroke: mix(C.ink, C.red, bad), lw: 2, r: 12, a: e(t, 0, .8) });
+    T('Platform', cx, cy - 4, { f: DISP, s: 28, w: 700, al: 'center', c: mix(C.ink, C.red, bad), a: e(t, 0, .8) });
+    T(bad > .5 ? 'account suspended' : 'your identity lives here', cx, cy + 25, { s: 14, al: 'center', c: bad > .5 ? C.red : C.soft, w: bad > .5 ? 600 : 400, a: e(t, 0, .8) });
+
+    const ra = e(t, 8, 9);
+    if (ra > 0) {
+      ctx.save(); ctx.globalAlpha *= ra;
+      ctx.strokeStyle = C.gridB; ctx.lineWidth = 1.5; ctx.setLineDash([4, 6]);
+      ctx.beginPath(); ctx.moveTo(640, 140); ctx.lineTo(640, 640); ctx.stroke(); ctx.setLineDash([]);
+      T('Every change on a blockchain', 960, 160, { s: 17, w: 600, c: C.soft, al: 'center' });
+      ctx.save(); ctx.beginPath(); ctx.rect(668, 280, 580, 110); ctx.clip();
+      const sp = 16, off = (t * sp) % 112, base = Math.floor(t * sp / 112);
+      for (let i = -1; i < 7; i++) {
+        const bx = 690 + i * 112 - off;
+        if (i > -1) { ctx.strokeStyle = C.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(bx - 28, 328); ctx.lineTo(bx, 328); ctx.stroke(); }
+        box(bx, 300, 84, 56, { fill: C.panel, stroke: C.ink, lw: 1.8, r: 6 });
+        T('#' + (826001 + base + i), bx + 42, 333, { f: MONO, s: 12, al: 'center', c: C.soft });
+      }
+      ctx.restore();
+      person(770, 520, 44, C.cobalt);
+      for (let k = 0; k < 3; k++) { const st = 9.4 + k * 2.1, pr = e(t, st, st + 1.5); if (pr > 0 && pr < 1) coin(lerp(795, 930, pr), lerp(505, 372, pr)); }
+      T('a fee for every change', 770, 588, { s: 15, c: C.amber, al: 'center', w: 600 });
+      clock(1110, 515, 30, t);
+      T('then wait for blocks', 1110, 588, { s: 15, c: C.soft, al: 'center', w: 600 });
+      ctx.restore();
+    }
+
+    const ov = e(t, 15.5, 16.5);
+    if (ov > 0) {
+      ctx.save(); ctx.globalAlpha *= ov * .88; ctx.fillStyle = C.paper; ctx.fillRect(0, 118, W, H - 118); ctx.restore();
+      cbox(640, 400, 720, 240, { fill: C.panel, stroke: C.gridB, r: 16, a: ov });
+      T('Archon splits the two jobs', 640, 340, { f: DISP, s: 36, w: 700, al: 'center', a: ov });
+      const r1 = e(t, 16.5, 17.3), r2 = e(t, 17.3, 18.1);
+      T('Create', 380, 410, { f: DISP, s: 28, w: 700, c: C.green, a: r1 });
+      T('free and instant, no chain needed', 510, 410, { s: 22, a: r1 });
+      T('Update', 380, 462, { f: DISP, s: 28, w: 700, c: C.cobalt, a: r2 });
+      T('signed, ordered, anchored to a registry', 510, 462, { s: 22, a: r2 });
+    }
+  }
+
+  // ---------- scene 3: creating a DID ----------
+  const WORDS = ['orbit', 'lantern', 'maple', 'cinder', 'velvet', 'harbor', 'quartz', 'meadow', 'signal', 'ember', 'tundra', 'willow'];
+  const CREATE_OP = [
+    '{',
+    '  "type": "create",',
+    '  "created": "2026-09-24T14:02:11Z",',
+    '  "registration": {',
+    '    "registry": "hyperswarm",',
+    '    "type": "agent",',
+    '    "version": 1',
+    '  },',
+    '  "publicJwk": { "kty": "EC", "crv": "secp256k1", … },',
+    '  "proof": {',
+    '    "type": "EcdsaSecp256k1Signature2019",',
+    '    "verificationMethod": "#key-1",',
+    '    "proofValue": "z3FXQjecWufY46yg…"',
+    '  }',
+    '}'
+  ];
+  function s3(t) {
+    heading(3, 'Creating a DID', t);
+    // wallet
+    const wa = e(t, 0, .8);
+    box(56, 130, 330, 480, { fill: C.panel, stroke: C.gridB, r: 14, a: wa });
+    T('Keymaster', 78, 168, { f: DISP, s: 24, w: 700, a: wa });
+    T('your wallet', 212, 168, { s: 15, c: C.soft, a: wa });
+    T('RECOVERY PHRASE', 78, 202, { f: MONO, s: 11, w: 500, c: C.soft, ls: 1.2, a: wa });
+    WORDS.forEach((w, i) => {
+      const c = i % 3, r = Math.floor(i / 3), x = 78 + c * 100, y = 214 + r * 36;
+      const pr = e(t, .5 + i * .22, .9 + i * .22);
+      pop(x + 46, y + 14, pr, () => {
+        box(x, y, 92, 28, { fill: C.paper, stroke: C.gridB, r: 6 });
+        T(String(i + 1), x + 8, y + 18, { f: MONO, s: 10, c: C.faint });
+        T(w, x + 22, y + 19, { f: MONO, s: 13, c: C.ink });
+      });
+    });
+    arrow(221, 364, 221, 396, e(t, 3.6, 4.4), { c: C.soft, hs: 8 });
+    T('derive', 234, 386, { f: MONO, s: 12, c: C.soft, a: e(t, 3.8, 4.4) });
+    pop(200, 440, e(t, 4.4, 5.2), () => {
+      keyIcon(88, 440, 30, C.amber);
+      T('private key', 136, 436, { s: 17, w: 600 });
+      T('never leaves the wallet', 136, 457, { s: 13, c: C.soft });
+    });
+    pop(200, 520, e(t, 5, 5.8), () => {
+      keyIcon(88, 520, 30, C.cobalt);
+      T('public key', 136, 516, { s: 17, w: 600 });
+      T('goes into the operation', 136, 537, { s: 13, c: C.soft });
+    });
+
+    // operation
+    const ca = e(t, 6, 6.6);
+    const signHl = e(t, 11.6, 12.4);
+    const cd = card(420, 130, 470, 'create operation', CREATE_OP, p(t, 6.4, 11.2), {
+      a: ca, fs: 13.5, lh: 21,
+      hl: { 8: [C.cobaltL, e(t, 8.6, 9.2)], 9: [C.amberL, signHl], 10: [C.amberL, signHl], 11: [C.amberL, signHl], 12: [C.amberL, signHl], 13: [C.amberL, signHl] }
+    });
+    arrow(330, 526, 424, cd.ly(8) - 5, e(t, 8, 9), { c: C.cobalt, hs: 9 });
+    arrow(330, 446, 424, cd.ly(11) - 5, e(t, 11, 12), { c: C.amber, hs: 9 });
+    T('sign', 360, 470, { f: MONO, s: 13, w: 500, c: C.amber, a: e(t, 11.4, 12) });
+
+    // hash
+    const ha = e(t, 12.8, 13.6);
+    if (ha > 0) {
+      ctx.save(); ctx.globalAlpha *= ha;
+      const spin = e(t, 13.4, 16) * Math.PI * 2 / 3;
+      hexagon(1080, 300, 64, spin, { fill: C.panel, stroke: C.ink, lw: 2.5 });
+      T('SHA-256', 1080, 297, { f: MONO, s: 15, w: 500, al: 'center', b: 'middle' });
+      T('content hash', 1080, 318, { s: 12, c: C.soft, al: 'center', b: 'middle' });
+      T('stored in IPFS', 1080, 392, { s: 14, c: C.soft, al: 'center' });
+      ctx.restore();
+    }
+    for (let k = 0; k < 6; k++) packet(890, 300, 1014, 300, p(t, 13.4 + k * .3, 14.4 + k * .3), k % 2 ? C.amber : C.cobalt, 5);
+    arrow(1080, 404, 1080, 528, e(t, 15.6, 16.4), { c: C.ink });
+
+    // DID line
+    const dl = e(t, 15.8, 16.4);
+    if (dl > 0) {
+      box(408, 534, 828, 52, { fill: C.cobaltL, stroke: C.cobalt, r: 10, a: dl });
+      ctx.save(); ctx.globalAlpha *= dl;
+      const cw = tw('m', 20, MONO, 500);
+      const x0 = 822 - cw * DID.length / 2;
+      T('did:cid:', x0, 567, { f: MONO, s: 20, w: 500, c: C.cobalt, a: e(t, 18.8, 19.6) });
+      T(scram(CID, e(t, 16.2, 19), t, 3), x0 + cw * 8, 567, { f: MONO, s: 20, w: 500, c: C.ink });
+      ctx.restore();
+    }
+    [['No fee', 560], ['No block wait', 720], ['Proves its own origin', 920]].forEach(([s, x], i) =>
+      pill(x, 636, s, { pr: e(t, 20 + i * .45, 20.6 + i * .45), bg: C.greenL, stroke: C.green, c: C.green, s: 15 }));
+  }
+
+  // ---------- scene 4: resolving ----------
+  const DOC = [
+    '{',
+    '  "didDocument": {',
+    '    "id": "did:cid:bafkreig6…xjbe",',
+    '    "verificationMethod": [{',
+    '      "id": "#key-1",',
+    '      "type": "EcdsaSecp256k1…",',
+    '      "publicKeyJwk": { … }',
+    '    }],',
+    '    "authentication": ["#key-1"]',
+    '  },',
+    '  "didDocumentMetadata": {',
+    '    "created": "2026-09-24T14:02:11Z",',
+    '    "versionSequence": "1"',
+    '  },',
+    '  "didDocumentData": {},',
+    '  "didDocumentRegistration": {',
+    '    "registry": "hyperswarm", "type": "agent"',
+    '  }',
+    '}'
+  ];
+  function s4(t) {
+    heading(4, 'Resolving a DID', t);
+    const a0 = e(t, 0, .8);
+    ctx.save(); ctx.globalAlpha *= a0;
+    person(130, 340, 64, C.ink);
+    T('Anyone', 130, 410, { s: 17, w: 600, al: 'center' });
+    T('did:cid:bafk…xjbe', 130, 434, { f: MONO, s: 12, c: C.cobalt, al: 'center' });
+    cbox(530, 350, 230, 100, { fill: C.panel, stroke: C.ink, lw: 2, r: 12 });
+    db(453, 350, 44, 54, C.ink);
+    T('Gatekeeper', 486, 345, { f: DISP, s: 24, w: 700 });
+    T('resolver + DID database', 487, 367, { s: 12, c: C.soft });
+    cbox(530, 570, 180, 60, { fill: C.panel, stroke: C.gridB, r: 10 });
+    T('IPFS', 530, 566, { f: DISP, s: 20, w: 700, al: 'center' });
+    T('genesis operation', 530, 586, { s: 12, c: C.soft, al: 'center' });
+    ctx.restore();
+
+    arrow(178, 350, 412, 350, e(t, 1, 3), { c: C.cobalt });
+    T('resolveDID(did)', 295, 336, { f: MONO, s: 13, w: 500, c: C.cobalt, al: 'center', a: e(t, 1.5, 2.5) });
+    arrow(510, 402, 510, 536, e(t, 3.4, 4.4), { c: C.ink, hs: 9 });
+    arrow(552, 538, 552, 404, e(t, 4.4, 5.4), { c: C.amber, hs: 9 });
+    T('fetch', 494, 474, { f: MONO, s: 12, c: C.soft, al: 'right', a: e(t, 3.6, 4.2) });
+    T('op', 566, 474, { f: MONO, s: 12, c: C.amber, a: e(t, 4.6, 5.2) });
+
+    const checks = [['hash(genesis) = CID', 5.6], ['signature matches key', 7], ['updates applied in order', 8.4]];
+    checks.forEach(([s, st], i) => {
+      const y = 172 + i * 38;
+      check(432, y - 5, 18, e(t, st, st + .6));
+      T(s, 452, y, { s: 16, w: 500, a: e(t, st, st + .4) });
+    });
+
+    arrow(646, 350, 790, 350, e(t, 9.4, 10.2), { c: C.ink });
+    const cd = card(800, 130, 430, 'resolution result', DOC, p(t, 10, 14.8), {
+      a: e(t, 9.8, 10.4), fs: 13, lh: 20,
+      hl: { 14: [C.greenL, e(t, 15, 15.8)] }
+    });
+    const na = e(t, 15.6, 16.4);
+    T('didDocumentData carries application data:', 800, 616, { s: 14, c: C.green, w: 600, a: na });
+    T('profiles, credential manifests, vault references', 800, 637, { s: 14, c: C.soft, a: na });
+    void cd;
+  }
+
+  // ---------- scene 5: updating ----------
+  const OPS = [
+    { v: 'v1', ty: 'create', l: ['genesis', 'adds #key-1'], sig: '#key-1', cid: '…xjbe' },
+    { v: 'v2', ty: 'update', l: ['name: "Alice"'], sig: '#key-1', cid: '…q7ta' },
+    { v: 'v3', ty: 'update', l: ['rotate key', '#key-1 → #key-2'], sig: '#key-1', cid: '…m2ho' },
+    { v: 'v4', ty: 'update', l: ['add email service'], sig: '#key-2', cid: '…w4ck' }
+  ];
+  function opCard(x, y, w, h, o, a, glow = 0) {
+    ctx.save(); ctx.globalAlpha *= a;
+    box(x, y, w, h, { fill: C.panel, stroke: glow > 0 ? mix(C.gridB, C.amber, glow) : C.gridB, lw: 1.5 + glow * 1.5, r: 12 });
+    ctx.beginPath(); ctx.roundRect(x, y, w, 30, [12, 12, 0, 0]); ctx.fillStyle = o.ty === 'create' ? C.green : C.ink; ctx.fill();
+    T(`${o.v} · ${o.ty}`.toUpperCase(), x + 14, y + 20, { f: MONO, s: 12, w: 500, c: C.paper, ls: 1.2 });
+    o.l.forEach((s, i) => T(s, x + 14, y + 58 + i * 22, { s: 16, w: i ? 400 : 600 }));
+    keyIcon(x + 22, y + h - 44, 14, o.sig === '#key-2' ? C.cobalt : C.amber);
+    T('signed ' + o.sig, x + 44, y + h - 39, { f: MONO, s: 12, c: C.soft });
+    T('cid ' + o.cid, x + 14, y + h - 14, { f: MONO, s: 12, c: C.faint });
+    ctx.restore();
+  }
+  function s5(t) {
+    heading(5, 'Updating a DID', t);
+    const xs = [70, 370, 670, 970], y = 210, w = 240, h = 160;
+    const appear = [[0, .8], [1.5, 2.4], [6, 6.9], [10, 10.9]];
+    const links = [null, [2.4, 3.2], [6.9, 7.7], [10.9, 11.7]];
+    const dim = 1 - .65 * e(t, 12, 12.8) + .65 * e(t, 17.6, 18.2);
+    ctx.save(); ctx.globalAlpha *= dim;
+    OPS.forEach((o, i) => {
+      const pr = e(t, appear[i][0], appear[i][1]);
+      const glow = i === 2 ? e(t, 7.2, 8) * (1 - e(t, 11, 12)) : 0;
+      pop(xs[i] + w / 2, y + h / 2, pr, () => opCard(xs[i], y, w, h, o, 1, glow));
+      if (links[i]) {
+        const lp = e(t, links[i][0], links[i][1]);
+        qarrow(xs[i] + 40, y - 4, xs[i] - 30, y - 70, xs[i - 1] + w - 40, y - 4, lp, { c: C.cobalt, lw: 2, hs: 9 });
+        T('previd', xs[i] - 30, y - 50, { f: MONO, s: 12, w: 500, c: C.cobalt, al: 'center', a: lp });
+      }
+    });
+    T('the current key signs the handover to the next', 790, 408, { s: 15, c: C.amber, w: 600, al: 'center', a: e(t, 7.6, 8.4) * (1 - e(t, 11, 11.6)) });
+    ctx.restore();
+
+    // forged update
+    const fa = e(t, 12.2, 13) * (1 - e(t, 17.4, 18));
+    if (fa > 0) {
+      ctx.save(); ctx.globalAlpha *= fa;
+      box(420, 470, 250, 120, { fill: C.redL, stroke: C.red, lw: 2, dash: [7, 6], r: 12 });
+      T('FORGED UPDATE', 438, 498, { f: MONO, s: 12, w: 500, c: C.red, ls: 1.2 });
+      T('previd …m2ho', 438, 530, { f: MONO, s: 14 });
+      keyIcon(446, 562, 14, C.amber);
+      T('signed #key-1', 468, 567, { f: MONO, s: 13, c: C.soft });
+      arrow(620, 468, 760, 376, e(t, 13, 14), { c: C.red, dash: [6, 6] });
+      cross(690, 422, 36, e(t, 14.4, 15.2));
+      T('rejected', 740, 520, { f: DISP, s: 26, w: 700, c: C.red, a: e(t, 14.8, 15.4) });
+      T('#key-1 stopped being valid at v3', 740, 548, { s: 15, c: C.soft, a: e(t, 15, 15.6) });
+      ctx.restore();
+    }
+
+    // competing updates
+    const ka = e(t, 18.2, 19);
+    if (ka > 0) {
+      ctx.save(); ctx.globalAlpha *= ka;
+      [[880, 'A'], [1080, 'B']].forEach(([bx, n], i) => {
+        const pr = e(t, 18.2 + i * .4, 19 + i * .4);
+        pop(bx, 500, pr, () => {
+          cbox(bx, 500, 170, 90, { fill: C.panel, stroke: C.ink, lw: 1.8, r: 10 });
+          T('update ' + n, bx, 490, { f: DISP, s: 20, w: 700, al: 'center' });
+          T('signed #key-2', bx, 516, { f: MONO, s: 12, c: C.soft, al: 'center' });
+        });
+        arrow(bx, 452, 1090 + (i ? 20 : -20), 376, e(t, 19 + i * .4, 19.8 + i * .4), { c: C.cobalt, hs: 9 });
+      });
+      T('?', 980, 510, { f: DISP, s: 48, w: 800, c: C.amber, al: 'center', b: 'middle', a: e(t, 20, 20.6) });
+      T('Which one came first?', 980, 600, { f: DISP, s: 24, w: 700, al: 'center', a: e(t, 20.4, 21) });
+      ctx.restore();
+    }
+  }
+
+  // ---------- scene 6: registries ----------
+  const MESH = (() => {
+    const n = 8, pts = [];
+    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2 - Math.PI / 2, r = 100 + rnd(i + 50) * 26; pts.push([190 + Math.cos(a) * r, 370 + Math.sin(a) * r * .95]); }
+    const edges = []; for (let i = 0; i < n; i++) edges.push([i, (i + 1) % n]);
+    edges.push([0, 3], [1, 5], [2, 6], [4, 7], [3, 6]);
+    const hop = Array(n).fill(99), par = Array(n).fill(-1); hop[0] = 0; const q = [0];
+    while (q.length) { const u = q.shift(); for (const [a, b] of edges) { const v = a === u ? b : b === u ? a : -1; if (v >= 0 && hop[v] === 99) { hop[v] = hop[u] + 1; par[v] = u; q.push(v); } } }
+    return { pts, edges, hop, par };
+  })();
+  const CHAINS = [
+    { n: 'Bitcoin', d: '~60 min', sp: 0 },
+    { n: 'Zcash', d: '~75 s', sp: 12 },
+    { n: 'Ethereum', d: '~2–3 min', sp: 8 },
+    { n: 'Solana', d: 'seconds', sp: 30 }
+  ];
+  function s6(t) {
+    heading(6, 'Registries and mediators', t);
+    const a0 = e(t, 0, 1);
+    ctx.save(); ctx.globalAlpha *= a0;
+    // mesh
+    T('Hyperswarm', 190, 222, { f: DISP, s: 22, w: 700, al: 'center' });
+    T('peer gossip · seconds · free', 190, 530, { s: 14, c: C.soft, al: 'center' });
+    ctx.strokeStyle = C.gridB; ctx.lineWidth = 2;
+    MESH.edges.forEach(([a, b]) => { ctx.beginPath(); ctx.moveTo(...MESH.pts[a]); ctx.lineTo(...MESH.pts[b]); ctx.stroke(); });
+    const pulses = [3, 6.4];
+    MESH.pts.forEach((pt, v) => {
+      let lit = 0;
+      pulses.forEach(P => {
+        const at = P + MESH.hop[v] * .45;
+        if (t >= at) lit = Math.max(lit, 1 - clamp((t - at) / 1.4));
+        if (v) { const pr = p(t, at - .45, at); if (pr > 0 && pr < 1) { const f = MESH.pts[MESH.par[v]]; dot(lerp(f[0], pt[0], pr), lerp(f[1], pt[1], pr), 5, C.cobalt); } }
+      });
+      dot(pt[0], pt[1], 13, mix(C.panel, C.cobalt, lit));
+      ctx.strokeStyle = v === 0 ? C.cobalt : C.ink; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(pt[0], pt[1], 13, 0, Math.PI * 2); ctx.stroke();
+    });
+    // services
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+    [[322, 370], [510, 560], [720, 770]].forEach(([a, b]) => { ctx.beginPath(); ctx.moveTo(a, 370); ctx.lineTo(b, 370); ctx.stroke(); });
+    cbox(440, 370, 140, 56, { fill: C.panel, stroke: C.ink, lw: 1.8, r: 10 });
+    T('Hyperswarm', 440, 366, { s: 14, w: 600, al: 'center' }); T('mediator', 440, 384, { s: 13, c: C.soft, al: 'center' });
+    cbox(640, 370, 160, 80, { fill: C.ink, r: 12 });
+    T('Gatekeeper', 640, 376, { f: DISP, s: 22, w: 700, c: C.paper, al: 'center' });
+    cbox(840, 370, 140, 56, { fill: C.panel, stroke: C.ink, lw: 1.8, r: 10 });
+    T('Chain', 840, 366, { s: 14, w: 600, al: 'center' }); T('mediators', 840, 384, { s: 13, c: C.soft, al: 'center' });
+    // chains
+    CHAINS.forEach((ch, r) => {
+      const ry = 190 + r * 92;
+      ctx.strokeStyle = C.gridB; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(910, 370); ctx.lineTo(958, ry + 15); ctx.stroke();
+      T(ch.n, 964, ry - 10, { s: 14, w: 600 });
+      T(ch.d, 964 + tw(ch.n, 14, SANS, 600) + 8, ry - 10, { s: 13, c: C.soft });
+      ctx.save(); ctx.beginPath(); ctx.rect(960, ry - 2, 290, 36); ctx.clip();
+      const off = ch.sp ? (t * ch.sp) % 44 : 0;
+      const count = ch.sp ? 8 : 5;
+      for (let k = 0; k < count; k++) {
+        const bx = 964 + k * 44 - off;
+        box(bx, ry, 34, 30, { fill: C.panel, stroke: C.ink, lw: 1.5, r: 4 });
+        if (k) { ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(bx - 10, ry + 15); ctx.lineTo(bx, ry + 15); ctx.stroke(); }
+      }
+      ctx.restore();
+    });
+    ctx.restore();
+
+    // batch
+    for (let k = 0; k < 6; k++) {
+      const ap = e(t, 9 + k * .25, 9.5 + k * .25); if (ap <= 0) continue;
+      const mv = e(t, 11 + k * .08, 12.2 + k * .08);
+      const x0 = 590 + k * 20, y0 = 432, x1 = 812 + (k % 3) * 22, y1 = 426 + Math.floor(k / 3) * 22;
+      const gone = e(t, 13, 13.4);
+      dot(lerp(x0, x1, mv), lerp(y0, y1, mv), 7, C.cobalt, ap * (1 - gone));
+    }
+    T('operations', 640, 462, { f: MONO, s: 12, c: C.soft, al: 'center', a: e(t, 9.4, 10) * (1 - e(t, 11, 11.6)) });
+    const bb = e(t, 12.2, 12.8) * (1 - e(t, 13, 13.4));
+    box(790, 412, 100, 58, { stroke: C.amber, lw: 2, dash: [5, 4], r: 8, a: bb });
+    T('batch', 840, 488, { f: MONO, s: 12, w: 500, c: C.amber, al: 'center', a: bb });
+    const fl = p(t, 13.2, 14.6);
+    if (fl > 0 && fl < 1) { const [px, py] = qpt(840, 437, 1100, 480, 1201, 205, ease(fl)); dot(px, py, 9, C.amber); }
+    const land = e(t, 14.5, 15.2);
+    if (land > 0) {
+      pop(1201, 205, land, () => {
+        ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(1174, 205); ctx.lineTo(1184, 205); ctx.stroke();
+        box(1184, 190, 34, 30, { fill: mix(C.amber, C.green, e(t, 15.5, 16.5)), r: 4 });
+      });
+    }
+    T('one transaction anchors', 1110, 560, { s: 14, w: 600, c: C.amber, al: 'center', a: e(t, 15, 15.6) });
+    T('the whole batch', 1110, 580, { s: 14, w: 600, c: C.amber, al: 'center', a: e(t, 15, 15.6) });
+
+    // ordinal
+    const fields = [['826005', 'block height'], ['42', 'tx index'], ['0', 'batch index'], ['3', 'op index']];
+    const oa = e(t, 18, 18.6);
+    T('(', 322, 624, { f: MONO, s: 40, c: C.faint, al: 'center', b: 'middle', a: oa });
+    T(')', 958, 624, { f: MONO, s: 40, c: C.faint, al: 'center', b: 'middle', a: oa });
+    fields.forEach(([v, l], i) => {
+      const x = 408 + i * 155;
+      pop(x, 624, e(t, 18.4 + i * .45, 19 + i * .45), () => {
+        cbox(x, 616, 130, 44, { fill: C.panel, stroke: C.ink, lw: 1.8, r: 8 });
+        T(v, x, 617, { f: MONO, s: 20, w: 500, al: 'center', b: 'middle' });
+        T(l, x, 660, { s: 13, c: C.soft, al: 'center' });
+      });
+    });
+    T('a strict order', 640, 700, { s: 15, w: 600, c: C.cobalt, al: 'center', a: e(t, 21, 21.6) });
+  }
+
+  // ---------- scene 7: timestamps & time travel ----------
+  const VX = [122, 724, 896, 1068];
+  const STATES = [
+    ['1', '—', '#key-1', '—'],
+    ['2', '"Alice"', '#key-1', '—'],
+    ['3', '"Alice"', '#key-2', '—'],
+    ['4', '"Alice"', '#key-2', '#email']
+  ];
+  function s7(t) {
+    heading(7, 'Timestamps and time travel', t);
+    for (let i = 0; i < 13; i++) {
+      const bx = 90 + i * 86, ap = e(t, i * .08, .6 + i * .08);
+      let fill = C.panel;
+      if (i === 2) fill = mix(C.panel, C.amberL, e(t, 1.6, 2.2));
+      if (i === 7) fill = mix(C.panel, C.greenL, e(t, 1.6, 2.2));
+      box(bx, 190, 64, 40, { fill, stroke: C.ink, lw: 1.6, r: 5, a: ap });
+      if (i < 12) arrow(bx + 64, 210, bx + 86, 210, ap, { c: C.ink, lw: 1.5, head: false });
+      T(String(825998 + i), bx + 32, 250, { f: MONO, s: 11, c: C.soft, al: 'center', a: ap });
+    }
+    const L = 90 + 2 * 86 + 32, R = 90 + 7 * 86 + 32, bp = e(t, 1.5, 2.6);
+    if (bp > 0) {
+      const mid = (L + R) / 2, hw = (R - L) / 2 * bp;
+      ctx.save(); ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(mid - hw, 178); ctx.lineTo(mid - hw, 164); ctx.lineTo(mid + hw, 164); ctx.lineTo(mid + hw, 178); ctx.stroke(); ctx.restore();
+    }
+    T('not before', L, 150, { s: 14, w: 600, c: C.amber, al: 'center', a: e(t, 2.4, 3) });
+    T('not after', R, 150, { s: 14, w: 600, c: C.green, al: 'center', a: e(t, 2.6, 3.2) });
+    T('v2 was signed inside this window', (L + R) / 2, 150, { s: 13, c: C.soft, al: 'center', a: e(t, 3, 3.6) });
+
+    const la = e(t, 3.2, 4);
+    ctx.save(); ctx.globalAlpha *= la;
+    ctx.strokeStyle = C.gridB; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(90, 296); ctx.lineTo(1190, 296); ctx.stroke();
+    T('versions', 90, 286, { f: MONO, s: 11, c: C.faint });
+    VX.forEach((x, i) => { dot(x, 296, 8, C.cobalt); T('v' + (i + 1), x, 322, { f: MONO, s: 13, w: 500, c: C.cobalt, al: 'center' }); });
+    ctx.restore();
+
+    const ta = e(t, 5.6, 6.4);
+    if (ta > 0) {
+      const cx = lerp(140, 1176, e(t, 6.6, 16.6));
+      const vi = VX.filter(x => x <= cx).length - 1;
+      const mins = Math.round((cx - 122) / 86 * 10);
+      const hh = 14 + Math.floor(mins / 60), mm = mins % 60;
+      const stamp = `2026-09-24T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}Z`;
+      ctx.save(); ctx.globalAlpha *= ta;
+      ctx.strokeStyle = C.cobalt; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(cx, 176); ctx.lineTo(cx, 308); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx - 8, 170); ctx.lineTo(cx + 8, 170); ctx.lineTo(cx, 180); ctx.closePath(); ctx.fillStyle = C.cobalt; ctx.fill();
+      T(`resolveDID(did, { versionTime: "${stamp}" })`, 640, 376, { f: MONO, s: 16, w: 500, c: C.cobalt, al: 'center' });
+      cbox(640, 498, 520, 190, { fill: C.panel, stroke: C.gridB, r: 12 });
+      const rows = ['versionSequence', 'name', 'active key', 'services'];
+      rows.forEach((r, i) => {
+        const y = 434 + i * 42;
+        const changed = vi >= 0 && (vi === 0 || STATES[vi][i] !== STATES[vi - 1][i]);
+        const flash = changed ? clamp(1 - (cx - VX[vi]) / 70) : 0;
+        if (flash > 0) box(396, y - 22, 488, 34, { fill: C.amberL, r: 6, a: flash });
+        T(r, 412, y, { s: 15, c: C.soft });
+        T(vi < 0 ? '—' : STATES[vi][i], 640, y, { f: MONO, s: 16, w: 500 });
+      });
+      ctx.restore();
+    }
+  }
+
+  // ---------- scene 8: credentials ----------
+  const TILES = [
+    ['Credentials', 'issue, reveal, revoke'],
+    ['Groups', 'membership lists'],
+    ['Vaults', 'encrypted files, hidden members'],
+    ['D-Mail', 'encrypted mail between DIDs'],
+    ['Polls', 'votes from verified DIDs'],
+    ['Schemas', 'JSON Schema for claims'],
+    ['Files & images', 'content-addressed assets'],
+    ['Lightning', 'payments to a DID']
+  ];
+  function credCard(x, y, title, by, locked) {
+    cbox(x, y, 180, 78, { fill: C.panel, stroke: C.ink, lw: 1.8, r: 10 });
+    T(title, x - 76, y - 12, { s: 15, w: 600 });
+    keyIcon(x - 68, y + 16, 12, C.amber);
+    T('signed · ' + by, x - 48, y + 20, { f: MONO, s: 12, c: C.soft });
+    if (locked > 0) { ctx.save(); ctx.globalAlpha *= locked; dot(x + 78, y - 36, 17, C.ink); lockIcon(x + 78, y - 37, 16, C.paper); ctx.restore(); }
+  }
+  function s8(t) {
+    heading(8, 'Credentials and more', t);
+    const act = 1 - e(t, 14, 15);
+    if (act > 0) {
+      ctx.save(); ctx.globalAlpha *= act;
+      const ap = e(t, 0, .8);
+      [[200, 'Issuer', 'Acme Corp'], [640, 'Holder', 'Alice'], [1080, 'Verifier', 'a website']].forEach(([x, r, n]) => {
+        ctx.save(); ctx.globalAlpha *= ap;
+        person(x, 238, 60, x === 640 ? C.cobalt : C.ink);
+        T(r, x, 170, { f: MONO, s: 12, w: 500, c: C.soft, al: 'center', ls: 1.2 });
+        T(n, x, 300, { s: 17, w: 600, al: 'center' });
+        ctx.restore();
+      });
+      cbox(640, 520, 880, 50, { fill: C.ink, r: 10, a: ap });
+      T('Gatekeeper · resolves any DID', 640, 526, { s: 16, w: 600, c: C.paper, al: 'center', a: ap });
+
+      // issue
+      const ci = e(t, 1, 1.8), mv = e(t, 3.6, 5.6), done = e(t, 9.2, 9.8);
+      if (ci > 0 && done < 1) {
+        const x = lerp(200, 640, mv);
+        ctx.save(); ctx.globalAlpha *= 1 - done;
+        pop(x, 390, ci, () => credCard(x, 390, 'EmployeeCredential', 'Acme', e(t, 2.4, 3.2)));
+        ctx.restore();
+      }
+      T('encrypted to Alice', 420, 452, { s: 14, c: C.soft, al: 'center', a: e(t, 3.6, 4.2) * (1 - e(t, 6, 6.6)) });
+      // challenge
+      arrow(1036, 250, 690, 250, e(t, 7, 8.6), { c: C.ink });
+      T('challenge · nonce 7f3a…', 862, 238, { f: MONO, s: 13, w: 500, al: 'center', a: e(t, 7.4, 8.2) });
+      // presentation
+      const pp = e(t, 9.4, 11.4), pa = e(t, 9.2, 9.8);
+      if (pa > 0) {
+        const x = lerp(640, 1080, pp);
+        pop(x, 390, pa, () => {
+          cbox(x, 390, 190, 78, { fill: C.cobaltL, stroke: C.cobalt, lw: 1.8, r: 10 });
+          T('Presentation', x - 80, 378, { s: 15, w: 600 });
+          keyIcon(x - 72, 406, 12, C.amber);
+          T('signed · Alice', x - 52, 410, { f: MONO, s: 12, c: C.soft });
+        });
+      }
+      arrow(1080, 432, 1080, 492, e(t, 11.6, 12.4), { c: C.cobalt, dash: [5, 5], hs: 9 });
+      arrow(1040, 432, 260, 493, e(t, 11.6, 12.6), { c: C.cobalt, dash: [5, 5], hs: 9, a: .6 });
+      [['issuer signature', 12.8], ['holder signature', 13.2], ['not revoked', 13.6]].forEach(([s, st], i) => {
+        const x = 520 + i * 200;
+        check(x, 596, 16, e(t, st, st + .5));
+        T(s, x + 16, 601, { s: 15, w: 500, a: e(t, st, st + .4) });
+      });
+      ctx.restore();
+    }
+    // tiles
+    TILES.forEach(([n, d], i) => {
+      const c = i % 4, r = Math.floor(i / 4), x = 94 + c * 279, y = 170 + r * 150;
+      pop(x + 127, y + 60, e(t, 15 + i * .3, 15.6 + i * .3), () => {
+        box(x, y, 255, 120, { fill: C.panel, stroke: C.gridB, r: 12 });
+        T(n, x + 20, y + 44, { f: DISP, s: 24, w: 700 });
+        T(d, x + 20, y + 74, { s: 14, c: C.soft });
+        T('DID', x + 20, y + 102, { f: MONO, s: 11, w: 500, c: C.cobalt, ls: 1.2 });
+      });
+    });
+    T('Each one is a DID owned by an agent', 640, 520, { f: DISP, s: 28, w: 700, al: 'center', a: e(t, 18, 18.8) });
+  }
+
+  // ---------- scene 9: the node ----------
+  function node(cx, cy, w, h, title, sub, o = {}) {
+    cbox(cx, cy, w, h, { fill: o.fill || C.panel, stroke: o.stroke || C.ink, lw: 1.8, r: 10 });
+    T(title, cx, sub ? cy - 2 : cy + 6, { f: o.f || SANS, s: o.s || 16, w: 700, c: o.c || C.ink, al: 'center' });
+    if (sub) T(sub, cx, cy + 17, { s: 12, c: o.sc || C.soft, al: 'center' });
+  }
+  function s9(t) {
+    const out = e(t, 6.6, 7.6);
+    ctx.save(); ctx.globalAlpha *= 1 - out * .9;
+    heading(9, 'An Archon node', t);
+    const st = (a, b) => e(t, a, b);
+    [[380, 'React wallet'], [640, 'Browser extension'], [900, 'CLI · MCP']].forEach(([x, n], i) =>
+      pop(x, 170, st(.2 + i * .2, .8 + i * .2), () => node(x, 170, 200, 46, n, '', { s: 15 })));
+    [380, 640, 900].forEach((x, i) => arrow(x, 194, lerp(x, 640, .55), 246, st(1 + i * .1, 1.6 + i * .1), { c: C.soft, lw: 1.6, hs: 8 }));
+    pop(640, 272, st(1.2, 1.8), () => node(640, 272, 250, 56, 'Keymaster', 'keys · signing · wallets', { fill: C.amberL, stroke: C.amber }));
+    arrow(640, 301, 640, 350, st(2, 2.5), { c: C.ink, hs: 8 });
+    pop(640, 384, st(2.2, 2.8), () => node(640, 384, 250, 64, 'Gatekeeper', 'DID database · resolver', { fill: C.ink, stroke: C.ink, c: C.paper, sc: C.gridB, f: DISP, s: 20 }));
+    arrow(514, 384, 422, 384, st(2.8, 3.3), { c: C.ink, hs: 8 });
+    pop(330, 384, st(3, 3.6), () => node(330, 384, 180, 54, 'IPFS', 'operations by CID'));
+    arrow(766, 384, 856, 384, st(3.2, 3.7), { c: C.ink, hs: 8 });
+    pop(950, 384, st(3.4, 4), () => node(950, 384, 180, 54, 'Mediators', 'network bridges'));
+    arrow(920, 412, 830, 470, st(4, 4.5), { c: C.ink, hs: 8 });
+    arrow(990, 412, 1070, 470, st(4.1, 4.6), { c: C.ink, hs: 8 });
+    pop(800, 498, st(4.4, 5), () => node(800, 498, 180, 50, 'Hyperswarm', 'peer gossip', { fill: C.cobaltL, stroke: C.cobalt }));
+    pop(1090, 498, st(4.6, 5.2), () => node(1090, 498, 240, 50, 'Blockchains', 'BTC · ZEC · ETH · SOL', { fill: C.cobaltL, stroke: C.cobalt }));
+    T('all in Docker, all open source', 330, 500, { s: 15, c: C.soft, al: 'center', a: st(5.2, 5.8) });
+    ctx.restore();
+
+    if (out > 0) {
+      network(t, .5 * out);
+      const g = ctx.createRadialGradient(640, 360, 40, 640, 360, 520);
+      g.addColorStop(0, `rgba(232,236,241,${.97 * out})`); g.addColorStop(1, 'rgba(232,236,241,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      T('Archon', 640, 320, { f: DISP, s: 120, w: 800, al: 'center', b: 'middle', ls: -2, a: out });
+      T('Your keys. Your identifiers. Any registry.', 640, 410, { s: 26, al: 'center', c: C.ink, a: e(t, 7.4, 8.2) });
+      T('github.com/archetech/archon', 640, 470, { f: MONO, s: 19, w: 500, c: C.cobalt, al: 'center', a: e(t, 8.2, 9) });
+    }
+  }
+
+  // ---------- timeline ----------
+  const SCENES = [
+    { title: 'Archon', start: 0, dur: 12, draw: s1 },
+    { title: 'The problem', start: 12, dur: 20, draw: s2 },
+    { title: 'Creating a DID', start: 32, dur: 26, draw: s3 },
+    { title: 'Resolving a DID', start: 58, dur: 20, draw: s4 },
+    { title: 'Updating a DID', start: 78, dur: 24, draw: s5 },
+    { title: 'Registries', start: 102, dur: 26, draw: s6 },
+    { title: 'Timestamps', start: 128, dur: 18, draw: s7 },
+    { title: 'Credentials', start: 146, dur: 22, draw: s8 },
+    { title: 'The node', start: 168, dur: 12, draw: s9 }
+  ];
+  const CUES = [
+    [0, 5, 'Archon is a peer-to-peer identity system built on the W3C DID standard.'],
+    [5, 12, 'Anyone can create an identifier, control it with their own keys, and let anyone else verify it, with no company in the middle.'],
+    [12, 18, 'Today most online identities are rows in someone else’s database.'],
+    [18, 23, 'If the platform goes away or locks you out, the identity goes with it.'],
+    [23, 28, 'Putting every identity change on a blockchain fixes that, but each change costs a fee and waits for blocks.'],
+    [28, 32, 'Archon separates creating an identity from updating it.'],
+    [32, 38, 'Keymaster, the wallet, derives keys from a twelve-word recovery phrase. Private keys never leave it.'],
+    [38, 45, 'To create an identity, it writes a create operation containing the public key, then signs it.'],
+    [45, 52, 'The operation is stored in IPFS. Its content hash, the CID, becomes the identifier: did:cid.'],
+    [52, 58, 'Creating a DID costs nothing and waits for no block. Change one byte and the hash changes, so the ID proves where it came from.'],
+    [58, 64, 'Gatekeeper is the node’s resolver. It keeps a local database of DIDs and their operations.'],
+    [64, 70, 'Given a DID, it fetches the genesis operation, checks that its hash matches the CID, and verifies the signature.'],
+    [70, 78, 'The result is a W3C DID document: public keys and metadata, plus didDocumentData for application data.'],
+    [78, 84, 'Every change is a new signed operation that points back to the one before it through previd.'],
+    [84, 90, 'Rotating keys is just another update. The current key signs the handover to the next one.'],
+    [90, 96, 'An operation signed with a retired key is rejected, because the node checks authority against the history.'],
+    [96, 102, 'When two valid updates compete, the network needs an agreed order. Registries provide it.'],
+    [102, 108, 'Each DID names its registry when it is created. Mediators connect the Gatekeeper to those networks.'],
+    [108, 114, 'Hyperswarm spreads operations between peers in seconds, for free.'],
+    [114, 121, 'Blockchain mediators batch many operations into a single transaction on Bitcoin, Zcash, Ethereum or Solana.'],
+    [121, 128, 'Block height, transaction, batch and operation index give every anchored update a strict position in order.'],
+    [128, 134, 'Anchoring also gives each update a timestamp backed by the chain: after one block, before another.'],
+    [134, 140, 'Because the whole history is kept, a DID can be resolved as it was at any past moment.'],
+    [140, 146, 'So anyone can check which keys were valid when a document was signed.'],
+    [146, 152, 'On top of DIDs, Keymaster issues verifiable credentials. An issuer signs a claim and encrypts it to the holder.'],
+    [152, 160, 'A verifier sends a challenge. The holder answers with a signed presentation, and the verifier resolves both DIDs to check it.'],
+    [160, 168, 'Groups, vaults, encrypted mail, polls, schemas and files work the same way: each is an asset DID owned by an agent.'],
+    [168, 174, 'An Archon node runs these pieces in Docker: Keymaster, Gatekeeper, IPFS and the mediators.'],
+    [174, 180, 'Run a full node yourself, or point your wallet at someone else’s. Either way, your keys stay with you.']
+  ];
+
+  let t = 0, playing = false, last = 0;
+  function render() {
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.globalAlpha = 1;
+    background();
+    const i = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const sc = SCENES[i < 0 ? SCENES.length - 1 : i];
+    const lt = Math.min(t - sc.start, sc.dur - 1e-3);
+    const fin = sc.start === 0 ? 1 : clamp(lt / .5);
+    const fout = sc.start + sc.dur >= TOTAL ? 1 : clamp((sc.dur - lt) / .5);
+    ctx.save(); ctx.globalAlpha = Math.min(fin, fout);
+    sc.draw(lt);
+    ctx.restore();
+  }
+
+  // ---------- UI ----------
+  const $ = id => document.getElementById(id);
+  const pp = $('pp'), seek = $('seek'), timeEl = $('time'), cap = $('cap'), big = $('bigplay'), player = $('player');
+  const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>';
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  const chapList = $('chapters');
+  SCENES.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<button type="button"><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t"></span><span class="d">${fmt(s.start)}</span></button>`;
+    li.querySelector('.t').textContent = s.title;
+    li.querySelector('button').addEventListener('click', () => { t = s.start; if (!playing) setPlaying(true); sync(); });
+    chapList.appendChild(li);
+    if (i) { const tick = document.createElement('i'); tick.style.left = `calc(${s.start / TOTAL * 100}% - 1px)`; $('ticks').appendChild(tick); }
+  });
+  const chapBtns = [...chapList.querySelectorAll('button')];
+
+  const tr = $('transcript');
+  SCENES.forEach((s, i) => {
+    const h = document.createElement('h3'); h.textContent = `${String(i + 1).padStart(2, '0')} · ${s.title}`; tr.appendChild(h);
+    CUES.filter(c => c[0] >= s.start && c[0] < s.start + s.dur).forEach(c => { const pEl = document.createElement('p'); pEl.textContent = c[2]; tr.appendChild(pEl); });
+  });
+
+  let lastCue = -1, lastChap = -1;
+  function sync() {
+    seek.value = t.toFixed(2);
+    seek.style.setProperty('--pct', (t / TOTAL * 100) + '%');
+    timeEl.textContent = `${fmt(t)} / ${fmt(TOTAL)}`;
+    const ci = CUES.findIndex(c => t >= c[0] && t < c[1]);
+    const cue = ci < 0 ? CUES.length - 1 : ci;
+    if (cue !== lastCue) { cap.textContent = CUES[cue][2]; lastCue = cue; }
+    const ch = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const chap = ch < 0 ? SCENES.length - 1 : ch;
+    if (chap !== lastChap) { chapBtns.forEach((b, i) => b.setAttribute('aria-current', i === chap ? 'true' : 'false')); lastChap = chap; }
+    render();
+  }
+  function setPlaying(v) {
+    if (v && t >= TOTAL - .01) t = 0;
+    playing = v; last = performance.now();
+    pp.innerHTML = v ? ICON_PAUSE : ICON_PLAY;
+    pp.setAttribute('aria-label', v ? 'Pause' : 'Play');
+    big.hidden = v;
+    big.setAttribute('aria-label', t > 0 ? 'Resume animation' : 'Play animation');
+  }
+  function frame(now) {
+    if (playing) {
+      t = Math.min(TOTAL, t + Math.min(.1, (now - last) / 1000));
+      if (t >= TOTAL) setPlaying(false);
+      sync();
+    }
+    last = now;
+    requestAnimationFrame(frame);
+  }
+
+  pp.addEventListener('click', () => setPlaying(!playing));
+  big.addEventListener('click', () => setPlaying(true));
+  cv.addEventListener('click', () => setPlaying(!playing));
+  seek.addEventListener('input', () => { t = parseFloat(seek.value); sync(); });
+  player.addEventListener('keydown', ev => {
+    if (ev.target === seek) return;
+    if (ev.key === ' ' || ev.key === 'k') { ev.preventDefault(); setPlaying(!playing); }
+    else if (ev.key === 'ArrowRight') { ev.preventDefault(); t = Math.min(TOTAL, t + 5); sync(); }
+    else if (ev.key === 'ArrowLeft') { ev.preventDefault(); t = Math.max(0, t - 5); sync(); }
+  });
+  $('fs').addEventListener('click', () => {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else if (player.requestFullscreen) player.requestFullscreen().catch(() => {});
+    } catch (_) {}
+  });
+  document.addEventListener('fullscreenchange', () => requestAnimationFrame(resize));
+  new ResizeObserver(() => resize()).observe(cv);
+
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fontsReady = document.fonts ? Promise.race([
+    Promise.all([
+      document.fonts.load(`800 40px ${DISP}`), document.fonts.load(`700 40px ${DISP}`),
+      document.fonts.load(`400 16px ${SANS}`), document.fonts.load(`600 16px ${SANS}`),
+      document.fonts.load(`400 16px ${MONO}`), document.fonts.load(`500 16px ${MONO}`)
+    ]),
+    new Promise(r => setTimeout(r, 2000))
+  ]).catch(() => {}) : Promise.resolve();
+
+  setPlaying(false);
+  resize(); sync();
+  fontsReady.then(() => {
+    sync();
+    if (reduce) { t = 6; sync(); big.hidden = false; }
+    else setPlaying(true);
+    requestAnimationFrame(frame);
+  });
+})();
+</script>
+</body>
+</html>
