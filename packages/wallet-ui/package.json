@@ -1,6 +1,6 @@
 {
   "name": "@didcid/wallet-ui",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "React components and contexts shared by the Archon wallets",
   "license": "MIT",
   "type": "module",
