@@ -439,7 +439,7 @@ End-to-end encrypted messages stored with DIDs:
 }
 ```
 
-The sender is the asset's controller and the creation time is in its metadata, so neither is repeated here. `cipher_hash` is present only when the sender asks for it, as challenge responses do (§8.5).
+The sender is the asset's controller and the creation time is in its metadata, so neither is repeated here. All three members are always serialized: `cipher_hash` is `null` unless the sender asks for a digest, as challenge responses do (§8.5), and `cipher_sender` is `null` when the sender opts out of a copy for themselves.
 
 #### Organizational Structures
 
@@ -480,7 +480,7 @@ A notice carries no content of its own. It expires through the asset's `validUnt
 
 #### Polls and Governance
 
-Polls among the members of a vault (§8.3). The poll definition is an encrypted vault item, readable only by members:
+Polls among the members of a vault and its owner (§8.3). The poll definition is an encrypted vault item, readable only by them:
 
 ```json
 {
@@ -774,20 +774,20 @@ The sender is the vault's controller, and the send time comes from its metadata.
 
 ### 8.3 Polls
 
-A poll is a vault (§8.4) whose members are its eligible voters. The poll definition (§6.3) is an encrypted vault item with a description, two to ten options and a deadline.
+A poll is a vault (§8.4). Its eligible voters are the vault's members plus the poll owner, who is eligible without being listed as a member, so the eligible count is the member count plus one. The poll definition (§6.3) is an encrypted vault item with a description, two to ten options and a deadline.
 
 **Voting:**
 
-1. A member casts a ballot: an asset DID holding `{ poll, vote }`, encrypted to the poll owner and to the voter
+1. An eligible voter casts a ballot: an asset DID holding `{ poll, vote }`, encrypted to the poll owner and to the voter
 2. The voter sends the ballot to the owner with a notice (§6.3)
 3. The owner adds the ballot to the poll vault, keyed by a salted hash of the voter's DID
-4. After the deadline, or once every member has voted, the owner can publish the results as a vault item that members can read
+4. After the deadline, or once every eligible voter (owner included) has voted, the owner can publish the results as a vault item that members can read
 
 **Privacy properties:**
 
-- **Ballots are private from other voters.** Only the poll owner and the voter can decrypt a ballot. The owner can see how each member voted.
+- **Ballots are private from other voters.** Only the poll owner and the voter can decrypt a ballot. The owner can see how each voter voted.
 - **Published results can omit individual ballots.** `publishPoll` publishes the tally alone by default, or every ballot with `reveal`.
-- **Spoiled ballots.** A vote of `0` spoils the ballot. It counts as participation and is tallied separately as `spoil`, so members can take part without choosing an option. It does not hide that the member voted.
+- **Spoiled ballots.** A vote of `0` spoils the ballot. It counts as participation and is tallied separately as `spoil`, so voters can take part without choosing an option. It does not hide that the voter voted.
 
 ### 8.4 Vaults
 
@@ -969,6 +969,7 @@ Archon issues credentials in the W3C Verifiable Credentials Data Model 2.0, secu
     "https://www.w3.org/ns/credentials/examples/v2"
   ],
   "type": ["VerifiableCredential", "UniversityDegreeCredential"],
+  "id": "did:cid:bafkrei...credential",
   "issuer": "did:cid:bafkrei...",
   "validFrom": "2024-01-15T00:00:00Z",
   "credentialSchema": {
@@ -1003,7 +1004,7 @@ Archon issues credentials in the W3C Verifiable Credentials Data Model 2.0, secu
 }
 ```
 
-Every credential carries the `archon-ecdsa-secp256k1-jcs-2026` proof. An issuer that has published an Ed25519 assertion key (`publish-assertion-key`) also adds an `eddsa-jcs-2022` proof, a registered W3C suite that verifiers built for other DID methods, such as `did:webvh` or `did:key` tooling, can check without knowing anything about Archon. Credentials issued before either suite existed carry the legacy `EcdsaSecp256k1Signature2019` proof and remain verifiable. A schema can set the credential's context and type; without one, the type is `VerifiableCredential` alone.
+Keymaster stores an issued credential as an encrypted asset DID, then re-signs it with that DID as its `id`. The signature therefore covers where the credential lives, so a revoked credential cannot be copied under a fresh DID and presented as current. Every credential carries the `archon-ecdsa-secp256k1-jcs-2026` proof. An issuer that has published an Ed25519 assertion key (`publish-assertion-key`) also adds an `eddsa-jcs-2022` proof, a registered W3C suite that verifiers built for other DID methods, such as `did:webvh` or `did:key` tooling, can check without knowing anything about Archon. Credentials issued before either suite existed carry the legacy `EcdsaSecp256k1Signature2019` proof and remain verifiable. A schema can set the credential's context and type; without one, the type is `VerifiableCredential` alone.
 
 ### 9.2 Credential Lifecycle
 
@@ -1172,7 +1173,7 @@ Connected devices receive unique, verifiable identities:
 Organizations implement transparent voting systems:
 
 - Ballots readable only by the poll owner and the voter
-- Eligibility defined by vault membership
+- Eligibility defined by vault membership, plus the poll owner
 - Tallies published to members, with or without individual ballots
 - Deadlines and results recorded in signed, versioned DIDs
 
