@@ -95,3 +95,23 @@ and a net reduction of one covered branch despite the newly exercised paths.
 The other changed areas add 23 covered branches. CI will provide the comparison
 under its own environment; do not present the local branch percentage as a
 controlled measure of the test additions alone.
+
+## Keymaster follow-up
+
+Additional public-API tests cover malformed addresses, failed authenticated
+claims without wallet mutation, server error messages and unusable lookup
+responses, and implicit publication with zero/one/multiple stored addresses.
+DIDComm coverage now includes local mailbox errors, rejected gateway challenges
+and fetches, missing endpoints, cached discovery failure with delivery fallback,
+invalid key-agreement references in signed documents, and unpublishing while
+preserving unrelated services and signing authority. A real encrypted Forward
+is left unacknowledged after a rejected delivery and acknowledged only after a
+successful retry.
+
+Both affected suites pass (99 tests). Merging their updated coverage with the
+preceding full unit/convergence run raises `packages/keymaster/src/keymaster.ts`
+from 95.27% to **96.34% lines**, 84.08% to **86.38% branches**, and 98.23% to
+**98.82% functions**: 29 more covered lines and 25 more covered branches. This
+follow-up changes tests only; it does not change Keymaster acceptance or retry
+policy. Assertions exercise transport failure and signed document state rather
+than calling private helpers solely to enter uncovered code.
