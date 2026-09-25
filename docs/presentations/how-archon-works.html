@@ -450,7 +450,9 @@
     '  "proof": {',
     '    "type": "DataIntegrityProof",',
     '    "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",',
+    '    "created": "2026-09-24T14:02:11Z",',
     '    "verificationMethod": "#key-1",',
+    '    "proofPurpose": "capabilityInvocation",',
     '    "proofValue": "esafZoTsLCbrza6G…"',
     '  }',
     '}'
@@ -489,11 +491,11 @@
     const ca = e(t, 6, 6.6);
     const signHl = e(t, 11.6, 12.4);
     const cd = card(420, 130, 470, 'create operation', CREATE_OP, p(t, 6.4, 11.2), {
-      a: ca, fs: 13.5, lh: 21,
-      hl: { 8: [C.cobaltL, e(t, 8.6, 9.2)], 9: [C.amberL, signHl], 10: [C.amberL, signHl], 11: [C.amberL, signHl], 12: [C.amberL, signHl], 13: [C.amberL, signHl], 14: [C.amberL, signHl] }
+      a: ca, fs: 13.5, lh: 19,
+      hl: { 8: [C.cobaltL, e(t, 8.6, 9.2)], 9: [C.amberL, signHl], 10: [C.amberL, signHl], 11: [C.amberL, signHl], 12: [C.amberL, signHl], 13: [C.amberL, signHl], 14: [C.amberL, signHl], 15: [C.amberL, signHl], 16: [C.amberL, signHl] }
     });
     arrow(330, 526, 424, cd.ly(8) - 5, e(t, 8, 9), { c: C.cobalt, hs: 9 });
-    arrow(330, 446, 424, cd.ly(11) - 5, e(t, 11, 12), { c: C.amber, hs: 9 });
+    arrow(330, 446, 424, cd.ly(13) - 5, e(t, 11, 12), { c: C.amber, hs: 9 });
     T('sign', 360, 470, { f: MONO, s: 13, w: 500, c: C.amber, a: e(t, 11.4, 12) });
 
     // hash
@@ -749,7 +751,7 @@
     T('the whole batch', 1110, 580, { s: 14, w: 600, c: C.amber, al: 'center', a: e(t, 15, 15.6) });
 
     // ordinal
-    const fields = [['826005', 'block height'], ['42', 'tx index'], ['3', 'op index']];
+    const fields = [['826005', 'block height'], ['42', 'position in block'], ['3', 'op index']];
     const oa = e(t, 18, 18.6);
     T('(', 400, 624, { f: MONO, s: 40, c: C.faint, al: 'center', b: 'middle', a: oa });
     T(')', 880, 624, { f: MONO, s: 40, c: C.faint, al: 'center', b: 'middle', a: oa });
@@ -971,12 +973,12 @@
     [70, 78, 'The result is a W3C DID document: public keys and metadata, plus didDocumentData for application data.'],
     [78, 84, 'Every change is a new signed operation that points back to the one before it through previd.'],
     [84, 90, 'Rotating keys is just another update. The current key signs the handover to the next one.'],
-    [90, 96, 'An operation signed with a retired key is rejected, because the node checks authority against the history.'],
-    [96, 102, 'When two valid updates compete, every node has to keep the same one. A blockchain registry settles it by the chain’s order.'],
+    [90, 96, 'An update that builds on v3 but is signed with the retired key is rejected: authority comes from the version an update builds on.'],
+    [96, 102, 'Updates can still compete for the same version, even one signed by a key before it was retired. Every node has to keep the same one, and a blockchain registry settles it by the chain’s order.'],
     [102, 108, 'Each DID names its registry when it is created. Mediators connect the Gatekeeper to those networks.'],
     [108, 114, 'Hyperswarm spreads operations between peers in seconds, for free. Competing updates there are settled by a fixed rule on their content hashes.'],
     [114, 121, 'Blockchain mediators batch many operations into a single transaction on Bitcoin, Zcash, Ethereum or Solana.'],
-    [121, 128, 'Block height, transaction index and operation index give every anchored update a strict position within its chain.'],
+    [121, 128, 'Block height, position in the block and operation index place every anchored update within its chain. In the rare tie, the content hash decides.'],
     [128, 134, 'Anchoring also gives each update a timestamp backed by the chain: after one block, before another.'],
     [134, 140, 'Because the whole history is kept, a DID can be resolved as it was at any past moment.'],
     [140, 146, 'So anyone can check which keys were valid when a document was signed.'],

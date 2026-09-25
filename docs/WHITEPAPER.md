@@ -253,7 +253,7 @@ Archon supports two fundamental DID types:
 }
 ```
 
-Metadata members appear only when they apply: `updated` after the first update, `deleted` and `deactivated: true` after a delete, and `timestamp` when the document's registry supplies one (§7.4). `confirmed` means every event in the resolved history arrived on the DID's own registry. The [Gatekeeper specification](services/gatekeeper/README.md) defines the full resolution algorithm, and the standards-conformant `/1.0/identifiers` endpoint returns the W3C resolution subset.
+Metadata members appear only when they apply: `updated` after the first update, `deleted` and `deactivated: true` after a delete, and `timestamp` when the document's registry supplies one (§7.4). `confirmed` means every update in the resolved history was received on the registry its predecessor expects; the create operation counts as confirmed by definition, so `confirmed: true` does not show that the creation itself was anchored. The [Gatekeeper specification](services/gatekeeper/README.md) defines the full resolution algorithm, and the standards-conformant `/1.0/identifiers` endpoint returns the W3C resolution subset.
 
 ### 5.4 Operations
 
@@ -663,7 +663,7 @@ This makes them suitable for legal contexts where proving "when" something happe
 
 **2. Temporal Ordering**
 
-Within one chain, the ordinal key `{block height, transaction index, operation index}`, plus any chain-specific position, orders every anchored operation, resolving any ambiguity about which came first. Ordinals are never compared across chains, and in the rare case of equal ordinals the canonical CID decides. This is critical for:
+Within one chain, the ordinal key `{block height, position in block, operation index}` orders every anchored operation, resolving any ambiguity about which came first. The position is chain-specific: the transaction index on Bitcoin and Zcash, the log index on Ethereum, and the instruction index on Solana. Ordinals are never compared across chains. Solana instruction indices restart in every transaction, so equal ordinals can occur there, and the canonical CID then decides. This is critical for:
 - Key rotation (ensuring old keys can't sign "backdated" operations)
 - Credential revocation (proving when a credential was revoked)
 - Dispute resolution (establishing timeline of events)
@@ -798,6 +798,7 @@ Vaults are shared encrypted storage. The owner creates a vault, adds members, an
 1. **Shared vault key**: Each vault has one key pair. Items are encrypted to its public key, and its private key is encrypted separately to each member.
 2. **Salted member index**: Each member's copy of the key is stored under a hash of the vault's salt and the member's DID, so the index does not show DIDs in the clear.
 3. **Owner-managed contents**: Only the owner adds or removes members and items.
+4. **Removal is not revocation**: Removing a member deletes their copy of the vault key, but the vault keeps the same key pair. A former member who kept the private key can still decrypt existing items and any added later.
 
 **Secret membership.** With the `secretMembers` option, the member list is encrypted to the owner alone, so members cannot list who else belongs. This keeps the roster from casual disclosure but is not anonymity: the salt is public, so anyone who can guess a DID can test whether it is a member.
 
@@ -924,7 +925,7 @@ Drawbridge implements the L402 protocol (formerly LSAT) to enable machine-readab
 
 #### How L402 Works
 
-1. Client requests a protected resource (any Drawbridge route other than the free ones: DID resolution, IPFS reads, and status endpoints)
+1. Client requests a protected resource: a route under Drawbridge's `/api/v1` API, other than DID resolution, IPFS reads and status endpoints. The Herald, DIDComm relay, explorer, Lightning invoice and `/1.0/identifiers` routes are mounted outside the paywall
 2. Drawbridge returns HTTP 402 with a macaroon (containing caveats for scope, expiry, and payment hash) and a BOLT11 Lightning invoice
 3. Client pays the invoice through the Lightning Network, receiving a preimage as proof of payment
 4. Client re-requests the resource with `Authorization: L402 <macaroon>:<preimage>`
@@ -938,7 +939,7 @@ L402 enables fine-grained monetization of identity services:
 - **Hybrid auth**: Internal services present the node's admin key and skip payment, while outside callers pay
 - **No accounts required**: Anonymous, permissionless access via payment alone
 
-This allows Archon node operators to charge for DID registration and updates, relays, and other services without requiring user registration or payment processors, while anyone can still resolve DIDs for free.
+This allows Archon node operators to charge for DID registration and updates and other `/api/v1` operations without requiring user registration or payment processors, while anyone can still resolve DIDs for free.
 
 ### 8.8 Key Rotation
 
@@ -947,7 +948,8 @@ Archon supports secure key rotation without changing the DID:
 ![Key Rotation](images/key-rotation.png)
 
 **Security Properties:**
-- Old keys cannot sign new operations (each operation is verified against the document its `previd` names)
+- A retired key cannot extend the rotated history: each operation is verified against the document its `previd` names
+- A retired key can still sign a competing update to a version it was valid for; if the registry's order prefers that update, it replaces the rotation. Anchoring the rotation on a blockchain registry early narrows this window
 - Historical signatures remain verifiable
 - Compromised keys can be rotated without losing identity
 - Key rotation is itself timestamped on blockchain registries
@@ -1179,7 +1181,7 @@ Organizations implement transparent voting systems:
 Node operators monetize identity services using Lightning micropayments:
 
 - DID registration and updates as a paid service (fractions of a cent per operation), while resolution stays free
-- Relays and other node services with per-request pricing
+- Other Gatekeeper and Lightning API calls with per-request pricing
 - Anonymous API access without accounts or payment processors
 - Content creators receive tips and zaps directly to their DID
 - Machine-to-machine payments for automated identity workflows
