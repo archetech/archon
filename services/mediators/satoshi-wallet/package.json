@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "postinstall": "patch-package",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:recovery": "npm run build && node --test ../../../tests/wallet/runtime-recovery.integration.mjs"
   },
   "keywords": [],
   "author": "Archetech",
