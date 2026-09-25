@@ -8,6 +8,7 @@ import { readFile } from 'fs/promises';
 import { timingSafeEqual } from 'crypto';
 import axios from 'axios';
 import config from './config.js';
+import { WalletRecovery } from './wallet-recovery.js';
 import { redactUrl } from './url-redaction.js';
 import {
     createBtcClient,
@@ -177,16 +178,27 @@ async function main() {
     // Auto-setup: create watch-only wallet on startup
     const maxRetries = 12;
     const retryIntervalMs = 30000;
-    let walletReady = false;
-    let descriptorMismatch: string | undefined;
-    let unrecoverable = false;
     let metricsStarted = false;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
+    const recovery = new WalletRecovery({
+        setup: async () => {
             const mnemonic = await fetchMnemonic();
             const result = await setupWatchOnlyWallet(btcClient, mnemonic, config.network);
             logger.info({ ...result }, 'Watch-only wallet ready');
-            walletReady = true;
+            return result;
+        },
+        changed: ready => {
+            walletSetupStatus.set(ready ? 1 : 0);
+            if (ready) startMetrics();
+        },
+        retryFailed: error => {
+            if (recovery.fatal) logger.error({ err: error }, 'Watch-only wallet recovery refused');
+            else logger.debug({ err: error }, 'Watch-only wallet setup still failing');
+        },
+        retryIntervalMs,
+    });
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            await recovery.setup();
             break;
         } catch (error: any) {
             // Fatal: the wallet watches a different seed's addresses. Retrying
@@ -194,8 +206,6 @@ async function main() {
             // this node has no key for.
             if (error.name === 'DescriptorMismatchError') {
                 logger.error(`Watch-only wallet does not match the current mnemonic: ${error.message}`);
-                descriptorMismatch = error.message;
-                unrecoverable = true;
                 break;
             }
 
@@ -203,7 +213,6 @@ async function main() {
             if (error.message?.includes('sqlite')) {
                 logger.error(`Bitcoin node does not support descriptor wallets: ${error.message}`);
                 logger.error('Upgrade Bitcoin Core to a build with sqlite support');
-                unrecoverable = true;
                 break;
             }
             if (attempt === maxRetries) {
@@ -214,60 +223,25 @@ async function main() {
             await new Promise(resolve => setTimeout(resolve, 10000));
         }
     }
-    if (!walletReady) {
+    if (!recovery.ready) {
         logger.warn('Wallet service starting without an active watch-only wallet');
     }
 
-    walletSetupStatus.set(walletReady ? 1 : 0);
+    recovery.start();
 
-    // Keymaster being slow to start is the ordinary reason setup runs out of
-    // attempts, and a chain mediator waits on this wallet to serve an address.
-    // Without a retry after startup the wallet stays unusable until somebody
-    // restarts it, long after the condition that caused it has cleared. A
-    // refusal is different: it is a decision, and repeating it would not
-    // change the answer.
-    if (!walletReady && !unrecoverable) {
-        let retrying = false;
+    function walletUnloaded(error: unknown): boolean {
+        if (config.backend !== 'core') return false;
+        const wasReady = recovery.ready;
+        const unloaded = recovery.walletUnloaded(error);
+        if (unloaded && wasReady) logger.warn('Bitcoin Core wallet unloaded; scheduling recovery');
+        return unloaded;
+    }
 
-        const retry = setInterval(async () => {
-            if (retrying) {
-                return;
-            }
-
-            retrying = true;
-
-            try {
-                const mnemonic = await fetchMnemonic();
-                const result = await setupWatchOnlyWallet(btcClient, mnemonic, config.network);
-                logger.info({ ...result }, 'Watch-only wallet ready');
-                walletReady = true;
-                walletSetupStatus.set(1);
-                startMetrics();
-                clearInterval(retry);
-            }
-            catch (error: any) {
-                if (error.name === 'DescriptorMismatchError') {
-                    logger.error(`Watch-only wallet does not match the current mnemonic: ${error.message}`);
-                    descriptorMismatch = error.message;
-                    clearInterval(retry);
-                    return;
-                }
-
-                if (error.message?.includes('sqlite')) {
-                    logger.error(`Bitcoin node does not support descriptor wallets: ${error.message}`);
-                    logger.error('Upgrade Bitcoin Core to a build with sqlite support');
-                    clearInterval(retry);
-                    return;
-                }
-
-                logger.debug({ err: error }, 'Watch-only wallet setup still failing');
-            }
-            finally {
-                retrying = false;
-            }
-        }, retryIntervalMs);
-
-        retry.unref();
+    function walletError(res: express.Response, error: any): void {
+        const unloaded = walletUnloaded(error);
+        res.status(unloaded ? 503 : 500).json({
+            error: unloaded ? recovery.descriptorMismatch ?? 'Bitcoin Core wallet unavailable; setup required or recovering' : error.message,
+        });
     }
 
     // Periodic metrics collection (every 60s)
@@ -290,25 +264,21 @@ async function main() {
             const blockchainInfo = await btcClient.command('getblockcount') as number;
             walletBlockHeight.set(blockchainInfo);
         } catch (error: any) {
+            walletUnloaded(error);
             logger.debug({ err: error }, 'Metrics update failed');
         }
     }
 
-    // Recovery through /wallet/setup can make the wallet ready long after
-    // startup gave up, so the collector starts once and skips its work until
-    // there is a wallet to measure, rather than being wired to that moment.
+    // Start once after the first successful setup. Keep polling through later
+    // outages so the same collector also detects an idle Core wallet unload.
 
     function startMetrics() {
         if (metricsStarted) {
             return;
         }
         metricsStarted = true;
-        updateMetrics();
+        void updateMetrics();
         setInterval(updateMetrics, 60_000);
-    }
-
-    if (walletReady) {
-        startMetrics();
     }
 
     // Health / version
@@ -319,21 +289,9 @@ async function main() {
     // Setup: create watch-only wallet and import descriptors
     v1router.post('/wallet/setup', requireAdminKey, async (_req, res) => {
         try {
-            const mnemonic = await fetchMnemonic();
-            const result = await setupWatchOnlyWallet(btcClient, mnemonic, config.network);
-            walletSetupStatus.set(1);
-            // Recovery runs through this route, so a wallet that now validates has
-            // to lift the block startup put in place.
-            walletReady = true;
-            descriptorMismatch = undefined;
-            startMetrics();
+            const result = await recovery.setup();
             res.json({ ok: true, network: config.network, ...result });
         } catch (error: any) {
-            if (error.name === 'DescriptorMismatchError') {
-                descriptorMismatch = error.message;
-            }
-            walletReady = false;
-            walletSetupStatus.set(0);
             logger.error({ err: error }, 'Wallet setup failed');
             res.status(500).json({ error: error.message });
         }
@@ -347,7 +305,7 @@ async function main() {
             res.json({ ...balance, network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to get balance');
-            res.status(500).json({ error: error.message });
+            walletError(res, error);
         }
     });
 
@@ -357,9 +315,9 @@ async function main() {
         // built on another seed accepts funds nothing here can spend. Setup
         // failing for any other reason leaves the wallet equally unvalidated,
         // and bitcoind will still answer from whatever descriptors it holds.
-        if (descriptorMismatch || !walletReady) {
+        if (!recovery.ready) {
             res.status(503).json({
-                error: descriptorMismatch ?? 'Watch-only wallet is not set up; refusing to serve an address',
+                error: recovery.descriptorMismatch ?? 'Watch-only wallet is not set up; refusing to serve an address',
             });
             return;
         }
@@ -370,7 +328,7 @@ async function main() {
             res.json({ address, network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to get address');
-            res.status(500).json({ error: error.message });
+            walletError(res, error);
         }
     });
 
@@ -394,7 +352,7 @@ async function main() {
             res.json({ transactions, network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to get transactions');
-            res.status(500).json({ error: error.message });
+            walletError(res, error);
         }
     });
 
@@ -413,7 +371,7 @@ async function main() {
             res.json({ utxos, network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to get UTXOs');
-            res.status(500).json({ error: error.message });
+            walletError(res, error);
         }
     });
 
@@ -431,7 +389,7 @@ async function main() {
             res.json({ ...estimate, network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to estimate fee');
-            res.status(500).json({ error: error.message });
+            walletError(res, error);
         }
     });
 
@@ -443,7 +401,7 @@ async function main() {
             res.json(status);
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to get wallet info');
-            res.status(500).json({ error: error.message });
+            walletError(res, error);
         }
     });
 
@@ -469,7 +427,7 @@ async function main() {
         } catch (error: any) {
             walletSendsTotal.inc({ status: 'failed' });
             logger.error({ err: error }, 'Failed to send BTC');
-            res.status(500).json({ error: error.message });
+            walletError(res, error);
         }
     });
 
@@ -495,7 +453,7 @@ async function main() {
         } catch (error: any) {
             walletSendsTotal.inc({ status: 'failed' });
             logger.error({ err: error }, 'Failed to anchor data');
-            res.status(500).json({ error: error.message });
+            walletError(res, error);
         }
     });
 
@@ -522,7 +480,7 @@ async function main() {
                 return;
             }
             logger.error({ err: error }, 'Failed to get transaction');
-            res.status(500).json({ error: error.message });
+            walletError(res, error);
         }
     });
 
@@ -541,7 +499,7 @@ async function main() {
             res.json({ ...result, network: config.network });
         } catch (error: any) {
             logger.error({ err: error }, 'Failed to bump fee');
-            res.status(500).json({ error: error.message });
+            walletError(res, error);
         }
     });
 
@@ -573,6 +531,7 @@ async function main() {
     // Graceful shutdown
     const shutdown = async () => {
         logger.info('Shutting down wallet service...');
+        recovery.stop();
         server.close(() => {
             logger.info('Server closed');
             process.exit(0);

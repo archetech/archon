@@ -100,7 +100,9 @@ status:
 - `400` for client-side validation (missing / invalid params, OP_RETURN
   > 80 bytes, etc.).
 - `404` for `gettransaction` misses.
-- `500` for anything else.
+- `503` when Core reports an unloaded/missing wallet (RPC code `-18`), or
+  the address route refuses an unvalidated wallet.
+- `500` for other service/RPC failures.
 
 ### 2.4 Body limits
 
@@ -246,9 +248,32 @@ still starting, and the satoshi-mediator waits on this service for an
 address. A refusal is the exception — a descriptor mismatch, or a Core
 without sqlite — since repeating it cannot change the answer.
 
-Until setup succeeds, `GET /api/v1/wallet/address` answers `503`. The
-balance route does not: it reads from Core, which answers whether or not
-this service has a watch-only wallet, so it is not a readiness signal.
+Until setup succeeds, `GET /api/v1/wallet/address` answers `503`. Balance
+reads do not prove that descriptors have been validated, so balance alone
+is not a readiness signal.
+
+For the Core backend, a runtime RPC error `-18` marks setup status as zero,
+blocks address publication, and starts the same 30-second setup retry loop.
+Detection comes from failed wallet requests (including `/wallet/info`, which
+propagates this RPC error instead of returning a 200 status report) or the
+existing 60-second metrics poll; no separate watchdog is used. Concurrent detections and manual setup
+share a single in-flight setup attempt. Successful setup revalidates the
+configured mnemonic against the wallet descriptors, restores readiness, and
+stops retries. Descriptor mismatch and missing SQLite support stop automatic
+retries; an operator can explicitly retry `/wallet/setup` after correcting the
+cause. Other RPC/transport errors do not trigger wallet reinitialization.
+
+Recovery repeats setup only, never the failed send, anchor, or fee-bump request.
+This behavior is specific to Core-loaded wallets; the Alchemy backend and other
+chain wallet services do not acquire an equivalent reload policy.
+
+Regression checks should exercise successful startup followed by a runtime
+unload, not just failed startup. Run the fast coordinator tests in
+`tests/wallet/runtime-recovery.test.ts`. With the wallet service dependencies
+installed, `npm run test:recovery --prefix services/mediators/satoshi-wallet`
+builds and starts an isolated service against HTTP fixtures using the real
+Bitcoin RPC client and real 30/60-second timers (about two minutes). It verifies
+request/metrics recovery and descriptor refusal without touching a live node.
 
 ### 5.2 Environment variables
 

@@ -308,7 +308,10 @@ export async function getWalletStatus(btcClient: BtcClient, mnemonic?: string): 
             descriptorCount: info.descriptors.length,
             ...(hasExternal && hasInternal ? {} : { error: 'Wallet is missing a receive or change descriptor' }),
         };
-    } catch {
+    } catch (error: any) {
+        // Let the HTTP layer mark the unloaded wallet unavailable and schedule
+        // setup, rather than hiding RPC_WALLET_NOT_FOUND in a 200 status reply.
+        if (error.code === -18) throw error;
         return {
             network: config.network,
             walletName: config.walletName,
