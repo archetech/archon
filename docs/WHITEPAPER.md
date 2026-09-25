@@ -1,6 +1,6 @@
 # Archon: A Decentralized Identity Protocol
 
-## White Paper v1.1
+## White Paper v1.2
 
 **Abstract**
 
@@ -95,13 +95,13 @@ Rather than mandating a single consensus mechanism, Archon supports multiple reg
 
 | Registry | Confirmation Time | Cost | Finality | Best For |
 |----------|-------------------|------|----------|----------|
-| Hyperswarm | Seconds | Free | Eventual | Development, internal systems |
-| Bitcoin-family (`BTC:mainnet`, `BTC:testnet4`, `BTC:signet`) | ~60 minutes (6 blocks) | Miner fee per batch; testnet/signet use test coins | Strong proof-of-work finality | Enterprise, legal identity, testing |
+| Hyperswarm | Seconds | Free | Eventual; competing updates resolved deterministically | Development, internal systems |
+| Bitcoin-family (`BTC:mainnet`, `BTC:testnet4`, `BTC:signet`) | First confirmation, ~10 minutes on average | Miner fee per batch; testnet/signet use test coins | Strong proof-of-work finality; the mediator rewinds and re-imports after a reorg | Enterprise, legal identity, testing |
 | Zcash (`ZEC:mainnet`, `ZEC:testnet`) | First confirmation in ~75 seconds | ZIP-317 conventional fee per batch; testnet uses test coins | Strong proof-of-work finality | Transparent Zcash anchoring |
-| Ethereum (`ETH:mainnet`, `ETH:sepolia`) | ~2-3 minutes at the default 12-confirmation import depth | Gas for one `ArchonRegistry` transaction per batch | Strong EVM block finality | EVM anchoring and contract discovery |
-| Solana (`SOL:mainnet-beta`, `SOL:devnet`) | Seconds at `confirmed`; tens of seconds at `finalized` | Lamports for one Memo transaction per batch | Fast proof-of-stake finality | High-throughput anchoring |
+| Ethereum (`ETH:mainnet`, `ETH:sepolia`) | After finalization, ~13 minutes | Gas for one `ArchonRegistry` transaction per batch | Proof-of-stake finality; anchors are imported only once finalized | EVM anchoring and contract discovery |
+| Solana (`SOL:mainnet-beta`, `SOL:devnet`) | After finalization, ~13 seconds | Lamports for one Memo transaction per batch | Proof-of-stake finality; anchors are imported only once finalized | High-throughput anchoring |
 
-Users select their registry at DID creation based on their specific requirements, enabling a spectrum of security-cost trade-offs.
+Users select their registry at DID creation based on their specific requirements, enabling a spectrum of security-cost trade-offs. A DID can later migrate to another registry with a signed update. Nodes also support the unanchored `local` and `pin` registries; the [Gatekeeper specification](services/gatekeeper/README.md) describes their semantics.
 
 ### 3.3 W3C Compliance
 
@@ -130,28 +130,38 @@ The Gatekeeper serves as the authoritative local source for DID state. It:
 - Maintains operation queues per registry
 - Merges operations from multiple sources
 - Provides a REST API for DID CRUD operations
-- Supports multiple database backends (Redis, MongoDB, SQLite)
+- Supports multiple database backends (Redis, MongoDB, SQLite, JSON)
+
+Two interchangeable implementations exist, one in TypeScript and one in native Rust. They serve the same HTTP API, and a cross-implementation parity suite checks that they accept, reject and resolve operations identically.
 
 #### Keymaster
 
-The Keymaster is the client-side wallet library responsible for:
+The Keymaster is the wallet responsible for:
 
 - BIP-32 hierarchical deterministic key derivation
 - BIP-39 mnemonic seed phrase management
-- ECDSA signing of DID operations
+- secp256k1 ECDSA signing of DID operations and credentials, with optional Ed25519 credential proofs (§9.1)
 - Encryption/decryption of messages and credentials
 - Wallet backup and recovery
 
+It runs as a library inside a client, or as a REST service used by the `archon` CLI, the demo clients and an MCP server for AI agents. TypeScript and Python implementations are kept in parity and read the same wallet format.
+
 #### Drawbridge
 
-Drawbridge is an API gateway that bridges the Archon identity layer with the Lightning Network:
+Drawbridge is the node's public API gateway:
 
-- Proxies Gatekeeper and Keymaster APIs with optional paywall protection
-- Manages Lightning Network node connectivity (Core Lightning)
-- Provides invoice generation, payment, and routing for DID-to-DID Lightning transactions
-- Supports L402 (formerly LSAT) authentication for API monetization
-- Exposes Lightning service endpoints via DID document service entries
+- Fronts Gatekeeper and the node's optional services (Herald, the Lightning mediator, the DIDComm relay and the explorer)
+- Supports L402 (formerly LSAT) authentication for API monetization, while keeping DID resolution and IPFS reads free
+- Serves the Lightning endpoints that DID documents advertise in their `#lightning` service entries, delegating invoices and payments to the Lightning mediator
 - Optionally fronted by a Tor hidden service for privacy-preserving access
+
+#### Herald
+
+Herald is the node's name service. A user proves control of a DID through challenge-response, claims a short `@name` handle, and receives a verifiable credential attesting to it. Herald publishes its directory as JSON, IPNS, LUD-16 Lightning addresses, WebFinger and OpenID Connect.
+
+#### DIDComm Relay
+
+An optional store-and-forward mailbox for DIDComm Messaging v2. Senders post encrypted envelopes; a recipient proves control of its DID and fetches its queued envelopes to decrypt locally. The relay holds no private keys and cannot read what it stores.
 
 #### Mediators
 
@@ -162,6 +172,9 @@ Mediators synchronize DID operations across network boundaries:
 - **Zcash Mediator**: Anchors operation batches to transparent Zcash transactions
 - **Ethereum Mediator**: Anchors operation batches through canonical `ArchonRegistry` contracts
 - **Solana Mediator**: Anchors operation batches through Memo-program payloads
+- **Pinning Mediator**: Keeps operations available through an IPFS Pinning Service for the registries an operator opts in
+- **Filecoin Mediator**: Stores operations with Filecoin storage proofs where a deployment needs them
+- **Lightning Mediator**: Creates invoices and makes payments, including zaps, for Drawbridge
 
 ### 4.3 Data Flow
 
@@ -207,7 +220,6 @@ Archon supports two fundamental DID types:
 
 ```json
 {
-  "@context": "https://w3id.org/did-resolution/v1",
   "didDocument": {
     "@context": ["https://www.w3.org/ns/did/v1"],
     "id": "did:cid:bafkreig6rjxbv2aopv47dgxhnxepqpb4yrxf2nvzrhmhdqthojfdxuxjbe",
@@ -223,14 +235,14 @@ Archon supports two fundamental DID types:
       }
     }],
     "authentication": ["#key-1"],
-    "assertionMethod": ["#key-1"]
+    "assertionMethod": ["#key-1"],
+    "capabilityInvocation": ["#key-1"]
   },
   "didDocumentMetadata": {
     "created": "2024-01-15T10:30:00Z",
-    "updated": "2024-01-15T10:30:00Z",
-    "deactivated": false,
     "versionId": "bafkrei...",
-    "versionSequence": "1"
+    "versionSequence": "1",
+    "confirmed": true
   },
   "didDocumentData": {},
   "didDocumentRegistration": {
@@ -240,6 +252,8 @@ Archon supports two fundamental DID types:
   }
 }
 ```
+
+Metadata members appear only when they apply: `updated` after the first update, `deleted` and `deactivated: true` after a delete, and `timestamp` when the document's registry supplies one (§7.4). `confirmed` means every update in the resolved history was received on the registry its predecessor expects; the create operation counts as confirmed by definition, so `confirmed: true` does not show that the creation itself was anchored. The [Gatekeeper specification](services/gatekeeper/README.md) defines the full resolution algorithm, and the standards-conformant `/1.0/identifiers` endpoint returns the W3C resolution subset.
 
 ### 5.4 Operations
 
@@ -262,10 +276,11 @@ All DID state changes occur through signed operations:
     "y": "..."
   },
   "proof": {
-    "type": "EcdsaSecp256k1Signature2019",
+    "type": "DataIntegrityProof",
+    "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
     "created": "2024-01-15T10:30:00Z",
     "verificationMethod": "#key-1",
-    "proofPurpose": "authentication",
+    "proofPurpose": "capabilityInvocation",
     "proofValue": "..."
   }
 }
@@ -285,10 +300,11 @@ All DID state changes occur through signed operations:
   },
   "previd": "bafkrei...",
   "proof": {
-    "type": "EcdsaSecp256k1Signature2019",
+    "type": "DataIntegrityProof",
+    "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
     "created": "2024-01-16T14:00:00Z",
     "verificationMethod": "did:cid:bafkrei...#key-1",
-    "proofPurpose": "authentication",
+    "proofPurpose": "capabilityInvocation",
     "proofValue": "..."
   }
 }
@@ -301,14 +317,17 @@ All DID state changes occur through signed operations:
   "did": "did:cid:bafkrei...",
   "previd": "bafkrei...",
   "proof": {
-    "type": "EcdsaSecp256k1Signature2019",
+    "type": "DataIntegrityProof",
+    "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
     "created": "2024-01-17T09:00:00Z",
     "verificationMethod": "did:cid:bafkrei...#key-1",
-    "proofPurpose": "authentication",
+    "proofPurpose": "capabilityInvocation",
     "proofValue": "..."
   }
 }
 ```
+
+Operations on a blockchain registry may also carry a `blockid` naming a recent block, which gives the operation a lower timestamp bound (§7.4). Operations anchored before the `archon-ecdsa-secp256k1-jcs-2026` suite existed carry the legacy `EcdsaSecp256k1Signature2019` proof with `proofPurpose: "authentication"`; both Gatekeeper implementations accept those indefinitely, because every node replays its own history. The [DID scheme](scheme.md) specifies both suites and includes a checked, signed example.
 
 ---
 
@@ -365,21 +384,21 @@ Users can publish verified credentials to their DID, creating a public or select
 }
 ```
 
-This enables LinkedIn-style professional profiles that are fully decentralized and cryptographically verifiable.
+This enables LinkedIn-style professional profiles that are fully decentralized and cryptographically verifiable. The holder chooses what to disclose: a credential published without being revealed shows only its subject, and its claims appear in the manifest only when the holder reveals it.
 
-#### Identity Vaults
+#### Wallet Backup
 
-Encrypted backup storage tied directly to an identity:
+The wallet's seed bank is a DID derived from the recovery phrase itself (§10.1). A backup is an asset DID holding the encrypted wallet, and the seed bank points to it:
 
 ```json
 {
   "didDocumentData": {
-    "vault": "did:cid:bafkrei...encrypted-backup"
+    "wallet": "did:cid:bafkrei...backup"
   }
 }
 ```
 
-Users can recover their entire identity—including all credentials and relationships—from just their seed phrase.
+The backup asset's own data is `{ "backup": "<ciphertext>" }`. Because the seed bank's DID can be regenerated from the phrase, users can recover every backed-up identity, with its credentials and relationships, from the seed phrase alone.
 
 #### Digital Assets as DIDs
 
@@ -388,16 +407,21 @@ Images, documents, and structured data become first-class citizens with their ow
 ```json
 {
   "didDocumentData": {
-    "type": "image/png",
-    "encoding": "base64",
-    "data": "iVBORw0KGgoAAAANSUhEUgAA...",
-    "metadata": {
-      "title": "Profile Photo",
-      "created": "2024-01-15T10:30:00Z"
+    "file": {
+      "cid": "bafkrei...",
+      "filename": "profile.png",
+      "type": "image/png",
+      "bytes": 48213
+    },
+    "image": {
+      "width": 512,
+      "height": 512
     }
   }
 }
 ```
+
+The bytes themselves live in IPFS under their CID; the asset DID records the reference and metadata, so updating the image is an ordinary signed update.
 
 #### Encrypted Communications
 
@@ -407,8 +431,6 @@ End-to-end encrypted messages stored with DIDs:
 {
   "didDocumentData": {
     "encrypted": {
-      "sender": "did:cid:bafkrei...alice",
-      "created": "2024-01-15T10:30:00Z",
       "cipher_hash": "a1b2c3...",
       "cipher_sender": "encrypted-for-sender...",
       "cipher_receiver": "encrypted-for-receiver..."
@@ -417,24 +439,23 @@ End-to-end encrypted messages stored with DIDs:
 }
 ```
 
+The sender is the asset's controller and the creation time is in its metadata, so neither is repeated here. All three members are always serialized: `cipher_hash` is `null` unless the sender asks for a digest, as challenge responses do (§8.5), and `cipher_sender` is `null` when the sender opts out of a copy for themselves.
+
 #### Organizational Structures
 
-Groups and hierarchies with membership data:
+Groups with public membership lists, which can nest other groups:
 
 ```json
 {
   "didDocumentData": {
+    "name": "Engineering Team",
     "group": {
-      "name": "Engineering Team",
+      "version": 2,
       "members": [
         "did:cid:bafkrei...alice",
         "did:cid:bafkrei...bob",
         "did:cid:bafkrei...carol"
-      ],
-      "roles": {
-        "did:cid:bafkrei...alice": "admin",
-        "did:cid:bafkrei...bob": "member"
-      }
+      ]
     }
   }
 }
@@ -442,35 +463,32 @@ Groups and hierarchies with membership data:
 
 #### Notices and Announcements
 
-Time-sensitive communications to specific recipients:
+Short-lived pointers that tell recipients a DID is waiting for them, such as a D-Mail or a poll ballot:
 
 ```json
 {
   "didDocumentData": {
     "notice": {
       "to": ["did:cid:bafkrei...recipient"],
-      "subject": "Meeting Request",
-      "body": "encrypted-content...",
-      "expires": "2024-02-01T00:00:00Z"
+      "dids": ["did:cid:bafkrei...dmail"]
     }
   }
 }
 ```
 
+A notice carries no content of its own. It expires through the asset's `validUntil`, after which nodes may garbage-collect it.
+
 #### Polls and Governance
 
-Decentralized voting with cryptographic integrity:
+Polls among the members of a vault and its owner (§8.3). The poll definition is an encrypted vault item, readable only by them:
 
 ```json
 {
-  "didDocumentData": {
-    "poll": {
-      "question": "Approve budget proposal?",
-      "options": ["Yes", "No", "Abstain"],
-      "deadline": "2024-02-01T00:00:00Z",
-      "results_hidden": true
-    }
-  }
+  "version": 2,
+  "name": "budget-q4",
+  "description": "Approve budget proposal?",
+  "options": ["Yes", "No", "Abstain"],
+  "deadline": "2024-02-01T00:00:00Z"
 }
 ```
 
@@ -530,32 +548,46 @@ The Hyperswarm registry provides fast, peer-to-peer operation distribution:
 - Confirmation time: Seconds
 - Cost: Zero
 - Finality: Eventual consistency (gossip-based)
-- Ordering: Timestamp-based with conflict resolution
+- Ordering: The `previd` chain, with a deterministic choice between competing updates
 
 **Mechanism:**
-1. Operations are broadcast to all connected peers
+1. Mediators join a shared Hyperswarm topic and exchange operation batches with their peers
 2. Peers validate and store operations locally
-3. Ordering determined by timestamp, with cryptographic tiebreakers
-4. Eventually consistent across the network
+3. When two valid updates name the same predecessor, every node keeps the one with the lexicographically smallest canonical CID; clocks and arrival order play no part
+4. Nodes holding the same operations converge on the same history
 
 **Best for:** Development, testing, internal organizational use, applications where speed matters more than finality
 
-### 7.3 Blockchain Registries (Satoshi)
+### 7.3 Blockchain Registries
 
-Blockchain registries provide cryptographic finality through proof-of-work:
+Blockchain registries order updates through each chain's consensus. Every chain mediator follows the same pattern:
 
-**Bitcoin-family registries**
-- Confirmation time: ~60 minutes (6 blocks)
-- Cost: variable with network fees
-- Finality: Extremely strong (computational security)
-- Ordering: Block height + transaction index
+1. Operations for the registry accumulate in a Gatekeeper queue
+2. The mediator stores each operation in IPFS and creates a batch asset DID, `{ "batch": { "version": 1, "ops": [<CID>, ...] } }`
+3. One transaction per batch records the batch DID on chain
+4. Every node running the mediator scans the chain, fetches the batch, and imports its operations with their chain position
 
-**Mechanism:**
-1. Operations accumulate in a queue
-2. Mediator batches operations and computes batch CID
-3. Batch CID embedded in OP_RETURN output (60 bytes)
-4. Transaction broadcast and confirmed
-5. All nodes can independently verify and import
+Mediators skip batches whose content is not yet available and retry them later, keeping the original chain position.
+
+**Bitcoin-family (Satoshi mediator)**
+- Anchor: the batch DID as UTF-8 in a standard `OP_RETURN` output
+- Import: after the first confirmation; on a reorg the mediator rewinds (6 blocks by default), withdraws orphaned receipts and rescans
+- Cost: miner fee per batch
+
+**Zcash**
+- Anchor: the batch DID in a transparent `OP_RETURN` transaction, verified against a Zebra node
+- Import: after the first confirmation, with the same reorg handling as Bitcoin
+- Cost: the ZIP-317 conventional fee per batch
+
+**Ethereum**
+- Anchor: an `ArchonBatch` event from the registry's one canonical `ArchonRegistry` contract
+- Import: only once the block is finalized; a rollback of finalized history is outside automatic recovery
+- Cost: gas for one transaction per batch
+
+**Solana**
+- Anchor: a Memo-program instruction with an `ARCHON_BATCH_V1:` payload, signed by a deterministic registry signer so nodes can discover anchors by address
+- Import: only once finalized
+- Cost: lamports for one transaction per batch
 
 ### 7.4 Blockchain Timestamping
 
@@ -603,7 +635,7 @@ When resolving a DID, the `didDocumentMetadata` includes timestamp information:
 
 **Lower Bound** (optional): Created when the operation includes a `blockid` field referencing a recent block at the time of creation. This proves the operation was created *after* that block existed, establishing a "not before" time.
 
-**Upper Bound** (always present for confirmed operations): The block in which the operation batch was anchored. This provides:
+**Upper Bound** (present when the anchoring block is known): The block in which the operation batch was anchored. Unanchored registries such as Hyperswarm supply no bounds. This provides:
 - `time`: Unix timestamp of the block
 - `timeISO`: Human-readable ISO 8601 format
 - `blockid`: The block hash (independently verifiable)
@@ -631,7 +663,7 @@ This makes them suitable for legal contexts where proving "when" something happe
 
 **2. Temporal Ordering**
 
-The ordinal key `{block height, transaction index, batch index, operation index}` provides a strict total ordering of all operations, resolving any ambiguity about which operation came first. This is critical for:
+Within one chain, the ordinal key `{block height, position in block, operation index}` orders every anchored operation, resolving any ambiguity about which came first. The position is chain-specific: the transaction index on Bitcoin and Zcash, the log index on Ethereum, and the instruction index on Solana. Ordinals are never compared across chains. Solana instruction indices restart in every transaction, so equal ordinals can occur there, and the canonical CID then decides. This is critical for:
 - Key rotation (ensuring old keys can't sign "backdated" operations)
 - Credential revocation (proving when a credential was revoked)
 - Dispute resolution (establishing timeline of events)
@@ -651,11 +683,11 @@ The timestamp system also enables proving that something *didn't* exist before a
 
 | Registry | Typical Precision | Verification |
 |----------|-------------------|--------------|
-| Bitcoin-family | ~10 minutes (block time) | Full node or SPV proof |
+| Bitcoin-family | ~10 minutes (block time) | Full-node RPC |
 | Zcash | ~75 seconds | Zebra-backed block and transaction checks |
 | Ethereum | ~12 seconds | RPC log and block verification |
 | Solana | Seconds | RPC signature and block-height verification |
-| Hyperswarm | Sub-second (self-asserted) | Peer attestation only |
+| Hyperswarm | Self-asserted (`proof.created`) | None beyond the signature |
 
 #### Use Cases for Timestamps
 
@@ -688,13 +720,16 @@ resolveDID(did, { versionTime: "2024-01-15T10:00:00Z" })
 // Resolve a specific version number
 resolveDID(did, { versionSequence: 3 })
 
+// Stop at the first update not yet confirmed on the DID's registry
+resolveDID(did, { confirm: true })
+
 // Verify operation proofs while resolving
 resolveDID(did, { verify: true })
 ```
 
 **How It Works:**
 
-Every DID operation includes a `previd` field linking to the previous operation, creating an immutable chain:
+Every update and delete operation includes a `previd` field linking to the previous operation, creating an immutable chain back to the create operation:
 
 ![Time-Travel Resolution](images/time-travel-resolution.png)
 
@@ -712,123 +747,65 @@ Archon includes a complete decentralized email system built on top of the DID in
 
 ![D-Mail System](images/dmail-system.png)
 
+Each message is a vault (§8.4) owned by the sender, with every `to` and `cc` recipient added as a member, so the sender and all recipients can decrypt it and no one else can.
+
 **Features:**
-- **Folder organization**: INBOX, SENT, DRAFT, ARCHIVED, DELETED
-- **CC support**: Multiple recipients with individual encryption
-- **Attachments**: Files stored as asset DIDs
-- **Read tracking**: UNREAD tag for new messages
-- **Dual encryption**: Both sender and recipient can decrypt
+- **Folder organization**: wallet tags `inbox`, `sent`, `draft`, `archived` and `deleted`
+- **CC support**: Every recipient is a vault member
+- **Attachments**: Files stored as further items in the same vault
+- **Read tracking**: `unread` tag for new messages
+- **Delivery**: Sending creates a notice (§6.3) addressed to the recipients, valid for 7 days, which their wallets pick up and file in their inboxes
+- **Threading**: An optional `reference` names the message being replied to
 
-**Message Structure:**
+**Message Structure** (the encrypted `dmail` vault item):
 ```json
 {
-  "didDocumentData": {
-    "dmail": {
-      "from": "did:cid:bafkrei...alice",
-      "to": ["did:cid:bafkrei...bob"],
-      "cc": ["did:cid:bafkrei...carol"],
-      "subject": "Meeting Tomorrow",
-      "body": "encrypted-content...",
-      "attachments": ["did:cid:bafkrei...file1"],
-      "created": "2024-01-15T10:30:00Z"
-    }
+  "dmail": {
+    "to": ["did:cid:bafkrei...bob"],
+    "cc": ["did:cid:bafkrei...carol"],
+    "subject": "Meeting Tomorrow",
+    "body": "See you at ten.",
+    "reference": "did:cid:bafkrei...earlier-message"
   }
 }
 ```
 
-### 8.3 Privacy-Preserving Voting
+The sender is the vault's controller, and the send time comes from its metadata.
 
-Archon's polling system goes beyond simple vote counting to provide cryptographic privacy guarantees:
+### 8.3 Polls
 
-**Two-Phase Voting Protocol:**
+A poll is a vault (§8.4). Its eligible voters are the vault's members plus the poll owner, who is eligible without being listed as a member, so the eligible count is the member count plus one. The poll definition (§6.3) is an encrypted vault item with a description, two to ten options and a deadline.
 
-```
-Phase 1: Ballot Collection (Private)
-──────────────────────────────────────
-• Voters cast encrypted ballots
-• Ballots stored as asset DIDs
-• Vote choices hidden from everyone
-• Eligibility verified via credentials
+**Voting:**
 
-Phase 2: Result Revelation (Optional)
-──────────────────────────────────────
-• Poll creator can reveal results
-• Individual ballots can remain hidden
-• Or full transparency with ballot publication
-```
+1. An eligible voter casts a ballot: an asset DID holding `{ poll, vote }`, encrypted to the poll owner and to the voter
+2. The voter sends the ballot to the owner with a notice (§6.3)
+3. The owner adds the ballot to the poll vault, keyed by a salted hash of the voter's DID
+4. After the deadline, or once every eligible voter (owner included) has voted, the owner can publish the results as a vault item that members can read
 
-**Privacy Features:**
+**Privacy properties:**
 
-1. **Spoil Ballots**: Voters can cast intentionally invalid ballots that are indistinguishable from valid ones, providing plausible deniability about whether they voted.
+- **Ballots are private from other voters.** Only the poll owner and the voter can decrypt a ballot. The owner can see how each voter voted.
+- **Published results can omit individual ballots.** `publishPoll` publishes the tally alone by default, or every ballot with `reveal`.
+- **Spoiled ballots.** A vote of `0` spoils the ballot. It counts as participation and is tallied separately as `spoil`, so voters can take part without choosing an option. It does not hide that the voter voted.
 
-2. **Hidden Results**: Poll creators can choose to keep results hidden until a deadline or indefinitely.
+### 8.4 Vaults
 
-3. **Anonymous Tallying**: Results can be published without revealing individual votes.
+Vaults are shared encrypted storage. The owner creates a vault, adds members, and adds items (files, messages, poll ballots); every member can decrypt the items.
 
-**Poll Structure:**
-```json
-{
-  "didDocumentData": {
-    "poll": {
-      "question": "Approve the Q4 budget?",
-      "options": ["Yes", "No", "Abstain"],
-      "deadline": "2024-02-01T00:00:00Z",
-      "roster": "did:cid:bafkrei...eligible-voters",
-      "resultsHidden": true,
-      "ballots": {
-        "did:cid:bafkrei...ballot1": "encrypted...",
-        "did:cid:bafkrei...ballot2": "encrypted..."
-      }
-    }
-  }
-}
-```
+**How vaults work:**
 
-### 8.4 Vaults with Secret Membership
+1. **Shared vault key**: Each vault has one key pair. Items are encrypted to its public key, and its private key is encrypted separately to each member.
+2. **Salted member index**: Each member's copy of the key is stored under a hash of the vault's salt and the member's DID, so the index does not show DIDs in the clear.
+3. **Owner-managed contents**: Only the owner adds or removes members and items.
+4. **Removal is not revocation**: Removing a member deletes their copy of the vault key, but the vault keeps the same key pair. A former member who kept the private key can still decrypt existing items and any added later.
 
-Archon supports multi-party encrypted storage where members can share data without necessarily knowing each other's identities:
+**Secret membership.** With the `secretMembers` option, the member list is encrypted to the owner alone, so members cannot list who else belongs. This keeps the roster from casual disclosure but is not anonymity: the salt is public, so anyone who can guess a DID can test whether it is a member.
 
-**Standard Group:**
-```json
-{
-  "didDocumentData": {
-    "group": {
-      "name": "Project Alpha Team",
-      "members": [
-        "did:cid:bafkrei...alice",
-        "did:cid:bafkrei...bob"
-      ],
-      "vault": "did:cid:bafkrei...shared-vault"
-    }
-  }
-}
-```
-
-**Secret Member Group:**
-```json
-{
-  "didDocumentData": {
-    "group": {
-      "name": "Anonymous Review Board",
-      "secretMembers": true,
-      "encryptedMembers": "encrypted-member-list...",
-      "vault": "did:cid:bafkrei...shared-vault"
-    }
-  }
-}
-```
-
-**How Secret Membership Works:**
-
-1. **Encrypted Member List**: The member list is encrypted so only the group controller knows all members
-2. **Individual Access Keys**: Each member receives their own derived key to access the vault
-3. **Plausible Membership**: Members cannot prove or disprove others' membership
-4. **Anonymous Contributions**: Items added to the vault don't reveal the contributor
-
-**Use Cases:**
-- **Whistleblower systems**: Submit documents without revealing identity to other submitters
-- **Blind review**: Academic or professional review where reviewers don't know each other
-- **Anonymous committees**: Voting bodies where member composition is confidential
+**Use cases:**
+- **Shared team storage**: Files and documents readable by a defined set of DIDs
+- **Private correspondence**: D-Mail messages (§8.2) are vaults
+- **Committee polls**: Polls (§8.3) whose electorate is the vault's membership
 
 ### 8.5 Challenge-Response Authentication
 
@@ -836,39 +813,47 @@ Archon provides a flexible challenge-response system for authentication and auth
 
 ![Challenge-Response Authentication](images/challenge-response.png)
 
+A challenge is a short-lived asset DID (valid for one hour by default) created by the verifier. Its DID is unique, so it serves as the nonce.
+
 **Challenge Types:**
 
-1. **Simple Identity Challenge**: Prove you control a specific DID
-2. **Credential Challenge**: Prove you hold a credential of a specific type
-3. **Issuer-Specific Challenge**: Prove you hold a credential from a specific issuer
+1. **Simple Identity Challenge**: An empty challenge; answering it proves control of the responding DID
+2. **Credential Challenge**: Prove you hold a credential for a given schema
+3. **Issuer-Specific Challenge**: The same, restricted to a list of issuers
 
-**Challenge Structure:**
+**Challenge Structure** (the challenge asset's data):
 ```json
 {
-  "type": "VerifiablePresentation",
-  "challenge": "random-nonce-12345",
-  "domain": "https://example.com",
-  "credentialRequirements": [
-    {
-      "type": "EmployeeCredential",
-      "issuers": ["did:cid:bafkrei...acme-corp"]
-    }
-  ]
+  "challenge": {
+    "credentials": [
+      {
+        "schema": "did:cid:bafkrei...employee-schema",
+        "issuers": ["did:cid:bafkrei...acme-corp"]
+      }
+    ]
+  }
 }
 ```
 
-**Response (Verifiable Presentation):**
+**Response Structure** (an asset encrypted to the verifier and signed by the holder):
 ```json
 {
-  "type": "VerifiablePresentation",
-  "holder": "did:cid:bafkrei...alice",
-  "challenge": "random-nonce-12345",
-  "verifiableCredential": [
-    { /* Matching credential */ }
-  ],
-  "proof": { /* Signature over presentation */ }
+  "response": {
+    "challenge": "did:cid:bafkrei...challenge",
+    "credentials": [
+      {
+        "vc": "did:cid:bafkrei...credential",
+        "vp": "did:cid:bafkrei...presentation"
+      }
+    ],
+    "requested": 1,
+    "fulfilled": 1,
+    "match": true
+  }
 }
 ```
+
+Each `vp` is the holder's copy of a credential re-encrypted to the verifier. The verifier checks that it hashes to the same content as the issued credential `vc`, that the credential's proof verifies against its issuer, and that the credential DID has not been revoked.
 
 ### 8.6 Lightning Payments
 
@@ -883,16 +868,16 @@ An agent publishes its Lightning receiving capability by registering an invoice 
   "didDocument": {
     "service": [
       {
-        "id": "#lightning",
-        "type": "LightningService",
-        "serviceEndpoint": "https://drawbridge.example.com"
+        "id": "did:cid:bafkrei...alice#lightning",
+        "type": "Lightning",
+        "serviceEndpoint": "https://drawbridge.example.com/invoice/bafkrei...alice"
       }
     ]
   }
 }
 ```
 
-Any party resolving the DID can discover the Lightning endpoint and initiate a payment without prior coordination.
+Any party resolving the DID can discover the Lightning endpoint and initiate a payment without prior coordination. The endpoint host is the Drawbridge's public address, which may be a Tor `.onion` address.
 
 #### Zap Protocol
 
@@ -903,36 +888,36 @@ zap <recipient> <amount_sats> [memo]
 ```
 
 **DID/Alias Flow:**
-1. Keymaster resolves the recipient alias or DID, loads the sender's LNbits admin key from the wallet, and delegates to Drawbridge (`POST /lightning/zap`)
-2. Drawbridge resolves the recipient DID via Gatekeeper to locate the `#lightning` service endpoint
-3. Drawbridge requests a BOLT11 invoice from the recipient's Lightning service (`.onion` endpoints are proxied via Tor; clearnet endpoints require HTTPS with SSRF protection)
-4. Drawbridge pays the invoice through the sender's LNbits instance, which routes the payment across the Lightning Network
+1. Keymaster resolves the recipient alias or DID, loads the sender's LNbits admin key from the wallet, and sends the zap to Drawbridge (`POST /lightning/zap`), which forwards it to the Lightning mediator
+2. The Lightning mediator resolves the recipient DID via Gatekeeper to locate the `#lightning` service endpoint
+3. It requests a BOLT11 invoice from the recipient's Lightning service (`.onion` endpoints are reached via Tor; clearnet endpoints require HTTPS with SSRF protection)
+4. It pays the invoice through the sender's LNbits instance, which routes the payment across the Lightning Network
 
 **LUD-16 Address Flow (user@domain):**
-1. Keymaster detects the `@` in the recipient string and delegates to Drawbridge
-2. Drawbridge fetches `https://domain/.well-known/lnurlp/user` for the LNURL-pay metadata (SSRF-protected)
-3. Drawbridge requests a BOLT11 invoice from the callback URL with the amount in millisatoshis
-4. Drawbridge pays the invoice through the sender's LNbits instance
+1. Keymaster detects the `@` in the recipient string and sends the zap through Drawbridge to the Lightning mediator
+2. The Lightning mediator fetches `https://domain/.well-known/lnurlp/user` for the LNURL-pay metadata (SSRF-protected)
+3. It requests a BOLT11 invoice from the callback URL with the amount in millisatoshis
+4. It pays the invoice through the sender's LNbits instance
 
 Both flows return a `paymentHash` to the caller for tracking. This unified interface abstracts away the differences between DID-native Lightning endpoints and standard LNURL/Lightning Address recipients.
 
 #### Payment Tracking
 
-All Lightning payments are recorded with full lifecycle tracking:
+The wallet lists incoming and outgoing Lightning payments with their status:
 
 ```json
 {
   "paymentHash": "a1b2c3...",
-  "bolt11": "lnbc...",
-  "amount": 1000,
+  "amount": -1000,
+  "fee": 2,
   "memo": "Thanks for the article",
-  "status": "settled",
-  "preimage": "d4e5f6...",
-  "expiry": "2024-01-15T11:30:00Z"
+  "time": "2024-01-15T10:30:00Z",
+  "pending": false,
+  "status": "success"
 }
 ```
 
-Payments transition through states: **pending** → **settled** | **failed** | **expired**, providing clear visibility into payment outcomes.
+`amount` is positive for incoming payments and negative for outgoing ones. `status` is `pending`, `success` or `failed`, and invoices also carry an `expiry`.
 
 ### 8.7 L402 API Gateway
 
@@ -940,7 +925,7 @@ Drawbridge implements the L402 protocol (formerly LSAT) to enable machine-readab
 
 #### How L402 Works
 
-1. Client requests a protected resource (any proxied Gatekeeper or Keymaster endpoint)
+1. Client requests a protected resource: a route under Drawbridge's `/api/v1` API, other than DID resolution, IPFS reads and status endpoints. The Herald, DIDComm relay, explorer, Lightning invoice and `/1.0/identifiers` routes are mounted outside the paywall
 2. Drawbridge returns HTTP 402 with a macaroon (containing caveats for scope, expiry, and payment hash) and a BOLT11 Lightning invoice
 3. Client pays the invoice through the Lightning Network, receiving a preimage as proof of payment
 4. Client re-requests the resource with `Authorization: L402 <macaroon>:<preimage>`
@@ -951,11 +936,10 @@ Drawbridge implements the L402 protocol (formerly LSAT) to enable machine-readab
 L402 enables fine-grained monetization of identity services:
 
 - **Per-request pricing**: Each API call requires a micro-payment
-- **Subscription tiers**: Authenticated users bypass L402 for included quotas
-- **Hybrid auth**: Combine traditional API keys with Lightning fallback
+- **Hybrid auth**: Internal services present the node's admin key and skip payment, while outside callers pay
 - **No accounts required**: Anonymous, permissionless access via payment alone
 
-This allows Archon node operators to offer public DID resolution, credential verification, and other services as paid APIs without requiring user registration or payment processors.
+This allows Archon node operators to charge for DID registration and updates and other `/api/v1` operations without requiring user registration or payment processors, while anyone can still resolve DIDs for free.
 
 ### 8.8 Key Rotation
 
@@ -964,7 +948,8 @@ Archon supports secure key rotation without changing the DID:
 ![Key Rotation](images/key-rotation.png)
 
 **Security Properties:**
-- Old keys cannot sign new operations (enforced by `previd` chain)
+- A retired key cannot extend the rotated history: each operation is verified against the document its `previd` names
+- A retired key can still sign a competing update to a version it was valid for; if the registry's order prefers that update, it replaces the rotation. Anchoring the rotation on a blockchain registry early narrows this window
 - Historical signatures remain verifiable
 - Compromised keys can be rotated without losing identity
 - Key rotation is itself timestamped on blockchain registries
@@ -975,16 +960,22 @@ Archon supports secure key rotation without changing the DID:
 
 ### 9.1 W3C Verifiable Credentials Support
 
-Archon implements the full W3C Verifiable Credentials Data Model:
+Archon issues credentials in the W3C Verifiable Credentials Data Model 2.0, secured with Data Integrity proofs:
 
 ```json
 {
   "@context": [
-    "https://www.w3.org/2018/credentials/v1"
+    "https://www.w3.org/ns/credentials/v2",
+    "https://www.w3.org/ns/credentials/examples/v2"
   ],
   "type": ["VerifiableCredential", "UniversityDegreeCredential"],
+  "id": "did:cid:bafkrei...credential",
   "issuer": "did:cid:bafkrei...",
-  "issuanceDate": "2024-01-15T00:00:00Z",
+  "validFrom": "2024-01-15T00:00:00Z",
+  "credentialSchema": {
+    "id": "did:cid:bafkrei...degree-schema",
+    "type": "JsonSchema"
+  },
   "credentialSubject": {
     "id": "did:cid:bafkrei...",
     "degree": {
@@ -992,15 +983,28 @@ Archon implements the full W3C Verifiable Credentials Data Model:
       "name": "Bachelor of Science"
     }
   },
-  "proof": {
-    "type": "EcdsaSecp256k1Signature2019",
-    "created": "2024-01-15T00:00:00Z",
-    "verificationMethod": "did:cid:bafkrei...#key-1",
-    "proofPurpose": "assertionMethod",
-    "proofValue": "..."
-  }
+  "proof": [
+    {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+      "created": "2024-01-15T00:00:00Z",
+      "verificationMethod": "did:cid:bafkrei...#key-1",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "..."
+    },
+    {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "eddsa-jcs-2022",
+      "created": "2024-01-15T00:00:00Z",
+      "verificationMethod": "did:cid:bafkrei...#key-assertion-1",
+      "proofPurpose": "assertionMethod",
+      "proofValue": "z..."
+    }
+  ]
 }
 ```
+
+Keymaster stores an issued credential as an encrypted asset DID, then re-signs it with that DID as its `id`. The signature therefore covers where the credential lives, so a revoked credential cannot be copied under a fresh DID and presented as current. Every credential carries the `archon-ecdsa-secp256k1-jcs-2026` proof. An issuer that has published an Ed25519 assertion key (`publish-assertion-key`) also adds an `eddsa-jcs-2022` proof, a registered W3C suite that verifiers built for other DID methods, such as `did:webvh` or `did:key` tooling, can check without knowing anything about Archon. Credentials issued before either suite existed carry the legacy `EcdsaSecp256k1Signature2019` proof and remain verifiable. A schema can set the credential's context and type; without one, the type is `VerifiableCredential` alone.
 
 ### 9.2 Credential Lifecycle
 
@@ -1011,7 +1015,7 @@ Archon implements the full W3C Verifiable Credentials Data Model:
 **Encryption**
 - Credentials can be encrypted for specific recipients
 - Only the intended holder can decrypt and access
-- Selective disclosure through encrypted presentations
+- Presentations re-encrypt a credential for a single verifier
 
 **Bound Credentials**
 - Credentials can be cryptographically bound to subjects
@@ -1043,29 +1047,26 @@ Master Seed (BIP-39 Mnemonic)
 Each identity occupies its own hardened account. Signing keys live on the `change = 0` branch and are indexed, so key rotation advances to the next index rather than deriving from a new account. Keys on other curves derive from the same BIP39 seed through **SLIP-0010**, which seeds each curve's master node with a different HMAC key so no curve can reproduce another's material. Those paths are hardened throughout, as SLIP-0010 requires for Ed25519, and the level below the account separates key types: `1'` for key agreement, `2'` for assertion. The X25519 key-agreement key used for DIDComm v2 messaging is derived as an Ed25519 key and converted, which is the relationship `did:key` defines between a `z6Mk` verification key and the key agreement key it resolves to. Because the derivation is standard rather than Archon-specific, any SLIP-0010 wallet given the mnemonic and the path arrives at the same keys. Both are deterministic from the seed: a given account and index always regenerate the same keys, so the messaging key needs no backup of its own. Recovery builds on the same property. The wallet's seed bank is a DID whose creation operation is itself derived from the seed, so it resolves to the same identifier every time — a controller who has taken a wallet backup can therefore restore every identity from the mnemonic alone, with no DID, file, or other material to keep alongside it. What the mnemonic cannot do is reconstruct identities that were never backed up: key regeneration is deterministic, but the mapping from name to DID, account and key index lives in wallet metadata and comes back only from a published backup.
 
 **Key Types:**
-- **ECDSA secp256k1**: Primary signing algorithm
+- **ECDSA secp256k1**: Signs DID operations and credentials
+- **Ed25519**: Optional credential assertion key for `eddsa-jcs-2022` proofs
+- **X25519**: Key agreement for DIDComm v2 messaging
 - **JWK format**: Standardized key representation
-- **AES-256-GCM**: Symmetric encryption for at-rest protection
+- **AES-256-GCM**: Symmetric encryption for wallets at rest and for encrypted messages; DIDComm envelopes also support A256CBC-HS512 and XC20P
 
 ### 10.2 Signature Scheme
 
-All operations are signed using ECDSA over secp256k1:
+Operations are signed with a `DataIntegrityProof` using the `archon-ecdsa-secp256k1-jcs-2026` cryptosuite. The proof configuration is the proof without `proofValue`, and the signed digest covers both it and the operation:
 
 ```
-signature = ECDSA_sign(
-  private_key,
-  SHA256(canonical_json(operation))
+digest = SHA256(
+  SHA256(JCS(proof_configuration)) ||
+  SHA256(JCS(operation_without_proof))
 )
+signature = ECDSA_sign(private_key, digest)   // 64-byte r || s
+proofValue = base64url(signature)
 ```
 
-Verification:
-```
-valid = ECDSA_verify(
-  public_key,
-  SHA256(canonical_json(operation)),
-  signature
-)
-```
+Verification recomputes the digest and checks the signature against the key the proof names. Because the configuration is inside the signature, its `created` time and `proofPurpose` cannot be altered without breaking it. The legacy `EcdsaSecp256k1Signature2019` proofs signed `SHA256(JCS(operation))` alone; they remain valid for history anchored before the new suite, and nothing new is signed that way except the seed bank's deterministic create operation. The [DID scheme](scheme.md) specifies both suites.
 
 ### 10.3 Content Addressing
 
@@ -1171,17 +1172,17 @@ Connected devices receive unique, verifiable identities:
 
 Organizations implement transparent voting systems:
 
-- Anonymous ballot casting
-- Verifiable vote counting
-- Proof of eligibility without identity disclosure
-- Auditable election results
+- Ballots readable only by the poll owner and the voter
+- Eligibility defined by vault membership, plus the poll owner
+- Tallies published to members, with or without individual ballots
+- Deadlines and results recorded in signed, versioned DIDs
 
 ### 12.6 Micropayments and API Monetization
 
 Node operators monetize identity services using Lightning micropayments:
 
-- DID resolution as a paid service (fractions of a cent per query)
-- Credential verification APIs with per-request pricing
+- DID registration and updates as a paid service (fractions of a cent per operation), while resolution stays free
+- Other Gatekeeper and Lightning API calls with per-request pricing
 - Anonymous API access without accounts or payment processors
 - Content creators receive tips and zaps directly to their DID
 - Machine-to-machine payments for automated identity workflows
@@ -1224,7 +1225,7 @@ Autonomous and semi-autonomous AI agents need durable identities, scoped authori
 | Arbitrary Data Storage | Yes (didDocumentData) | External only | External only | No |
 | Blockchain Timestamps | Automatic (with bounds) | Implicit | No | No |
 | Time-Travel Resolution | Yes | No | Yes | No |
-| Built-in Messaging | Yes (D-Mail) | No | No | No |
+| Built-in Messaging | Yes (D-Mail, DIDComm v2) | No | No | No |
 | Lightning Payments | Yes (L402 + Zaps) | No | No | No |
 | API Monetization | Yes (L402) | No | No | No |
 | Tor Hidden Services | Yes | No | No | No |
@@ -1277,10 +1278,11 @@ The graded entries above — "Full", "Partial", "Strong", "Limited", "Multiple",
 - Anonymous credential verification
 - Privacy-preserving age/attribute verification
 
-**Cross-Chain Bridges**
-- Registry migration between blockchains
-- Interoperability with other DID methods
+**Cross-Network Identity**
 - Federated identity across networks
+- Wider interoperability with other DID methods, building on the `eddsa-jcs-2022` credential proofs other methods can already verify
+
+A DID can already migrate between registries, including between blockchains, with a signed update.
 
 ### 14.2 Ecosystem Development
 
@@ -1297,7 +1299,7 @@ The graded entries above — "Full", "Partial", "Strong", "Limited", "Multiple",
 ### 14.3 Performance Optimization
 
 **Layer 2 Scaling**
-- Batching and rollup techniques
+- Rollup techniques beyond today's per-transaction operation batches
 - State channels for high-frequency updates
 - Optimistic confirmation with dispute resolution
 
@@ -1317,13 +1319,15 @@ Key innovations include:
 6. **Decentralized messaging (D-Mail)** built on the identity layer
 7. **Lightning Network integration** enabling instant DID-to-DID payments and zaps
 8. **L402 API monetization** allowing node operators to offer paid identity services without accounts
-9. **Privacy-preserving voting** with spoil ballots and two-phase revelation
-10. **Vaults with secret membership** for anonymous collaboration
-11. **Tor hidden service support** for censorship-resistant, anonymous access
-12. **Full W3C compliance** ensuring ecosystem interoperability
-13. **Comprehensive credential support** for real-world applications
+9. **Member polls** with encrypted ballots and tallies that can omit individual votes
+10. **Encrypted vaults** for shared storage, with optional secret member lists
+11. **DIDComm v2 messaging** with a store-and-forward relay that cannot read what it holds
+12. **Tor hidden service support** for censorship-resistant, anonymous access
+13. **Full W3C compliance** ensuring ecosystem interoperability
+14. **VC 2.0 credentials** with Data Integrity proofs that other DID methods can verify
+15. **Machine-checked convergence proofs** in Lean showing that nodes holding the same evidence reconstruct the same DID histories
 
-The protocol is production-ready, with multiple client implementations (CLI, web, mobile, browser extension), a Lightning-enabled API gateway (Drawbridge), robust cryptographic foundations, and extensive testing. Organizations seeking to implement decentralized identity infrastructure will find Archon provides the flexibility, security, and performance required for diverse use cases.
+The protocol is production-ready, with interchangeable TypeScript and Rust Gatekeepers, TypeScript and Python Keymasters, multiple clients (CLI, web, mobile, browser extension, and an MCP server for AI agents), a Lightning-enabled API gateway (Drawbridge), a name service (Herald), robust cryptographic foundations, and extensive testing. Organizations seeking to implement decentralized identity infrastructure will find Archon provides the flexibility, security, and performance required for diverse use cases.
 
 As the digital identity landscape continues to evolve, Archon's modular architecture positions it to adapt to new requirements while maintaining backward compatibility and the core principles of user sovereignty and decentralization.
 
@@ -1332,12 +1336,16 @@ As the digital identity landscape continues to evolve, Archon's modular architec
 ## References
 
 1. W3C Decentralized Identifiers (DIDs) v1.0. https://www.w3.org/TR/did-core/
-2. W3C Verifiable Credentials Data Model v1.1. https://www.w3.org/TR/vc-data-model/
+2. W3C Verifiable Credentials Data Model v2.0. https://www.w3.org/TR/vc-data-model-2.0/
 3. IPFS Content Identifiers (CIDs). https://docs.ipfs.tech/concepts/content-addressing/
 4. BIP-32: Hierarchical Deterministic Wallets. https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki
 5. BIP-39: Mnemonic code for generating deterministic keys. https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki
 6. Hyperswarm Protocol. https://docs.holepunch.to/building-blocks/hyperswarm
 7. JSON Canonicalization Scheme (JCS). RFC 8785
+8. W3C Verifiable Credential Data Integrity 1.0. https://www.w3.org/TR/vc-data-integrity/
+9. W3C Data Integrity EdDSA Cryptosuites v1.0. https://www.w3.org/TR/vc-di-eddsa/
+10. SLIP-0010: Universal private key derivation from master private key. https://github.com/satoshilabs/slips/blob/master/slip-0010.md
+11. DIF DIDComm Messaging v2.1. https://identity.foundation/didcomm-messaging/spec/v2.1/
 
 ---
 

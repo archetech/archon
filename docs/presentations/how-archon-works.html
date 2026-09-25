@@ -448,9 +448,12 @@
     '  },',
     '  "publicJwk": { "kty": "EC", "crv": "secp256k1", … },',
     '  "proof": {',
-    '    "type": "EcdsaSecp256k1Signature2019",',
+    '    "type": "DataIntegrityProof",',
+    '    "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",',
+    '    "created": "2026-09-24T14:02:11Z",',
     '    "verificationMethod": "#key-1",',
-    '    "proofValue": "z3FXQjecWufY46yg…"',
+    '    "proofPurpose": "capabilityInvocation",',
+    '    "proofValue": "esafZoTsLCbrza6G…"',
     '  }',
     '}'
   ];
@@ -488,11 +491,11 @@
     const ca = e(t, 6, 6.6);
     const signHl = e(t, 11.6, 12.4);
     const cd = card(420, 130, 470, 'create operation', CREATE_OP, p(t, 6.4, 11.2), {
-      a: ca, fs: 13.5, lh: 21,
-      hl: { 8: [C.cobaltL, e(t, 8.6, 9.2)], 9: [C.amberL, signHl], 10: [C.amberL, signHl], 11: [C.amberL, signHl], 12: [C.amberL, signHl], 13: [C.amberL, signHl] }
+      a: ca, fs: 13.5, lh: 19,
+      hl: { 8: [C.cobaltL, e(t, 8.6, 9.2)], 9: [C.amberL, signHl], 10: [C.amberL, signHl], 11: [C.amberL, signHl], 12: [C.amberL, signHl], 13: [C.amberL, signHl], 14: [C.amberL, signHl], 15: [C.amberL, signHl], 16: [C.amberL, signHl] }
     });
     arrow(330, 526, 424, cd.ly(8) - 5, e(t, 8, 9), { c: C.cobalt, hs: 9 });
-    arrow(330, 446, 424, cd.ly(11) - 5, e(t, 11, 12), { c: C.amber, hs: 9 });
+    arrow(330, 446, 424, cd.ly(13) - 5, e(t, 11, 12), { c: C.amber, hs: 9 });
     T('sign', 360, 470, { f: MONO, s: 13, w: 500, c: C.amber, a: e(t, 11.4, 12) });
 
     // hash
@@ -671,10 +674,10 @@
     return { pts, edges, hop, par };
   })();
   const CHAINS = [
-    { n: 'Bitcoin', d: '~60 min', sp: 0 },
+    { n: 'Bitcoin', d: '~10 min', sp: 0 },
     { n: 'Zcash', d: '~75 s', sp: 12 },
-    { n: 'Ethereum', d: '~2–3 min', sp: 8 },
-    { n: 'Solana', d: 'seconds', sp: 30 }
+    { n: 'Ethereum', d: '~13 min, finalized', sp: 8 },
+    { n: 'Solana', d: '~13 s, finalized', sp: 30 }
   ];
   function s6(t) {
     heading(6, 'Registries and mediators', t);
@@ -748,19 +751,19 @@
     T('the whole batch', 1110, 580, { s: 14, w: 600, c: C.amber, al: 'center', a: e(t, 15, 15.6) });
 
     // ordinal
-    const fields = [['826005', 'block height'], ['42', 'tx index'], ['0', 'batch index'], ['3', 'op index']];
+    const fields = [['826005', 'block height'], ['42', 'position in block'], ['3', 'op index']];
     const oa = e(t, 18, 18.6);
-    T('(', 322, 624, { f: MONO, s: 40, c: C.faint, al: 'center', b: 'middle', a: oa });
-    T(')', 958, 624, { f: MONO, s: 40, c: C.faint, al: 'center', b: 'middle', a: oa });
+    T('(', 400, 624, { f: MONO, s: 40, c: C.faint, al: 'center', b: 'middle', a: oa });
+    T(')', 880, 624, { f: MONO, s: 40, c: C.faint, al: 'center', b: 'middle', a: oa });
     fields.forEach(([v, l], i) => {
-      const x = 408 + i * 155;
+      const x = 485 + i * 155;
       pop(x, 624, e(t, 18.4 + i * .45, 19 + i * .45), () => {
         cbox(x, 616, 130, 44, { fill: C.panel, stroke: C.ink, lw: 1.8, r: 8 });
         T(v, x, 617, { f: MONO, s: 20, w: 500, al: 'center', b: 'middle' });
         T(l, x, 660, { s: 13, c: C.soft, al: 'center' });
       });
     });
-    T('a strict order', 640, 700, { s: 15, w: 600, c: C.cobalt, al: 'center', a: e(t, 21, 21.6) });
+    T('a strict order within the chain', 640, 700, { s: 15, w: 600, c: C.cobalt, al: 'center', a: e(t, 21, 21.6) });
   }
 
   // ---------- scene 7: timestamps & time travel ----------
@@ -828,9 +831,9 @@
   const TILES = [
     ['Credentials', 'issue, reveal, revoke'],
     ['Groups', 'membership lists'],
-    ['Vaults', 'encrypted files, hidden members'],
+    ['Vaults', 'shared encrypted storage'],
     ['D-Mail', 'encrypted mail between DIDs'],
-    ['Polls', 'votes from verified DIDs'],
+    ['Polls', 'encrypted member ballots'],
     ['Schemas', 'JSON Schema for claims'],
     ['Files & images', 'content-addressed assets'],
     ['Lightning', 'payments to a DID']
@@ -869,14 +872,14 @@
       T('encrypted to Alice', 420, 452, { s: 14, c: C.soft, al: 'center', a: e(t, 3.6, 4.2) * (1 - e(t, 6, 6.6)) });
       // challenge
       arrow(1036, 250, 690, 250, e(t, 7, 8.6), { c: C.ink });
-      T('challenge · nonce 7f3a…', 862, 238, { f: MONO, s: 13, w: 500, al: 'center', a: e(t, 7.4, 8.2) });
+      T('challenge · which credentials?', 862, 238, { f: MONO, s: 13, w: 500, al: 'center', a: e(t, 7.4, 8.2) });
       // presentation
       const pp = e(t, 9.4, 11.4), pa = e(t, 9.2, 9.8);
       if (pa > 0) {
         const x = lerp(640, 1080, pp);
         pop(x, 390, pa, () => {
           cbox(x, 390, 190, 78, { fill: C.cobaltL, stroke: C.cobalt, lw: 1.8, r: 10 });
-          T('Presentation', x - 80, 378, { s: 15, w: 600 });
+          T('Response', x - 80, 378, { s: 15, w: 600 });
           keyIcon(x - 72, 406, 12, C.amber);
           T('signed · Alice', x - 52, 410, { f: MONO, s: 12, c: C.soft });
         });
@@ -970,17 +973,17 @@
     [70, 78, 'The result is a W3C DID document: public keys and metadata, plus didDocumentData for application data.'],
     [78, 84, 'Every change is a new signed operation that points back to the one before it through previd.'],
     [84, 90, 'Rotating keys is just another update. The current key signs the handover to the next one.'],
-    [90, 96, 'An operation signed with a retired key is rejected, because the node checks authority against the history.'],
-    [96, 102, 'When two valid updates compete, the network needs an agreed order. Registries provide it.'],
+    [90, 96, 'An update that builds on v3 but is signed with the retired key is rejected: authority comes from the version an update builds on.'],
+    [96, 102, 'Updates can still compete for the same version, even one signed by a key before it was retired. Every node has to keep the same one, and a blockchain registry settles it by the chain’s order.'],
     [102, 108, 'Each DID names its registry when it is created. Mediators connect the Gatekeeper to those networks.'],
-    [108, 114, 'Hyperswarm spreads operations between peers in seconds, for free.'],
+    [108, 114, 'Hyperswarm spreads operations between peers in seconds, for free. Competing updates there are settled by a fixed rule on their content hashes.'],
     [114, 121, 'Blockchain mediators batch many operations into a single transaction on Bitcoin, Zcash, Ethereum or Solana.'],
-    [121, 128, 'Block height, transaction, batch and operation index give every anchored update a strict position in order.'],
+    [121, 128, 'Block height, position in the block and operation index place every anchored update within its chain. In the rare tie, the content hash decides.'],
     [128, 134, 'Anchoring also gives each update a timestamp backed by the chain: after one block, before another.'],
     [134, 140, 'Because the whole history is kept, a DID can be resolved as it was at any past moment.'],
     [140, 146, 'So anyone can check which keys were valid when a document was signed.'],
     [146, 152, 'On top of DIDs, Keymaster issues verifiable credentials. An issuer signs a claim and encrypts it to the holder.'],
-    [152, 160, 'A verifier sends a challenge. The holder answers with a signed presentation, and the verifier resolves both DIDs to check it.'],
+    [152, 160, 'A verifier sends a challenge naming the credentials it needs. The holder answers with a signed response encrypted to the verifier, who resolves both DIDs to check it.'],
     [160, 168, 'Groups, vaults, encrypted mail, polls, schemas and files work the same way: each is an asset DID owned by an agent.'],
     [168, 174, 'An Archon node runs these pieces in Docker: Keymaster, Gatekeeper, IPFS and the mediators.'],
     [174, 180, 'Run a full node yourself, or point your wallet at someone else’s. Either way, your keys stay with you.']
