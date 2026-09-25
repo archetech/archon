@@ -1170,3 +1170,160 @@ describe('credential exchange over DIDComm', () => {
         await expect(keymaster.acceptCredentialDidComm({ body: {} })).resolves.toBe(false);
     });
 });
+
+describe('explicit DIDComm routing method references', () => {
+    test.each(['valid', 'missing', 'wrong-type'])('handles %s routing keys before handing off delivery', async state => {
+        useDidCommGateway();
+        await keymaster.createId('Alice');
+        const mediator = await keymaster.createId('Mediator');
+        const bob = await keymaster.createId('Bob');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://mediator.example/didcomm', 'Mediator');
+        const doc = await keymaster.resolveDID(mediator);
+        const ka = doc.didDocument!.keyAgreement![0] as string;
+        const validKid = ka.startsWith('#') ? `${mediator}${ka}` : ka;
+        const operationMethod = doc.didDocument!.verificationMethod![0].id!;
+        const wrongKid = operationMethod.startsWith('#') ? `${mediator}${operationMethod}` : operationMethod;
+        const routingKey = state === 'valid' ? validKid : state === 'missing' ? `${mediator}#absent` : wrongKid;
+        await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob', [routingKey]);
+        const fetcher = jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+            if (String(input).endsWith('/challenge')) return jsonResponse({ challenge: 'routing-challenge' });
+            if (String(input).endsWith('/deliver')) return jsonResponse({ ids: ['routed'] });
+            throw new Error(`unexpected fetch ${input}`);
+        });
+        const sending = keymaster.sendDidComm({ type: 'https://example.test/message', body: {} }, bob, { name: 'Alice' });
+        if (state === 'valid') {
+            await expect(sending).resolves.toEqual(['routed']);
+            expect(fetcher.mock.calls.some(([url]) => String(url).endsWith('/deliver'))).toBe(true);
+        } else {
+            await expect(sending).rejects.toThrow(state === 'missing' ? 'not found' : 'not an X25519 key');
+            expect(fetcher).not.toHaveBeenCalled();
+        }
+    });
+});
+
+test('failed endpoint discovery does not publish a partial DIDComm document', async () => {
+    const did = await keymaster.createId('Alice');
+    const before = (await keymaster.resolveDID(did)).didDocument;
+    (gatekeeper as any).getDidCommEndpoint = async () => { throw new Error('gateway unavailable'); };
+    await expect(keymaster.publishDidComm()).rejects.toThrow('gateway unavailable');
+    expect((await keymaster.resolveDID(did)).didDocument).toEqual(before);
+    // An explicit endpoint remains usable during discovery failure.
+    await expect(keymaster.publishDidComm('https://alice.example/didcomm')).resolves.toBe(true);
+});
+
+describe('DIDComm delivery failure boundaries', () => {
+    test.each(['json', 'text'])('reports local mailbox rejection (%s) without external delivery', async format => {
+        const base = useDidCommGateway();
+        const did = await keymaster.createId('Alice');
+        const endpoint = 'https://node.example/didcomm';
+        (gatekeeper as any).getDidCommEndpoint = async () => endpoint;
+        await keymaster.publishDidComm(endpoint);
+        const fetcher = jest.spyOn(globalThis, 'fetch').mockResolvedValue(format === 'json'
+            ? jsonResponse({ error: 'mailbox full' }, 507) : new Response('unavailable', { status: 503 }));
+        await expect(keymaster.sendDidComm({ body: {} }, did)).rejects.toThrow(
+            format === 'json' ? '507 (mailbox full)' : '503');
+        expect(fetcher).toHaveBeenCalledTimes(1);
+        expect(fetcher.mock.calls[0][0]).toBe(`${base}/api/v1/messages`);
+    });
+
+    test.each(['receive', 'mediate'] as const)('%s reports fetch rejection without acknowledging messages', async method => {
+        useDidCommGateway();
+        await keymaster.createId('Alice');
+        await keymaster.publishDidComm('https://alice.example/didcomm');
+        const fetcher = jest.spyOn(globalThis, 'fetch').mockImplementation(async input =>
+            String(input).endsWith('/challenge') ? jsonResponse({ challenge: 'fetch-challenge' }) : jsonResponse({}, 503));
+        const result = method === 'receive' ? keymaster.receiveDidComm() : keymaster.mediateDidComm();
+        await expect(result).rejects.toThrow('fetch failed: 503');
+        expect(fetcher.mock.calls.map(([url]) => String(url).split('/').pop())).toEqual(['challenge', 'fetch']);
+    });
+
+    test('reports a rejected gateway challenge before fetching the mailbox', async () => {
+        useDidCommGateway();
+        await keymaster.createId('Alice');
+        const fetcher = jest.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({}, 429));
+        await expect(keymaster.receiveDidComm()).rejects.toThrow('gateway challenge request returned 429');
+        expect(fetcher).toHaveBeenCalledTimes(1);
+    });
+
+    test('a published key without a messaging endpoint cannot receive deliveries', async () => {
+        useDidCommGateway();
+        const did = await keymaster.createId('Alice');
+        await keymaster.publishDidComm();
+        const fetcher = jest.spyOn(globalThis, 'fetch');
+        await expect(keymaster.sendDidComm({ body: {} }, did)).rejects.toThrow('has no DIDCommMessaging endpoint');
+        expect(fetcher).not.toHaveBeenCalled();
+    });
+
+    test('failed endpoint discovery falls back to authenticated gateway delivery', async () => {
+        const base = useDidCommGateway();
+        const did = await keymaster.createId('Alice');
+        await keymaster.publishDidComm('https://alice.example/didcomm');
+        const discover = jest.fn<() => Promise<string>>().mockRejectedValue(new Error('discovery offline'));
+        (gatekeeper as any).getDidCommEndpoint = discover;
+        const fetcher = jest.spyOn(globalThis, 'fetch').mockImplementation(async input =>
+            String(input).endsWith('/challenge') ? jsonResponse({ challenge: 'deliver-challenge' }) : jsonResponse({ ids: ['sent'] }));
+        await expect(keymaster.sendDidComm({ body: {} }, did)).resolves.toEqual(['sent']);
+        await expect(keymaster.sendDidComm({ body: {} }, did)).resolves.toEqual(['sent']);
+        expect(discover).toHaveBeenCalledTimes(1);
+        expect(fetcher.mock.calls.filter(([url]) => url === `${base}/api/v1/deliver`)).toHaveLength(2);
+    });
+
+    test('unpublishing DIDComm preserves unrelated services and signing authority', async () => {
+        const did = await keymaster.createId('Alice');
+        await keymaster.publishDidComm('https://alice.example/didcomm');
+        const document = (await keymaster.resolveDID(did)).didDocument!;
+        const other = { id: `${did}#other`, type: 'Example', serviceEndpoint: 'https://alice.example' };
+        document.service!.push(other);
+        await keymaster.updateDID(did, { didDocument: document });
+        await keymaster.unpublishDidComm();
+        const result = (await keymaster.resolveDID(did)).didDocument!;
+        expect(result.service).toEqual([other]);
+        expect(result.keyAgreement).toBeUndefined();
+        expect(result.verificationMethod).toHaveLength(1);
+        await expect(keymaster.addProof({ hello: 'world' })).resolves.toHaveProperty('proof');
+    });
+});
+
+test.each(['missing', 'signing-key'])('rejects a recipient keyAgreement referencing %s', async state => {
+    const did = await keymaster.createId('Alice');
+    const document = (await keymaster.resolveDID(did)).didDocument!;
+    document.keyAgreement = [state === 'missing' ? '#absent' : document.verificationMethod![0].id!];
+    await keymaster.updateDID(did, { didDocument: document });
+    await expect(keymaster.packDidComm({ body: {} }, did)).rejects.toThrow(
+        state === 'missing' ? 'verification method not found' : 'not an X25519 key');
+});
+
+test('a mediator retains a valid Forward when the destination rejects it, then acknowledges a successful retry', async () => {
+    useDidCommGateway();
+    await keymaster.createId('Alice');
+    const mediator = await keymaster.createId('Mediator');
+    const bob = await keymaster.createId('Bob');
+    await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+    await keymaster.publishDidComm('https://mediator.example/didcomm', 'Mediator');
+    await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob', [mediator]);
+    let forward: string;
+    const fetcher = jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+        if (String(input).endsWith('/challenge')) return jsonResponse({ challenge: 'forward-challenge' });
+        forward = JSON.parse(String(init?.body)).message;
+        return jsonResponse({ ids: ['forward'] });
+    });
+    await keymaster.sendDidComm({ body: { text: 'retry me' } }, bob, { name: 'Alice' });
+    let accepts = false;
+    fetcher.mockClear().mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url.endsWith('/challenge')) return jsonResponse({ challenge: 'mediate-challenge' });
+        if (url.endsWith('/fetch')) return jsonResponse({ messages: [{ id: 'forward', message: forward }] });
+        if (url.endsWith('/messages')) return jsonResponse({}, accepts ? 200 : 503);
+        if (url.endsWith('/remove')) {
+            expect(JSON.parse(String(init?.body)).ids).toEqual(['forward']);
+            return jsonResponse({});
+        }
+        throw new Error(`unexpected fetch ${url}`);
+    });
+    await expect(keymaster.mediateDidComm({ name: 'Mediator' })).resolves.toEqual({ relayed: 0, skipped: 1 });
+    expect(fetcher.mock.calls.some(([url]) => String(url).endsWith('/remove'))).toBe(false);
+    accepts = true;
+    await expect(keymaster.mediateDidComm({ name: 'Mediator' })).resolves.toEqual({ relayed: 1, skipped: 0 });
+    expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/remove'))).toHaveLength(1);
+});

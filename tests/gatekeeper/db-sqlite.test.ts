@@ -1,3 +1,4 @@
+import { DatabaseSync } from 'node:sqlite';
 import { mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -421,5 +422,48 @@ describe('DbSqlite concurrency', () => {
 
             await expect(db.getQueue('local')).resolves.toHaveLength(10);
         });
+    });
+});
+
+
+describe('SQLite rollback and recovery', () => {
+    it('rolls back every reset table when a real SQLite trigger rejects deletion, then accepts later writes', async () => {
+        const dir = await mkdtemp(join(tmpdir(), 'gk-rollback-'));
+        const db = new DbSqlite('rollback', dir);
+        let observer: DatabaseSync | undefined;
+        try {
+            await db.start();
+            await db.addEvent(DID, event('op1'));
+            await db.setCandidates(DID, [event('op1')]);
+            await db.queueOperation('local', operation('queued'));
+            await db.addBlock('local', block(1, 'block1'));
+            observer = new DatabaseSync(join(dir, 'rollback.db'));
+            observer.exec(`CREATE TRIGGER prevent_block_delete BEFORE DELETE ON blocks
+                BEGIN SELECT RAISE(ABORT, 'injected block deletion failure'); END`);
+            await expect(db.resetDb()).rejects.toThrow('injected block deletion failure');
+            // dids and queue were deleted before the failing statement. Their
+            // continued presence proves rollback, not merely error propagation.
+            expect(await db.getEvents(DID)).toHaveLength(1);
+            expect(await db.getQueue('local')).toHaveLength(1);
+            expect(await db.getBlock('local')).toMatchObject({ hash: 'block1' });
+            expect(await db.getOperation('op1')).toEqual(operation('op1'));
+            expect(await db.getCandidates()).toEqual({ [DID]: [event('op1')] });
+            await db.stop();
+            await db.start();
+            expect(await db.getEvents(DID)).toHaveLength(1);
+            expect(await db.getQueue('local')).toHaveLength(1);
+            observer.exec('DROP TRIGGER prevent_block_delete');
+            await db.resetDb();
+            expect(await db.getAllKeys()).toEqual([]);
+            expect(await db.getQueue('local')).toEqual([]);
+            expect(await db.getCandidates()).toEqual({});
+            expect(await db.getOperation('op1')).toBeNull();
+            await db.addEvent(DID, event('op2'));
+            expect((await db.getEvents(DID)).map(e => e.opid)).toEqual(['op2']);
+        } finally {
+            observer?.close();
+            await db.stop();
+            await rm(dir, { recursive: true, force: true });
+        }
     });
 });

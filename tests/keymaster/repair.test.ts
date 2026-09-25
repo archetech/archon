@@ -206,3 +206,40 @@ test.each(['deactivated', 'unsupported-operation-key', 'uncontrolled'])(
         await expect(keymaster.repairDID(asset)).rejects.toThrow('Controller repair unavailable');
     },
 );
+
+test('cannot repair after a valid signed update moves authority to a key absent from the wallet', async () => {
+    const did = await damagedAgent();
+    // Another wallet supplies a valid public key; Alice authorizes the update
+    // with her predecessor key, but does not possess the replacement secret.
+    const other = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'other' });
+    await other.loadOrCreateWallet();
+    const otherDid = await other.createId('Other', { registry: 'local' });
+    const replacement = (await other.resolveDID(otherDid)).didDocument!.verificationMethod![0].publicKeyJwk;
+    const document = (await keymaster.resolveDID(did)).didDocument!;
+    document.verificationMethod![0].publicKeyJwk = replacement;
+    await keymaster.updateDID(did, { didDocument: document });
+    const before = await keymaster.resolveDID(did);
+    expect(await keymaster.checkDID(did)).toMatchObject({ canRepair: false, changes: null });
+    await expect(keymaster.repairDID(did)).rejects.toThrow(/key|wallet/);
+    expect(await keymaster.resolveDID(did)).toMatchObject({
+        didDocument: before.didDocument, didDocumentMetadata: before.didDocumentMetadata,
+    });
+});
+
+test('a rejected repair submission is reported as failure and leaves the document unchanged', async () => {
+    const did = await damagedAgent();
+    const before = await keymaster.resolveDID(did);
+    const update = gatekeeper.updateDID.bind(gatekeeper);
+    // Exercise the public transport's negative acknowledgment, not a new
+    // protocol acceptance rule.
+    gatekeeper.updateDID = async () => false;
+    try {
+        await expect(keymaster.repairDID(did)).rejects.toThrow('DID repair was not accepted');
+        expect(await keymaster.resolveDID(did)).toMatchObject({
+            didDocument: before.didDocument, didDocumentMetadata: before.didDocumentMetadata,
+        });
+    } finally {
+        gatekeeper.updateDID = update;
+    }
+    expect((await keymaster.repairDID(did)).submitted).toBe(true);
+});

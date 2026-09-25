@@ -146,7 +146,12 @@ on first startup and persisted at
 `${ARCHON_HERALD_DATA_DIR}/oauth-signing-key.json` (as a JSON-encoded
 private JWK with `kid`). `kid` defaults to
 `archon-social-signing-key-1`. Implementations MUST persist the key —
-rotating it invalidates all outstanding sessions.
+replacing it prevents verification of earlier ID tokens against the new JWKS.
+Reload the private JWK with `extractable: true` so the public JWKS can be
+rebuilt; a non-extractable import fails at export and triggers key replacement.
+Test a fresh OAuth instance against the persisted key and verify an earlier
+ID token, rather than checking only that a key file exists. Opaque access
+tokens and authorization codes remain in memory and do not survive restart.
 
 ### 2.9 Admin (owner-only)
 
@@ -490,8 +495,8 @@ A conformant third implementation MUST:
   `bindCredential`/`issueCredential`/`updateCredential`/`revokeCredential`.
 - Persist user records via the `DatabaseInterface` shape in
   [§6](#6-storage-backends), with atomic `findDidByName`.
-- Persist the OAuth ES256 signing key on disk; rotation invalidates
-  all outstanding tokens.
+- Persist and reload the OAuth ES256 signing key; keep the public JWKS
+  stable across restarts so earlier ID tokens remain verifiable.
 - Refuse to start when `ARCHON_HERALD_SESSION_SECRET` is empty or a
   known placeholder (`change-me`, `change-me-to-a-random-string`).
 - Ensure the service identity exists in Keymaster on startup

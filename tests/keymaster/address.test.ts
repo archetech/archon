@@ -632,3 +632,79 @@ describe('publishAddress', () => {
         ]);
     });
 });
+
+describe('address challenge transport failures', () => {
+    it('does not change wallet addresses when both challenge endpoints fail', async () => {
+        await keymaster.createId('Alice');
+        const before = await keymaster.listAddresses();
+        const fetcher = jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network unavailable'));
+        await expect(keymaster.addAddress('alice@archon.social')).rejects.toThrow('Failed to fetch address challenge');
+        expect(fetcher).toHaveBeenCalledTimes(2);
+        expect(await keymaster.listAddresses()).toEqual(before);
+    });
+
+    it('recovers from a failed proxy challenge through the direct Herald endpoint', async () => {
+        await keymaster.createId('Alice');
+        jest.spyOn(keymaster, 'createResponse').mockResolvedValue('did:cid:response');
+        const fetcher = jest.spyOn(globalThis, 'fetch')
+            .mockRejectedValueOnce(new Error('proxy down'))
+            .mockResolvedValueOnce(mockFetchResponse(true, { challenge: 'did:cid:challenge' }))
+            .mockResolvedValueOnce(mockFetchResponse(true, { ok: true }))
+            .mockResolvedValue(mockFetchResponse(false, {}, 404));
+        await expect(keymaster.addAddress('alice@archon.social')).resolves.toBe(true);
+        expect(fetcher.mock.calls[1][0]).toBe('https://archon.social/api/challenge');
+        expect(await keymaster.listAddresses()).toHaveProperty(['alice@archon.social']);
+    });
+});
+
+describe('address failure and publication boundaries', () => {
+    test.each(['', '   ', 'alice', '@example.com', 'alice@', 'a@b@c'])(
+        'rejects malformed address %j before transport', async address => {
+            const fetcher = jest.spyOn(globalThis, 'fetch');
+            await expect(keymaster.checkAddress(address)).rejects.toThrow('address');
+            expect(fetcher).not.toHaveBeenCalled();
+        });
+
+    test.each(['network', 'message', 'invalid-json'])(
+        'a failed authenticated claim (%s) does not save an address', async failure => {
+            await keymaster.createId('Alice');
+            jest.spyOn(keymaster, 'createResponse').mockResolvedValue('did:cid:response');
+            const fetcher = jest.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+                if (init?.method !== 'PUT') return mockFetchResponse(true, { challenge: 'did:cid:challenge' });
+                if (failure === 'network') throw new Error('offline');
+                if (failure === 'message') return mockFetchResponse(false, { message: 'name rejected' }, 409);
+                return new Response('upstream failed', { status: 502 });
+            });
+            await expect(keymaster.addAddress('alice@example.com')).rejects.toThrow(
+                failure === 'message' ? 'name rejected' : 'Failed to add address');
+            expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(2);
+            expect(await keymaster.listAddresses()).toEqual({});
+        });
+
+    test('reports a server error and treats a successful response without a DID as unsupported', async () => {
+        const fetcher = jest.spyOn(globalThis, 'fetch').mockResolvedValue(mockFetchResponse(false, { message: 'try later' }, 503));
+        await expect(keymaster.checkAddress('alice@example.com')).rejects.toThrow('try later');
+        fetcher.mockResolvedValue(mockFetchResponse(true, { unexpected: true }));
+        expect(await keymaster.checkAddress('alice@example.com')).toMatchObject({ status: 'unsupported', available: false });
+    });
+
+    test('implicit publication requires exactly one stored address and publishes no email service without a relay', async () => {
+        const did = await keymaster.createId('Alice');
+        const before = (await keymaster.resolveDID(did)).didDocument;
+        await expect(keymaster.publishAddress()).rejects.toThrow('address');
+        const data = await keymaster.loadWallet();
+        data.ids.Alice.addresses = {
+            'example.com': { name: 'alice', added: new Date().toISOString() },
+            'other.example': { name: 'alice', added: new Date().toISOString() },
+        };
+        await keymaster.saveWallet(data, true);
+        await expect(keymaster.publishAddress()).rejects.toThrow('address');
+        expect((await keymaster.resolveDID(did)).didDocument).toEqual(before);
+        delete data.ids.Alice.addresses['other.example'];
+        await keymaster.saveWallet(data, true);
+        await expect(keymaster.publishAddress()).resolves.toBe(true);
+        const published = await keymaster.resolveDID(did);
+        expect(published.didDocumentData).toMatchObject({ address: 'alice@example.com' });
+        expect(published.didDocument!.service).toBeUndefined();
+    });
+});
