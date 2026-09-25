@@ -1170,3 +1170,44 @@ describe('credential exchange over DIDComm', () => {
         await expect(keymaster.acceptCredentialDidComm({ body: {} })).resolves.toBe(false);
     });
 });
+
+describe('explicit DIDComm routing method references', () => {
+    test.each(['valid', 'missing', 'wrong-type'])('handles %s routing keys before handing off delivery', async state => {
+        useDidCommGateway();
+        await keymaster.createId('Alice');
+        const mediator = await keymaster.createId('Mediator');
+        const bob = await keymaster.createId('Bob');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        await keymaster.publishDidComm('https://mediator.example/didcomm', 'Mediator');
+        const doc = await keymaster.resolveDID(mediator);
+        const ka = doc.didDocument!.keyAgreement![0] as string;
+        const validKid = ka.startsWith('#') ? `${mediator}${ka}` : ka;
+        const operationMethod = doc.didDocument!.verificationMethod![0].id!;
+        const wrongKid = operationMethod.startsWith('#') ? `${mediator}${operationMethod}` : operationMethod;
+        const routingKey = state === 'valid' ? validKid : state === 'missing' ? `${mediator}#absent` : wrongKid;
+        await keymaster.publishDidComm('https://bob.example/didcomm', 'Bob', [routingKey]);
+        const fetcher = jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+            if (String(input).endsWith('/challenge')) return jsonResponse({ challenge: 'routing-challenge' });
+            if (String(input).endsWith('/deliver')) return jsonResponse({ ids: ['routed'] });
+            throw new Error(`unexpected fetch ${input}`);
+        });
+        const sending = keymaster.sendDidComm({ type: 'https://example.test/message', body: {} }, bob, { name: 'Alice' });
+        if (state === 'valid') {
+            await expect(sending).resolves.toEqual(['routed']);
+            expect(fetcher.mock.calls.some(([url]) => String(url).endsWith('/deliver'))).toBe(true);
+        } else {
+            await expect(sending).rejects.toThrow(state === 'missing' ? 'not found' : 'not an X25519 key');
+            expect(fetcher).not.toHaveBeenCalled();
+        }
+    });
+});
+
+test('failed endpoint discovery does not publish a partial DIDComm document', async () => {
+    const did = await keymaster.createId('Alice');
+    const before = (await keymaster.resolveDID(did)).didDocument;
+    (gatekeeper as any).getDidCommEndpoint = async () => { throw new Error('gateway unavailable'); };
+    await expect(keymaster.publishDidComm()).rejects.toThrow('gateway unavailable');
+    expect((await keymaster.resolveDID(did)).didDocument).toEqual(before);
+    // An explicit endpoint remains usable during discovery failure.
+    await expect(keymaster.publishDidComm('https://alice.example/didcomm')).resolves.toBe(true);
+});

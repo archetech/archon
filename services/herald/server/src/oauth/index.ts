@@ -22,7 +22,8 @@ async function loadPersistedJWTKey(): Promise<boolean> {
     try {
         const raw = await readFile(JWT_KEY_PATH, 'utf8');
         const persisted = JSON.parse(raw) as PersistedJwtKey;
-        jwtSigningKey = await importJWK(persisted.privateJwk, 'ES256') as CryptoKey;
+        // Reloaded keys must remain exportable so the public JWKS can be rebuilt.
+        jwtSigningKey = await importJWK(persisted.privateJwk, 'ES256', { extractable: true }) as CryptoKey;
         jwtPublicJWK = await exportJWK(jwtSigningKey);
         delete jwtPublicJWK.d;
         delete jwtPublicJWK.key_ops;

@@ -632,3 +632,27 @@ describe('publishAddress', () => {
         ]);
     });
 });
+
+describe('address challenge transport failures', () => {
+    it('does not change wallet addresses when both challenge endpoints fail', async () => {
+        await keymaster.createId('Alice');
+        const before = await keymaster.listAddresses();
+        const fetcher = jest.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network unavailable'));
+        await expect(keymaster.addAddress('alice@archon.social')).rejects.toThrow('Failed to fetch address challenge');
+        expect(fetcher).toHaveBeenCalledTimes(2);
+        expect(await keymaster.listAddresses()).toEqual(before);
+    });
+
+    it('recovers from a failed proxy challenge through the direct Herald endpoint', async () => {
+        await keymaster.createId('Alice');
+        jest.spyOn(keymaster, 'createResponse').mockResolvedValue('did:cid:response');
+        const fetcher = jest.spyOn(globalThis, 'fetch')
+            .mockRejectedValueOnce(new Error('proxy down'))
+            .mockResolvedValueOnce(mockFetchResponse(true, { challenge: 'did:cid:challenge' }))
+            .mockResolvedValueOnce(mockFetchResponse(true, { ok: true }))
+            .mockResolvedValue(mockFetchResponse(false, {}, 404));
+        await expect(keymaster.addAddress('alice@archon.social')).resolves.toBe(true);
+        expect(fetcher.mock.calls[1][0]).toBe('https://archon.social/api/challenge');
+        expect(await keymaster.listAddresses()).toHaveProperty(['alice@archon.social']);
+    });
+});
