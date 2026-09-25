@@ -254,8 +254,9 @@ is not a readiness signal.
 
 For the Core backend, a runtime RPC error `-18` marks setup status as zero,
 blocks address publication, and starts the same 30-second setup retry loop.
-Detection comes from failed wallet requests or the existing 60-second metrics
-poll; no separate watchdog is used. Concurrent detections and manual setup
+Detection comes from failed wallet requests (including `/wallet/info`, which
+propagates this RPC error instead of returning a 200 status report) or the
+existing 60-second metrics poll; no separate watchdog is used. Concurrent detections and manual setup
 share a single in-flight setup attempt. Successful setup revalidates the
 configured mnemonic against the wallet descriptors, restores readiness, and
 stops retries. Descriptor mismatch and missing SQLite support stop automatic

@@ -99,7 +99,12 @@ test('running wallet recovers from Core unloads via requests and metrics, preser
         try { return (await api('balance')).status === 200; } catch { return false; }
     }, 10_000);
     assert.equal(loads, 1);
+    assert.equal((await (await api('info')).json()).ready, true);
     loaded = false;
+    // Info alone must trigger recovery, before balance/UTXO requests or the
+    // next metrics tick can mask a swallowed RPC error.
+    assert.equal((await api('info')).status, 503);
+    assert.equal((await api('address')).status, 503);
     const failed = await Promise.all([api('balance'), api('balance'), api('utxos')]);
     assert.deepEqual(failed.map(r => r.status), [503, 503, 503]);
     assert.equal((await api('address')).status, 503);
@@ -109,6 +114,9 @@ test('running wallet recovers from Core unloads via requests and metrics, preser
 
     rpcFailure = { code: -6, message: 'ordinary RPC failure' };
     assert.equal((await api('balance')).status, 500);
+    const unavailable = await api('info');
+    assert.equal(unavailable.status, 200);
+    assert.equal((await unavailable.json()).ready, false);
     rpcFailure = undefined;
     loaded = false;
     // No wallet API requests: the existing 60-second collector must detect it.
