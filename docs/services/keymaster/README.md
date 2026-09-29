@@ -1019,8 +1019,8 @@ poll asset data. Everything lives in the vault's items:
 
 - **Voters** are the vault's members: `addPollVoter` / `removePollVoter` /
   `listPollVoters` are `addVaultMember` / `removeVaultMember` /
-  `listVaultMembers`. The owner may always vote and counts as an eligible
-  voter.
+  `listVaultMembers`. The owner cannot be a vault member, but may always
+  vote and counts as an eligible voter.
 - **Ballots.** `votePoll` checks eligibility (the caller is the owner or can
   decrypt the vault), the deadline, and that `vote` is an integer from `0`
   (spoil) to the number of options. It returns the DID of an encrypted asset
@@ -1059,7 +1059,7 @@ PollResults = {
 | `GET /api/v1/polls/:poll` | `{ "poll": PollConfig }`. |
 | `GET /api/v1/polls/:poll/test` | `{ "test": boolean }`. |
 | `GET /api/v1/polls/:poll/view` | `{ "poll": ViewPollResult }`. |
-| `POST /api/v1/polls/:poll/send` | Notifies every voter of the poll. `{ "did": string }` (the notice). |
+| `POST /api/v1/polls/:poll/send` | Notifies the vault members (not the owner) of the poll. `{ "did": string }` (the notice). |
 | `POST /api/v1/polls/:poll/vote` | `{ "vote": int, "options"?: { "registry"?, "validUntil"? } }` → `{ "did": string }` (the ballot). |
 | `POST /api/v1/polls/ballot/send` | `{ "ballot": string, "poll": string }` → `{ "did": string }` (the notice). |
 | `GET /api/v1/polls/ballot/:did` | `{ "ballot": ViewBallotResult }`. |
