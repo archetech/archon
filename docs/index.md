@@ -9,6 +9,7 @@ Archon is a decentralized identity protocol implementing the W3C-compliant `did:
 - [Sidetree and Archon Comparison](sidetree-archon-comparison.md) — deep dive on Archon's Sidetree lineage and design differences
 - [DIDComm Messaging Support](didcomm-design.md) — design doc for adding standards-based DIDComm v2 messaging
 - [Messages Between DIDs](presentations/didcomm.html) — three-minute animated walkthrough of DIDComm in Archon: keys, envelopes, delivery through the relay and Tor, mediators, and protocols
+- [A Name for Your DID](presentations/names.html) — three-minute animated walkthrough of Archon addresses: claiming name@domain, resolving and publishing it, Herald's public pages, and using addresses for Lightning and email
 - [did:cid Technical Presentation](presentations/did-cid-technical-presentation.md) — slide outline, speaker notes, and prep checklist
 - [Gatekeeper Resolution Infographic](presentations/gatekeeper-resolution-infographic.md) — visual brief for operation import and DID document replay
 - [How Archon Works](presentations/how-archon-works.html) — three-minute animated walkthrough of DID creation, resolution, updates, and registries
