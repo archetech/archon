@@ -11,6 +11,7 @@ Archon is a decentralized identity protocol implementing the W3C-compliant `did:
 - [Messages Between DIDs](presentations/didcomm.html) — three-minute animated walkthrough of DIDComm in Archon: keys, envelopes, delivery through the relay and Tor, mediators, and protocols
 - [did:cid Technical Presentation](presentations/did-cid-technical-presentation.md) — slide outline, speaker notes, and prep checklist
 - [Gatekeeper Resolution Infographic](presentations/gatekeeper-resolution-infographic.md) — visual brief for operation import and DID document replay
+- [Shared, Sealed, Counted](presentations/assets.html) — three-minute animated walkthrough of groups, vaults and polls: nested membership, per-member vault keys, sealed ballots, and who can see what
 - [How Archon Works](presentations/how-archon-works.html) — three-minute animated walkthrough of DID creation, resolution, updates, and registries
 - [Proving What You Hold](presentations/credential-verification.html) — three-minute animated walkthrough of credential issuance, presentation, the five verification checks, request pairing, and verifying as of a past time
 - [One History, Everywhere](presentations/convergence.html) — three-minute animated walkthrough of how nodes converge on DID history: replay, forks, chain anchors, late evidence, and reorganizations

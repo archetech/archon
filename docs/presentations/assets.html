@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shared, Sealed, Counted</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #e8ecf1;
+    --panel: #f6f8fb;
+    --ink: #141d2b;
+    --soft: #5b6879;
+    --line: #c6cfdb;
+    --cobalt: #2a4fc4;
+    --amber: #c97a12;
+    --bar: #141d2b;
+    --bar-text: #e8ecf1;
+    --bar-soft: #9aa6b8;
+  }
+  html, body { background: var(--paper); color: var(--ink); }
+  body { margin: 0; font: 15px/1.55 "IBM Plex Sans", system-ui, sans-serif; padding-inline: 16px; padding-block: 28px 48px; }
+  .wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+  header h1 { font: 800 clamp(30px, 5vw, 46px)/1.05 "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif; margin: 0; letter-spacing: -0.5px; text-wrap: balance; }
+  header p { margin: 8px 0 0; color: var(--soft); max-width: 62ch; }
+  header .eyebrow { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 1.5px; text-transform: uppercase; color: var(--cobalt); margin: 0 0 8px; }
+
+  .player { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--bar); box-shadow: 0 18px 50px -24px rgba(20, 29, 43, .45); outline: none; }
+  .player:focus-visible { box-shadow: 0 0 0 3px var(--cobalt); }
+  .player:fullscreen { display: flex; flex-direction: column; justify-content: center; border-radius: 0; }
+  .player:fullscreen .stage { max-height: calc(100vh - 120px); aspect-ratio: 16 / 9; margin: 0 auto; width: min(100%, calc((100vh - 120px) * 16 / 9)); }
+  .stage { position: relative; aspect-ratio: 16 / 9; max-width: 100%; background: var(--paper); }
+  canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+  .bigplay { position: absolute; inset: 0; margin: auto; width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--ink); color: var(--paper); display: grid; place-items: center; cursor: pointer; box-shadow: 0 10px 30px -8px rgba(20, 29, 43, .6); }
+  .bigplay[hidden] { display: none; }
+  .bigplay svg { width: 30px; height: 30px; margin-left: 4px; }
+  .bigplay:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 3px; }
+
+  .caption { min-height: 3.4em; padding: 12px 20px; color: var(--bar-text); font-size: clamp(14px, 1.9vw, 18px); line-height: 1.45; display: flex; align-items: center; justify-content: center; text-align: center; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+  .caption span { max-width: 70ch; transition: opacity .25s; }
+
+  .controls { display: flex; align-items: center; gap: 14px; padding: 10px 16px 14px; color: var(--bar-text); }
+  .controls button { background: none; border: 0; color: inherit; width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; flex: none; }
+  .controls button:hover { background: rgba(255, 255, 255, .08); }
+  .controls button:focus-visible { outline: 2px solid #8ea6ff; }
+  .controls svg { width: 20px; height: 20px; }
+  .time { font: 500 13px "IBM Plex Mono", ui-monospace, monospace; color: var(--bar-soft); font-variant-numeric: tabular-nums; flex: none; }
+  .seek { position: relative; flex: 1; min-width: 0; height: 36px; display: flex; align-items: center; }
+  .seek input { width: 100%; margin: 0; appearance: none; -webkit-appearance: none; background: transparent; height: 36px; cursor: pointer; position: relative; z-index: 2; }
+  .seek input::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; margin-top: -5px; border: 0; }
+  .seek input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 0; }
+  .seek input:focus-visible { outline: 2px solid #8ea6ff; border-radius: 4px; }
+  .ticks { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+  .ticks i { position: absolute; top: 15px; width: 2px; height: 6px; background: var(--bar); }
+
+  .chapters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .chapters button { width: 100%; text-align: left; display: flex; gap: 10px; align-items: baseline; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
+  .chapters button:hover { border-color: var(--cobalt); }
+  .chapters button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  .chapters button[aria-current="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .chapters .n { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--cobalt); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .n { color: #8ea6ff; }
+  .chapters .t { font-weight: 600; flex: 1; }
+  .chapters .d { font: 400 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--soft); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .d { color: var(--bar-soft); }
+
+  details { border-top: 1px solid var(--line); padding-top: 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .transcript { max-width: 70ch; }
+  .transcript h3 { font: 700 17px "Bricolage Grotesque", system-ui, sans-serif; margin: 18px 0 4px; }
+  .transcript p { margin: 0 0 6px; color: var(--soft); }
+
+  @media (max-width: 560px) {
+    .controls { gap: 8px; padding-inline: 10px; }
+    .time { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">did:cid · assets · three minutes</p>
+    <h1>Shared, sealed, counted</h1>
+    <p>An animated walkthrough of groups, vaults and polls in Archon: assets owned by agents, nested group membership, vaults whose key is wrapped for each member, polls whose ballots are sealed for the owner, and who can see what. Everything on screen is drawn live with canvas code.</p>
+  </header>
+
+  <div class="player" id="player" tabindex="0" aria-label="Animation player. Space plays or pauses, arrow keys skip.">
+    <div class="stage">
+      <canvas id="cv" role="img" aria-label="Animated diagram of Archon groups, vaults and polls. The caption below describes each scene."></canvas>
+      <button class="bigplay" id="bigplay" aria-label="Play animation" hidden>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+      </button>
+    </div>
+    <div class="caption"><span id="cap"></span></div>
+    <div class="controls">
+      <button id="pp" aria-label="Play"></button>
+      <div class="seek">
+        <input type="range" id="seek" min="0" max="160" step="0.05" value="0" aria-label="Seek">
+        <div class="ticks" id="ticks"></div>
+      </div>
+      <span class="time" id="time">0:00 / 2:40</span>
+      <button id="fs" aria-label="Full screen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <ol class="chapters" id="chapters"></ol>
+
+  <details>
+    <summary>Transcript</summary>
+    <div class="transcript" id="transcript"></div>
+  </details>
+</div>
+
+<script>
+(() => {
+  // ---------- palette & type ----------
+  const W = 1280, H = 720, TOTAL = 160;
+  const C = {
+    paper: '#e8ecf1', grid: '#dbe1e9', gridB: '#c6cfdb', panel: '#f6f8fb',
+    ink: '#141d2b', soft: '#5b6879', faint: '#8c98a8',
+    cobalt: '#2a4fc4', cobaltL: '#dde5fb',
+    amber: '#c97a12', amberL: '#fbecd3',
+    green: '#23835a', greenL: '#d6eee2',
+    red: '#c03b28', redL: '#f8dcd6'
+  };
+  const DISP = '"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif';
+  const SANS = '"IBM Plex Sans", system-ui, sans-serif';
+  const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
+
+  // ---------- math ----------
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const p = (t, a, b) => clamp((t - a) / (b - a));
+  const e = (t, a, b) => ease(p(t, a, b));
+  const rnd = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+  const hx = c => { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  const mix = (a, b, t) => { const A = hx(a), B = hx(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], clamp(t)))).join(',')})`; };
+  const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
+  const scram = (s, pr, t, seed) => {
+    const k = Math.floor(pr * s.length); let out = '';
+    for (let i = 0; i < s.length; i++) out += i < k ? s[i] : B32[Math.floor(rnd(seed * 97 + i * 13 + Math.floor(t * 18)) * 32)];
+    return out;
+  };
+
+  // ---------- canvas ----------
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  let scale = 1;
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    const d = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.max(1, Math.round(r.width * d));
+    cv.height = Math.max(1, Math.round(r.width * 9 / 16 * d));
+    scale = cv.width / W;
+    render();
+  }
+
+  // ---------- drawing primitives ----------
+  function T(s, x, y, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.font = `${o.w || 400} ${o.s || 16}px ${o.f || SANS}`;
+    ctx.fillStyle = o.c || C.ink; ctx.textAlign = o.al || 'left'; ctx.textBaseline = o.b || 'alphabetic';
+    if (o.ls) ctx.letterSpacing = o.ls + 'px';
+    ctx.fillText(s, x, y); ctx.restore();
+  }
+  function tw(s, size, font = SANS, weight = 400) { ctx.save(); ctx.font = `${weight} ${size}px ${font}`; const w = ctx.measureText(s).width; ctx.restore(); return w; }
+  function box(x, y, w, h, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, o.r ?? 10);
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 1.5; if (o.dash) ctx.setLineDash(o.dash); ctx.stroke(); }
+    ctx.restore();
+  }
+  const cbox = (cx, cy, w, h, o) => box(cx - w / 2, cy - h / 2, w, h, o);
+  function pop(cx, cy, pr, fn) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.globalAlpha *= pr;
+    const s = lerp(.88, 1, pr);
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+    fn(); ctx.restore();
+  }
+  function arrowHead(x, y, a, c, s) {
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.lineTo(x - s * Math.cos(a - .45), y - s * Math.sin(a - .45));
+    ctx.lineTo(x - s * Math.cos(a + .45), y - s * Math.sin(a + .45));
+    ctx.closePath(); ctx.fillStyle = c; ctx.fill();
+  }
+  function arrow(x1, y1, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, x = lerp(x1, x2, pr), y = lerp(y1, y2, pr);
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(x, y, Math.atan2(y2 - y1, x2 - x1), c, o.hs || 10);
+    ctx.restore();
+  }
+  const qpt = (x1, y1, cx, cy, x2, y2, t) => { const u = 1 - t; return [u * u * x1 + 2 * u * t * cx + t * t * x2, u * u * y1 + 2 * u * t * cy + t * t * y2]; };
+  function qarrow(x1, y1, cx, cy, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, N = 36;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1);
+    let prev = [x1, y1], cur = prev;
+    for (let i = 1; i <= N; i++) { const tt = pr * i / N; prev = cur; cur = qpt(x1, y1, cx, cy, x2, y2, tt); ctx.lineTo(cur[0], cur[1]); }
+    ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(cur[0], cur[1], Math.atan2(cur[1] - prev[1], cur[0] - prev[0]), c, o.hs || 10);
+    ctx.restore();
+  }
+  function dot(x, y, r, c, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill(); ctx.restore(); }
+  function packet(x1, y1, x2, y2, pr, c, r = 6) { if (pr <= 0 || pr >= 1) return; dot(lerp(x1, x2, pr), lerp(y1, y2, pr), r, c); }
+  function check(x, y, s, pr, c = C.green) {
+    if (pr <= 0) return;
+    const a = [x - s * .5, y], b = [x - s * .12, y + s * .38], d = [x + s * .55, y - s * .42];
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]);
+    const p1 = clamp(pr / .35); ctx.lineTo(lerp(a[0], b[0], p1), lerp(a[1], b[1], p1));
+    if (pr > .35) { const p2 = clamp((pr - .35) / .65); ctx.lineTo(lerp(b[0], d[0], p2), lerp(b[1], d[1], p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function cross(x, y, s, pr, c = C.red) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .22; ctx.lineCap = 'round';
+    const p1 = clamp(pr / .5), p2 = clamp((pr - .5) / .5);
+    ctx.beginPath(); ctx.moveTo(x - s / 2, y - s / 2); ctx.lineTo(lerp(x - s / 2, x + s / 2, p1), lerp(y - s / 2, y + s / 2, p1));
+    if (p2 > 0) { ctx.moveTo(x + s / 2, y - s / 2); ctx.lineTo(lerp(x + s / 2, x - s / 2, p2), lerp(y - s / 2, y + s / 2, p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function person(x, y, s, c) {
+    ctx.save(); ctx.fillStyle = c;
+    ctx.beginPath(); ctx.arc(x, y - s * .28, s * .2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y + s * .4, s * .36, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function keyIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .14; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y, s * .3, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + s * .3, y); ctx.lineTo(x + s * 1.05, y);
+    ctx.moveTo(x + s * .75, y); ctx.lineTo(x + s * .75, y + s * .24);
+    ctx.moveTo(x + s * .98, y); ctx.lineTo(x + s * .98, y + s * .2);
+    ctx.stroke(); ctx.restore();
+  }
+  function lockIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = s * .13;
+    ctx.beginPath(); ctx.arc(x, y - s * .08, s * .26, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(x - s * .42, y - s * .1, s * .84, s * .6, s * .1); ctx.fill();
+    ctx.restore();
+  }
+  function db(x, y, w, h, c) {
+    const rx = w / 2, ry = h * .15, top = y - h / 2, bot = y + h / 2;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.fillStyle = C.panel;
+    ctx.beginPath(); ctx.moveTo(x - rx, top + ry); ctx.lineTo(x - rx, bot - ry);
+    ctx.ellipse(x, bot - ry, rx, ry, 0, Math.PI, 0, true);
+    ctx.lineTo(x + rx, top + ry); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI, true);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI); ctx.stroke();
+    ctx.restore();
+  }
+  function hexagon(x, y, r, rot, o = {}) {
+    ctx.save(); ctx.beginPath();
+    for (let i = 0; i < 6; i++) { const a = rot + i * Math.PI / 3; const px = x + r * Math.cos(a), py = y + r * Math.sin(a); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.closePath();
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 2; ctx.stroke(); }
+    ctx.restore();
+  }
+  function pill(cx, cy, text, o = {}) {
+    const s = o.s || 15, pad = o.pad || 14, w = tw(text, s, o.f || SANS, o.w || 600) + pad * 2, h = s + 16;
+    pop(cx, cy, o.pr ?? 1, () => {
+      cbox(cx, cy, w, h, { fill: o.bg || C.panel, stroke: o.stroke || C.gridB, r: h / 2 });
+      T(text, cx, cy + 1, { s, w: o.w || 600, f: o.f || SANS, c: o.c || C.ink, al: 'center', b: 'middle' });
+    });
+  }
+  function codeLine(s, x, y, n, fs) {
+    const re = /("(?:[^"\\]|\\.)*"\s*:)|("(?:[^"\\]|\\.)*")|([{}\[\],])|(\b\d+\b)|([^"{}\[\],]+?(?=["{}\[\],]|\b\d+\b|$))/g;
+    ctx.save(); ctx.font = `400 ${fs}px ${MONO}`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    let m, cx = x, used = 0;
+    while ((m = re.exec(s)) && used < n) {
+      if (!m[0]) { re.lastIndex++; continue; }
+      const tok = m[0];
+      ctx.fillStyle = m[1] ? C.soft : m[2] ? C.cobalt : m[3] ? C.faint : m[4] ? C.amber : C.ink;
+      const show = tok.slice(0, n - used); used += tok.length;
+      ctx.fillText(show, cx, y); cx += ctx.measureText(show).width;
+    }
+    ctx.restore();
+  }
+  function card(x, y, w, title, lines, pr, o = {}) {
+    const fs = o.fs || 14, lh = o.lh || 22, top = 30 + 24;
+    const h = top + (lines.length - 1) * lh + 18;
+    const ly = i => y + top + i * lh;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    box(x, y, w, h, { fill: C.panel, stroke: C.gridB, r: 12 });
+    ctx.beginPath(); ctx.roundRect(x, y, w, 30, [12, 12, 0, 0]); ctx.fillStyle = o.hc || C.ink; ctx.fill();
+    T(title.toUpperCase(), x + 16, y + 20, { f: MONO, s: 12, w: 500, c: C.paper, ls: 1.2 });
+    let n = Math.floor(pr * lines.reduce((a, l) => a + l.length, 0));
+    lines.forEach((l, i) => {
+      const hl = o.hl && o.hl[i];
+      if (hl && hl[1] > 0) { ctx.save(); ctx.globalAlpha *= hl[1]; ctx.fillStyle = hl[0]; ctx.fillRect(x + 6, ly(i) - fs - 2, w - 12, lh); ctx.restore(); }
+      if (n > 0) { codeLine(l, x + 16, ly(i), n, fs); n -= l.length; }
+    });
+    ctx.restore();
+    return { h, ly };
+  }
+
+  // ---------- ambient network ----------
+  const NET = Array.from({ length: 46 }, (_, i) => ({ x: rnd(i * 3 + 1) * W, y: rnd(i * 3 + 2) * H, ph: rnd(i * 3 + 3) * 6.28 }));
+  function network(t, a) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    const P = NET.map(q => [q.x + Math.sin(t * .3 + q.ph) * 16, q.y + Math.cos(t * .25 + q.ph) * 12]);
+    ctx.lineWidth = 1;
+    for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+      const d = Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1]);
+      if (d < 175) { ctx.strokeStyle = `rgba(90,110,140,${(1 - d / 175) * .45})`; ctx.beginPath(); ctx.moveTo(P[i][0], P[i][1]); ctx.lineTo(P[j][0], P[j][1]); ctx.stroke(); }
+    }
+    P.forEach((q, i) => dot(q[0], q[1], i % 7 === 0 ? 4 : 2.5, i % 7 === 0 ? C.cobalt : C.faint, .8));
+    ctx.restore();
+  }
+
+  function background() {
+    ctx.fillStyle = C.paper; ctx.fillRect(0, 0, W, H);
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 40) { ctx.strokeStyle = x % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = x % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += 40) { ctx.strokeStyle = y % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = y % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+
+  function heading(n, title, t) {
+    const a = e(t, 0, .8);
+    T(`${String(n).padStart(2, '0')} / 09`, 56, 58, { f: MONO, s: 13, w: 500, c: C.cobalt, a, ls: 1.5 });
+    T(title, 56 + lerp(-12, 0, a), 94, { f: DISP, s: 32, w: 700, a });
+  }
+
+  // ---------- shared pieces ----------
+  function actor(x, y, name, role, c, a = 1, s = 50) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    if (role) T(role.toUpperCase(), x, y - s * .95, { f: MONO, s: 12, w: 500, c: C.soft, al: 'center', ls: 1.2 });
+    person(x, y, s, c);
+    T(name, x, y + s * 1.05, { s: 17, w: 600, al: 'center' });
+    ctx.restore();
+  }
+  function envelope(cx, cy, w, c = C.ink, a = 1) {
+    if (a <= 0) return;
+    const h = w * .66;
+    ctx.save(); ctx.globalAlpha *= a;
+    box(cx - w / 2, cy - h / 2, w, h, { fill: C.panel, stroke: c, lw: 2, r: 4 });
+    ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.beginPath();
+    ctx.moveTo(cx - w / 2 + 2, cy - h / 2 + 2); ctx.lineTo(cx, cy + h * .08); ctx.lineTo(cx + w / 2 - 2, cy - h / 2 + 2); ctx.stroke();
+    ctx.restore();
+  }
+  function moving(x1, y1, x2, y2, pr, c) {
+    if (pr <= 0 || pr >= 1) return;
+    const k = ease(pr);
+    envelope(lerp(x1, x2, k), lerp(y1, y2, k), 30, c);
+  }
+  // An asset tile: header strip, label, DID and owner line.
+  function assetTile(x, y, w, kind, label, did, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    box(x, y, w, 88, { fill: C.panel, stroke: o.stroke || C.gridB, lw: o.lw || 1.5, r: 12 });
+    ctx.beginPath(); ctx.roundRect(x, y, w, 26, [12, 12, 0, 0]); ctx.fillStyle = o.hc || C.ink; ctx.fill();
+    T(kind.toUpperCase(), x + 14, y + 18, { f: MONO, s: 11, w: 500, c: C.paper, ls: 1.1 });
+    if (o.locked) lockIcon(x + w - 20, y + 14, 14, C.paper);
+    T(label, x + 14, y + 52, { s: 16, w: 600 });
+    T(did, x + 14, y + 76, { f: MONO, s: 12, c: C.cobalt });
+    if (o.owner) T(o.owner, x + w - 14, y + 76, { s: 12, c: C.soft, al: 'right' });
+    ctx.restore();
+  }
+  // A member's wrapped copy of the vault key.
+  function wrapTile(cx, cy, name, c, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    cbox(cx, cy, 168, 74, { fill: o.gone ? C.redL : C.panel, stroke: o.gone ? C.red : C.gridB, lw: 1.5, r: 10 });
+    dot(cx - 58, cy - 10, 16, c); lockIcon(cx - 58, cy - 11, 15, C.paper);
+    T(name, cx - 34, cy - 6, { s: 16, w: 600 });
+    T('vault key for ' + (o.short || name), cx - 34, cy + 14, { s: 11, c: C.soft });
+    if (o.tag) T(o.tag, cx, cy + 56, { f: MONO, s: 11, c: C.soft, al: 'center' });
+    ctx.restore();
+  }
+  function bar(x, y, w, label, n, max, c, a) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    T(label, x, y + 18, { s: 15, w: 600 });
+    box(x + 70, y, 260, 26, { fill: C.paper, stroke: C.gridB, r: 6 });
+    if (n > 0) box(x + 70, y, 260 * (n / max) * a, 26, { fill: c, r: 6 });
+    T(String(n), x + 344, y + 19, { f: MONO, s: 15, w: 500 });
+    ctx.restore();
+  }
+
+  // ---------- scene 1: title ----------
+  function s1(t) {
+    network(t, .55);
+    const g = ctx.createRadialGradient(640, 330, 40, 640, 330, 540);
+    g.addColorStop(0, 'rgba(232,236,241,0.97)'); g.addColorStop(1, 'rgba(232,236,241,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const sc = lerp(.97, 1, e(t, 0, 2.5));
+    ctx.save(); ctx.translate(640, 280); ctx.scale(sc, sc);
+    T('Shared, sealed, counted', 0, 0, { f: DISP, s: 90, w: 800, al: 'center', b: 'middle', ls: -1.5 });
+    ctx.restore();
+    T('Groups, vaults and polls in Archon', 640, 372, { s: 25, c: C.soft, al: 'center', a: e(t, .8, 2.3) });
+    [['Groups', 520], ['Vaults', 640], ['Polls', 760]].forEach(([s, x], i) =>
+      pill(x, 450, s, { pr: e(t, 4 + i * .4, 4.6 + i * .4), s: 15, c: C.soft }));
+  }
+
+  // ---------- scene 2: assets owned by agents ----------
+  const ASSETS = [['group', 'team-alpha', 'did:cid:…9r0p', C.ink, false], ['vault', 'project files', 'did:cid:…va17', C.cobalt, true], ['poll', 'offsite-date', 'did:cid:…p011', C.amber, true]];
+  function s2(t) {
+    heading(2, 'Assets owned by agents', t);
+    actor(170, 350, 'Alice', 'Agent', C.amber, e(t, 0, .8), 60);
+    ASSETS.forEach(([k, l, d, c, lk], i) => {
+      const y = 160 + i * 130;
+      assetTile(560, y, 420, k, l, d, { hc: c, locked: lk, owner: 'controller: Alice', a: e(t, 1 + i * .5, 1.8 + i * .5) });
+      qarrow(230, 350, 380, y + 44, 552, y + 44, e(t, 1.4 + i * .5, 2.4 + i * .5), { c: C.gridB, lw: 2, hs: 8 });
+    });
+    const ua = e(t, 6, 6.8);
+    if (ua > 0) pop(260, 490, ua, () => { keyIcon(120, 490, 22, C.amber); T('every change: an update', 152, 486, { s: 15, w: 600 }); T('signed with Alice’s key', 152, 506, { s: 14, c: C.soft }); });
+    const ra = e(t, 11.2, 12);
+    if (ra > 0) {
+      ctx.save(); ctx.globalAlpha *= ra;
+      [1030, 1090, 1150].forEach(x => person(x, 330, 36, C.faint));
+      T('anyone can resolve them', 1090, 390, { s: 14, w: 600, c: C.soft, al: 'center' });
+      T('what they can read depends', 1090, 412, { s: 13, c: C.soft, al: 'center' });
+      T('on the encryption', 1090, 430, { s: 13, c: C.soft, al: 'center' });
+      ctx.restore();
+    }
+  }
+
+  // ---------- scene 3: groups ----------
+  const GROUP = [
+    '{',
+    '  "name": "team-alpha",',
+    '  "group": {',
+    '    "version": 2,',
+    '    "members": [',
+    '      "did:cid:…b0b5",',
+    '      "did:cid:…ca70",',
+    '      "did:cid:…7ea3"',
+    '    ]',
+    '  }',
+    '}'
+  ];
+  function node(cx, cy, label, sub, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    cbox(cx, cy, 150, 54, { fill: o.fill || C.panel, stroke: o.stroke || C.ink, lw: o.lw || 1.8, r: 10 });
+    T(label, cx, cy - 2, { s: 15, w: 700, al: 'center' });
+    T(sub, cx, cy + 16, { f: MONO, s: 11, c: C.soft, al: 'center' });
+    ctx.restore();
+  }
+  function s3(t) {
+    heading(3, 'Groups', t);
+    card(70, 140, 380, 'group asset · plain data', GROUP, p(t, .6, 5), { a: e(t, .2, .8), fs: 13.5, lh: 21, hl: { 7: [C.cobaltL, e(t, 6.4, 7)] } });
+    const path = e(t, 6.4, 8);
+    node(760, 180, 'team-alpha', 'group', { a: e(t, 1, 1.6), fill: C.ink === 0 ? C.panel : C.panel });
+    [['Bob', '…b0b5', 560], ['Carol', '…ca70', 760], ['Team', 'group · …7ea3', 960]].forEach(([n, s, x], i) => {
+      arrow(760, 208, x, 292, e(t, 1.6 + i * .3, 2.2 + i * .3), { c: i === 2 && path > 0 ? C.cobalt : C.gridB, lw: 2, hs: 8 });
+      node(x, 320, n, s, { a: e(t, 2 + i * .3, 2.6 + i * .3), stroke: i === 2 && path > .3 ? C.cobalt : C.ink });
+    });
+    arrow(960, 348, 960, 422, e(t, 3.4, 4), { c: path > .6 ? C.cobalt : C.gridB, lw: 2, hs: 8 });
+    node(960, 450, 'Dana', '…da7a', { a: e(t, 3.8, 4.4), stroke: path > .9 ? C.cobalt : C.ink });
+    T('testGroup(team-alpha, Dana)', 760, 430, { f: MONO, s: 13, w: 500, c: C.cobalt, al: 'center', a: e(t, 6.2, 6.8) });
+    check(700, 460, 16, e(t, 8, 8.6)); T('member, through Team', 720, 466, { s: 15, w: 700, c: C.green, a: e(t, 8, 8.6) });
+    const ra = e(t, 12, 12.8);
+    ctx.save(); ctx.globalAlpha *= ra;
+    cross(520, 540, 16, e(t, 12, 12.6)); T('a group containing itself', 540, 546, { s: 15, w: 500 });
+    cross(520, 580, 16, e(t, 12.4, 13)); T('two groups containing each other', 540, 586, { s: 15, w: 500 });
+    ctx.restore();
+    pill(1000, 568, 'not encrypted: anyone can read the list', { pr: e(t, 14.2, 15), s: 14, c: C.amber, bg: C.amberL, stroke: C.amber });
+  }
+
+  // ---------- scene 4: vaults ----------
+  function s4(t) {
+    heading(4, 'Vaults', t);
+    const ka = e(t, .4, 1.2);
+    if (ka > 0) pop(560, 180, ka, () => {
+      cbox(560, 180, 230, 72, { fill: C.cobaltL, stroke: C.cobalt, lw: 2, r: 12 });
+      keyIcon(470, 180, 26, C.cobalt);
+      T('vault key pair', 510, 176, { s: 17, w: 700, c: C.cobalt });
+      T('random · its own', 510, 196, { s: 13, c: C.soft });
+    });
+    const gone = e(t, 20.6, 21.4);
+    const wraps = [['Alice', C.amber, 180, 6.2, 'owner'], ['Bob', C.cobalt, 380, 6.8, ''], ['Carol', C.green, 580, 7.4, '']];
+    wraps.forEach(([n, c, x, at, tag], i) => {
+      arrow(560, 218, x, 294, e(t, at - .2, at + .5), { c: C.cobalt, lw: 1.8, hs: 8, a: i === 2 ? 1 - gone : 1 });
+      wrapTile(x, 330, n, c, { a: e(t, at, at + .6) * (i === 2 ? 1 - gone * .5 : 1), tag, gone: i === 2 && gone > .5 });
+    });
+    const da = e(t, 19.2, 20);
+    arrow(560, 218, 780, 294, da, { c: C.green, lw: 1.8, hs: 8 });
+    wrapTile(780, 330, 'Dan', C.ink, { a: da, tag: 'added' });
+    if (gone > 0) T('removed · key deleted', 580, 386, { f: MONO, s: 11, c: C.red, al: 'center', a: gone });
+    T('each copy is encrypted to that member’s own public key', 480, 430, { s: 14, w: 600, c: C.cobalt, al: 'center', a: e(t, 8.4, 9) });
+
+    // items
+    const ia = e(t, 12, 12.8);
+    if (ia > 0) {
+      ctx.save(); ctx.globalAlpha *= ia;
+      box(900, 150, 320, 300, { fill: C.panel, stroke: C.gridB, r: 12 });
+      T('ITEMS', 920, 180, { f: MONO, s: 12, w: 500, c: C.soft, ls: 1.1 });
+      T('encrypted to the vault key', 920, 200, { s: 13, c: C.soft });
+      [['notes.txt', 'small: kept in the asset'], ['plan.pdf', 'large: in IPFS by CID']].forEach(([n, s], i) => {
+        const y = 222 + i * 96;
+        const pa = e(t, 12.6 + i * .6, 13.2 + i * .6);
+        ctx.save(); ctx.globalAlpha *= pa;
+        box(920, y, 280, 76, { fill: C.paper, stroke: C.gridB, r: 8 });
+        lockIcon(944, y + 30, 18, C.cobalt);
+        T(n, 966, y + 34, { f: MONO, s: 15, w: 500 });
+        T(s, 966, y + 56, { s: 13, c: C.soft });
+        ctx.restore();
+      });
+      ctx.restore();
+    }
+    arrow(676, 180, 894, 250, e(t, 12, 12.8), { c: C.cobalt, lw: 1.8, hs: 8, dash: [5, 5] });
+    T('only the owner adds items or members', 640, 520, { f: DISP, s: 22, w: 700, al: 'center', a: e(t, 18.2, 19) });
+    pill(640, 572, 'secretMembers: only the owner can read the member list', { pr: e(t, 22, 22.7), s: 13, c: C.soft });
+  }
+
+  // ---------- scene 5: a poll is a vault ----------
+  const POLL = [
+    '{',
+    '  "version": 2,',
+    '  "name": "offsite-date",',
+    '  "description": "When should we meet?",',
+    '  "options": ["May", "June", "July"],',
+    '  "deadline": "2026-10-06T00:00:00Z"',
+    '}'
+  ];
+  const VOTERS = [['Bob', C.cobalt, 210], ['Carol', C.green, 330], ['Dan', C.ink, 450]];
+  function s5(t) {
+    heading(5, 'A poll is a vault', t);
+    actor(130, 330, 'Alice', 'Owner', C.amber, e(t, 0, .6), 50);
+    const va = e(t, .4, 1);
+    box(260, 140, 560, 330, { stroke: C.cobalt, lw: 2, dash: [8, 6], r: 16, a: va });
+    T('POLL = VAULT · did:cid:…p011', 280, 166, { f: MONO, s: 12, w: 500, c: C.cobalt, ls: 1, a: va });
+    card(284, 186, 512, 'item: poll', POLL, p(t, 1, 5), { a: e(t, .8, 1.4), fs: 14, lh: 22, hc: C.amber, hl: { 4: [C.amberL, e(t, 5.2, 5.8)], 5: [C.amberL, e(t, 5.6, 6.2)] } });
+    T('2 to 10 options · a future deadline', 540, 440, { s: 14, w: 600, c: C.amber, al: 'center', a: e(t, 5.8, 6.4) });
+    const ma = e(t, 6.4, 7.2);
+    T('VOTERS = VAULT MEMBERS', 1050, 150, { f: MONO, s: 12, w: 500, c: C.soft, ls: 1.1, al: 'center', a: ma });
+    VOTERS.forEach(([n, c, y], i) => {
+      const a = e(t, 6.8 + i * .4, 7.4 + i * .4);
+      ctx.save(); ctx.globalAlpha *= a;
+      person(990, y, 40, c); T(n, 1030, y + 6, { s: 16, w: 600 });
+      dot(1122, y - 2, 14, C.cobaltL); lockIcon(1122, y - 3, 13, C.cobalt);
+      T('can read', 1142, y + 3, { s: 12, c: C.soft });
+      ctx.restore();
+    });
+    T('sendPoll', 900, 520, { f: MONO, s: 15, w: 500, c: C.cobalt, al: 'center', a: e(t, 12, 12.6) });
+    VOTERS.forEach(([n, c, y], i) => moving(820, 470, 960, y, p(t, 12.6 + i * .5, 14 + i * .5), C.cobalt));
+    pill(900, 566, 'a notice to each voter, pointing at the poll', { pr: e(t, 14.6, 15.3), s: 13, c: C.soft });
+  }
+
+  // ---------- scene 6: voting ----------
+  const BALLOT = ['{', '  "poll": "did:cid:…p011",', '  "vote": 2', '}'];
+  function s6(t) {
+    heading(6, 'Voting', t);
+    actor(110, 270, 'Bob', 'Voter', C.cobalt, e(t, 0, .6), 48);
+    card(210, 150, 330, 'ballot', BALLOT, p(t, .6, 2.6), { a: e(t, .4, 1), fs: 14.5, lh: 24, hc: C.cobalt, hl: { 2: [C.cobaltL, e(t, 2.8, 3.4)] } });
+    T('2 = June · 0 = spoiled', 226, 322, { s: 14, w: 600, c: C.cobalt, a: e(t, 3, 3.6) });
+    arrow(546, 210, 622, 210, e(t, 6, 6.8), { c: C.ink, hs: 8 });
+    const aa = e(t, 6.6, 7.4);
+    if (aa > 0) pop(760, 210, aa, () => assetTile(630, 166, 280, 'ballot asset', 'encrypted', 'did:cid:…ba11', { hc: C.ink, locked: true }));
+    T('to Alice, plus a copy Bob can read', 770, 280, { s: 14, w: 600, c: C.soft, al: 'center', a: e(t, 7.4, 8) });
+    actor(1130, 250, 'Alice', 'Owner', C.amber, e(t, 8, 8.6), 48);
+    moving(920, 210, 1080, 240, p(t, 9, 10.6), C.amber);
+    T('sendBallot', 1000, 200, { f: MONO, s: 13, w: 500, c: C.amber, al: 'center', a: e(t, 9, 9.6) });
+    // filed into the vault
+    const fa = e(t, 12.4, 13.2);
+    if (fa > 0) {
+      ctx.save(); ctx.globalAlpha *= fa;
+      box(300, 380, 760, 200, { stroke: C.cobalt, lw: 2, dash: [8, 6], r: 16 });
+      T('POLL VAULT · ITEMS', 322, 408, { f: MONO, s: 12, w: 500, c: C.cobalt, ls: 1 });
+      [['poll', 'the question'], ['a3f9c2…', 'Bob’s ballot DID · keyed to Bob'], ['7d10e8…', 'Carol’s ballot DID · keyed to Carol']].forEach(([k, s], i) => {
+        const ya = 424 + i * 48, pa = i === 0 ? 1 : e(t, 13 + (i - 1) * .8, 13.6 + (i - 1) * .8);
+        ctx.save(); ctx.globalAlpha *= pa;
+        box(322, ya, 716, 38, { fill: i === 1 ? C.cobaltL : C.paper, stroke: C.gridB, r: 8 });
+        T(k, 340, ya + 25, { f: MONO, s: 14, w: 500 });
+        T(s, 480, ya + 25, { s: 14, c: C.soft });
+        if (i) { lockIcon(1010, ya + 18, 16, C.ink); }
+        ctx.restore();
+      });
+      ctx.restore();
+    }
+    arrow(1130, 320, 1064, 470, e(t, 12.4, 13.2), { c: C.amber, hs: 8 });
+    T('Alice files it', 1150, 400, { s: 14, w: 600, c: C.amber, a: e(t, 12.6, 13.2) });
+    T('voters see that ballots arrived, not what they say', 680, 620, { f: DISP, s: 20, w: 700, al: 'center', a: e(t, 15.4, 16.2) });
+  }
+
+  // ---------- scene 7: tallying and publishing ----------
+  const CAST_BALLOTS = [['Alice', 'July', C.amber], ['Bob', 'June', C.cobalt], ['Carol', 'May', C.green], ['Dan', 'June', C.ink]];
+  function s7(t) {
+    heading(7, 'Counting and publishing', t);
+    T('only Alice can decrypt the ballots', 90, 170, { s: 16, w: 600, c: C.amber, a: e(t, 0, .8) });
+    CAST_BALLOTS.forEach(([n, v, c], i) => {
+      const y = 200 + i * 62, a = e(t, .6 + i * .4, 1.2 + i * .4), open = e(t, 2.4 + i * .4, 3 + i * .4);
+      ctx.save(); ctx.globalAlpha *= a;
+      box(90, y, 330, 50, { fill: C.panel, stroke: C.gridB, r: 8 });
+      person(120, y + 26, 28, c); T(n, 142, y + 31, { s: 15, w: 600 });
+      if (open < 1) { ctx.save(); ctx.globalAlpha *= 1 - open; lockIcon(390, y + 24, 18, C.ink); ctx.restore(); }
+      T(v, 400, y + 31, { f: MONO, s: 15, w: 500, al: 'right', c: C.ink, a: open });
+      ctx.restore();
+    });
+    const ta = e(t, 5, 5.8);
+    T('TALLY', 520, 196, { f: MONO, s: 12, w: 500, c: C.soft, ls: 1.1, a: ta });
+    [['May', 1], ['June', 2], ['July', 1], ['spoil', 0]].forEach(([l, n], i) => bar(520, 214 + i * 42, 0, l, n, 2, C.cobalt, e(t, 5.2 + i * .3, 6 + i * .3)));
+    const fa = e(t, 7, 7.8);
+    pill(700, 420, 'received 4 of 4 eligible · final', { pr: fa, s: 14, c: C.green, bg: C.greenL, stroke: C.green });
+    T('final after the deadline, or once every voter has voted', 700, 456, { s: 13, c: C.soft, al: 'center', a: fa });
+    // publish
+    const pa = e(t, 12, 12.8);
+    T('publishPoll', 940, 196, { f: MONO, s: 16, w: 500, c: C.cobalt, a: pa });
+    box(940, 214, 290, 104, { fill: C.panel, stroke: C.gridB, r: 12, a: pa });
+    T('default', 960, 242, { f: DISP, s: 18, w: 700, a: pa });
+    T('tally and vote counts', 960, 266, { s: 14, c: C.soft, a: pa });
+    T('saved in the poll vault', 960, 290, { s: 14, c: C.soft, a: pa });
+    const ra = e(t, 18, 18.8);
+    box(940, 334, 290, 150, { fill: mix(C.panel, C.amberL, ra), stroke: mix(C.gridB, C.amber, ra), r: 12, a: ra });
+    T('reveal: true', 960, 362, { f: DISP, s: 18, w: 700, a: ra });
+    T('also each voter’s choice', 960, 386, { s: 14, c: C.soft, a: ra });
+    [['Bob', 'June'], ['Carol', 'May']].forEach(([n, v], i) => T(n + ' → ' + v, 960, 416 + i * 24, { f: MONO, s: 13, c: C.ink, a: e(t, 18.6 + i * .3, 19.2 + i * .3) }));
+    T('…', 960, 462, { f: MONO, s: 13, c: C.soft, a: ra });
+    T('voters read the published results', 1085, 520, { s: 14, w: 600, c: C.cobalt, al: 'center', a: e(t, 13, 13.8) });
+  }
+
+  // ---------- scene 8: who sees what ----------
+  const SEES = [
+    ['that the assets exist', 1, 1, 1],
+    ['group memberships', 1, 1, 1],
+    ['the poll question and vault items', 0, 1, 1],
+    ['published results', 0, 1, 1],
+    ['how each voter voted', 0, 2, 1]
+  ];
+  function s8(t) {
+    heading(8, 'Who sees what', t);
+    const cols = [['Anyone', C.soft, 660], ['Voters', C.cobalt, 860], ['Alice, the owner', C.amber, 1080]];
+    cols.forEach(([n, c, x], i) => T(n, x, 170, { f: DISP, s: 20, w: 700, c, al: 'center', a: e(t, .4 + i * .3, 1 + i * .3) }));
+    SEES.forEach(([s, a0, a1, a2], r) => {
+      const y = 224 + r * 70, ra = e(t, 1.2 + r * .9, 1.8 + r * .9);
+      box(80, y - 30, 1120, 52, { fill: r % 2 ? 'transparent' : C.panel, r: 8, a: ra });
+      T(s, 104, y + 2, { s: 17, w: 500, a: ra });
+      [a0, a1, a2].forEach((v, i) => {
+        const x = cols[i][2];
+        if (v === 1) check(x, y - 4, 18, ra, C.green);
+        else if (v === 0) cross(x, y - 4, 16, ra);
+        else T('only if revealed', x, y + 2, { s: 14, w: 600, c: C.amber, al: 'center', a: ra });
+      });
+    });
+    T('Private from outsiders, not secret from the owner', 640, 620, { f: DISP, s: 22, w: 700, al: 'center', a: e(t, 13, 13.8) });
+  }
+
+  // ---------- scene 9: recap ----------
+  const RECAP = [
+    'groups list their members in the open, and can nest',
+    'vaults share one key, wrapped for each member',
+    'only the owner changes a vault or its members',
+    'ballots are sealed for the poll owner, who counts them',
+    'results go back into the vault, with or without each vote'
+  ];
+  function s9(t) {
+    const out = e(t, 7, 8);
+    ctx.save(); ctx.globalAlpha *= 1 - out;
+    heading(9, 'Recap', t);
+    T('Groups, vaults and polls', 110, 190, { f: DISP, s: 38, w: 800, a: e(t, .2, .8) });
+    RECAP.forEach((s, i) => {
+      const y = 258 + i * 60, a = e(t, .8 + i * .5, 1.4 + i * .5);
+      dot(132, y - 7, 18, C.greenL, a); check(132, y - 7, 18, a);
+      T(s, 168, y, { s: 23, w: 500, a });
+    });
+    ctx.restore();
+    if (out > 0) {
+      network(t, .5 * out);
+      const g = ctx.createRadialGradient(640, 360, 40, 640, 360, 520);
+      g.addColorStop(0, `rgba(232,236,241,${.97 * out})`); g.addColorStop(1, 'rgba(232,236,241,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      T('Shared, sealed, counted', 640, 320, { f: DISP, s: 80, w: 800, al: 'center', b: 'middle', ls: -1.5, a: out });
+      T('All three are ordinary asset DIDs.', 640, 400, { s: 24, al: 'center', c: C.ink, a: e(t, 8, 8.8) });
+      T('docs/services/keymaster · §10', 640, 458, { f: MONO, s: 18, w: 500, c: C.cobalt, al: 'center', a: e(t, 8.8, 9.6) });
+    }
+  }
+
+  // ---------- timeline ----------
+  const SCENES = [
+    { title: 'Shared, sealed, counted', start: 0, dur: 10, draw: s1 },
+    { title: 'Assets owned by agents', start: 10, dur: 16, draw: s2 },
+    { title: 'Groups', start: 26, dur: 18, draw: s3 },
+    { title: 'Vaults', start: 44, dur: 24, draw: s4 },
+    { title: 'A poll is a vault', start: 68, dur: 18, draw: s5 },
+    { title: 'Voting', start: 86, dur: 20, draw: s6 },
+    { title: 'Counting and publishing', start: 106, dur: 22, draw: s7 },
+    { title: 'Who sees what', start: 128, dur: 18, draw: s8 },
+    { title: 'Recap', start: 146, dur: 14, draw: s9 }
+  ];
+  const CUES = [
+    [0, 5, 'Archon can share data privately among a set of DIDs, and run a vote among them.'],
+    [5, 10, 'Groups, vaults and polls are all built the same way: as assets owned by an agent.'],
+    [10, 16, 'An asset is a DID controlled by an agent. Here Alice owns a group, a vault and a poll.'],
+    [16, 21, 'Every change to an asset is an update signed with its owner’s key, so only Alice can change them.'],
+    [21, 26, 'Anyone can resolve these DIDs. What they can read depends on what is encrypted, and to whom.'],
+    [26, 32, 'A group is a named list of member DIDs, stored in the asset’s data.'],
+    [32, 38, 'A member can itself be a group. Testing membership follows nested groups, so Dana counts through Team.'],
+    [38, 44, 'A group can’t contain itself, or a group that contains it. Group data isn’t encrypted: anyone can read it.'],
+    [44, 50, 'A vault is encrypted shared storage. It gets its own key pair, separate from anyone’s identity key.'],
+    [50, 56, 'The vault’s private key is encrypted separately to each member’s public key, the owner’s included.'],
+    [56, 62, 'Items are encrypted to the vault key. Small ones stay in the asset; larger ones are stored in IPFS by CID.'],
+    [62, 68, 'Only the owner adds items or members. Removing a member deletes their copy of the vault key.'],
+    [68, 74, 'A poll is a vault. Its first item holds the question, two to ten options, and a deadline.'],
+    [74, 80, 'The poll’s voters are the vault’s members, so only they can read the question.'],
+    [80, 86, 'sendPoll posts a notice to each voter, pointing at the poll.'],
+    [86, 92, 'Bob votes by creating a ballot: a new asset holding the poll DID and his choice. Zero spoils the ballot.'],
+    [92, 98, 'The ballot is encrypted to the poll owner, with a copy Bob can read. sendBallot tells Alice it exists.'],
+    [98, 106, 'Alice files it in the poll vault, keyed to Bob. Voters can see that ballots arrived, but not what they say.'],
+    [106, 112, 'Only Alice can decrypt the ballots, so only she can count them.'],
+    [112, 118, 'Results are final once the deadline passes, or once every voter, Alice included, has voted.'],
+    [118, 124, 'publishPoll saves the results in the poll vault for voters to read: the tally and the vote counts.'],
+    [124, 128, 'With reveal, the results also list how each voter voted.'],
+    [128, 134, 'So who sees what? Anyone can resolve the assets and read group memberships, but not what is encrypted.'],
+    [134, 140, 'Voters read the vault’s items, the poll question and the published results.'],
+    [140, 146, 'Alice, the owner, can decrypt every ballot. A poll is private from outsiders, not secret from its owner.'],
+    [146, 153, 'Groups list members in the open; vaults share a key among members; polls count sealed ballots.'],
+    [153, 160, 'All three are ordinary asset DIDs, so they resolve, update and anchor like any other.']
+  ];
+
+  let t = 0, playing = false, last = 0;
+  function render() {
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.globalAlpha = 1;
+    background();
+    const i = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const sc = SCENES[i < 0 ? SCENES.length - 1 : i];
+    const lt = Math.min(t - sc.start, sc.dur - 1e-3);
+    const fin = sc.start === 0 ? 1 : clamp(lt / .5);
+    const fout = sc.start + sc.dur >= TOTAL ? 1 : clamp((sc.dur - lt) / .5);
+    ctx.save(); ctx.globalAlpha = Math.min(fin, fout);
+    sc.draw(lt);
+    ctx.restore();
+  }
+
+  // ---------- UI ----------
+  const $ = id => document.getElementById(id);
+  const pp = $('pp'), seek = $('seek'), timeEl = $('time'), cap = $('cap'), big = $('bigplay'), player = $('player');
+  const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>';
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  const chapList = $('chapters');
+  SCENES.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<button type="button"><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t"></span><span class="d">${fmt(s.start)}</span></button>`;
+    li.querySelector('.t').textContent = s.title;
+    li.querySelector('button').addEventListener('click', () => { t = s.start; if (!playing) setPlaying(true); sync(); });
+    chapList.appendChild(li);
+    if (i) { const tick = document.createElement('i'); tick.style.left = `calc(${s.start / TOTAL * 100}% - 1px)`; $('ticks').appendChild(tick); }
+  });
+  const chapBtns = [...chapList.querySelectorAll('button')];
+
+  const tr = $('transcript');
+  SCENES.forEach((s, i) => {
+    const h = document.createElement('h3'); h.textContent = `${String(i + 1).padStart(2, '0')} · ${s.title}`; tr.appendChild(h);
+    CUES.filter(c => c[0] >= s.start && c[0] < s.start + s.dur).forEach(c => { const pEl = document.createElement('p'); pEl.textContent = c[2]; tr.appendChild(pEl); });
+  });
+
+  let lastCue = -1, lastChap = -1;
+  function sync() {
+    seek.value = t.toFixed(2);
+    seek.style.setProperty('--pct', (t / TOTAL * 100) + '%');
+    timeEl.textContent = `${fmt(t)} / ${fmt(TOTAL)}`;
+    const ci = CUES.findIndex(c => t >= c[0] && t < c[1]);
+    const cue = ci < 0 ? CUES.length - 1 : ci;
+    if (cue !== lastCue) { cap.textContent = CUES[cue][2]; lastCue = cue; }
+    const ch = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const chap = ch < 0 ? SCENES.length - 1 : ch;
+    if (chap !== lastChap) { chapBtns.forEach((b, i) => b.setAttribute('aria-current', i === chap ? 'true' : 'false')); lastChap = chap; }
+    render();
+  }
+  function setPlaying(v) {
+    if (v && t >= TOTAL - .01) t = 0;
+    playing = v; last = performance.now();
+    pp.innerHTML = v ? ICON_PAUSE : ICON_PLAY;
+    pp.setAttribute('aria-label', v ? 'Pause' : 'Play');
+    big.hidden = v;
+    big.setAttribute('aria-label', t > 0 ? 'Resume animation' : 'Play animation');
+  }
+  function frame(now) {
+    if (playing) {
+      t = Math.min(TOTAL, t + Math.min(.1, (now - last) / 1000));
+      if (t >= TOTAL) setPlaying(false);
+      sync();
+    }
+    last = now;
+    requestAnimationFrame(frame);
+  }
+
+  pp.addEventListener('click', () => setPlaying(!playing));
+  big.addEventListener('click', () => setPlaying(true));
+  cv.addEventListener('click', () => setPlaying(!playing));
+  seek.addEventListener('input', () => { t = parseFloat(seek.value); sync(); });
+  player.addEventListener('keydown', ev => {
+    if (ev.target === seek) return;
+    if (ev.key === ' ' || ev.key === 'k') { ev.preventDefault(); setPlaying(!playing); }
+    else if (ev.key === 'ArrowRight') { ev.preventDefault(); t = Math.min(TOTAL, t + 5); sync(); }
+    else if (ev.key === 'ArrowLeft') { ev.preventDefault(); t = Math.max(0, t - 5); sync(); }
+  });
+  $('fs').addEventListener('click', () => {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else if (player.requestFullscreen) player.requestFullscreen().catch(() => {});
+    } catch (_) {}
+  });
+  document.addEventListener('fullscreenchange', () => requestAnimationFrame(resize));
+  new ResizeObserver(() => resize()).observe(cv);
+
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fontsReady = document.fonts ? Promise.race([
+    Promise.all([
+      document.fonts.load(`800 40px ${DISP}`), document.fonts.load(`700 40px ${DISP}`),
+      document.fonts.load(`400 16px ${SANS}`), document.fonts.load(`600 16px ${SANS}`),
+      document.fonts.load(`400 16px ${MONO}`), document.fonts.load(`500 16px ${MONO}`)
+    ]),
+    new Promise(r => setTimeout(r, 2000))
+  ]).catch(() => {}) : Promise.resolve();
+
+  setPlaying(false);
+  resize(); sync();
+  fontsReady.then(() => {
+    sync();
+    if (reduce) { t = 6; sync(); big.hidden = false; }
+    else setPlaying(true);
+    requestAnimationFrame(frame);
+  });
+})();
+</script>
+</body>
+</html>
