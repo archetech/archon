@@ -1002,27 +1002,77 @@ PollConfig = {
   "version": 2,
   "name":        string,
   "description": string,
-  "options":     string[],
-  "deadline":    "<RFC 3339>"
+  "options":     string[],      // 2 to 10 choices
+  "deadline":    "<RFC 3339>"   // must be in the future at creation
 }
 ```
 
-A poll is owned by a creator, scoped to a voter group, and produces
-ballots which are sealed Vault items revealed after the deadline.
+A poll is a [vault](#104-vaults) (§10.4); the poll DID is the vault DID and
+its owner is the poll owner. It has no separate voter group, ballot list or
+poll asset data. Everything lives in the vault's items:
 
-16 routes covering create / view / vote / send / publish / voter management.
-See the route list at the top of this document and the
-[KeymasterInterface](../../../packages/keymaster/src/types.ts#L361) for
-exact method signatures. The data shape on the poll asset:
+| Vault item | Content |
+| --- | --- |
+| `poll` | The `PollConfig`, as UTF-8 JSON. A vault is a poll exactly when this item exists. |
+| `<ballot key>` | One per voter: the voter's ballot DID, as UTF-8 text. |
+| `results` | The published `PollResults`, as UTF-8 JSON. Present only after `publishPoll`. |
+
+- **Voters** are the vault's members: `addPollVoter` / `removePollVoter` /
+  `listPollVoters` are `addVaultMember` / `removeVaultMember` /
+  `listVaultMembers`. The owner may always vote and counts as an eligible
+  voter.
+- **Ballots.** `votePoll` checks eligibility (the caller is the owner or can
+  decrypt the vault), the deadline, and that `vote` is an integer from `0`
+  (spoil) to the number of options. It returns the DID of an encrypted asset
+  holding `{ "poll": "<poll DID>", "vote": <int> }`, readable by the owner
+  and the voter. `sendBallot` delivers the ballot DID to the owner as a
+  notice.
+- **Filing.** Only the owner files a ballot: `updatePoll` decrypts it,
+  checks that the ballot's controller is a voter (or the owner), the
+  deadline and the vote range, and stores the ballot DID under the voter's
+  ballot key. The ballot key is the vault member ID truncated to
+  `maxAliasLength` (default 32) hex characters: SHA-256 of the vault `salt`
+  concatenated with the voter DID's method-specific ID (with the whole DID
+  for an unversioned vault). A voter who votes again replaces their earlier
+  ballot.
+- **Results.** The owner's `viewPoll` computes `PollResults` from the filed
+  ballots; other voters see the published `results` item, if any.
+  `publishPoll` requires the results to be final (deadline passed or every
+  eligible voter has voted). By default it removes the per-voter `ballots`
+  list before storing the results; `{ "reveal": true }` keeps it.
+  `unpublishPoll` deletes the `results` item.
 
 ```jsonc
-{
-  "poll": PollConfig,
-  "voters": "<group DID>",
-  "ballots": ["<ballot DID>", ...],
-  "vault":  "<vault DID>"          // sealed ballot box
+PollResults = {
+  "tally":   [{ "vote": int, "option": string, "count": int }],   // vote 0 is "spoil"
+  "ballots"?: [{ "voter": "<DID>", "vote": int, "option": string, "received": "<RFC 3339>" }],
+  "votes"?:  { "eligible": int, "received": int, "pending": int },
+  "final"?:  boolean
 }
 ```
+
+| Route | Behavior |
+| --- | --- |
+| `GET /api/v1/templates/poll` | `{ "template": PollConfig }` — an example config. |
+| `GET /api/v1/polls` | `?owner=<DID>` optional. `{ "polls": string[] }`. |
+| `POST /api/v1/polls` | `{ "poll": PollConfig, "options"?: VaultOptions }` → `{ "did": string }`. |
+| `GET /api/v1/polls/:poll` | `{ "poll": PollConfig }`. |
+| `GET /api/v1/polls/:poll/test` | `{ "test": boolean }`. |
+| `GET /api/v1/polls/:poll/view` | `{ "poll": ViewPollResult }`. |
+| `POST /api/v1/polls/:poll/send` | Notifies every voter of the poll. `{ "did": string }` (the notice). |
+| `POST /api/v1/polls/:poll/vote` | `{ "vote": int, "options"?: { "registry"?, "validUntil"? } }` → `{ "did": string }` (the ballot). |
+| `POST /api/v1/polls/ballot/send` | `{ "ballot": string, "poll": string }` → `{ "did": string }` (the notice). |
+| `GET /api/v1/polls/ballot/:did` | `{ "ballot": ViewBallotResult }`. |
+| `PUT /api/v1/polls/update` | Owner only. `{ "ballot": string }` → `{ "ok": boolean }`. |
+| `POST /api/v1/polls/:poll/publish` | Owner only. `{ "options"?: { "reveal"?: boolean } }` → `{ "ok": boolean }`. |
+| `POST /api/v1/polls/:poll/unpublish` | Owner only. `{ "ok": boolean }`. |
+| `POST /api/v1/polls/:poll/voters` | `{ "memberId": string }` → `{ "ok": boolean }`. |
+| `DELETE /api/v1/polls/:poll/voters/:voter` | `{ "ok": boolean }`. |
+| `GET /api/v1/polls/:poll/voters` | `{ "voters": Record<string, …> }`. |
+
+See the
+[KeymasterInterface](../../../packages/clients/src/keymaster-types.ts) for
+exact method signatures.
 
 ### 10.4 Vaults
 
