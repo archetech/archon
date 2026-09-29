@@ -14,6 +14,7 @@ Archon is a decentralized identity protocol implementing the W3C-compliant `did:
 - [How Archon Works](presentations/how-archon-works.html) — three-minute animated walkthrough of DID creation, resolution, updates, and registries
 - [Proving What You Hold](presentations/credential-verification.html) — three-minute animated walkthrough of credential issuance, presentation, the five verification checks, request pairing, and verifying as of a past time
 - [One History, Everywhere](presentations/convergence.html) — three-minute animated walkthrough of how nodes converge on DID history: replay, forks, chain anchors, late evidence, and reorganizations
+- [Sign In With a DID](presentations/signin.html) — three-minute animated walkthrough of passwordless sign-in: challenge, wallet response, Herald verification, and OpenID Connect
 
 ## Operations
 

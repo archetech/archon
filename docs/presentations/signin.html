@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign In With a DID</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #e8ecf1;
+    --panel: #f6f8fb;
+    --ink: #141d2b;
+    --soft: #5b6879;
+    --line: #c6cfdb;
+    --cobalt: #2a4fc4;
+    --amber: #c97a12;
+    --bar: #141d2b;
+    --bar-text: #e8ecf1;
+    --bar-soft: #9aa6b8;
+  }
+  html, body { background: var(--paper); color: var(--ink); }
+  body { margin: 0; font: 15px/1.55 "IBM Plex Sans", system-ui, sans-serif; padding-inline: 16px; padding-block: 28px 48px; }
+  .wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+  header h1 { font: 800 clamp(30px, 5vw, 46px)/1.05 "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif; margin: 0; letter-spacing: -0.5px; text-wrap: balance; }
+  header p { margin: 8px 0 0; color: var(--soft); max-width: 62ch; }
+  header .eyebrow { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 1.5px; text-transform: uppercase; color: var(--cobalt); margin: 0 0 8px; }
+
+  .player { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--bar); box-shadow: 0 18px 50px -24px rgba(20, 29, 43, .45); outline: none; }
+  .player:focus-visible { box-shadow: 0 0 0 3px var(--cobalt); }
+  .player:fullscreen { display: flex; flex-direction: column; justify-content: center; border-radius: 0; }
+  .player:fullscreen .stage { max-height: calc(100vh - 120px); aspect-ratio: 16 / 9; margin: 0 auto; width: min(100%, calc((100vh - 120px) * 16 / 9)); }
+  .stage { position: relative; aspect-ratio: 16 / 9; max-width: 100%; background: var(--paper); }
+  canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+  .bigplay { position: absolute; inset: 0; margin: auto; width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--ink); color: var(--paper); display: grid; place-items: center; cursor: pointer; box-shadow: 0 10px 30px -8px rgba(20, 29, 43, .6); }
+  .bigplay[hidden] { display: none; }
+  .bigplay svg { width: 30px; height: 30px; margin-left: 4px; }
+  .bigplay:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 3px; }
+
+  .caption { min-height: 3.4em; padding: 12px 20px; color: var(--bar-text); font-size: clamp(14px, 1.9vw, 18px); line-height: 1.45; display: flex; align-items: center; justify-content: center; text-align: center; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+  .caption span { max-width: 70ch; transition: opacity .25s; }
+
+  .controls { display: flex; align-items: center; gap: 14px; padding: 10px 16px 14px; color: var(--bar-text); }
+  .controls button { background: none; border: 0; color: inherit; width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; flex: none; }
+  .controls button:hover { background: rgba(255, 255, 255, .08); }
+  .controls button:focus-visible { outline: 2px solid #8ea6ff; }
+  .controls svg { width: 20px; height: 20px; }
+  .time { font: 500 13px "IBM Plex Mono", ui-monospace, monospace; color: var(--bar-soft); font-variant-numeric: tabular-nums; flex: none; }
+  .seek { position: relative; flex: 1; min-width: 0; height: 36px; display: flex; align-items: center; }
+  .seek input { width: 100%; margin: 0; appearance: none; -webkit-appearance: none; background: transparent; height: 36px; cursor: pointer; position: relative; z-index: 2; }
+  .seek input::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; margin-top: -5px; border: 0; }
+  .seek input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 0; }
+  .seek input:focus-visible { outline: 2px solid #8ea6ff; border-radius: 4px; }
+  .ticks { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+  .ticks i { position: absolute; top: 15px; width: 2px; height: 6px; background: var(--bar); }
+
+  .chapters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .chapters button { width: 100%; text-align: left; display: flex; gap: 10px; align-items: baseline; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
+  .chapters button:hover { border-color: var(--cobalt); }
+  .chapters button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  .chapters button[aria-current="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .chapters .n { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--cobalt); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .n { color: #8ea6ff; }
+  .chapters .t { font-weight: 600; flex: 1; }
+  .chapters .d { font: 400 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--soft); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .d { color: var(--bar-soft); }
+
+  details { border-top: 1px solid var(--line); padding-top: 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .transcript { max-width: 70ch; }
+  .transcript h3 { font: 700 17px "Bricolage Grotesque", system-ui, sans-serif; margin: 18px 0 4px; }
+  .transcript p { margin: 0 0 6px; color: var(--soft); }
+
+  @media (max-width: 560px) {
+    .controls { gap: 8px; padding-inline: 10px; }
+    .time { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">did:cid · herald · three minutes</p>
+    <h1>Sign in with a DID</h1>
+    <p>An animated walkthrough of signing in without a password: a site asks with a challenge, your wallet answers, Herald verifies the response, and any website can use the same flow through OpenID Connect. Everything on screen is drawn live with canvas code.</p>
+  </header>
+
+  <div class="player" id="player" tabindex="0" aria-label="Animation player. Space plays or pauses, arrow keys skip.">
+    <div class="stage">
+      <canvas id="cv" role="img" aria-label="Animated diagram of signing in with a DID. The caption below describes each scene."></canvas>
+      <button class="bigplay" id="bigplay" aria-label="Play animation" hidden>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+      </button>
+    </div>
+    <div class="caption"><span id="cap"></span></div>
+    <div class="controls">
+      <button id="pp" aria-label="Play"></button>
+      <div class="seek">
+        <input type="range" id="seek" min="0" max="150" step="0.05" value="0" aria-label="Seek">
+        <div class="ticks" id="ticks"></div>
+      </div>
+      <span class="time" id="time">0:00 / 2:30</span>
+      <button id="fs" aria-label="Full screen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <ol class="chapters" id="chapters"></ol>
+
+  <details>
+    <summary>Transcript</summary>
+    <div class="transcript" id="transcript"></div>
+  </details>
+</div>
+
+<script>
+(() => {
+  // ---------- palette & type ----------
+  const W = 1280, H = 720, TOTAL = 150;
+  const C = {
+    paper: '#e8ecf1', grid: '#dbe1e9', gridB: '#c6cfdb', panel: '#f6f8fb',
+    ink: '#141d2b', soft: '#5b6879', faint: '#8c98a8',
+    cobalt: '#2a4fc4', cobaltL: '#dde5fb',
+    amber: '#c97a12', amberL: '#fbecd3',
+    green: '#23835a', greenL: '#d6eee2',
+    red: '#c03b28', redL: '#f8dcd6'
+  };
+  const DISP = '"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif';
+  const SANS = '"IBM Plex Sans", system-ui, sans-serif';
+  const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
+
+  // ---------- math ----------
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const p = (t, a, b) => clamp((t - a) / (b - a));
+  const e = (t, a, b) => ease(p(t, a, b));
+  const rnd = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+  const hx = c => { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  const mix = (a, b, t) => { const A = hx(a), B = hx(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], clamp(t)))).join(',')})`; };
+  const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
+  const scram = (s, pr, t, seed) => {
+    const k = Math.floor(pr * s.length); let out = '';
+    for (let i = 0; i < s.length; i++) out += i < k ? s[i] : B32[Math.floor(rnd(seed * 97 + i * 13 + Math.floor(t * 18)) * 32)];
+    return out;
+  };
+
+  // ---------- canvas ----------
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  let scale = 1;
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    const d = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.max(1, Math.round(r.width * d));
+    cv.height = Math.max(1, Math.round(r.width * 9 / 16 * d));
+    scale = cv.width / W;
+    render();
+  }
+
+  // ---------- drawing primitives ----------
+  function T(s, x, y, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.font = `${o.w || 400} ${o.s || 16}px ${o.f || SANS}`;
+    ctx.fillStyle = o.c || C.ink; ctx.textAlign = o.al || 'left'; ctx.textBaseline = o.b || 'alphabetic';
+    if (o.ls) ctx.letterSpacing = o.ls + 'px';
+    ctx.fillText(s, x, y); ctx.restore();
+  }
+  function tw(s, size, font = SANS, weight = 400) { ctx.save(); ctx.font = `${weight} ${size}px ${font}`; const w = ctx.measureText(s).width; ctx.restore(); return w; }
+  function box(x, y, w, h, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, o.r ?? 10);
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 1.5; if (o.dash) ctx.setLineDash(o.dash); ctx.stroke(); }
+    ctx.restore();
+  }
+  const cbox = (cx, cy, w, h, o) => box(cx - w / 2, cy - h / 2, w, h, o);
+  function pop(cx, cy, pr, fn) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.globalAlpha *= pr;
+    const s = lerp(.88, 1, pr);
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+    fn(); ctx.restore();
+  }
+  function arrowHead(x, y, a, c, s) {
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.lineTo(x - s * Math.cos(a - .45), y - s * Math.sin(a - .45));
+    ctx.lineTo(x - s * Math.cos(a + .45), y - s * Math.sin(a + .45));
+    ctx.closePath(); ctx.fillStyle = c; ctx.fill();
+  }
+  function arrow(x1, y1, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, x = lerp(x1, x2, pr), y = lerp(y1, y2, pr);
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(x, y, Math.atan2(y2 - y1, x2 - x1), c, o.hs || 10);
+    ctx.restore();
+  }
+  const qpt = (x1, y1, cx, cy, x2, y2, t) => { const u = 1 - t; return [u * u * x1 + 2 * u * t * cx + t * t * x2, u * u * y1 + 2 * u * t * cy + t * t * y2]; };
+  function qarrow(x1, y1, cx, cy, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, N = 36;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1);
+    let prev = [x1, y1], cur = prev;
+    for (let i = 1; i <= N; i++) { const tt = pr * i / N; prev = cur; cur = qpt(x1, y1, cx, cy, x2, y2, tt); ctx.lineTo(cur[0], cur[1]); }
+    ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(cur[0], cur[1], Math.atan2(cur[1] - prev[1], cur[0] - prev[0]), c, o.hs || 10);
+    ctx.restore();
+  }
+  function dot(x, y, r, c, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill(); ctx.restore(); }
+  function packet(x1, y1, x2, y2, pr, c, r = 6) { if (pr <= 0 || pr >= 1) return; dot(lerp(x1, x2, pr), lerp(y1, y2, pr), r, c); }
+  function check(x, y, s, pr, c = C.green) {
+    if (pr <= 0) return;
+    const a = [x - s * .5, y], b = [x - s * .12, y + s * .38], d = [x + s * .55, y - s * .42];
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]);
+    const p1 = clamp(pr / .35); ctx.lineTo(lerp(a[0], b[0], p1), lerp(a[1], b[1], p1));
+    if (pr > .35) { const p2 = clamp((pr - .35) / .65); ctx.lineTo(lerp(b[0], d[0], p2), lerp(b[1], d[1], p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function cross(x, y, s, pr, c = C.red) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .22; ctx.lineCap = 'round';
+    const p1 = clamp(pr / .5), p2 = clamp((pr - .5) / .5);
+    ctx.beginPath(); ctx.moveTo(x - s / 2, y - s / 2); ctx.lineTo(lerp(x - s / 2, x + s / 2, p1), lerp(y - s / 2, y + s / 2, p1));
+    if (p2 > 0) { ctx.moveTo(x + s / 2, y - s / 2); ctx.lineTo(lerp(x + s / 2, x - s / 2, p2), lerp(y - s / 2, y + s / 2, p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function person(x, y, s, c) {
+    ctx.save(); ctx.fillStyle = c;
+    ctx.beginPath(); ctx.arc(x, y - s * .28, s * .2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y + s * .4, s * .36, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function keyIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .14; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y, s * .3, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + s * .3, y); ctx.lineTo(x + s * 1.05, y);
+    ctx.moveTo(x + s * .75, y); ctx.lineTo(x + s * .75, y + s * .24);
+    ctx.moveTo(x + s * .98, y); ctx.lineTo(x + s * .98, y + s * .2);
+    ctx.stroke(); ctx.restore();
+  }
+  function lockIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = s * .13;
+    ctx.beginPath(); ctx.arc(x, y - s * .08, s * .26, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(x - s * .42, y - s * .1, s * .84, s * .6, s * .1); ctx.fill();
+    ctx.restore();
+  }
+  function db(x, y, w, h, c) {
+    const rx = w / 2, ry = h * .15, top = y - h / 2, bot = y + h / 2;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.fillStyle = C.panel;
+    ctx.beginPath(); ctx.moveTo(x - rx, top + ry); ctx.lineTo(x - rx, bot - ry);
+    ctx.ellipse(x, bot - ry, rx, ry, 0, Math.PI, 0, true);
+    ctx.lineTo(x + rx, top + ry); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI, true);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI); ctx.stroke();
+    ctx.restore();
+  }
+  function hexagon(x, y, r, rot, o = {}) {
+    ctx.save(); ctx.beginPath();
+    for (let i = 0; i < 6; i++) { const a = rot + i * Math.PI / 3; const px = x + r * Math.cos(a), py = y + r * Math.sin(a); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.closePath();
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 2; ctx.stroke(); }
+    ctx.restore();
+  }
+  function pill(cx, cy, text, o = {}) {
+    const s = o.s || 15, pad = o.pad || 14, w = tw(text, s, o.f || SANS, o.w || 600) + pad * 2, h = s + 16;
+    pop(cx, cy, o.pr ?? 1, () => {
+      cbox(cx, cy, w, h, { fill: o.bg || C.panel, stroke: o.stroke || C.gridB, r: h / 2 });
+      T(text, cx, cy + 1, { s, w: o.w || 600, f: o.f || SANS, c: o.c || C.ink, al: 'center', b: 'middle' });
+    });
+  }
+  function codeLine(s, x, y, n, fs) {
+    const re = /("(?:[^"\\]|\\.)*"\s*:)|("(?:[^"\\]|\\.)*")|([{}\[\],])|(\b\d+\b)|([^"{}\[\],]+?(?=["{}\[\],]|\b\d+\b|$))/g;
+    ctx.save(); ctx.font = `400 ${fs}px ${MONO}`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    let m, cx = x, used = 0;
+    while ((m = re.exec(s)) && used < n) {
+      if (!m[0]) { re.lastIndex++; continue; }
+      const tok = m[0];
+      ctx.fillStyle = m[1] ? C.soft : m[2] ? C.cobalt : m[3] ? C.faint : m[4] ? C.amber : C.ink;
+      const show = tok.slice(0, n - used); used += tok.length;
+      ctx.fillText(show, cx, y); cx += ctx.measureText(show).width;
+    }
+    ctx.restore();
+  }
+  function card(x, y, w, title, lines, pr, o = {}) {
+    const fs = o.fs || 14, lh = o.lh || 22, top = 30 + 24;
+    const h = top + (lines.length - 1) * lh + 18;
+    const ly = i => y + top + i * lh;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    box(x, y, w, h, { fill: C.panel, stroke: C.gridB, r: 12 });
+    ctx.beginPath(); ctx.roundRect(x, y, w, 30, [12, 12, 0, 0]); ctx.fillStyle = o.hc || C.ink; ctx.fill();
+    T(title.toUpperCase(), x + 16, y + 20, { f: MONO, s: 12, w: 500, c: C.paper, ls: 1.2 });
+    let n = Math.floor(pr * lines.reduce((a, l) => a + l.length, 0));
+    lines.forEach((l, i) => {
+      const hl = o.hl && o.hl[i];
+      if (hl && hl[1] > 0) { ctx.save(); ctx.globalAlpha *= hl[1]; ctx.fillStyle = hl[0]; ctx.fillRect(x + 6, ly(i) - fs - 2, w - 12, lh); ctx.restore(); }
+      if (n > 0) { codeLine(l, x + 16, ly(i), n, fs); n -= l.length; }
+    });
+    ctx.restore();
+    return { h, ly };
+  }
+
+  // ---------- ambient network ----------
+  const NET = Array.from({ length: 46 }, (_, i) => ({ x: rnd(i * 3 + 1) * W, y: rnd(i * 3 + 2) * H, ph: rnd(i * 3 + 3) * 6.28 }));
+  function network(t, a) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    const P = NET.map(q => [q.x + Math.sin(t * .3 + q.ph) * 16, q.y + Math.cos(t * .25 + q.ph) * 12]);
+    ctx.lineWidth = 1;
+    for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+      const d = Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1]);
+      if (d < 175) { ctx.strokeStyle = `rgba(90,110,140,${(1 - d / 175) * .45})`; ctx.beginPath(); ctx.moveTo(P[i][0], P[i][1]); ctx.lineTo(P[j][0], P[j][1]); ctx.stroke(); }
+    }
+    P.forEach((q, i) => dot(q[0], q[1], i % 7 === 0 ? 4 : 2.5, i % 7 === 0 ? C.cobalt : C.faint, .8));
+    ctx.restore();
+  }
+
+  function background() {
+    ctx.fillStyle = C.paper; ctx.fillRect(0, 0, W, H);
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 40) { ctx.strokeStyle = x % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = x % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += 40) { ctx.strokeStyle = y % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = y % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+
+  function heading(n, title, t) {
+    const a = e(t, 0, .8);
+    T(`${String(n).padStart(2, '0')} / 09`, 56, 58, { f: MONO, s: 13, w: 500, c: C.cobalt, a, ls: 1.5 });
+    T(title, 56 + lerp(-12, 0, a), 94, { f: DISP, s: 32, w: 700, a });
+  }
+
+  // ---------- shared pieces ----------
+  const USER = 'did:cid:…c4r0', CHAL = 'did:cid:…ch9e', RESP = 'did:cid:…r35p';
+  function actor(x, y, name, role, c, a = 1, s = 56) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    T(role.toUpperCase(), x, y - s * .95, { f: MONO, s: 12, w: 500, c: C.soft, al: 'center', ls: 1.2 });
+    person(x, y, s, c);
+    T(name, x, y + s * 1.05, { s: 17, w: 600, al: 'center' });
+    ctx.restore();
+  }
+  function svc(cx, cy, w, title, sub, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    cbox(cx, cy, w, 70, { fill: o.fill || C.panel, stroke: o.stroke || C.ink, lw: 2, r: 12 });
+    T(title, cx, cy - 4, { f: DISP, s: 19, w: 700, al: 'center', c: o.c || C.ink });
+    T(sub, cx, cy + 18, { s: 12, c: o.sc || C.soft, al: 'center' });
+    ctx.restore();
+  }
+  // A QR-like glyph: finder squares plus a deterministic module pattern.
+  function qr(cx, cy, s, a = 1) {
+    if (a <= 0) return;
+    const n = 21, m = s / n, x0 = cx - s / 2, y0 = cy - s / 2;
+    ctx.save(); ctx.globalAlpha *= a;
+    box(x0 - 10, y0 - 10, s + 20, s + 20, { fill: '#ffffff', stroke: C.gridB, r: 8 });
+    ctx.fillStyle = C.ink;
+    const finder = (fx, fy) => {
+      ctx.fillRect(x0 + fx * m, y0 + fy * m, 7 * m, 7 * m);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(x0 + (fx + 1) * m, y0 + (fy + 1) * m, 5 * m, 5 * m);
+      ctx.fillStyle = C.ink; ctx.fillRect(x0 + (fx + 2) * m, y0 + (fy + 2) * m, 3 * m, 3 * m);
+    };
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const inFinder = (i < 8 && j < 8) || (i > 12 && j < 8) || (i < 8 && j > 12);
+      if (!inFinder && rnd(i * 31 + j * 7 + 3) > .52) ctx.fillRect(x0 + i * m, y0 + j * m, m, m);
+    }
+    finder(0, 0); finder(14, 0); finder(0, 14);
+    ctx.restore();
+  }
+  function phone(cx, cy, a = 1) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    box(cx - 120, cy - 200, 240, 400, { fill: C.ink, r: 28 });
+    box(cx - 108, cy - 184, 216, 368, { fill: C.panel, r: 18 });
+    ctx.restore();
+  }
+  function flowStep(x, y, n, text, a, done, c = C.cobalt) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    dot(x, y - 5, 14, done ? C.greenL : C.cobaltL);
+    if (done) check(x, y - 5, 14, 1); else T(String(n), x, y, { f: MONO, s: 13, w: 500, c, al: 'center' });
+    T(text, x + 26, y, { s: 16, w: 500 });
+    ctx.restore();
+  }
+
+  // ---------- scene 1: title ----------
+  function s1(t) {
+    network(t, .55);
+    const g = ctx.createRadialGradient(640, 330, 40, 640, 330, 540);
+    g.addColorStop(0, 'rgba(232,236,241,0.97)'); g.addColorStop(1, 'rgba(232,236,241,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const sc = lerp(.97, 1, e(t, 0, 2.5));
+    ctx.save(); ctx.translate(640, 280); ctx.scale(sc, sc);
+    T('Sign in with a DID', 0, 0, { f: DISP, s: 96, w: 800, al: 'center', b: 'middle', ls: -1.5 });
+    ctx.restore();
+    T('How a site learns who you are without a password', 640, 372, { s: 25, c: C.soft, al: 'center', a: e(t, .8, 2.3) });
+    [['No password', 470], ['Your wallet answers', 640], ['Works with OpenID Connect', 842]].forEach(([s, x], i) =>
+      pill(x, 452, s, { pr: e(t, 4 + i * .4, 4.6 + i * .4), s: 14, c: C.soft }));
+  }
+
+  // ---------- scene 2: the problem ----------
+  function s2(t) {
+    heading(2, 'The problem with passwords', t);
+    const la = e(t, 0, .8);
+    box(70, 150, 540, 400, { fill: C.panel, stroke: C.gridB, r: 14, a: la });
+    T('A password account', 94, 188, { f: DISP, s: 22, w: 700, a: la });
+    [['the site stores a secret about you', 1], ['one account per site', 2.2], ['a leak exposes every account’s secret', 3.4], ['a lost password means a reset email', 4.6]].forEach(([s, at], i) => {
+      const y = 240 + i * 70;
+      cross(106, y - 6, 18, e(t, at, at + .6));
+      T(s, 132, y, { s: 17, w: 500, a: e(t, at, at + .4) });
+    });
+    const ra = e(t, 7, 7.8);
+    box(670, 150, 540, 400, { fill: mix(C.panel, C.greenL, ra * .5), stroke: mix(C.gridB, C.green, ra), r: 14, a: ra });
+    T('A DID sign-in', 694, 188, { f: DISP, s: 22, w: 700, a: ra });
+    [['the site stores no secret', 8], ['one identity, many sites', 9.2], ['proof comes from a key only you hold', 10.4], ['your wallet answers each time', 11.6]].forEach(([s, at], i) => {
+      const y = 240 + i * 70;
+      check(706, y - 6, 18, e(t, at, at + .6));
+      T(s, 732, y, { s: 17, w: 500, a: e(t, at, at + .4) });
+    });
+  }
+
+  // ---------- scene 3: the challenge ----------
+  const CHALLENGE = [
+    '{',
+    '  "challenge": {',
+    '    "callback": "https://herald.example/api/login"',
+    '  }',
+    '}'
+  ];
+  function s3(t) {
+    heading(3, 'The site asks', t);
+    svc(170, 330, 220, 'Herald', 'the site’s name service', { a: e(t, 0, .7) });
+    arrow(170, 280, 170, 220, e(t, .8, 1.6), { c: C.soft, hs: 8 });
+    T('GET /api/challenge', 188, 256, { f: MONO, s: 12, w: 500, c: C.cobalt, a: e(t, 1, 1.6) });
+    T('the login page asks', 170, 200, { s: 13, c: C.soft, al: 'center', a: e(t, 1, 1.6) });
+    const cd = card(330, 200, 480, 'challenge · an asset did', CHALLENGE, p(t, 2.2, 5), {
+      a: e(t, 2, 2.6), fs: 14, lh: 22, hc: C.cobalt, hl: { 2: [C.amberL, e(t, 6, 6.8)] }
+    });
+    arrow(284, 330, 326, 300, e(t, 2, 2.8), { c: C.cobalt, hs: 8 });
+    T('createChallenge', 330, 186, { f: MONO, s: 12, w: 500, c: C.cobalt, a: e(t, 2, 2.6) });
+    T('where the wallet should send its answer', 570, cd.h + 226, { s: 14, w: 600, c: C.amber, al: 'center', a: e(t, 6.4, 7) });
+    T('no credentials requested: identity only', 570, cd.h + 250, { s: 14, c: C.soft, al: 'center', a: e(t, 7.4, 8) });
+    // QR
+    qr(1040, 300, 170, e(t, 9.4, 10.4));
+    T('wallet URL ?challenge=' + CHAL, 1040, 420, { f: MONO, s: 12, c: C.cobalt, al: 'center', a: e(t, 10, 10.6) });
+    T('shown as a QR code or link', 1040, 444, { s: 14, c: C.soft, al: 'center', a: e(t, 10.4, 11) });
+    arrow(816, 300, 930, 300, e(t, 9, 9.8), { c: C.ink, hs: 8 });
+    pill(1040, 500, 'expires after an hour by default', { pr: e(t, 13, 13.6), s: 13, c: C.soft });
+  }
+
+  // ---------- scene 4: the wallet answers ----------
+  function s4(t) {
+    heading(4, 'The wallet answers', t);
+    qr(150, 290, 120, e(t, 0, .6));
+    arrow(230, 290, 330, 290, e(t, .8, 1.8), { c: C.ink, hs: 8 });
+    T('scan', 280, 276, { f: MONO, s: 12, w: 500, c: C.soft, al: 'center', a: e(t, 1, 1.6) });
+    const pa = e(t, 1.2, 2);
+    phone(470, 360, pa);
+    if (pa > 0) {
+      ctx.save(); ctx.globalAlpha *= pa;
+      T('Login Request', 380, 206, { f: DISP, s: 20, w: 700 });
+      T('DESTINATION', 380, 240, { f: MONO, s: 10, w: 500, c: C.soft, ls: 1 });
+      T('herald.example/api/login', 380, 260, { f: MONO, s: 12, c: C.ink });
+      T('CREDENTIALS', 380, 294, { f: MONO, s: 10, w: 500, c: C.soft, ls: 1 });
+      T('Identity verification only', 380, 314, { s: 14, w: 600 });
+      T('(no credentials requested)', 380, 334, { s: 13, c: C.soft });
+      const ba = e(t, 5.4, 6);
+      cbox(470, 500, 180, 44, { fill: mix(C.cobaltL, C.cobalt, ba), r: 22 });
+      T('Send response', 470, 506, { s: 15, w: 700, c: ba > .5 ? C.paper : C.cobalt, al: 'center' });
+      ctx.restore();
+    }
+    // response
+    const ra = e(t, 7, 7.8);
+    if (ra > 0) {
+      ctx.save(); ctx.globalAlpha *= ra;
+      box(650, 170, 380, 190, { fill: C.panel, stroke: C.gridB, r: 12 });
+      T('createResponse(challenge)', 670, 202, { f: MONO, s: 14, w: 500, c: C.cobalt });
+      T('a new asset DID ' + RESP, 670, 236, { s: 15, w: 600 });
+      keyIcon(678, 268, 16, C.amber);
+      T('created and signed by your DID', 702, 273, { s: 14, c: C.soft });
+      lockIcon(680, 308, 18, C.ink);
+      T('encrypted to Herald, the challenger', 702, 313, { s: 14, c: C.soft });
+      T('names the challenge; no password', 670, 345, { s: 14, c: C.soft });
+      ctx.restore();
+    }
+    arrow(600, 440, 1060, 440, e(t, 12, 13.4), { c: C.cobalt, dash: [7, 6] });
+    T('POST { response } → the callback URL', 830, 424, { f: MONO, s: 13, w: 500, c: C.cobalt, al: 'center', a: e(t, 12.6, 13.4) });
+    svc(1140, 440, 150, 'Herald', '/api/login', { a: e(t, 12, 12.8) });
+  }
+
+  // ---------- scene 5: Herald verifies ----------
+  const VERIFY = [
+    ['decrypt the response with Herald’s key', 1],
+    ['check it answers this challenge', 2.6],
+    ['credentials requested? none', 4.2],
+    ['responder = the DID that signed it', 5.8]
+  ];
+  function s5(t) {
+    heading(5, 'Herald verifies', t);
+    T('verifyResponse(response, { retries: 10 })', 90, 170, { f: MONO, s: 17, w: 500, c: C.cobalt, a: e(t, 0, .8) });
+    VERIFY.forEach(([s, at], i) => flowStep(104, 230 + i * 56, i + 1, s, e(t, at, at + .5), t >= at + 1.2));
+    const sa = e(t, 8, 8.8);
+    if (sa > 0) {
+      ctx.save(); ctx.globalAlpha *= sa;
+      box(90, 470, 500, 110, { fill: C.greenL, stroke: C.green, lw: 2, r: 12 });
+      T('session.user = { did: ' + USER + ' }', 114, 512, { f: MONO, s: 15, w: 500, c: C.green });
+      T('Herald also notes first and last login for that DID', 114, 546, { s: 14, c: C.soft });
+      ctx.restore();
+    }
+    // browser picks it up
+    const ba = e(t, 10, 10.8);
+    if (ba > 0) {
+      ctx.save(); ctx.globalAlpha *= ba;
+      box(700, 180, 500, 300, { fill: C.panel, stroke: C.gridB, r: 12 });
+      ctx.beginPath(); ctx.roundRect(700, 180, 500, 32, [12, 12, 0, 0]); ctx.fillStyle = C.ink; ctx.fill();
+      [0, 1, 2].forEach(k => dot(720 + k * 18, 196, 5, C.gridB));
+      T('herald.example', 790, 201, { f: MONO, s: 12, c: C.gridB });
+      const logged = t >= 13;
+      if (!logged) {
+        qr(950, 320, 110, 1);
+        T('waiting for the wallet…', 950, 430, { s: 14, c: C.soft, al: 'center' });
+      } else {
+        dot(950, 300, 44, C.greenL); check(950, 300, 36, e(t, 13, 13.8));
+        T('Signed in as', 950, 380, { s: 15, c: C.soft, al: 'center' });
+        T(USER, 950, 406, { f: MONO, s: 16, w: 500, c: C.cobalt, al: 'center' });
+      }
+      ctx.restore();
+    }
+    T('the page’s session holds the challenge, so it sees the login', 950, 520, { s: 14, c: C.soft, al: 'center', a: e(t, 13.6, 14.4) });
+  }
+
+  // ---------- scene 6: OpenID Connect ----------
+  const OIDC = [
+    ['site redirects to /oauth/authorize', 'registered client and redirect URI'],
+    ['Herald shows a sign-in QR', 'and polls for the answer'],
+    ['wallet answers to /oauth/callback', 'Herald runs verifyResponse'],
+    ['redirect back with ?code=…', 'the code is good for 10 minutes'],
+    ['site POSTs /oauth/token', 'gets an id_token and access token'],
+    ['site can check the ES256 signature', 'against Herald’s published JWKS']
+  ];
+  function s6(t) {
+    heading(6, 'OpenID Connect', t);
+    svc(170, 200, 230, 'Any website', 'an OIDC client', { a: e(t, 0, .7) });
+    svc(1100, 200, 200, 'Herald', 'OpenID provider', { a: e(t, .3, 1) });
+    actor(640, 200, 'You', 'Wallet', C.cobalt, e(t, .6, 1.2), 44);
+    OIDC.forEach(([s, d], i) => {
+      const at = 1.6 + i * 3, y = 330 + i * 50, a = e(t, at, at + .5), done = t >= at + 2.6;
+      const x = i % 2 ? 660 : 100;
+      void x;
+      ctx.save(); ctx.globalAlpha *= a;
+      dot(120, y - 5, 14, done ? C.greenL : C.cobaltL);
+      if (done) check(120, y - 5, 14, 1); else T(String(i + 1), 120, y, { f: MONO, s: 13, w: 500, c: C.cobalt, al: 'center' });
+      T(s, 146, y, { s: 16, w: 600 });
+      T(d, 560, y, { s: 15, c: C.soft });
+      ctx.restore();
+    });
+    // arrows showing who talks to whom, one per step
+    const legs = [[290, 1000], [1000, 700], [690, 1000], [1000, 290], [290, 1000], [1000, 290]];
+    legs.forEach(([a, b], i) => {
+      const at = 1.6 + i * 3, v = e(t, at, at + 1) * (1 - e(t, at + 2.6, at + 3));
+      arrow(a, 278, b, 278, v, { c: C.cobalt, hs: 8, a: v });
+    });
+  }
+
+  // ---------- scene 7: what the site gets ----------
+  const TOKEN = [
+    '{',
+    '  "sub": "did:cid:…c4r0",',
+    '  "did": "did:cid:…c4r0",',
+    '  "preferred_username": "carol",',
+    '  "name": "…", "picture": "…",',
+    '  "email": "…", "email_verified": true,',
+    '  "iss": "…/names/oauth", "exp": now + 1 hour',
+    '}'
+  ];
+  function s7(t) {
+    heading(7, 'What the site gets', t);
+    const cd = card(90, 150, 520, 'id_token · es256 jwt', TOKEN, p(t, .6, 4), {
+      a: e(t, .4, 1), fs: 14, lh: 22, hc: C.cobalt, hl: { 1: [C.cobaltL, e(t, 4.6, 5.2)], 2: [C.cobaltL, e(t, 4.6, 5.2)] }
+    });
+    T('the subject is your DID', 350, cd.h + 180, { s: 16, w: 600, c: C.cobalt, al: 'center', a: e(t, 5, 5.6) });
+    T('handle and picture from your Herald profile, if you have one', 350, cd.h + 204, { s: 14, c: C.soft, al: 'center', a: e(t, 6.4, 7) });
+    const na = e(t, 8.4, 9.2);
+    ctx.save(); ctx.globalAlpha *= na;
+    box(680, 150, 520, 300, { fill: C.panel, stroke: C.gridB, r: 12 });
+    T('What it never gets', 704, 188, { f: DISP, s: 22, w: 700 });
+    [['a password or password hash', 9.2], ['your private key', 10.2], ['any secret it could leak', 11.2]].forEach(([s, at], i) => {
+      const y = 240 + i * 60;
+      cross(716, y - 6, 18, e(t, at, at + .6));
+      T(s, 742, y, { s: 17, w: 500 });
+    });
+    T('next time, your wallet signs a fresh answer', 704, 420, { s: 14, c: C.soft });
+    ctx.restore();
+  }
+
+  // ---------- scene 8: asking for more ----------
+  const ASK = [
+    '{',
+    '  "challenge": {',
+    '    "callback": "…",',
+    '    "credentials": [{',
+    '      "schema": "did:cid:…5ema",',
+    '      "issuers": ["did:cid:…a1ce"]',
+    '    }]',
+    '  }',
+    '}'
+  ];
+  function s8(t) {
+    heading(8, 'Asking for more than a DID', t);
+    card(90, 150, 470, 'challenge · with credentials', ASK, p(t, .6, 4), {
+      a: e(t, .4, 1), fs: 14, lh: 22, hc: C.cobalt, hl: { 3: [C.amberL, e(t, 4.4, 5)], 4: [C.amberL, e(t, 4.4, 5)], 5: [C.amberL, e(t, 4.4, 5)], 6: [C.amberL, e(t, 4.4, 5)] }
+    });
+    const ra = e(t, 6, 6.8);
+    ctx.save(); ctx.globalAlpha *= ra;
+    box(640, 150, 560, 250, { fill: C.panel, stroke: C.gridB, r: 12 });
+    T('The response then carries presentations', 664, 188, { s: 17, w: 600 });
+    T('and verifyResponse checks each one:', 664, 212, { s: 17, w: 600 });
+    ['signed by its issuer', 'still live and current', 'lives at the DID presented', 'meets a request'].forEach((s, i) => {
+      check(676, 250 + i * 36 - 5, 14, e(t, 7 + i * .4, 7.6 + i * .4));
+      T(s, 698, 250 + i * 36, { s: 15, w: 500 });
+    });
+    ctx.restore();
+    T('See “Proving what you hold” for how those checks work.', 920, 450, { s: 15, w: 600, c: C.cobalt, al: 'center', a: e(t, 10, 10.8) });
+    T('Herald’s own sign-in asks for none.', 920, 478, { s: 15, c: C.soft, al: 'center', a: e(t, 11, 11.8) });
+  }
+
+  // ---------- scene 9: recap ----------
+  const RECAP = [
+    'the site asks with a challenge DID',
+    'your wallet answers with a response only it could create',
+    'the verifier learns your DID, and nothing secret',
+    'OpenID Connect sites get a signed id_token',
+    'credentials only when a challenge asks for them'
+  ];
+  function s9(t) {
+    const out = e(t, 7, 8);
+    ctx.save(); ctx.globalAlpha *= 1 - out;
+    heading(9, 'Recap', t);
+    T('Signing in with a DID', 110, 190, { f: DISP, s: 38, w: 800, a: e(t, .2, .8) });
+    RECAP.forEach((s, i) => {
+      const y = 258 + i * 60, a = e(t, .8 + i * .5, 1.4 + i * .5);
+      dot(132, y - 7, 18, C.greenL, a); check(132, y - 7, 18, a);
+      T(s, 168, y, { s: 23, w: 500, a });
+    });
+    ctx.restore();
+    if (out > 0) {
+      network(t, .5 * out);
+      const g = ctx.createRadialGradient(640, 360, 40, 640, 360, 520);
+      g.addColorStop(0, `rgba(232,236,241,${.97 * out})`); g.addColorStop(1, 'rgba(232,236,241,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      T('Nothing to remember', 640, 320, { f: DISP, s: 84, w: 800, al: 'center', b: 'middle', ls: -1.5, a: out });
+      T('Nothing for a site to leak.', 640, 400, { s: 26, al: 'center', c: C.ink, a: e(t, 8, 8.8) });
+      T('docs/services/herald · §2.2, §2.8, §3', 640, 458, { f: MONO, s: 18, w: 500, c: C.cobalt, al: 'center', a: e(t, 8.8, 9.6) });
+    }
+  }
+
+  // ---------- timeline ----------
+  const SCENES = [
+    { title: 'Sign in with a DID', start: 0, dur: 10, draw: s1 },
+    { title: 'The problem', start: 10, dur: 16, draw: s2 },
+    { title: 'The site asks', start: 26, dur: 18, draw: s3 },
+    { title: 'The wallet answers', start: 44, dur: 20, draw: s4 },
+    { title: 'Herald verifies', start: 64, dur: 18, draw: s5 },
+    { title: 'OpenID Connect', start: 82, dur: 22, draw: s6 },
+    { title: 'What the site gets', start: 104, dur: 16, draw: s7 },
+    { title: 'Asking for more', start: 120, dur: 16, draw: s8 },
+    { title: 'Recap', start: 136, dur: 14, draw: s9 }
+  ];
+  const CUES = [
+    [0, 5, 'With Archon, you sign in to a site by proving you control a DID. There is no password.'],
+    [5, 10, 'This is how Herald, Archon’s name service, does it, and how any website can use it.'],
+    [10, 18, 'A password account means the site keeps a secret about you, and every site keeps its own.'],
+    [18, 26, 'A DID sign-in turns that around: the site stores no secret, and the proof comes from a key only your wallet holds.'],
+    [26, 32, 'The login page asks Herald for a challenge. Herald creates one: a small asset DID.'],
+    [32, 38, 'It names a callback URL for the answer, and asks for no credentials: this is identity only.'],
+    [38, 44, 'The page shows it as a QR code or a link that opens your wallet. By default it expires after an hour.'],
+    [44, 50, 'Your wallet shows a login request: where the answer will go, and what is being asked for.'],
+    [50, 57, 'When you approve, it creates a response: a new asset DID that only your DID can create, encrypted to Herald.'],
+    [57, 64, 'The wallet posts the response DID to the callback URL. No password, and no key, ever leaves the wallet.'],
+    [64, 70, 'Herald verifies the response: it decrypts it and checks that it answers this challenge.'],
+    [70, 76, 'The DID that created the response is who you are. Herald stores it in the session and notes the login.'],
+    [76, 82, 'The login page was waiting on that same challenge, so it now shows you signed in.'],
+    [82, 88, 'Any website can use this through OpenID Connect. It registers with Herald and redirects you there to sign in.'],
+    [88, 94, 'Herald shows the same kind of QR code. Your wallet answers, and Herald verifies the response.'],
+    [94, 100, 'Herald redirects you back with a one-time code, which the site exchanges for an ID token.'],
+    [100, 104, 'The ID token is signed with Herald’s key, which it publishes, so the site can check it.'],
+    [104, 110, 'The token’s subject is your DID, plus your handle and picture if you have a Herald profile.'],
+    [110, 116, 'The site never receives a password or a private key, so it has no secret of yours to leak.'],
+    [116, 120, 'Next time, your wallet signs a fresh answer to a fresh challenge.'],
+    [120, 126, 'A challenge can also ask for credentials: a schema, and the issuers the site trusts.'],
+    [126, 132, 'Then the response carries presentations, and verification checks each one before it counts.'],
+    [132, 136, 'Herald’s own sign-in asks for none. The credential walkthrough shows how those checks work.'],
+    [136, 143, 'The site asks, your wallet answers with something only you could create, and the site learns your DID.'],
+    [143, 150, 'Nothing to remember, and nothing for a site to leak.']
+  ];
+
+  let t = 0, playing = false, last = 0;
+  function render() {
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.globalAlpha = 1;
+    background();
+    const i = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const sc = SCENES[i < 0 ? SCENES.length - 1 : i];
+    const lt = Math.min(t - sc.start, sc.dur - 1e-3);
+    const fin = sc.start === 0 ? 1 : clamp(lt / .5);
+    const fout = sc.start + sc.dur >= TOTAL ? 1 : clamp((sc.dur - lt) / .5);
+    ctx.save(); ctx.globalAlpha = Math.min(fin, fout);
+    sc.draw(lt);
+    ctx.restore();
+  }
+
+  // ---------- UI ----------
+  const $ = id => document.getElementById(id);
+  const pp = $('pp'), seek = $('seek'), timeEl = $('time'), cap = $('cap'), big = $('bigplay'), player = $('player');
+  const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>';
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  const chapList = $('chapters');
+  SCENES.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<button type="button"><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t"></span><span class="d">${fmt(s.start)}</span></button>`;
+    li.querySelector('.t').textContent = s.title;
+    li.querySelector('button').addEventListener('click', () => { t = s.start; if (!playing) setPlaying(true); sync(); });
+    chapList.appendChild(li);
+    if (i) { const tick = document.createElement('i'); tick.style.left = `calc(${s.start / TOTAL * 100}% - 1px)`; $('ticks').appendChild(tick); }
+  });
+  const chapBtns = [...chapList.querySelectorAll('button')];
+
+  const tr = $('transcript');
+  SCENES.forEach((s, i) => {
+    const h = document.createElement('h3'); h.textContent = `${String(i + 1).padStart(2, '0')} · ${s.title}`; tr.appendChild(h);
+    CUES.filter(c => c[0] >= s.start && c[0] < s.start + s.dur).forEach(c => { const pEl = document.createElement('p'); pEl.textContent = c[2]; tr.appendChild(pEl); });
+  });
+
+  let lastCue = -1, lastChap = -1;
+  function sync() {
+    seek.value = t.toFixed(2);
+    seek.style.setProperty('--pct', (t / TOTAL * 100) + '%');
+    timeEl.textContent = `${fmt(t)} / ${fmt(TOTAL)}`;
+    const ci = CUES.findIndex(c => t >= c[0] && t < c[1]);
+    const cue = ci < 0 ? CUES.length - 1 : ci;
+    if (cue !== lastCue) { cap.textContent = CUES[cue][2]; lastCue = cue; }
+    const ch = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const chap = ch < 0 ? SCENES.length - 1 : ch;
+    if (chap !== lastChap) { chapBtns.forEach((b, i) => b.setAttribute('aria-current', i === chap ? 'true' : 'false')); lastChap = chap; }
+    render();
+  }
+  function setPlaying(v) {
+    if (v && t >= TOTAL - .01) t = 0;
+    playing = v; last = performance.now();
+    pp.innerHTML = v ? ICON_PAUSE : ICON_PLAY;
+    pp.setAttribute('aria-label', v ? 'Pause' : 'Play');
+    big.hidden = v;
+    big.setAttribute('aria-label', t > 0 ? 'Resume animation' : 'Play animation');
+  }
+  function frame(now) {
+    if (playing) {
+      t = Math.min(TOTAL, t + Math.min(.1, (now - last) / 1000));
+      if (t >= TOTAL) setPlaying(false);
+      sync();
+    }
+    last = now;
+    requestAnimationFrame(frame);
+  }
+
+  pp.addEventListener('click', () => setPlaying(!playing));
+  big.addEventListener('click', () => setPlaying(true));
+  cv.addEventListener('click', () => setPlaying(!playing));
+  seek.addEventListener('input', () => { t = parseFloat(seek.value); sync(); });
+  player.addEventListener('keydown', ev => {
+    if (ev.target === seek) return;
+    if (ev.key === ' ' || ev.key === 'k') { ev.preventDefault(); setPlaying(!playing); }
+    else if (ev.key === 'ArrowRight') { ev.preventDefault(); t = Math.min(TOTAL, t + 5); sync(); }
+    else if (ev.key === 'ArrowLeft') { ev.preventDefault(); t = Math.max(0, t - 5); sync(); }
+  });
+  $('fs').addEventListener('click', () => {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else if (player.requestFullscreen) player.requestFullscreen().catch(() => {});
+    } catch (_) {}
+  });
+  document.addEventListener('fullscreenchange', () => requestAnimationFrame(resize));
+  new ResizeObserver(() => resize()).observe(cv);
+
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fontsReady = document.fonts ? Promise.race([
+    Promise.all([
+      document.fonts.load(`800 40px ${DISP}`), document.fonts.load(`700 40px ${DISP}`),
+      document.fonts.load(`400 16px ${SANS}`), document.fonts.load(`600 16px ${SANS}`),
+      document.fonts.load(`400 16px ${MONO}`), document.fonts.load(`500 16px ${MONO}`)
+    ]),
+    new Promise(r => setTimeout(r, 2000))
+  ]).catch(() => {}) : Promise.resolve();
+
+  setPlaying(false);
+  resize(); sync();
+  fontsReady.then(() => {
+    sync();
+    if (reduce) { t = 6; sync(); big.hidden = false; }
+    else setPlaying(true);
+    requestAnimationFrame(frame);
+  });
+})();
+</script>
+</body>
+</html>
