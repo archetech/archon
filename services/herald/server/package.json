@@ -22,7 +22,7 @@
     "jose": "^6.2.12",
     "morgan": "^1.12.1",
     "multer": "^2.4.0",
-    "undici": "^7.28.0"
+    "undici": "^7.30.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.18",
