@@ -42,7 +42,8 @@ const Header = (
                     component="img"
                     src={iconInverted}
                     alt="Archon"
-                    sx={{ width: 32, height: 32 }}
+                    // A black mark on transparency; white on the dark theme.
+                    sx={{ width: 32, height: 32, filter: darkMode ? "invert(1)" : "none" }}
                 />
             </Box>
 

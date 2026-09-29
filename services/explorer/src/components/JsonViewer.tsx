@@ -5,6 +5,8 @@ import React, {
     useState
 } from "react";
 import JsonView from '@uiw/react-json-view';
+import { darkTheme as jsonDarkTheme } from '@uiw/react-json-view/dark';
+import { lightTheme as jsonLightTheme } from '@uiw/react-json-view/light';
 import {
     Box,
     Button,
@@ -13,7 +15,8 @@ import {
     Select,
     TextField,
     Typography,
-    IconButton
+    IconButton,
+    useTheme
 } from "@mui/material";
 import {
     GatekeeperInterface,
@@ -45,6 +48,15 @@ function JsonViewer(
     const [searchPage, setSearchPage] = useState<number>(0);
     const [searchCount, setSearchCount] = useState<number>(50);
     const [searchParams, setSearchParams] = useSearchParams();
+    const theme = useTheme();
+    const linkColor = theme.palette.primary.main;
+    // The viewer's colors follow the app's theme mode; it draws on the page
+    // background, and its type labels use the theme's secondary text color.
+    const jsonStyle = {
+        ...(theme.palette.mode === 'dark' ? jsonDarkTheme : jsonLightTheme),
+        '--w-rjv-background-color': 'transparent',
+        '--w-rjv-info-color': theme.palette.text.secondary,
+    } as CSSProperties;
 
     useEffect(() => {
         const didParam = searchParams.get('did');
@@ -272,7 +284,7 @@ function JsonViewer(
                                         sx={{
                                             fontFamily: "Courier, monospace",
                                             textDecoration: "underline",
-                                            color: "blue",
+                                            color: "primary.main",
                                             cursor: "pointer",
                                             maxWidth: 700,
                                             overflow: "hidden",
@@ -387,6 +399,7 @@ function JsonViewer(
                         <JsonView
                             value={aliasDocs}
                             shortenTextAfterLength={0}
+                            style={jsonStyle}
                         >
                             <JsonView.String
                                 render={(
@@ -408,7 +421,7 @@ function JsonViewer(
                                         return (
                                             <span
                                                 {...rest}
-                                                style={{ ...style, color: 'blue', textDecoration: 'underline', cursor: 'pointer' }}
+                                                style={{ ...style, color: linkColor, textDecoration: 'underline', cursor: 'pointer' }}
                                                 onClick={() => handleClickDid(value)}
                                             >
                                                 {children}
@@ -434,7 +447,7 @@ function JsonViewer(
                                                     href={url}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    style={{ ...style, color: 'blue', textDecoration: 'underline', cursor: 'pointer' }}
+                                                    style={{ ...style, color: linkColor, textDecoration: 'underline', cursor: 'pointer' }}
                                                 >
                                                     {children}
                                                 </a>

@@ -3,12 +3,13 @@ import { CSSProperties } from "react";
 export function getTypeStyle(type: string): CSSProperties {
     const base = { fontWeight: "bold" as const };
     switch (type) {
+    // Palette paths, resolved by `sx` so they suit light and dark mode.
     case "create":
-        return { ...base, color: "green" };
+        return { ...base, color: "success.main" };
     case "update":
-        return { ...base, color: "orange" };
+        return { ...base, color: "warning.main" };
     case "delete":
-        return { ...base, color: "red" };
+        return { ...base, color: "error.main" };
     default:
         return base;
     }
