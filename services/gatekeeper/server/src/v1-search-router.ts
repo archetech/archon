@@ -172,6 +172,20 @@ export function createSearchRouter(options: CreateV1RouterOptions): express.Rout
      *                         type: object
      *                       opid:
      *                         type: string
+     *                       registration:
+     *                         type: object
+     *                         description: Chain registration metadata, present on anchored events.
+     *                         properties:
+     *                           height:
+     *                             type: integer
+     *                           index:
+     *                             type: integer
+     *                           opidx:
+     *                             type: integer
+     *                           txid:
+     *                             type: string
+     *                           batch:
+     *                             type: string
      *                       did:
      *                         type: string
      *       400:
