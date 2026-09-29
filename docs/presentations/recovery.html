@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Keys You Can Lose</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #e8ecf1;
+    --panel: #f6f8fb;
+    --ink: #141d2b;
+    --soft: #5b6879;
+    --line: #c6cfdb;
+    --cobalt: #2a4fc4;
+    --amber: #c97a12;
+    --bar: #141d2b;
+    --bar-text: #e8ecf1;
+    --bar-soft: #9aa6b8;
+  }
+  html, body { background: var(--paper); color: var(--ink); }
+  body { margin: 0; font: 15px/1.55 "IBM Plex Sans", system-ui, sans-serif; padding-inline: 16px; padding-block: 28px 48px; }
+  .wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+  header h1 { font: 800 clamp(30px, 5vw, 46px)/1.05 "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif; margin: 0; letter-spacing: -0.5px; text-wrap: balance; }
+  header p { margin: 8px 0 0; color: var(--soft); max-width: 62ch; }
+  header .eyebrow { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 1.5px; text-transform: uppercase; color: var(--cobalt); margin: 0 0 8px; }
+
+  .player { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--bar); box-shadow: 0 18px 50px -24px rgba(20, 29, 43, .45); outline: none; }
+  .player:focus-visible { box-shadow: 0 0 0 3px var(--cobalt); }
+  .player:fullscreen { display: flex; flex-direction: column; justify-content: center; border-radius: 0; }
+  .player:fullscreen .stage { max-height: calc(100vh - 120px); aspect-ratio: 16 / 9; margin: 0 auto; width: min(100%, calc((100vh - 120px) * 16 / 9)); }
+  .stage { position: relative; aspect-ratio: 16 / 9; max-width: 100%; background: var(--paper); }
+  canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+  .bigplay { position: absolute; inset: 0; margin: auto; width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--ink); color: var(--paper); display: grid; place-items: center; cursor: pointer; box-shadow: 0 10px 30px -8px rgba(20, 29, 43, .6); }
+  .bigplay[hidden] { display: none; }
+  .bigplay svg { width: 30px; height: 30px; margin-left: 4px; }
+  .bigplay:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 3px; }
+
+  .caption { min-height: 3.4em; padding: 12px 20px; color: var(--bar-text); font-size: clamp(14px, 1.9vw, 18px); line-height: 1.45; display: flex; align-items: center; justify-content: center; text-align: center; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+  .caption span { max-width: 70ch; transition: opacity .25s; }
+
+  .controls { display: flex; align-items: center; gap: 14px; padding: 10px 16px 14px; color: var(--bar-text); }
+  .controls button { background: none; border: 0; color: inherit; width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; flex: none; }
+  .controls button:hover { background: rgba(255, 255, 255, .08); }
+  .controls button:focus-visible { outline: 2px solid #8ea6ff; }
+  .controls svg { width: 20px; height: 20px; }
+  .time { font: 500 13px "IBM Plex Mono", ui-monospace, monospace; color: var(--bar-soft); font-variant-numeric: tabular-nums; flex: none; }
+  .seek { position: relative; flex: 1; min-width: 0; height: 36px; display: flex; align-items: center; }
+  .seek input { width: 100%; margin: 0; appearance: none; -webkit-appearance: none; background: transparent; height: 36px; cursor: pointer; position: relative; z-index: 2; }
+  .seek input::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; margin-top: -5px; border: 0; }
+  .seek input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 0; }
+  .seek input:focus-visible { outline: 2px solid #8ea6ff; border-radius: 4px; }
+  .ticks { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+  .ticks i { position: absolute; top: 15px; width: 2px; height: 6px; background: var(--bar); }
+
+  .chapters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .chapters button { width: 100%; text-align: left; display: flex; gap: 10px; align-items: baseline; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
+  .chapters button:hover { border-color: var(--cobalt); }
+  .chapters button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  .chapters button[aria-current="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .chapters .n { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--cobalt); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .n { color: #8ea6ff; }
+  .chapters .t { font-weight: 600; flex: 1; }
+  .chapters .d { font: 400 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--soft); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .d { color: var(--bar-soft); }
+
+  details { border-top: 1px solid var(--line); padding-top: 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .transcript { max-width: 70ch; }
+  .transcript h3 { font: 700 17px "Bricolage Grotesque", system-ui, sans-serif; margin: 18px 0 4px; }
+  .transcript p { margin: 0 0 6px; color: var(--soft); }
+
+  @media (max-width: 560px) {
+    .controls { gap: 8px; padding-inline: 10px; }
+    .time { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">did:cid · recovery · three minutes</p>
+    <h1>Keys you can lose, an identity you keep</h1>
+    <p>An animated walkthrough of identity recovery and key rotation in Archon: how one recovery phrase derives every key, restoring a wallet on a new device, rotating a signing key, why a stolen retired key can’t take over, how owned assets follow their agent, checking and repairing DID documents, and what can’t be recovered. Everything on screen is drawn live with canvas code.</p>
+  </header>
+
+  <div class="player" id="player" tabindex="0" aria-label="Animation player. Space plays or pauses, arrow keys skip.">
+    <div class="stage">
+      <canvas id="cv" role="img" aria-label="Animated diagram of Archon identity recovery and key rotation. The caption below describes each scene."></canvas>
+      <button class="bigplay" id="bigplay" aria-label="Play animation" hidden>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+      </button>
+    </div>
+    <div class="caption"><span id="cap"></span></div>
+    <div class="controls">
+      <button id="pp" aria-label="Play"></button>
+      <div class="seek">
+        <input type="range" id="seek" min="0" max="150" step="0.05" value="0" aria-label="Seek">
+        <div class="ticks" id="ticks"></div>
+      </div>
+      <span class="time" id="time">0:00 / 2:30</span>
+      <button id="fs" aria-label="Full screen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <ol class="chapters" id="chapters"></ol>
+
+  <details>
+    <summary>Transcript</summary>
+    <div class="transcript" id="transcript"></div>
+  </details>
+</div>
+
+<script>
+(() => {
+  // ---------- palette & type ----------
+  const W = 1280, H = 720, TOTAL = 150;
+  const C = {
+    paper: '#e8ecf1', grid: '#dbe1e9', gridB: '#c6cfdb', panel: '#f6f8fb',
+    ink: '#141d2b', soft: '#5b6879', faint: '#8c98a8',
+    cobalt: '#2a4fc4', cobaltL: '#dde5fb',
+    amber: '#c97a12', amberL: '#fbecd3',
+    green: '#23835a', greenL: '#d6eee2',
+    red: '#c03b28', redL: '#f8dcd6'
+  };
+  const DISP = '"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif';
+  const SANS = '"IBM Plex Sans", system-ui, sans-serif';
+  const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
+
+  // ---------- math ----------
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const p = (t, a, b) => clamp((t - a) / (b - a));
+  const e = (t, a, b) => ease(p(t, a, b));
+  const rnd = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+  const hx = c => { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  const mix = (a, b, t) => { const A = hx(a), B = hx(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], clamp(t)))).join(',')})`; };
+  const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
+  const scram = (s, pr, t, seed) => {
+    const k = Math.floor(pr * s.length); let out = '';
+    for (let i = 0; i < s.length; i++) out += i < k ? s[i] : B32[Math.floor(rnd(seed * 97 + i * 13 + Math.floor(t * 18)) * 32)];
+    return out;
+  };
+
+  // ---------- canvas ----------
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  let scale = 1;
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    const d = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.max(1, Math.round(r.width * d));
+    cv.height = Math.max(1, Math.round(r.width * 9 / 16 * d));
+    scale = cv.width / W;
+    render();
+  }
+
+  // ---------- drawing primitives ----------
+  function T(s, x, y, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.font = `${o.w || 400} ${o.s || 16}px ${o.f || SANS}`;
+    ctx.fillStyle = o.c || C.ink; ctx.textAlign = o.al || 'left'; ctx.textBaseline = o.b || 'alphabetic';
+    if (o.ls) ctx.letterSpacing = o.ls + 'px';
+    ctx.fillText(s, x, y); ctx.restore();
+  }
+  function tw(s, size, font = SANS, weight = 400) { ctx.save(); ctx.font = `${weight} ${size}px ${font}`; const w = ctx.measureText(s).width; ctx.restore(); return w; }
+  function box(x, y, w, h, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, o.r ?? 10);
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 1.5; if (o.dash) ctx.setLineDash(o.dash); ctx.stroke(); }
+    ctx.restore();
+  }
+  const cbox = (cx, cy, w, h, o) => box(cx - w / 2, cy - h / 2, w, h, o);
+  function pop(cx, cy, pr, fn) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.globalAlpha *= pr;
+    const s = lerp(.88, 1, pr);
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+    fn(); ctx.restore();
+  }
+  function arrowHead(x, y, a, c, s) {
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.lineTo(x - s * Math.cos(a - .45), y - s * Math.sin(a - .45));
+    ctx.lineTo(x - s * Math.cos(a + .45), y - s * Math.sin(a + .45));
+    ctx.closePath(); ctx.fillStyle = c; ctx.fill();
+  }
+  function arrow(x1, y1, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, x = lerp(x1, x2, pr), y = lerp(y1, y2, pr);
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(x, y, Math.atan2(y2 - y1, x2 - x1), c, o.hs || 10);
+    ctx.restore();
+  }
+  const qpt = (x1, y1, cx, cy, x2, y2, t) => { const u = 1 - t; return [u * u * x1 + 2 * u * t * cx + t * t * x2, u * u * y1 + 2 * u * t * cy + t * t * y2]; };
+  function qarrow(x1, y1, cx, cy, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, N = 36;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1);
+    let prev = [x1, y1], cur = prev;
+    for (let i = 1; i <= N; i++) { const tt = pr * i / N; prev = cur; cur = qpt(x1, y1, cx, cy, x2, y2, tt); ctx.lineTo(cur[0], cur[1]); }
+    ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(cur[0], cur[1], Math.atan2(cur[1] - prev[1], cur[0] - prev[0]), c, o.hs || 10);
+    ctx.restore();
+  }
+  function dot(x, y, r, c, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill(); ctx.restore(); }
+  function packet(x1, y1, x2, y2, pr, c, r = 6) { if (pr <= 0 || pr >= 1) return; dot(lerp(x1, x2, pr), lerp(y1, y2, pr), r, c); }
+  function check(x, y, s, pr, c = C.green) {
+    if (pr <= 0) return;
+    const a = [x - s * .5, y], b = [x - s * .12, y + s * .38], d = [x + s * .55, y - s * .42];
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]);
+    const p1 = clamp(pr / .35); ctx.lineTo(lerp(a[0], b[0], p1), lerp(a[1], b[1], p1));
+    if (pr > .35) { const p2 = clamp((pr - .35) / .65); ctx.lineTo(lerp(b[0], d[0], p2), lerp(b[1], d[1], p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function cross(x, y, s, pr, c = C.red) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .22; ctx.lineCap = 'round';
+    const p1 = clamp(pr / .5), p2 = clamp((pr - .5) / .5);
+    ctx.beginPath(); ctx.moveTo(x - s / 2, y - s / 2); ctx.lineTo(lerp(x - s / 2, x + s / 2, p1), lerp(y - s / 2, y + s / 2, p1));
+    if (p2 > 0) { ctx.moveTo(x + s / 2, y - s / 2); ctx.lineTo(lerp(x + s / 2, x - s / 2, p2), lerp(y - s / 2, y + s / 2, p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function person(x, y, s, c) {
+    ctx.save(); ctx.fillStyle = c;
+    ctx.beginPath(); ctx.arc(x, y - s * .28, s * .2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y + s * .4, s * .36, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function keyIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .14; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y, s * .3, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + s * .3, y); ctx.lineTo(x + s * 1.05, y);
+    ctx.moveTo(x + s * .75, y); ctx.lineTo(x + s * .75, y + s * .24);
+    ctx.moveTo(x + s * .98, y); ctx.lineTo(x + s * .98, y + s * .2);
+    ctx.stroke(); ctx.restore();
+  }
+  function lockIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = s * .13;
+    ctx.beginPath(); ctx.arc(x, y - s * .08, s * .26, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(x - s * .42, y - s * .1, s * .84, s * .6, s * .1); ctx.fill();
+    ctx.restore();
+  }
+  function db(x, y, w, h, c) {
+    const rx = w / 2, ry = h * .15, top = y - h / 2, bot = y + h / 2;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.fillStyle = C.panel;
+    ctx.beginPath(); ctx.moveTo(x - rx, top + ry); ctx.lineTo(x - rx, bot - ry);
+    ctx.ellipse(x, bot - ry, rx, ry, 0, Math.PI, 0, true);
+    ctx.lineTo(x + rx, top + ry); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI, true);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI); ctx.stroke();
+    ctx.restore();
+  }
+  function hexagon(x, y, r, rot, o = {}) {
+    ctx.save(); ctx.beginPath();
+    for (let i = 0; i < 6; i++) { const a = rot + i * Math.PI / 3; const px = x + r * Math.cos(a), py = y + r * Math.sin(a); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.closePath();
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 2; ctx.stroke(); }
+    ctx.restore();
+  }
+  function pill(cx, cy, text, o = {}) {
+    const s = o.s || 15, pad = o.pad || 14, w = tw(text, s, o.f || SANS, o.w || 600) + pad * 2, h = s + 16;
+    pop(cx, cy, o.pr ?? 1, () => {
+      cbox(cx, cy, w, h, { fill: o.bg || C.panel, stroke: o.stroke || C.gridB, r: h / 2 });
+      T(text, cx, cy + 1, { s, w: o.w || 600, f: o.f || SANS, c: o.c || C.ink, al: 'center', b: 'middle' });
+    });
+  }
+  function codeLine(s, x, y, n, fs) {
+    const re = /("(?:[^"\\]|\\.)*"\s*:)|("(?:[^"\\]|\\.)*")|([{}\[\],])|(\b\d+\b)|([^"{}\[\],]+?(?=["{}\[\],]|\b\d+\b|$))/g;
+    ctx.save(); ctx.font = `400 ${fs}px ${MONO}`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    let m, cx = x, used = 0;
+    while ((m = re.exec(s)) && used < n) {
+      if (!m[0]) { re.lastIndex++; continue; }
+      const tok = m[0];
+      ctx.fillStyle = m[1] ? C.soft : m[2] ? C.cobalt : m[3] ? C.faint : m[4] ? C.amber : C.ink;
+      const show = tok.slice(0, n - used); used += tok.length;
+      ctx.fillText(show, cx, y); cx += ctx.measureText(show).width;
+    }
+    ctx.restore();
+  }
+  function card(x, y, w, title, lines, pr, o = {}) {
+    const fs = o.fs || 14, lh = o.lh || 22, top = 30 + 24;
+    const h = top + (lines.length - 1) * lh + 18;
+    const ly = i => y + top + i * lh;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    box(x, y, w, h, { fill: C.panel, stroke: C.gridB, r: 12 });
+    ctx.beginPath(); ctx.roundRect(x, y, w, 30, [12, 12, 0, 0]); ctx.fillStyle = o.hc || C.ink; ctx.fill();
+    T(title.toUpperCase(), x + 16, y + 20, { f: MONO, s: 12, w: 500, c: C.paper, ls: 1.2 });
+    let n = Math.floor(pr * lines.reduce((a, l) => a + l.length, 0));
+    lines.forEach((l, i) => {
+      const hl = o.hl && o.hl[i];
+      if (hl && hl[1] > 0) { ctx.save(); ctx.globalAlpha *= hl[1]; ctx.fillStyle = hl[0]; ctx.fillRect(x + 6, ly(i) - fs - 2, w - 12, lh); ctx.restore(); }
+      if (n > 0) { codeLine(l, x + 16, ly(i), n, fs); n -= l.length; }
+    });
+    ctx.restore();
+    return { h, ly };
+  }
+
+  // ---------- ambient network ----------
+  const NET = Array.from({ length: 46 }, (_, i) => ({ x: rnd(i * 3 + 1) * W, y: rnd(i * 3 + 2) * H, ph: rnd(i * 3 + 3) * 6.28 }));
+  function network(t, a) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    const P = NET.map(q => [q.x + Math.sin(t * .3 + q.ph) * 16, q.y + Math.cos(t * .25 + q.ph) * 12]);
+    ctx.lineWidth = 1;
+    for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+      const d = Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1]);
+      if (d < 175) { ctx.strokeStyle = `rgba(90,110,140,${(1 - d / 175) * .45})`; ctx.beginPath(); ctx.moveTo(P[i][0], P[i][1]); ctx.lineTo(P[j][0], P[j][1]); ctx.stroke(); }
+    }
+    P.forEach((q, i) => dot(q[0], q[1], i % 7 === 0 ? 4 : 2.5, i % 7 === 0 ? C.cobalt : C.faint, .8));
+    ctx.restore();
+  }
+
+  function background() {
+    ctx.fillStyle = C.paper; ctx.fillRect(0, 0, W, H);
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 40) { ctx.strokeStyle = x % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = x % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += 40) { ctx.strokeStyle = y % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = y % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+
+  function heading(n, title, t) {
+    const a = e(t, 0, .8);
+    T(`${String(n).padStart(2, '0')} / 09`, 56, 58, { f: MONO, s: 13, w: 500, c: C.cobalt, a, ls: 1.5 });
+    T(title, 56 + lerp(-12, 0, a), 94, { f: DISP, s: 32, w: 700, a });
+  }
+
+  // ---------- shared pieces ----------
+  const WORDS12 = ['orbit', 'lantern', 'maple', 'cinder', 'velvet', 'harbor', 'quartz', 'meadow', 'signal', 'ember', 'tundra', 'willow'];
+  function phrase(x, y, t0, t, o = {}) {
+    WORDS12.forEach((w, i) => {
+      const c = i % 3, r = Math.floor(i / 3), bx = x + c * 96, by = y + r * 34;
+      const pr = o.static ? 1 : e(t, t0 + i * .12, t0 + .4 + i * .12);
+      pop(bx + 44, by + 13, pr, () => {
+        box(bx, by, 88, 26, { fill: o.fill || C.paper, stroke: o.stroke || C.gridB, r: 6 });
+        T(String(i + 1), bx + 7, by + 17, { f: MONO, s: 10, c: C.faint });
+        T(w, bx + 21, by + 18, { f: MONO, s: 12, c: C.ink });
+      });
+    });
+  }
+  function keyRow(x, y, label, sub, c, a) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    keyIcon(x + 12, y, 22, c);
+    T(label, x + 46, y - 3, { s: 15, w: 600 });
+    T(sub, x + 46, y + 16, { f: MONO, s: 11, c: C.soft });
+    ctx.restore();
+  }
+  function device(cx, cy, label, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    box(cx - 70, cy - 90, 140, 180, { fill: o.fill || C.panel, stroke: o.stroke || C.ink, lw: 2, r: 16 });
+    box(cx - 58, cy - 72, 116, 132, { fill: o.screen || C.paper, stroke: C.gridB, r: 6 });
+    dot(cx, cy + 74, 6, C.gridB);
+    T(label, cx, cy + 120, { s: 15, w: 600, al: 'center' });
+    ctx.restore();
+  }
+
+  // ---------- scene 1: title ----------
+  function s1(t) {
+    network(t, .55);
+    const g = ctx.createRadialGradient(640, 330, 40, 640, 330, 560);
+    g.addColorStop(0, 'rgba(232,236,241,0.97)'); g.addColorStop(1, 'rgba(232,236,241,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const sc = lerp(.97, 1, e(t, 0, 2.5));
+    ctx.save(); ctx.translate(640, 270); ctx.scale(sc, sc);
+    T('Keys you can lose,', 0, -44, { f: DISP, s: 76, w: 800, al: 'center', b: 'middle', ls: -1.5 });
+    T('an identity you keep', 0, 40, { f: DISP, s: 76, w: 800, al: 'center', b: 'middle', ls: -1.5 });
+    ctx.restore();
+    T('Recovery and key rotation in Archon', 640, 392, { s: 25, c: C.soft, al: 'center', a: e(t, .8, 2.3) });
+    [['One recovery phrase', 470], ['Rotatable keys', 650], ['No key escrow', 810]].forEach(([s, x], i) =>
+      pill(x, 470, s, { pr: e(t, 4 + i * .4, 4.6 + i * .4), s: 14, c: C.soft }));
+  }
+
+  // ---------- scene 2: one phrase, every key ----------
+  function s2(t) {
+    heading(2, 'One phrase, every key', t);
+    const pa = e(t, 0, .8);
+    box(56, 140, 330, 210, { fill: C.panel, stroke: C.gridB, r: 14, a: pa });
+    T('RECOVERY PHRASE · BIP39', 78, 170, { f: MONO, s: 11, w: 500, c: C.soft, ls: 1.1, a: pa });
+    phrase(78, 186, .4, t);
+    T('encrypted in the wallet with your passphrase', 221, 380, { s: 13, c: C.soft, al: 'center', a: e(t, 3, 3.6) });
+    arrow(390, 245, 470, 245, e(t, 2.4, 3.2), { c: C.ink });
+    const ra = e(t, 3, 3.8);
+    if (ra > 0) pop(560, 245, ra, () => {
+      hexagon(560, 245, 62, e(t, 3.2, 5) * Math.PI / 3, { fill: C.panel, stroke: C.ink, lw: 2.5 });
+      T('root key', 560, 241, { s: 15, w: 700, al: 'center', b: 'middle' });
+      T('BIP32', 560, 262, { f: MONO, s: 11, c: C.soft, al: 'center', b: 'middle' });
+    });
+    // per identity
+    const rows = [
+      ['signing key #key-1', 'm/44\'/0\'/<account>\'/0/0', C.amber, 5],
+      ['next key, #key-2 …', 'm/44\'/0\'/<account>\'/0/1', C.amber, 6.2],
+      ['DIDComm key (X25519)', 'm/44\'/0\'/<account>\'/1\'/0\'', C.cobalt, 7.4],
+      ['seed bank DID', 'from the root key itself', C.green, 9]
+    ];
+    const ia = e(t, 4.4, 5.2);
+    box(700, 140, 520, 330, { fill: C.panel, stroke: C.gridB, r: 14, a: ia });
+    T('Each identity has its own account', 724, 176, { f: DISP, s: 20, w: 700, a: ia });
+    rows.forEach(([l, s, c, at], i) => {
+      keyRow(724, 226 + i * 64, l, s, c, e(t, at, at + .6));
+      arrow(624, 245, 718, 222 + i * 64, e(t, at - .3, at + .3), { c: C.gridB, lw: 1.5, hs: 7 });
+    });
+    T('Nothing but the phrase needs backing up to derive these keys', 640, 560, { f: DISP, s: 22, w: 700, al: 'center', a: e(t, 12, 12.8) });
+  }
+
+  // ---------- scene 3: losing a device ----------
+  function s3(t) {
+    heading(3, 'Losing a device', t);
+    const lost = e(t, 8, 9);
+    device(170, 330, 'old device', { a: 1 - lost * .7, stroke: mix(C.ink, C.red, lost) });
+    if (lost > 0) cross(170, 316, 50, e(t, 8.4, 9.2));
+    // backup
+    arrow(250, 290, 420, 290, e(t, 1.2, 2.2), { c: C.cobalt });
+    T('backup-wallet-did', 335, 276, { f: MONO, s: 12, w: 500, c: C.cobalt, al: 'center', a: e(t, 1.4, 2) });
+    const ba = e(t, 2, 2.8);
+    if (ba > 0) {
+      ctx.save(); ctx.globalAlpha *= ba;
+      box(430, 200, 400, 200, { fill: C.panel, stroke: C.gridB, r: 14 });
+      T('SEED BANK DID · DERIVED FROM THE PHRASE', 452, 230, { f: MONO, s: 11, w: 500, c: C.soft, ls: 1 });
+      T('"wallet": "did:cid:…b4ck"', 452, 262, { f: MONO, s: 14, w: 500, c: C.cobalt });
+      box(452, 282, 356, 96, { fill: C.cobaltL, stroke: C.cobalt, lw: 2, r: 10 });
+      lockIcon(484, 330, 26, C.cobalt);
+      T('backup asset', 514, 318, { s: 16, w: 700 });
+      T('the whole wallet, encrypted', 514, 340, { s: 13, c: C.soft });
+      T('to the root key', 514, 358, { s: 13, c: C.soft });
+      ctx.restore();
+    }
+    // new device
+    device(1090, 330, 'new device', { a: e(t, 10, 10.8) });
+    const pa = e(t, 11, 11.6);
+    if (pa > 0) {
+      ctx.save(); ctx.globalAlpha *= pa;
+      T('import-wallet <phrase>', 1090, 490, { f: MONO, s: 12, w: 500, c: C.ink, al: 'center' });
+      ctx.restore();
+    }
+    arrow(1020, 290, 840, 290, e(t, 12.6, 13.6), { c: C.green });
+    T('recover-wallet-did', 930, 276, { f: MONO, s: 12, w: 500, c: C.green, al: 'center', a: e(t, 12.8, 13.4) });
+    const ok = e(t, 15, 15.8);
+    if (ok > 0) pop(1090, 318, ok, () => {
+      check(1090, 290, 30, 1);
+      T('same IDs', 1090, 330, { s: 14, w: 700, c: C.green, al: 'center' });
+      T('same DIDs', 1090, 350, { s: 14, w: 700, c: C.green, al: 'center' });
+    });
+    T('Or keep an encrypted wallet file: backup-wallet-file / restore-wallet-file', 640, 600, { s: 15, c: C.soft, al: 'center', a: e(t, 16.6, 17.4) });
+  }
+
+  // ---------- scene 4: rotating a key ----------
+  const ROT = [
+    '"verificationMethod": [',
+    '  { "id": "#key-2", "publicKeyJwk": { … } },',
+    '  { "id": "#key-agreement-1", … }',
+    ']'
+  ];
+  function s4(t) {
+    heading(4, 'Rotating a key', t);
+    const xs = [80, 460], y = 180;
+    op4(xs[0], y, 'v2 · current', '#key-1', C.amber, e(t, 0, .8));
+    const na = e(t, 2.6, 3.4);
+    if (na > 0) pop(xs[1] + 170, y + 60, na, () => {
+      box(xs[1], y, 470, 162, { fill: C.panel, stroke: C.gridB, r: 12 });
+      ctx.beginPath(); ctx.roundRect(xs[1], y, 470, 26, [12, 12, 0, 0]); ctx.fillStyle = C.ink; ctx.fill();
+      T('V3 · UPDATE', xs[1] + 14, y + 18, { f: MONO, s: 11, w: 500, c: C.paper, ls: 1.1 });
+      ROT.forEach((l, i) => codeLine(l, xs[1] + 14, y + 54 + i * 22, 999, 13));
+      keyIcon(xs[1] + 22, y + 142, 12, C.amber);
+      T('signed with #key-1', xs[1] + 42, y + 146, { f: MONO, s: 12, c: C.soft });
+    });
+    arrow(xs[1] - 4, y + 60, xs[0] + 300 + 8, y + 60, e(t, 3.4, 4.2), { c: C.cobalt, hs: 8 });
+    T('rotate-keys', (xs[0] + 300 + xs[1]) / 2, y + 46, { f: MONO, s: 12, w: 500, c: C.cobalt, al: 'center', a: e(t, 3.6, 4.2) });
+    T('the current key signs the handover to the next', 640, 380, { f: DISP, s: 22, w: 700, al: 'center', a: e(t, 5, 5.8) });
+    const facts = [
+      ['#key-2 comes from the same phrase, at the next index', 7],
+      ['other methods, like the DIDComm key, stay as they are', 9],
+      ['Keymaster rotates only a confirmed identity', 11],
+      ['old messages still decrypt: the wallet tries earlier keys', 13]
+    ];
+    facts.forEach(([s, at], i) => {
+      const yy = 440 + i * 40;
+      check(300, yy - 5, 16, e(t, at, at + .6));
+      T(s, 322, yy, { s: 16, w: 500, a: e(t, at, at + .4) });
+    });
+  }
+  function op4(x, y, label, key, c, a) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    box(x, y, 300, 120, { fill: C.panel, stroke: C.gridB, r: 12 });
+    ctx.beginPath(); ctx.roundRect(x, y, 300, 26, [12, 12, 0, 0]); ctx.fillStyle = C.ink; ctx.fill();
+    T(label.toUpperCase(), x + 14, y + 18, { f: MONO, s: 11, w: 500, c: C.paper, ls: 1.1 });
+    keyIcon(x + 26, y + 70, 20, c);
+    T(key, x + 60, y + 76, { f: MONO, s: 16, w: 500 });
+    ctx.restore();
+  }
+
+  // ---------- scene 5: a stolen old key ----------
+  function s5(t) {
+    heading(5, 'A stolen old key', t);
+    const cy = 250;
+    [['v2', '#key-1', 90], ['v3 · rotation', 'now #key-2', 330]].forEach(([l, k, x], i) => {
+      const a = e(t, i * .4, .8 + i * .4);
+      ctx.save(); ctx.globalAlpha *= a;
+      box(x, cy - 50, 200, 100, { fill: i ? C.greenL : C.panel, stroke: i ? C.green : C.gridB, lw: i ? 2 : 1.5, r: 12 });
+      T(l, x + 16, cy - 16, { f: MONO, s: 13, w: 500, c: C.soft });
+      T(k, x + 16, cy + 16, { f: MONO, s: 17, w: 500 });
+      ctx.restore();
+    });
+    arrow(326, cy, 294, cy, e(t, .8, 1.4), { c: C.cobalt, hs: 8 });
+    // thief
+    const ta = e(t, 2.4, 3.2);
+    if (ta > 0) {
+      ctx.save(); ctx.globalAlpha *= ta;
+      person(1110, 260, 56, C.red);
+      T('THIEF', 1110, 200, { f: MONO, s: 12, w: 500, c: C.red, al: 'center', ls: 1.2 });
+      keyIcon(1070, 340, 18, C.amber); T('has #key-1', 1096, 345, { f: MONO, s: 13, c: C.soft });
+      ctx.restore();
+    }
+    // attempt 1: update on v3
+    const a1 = e(t, 4, 4.8);
+    if (a1 > 0) {
+      ctx.save(); ctx.globalAlpha *= a1;
+      box(620, cy - 50, 280, 100, { fill: C.redL, stroke: C.red, lw: 2, dash: [7, 6], r: 12 });
+      T('update on v3', 636, cy - 16, { f: MONO, s: 13, w: 500, c: C.red });
+      T('signed #key-1', 636, cy + 16, { f: MONO, s: 17, w: 500 });
+      ctx.restore();
+    }
+    arrow(616, cy, 540, cy, e(t, 4.6, 5.4), { c: C.red, dash: [6, 6], hs: 8 });
+    cross(760, cy + 80, 30, e(t, 6, 6.8));
+    T('rejected: v3 lists only #key-2', 790, cy + 88, { s: 16, w: 700, c: C.red, a: e(t, 6.4, 7) });
+    // attempt 2: fork at v2
+    const a2 = e(t, 9.4, 10.2);
+    if (a2 > 0) {
+      ctx.save(); ctx.globalAlpha *= a2;
+      box(330, cy + 150, 280, 100, { fill: C.panel, stroke: C.red, lw: 2, dash: [7, 6], r: 12 });
+      T('competing update on v2', 346, cy + 184, { f: MONO, s: 13, w: 500, c: C.red });
+      T('signed #key-1', 346, cy + 216, { f: MONO, s: 17, w: 500 });
+      ctx.restore();
+    }
+    qarrow(326, cy + 200, 250, cy + 190, 200, cy + 54, e(t, 10, 11), { c: C.red, dash: [6, 6], hs: 8 });
+    const fa = e(t, 12, 12.8);
+    if (fa > 0) {
+      ctx.save(); ctx.globalAlpha *= fa;
+      box(650, cy + 140, 560, 130, { fill: C.panel, stroke: C.gridB, r: 12 });
+      T('a fork, settled like any other', 670, cy + 172, { s: 16, w: 600 });
+      T('anchored on a chain: the earlier position wins,', 670, cy + 202, { s: 15, c: C.ink });
+      T('so the rotation, anchored first, stands', 670, cy + 222, { s: 15, c: C.ink });
+      T('unanchored: the smaller CID wins, which a thief can grind for', 670, cy + 252, { s: 15, c: C.soft });
+      ctx.restore();
+    }
+  }
+
+  // ---------- scene 6: assets follow the agent ----------
+  function s6(t) {
+    heading(6, 'Owned assets follow', t);
+    const aa = e(t, 0, .8);
+    ctx.save(); ctx.globalAlpha *= aa;
+    person(180, 300, 64, C.cobalt);
+    T('Alice', 180, 372, { s: 17, w: 600, al: 'center' });
+    T('agent DID', 180, 394, { f: MONO, s: 12, c: C.soft, al: 'center' });
+    ctx.restore();
+    const k2 = e(t, 5, 5.8);
+    keyRow(120, 450, k2 > .5 ? 'now signs with #key-2' : 'signs with #key-1', 'her current key', k2 > .5 ? C.green : C.amber, aa);
+    [['Group', 'members'], ['Vault', 'shared files'], ['Credential', 'issued to Bob'], ['Poll', 'ballots']].forEach(([n, d], i) => {
+      const x = 470 + (i % 2) * 380, y = 170 + Math.floor(i / 2) * 170, a = e(t, .8 + i * .4, 1.4 + i * .4);
+      ctx.save(); ctx.globalAlpha *= a;
+      box(x, y, 330, 130, { fill: C.panel, stroke: C.gridB, r: 12 });
+      T(n, x + 20, y + 40, { f: DISP, s: 22, w: 700 });
+      T(d, x + 20, y + 64, { s: 14, c: C.soft });
+      T('"controller": "did:cid:…a1ce"', x + 20, y + 100, { f: MONO, s: 13, w: 500, c: C.cobalt });
+      ctx.restore();
+    });
+    T('Asset operations are signed by the controller’s current key.', 640, 560, { f: DISP, s: 21, w: 700, al: 'center', a: e(t, 7, 7.8) });
+    T('After a rotation, #key-2 signs them. Nothing is re-issued.', 640, 592, { s: 17, c: C.soft, al: 'center', a: e(t, 8, 8.8) });
+  }
+
+  // ---------- scene 7: DID repair ----------
+  function s7(t) {
+    heading(7, 'Checking and repairing', t);
+    T('check-did Alice', 90, 170, { f: MONO, s: 16, w: 500, c: C.cobalt, a: e(t, 0, .8) });
+    const ra = e(t, .8, 1.6);
+    box(80, 190, 520, 250, { fill: C.panel, stroke: C.gridB, r: 12, a: ra });
+    T('read-only · no document writes', 100, 222, { s: 13, c: C.soft, a: ra });
+    [['missing-operation-key', 'no operation-signing method published'], ['stale-operation-permissions', 'capabilityInvocation names a removed key'], ['missing-operation-permission', 'the signing key isn’t authorized']].forEach(([c, d], i) => {
+      const y = 262 + i * 58, a = e(t, 2 + i * .7, 2.6 + i * .7);
+      ctx.save(); ctx.globalAlpha *= a;
+      dot(108, y - 5, 7, i === 1 ? C.amber : C.faint);
+      T(c, 126, y, { f: MONO, s: 13, w: 500, c: i === 1 ? C.amber : C.ink });
+      T(d, 126, y + 20, { s: 13, c: C.soft });
+      ctx.restore();
+    });
+    T('some of the issues it reports', 340, 470, { s: 13, c: C.soft, al: 'center', a: e(t, 4.4, 5) });
+    arrow(606, 315, 690, 315, e(t, 7, 7.8), { c: C.green });
+    T('repair-did Alice', 700, 170, { f: MONO, s: 16, w: 500, c: C.green, a: e(t, 7.6, 8.4) });
+    const fa = e(t, 8, 8.8);
+    box(690, 190, 520, 250, { fill: C.greenL, stroke: C.green, lw: 2, r: 12, a: fa });
+    ['signs with the wallet’s actual signing key', 'against the version it inspected', 'keeps valid permissions and other components', 'only when you ask: an explicit step'].forEach((s, i) => {
+      const y = 240 + i * 48;
+      check(716, y - 5, 16, e(t, 9 + i * .7, 9.6 + i * .7));
+      T(s, 738, y, { s: 15, w: 500, a: e(t, 9 + i * .7, 9.4 + i * .7) });
+    });
+    T('Wallets show the same check and repair in a Repair… dialog.', 640, 540, { s: 17, w: 600, al: 'center', a: e(t, 13, 13.8) });
+  }
+
+  // ---------- scene 8: limits ----------
+  function s8(t) {
+    heading(8, 'What can’t be recovered', t);
+    const la = e(t, 0, .8);
+    box(80, 160, 520, 320, { fill: C.panel, stroke: C.gridB, r: 14, a: la });
+    phrase(118, 210, 0, t, { static: true, fill: C.redL, stroke: C.red });
+    if (la > 0) { ctx.save(); ctx.globalAlpha *= la * .55; ctx.fillStyle = C.paper; ctx.fillRect(90, 196, 500, 150); ctx.restore(); }
+    cross(260, 270, 60, e(t, 1, 1.8));
+    T('phrase lost, no backup', 340, 400, { f: DISP, s: 22, w: 700, c: C.red, al: 'center', a: e(t, 1.6, 2.2) });
+    T('no one can restore it: Archon never stores', 340, 432, { s: 14, c: C.soft, al: 'center', a: e(t, 2.2, 2.8) });
+    T('private keys for you', 340, 452, { s: 14, c: C.soft, al: 'center', a: e(t, 2.2, 2.8) });
+    const ra = e(t, 6.4, 7.2);
+    box(680, 160, 520, 320, { fill: C.panel, stroke: C.gridB, r: 14, a: ra });
+    if (ra > 0) {
+      ctx.save(); ctx.globalAlpha *= ra;
+      T('phrase leaked', 710, 206, { f: DISP, s: 22, w: 700, c: C.red });
+      T('every future key comes from it too,', 710, 244, { s: 16, w: 500 });
+      T('so rotating doesn’t help', 710, 268, { s: 16, w: 500 });
+      keyIcon(730, 322, 22, C.amber); T('#key-2', 764, 327, { f: MONO, s: 14, c: C.red });
+      keyIcon(730, 366, 22, C.amber); T('#key-3', 764, 371, { f: MONO, s: 14, c: C.red });
+      T('rotation protects against a leaked key,', 710, 430, { s: 15, w: 600, c: C.cobalt });
+      T('not a leaked phrase', 710, 452, { s: 15, w: 600, c: C.cobalt });
+      ctx.restore();
+    }
+  }
+
+  // ---------- scene 9: recap ----------
+  const RECAP9 = [
+    'one phrase derives every key, per identity',
+    'a backup on the seed bank DID restores the whole wallet',
+    'rotation: the current key signs the handover',
+    'retired keys can’t update what comes after',
+    'check-did finds problems; repair-did fixes them on request'
+  ];
+  function s9(t) {
+    const out = e(t, 7, 8);
+    ctx.save(); ctx.globalAlpha *= 1 - out;
+    heading(9, 'Recap', t);
+    T('Recovery in Archon', 110, 190, { f: DISP, s: 38, w: 800, a: e(t, .2, .8) });
+    RECAP9.forEach((s, i) => {
+      const y = 258 + i * 60, a = e(t, .8 + i * .5, 1.4 + i * .5);
+      dot(132, y - 7, 18, C.greenL, a); check(132, y - 7, 18, a);
+      T(s, 168, y, { s: 23, w: 500, a });
+    });
+    ctx.restore();
+    if (out > 0) {
+      network(t, .5 * out);
+      const g = ctx.createRadialGradient(640, 360, 40, 640, 360, 520);
+      g.addColorStop(0, `rgba(232,236,241,${.97 * out})`); g.addColorStop(1, 'rgba(232,236,241,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      T('Your phrase is your identity', 640, 320, { f: DISP, s: 76, w: 800, al: 'center', b: 'middle', ls: -1.5, a: out });
+      T('Write it down. Back up the wallet. Rotate a key you suspect.', 640, 400, { s: 24, al: 'center', c: C.ink, a: e(t, 8, 8.8) });
+      T('docs/services/keymaster · §3 and §5', 640, 458, { f: MONO, s: 18, w: 500, c: C.cobalt, al: 'center', a: e(t, 8.8, 9.6) });
+    }
+  }
+
+  // ---------- timeline ----------
+  const SCENES = [
+    { title: 'Keys you can lose', start: 0, dur: 10, draw: s1 },
+    { title: 'One phrase, every key', start: 10, dur: 18, draw: s2 },
+    { title: 'Losing a device', start: 28, dur: 20, draw: s3 },
+    { title: 'Rotating a key', start: 48, dur: 18, draw: s4 },
+    { title: 'A stolen old key', start: 66, dur: 22, draw: s5 },
+    { title: 'Owned assets follow', start: 88, dur: 16, draw: s6 },
+    { title: 'Checking and repairing', start: 104, dur: 18, draw: s7 },
+    { title: 'What can’t be recovered', start: 122, dur: 14, draw: s8 },
+    { title: 'Recap', start: 136, dur: 14, draw: s9 }
+  ];
+  const CUES = [
+    [0, 5, 'An Archon identity is controlled by keys, and keys get lost, stolen, and replaced.'],
+    [5, 10, 'This is how you keep the identity when that happens.'],
+    [10, 16, 'Your wallet starts from a BIP39 recovery phrase. The wallet stores it encrypted with your passphrase.'],
+    [16, 22, 'Each identity gets its own account under that phrase: its signing keys, the keys that replace them, and its DIDComm key.'],
+    [22, 28, 'Even the seed bank, the DID that holds your wallet backups, is derived from the phrase itself.'],
+    [28, 34, 'backup-wallet-did encrypts your whole wallet to the phrase’s root key and stores it as an asset DID.'],
+    [34, 40, 'The seed bank DID, derived from the phrase, records where that backup is.'],
+    [40, 48, 'On a new device, import the phrase and run recover-wallet-did: the same seed bank leads to your backup and your identities.'],
+    [48, 54, 'rotate-keys replaces your signing key. The current key signs the update that installs the next one.'],
+    [54, 60, 'The new key comes from the same phrase, at the next index. Other methods, such as your DIDComm key, stay as they are.'],
+    [60, 66, 'Keymaster only rotates a confirmed identity, and messages encrypted to older keys still decrypt.'],
+    [66, 72, 'Suppose someone stole your old key before you rotated it.'],
+    [72, 78, 'An update they sign on top of your rotation is rejected: that version no longer lists the old key.'],
+    [78, 84, 'An update they sign on the version before your rotation is a fork. On a chain, the earlier anchor wins.'],
+    [84, 88, 'Without a chain, the smaller CID wins, and a thief can try variants until one does. A chain registry is the protection.'],
+    [88, 94, 'Your groups, vaults, polls, and issued credentials name your agent DID as their controller.'],
+    [94, 100, 'Their updates are signed with your agent’s current key, so after a rotation the new key signs them.'],
+    [100, 104, 'Nothing has to be re-issued.'],
+    [104, 110, 'check-did inspects a DID document without changing it, and reports problems such as stale key permissions.'],
+    [110, 116, 'repair-did fixes supported problems: it signs with the wallet’s actual signing key, against the version it inspected.'],
+    [116, 122, 'It keeps valid permissions and other components, and runs only when you ask. Wallets offer the same Repair dialog.'],
+    [122, 128, 'Archon never stores private keys for you. Lose the phrase with no backup, and no one can restore the identity.'],
+    [128, 136, 'And rotation protects against a leaked key, not a leaked phrase: every future key comes from the same phrase.'],
+    [136, 143, 'One phrase derives every key; the seed bank restores the wallet; rotation hands control to a new key.'],
+    [143, 150, 'Keep the phrase safe, back up the wallet, and rotate any key you suspect.']
+  ];
+
+  let t = 0, playing = false, last = 0;
+  function render() {
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.globalAlpha = 1;
+    background();
+    const i = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const sc = SCENES[i < 0 ? SCENES.length - 1 : i];
+    const lt = Math.min(t - sc.start, sc.dur - 1e-3);
+    const fin = sc.start === 0 ? 1 : clamp(lt / .5);
+    const fout = sc.start + sc.dur >= TOTAL ? 1 : clamp((sc.dur - lt) / .5);
+    ctx.save(); ctx.globalAlpha = Math.min(fin, fout);
+    sc.draw(lt);
+    ctx.restore();
+  }
+
+  // ---------- UI ----------
+  const $ = id => document.getElementById(id);
+  const pp = $('pp'), seek = $('seek'), timeEl = $('time'), cap = $('cap'), big = $('bigplay'), player = $('player');
+  const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>';
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  const chapList = $('chapters');
+  SCENES.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<button type="button"><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t"></span><span class="d">${fmt(s.start)}</span></button>`;
+    li.querySelector('.t').textContent = s.title;
+    li.querySelector('button').addEventListener('click', () => { t = s.start; if (!playing) setPlaying(true); sync(); });
+    chapList.appendChild(li);
+    if (i) { const tick = document.createElement('i'); tick.style.left = `calc(${s.start / TOTAL * 100}% - 1px)`; $('ticks').appendChild(tick); }
+  });
+  const chapBtns = [...chapList.querySelectorAll('button')];
+
+  const tr = $('transcript');
+  SCENES.forEach((s, i) => {
+    const h = document.createElement('h3'); h.textContent = `${String(i + 1).padStart(2, '0')} · ${s.title}`; tr.appendChild(h);
+    CUES.filter(c => c[0] >= s.start && c[0] < s.start + s.dur).forEach(c => { const pEl = document.createElement('p'); pEl.textContent = c[2]; tr.appendChild(pEl); });
+  });
+
+  let lastCue = -1, lastChap = -1;
+  function sync() {
+    seek.value = t.toFixed(2);
+    seek.style.setProperty('--pct', (t / TOTAL * 100) + '%');
+    timeEl.textContent = `${fmt(t)} / ${fmt(TOTAL)}`;
+    const ci = CUES.findIndex(c => t >= c[0] && t < c[1]);
+    const cue = ci < 0 ? CUES.length - 1 : ci;
+    if (cue !== lastCue) { cap.textContent = CUES[cue][2]; lastCue = cue; }
+    const ch = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const chap = ch < 0 ? SCENES.length - 1 : ch;
+    if (chap !== lastChap) { chapBtns.forEach((b, i) => b.setAttribute('aria-current', i === chap ? 'true' : 'false')); lastChap = chap; }
+    render();
+  }
+  function setPlaying(v) {
+    if (v && t >= TOTAL - .01) t = 0;
+    playing = v; last = performance.now();
+    pp.innerHTML = v ? ICON_PAUSE : ICON_PLAY;
+    pp.setAttribute('aria-label', v ? 'Pause' : 'Play');
+    big.hidden = v;
+    big.setAttribute('aria-label', t > 0 ? 'Resume animation' : 'Play animation');
+  }
+  function frame(now) {
+    if (playing) {
+      t = Math.min(TOTAL, t + Math.min(.1, (now - last) / 1000));
+      if (t >= TOTAL) setPlaying(false);
+      sync();
+    }
+    last = now;
+    requestAnimationFrame(frame);
+  }
+
+  pp.addEventListener('click', () => setPlaying(!playing));
+  big.addEventListener('click', () => setPlaying(true));
+  cv.addEventListener('click', () => setPlaying(!playing));
+  seek.addEventListener('input', () => { t = parseFloat(seek.value); sync(); });
+  player.addEventListener('keydown', ev => {
+    if (ev.target === seek) return;
+    if (ev.key === ' ' || ev.key === 'k') { ev.preventDefault(); setPlaying(!playing); }
+    else if (ev.key === 'ArrowRight') { ev.preventDefault(); t = Math.min(TOTAL, t + 5); sync(); }
+    else if (ev.key === 'ArrowLeft') { ev.preventDefault(); t = Math.max(0, t - 5); sync(); }
+  });
+  $('fs').addEventListener('click', () => {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else if (player.requestFullscreen) player.requestFullscreen().catch(() => {});
+    } catch (_) {}
+  });
+  document.addEventListener('fullscreenchange', () => requestAnimationFrame(resize));
+  new ResizeObserver(() => resize()).observe(cv);
+
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fontsReady = document.fonts ? Promise.race([
+    Promise.all([
+      document.fonts.load(`800 40px ${DISP}`), document.fonts.load(`700 40px ${DISP}`),
+      document.fonts.load(`400 16px ${SANS}`), document.fonts.load(`600 16px ${SANS}`),
+      document.fonts.load(`400 16px ${MONO}`), document.fonts.load(`500 16px ${MONO}`)
+    ]),
+    new Promise(r => setTimeout(r, 2000))
+  ]).catch(() => {}) : Promise.resolve();
+
+  setPlaying(false);
+  resize(); sync();
+  fontsReady.then(() => {
+    sync();
+    if (reduce) { t = 6; sync(); big.hidden = false; }
+    else setPlaying(true);
+    requestAnimationFrame(frame);
+  });
+})();
+</script>
+</body>
+</html>
