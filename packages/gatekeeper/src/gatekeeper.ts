@@ -296,12 +296,11 @@ export default class Gatekeeper implements GatekeeperInterface {
             get(target, property) {
                 const value = Reflect.get(target, property);
                 if (typeof value !== 'function') return value;
-                let method = methods.get(property);
-                if (method?.source !== value) {
-                    method = { source: value, wrapped: wrap(target, property, value) };
-                    methods.set(property, method);
-                }
-                return method.wrapped;
+                const cached = methods.get(property);
+                if (cached && cached.source === value) return cached.wrapped;
+                const wrapped = wrap(target, property, value);
+                methods.set(property, { source: value, wrapped });
+                return wrapped;
             }
         });
     }
