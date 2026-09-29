@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=block">
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+// Every frame is drawn by render(t); nothing is filmed, traced or sampled.
+const W = 1920, H = 1080, BPM = 128, BEAT = 60 / BPM, BAR = BEAT * 4;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const MONO = '"JetBrains Mono", monospace', DISP = '"Bricolage Grotesque", sans-serif';
+const AMBER = '#F5B544', WHITE = '#F2F4F8', DIM = 'rgba(242,244,248,0.38)', FAINT = 'rgba(242,244,248,0.14)';
+
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const p = (t, a, b) => clamp((t - a) / (b - a));
+const e = (t, a, b) => ease(p(t, a, b));
+const rnd = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
+const scram = (s, pr, t, seed) => { const k = Math.floor(pr * s.length); let o = ''; for (let i = 0; i < s.length; i++) o += i < k || s[i] === ':' ? s[i] : B32[Math.floor(rnd(seed * 97 + i * 13 + Math.floor(t * 24)) * 32)]; return o; };
+// Beat pulse: 1 on the beat, decaying over it (kicks start at bar 2, end at bar 14).
+const pulse = t => { const b = t / BEAT; return (t >= 2 * BAR && t < 14 * BAR) ? Math.exp(-(b - Math.floor(b)) * 6) : 0; };
+
+function T(s, x, y, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.font = `${o.w || 400} ${o.s || 16}px ${o.f || MONO}`;
+    ctx.fillStyle = o.c || WHITE; ctx.textAlign = o.al || 'left'; ctx.textBaseline = o.b || 'alphabetic';
+    if (o.ls) ctx.letterSpacing = o.ls + 'px';
+    if (o.glow) { ctx.shadowColor = o.gc || o.c || WHITE; ctx.shadowBlur = o.glow; }
+    ctx.fillText(s, x, y);
+    if (o.glow) { ctx.shadowBlur = o.glow * .4; ctx.fillText(s, x, y); }
+    ctx.restore();
+}
+function line(x1, y1, x2, y2, c, lw = 1, a = 1) { ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = c; ctx.lineWidth = lw; ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.restore(); }
+
+// ---------- scenes (times in seconds) ----------
+const SC = [
+    { n: '00', name: 'genesis', at: 0, log: ['> boot archon', '> generate keypair', '> sign create op'] },
+    { n: '01', name: 'identity', at: 2 * BAR, log: ['> sha-256 → cid', '> did:cid issued', '> fee: 0'] },
+    { n: '02', name: 'keys', at: 5 * BAR, log: ['> bip-39 · 12 words', '> derive secp256k1', '> derive x25519'] },
+    { n: '03', name: 'anchoring', at: 8 * BAR, log: ['> batch operations', '> anchor on chain', '> order by position'] },
+    { n: '04', name: 'use it', at: 11 * BAR, log: ['> issue credential', '> send didcomm', '> zap lightning'] },
+    { n: '05', name: 'archon', at: 14 * BAR, log: [] }
+];
+const sceneAt = t => SC.reduce((a, s) => t >= s.at ? s : a, SC[0]);
+
+function hud(t) {
+    const sc = sceneAt(t), lt = t - sc.at, fade = t > 14 * BAR ? 1 - e(t, 14 * BAR, 14 * BAR + .6) : 1;
+    ctx.save(); ctx.globalAlpha = fade;
+    // corner brackets
+    for (const [x, y, dx, dy] of [[48, 48, 1, 1], [W - 48, 48, -1, 1], [48, H - 48, 1, -1], [W - 48, H - 48, -1, -1]]) {
+        line(x, y, x + 22 * dx, y, FAINT, 2); line(x, y, x, y + 22 * dy, FAINT, 2);
+    }
+    T(sc.n, 96, 84, { s: 17, w: 500, c: AMBER });
+    T(sc.name, 134, 84, { s: 17, c: WHITE });
+    sc.log.forEach((l, i) => {
+        const a = e(lt, .15 + i * .35, .35 + i * .35), k = Math.floor(clamp((lt - .15 - i * .35) / .5) * l.length);
+        T(l.slice(0, k), 96, 116 + i * 22, { s: 14, c: i === 0 ? WHITE : DIM, a });
+    });
+    const b = t / BEAT, bar = Math.floor(b / 4) + 1, beat = Math.floor(b % 4) + 1;
+    T(`128 bpm   bar ${String(bar).padStart(2, '0')}.${beat}`, W - 290, 84, { s: 14, c: DIM, al: 'right' });
+    const f = Math.floor(t * 60) % 60, sec = Math.floor(t);
+    T(`00:${String(sec).padStart(2, '0')}:${String(f).padStart(2, '0')}`, W - 96, 84, { s: 17, c: WHITE, al: 'right' });
+    // timeline
+    const x0 = 96, x1 = W - 96, y = H - 70, px = lerp(x0, x1, t / 30);
+    line(x0, y, x1, y, FAINT, 1.5);
+    line(x0, y, px, y, 'rgba(245,181,68,.55)', 1.5);
+    for (const s of SC.slice(1)) line(lerp(x0, x1, s.at / 30), y - 5, lerp(x0, x1, s.at / 30), y + 5, DIM, 1.5);
+    ctx.save(); ctx.fillStyle = AMBER; ctx.shadowColor = AMBER; ctx.shadowBlur = 14; ctx.beginPath(); ctx.arc(px, y, 3.5, 0, 7); ctx.fill(); ctx.restore();
+    T('genesis', x0, y + 30, { s: 13, c: DIM });
+    T('now', x1, y + 30, { s: 13, c: DIM, al: 'right' });
+    ctx.restore();
+}
+
+function caption(t, t0, big, small) {
+    const a = e(t, t0, t0 + .5) * (1 - e(t, t0 + 5.1, t0 + 5.5));
+    if (a <= 0) return;
+    const dx = lerp(-18, 0, e(t, t0, t0 + .6));
+    T(big, 96 + dx, H - 170, { f: MONO, s: 46, w: 400, a });
+    T(small, 96 + dx, H - 128, { s: 18, c: DIM, a: a * e(t, t0 + .3, t0 + .8) });
+}
+
+function flash(t) {
+    for (const s of SC.slice(1)) {
+        const d = t - s.at;
+        if (d >= 0 && d < .25) { ctx.save(); ctx.globalAlpha = (1 - d / .25) * .35; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); ctx.restore(); }
+    }
+}
+
+// Dust that drifts through every scene.
+const DUST = Array.from({ length: 420 }, (_, i) => ({ x: rnd(i) * W, y: rnd(i + 9) * H, z: .2 + rnd(i + 17) * .8, s: rnd(i + 31) }));
+function dust(t, a = 1) {
+    ctx.save();
+    for (const d of DUST) {
+        const x = (d.x + t * 14 * d.z) % W, y = (d.y + Math.sin(t * .3 + d.s * 6) * 12) % H;
+        ctx.globalAlpha = a * (.15 + .35 * d.z) * (.6 + .4 * Math.sin(t * 2 + d.s * 9));
+        ctx.fillStyle = d.s > .93 ? AMBER : WHITE;
+        ctx.fillRect(x, y, 1.6 * d.z, 1.6 * d.z);
+    }
+    ctx.restore();
+}
+
+// ---------- 00 genesis: a point, a scan line, the promise ----------
+function s0(t) {
+    const cx = W / 2, cy = H / 2 - 40;
+    const r = 3 + 14 * e(t, .2, 1.6), a = e(t, .1, .8);
+    ctx.save(); ctx.fillStyle = WHITE; ctx.shadowColor = AMBER; ctx.shadowBlur = 40 * a; ctx.globalAlpha = a;
+    ctx.beginPath(); ctx.arc(cx, cy, 3 + 2 * Math.sin(t * 6), 0, 7); ctx.fill(); ctx.restore();
+    for (let k = 0; k < 3; k++) {
+        const pr = p((t + k * .6) % 1.8, 0, 1.8);
+        ctx.save(); ctx.globalAlpha = (1 - pr) * .5 * a; ctx.strokeStyle = k ? WHITE : AMBER; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(cx, cy, r + pr * 260, 0, 7); ctx.stroke(); ctx.restore();
+    }
+    const sw = e(t, 1.6, 3.2) * 700;
+    line(cx - sw, cy, cx + sw, cy, 'rgba(242,244,248,.35)', 1);
+    T('OWN YOUR IDENTITY', cx, cy + 120, { s: 40, w: 500, al: 'center', ls: 14 * (1 - e(t, 1.9, 3.3)) + 6, a: e(t, 1.8, 2.8) });
+    T('no platform · no permission · no fee to begin', cx, cy + 162, { s: 16, c: DIM, al: 'center', a: e(t, 2.4, 3.2) });
+}
+
+// ---------- 01 identity: a disc of hash dashes resolving to a DID ----------
+const DID = 'did:cid:bagaaieravc7qx4wn3kbpzyu6lmrfd2ghtjxoe5sai7qbcw4m2kd';
+function s1(t) {
+    const lt = t - 2 * BAR, cx = W / 2 + 130, cy = H / 2 - 80, pu = pulse(t);
+    const N = 1500, SP = 7, grow = e(lt, 0, 1.4), rot = lt * .12;
+    ctx.save(); ctx.translate(cx, cy);
+    for (let i = 0; i < N * grow; i++) {
+        const r = SP * Math.sqrt(i), th = i * 2.39996 + rot;
+        const x = r * Math.cos(th), y = r * Math.sin(th);
+        const hot = rnd(i + Math.floor(lt * 4) * 3) > .965;
+        ctx.save(); ctx.translate(x, y); ctx.rotate(th + Math.PI / 2 + Math.sin(lt + i) * .1);
+        ctx.globalAlpha = (.25 + .6 * (i / N)) * (hot ? 1 : .7);
+        ctx.fillStyle = hot ? AMBER : (rnd(i) > .9 ? '#8FA3FF' : WHITE);
+        ctx.fillRect(-4, -.9, 8 + pu * 3 * (hot ? 1 : 0), 1.8);
+        ctx.restore();
+    }
+    // outer tick ring
+    for (let k = 0; k < 120; k++) {
+        const th = k / 120 * Math.PI * 2 - lt * .05, r0 = SP * Math.sqrt(N) + 22;
+        const len = k % 10 === 0 ? 14 : 6;
+        line(Math.cos(th) * r0, Math.sin(th) * r0, Math.cos(th) * (r0 + len), Math.sin(th) * (r0 + len), WHITE, 1.2, grow * .5);
+    }
+    ctx.restore();
+    // annotation
+    const aa = e(lt, 1.4, 2);
+    // Leader from the disc's rim (upper right) out to a label block clear of it.
+    const rim = SP * Math.sqrt(N) + 40, ang = -Math.PI / 4;
+    const sx = cx + Math.cos(ang) * rim, sy = cy + Math.sin(ang) * rim, ax = sx + 90, ay = sy - 70;
+    line(sx, sy, ax, ay, WHITE, 1.2, aa);
+    line(ax, ay, ax + 40, ay, WHITE, 1.2, aa);
+    T('op    = create · signed', ax + 52, ay - 32, { s: 18, a: aa });
+    T('hash  = sha-256', ax + 52, ay - 6, { s: 18, a: aa });
+    T('cid   = the identifier', ax + 52, ay + 20, { s: 18, c: AMBER, a: aa });
+    T('fee   = 0 · no block wait', ax + 52, ay + 46, { s: 16, c: DIM, a: aa });
+    // the DID resolving
+    const da = e(lt, 2, 2.6);
+    T(scram(DID, e(lt, 2.2, 4.4), t, 7), cx, cy + SP * Math.sqrt(N) + 72, { s: 24, w: 500, c: WHITE, al: 'center', a: da, glow: 12 * e(lt, 4.2, 4.8), gc: AMBER });
+    caption(t, 2 * BAR + .2, 'Create an identity.', 'free and instant · proves its own origin');
+}
+
+// ---------- 02 keys: twelve words collapse into two keys ----------
+const WORDS = ['orbit', 'lantern', 'maple', 'cinder', 'velvet', 'harbor', 'quartz', 'meadow', 'signal', 'ember', 'tundra', 'willow'];
+function keyGlyph(x, y, s, c, a) {
+    ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = c; ctx.lineWidth = s * .09; ctx.lineCap = 'round'; ctx.shadowColor = c; ctx.shadowBlur = 20;
+    ctx.beginPath(); ctx.arc(x, y, s * .32, 0, 7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + s * .32, y); ctx.lineTo(x + s * 1.2, y); ctx.moveTo(x + s * .85, y); ctx.lineTo(x + s * .85, y + s * .26); ctx.moveTo(x + s * 1.1, y); ctx.lineTo(x + s * 1.1, y + s * .2); ctx.stroke();
+    ctx.restore();
+}
+function s2(t) {
+    const lt = t - 5 * BAR, cx = W / 2, cy = H / 2 - 40, col = e(lt, 2.4, 3.4), pu = pulse(t);
+    // orbit rings
+    for (const r of [200, 290, 380]) { ctx.save(); ctx.globalAlpha = .12 * (1 - col); ctx.strokeStyle = WHITE; ctx.setLineDash([2, 8]); ctx.beginPath(); ctx.ellipse(cx, cy, r * 1.35, r * .55, -.12, 0, 7); ctx.stroke(); ctx.restore(); }
+    WORDS.forEach((w, i) => {
+        const r = [200, 290, 380][i % 3] * (1 - col), th = i / 12 * Math.PI * 2 + lt * (.35 + (i % 3) * .08);
+        const x = cx + Math.cos(th) * r * 1.35, y = cy + Math.sin(th) * r * .55;
+        const a = e(lt, i * .08, i * .08 + .4) * (1 - e(lt, 3, 3.4));
+        T(`${String(i + 1).padStart(2, '0')} ${w}`, x, y, { s: 22, al: 'center', b: 'middle', c: i % 4 === 0 ? AMBER : WHITE, a });
+    });
+    // core
+    const ca = e(lt, 2.8, 3.3);
+    ctx.save(); ctx.globalAlpha = ca; ctx.fillStyle = WHITE; ctx.shadowColor = AMBER; ctx.shadowBlur = 50 + pu * 40; ctx.beginPath(); ctx.arc(cx, cy, 6 + pu * 4, 0, 7); ctx.fill(); ctx.restore();
+    const sp = e(lt, 3.3, 4.1);
+    keyGlyph(cx - 60 - sp * 300, cy, 70, AMBER, sp);
+    keyGlyph(cx - 60 + sp * 300, cy, 70, '#8FA3FF', sp);
+    T('secp256k1 · signs', cx - 30 - sp * 300, cy + 90, { s: 20, al: 'center', a: e(lt, 3.8, 4.3) });
+    T('x25519 · encrypts', cx - 30 + sp * 300, cy + 90, { s: 20, al: 'center', a: e(lt, 3.9, 4.4) });
+    caption(t, 5 * BAR + .2, 'Twelve words. Every key.', 'your recovery phrase · no custodian');
+}
+
+// ---------- 03 anchoring: wireframe blocks, a batch, four chains ----------
+function proj(x, y, z, cam) {
+    // simple perspective: rotate around Y then tilt, camera at distance.
+    const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+    let X = x * cy - z * sy, Z = x * sy + z * cy;
+    let Y = y * cp - Z * sp; Z = y * sp + Z * cp;
+    const f = 1100 / (Z + cam.dist);
+    return [W / 2 + X * f, H / 2 + 60 - Y * f, f];
+}
+function cube(cx, cy, cz, s, cam, c, a, glow = 0) {
+    const v = [];
+    for (const dx of [-1, 1]) for (const dy of [-1, 1]) for (const dz of [-1, 1]) v.push(proj(cx + dx * s, cy + dy * s, cz + dz * s, cam));
+    const edges = [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+    ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = c; ctx.lineWidth = 1.6; if (glow) { ctx.shadowColor = c; ctx.shadowBlur = glow; }
+    ctx.beginPath(); for (const [i, j] of edges) { ctx.moveTo(v[i][0], v[i][1]); ctx.lineTo(v[j][0], v[j][1]); } ctx.stroke(); ctx.restore();
+    return proj(cx, cy, cz, cam);
+}
+function plane(y, w, d, cam, a) {
+    const c = [[-w, y, -d], [w, y, -d], [w, y, d], [-w, y, d]].map(q => proj(...q, cam));
+    ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = WHITE; ctx.lineWidth = 1.4; ctx.beginPath(); c.forEach(([x, yy], i) => i ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy)); ctx.closePath(); ctx.stroke();
+    // speckle
+    ctx.globalAlpha *= .5; ctx.fillStyle = WHITE;
+    for (let k = 0; k < 500; k++) { const [x, yy] = proj(lerp(-w, w, rnd(k + y)), y, lerp(-d, d, rnd(k * 3 + y)), cam); ctx.fillRect(x, yy, 1.2, 1.2); }
+    ctx.restore();
+}
+const CHAINS = ['BTC', 'ZEC', 'ETH', 'SOL'];
+function s3(t) {
+    const lt = t - 8 * BAR, pu = pulse(t);
+    const cam = { yaw: -.55 + lt * .05, pitch: .42, dist: 1500 };
+    const a0 = e(lt, 0, .6);
+    plane(-120, 520, 300, cam, a0);
+    plane(260, 520, 300, cam, e(lt, 1.6, 2.2));
+    // the DID's operations: v1..v4 chained
+    let prev = null;
+    for (let k = 0; k < 4; k++) {
+        const a = e(lt, .3 + k * .25, .6 + k * .25);
+        const c = cube(-300 + k * 150, -60, 40, 45, cam, WHITE, a);
+        cube(-300 + k * 150, -60, 40, 20, cam, WHITE, a * .6);
+        if (prev && a > 0) line(prev[0], prev[1], c[0], c[1], WHITE, 1.2, a * .7);
+        prev = c;
+    }
+    // batch rising
+    const rise = e(lt, 1.4, 2.6), by = lerp(-60, 320, rise);
+    const b = cube(200, by, 40, 55, cam, AMBER, e(lt, 1.2, 1.5), 18 + pu * 20);
+    if (rise > 0 && prev) line(prev[0], prev[1], b[0], b[1], AMBER, 1.2, .6 * rise);
+    // four chain rows on the upper plane
+    CHAINS.forEach((ch, i) => {
+        const a = e(lt, 2 + i * .2, 2.5 + i * .2), z = -200 + i * 130;
+        let lastc = null;
+        for (let k = 0; k < 7; k++) {
+            const x = -470 + k * 120 - ((lt * (40 + i * 25)) % 120);
+            const hot = k === 5 && lt > 2.6 + i * .25;
+            const c = cube(x, 300, z, 22, cam, hot ? AMBER : WHITE, a * (x < -480 || x > 470 ? 0 : .8), hot ? 16 : 0);
+            if (lastc) line(lastc[0], lastc[1], c[0], c[1], WHITE, 1, a * .4);
+            lastc = c;
+        }
+        const [lx, ly] = proj(510, 300, z, cam);
+        T(ch, lx + 12, ly + 5, { s: 16, w: 500, c: i ? WHITE : AMBER, a });
+    });
+    caption(t, 8 * BAR + .2, 'Anchor it on any chain.', 'bitcoin · zcash · ethereum · solana');
+}
+
+// ---------- 04 use it: acceleration, three capabilities ----------
+const STREAKS = Array.from({ length: 900 }, (_, i) => ({ a: rnd(i) * Math.PI * 2, d: rnd(i + 5), s: .3 + rnd(i + 8) * .7, c: rnd(i + 11) }));
+const WORDS4 = [['CREDENTIALS', 'issue · present · verify'], ['MESSAGES', 'end-to-end encrypted · didcomm'], ['PAYMENTS', 'zap any DID · lightning']];
+function s4(t) {
+    const lt = t - 11 * BAR, cx = W / 2, cy = H / 2 - 10, pu = pulse(t);
+    const speed = 1 + lt * 1.6;
+    ctx.save();
+    for (const s of STREAKS) {
+        const z = (s.d + lt * .35 * speed * s.s) % 1, r = Math.pow(z, 2.2) * 1400, len = 6 + z * 90 * speed * .5;
+        const x1 = cx + Math.cos(s.a) * r, y1 = cy + Math.sin(s.a) * r * .8, x2 = cx + Math.cos(s.a) * (r + len), y2 = cy + Math.sin(s.a) * (r + len) * .8;
+        ctx.globalAlpha = z * .7; ctx.strokeStyle = s.c > .92 ? AMBER : WHITE; ctx.lineWidth = .6 + z * 1.4;
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+    ctx.restore();
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 420);
+    g.addColorStop(0, `rgba(245,181,68,${.16 + pu * .1})`); g.addColorStop(1, 'rgba(245,181,68,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const k = Math.min(2, Math.floor(lt / BAR)), kt = lt - k * BAR;
+    const [word, sub] = WORDS4[k];
+    const ia = e(kt, 0, .25) * (k === 2 ? 1 - e(lt, 3 * BAR - .15, 3 * BAR) : 1 - e(kt, BAR - .12, BAR));
+    const sc = 1 + .04 * pu;
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(sc, sc);
+    T(`[0${k + 1}/03]`, 0, -110, { s: 22, c: AMBER, al: 'center', a: ia });
+    T(word, 0, 20, { s: 150, w: 800, al: 'center', a: ia, glow: 30, gc: '#ffffff' });
+    ctx.restore();
+    const uw = 760 * e(kt, .05, .45);
+    line(cx - uw / 2, cy + 62, cx + uw / 2, cy + 62, AMBER, 3, ia);
+    T(sub, cx, cy + 118, { s: 22, c: DIM, al: 'center', a: ia });
+}
+
+// ---------- 05 end card ----------
+function s5(t) {
+    const lt = t - 14 * BAR, cx = W / 2, cy = H / 2 - 70;
+    for (const [rx, ry, a] of [[720, 260, .08], [860, 320, .05]]) { ctx.save(); ctx.globalAlpha = a * e(lt, 0, 1); ctx.strokeStyle = WHITE; ctx.beginPath(); ctx.ellipse(cx, cy + 20, rx, ry, 0, 0, 7); ctx.stroke(); ctx.restore(); }
+    const la = e(lt, .05, .5), sc = lerp(1.08, 1, e(lt, 0, 1.2));
+    ctx.save(); ctx.translate(cx, cy); ctx.scale(sc, sc);
+    T('ARCHON', 0, 70, { f: DISP, s: 230, w: 800, al: 'center', a: la, glow: 36, ls: -4 });
+    ctx.restore();
+    const bw = 170 * e(lt, .4, .9);
+    ctx.save(); ctx.globalAlpha = la; ctx.fillStyle = AMBER; ctx.shadowColor = AMBER; ctx.shadowBlur = 24; ctx.fillRect(cx + 330 - bw / 2 + 85 - 85, cy + 110, bw, 26); ctx.restore();
+    T('Identity you create, control and prove yourself', cx, cy + 210, { s: 28, al: 'center', ls: 2, a: e(lt, .8, 1.4) });
+    line(cx - 40, cy + 246, cx + 40, cy + 246, DIM, 1, e(lt, 1.1, 1.5));
+    T('github.com/archetech/archon', cx, cy + 290, { s: 24, w: 700, al: 'center', a: e(lt, 1.3, 1.8) });
+    T('did:cid', cx, cy + 330, { s: 16, c: AMBER, al: 'center', a: e(lt, 1.6, 2.1) });
+}
+
+function vignette() {
+    const g = ctx.createRadialGradient(W / 2, H / 2, 300, W / 2, H / 2, 1150);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.75)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+}
+
+window.render = t => {
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+    ctx.fillStyle = '#030305'; ctx.fillRect(0, 0, W, H);
+    dust(t, t > 11 * BAR && t < 14 * BAR ? .4 : 1);
+    const sc = sceneAt(t);
+    const out = next => { const n = SC[SC.indexOf(sc) + 1]; return n ? 1 - e(t, n.at - .35, n.at) : 1; };
+    ctx.save(); ctx.globalAlpha = out();
+    ({ '00': s0, '01': s1, '02': s2, '03': s3, '04': s4, '05': s5 })[sc.n](t);
+    ctx.restore();
+    vignette();
+    hud(t);
+    flash(t);
+    // final fade to black
+    if (t > 29.4) { ctx.fillStyle = `rgba(0,0,0,${p(t, 29.4, 30)})`; ctx.fillRect(0, 0, W, H); }
+};
+window.ready = document.fonts.load('800 40px "Bricolage Grotesque"').then(() => Promise.all([
+    document.fonts.load('400 20px "JetBrains Mono"'), document.fonts.load('500 20px "JetBrains Mono"'),
+    document.fonts.load('700 20px "JetBrains Mono"'), document.fonts.load('800 20px "JetBrains Mono"')])).then(() => { render(0); return true; });
+</script>
+</body>
+</html>
