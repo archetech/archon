@@ -25,12 +25,15 @@ import {
     DidCidDocument,
     ResolveDIDOptions,
     GetDIDOptions,
+    ListEventsOptions,
+    ListEventsResult,
     CheckDIDsResult,
     ImportBatchResult,
     ProcessEventsResult,
     VerifyDbResult,
 } from './types.js';
 import SearchIndex from './search-index.js';
+import EventIndex from './event-index.js';
 import ProgressLogger from './progress.js';
 
 // A well-formed secp256k1 public key, matching the Rust port's
@@ -166,6 +169,7 @@ export default class Gatekeeper implements GatekeeperInterface {
     supportedRegistries: string[];
     private didLocks = new Map<string, Promise<void>>();
     private searchIndex: SearchIndex;
+    private eventIndex = new EventIndex(timestampMillis);
     // Used only by an isolated replay whose operation objects are immutable.
     private replayOperationIds?: WeakMap<object, string>;
 
@@ -173,7 +177,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         if (!options || !options.db) {
             throw new InvalidParameterError('missing options.db');
         }
-        this.db = options.db;
+        this.db = this.trackEventWrites(options.db);
 
         // Only used for unit testing
         // TBD replace console with a real logging package
@@ -249,6 +253,52 @@ export default class Gatekeeper implements GatekeeperInterface {
             // If DID can't be resolved, remove from index
             this.searchIndex.delete(did);
         }
+    }
+
+    // Every accepted-history write goes through the database, so the event index
+    // follows those writes rather than each caller that makes one.
+    private trackEventWrites(db: GatekeeperDb): GatekeeperDb {
+        const index = this.eventIndex;
+        // Bound once per method: replay reads through this on every lookup.
+        const methods = new Map<PropertyKey, unknown>();
+        const wrap = (target: GatekeeperDb, property: PropertyKey, value: (...args: any[]) => any) => {
+            switch (property) {
+            case 'addEvent':
+                return async (did: string, event: GatekeeperEvent) => {
+                    const result = await value.call(target, did, event);
+                    index.add(did, event);
+                    return result;
+                };
+            case 'setEvents':
+                return async (did: string, events: GatekeeperEvent[]) => {
+                    const result = await value.call(target, did, events);
+                    index.set(did, events);
+                    return result;
+                };
+            case 'deleteEvents':
+                return async (did: string) => {
+                    const result = await value.call(target, did);
+                    index.delete(did);
+                    return result;
+                };
+            case 'resetDb':
+                return async () => {
+                    const result = await value.call(target);
+                    index.clear();
+                    return result;
+                };
+            default:
+                return value.bind(target);
+            }
+        };
+        return new Proxy(db, {
+            get(target, property) {
+                const value = Reflect.get(target, property);
+                if (typeof value !== 'function') return value;
+                if (!methods.has(property)) methods.set(property, wrap(target, property, value));
+                return methods.get(property);
+            }
+        });
     }
 
     private async withDidLock<T>(did: string, fn: () => Promise<T>): Promise<T> {
@@ -1792,6 +1842,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             const index = new SearchIndex();
             const status = await replay.checkDIDsOnce({ dids: accepted }, index);
             this.searchIndex = index;
+            this.eventIndex.build(accepted.map(target => [target, staged.get(target)!]));
             console.log(`Search index initialized with ${index.size} DIDs`);
             return { changed, status };
         }
@@ -2388,6 +2439,32 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     async getJSON(cid: string): Promise<object | null> {
         return this.ipfs.getJSON(cid);
+    }
+
+    async listEvents(options: ListEventsOptions = {}): Promise<ListEventsResult> {
+        const { after, before, registry, limit = 50, offset = 0 } = options;
+        // The timestamp grammar both ports apply to event times.
+        if (after !== undefined && !this.verifyDateFormat(after)) throw new InvalidParameterError('after');
+        if (before !== undefined && !this.verifyDateFormat(before)) throw new InvalidParameterError('before');
+        const afterMs = after === undefined ? undefined : timestampMillis(after);
+        const beforeMs = before === undefined ? undefined : timestampMillis(before);
+        if (registry !== undefined && (typeof registry !== 'string' || !registry)) throw new InvalidParameterError('registry');
+        if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new InvalidParameterError('limit');
+        if (!Number.isSafeInteger(offset) || offset < 0) throw new InvalidParameterError('offset');
+
+        await this.ensureHistoryReady();
+        return this.withHistoryLock(async () => {
+            const { total, page } = this.eventIndex.query({ after: afterMs, before: beforeMs, registry, limit, offset });
+            const histories = new Map<string, GatekeeperEvent[]>();
+            await Promise.all([...new Set(page.map(entry => entry.key))].map(async key => {
+                histories.set(key, await this.db.getEvents(`${this.didPrefix}:${key}`));
+            }));
+            const events = page.flatMap(({ key, position }) => {
+                const event = histories.get(key)?.[position];
+                return event ? [{ ...event, did: event.did ?? `${this.didPrefix}:${key}` }] : [];
+            });
+            return { total, events };
+        });
     }
 
     async searchDocs(q: string): Promise<string[]> {

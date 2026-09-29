@@ -970,6 +970,78 @@ pub(crate) async fn search_docs(
     Json(json!(result)).into_response()
 }
 
+// Query values for the events listing. A repeated parameter is invalid rather
+// than first- or last-wins, and counts must be plain safe integers, so both
+// ports accept exactly the same requests.
+fn single_query_value<'a>(pairs: &'a [(String, String)], name: &str) -> Result<Option<&'a str>, ()> {
+    let mut values = pairs.iter().filter(|(key, _)| key == name).map(|(_, value)| value.as_str());
+    let first = values.next();
+    if values.next().is_some() {
+        return Err(());
+    }
+    Ok(first)
+}
+
+fn query_time(pairs: &[(String, String)], name: &str) -> Result<Option<i64>, ()> {
+    match single_query_value(pairs, name)? {
+        None => Ok(None),
+        Some(value) => crate::event_index::event_time_millis(value).map(Some).ok_or(()),
+    }
+}
+
+fn query_count(pairs: &[(String, String)], name: &str, default: u64, min: u64, max: u64) -> Result<u64, ()> {
+    match single_query_value(pairs, name)? {
+        None => Ok(default),
+        Some(value) if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) => {
+            let count = value.parse::<u64>().map_err(|_| ())?;
+            if (min..=max).contains(&count) { Ok(count) } else { Err(()) }
+        }
+        Some(_) => Err(()),
+    }
+}
+
+pub(crate) async fn list_events(
+    State(state): State<AppState>,
+    Query(pairs): Query<Vec<(String, String)>>,
+) -> Response {
+    let start = Instant::now();
+    let invalid = |field: &str| {
+        record_metrics(&state, "GET", "/events", 400, start.elapsed().as_secs_f64());
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("Invalid parameter: {field}") })),
+        )
+            .into_response()
+    };
+    let Ok(after) = query_time(&pairs, "after") else { return invalid("after") };
+    let Ok(before) = query_time(&pairs, "before") else { return invalid("before") };
+    let registry = match single_query_value(&pairs, "registry") {
+        Ok(Some("")) | Err(()) => return invalid("registry"),
+        Ok(registry) => registry,
+    };
+    let Ok(limit) = query_count(&pairs, "limit", 50, 1, 1000) else { return invalid("limit") };
+    let Ok(offset) = query_count(&pairs, "offset", 0, 0, 9_007_199_254_740_991) else { return invalid("offset") };
+
+    if let Err(error) = crate::history::ensure_history_ready(&state).await {
+        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    }
+    let _history_guard = state.history_lock.lock().await;
+    let query = crate::event_index::EventQuery {
+        after,
+        before,
+        registry,
+        limit: limit as usize,
+        offset: usize::try_from(offset).unwrap_or(usize::MAX),
+    };
+    let (total, events) = state
+        .store
+        .lock()
+        .await
+        .list_events(&state.config.did_prefix, &query);
+    record_metrics(&state, "GET", "/events", 200, start.elapsed().as_secs_f64());
+    Json(json!({ "total": total, "events": events })).into_response()
+}
+
 pub(crate) async fn query_docs(
     State(state): State<AppState>,
     Json(payload): Json<Value>,
@@ -2644,6 +2716,7 @@ mod rewind_admission_tests {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         });
         state.config.admin_api_key = "rewind-test-key".into();
         let mut headers = HeaderMap::new();

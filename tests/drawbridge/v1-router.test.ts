@@ -33,6 +33,7 @@ function createMockGatekeeper() {
         getBlock: jest.fn<any>().mockResolvedValue({ hash: 'abc', height: 7 }),
         searchDocs: jest.fn<any>().mockResolvedValue(['did:cid:abc']),
         queryDocs: jest.fn<any>().mockResolvedValue(['did:cid:abc']),
+        listEvents: jest.fn<any>().mockResolvedValue({ total: 1, events: [{ did: 'did:cid:abc' }] }),
     };
 }
 
@@ -335,6 +336,31 @@ describe('drawbridge v1 gatekeeper proxy routes', () => {
         // Without a `where` wrapper the whole body is treated as the query.
         await request(app).post('/api/v1/query').send({ type: 'notice' });
         expect(gatekeeper.queryDocs).toHaveBeenLastCalledWith({ type: 'notice' });
+    });
+
+    it('lists events, passing parameters through and upstream 400s back', async () => {
+        const { app, gatekeeper } = mount();
+
+        const listed = await request(app).get('/api/v1/events?registry=local&limit=10&offset=20&after=2026-01-01T00:00:00Z');
+        expect(listed.status).toBe(200);
+        expect(listed.body).toStrictEqual({ total: 1, events: [{ did: 'did:cid:abc' }] });
+        expect(gatekeeper.listEvents).toHaveBeenLastCalledWith({
+            after: '2026-01-01T00:00:00Z', before: undefined, registry: 'local', limit: 10, offset: 20,
+        });
+
+        // Repeated or non-digit values stay invalid for the gatekeeper to reject.
+        await request(app).get('/api/v1/events?registry=a&registry=b&limit=1e1');
+        expect(gatekeeper.listEvents).toHaveBeenLastCalledWith({
+            after: undefined, before: undefined, registry: '', limit: NaN, offset: undefined,
+        });
+
+        gatekeeper.listEvents.mockRejectedValueOnce({ error: 'Invalid parameter: limit' });
+        const rejected = await request(app).get('/api/v1/events?limit=0');
+        expect(rejected.status).toBe(400);
+        expect(rejected.body).toStrictEqual({ error: 'Invalid parameter: limit' });
+
+        gatekeeper.listEvents.mockRejectedValueOnce('connect ECONNREFUSED');
+        expect((await request(app).get('/api/v1/events')).status).toBe(502);
     });
 
     it('reports any upstream gatekeeper failure as 502', async () => {

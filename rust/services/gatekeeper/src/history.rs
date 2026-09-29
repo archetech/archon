@@ -249,6 +249,8 @@ pub(crate) async fn ensure_history_ready(state: &AppState) -> Result<()> {
         preparing.update(index + 1);
     }
     rebuild_histories(state, dids, Some(&histories)).await?;
+    // Replay builds the event index from its snapshot; an empty store has none.
+    state.store.lock().await.ensure_event_index(&state.config.did_prefix)?;
     *state.history_ready.lock().await = true;
     Ok(())
 }
@@ -397,6 +399,7 @@ async fn rebuild_histories(
         backend: DbBackend::Memory,
         data,
         redis_connection: None,
+        event_index: Default::default(),
     }));
     replay.did_locks = Arc::new(Mutex::new(HashMap::new()));
     replay.search_index = Arc::new(Mutex::new(SearchIndex::default()));
@@ -489,6 +492,10 @@ async fn rebuild_histories(
             .retain(|_, events| !events.is_empty());
         crate::resolver::build_startup_views(&replay).await;
         *state.search_index.lock().await = std::mem::take(&mut *replay.search_index.lock().await);
+        {
+            let replay_store = replay.store.lock().await;
+            state.store.lock().await.event_index.build(replay_store.data.dids.iter());
+        }
         // status_snapshot and metrics are shared by the replay state clone.
     } else {
         // Runtime reconciliation only replaces affected search documents.
@@ -537,6 +544,7 @@ mod tests {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         });
         for value in vector["base"]
             .as_array()
@@ -610,6 +618,7 @@ mod tests {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         });
         for value in vector["base"]
             .as_array()
@@ -663,6 +672,7 @@ mod tests {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             let mut asset = vectors[0]["base"][1].clone();
             if gossip {
@@ -699,6 +709,7 @@ mod tests {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             for value in vector["base"].as_array().unwrap() {
                 let mut event: EventRecord = serde_json::from_value(value.clone()).unwrap();
@@ -798,6 +809,7 @@ mod tests {
             backend: DbBackend::Memory,
             data,
             redis_connection: None,
+            event_index: Default::default(),
         });
         // The snapshot is already recovered; benchmark sync, excluding startup.
         retain_candidates(&state, &controller, None).await.unwrap();
@@ -837,7 +849,7 @@ mod tests {
         data.candidates = candidates;
         let count = data.dids.len();
         let (state, _dir) = crate::tests::make_state(JsonDb {
-            backend: DbBackend::Memory, data, redis_connection: None,
+            backend: DbBackend::Memory, data, redis_connection: None, event_index: Default::default(),
         });
         let started = std::time::Instant::now();
         ensure_history_ready(&state).await.unwrap();
@@ -854,7 +866,7 @@ mod tests {
         )).unwrap();
         let did = vector["did"].as_str().unwrap();
         let (state, _dir) = crate::tests::make_state(JsonDb {
-            backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None,
+            backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None, event_index: Default::default(),
         });
         crate::events::handle_did_operation(&state, &vector["create"]).await.unwrap();
         let before = serde_json::to_value(&state.store.lock().await.data).unwrap();
@@ -869,7 +881,7 @@ mod tests {
             .await.unwrap_err().contains("previd"));
 
         let (state, _dir) = crate::tests::make_state(JsonDb {
-            backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None,
+            backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None, event_index: Default::default(),
         });
         for name in ["create", "successor", "valid"] {
             let event = crate::value_to_event_record(&json!({
@@ -913,6 +925,7 @@ mod tests {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             for index in order {
                 crate::events::import_event_impl(&state, events[index].clone()).await;
@@ -968,6 +981,7 @@ mod tests {
             backend: DbBackend::Memory,
             data,
             redis_connection: None,
+            event_index: Default::default(),
         });
         ensure_history_ready(&state).await.unwrap();
         let doc = crate::resolve_local_doc_async(
@@ -988,6 +1002,7 @@ mod tests {
             backend: DbBackend::Memory,
             data: repaired,
             redis_connection: None,
+            event_index: Default::default(),
         });
         ensure_history_ready(&restarted).await.unwrap();
         assert_eq!(
@@ -1014,6 +1029,7 @@ mod tests {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         });
         ensure_history_ready(&state).await.unwrap();
         for operation in [&v["agent"], &rotation] {
@@ -1064,6 +1080,7 @@ mod tests {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             };
             db.set_events(controller, old.clone()).unwrap();
             db.set_candidates(controller, old.clone()).unwrap();
@@ -1090,6 +1107,7 @@ mod tests {
                 backend: DbBackend::Memory,
                 data: repaired,
                 redis_connection: None,
+                event_index: Default::default(),
             });
             ensure_history_ready(&restarted).await.unwrap();
             let store = restarted.store.lock().await;
@@ -1127,6 +1145,7 @@ mod tests {
                             backend: DbBackend::Memory,
                             data: JsonDbFile::default(),
                             redis_connection: None,
+                            event_index: Default::default(),
                         });
                         ensure_history_ready(&state).await.unwrap();
                         let controllers = vec![
@@ -1184,6 +1203,7 @@ mod tests {
                             backend: DbBackend::Memory,
                             data,
                             redis_connection: None,
+                            event_index: Default::default(),
                         });
                         let controller = v["controller"].as_str().unwrap();
                         let asset = v["asset"].as_str().unwrap();
@@ -1294,6 +1314,7 @@ mod tests {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             ensure_history_ready(&state).await.unwrap();
             for name in ["agent", "leapRotation"] {
@@ -1340,6 +1361,7 @@ mod tests {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             ensure_history_ready(&state).await.unwrap();
             for name in ["backdatedSuccessor", "controllerRotation", "agent"] {
@@ -1396,6 +1418,7 @@ mod tests {
                     backend: DbBackend::Memory,
                     data: JsonDbFile::default(),
                     redis_connection: None,
+                    event_index: Default::default(),
                 });
                 if mode == "direct" {
                     state
@@ -1466,6 +1489,7 @@ mod tests {
                     backend: DbBackend::Memory,
                     data,
                     redis_connection: None,
+                    event_index: Default::default(),
                 });
                 let states = if mode == "replay" {
                     vec![&restarted]
@@ -1527,6 +1551,7 @@ mod tests {
                     backend: DbBackend::Memory,
                     data: JsonDbFile::default(),
                     redis_connection: None,
+                    event_index: Default::default(),
                 });
                 if mode == "direct" {
                     state
@@ -1593,6 +1618,7 @@ mod tests {
                     backend: DbBackend::Memory,
                     data,
                     redis_connection: None,
+                    event_index: Default::default(),
                 });
                 let states = if mode == "replay" {
                     vec![&restarted]
@@ -1631,6 +1657,7 @@ mod tests {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             ensure_history_ready(&state).await.unwrap();
             let before = serde_json::to_value(&state.store.lock().await.data).unwrap();
@@ -1653,6 +1680,7 @@ mod tests {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         });
         assert!(
             crate::events::handle_did_operation(&state, &v["unsupportedGenesis"])
@@ -1693,6 +1721,7 @@ mod tests {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             crate::events::import_event_impl(&state, identity_event(&vector["create"], 100)).await;
             let mut batch = vec![
@@ -1747,6 +1776,7 @@ mod tests {
                     backend: DbBackend::Memory,
                     data: JsonDbFile::default(),
                     redis_connection: None,
+                    event_index: Default::default(),
                 });
                 let alias = vector["aliasCid"].as_str().unwrap();
                 // CID ingress retains the retrieved bytes under their source CID.
@@ -1839,6 +1869,7 @@ mod tests {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             };
             let (state, _directory) = crate::tests::make_state(db);
             for event in vector["base"]
@@ -1884,6 +1915,7 @@ mod tests {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         };
         let (state, _directory) = crate::tests::make_state(db);
         for event in vector["base"]
@@ -1954,6 +1986,7 @@ mod tests {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         };
         let (mut state, directory) = crate::tests::make_state(db);
         for event in vector["base"].as_array().unwrap() {
@@ -2010,6 +2043,7 @@ mod tests {
                     backend: DbBackend::Memory,
                     data: JsonDbFile::default(),
                     redis_connection: None,
+                    event_index: Default::default(),
                 };
                 let (state, _directory) = crate::tests::make_state(db);
                 *state.supported_registries.lock().await =
@@ -2079,6 +2113,7 @@ mod tests {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             };
             let (state, _directory) = crate::tests::make_state(db);
             if repair {
@@ -2148,6 +2183,7 @@ mod tests {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             };
             let (state, _directory) = crate::tests::make_state(db);
             for event in vector["base"]
@@ -2216,6 +2252,7 @@ mod tests {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             };
             let (state, _directory) = crate::tests::make_state(db);
             for event in vector["base"].as_array().unwrap() {
@@ -2284,6 +2321,7 @@ mod tests {
                             backend: DbBackend::Memory,
                             data: JsonDbFile::default(),
                             redis_connection: None,
+                            event_index: Default::default(),
                         };
                         let (mut state, _directory) = crate::tests::make_state(db);
                         state.config.db = backend.to_string();
@@ -2418,6 +2456,7 @@ mod tests {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         };
         let (state, _directory) = crate::tests::make_state(db);
         crate::import_batch_impl(&state, vector["base"].as_array().unwrap()).await;
@@ -2462,6 +2501,7 @@ mod tests {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         });
         ensure_history_ready(&state).await.unwrap();
         for name in ["agent", "assetCreate", "assetUpdate", "controllerDelete"] {
@@ -2542,6 +2582,7 @@ mod tests {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         });
         for vector in &vectors {
             for event in vector["base"].as_array().unwrap() {
@@ -2577,6 +2618,7 @@ mod tests {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         };
         for (did, events) in [
             (
@@ -2626,13 +2668,13 @@ mod tests {
                 assert_eq!(generate_json_cid(operation).unwrap(), v["cids"][index]);
             }
             let (direct, _dir) = crate::tests::make_state(JsonDb {
-                backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None,
+                backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None, event_index: Default::default(),
             });
             for op in operations {
                 crate::events::handle_did_operation(&direct, op).await.unwrap();
             }
             let (state, _dir) = crate::tests::make_state(JsonDb {
-                backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None,
+                backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None, event_index: Default::default(),
             });
             for index in [2, 1, 0] {
                 let op = &operations[index];

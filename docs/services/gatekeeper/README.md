@@ -111,6 +111,7 @@ unhandled paths.
 | `GET` | `/api/v1/block/:registry/latest` | no | Latest known block for the registry. |
 | `GET` | `/api/v1/block/:registry/:blockId` | no | Block lookup. Numeric `blockId` is treated as height; otherwise as hash. |
 | `POST` | `/api/v1/block/:registry` | yes | Body: `BlockInfo`. Returns boolean. |
+| `GET` | `/api/v1/events` | no | Query `after`, `before`, `registry`, `limit`, `offset`. Returns `{ "total": number, "events": GatekeeperEvent[] }`, accepted events across all DIDs, newest first. See [§9.3](#93-get-apiv1events). |
 | `GET` | `/api/v1/search` | no | Query `q`. Returns array of DIDs whose `didDocumentData` contains the query string. Empty `q` returns `[]`. |
 | `POST` | `/api/v1/query` | no | Body: `{ "where": {...} }`. See [§9](#9-search-and-structured-query). MUST return HTTP 400 `{"error":"`where` must be an object"}` if `where` is missing or not an object. |
 | `GET` | `/metrics` | no | Prometheus exposition. See [§13](#13-prometheus-metrics-contract). |
@@ -1285,6 +1286,49 @@ Errors:
 
 - `where` missing or non-object -> HTTP 400 `{"error":"`where` must be an object"}`
 - `cond.$in` missing or non-array -> HTTP 500 `{"error":"<implementation-specific>"}`
+
+### 9.3 `GET /api/v1/events`
+
+Pages through the events in every DID's accepted history (the `dids`
+resource of [§10](#10-storage-contract)), so a client such as the Explorer
+need not export whole histories to show recent activity.
+
+Query parameters, all optional:
+
+| Parameter | Meaning |
+| --- | --- |
+| `after` | Only events whose `time` is after this instant (exclusive). |
+| `before` | Only events whose `time` is before this instant (exclusive). |
+| `registry` | Only events whose `registry` equals this value. |
+| `limit` | Page size, `1`–`1000`. Default `50`. |
+| `offset` | Matching events to skip, `0`–`9007199254740991`. Default `0`. |
+
+`after` and `before` use the timestamp grammar of
+`tests/gatekeeper/timestamp-vectors.json`. Event times and bounds are
+compared as millisecond instants, as in resolution cutoffs; an event whose
+`time` cannot be parsed is not listed. `limit` and `offset` MUST be plain
+decimal digits. A parameter given more than once, an empty value, or any
+other invalid value MUST return HTTP 400
+`{"error":"Invalid parameter: <name>"}`, checking `after`, `before`,
+`registry`, `limit` and `offset` in that order.
+
+The response is `{ "total": number, "events": GatekeeperEvent[] }`: `total`
+counts every matching event and `events` holds the requested page, ordered by
+
+1. event time, newest first;
+2. storage key (the DID suffix), ascending by code point;
+3. position in that DID's history, later first.
+
+Each event is the stored record, as `POST /api/v1/dids/export` returns it,
+with `did` set to its DID when the record lacks one (the configured prefix
+and the storage key).
+
+Implementations serve this from an in-memory index maintained with the
+accepted histories: built from the recovery snapshot at startup (or from
+the store when there is none), updated by every write to an accepted
+history, and cleared by a database reset. A page reads only the histories
+of the DIDs it lists. Like the search index, the index reflects writes made
+by this process.
 
 ---
 

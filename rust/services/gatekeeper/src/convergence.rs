@@ -116,6 +116,7 @@ async fn convergence_delivery_permutations_match_restricted_model() {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             let events: Vec<Value> = case["order"]
                 .as_array()
@@ -170,6 +171,7 @@ async fn convergence_delivery_permutations_match_restricted_model() {
                 backend: DbBackend::Memory,
                 data,
                 redis_connection: None,
+                event_index: Default::default(),
             });
             outcomes.insert(assert_projection(&restarted, &vector, case).await);
         }
@@ -187,6 +189,7 @@ async fn convergence_controller_fork_replays_asset_authorization() {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             for (receipt, index) in order.as_array().unwrap().iter().enumerate() {
                 let operation = &v["operations"][index.as_u64().unwrap() as usize];
@@ -203,6 +206,7 @@ async fn convergence_controller_fork_replays_asset_authorization() {
                 backend: DbBackend::Memory,
                 data,
                 redis_connection: None,
+                event_index: Default::default(),
             });
             for current in [&state, &restarted] {
                 crate::history::ensure_history_ready(current).await.unwrap();
@@ -276,6 +280,7 @@ async fn convergence_full_event_records_settle() {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         });
         let events: Vec<Value> = case["events"]
             .as_array()
@@ -334,6 +339,7 @@ async fn convergence_full_event_records_settle() {
             backend: DbBackend::Memory,
             data,
             redis_connection: None,
+            event_index: Default::default(),
         });
         crate::history::ensure_history_ready(&restarted)
             .await
@@ -396,6 +402,7 @@ async fn convergence_runtime_passes_match_lean_and_serialized_stopping() {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             crate::history::ensure_history_ready(&state).await.unwrap();
             let seed = if warm {
@@ -480,6 +487,7 @@ async fn convergence_agent_rotation_and_deletion() {
                     backend: DbBackend::Memory,
                     data: JsonDbFile::default(),
                     redis_connection: None,
+                    event_index: Default::default(),
                 });
                 let events: Vec<Value> = order.as_array().unwrap().iter().enumerate().map(|(receipt, index)| {
                     let operation = &vector["operations"][index.as_u64().unwrap() as usize];
@@ -508,6 +516,7 @@ async fn convergence_agent_rotation_and_deletion() {
                             backend: DbBackend::Memory,
                             data,
                             redis_connection: None,
+                            event_index: Default::default(),
                         });
                         state = restarted;
                         restart_directory = Some(directory);
@@ -588,6 +597,7 @@ async fn convergence_earliest_valid_chain_anchors() {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             state
                 .store
@@ -625,6 +635,7 @@ async fn convergence_earliest_valid_chain_anchors() {
                         backend: DbBackend::Memory,
                         data,
                         redis_connection: None,
+                        event_index: Default::default(),
                     });
                     state = restarted;
                     restart_directory = Some(directory);
@@ -710,6 +721,7 @@ async fn convergence_chain_successor_priority() {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             if let Some(blocks) = vector["blocks"].as_array() {
                 for entry in blocks {
@@ -758,6 +770,7 @@ async fn convergence_chain_successor_priority() {
                         backend: DbBackend::Memory,
                         data,
                         redis_connection: None,
+                        event_index: Default::default(),
                     });
                     state = restarted;
                     restart_directory = Some(directory);
@@ -874,6 +887,7 @@ async fn convergence_interleaved_transitions() {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             crate::history::ensure_history_ready(&state).await.unwrap();
             let blocks = v["blocks"]
@@ -955,6 +969,7 @@ async fn convergence_controller_cutoff_view() {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             for entry in vector["blocks"].as_array().unwrap() {
                 state
@@ -994,6 +1009,7 @@ async fn convergence_controller_cutoff_view() {
                         backend: DbBackend::Memory,
                         data,
                         redis_connection: None,
+                        event_index: Default::default(),
                     });
                     state = restarted;
                     restart_directory = Some(directory);
@@ -1126,6 +1142,7 @@ async fn convergence_chain_ordinals_required() {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             state.config.admin_api_key = "ordinal-test".to_string();
             let mut invalid = genesis.clone();
@@ -1190,6 +1207,7 @@ async fn convergence_chain_ordinals_required() {
                 backend: DbBackend::Memory,
                 data,
                 redis_connection: None,
+                event_index: Default::default(),
             });
             state = restarted;
             crate::history::ensure_history_ready(&state).await.unwrap();
@@ -1209,6 +1227,7 @@ async fn convergence_chain_ordinals_required() {
                 backend: DbBackend::Memory,
                 data,
                 redis_connection: None,
+                event_index: Default::default(),
             });
             crate::history::ensure_history_ready(&restarted)
                 .await
@@ -1222,6 +1241,7 @@ async fn convergence_chain_ordinals_required() {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         });
         state.config.admin_api_key = "ordinal-test".to_string();
         state
@@ -1294,6 +1314,7 @@ async fn convergence_chain_ordinals_required() {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         });
         let mut unpositioned = genesis.clone();
         unpositioned.as_object_mut().unwrap().remove("ordinal");
@@ -1321,6 +1342,7 @@ async fn convergence_integrated_agents() {
                     backend: DbBackend::Memory,
                     data: JsonDbFile::default(),
                     redis_connection: None,
+                    event_index: Default::default(),
                 });
                 for entry in vector["blocks"].as_array().unwrap() {
                     state
@@ -1360,6 +1382,7 @@ async fn convergence_integrated_agents() {
                             backend: DbBackend::Memory,
                             data,
                             redis_connection: None,
+                            event_index: Default::default(),
                         });
                         state = restarted;
                         restart_directory = Some(directory);
@@ -1458,6 +1481,7 @@ async fn convergence_pin_receipt_proof_time() {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             for index in order.as_array().unwrap() {
                 let data = serde_json::from_value(
@@ -1468,6 +1492,7 @@ async fn convergence_pin_receipt_proof_time() {
                     backend: DbBackend::Memory,
                     data,
                     redis_connection: None,
+                    event_index: Default::default(),
                 });
                 state = restarted;
                 crate::import_batch_impl(
@@ -1486,6 +1511,7 @@ async fn convergence_pin_receipt_proof_time() {
                     backend: DbBackend::Memory,
                     data,
                     redis_connection: None,
+                    event_index: Default::default(),
                 });
                 state = restarted;
                 crate::history::ensure_history_ready(&state).await.unwrap();
@@ -1516,6 +1542,7 @@ async fn convergence_pin_receipt_proof_time() {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         };
         let retained: Vec<_> = vector["events"]
             .as_array()
@@ -1587,6 +1614,7 @@ async fn convergence_assets_with_controller_recovery() {
                     backend: DbBackend::JsonFile { path: path.clone() },
                     data: JsonDbFile::default(),
                     redis_connection: None,
+                    event_index: Default::default(),
                 });
                 for entry in vector["blocks"].as_array().unwrap() {
                     state
@@ -1630,6 +1658,7 @@ async fn convergence_assets_with_controller_recovery() {
                                     backend: DbBackend::JsonFile { path: path.clone() },
                                     data,
                                     redis_connection: None,
+                                    event_index: Default::default(),
                                 });
                             state = restarted;
                             state_directory = restarted_directory;
@@ -1726,6 +1755,7 @@ async fn convergence_local_receipt_clock_audit() {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             for index in order.as_array().unwrap() {
                 crate::import_batch_impl(
@@ -1744,6 +1774,7 @@ async fn convergence_local_receipt_clock_audit() {
                     backend: DbBackend::Memory,
                     data,
                     redis_connection: None,
+                    event_index: Default::default(),
                 });
                 state = restarted;
                 crate::history::ensure_history_ready(&state).await.unwrap();
@@ -1777,6 +1808,7 @@ async fn convergence_local_receipt_clock_audit() {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         };
         let retained: Vec<_> = [0, 1, 4].iter().map(|index| {
             let mut value = vector["events"][*index].clone();
@@ -1826,6 +1858,7 @@ async fn convergence_local_registration_metadata_audit() {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             for event in vector["events"].as_array().unwrap() {
                 crate::import_batch_impl(&state, &[event.clone()]).await;
@@ -1843,6 +1876,7 @@ async fn convergence_local_registration_metadata_audit() {
                 backend: DbBackend::Memory,
                 data,
                 redis_connection: None,
+                event_index: Default::default(),
             });
             crate::history::ensure_history_ready(&state).await.unwrap();
             let store = state.store.lock().await;
@@ -1862,6 +1896,7 @@ async fn convergence_local_registration_metadata_audit() {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         };
         let did = vector["did"].as_str().unwrap();
         let asset_did = vector["assetDid"].as_str().unwrap();
@@ -1898,6 +1933,7 @@ async fn convergence_direct_local_creation_clock() {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         });
         let operation = &vector["events"][0]["operation"];
         assert_ne!(operation["created"], operation["proof"]["created"]);
@@ -1921,6 +1957,7 @@ async fn convergence_local_receipt_of_chain_genesis() {
             backend: DbBackend::Memory,
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         });
         state.supported_registries.lock().await.push("BTC:signet".to_string());
         let operation = &vector["nonlocalGenesis"];
@@ -1945,7 +1982,7 @@ async fn convergence_local_receipt_of_chain_genesis() {
                 serde_json::from_value(serde_json::to_value(&store.data).unwrap()).unwrap()
             };
             let (restarted, _restart) = crate::tests::make_state(JsonDb {
-                backend: DbBackend::Memory, data, redis_connection: None,
+                backend: DbBackend::Memory, data, redis_connection: None, event_index: Default::default(),
             });
             state = restarted;
             crate::history::ensure_history_ready(&state).await.unwrap();
@@ -1966,6 +2003,7 @@ async fn convergence_chain_registration_metadata_audit() {
                 backend: DbBackend::Memory,
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             });
             for index in order {
                 crate::import_batch_impl(&state, &[vector["genesis"][index].clone()]).await;
@@ -1988,7 +2026,7 @@ async fn convergence_chain_registration_metadata_audit() {
                 serde_json::from_value(serde_json::to_value(&store.data).unwrap()).unwrap()
             };
             let (state, _restart) = crate::tests::make_state(JsonDb {
-                backend: DbBackend::Memory, data, redis_connection: None,
+                backend: DbBackend::Memory, data, redis_connection: None, event_index: Default::default(),
             });
             crate::history::ensure_history_ready(&state).await.unwrap();
             outcomes.push(state.store.lock().await.get_events(asset_did).len());
@@ -1996,7 +2034,7 @@ async fn convergence_chain_registration_metadata_audit() {
         assert_eq!(outcomes, vec![1, 1, 1, 1]);
         for order in [[0, 1], [1, 0]] {
             let (mut state, _directory) = crate::tests::make_state(JsonDb {
-                backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None,
+                backend: DbBackend::Memory, data: JsonDbFile::default(), redis_connection: None, event_index: Default::default(),
             });
             for event in std::iter::once(&vector["genesis"][1]).chain(vector["events"].as_array().unwrap()) {
                 crate::import_batch_impl(&state, &[event.clone()]).await;
@@ -2018,7 +2056,7 @@ async fn convergence_chain_registration_metadata_audit() {
                     serde_json::from_value(serde_json::to_value(&store.data).unwrap()).unwrap()
                 };
                 let (restarted, _restart) = crate::tests::make_state(JsonDb {
-                    backend: DbBackend::Memory, data, redis_connection: None,
+                    backend: DbBackend::Memory, data, redis_connection: None, event_index: Default::default(),
                 });
                 state = restarted;
                 crate::history::ensure_history_ready(&state).await.unwrap();

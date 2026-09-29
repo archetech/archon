@@ -477,6 +477,37 @@ describe('exportDIDs', () => {
     });
 });
 
+describe('listEvents', () => {
+    it('should send the options as query parameters and return the page', async () => {
+        const page = { total: 3, events: [{ did: 'did:cid:abc', registry: 'local', time: '2026-01-01T00:00:00Z' }] };
+        nock(GatekeeperURL)
+            .get('/api/v1/events')
+            .query({ registry: 'local', limit: '1', offset: '2', after: '2025-12-31T00:00:00Z' })
+            .reply(200, page);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+        const result = await gatekeeper.listEvents({ registry: 'local', limit: 1, offset: 2, after: '2025-12-31T00:00:00Z' });
+
+        expect(result).toStrictEqual(page);
+    });
+
+    it('should throw exception on listEvents server error', async () => {
+        nock(GatekeeperURL)
+            .get('/api/v1/events')
+            .reply(500, ServerError);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+
+        try {
+            await gatekeeper.listEvents();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('importDIDs', () => {
     it('should return imported DID results', async () => {
         nock(GatekeeperURL)

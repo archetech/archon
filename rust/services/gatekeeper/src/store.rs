@@ -13,7 +13,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-use crate::{config::Config, generate_json_cid};
+use crate::{config::Config, event_index::{EventIndex, EventQuery}, generate_json_cid};
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub(crate) struct EventRecord {
@@ -48,6 +48,8 @@ pub(crate) struct JsonDb {
     pub(crate) backend: DbBackend,
     pub(crate) data: JsonDbFile,
     pub(crate) redis_connection: Option<StdMutex<redis::Connection>>,
+    // Follows every accepted-history write below; see set_events.
+    pub(crate) event_index: EventIndex,
 }
 
 #[derive(Clone)]
@@ -292,6 +294,80 @@ pub(crate) fn chrono_like_now() -> String {
 }
 
 impl JsonDb {
+    // Accepted-history writes go through these, so the event index cannot miss
+    // one, whichever caller or backend makes it. Creates and follow-ups may
+    // decline to write, so their DID's history is reread afterwards.
+    fn add_create_event(&mut self, did: &str, event: EventRecord) -> Result<String> {
+        let result = self.add_create_event_unindexed(did, event)?;
+        self.refresh_event_index(did);
+        Ok(result)
+    }
+
+    fn add_followup_event(&mut self, did: &str, event: EventRecord) -> Result<bool> {
+        let result = self.add_followup_event_unindexed(did, event)?;
+        self.refresh_event_index(did);
+        Ok(result)
+    }
+
+    fn set_events(&mut self, did: &str, events: Vec<EventRecord>) -> Result<()> {
+        if !self.event_index.is_built() {
+            return self.set_events_unindexed(did, events);
+        }
+        let indexed = events.clone();
+        self.set_events_unindexed(did, events)?;
+        self.event_index.set(did, &indexed);
+        Ok(())
+    }
+
+    fn delete_events(&mut self, did: &str) -> Result<()> {
+        self.delete_events_unindexed(did)?;
+        self.event_index.delete(did);
+        Ok(())
+    }
+
+    fn reset_db(&mut self) -> Result<()> {
+        self.reset_db_unindexed()?;
+        self.event_index.clear();
+        Ok(())
+    }
+
+    fn refresh_event_index(&mut self, did: &str) {
+        if self.event_index.is_built() {
+            let events = self.get_events(did);
+            self.event_index.set(did, &events);
+        }
+    }
+
+    /// Builds the event index from every stored history if nothing has yet.
+    pub(crate) fn ensure_event_index(&mut self, did_prefix: &str) -> Result<()> {
+        if !self.event_index.is_built() {
+            let dids = self.list_dids(did_prefix, None);
+            let histories = self.get_histories(&dids)?;
+            self.event_index.build(histories.iter());
+        }
+        Ok(())
+    }
+
+    /// One page of accepted events and the number matching the query. Each
+    /// event carries its DID, from the record or else from its storage key.
+    pub(crate) fn list_events(&mut self, did_prefix: &str, query: &EventQuery<'_>) -> (usize, Vec<EventRecord>) {
+        let (total, page) = self.event_index.query(query);
+        let mut histories: HashMap<String, Vec<EventRecord>> = HashMap::new();
+        let events = page
+            .into_iter()
+            .filter_map(|entry| {
+                let did = format!("{did_prefix}:{}", entry.key);
+                let history = histories
+                    .entry(entry.key)
+                    .or_insert_with(|| self.get_events(&did));
+                let mut event = history.get(entry.position)?.clone();
+                event.did.get_or_insert(did);
+                Some(event)
+            })
+            .collect();
+        (total, events)
+    }
+
     fn did_suffix(did: &str) -> Result<String> {
         did.split(':')
             .next_back()
@@ -357,6 +433,7 @@ impl JsonDb {
             backend,
             data,
             redis_connection,
+            event_index: Default::default(),
         })
     }
 
@@ -617,7 +694,7 @@ impl JsonDb {
         bson::from_bson::<Value>(bson.clone()).context("failed to decode bson value")
     }
 
-    fn add_create_event(&mut self, did: &str, event: EventRecord) -> Result<String> {
+    fn add_create_event_unindexed(&mut self, did: &str, event: EventRecord) -> Result<String> {
         if matches!(self.backend, DbBackend::Redis { .. }) {
             if !self.get_events(did).is_empty() {
                 return Ok(did.to_string());
@@ -682,7 +759,7 @@ impl JsonDb {
         Ok(did.to_string())
     }
 
-    fn add_followup_event(&mut self, did: &str, event: EventRecord) -> Result<bool> {
+    fn add_followup_event_unindexed(&mut self, did: &str, event: EventRecord) -> Result<bool> {
         let canonical_previd = event.operation.get("previd").and_then(Value::as_str)
             .map(|reference| self.canonical_reference(reference));
         if matches!(self.backend, DbBackend::Redis { .. }) {
@@ -1025,7 +1102,7 @@ impl JsonDb {
             .collect()
     }
 
-    fn set_events(&mut self, did: &str, events: Vec<EventRecord>) -> Result<()> {
+    fn set_events_unindexed(&mut self, did: &str, events: Vec<EventRecord>) -> Result<()> {
         if matches!(self.backend, DbBackend::Redis { .. }) {
             return self.with_redis_connection(|conn, namespace| {
                 let did_key = Self::redis_did_key(namespace, did)?;
@@ -1113,7 +1190,7 @@ impl JsonDb {
         self.save()
     }
 
-    fn delete_events(&mut self, did: &str) -> Result<()> {
+    fn delete_events_unindexed(&mut self, did: &str) -> Result<()> {
         if matches!(self.backend, DbBackend::Redis { .. }) {
             return self.with_redis_connection(|conn, namespace| {
                 let did_key = Self::redis_did_key(namespace, did)?;
@@ -1152,7 +1229,7 @@ impl JsonDb {
         self.save()
     }
 
-    fn reset_db(&mut self) -> Result<()> {
+    fn reset_db_unindexed(&mut self) -> Result<()> {
         if matches!(self.backend, DbBackend::Redis { .. }) {
             return self.with_redis_connection(|conn, namespace| {
                 let mut cursor = 0_u64;
@@ -2373,6 +2450,7 @@ mod startup_read_tests {
             },
             data: JsonDbFile::default(),
             redis_connection: Some(StdMutex::new(client.get_connection()?)),
+            event_index: Default::default(),
         };
         let batch = db.get_histories(&dids)?;
         for did in &dids {

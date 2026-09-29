@@ -46,6 +46,41 @@
     "compareMode": "json"
   },
   {
+    "name": "events-empty",
+    "method": "GET",
+    "path": "/api/v1/events",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
+    "name": "events-bad-limit",
+    "method": "GET",
+    "path": "/api/v1/events?limit=0",
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
+    "name": "events-bad-offset",
+    "method": "GET",
+    "path": "/api/v1/events?offset=1e1",
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
+    "name": "events-bad-after",
+    "method": "GET",
+    "path": "/api/v1/events?after=2026-02-30T00:00:00Z",
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
+    "name": "events-repeated-registry",
+    "method": "GET",
+    "path": "/api/v1/events?registry=local&registry=hyperswarm",
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
     "name": "api-not-found",
     "method": "GET",
     "path": "/api/nope",

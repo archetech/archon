@@ -5,6 +5,7 @@ mod config;
 #[cfg(test)]
 mod convergence;
 mod event_policy;
+mod event_index;
 mod events;
 mod history;
 mod history_view;
@@ -102,6 +103,7 @@ mod tests {
             },
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         };
         (db, temp_dir)
     }
@@ -604,6 +606,7 @@ mod tests {
             },
             data: JsonDbFile::default(),
             redis_connection: None,
+            event_index: Default::default(),
         };
         db.data.dids.insert(
             "bagaaieratestdid".to_string(),

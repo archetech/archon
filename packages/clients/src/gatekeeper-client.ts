@@ -6,6 +6,8 @@ import {
     GatekeeperClientOptions,
     GatekeeperInterface,
     GatekeeperEvent,
+    ListEventsOptions,
+    ListEventsResult,
     GetStatusResult,
     Operation,
     DidCidDocument,
@@ -252,6 +254,16 @@ export default class GatekeeperClient implements GatekeeperInterface {
     async exportDIDs(dids?: string[]): Promise<GatekeeperEvent[][]> {
         try {
             const response = await this.axios.post(`${this.API}/dids/export`, { dids });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listEvents(options: ListEventsOptions = {}): Promise<ListEventsResult> {
+        try {
+            const response = await this.axios.get(`${this.API}/events`, { params: options });
             return response.data;
         }
         catch (error) {

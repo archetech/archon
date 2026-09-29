@@ -19,13 +19,11 @@ import { getRuntimeConfig } from './runtimeConfig.js';
 
 const gatekeeper = new GatekeeperClient();
 
-// Every refresh exports each DID updated in the selected date range, which on a
-// large node is minutes of Gatekeeper work, so poll rarely and never overlap.
-const EVENTS_REFRESH_MS = 60_000;
+// A page of events is an indexed query on the Gatekeeper, cheap to repeat.
+const EVENTS_REFRESH_MS = 10_000;
 
-// The client cannot cancel a fetch, so one started for an earlier date range or
-// visit to /events keeps the Gatekeeper busy after its results are discarded.
-// Later fetches wait for it instead of running alongside it.
+// A fetch cannot be cancelled, so one started for an earlier filter or visit
+// to /events finishes anyway. Later fetches wait for it rather than overlap.
 let eventsFetch: Promise<unknown> | undefined;
 
 interface SnackbarState {
@@ -42,7 +40,8 @@ function App() {
         severity: "warning",
     });
     const [darkMode, setDarkMode] = useState<boolean>(false);
-    const [rangeEvents, setRangeEvents] = useState<GatekeeperEvent[]>([]);
+    const [events, setEvents] = useState<GatekeeperEvent[]>([]);
+    const [total, setTotal] = useState<number>(0);
     const [eventCount, setEventCount] = useState<number>(50);
     const [page, setPage] = useState<number>(0);
     const [registry, setRegistry] = useState<string>("All");
@@ -119,8 +118,7 @@ function App() {
     }, []);
 
 
-    // Only the date range needs the Gatekeeper; the registry filter, order and
-    // paging are applied to the fetched events locally.
+    // The Gatekeeper filters, orders and pages the events.
     useEffect(() => {
         if (!isReady || !showingEvents) {
             return;
@@ -129,27 +127,19 @@ function App() {
         let isMounted = true;
         let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-        async function fetchRange() {
-            let updatedAfter: string | undefined;
-            let updatedBefore: string | undefined;
+        function fetchPage() {
+            // The From day starts at local midnight and the To day includes
+            // its last millisecond; the Gatekeeper's bounds are exclusive.
+            const after = dateFrom ? new Date(new Date(`${dateFrom}T00:00:00`).getTime() - 1).toISOString() : undefined;
+            const before = dateTo ? new Date(new Date(`${dateTo}T23:59:59.999`).getTime() + 1).toISOString() : undefined;
 
-            if (dateFrom) {
-                const fromDate = new Date(`${dateFrom}T00:00:00`);
-                updatedAfter = fromDate.toISOString();
-            }
-
-            if (dateTo) {
-                const toDate = new Date(`${dateTo}T23:59:59.999`);
-                updatedBefore = toDate.toISOString();
-            }
-
-            const dids = (await gatekeeper.getDIDs({
-                updatedAfter,
-                updatedBefore
-            })) as string[];
-            const fetched = (await gatekeeper.exportDIDs(dids)).flat();
-            fetched.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-            return fetched;
+            return gatekeeper.listEvents({
+                after,
+                before,
+                registry: registry === "All" ? undefined : registry,
+                limit: Number(eventCount),
+                offset: page * Number(eventCount),
+            });
         }
 
         // The next refresh is scheduled when this one finishes, and skipped
@@ -163,12 +153,13 @@ function App() {
                 if (!isMounted) {
                     return;
                 }
-                const current = fetchRange();
+                const current = fetchPage();
                 eventsFetch = current;
                 try {
                     const fetched = await current;
                     if (isMounted) {
-                        setRangeEvents(fetched);
+                        setEvents(fetched.events);
+                        setTotal(fetched.total);
                     }
                 } catch (err: any) {
                     if (isMounted) {
@@ -192,17 +183,9 @@ function App() {
             if (timeoutId) clearTimeout(timeoutId);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isReady, showingEvents, dateFrom, dateTo]);
+    }, [isReady, showingEvents, dateFrom, dateTo, registry, page, eventCount]);
 
-    const registryEvents = useMemo(
-        () => registry === "All" ? rangeEvents : rangeEvents.filter((evt) => evt.registry === registry),
-        [rangeEvents, registry]
-    );
-    const events = useMemo(
-        () => registryEvents.slice(page * eventCount, (page + 1) * eventCount),
-        [registryEvents, page, eventCount]
-    );
-    const totalPages = Math.ceil(registryEvents.length / eventCount);
+    const totalPages = Math.ceil(total / eventCount);
 
     return (
         <ThemeProvider theme={theme}>

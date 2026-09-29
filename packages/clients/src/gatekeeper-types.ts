@@ -82,6 +82,26 @@ export interface GetDIDOptions {
     resolve?: boolean;
 }
 
+export interface ListEventsOptions {
+    /** Only events after this RFC 3339 time (exclusive). */
+    after?: string;
+    /** Only events before this RFC 3339 time (exclusive). */
+    before?: string;
+    /** Only events in this registry. */
+    registry?: string;
+    /** Page size, 1 to 1000; defaults to 50. */
+    limit?: number;
+    /** Events to skip; defaults to 0. */
+    offset?: number;
+}
+
+export interface ListEventsResult {
+    /** Events matching the filters, across all pages. */
+    total: number;
+    /** Newest first; each carries the DID it belongs to. */
+    events: GatekeeperEvent[];
+}
+
 export interface GatekeeperEvent {
     registry: string;
     time: string;
@@ -150,6 +170,7 @@ export interface GatekeeperInterface {
     deleteDID(operation: Operation): Promise<boolean>;
     getDIDs(options?: GetDIDOptions): Promise<string[] | DidCidDocument[]>;
     exportDIDs(dids?: string[]): Promise<GatekeeperEvent[][]>;
+    listEvents(options?: ListEventsOptions): Promise<ListEventsResult>;
     importDIDs(dids: GatekeeperEvent[][]): Promise<ImportBatchResult>;
     removeDIDs(dids: string[]): Promise<boolean>;
     exportBatch(dids?: string[]): Promise<GatekeeperEvent[]>;

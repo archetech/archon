@@ -19,6 +19,7 @@ fn memory() -> JsonDb {
         backend: DbBackend::Memory,
         data: JsonDbFile::default(),
         redis_connection: None,
+        event_index: Default::default(),
     }
 }
 

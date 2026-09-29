@@ -43,6 +43,7 @@ The TypeScript service exposes these public routes under `/api/v1`:
 | `GET` | `/block/:registry/latest` | Latest known block for the registry. |
 | `GET` | `/block/:registry/:blockId` | Block lookup by hash or height. |
 | `POST` | `/block/:registry` | Admin protected. |
+| `GET` | `/events` | Page through accepted events across DIDs, newest first. |
 | `GET` | `/search` | Full-text DID search. |
 | `POST` | `/query` | Structured query with `where`. |
 

@@ -14,6 +14,7 @@ fn memory() -> JsonDb {
         backend: DbBackend::Memory,
         data: JsonDbFile::default(),
         redis_connection: None,
+        event_index: Default::default(),
     }
 }
 
@@ -99,6 +100,7 @@ async fn conflicting_genesis_converges_through_durable_restart() {
                     backend: DbBackend::JsonFile { path: path.clone() },
                     data: serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap(),
                     redis_connection: None,
+                    event_index: Default::default(),
                 });
                 state = restarted;
             }

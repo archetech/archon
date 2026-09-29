@@ -15,6 +15,7 @@ async fn method_id_admission_submission_import_and_restart() {
                 backend: DbBackend::JsonFile { path: path.clone() },
                 data: JsonDbFile::default(),
                 redis_connection: None,
+                event_index: Default::default(),
             };
             let (mut state, _state_dir) = crate::tests::make_state(open());
             let hint = |op: &Value| json!({

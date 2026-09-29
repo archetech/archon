@@ -230,6 +230,34 @@
     "compareMode": "jsonLoose"
   },
   {
+    "name": "events-list-all",
+    "method": "GET",
+    "path": "/api/v1/events",
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
+    "name": "events-list-local-page",
+    "method": "GET",
+    "path": "/api/v1/events?registry=local&limit=2&offset=1",
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
+    "name": "events-list-hyperswarm",
+    "method": "GET",
+    "path": "/api/v1/events?registry=hyperswarm",
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
+    "name": "events-list-before-epoch",
+    "method": "GET",
+    "path": "/api/v1/events?before=2000-01-01T00:00:00Z",
+    "expectedStatus": 200,
+    "compareMode": "json"
+  },
+  {
     "name": "db-verify-after-create",
     "method": "GET",
     "path": "/api/v1/db/verify",
