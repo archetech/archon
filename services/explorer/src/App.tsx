@@ -13,11 +13,15 @@ import {
 } from "@mui/material";
 import Header from "./components/Header.js";
 import { GatekeeperEvent } from "@didcid/gatekeeper/types";
-import { Routes, Route, useNavigate, Navigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 
 import { getRuntimeConfig } from './runtimeConfig.js';
 
 const gatekeeper = new GatekeeperClient();
+
+// Every refresh exports each DID updated in the selected date range, which on a
+// large node is minutes of Gatekeeper work, so poll rarely and never overlap.
+const EVENTS_REFRESH_MS = 60_000;
 
 interface SnackbarState {
     open: boolean;
@@ -33,8 +37,7 @@ function App() {
         severity: "warning",
     });
     const [darkMode, setDarkMode] = useState<boolean>(false);
-    const [events, setEvents] = useState<GatekeeperEvent[]>([]);
-    const [total, setTotal] = useState<number>(0);
+    const [rangeEvents, setRangeEvents] = useState<GatekeeperEvent[]>([]);
     const [eventCount, setEventCount] = useState<number>(50);
     const [page, setPage] = useState<number>(0);
     const [registry, setRegistry] = useState<string>("All");
@@ -49,6 +52,7 @@ function App() {
     });
 
     const navigate = useNavigate();
+    const showingEvents = useLocation().pathname === '/events';
 
     function handleViewDid(did: string) {
         navigate(`/search?did=${encodeURIComponent(did)}`);
@@ -110,69 +114,77 @@ function App() {
     }, []);
 
 
+    // Only the date range needs the Gatekeeper; the registry filter, order and
+    // paging are applied to the fetched events locally.
     useEffect(() => {
-        if (!isReady) {
+        if (!isReady || !showingEvents) {
             return;
         }
 
         let isMounted = true;
-        let intervalId: NodeJS.Timeout | undefined;
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-        async function fetchRecent() {
-            try {
-                let updatedAfter: string | undefined;
-                let updatedBefore: string | undefined;
+        async function fetchRange() {
+            let updatedAfter: string | undefined;
+            let updatedBefore: string | undefined;
 
-                if (dateFrom) {
-                    const fromDate = new Date(`${dateFrom}T00:00:00`);
-                    updatedAfter = fromDate.toISOString();
+            if (dateFrom) {
+                const fromDate = new Date(`${dateFrom}T00:00:00`);
+                updatedAfter = fromDate.toISOString();
+            }
+
+            if (dateTo) {
+                const toDate = new Date(`${dateTo}T23:59:59.999`);
+                updatedBefore = toDate.toISOString();
+            }
+
+            const dids = (await gatekeeper.getDIDs({
+                updatedAfter,
+                updatedBefore
+            })) as string[];
+            const fetched = (await gatekeeper.exportDIDs(dids)).flat();
+            fetched.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+            return fetched;
+        }
+
+        // The next refresh is scheduled when this one finishes, and skipped
+        // while the tab is hidden.
+        async function refresh() {
+            if (!document.hidden) {
+                try {
+                    const fetched = await fetchRange();
+                    if (isMounted) {
+                        setRangeEvents(fetched);
+                    }
+                } catch (err: any) {
+                    if (isMounted) {
+                        setError(err);
+                    }
                 }
-
-                if (dateTo) {
-                    const toDate = new Date(`${dateTo}T23:59:59.999`);
-                    updatedBefore = toDate.toISOString();
-                }
-
-                const dids = (await gatekeeper.getDIDs({
-                    updatedAfter,
-                    updatedBefore
-                })) as string[];
-                let allEvents = (await gatekeeper.exportDIDs(dids)).flat();
-
-                if (registry !== "All") {
-                    allEvents = allEvents.filter((evt) => evt.registry === registry);
-                }
-
-                allEvents.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
-
-                const from = page * eventCount;
-                const to = from + eventCount;
-                const pageEvents = allEvents.slice(from, to);
-                const totalCount = allEvents.length;
-
-                if (isMounted) {
-                    setEvents(pageEvents);
-                    setTotal(totalCount);
-                }
-            } catch (err: any) {
-                if (isMounted) {
-                    setError(err);
-                }
+            }
+            if (isMounted) {
+                timeoutId = setTimeout(refresh, EVENTS_REFRESH_MS);
             }
         }
 
-        fetchRecent();
-
-        intervalId = setInterval(fetchRecent, 10000);
+        refresh();
 
         return () => {
             isMounted = false;
-            if (intervalId) clearInterval(intervalId);
+            if (timeoutId) clearTimeout(timeoutId);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isReady, eventCount, page, registry, dateFrom, dateTo]);
+    }, [isReady, showingEvents, dateFrom, dateTo]);
 
-    const totalPages = Math.ceil(total / eventCount);
+    const registryEvents = useMemo(
+        () => registry === "All" ? rangeEvents : rangeEvents.filter((evt) => evt.registry === registry),
+        [rangeEvents, registry]
+    );
+    const events = useMemo(
+        () => registryEvents.slice(page * eventCount, (page + 1) * eventCount),
+        [registryEvents, page, eventCount]
+    );
+    const totalPages = Math.ceil(registryEvents.length / eventCount);
 
     return (
         <ThemeProvider theme={theme}>
