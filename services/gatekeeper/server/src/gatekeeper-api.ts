@@ -216,10 +216,35 @@ export function createGatekeeperApp(options: CreateGatekeeperAppOptions) {
         eventsQueue: [],
     };
 
-    async function checkDids(initialStatus?: CheckDIDsResult) {
+    // A scan holds the history read lock for its whole run, so overlapping scans
+    // queue resolves behind each other. Callers that arrive while one is running
+    // (the status loop, GC) share its result instead of starting another.
+    let didScan: Promise<void> | undefined;
+
+    function checkDids(initialStatus?: CheckDIDsResult): Promise<void> {
+        if (initialStatus) {
+            return updateDidCheck(initialStatus);
+        }
+        if (!didScan) {
+            didScan = scanDids().finally(() => {
+                didScan = undefined;
+            });
+        }
+        return didScan;
+    }
+
+    async function scanDids() {
         console.time('checkDIDs');
-        didCheck = initialStatus ?? await gatekeeper.checkDIDs();
-        console.timeEnd('checkDIDs');
+        try {
+            await updateDidCheck(await gatekeeper.checkDIDs());
+        }
+        finally {
+            console.timeEnd('checkDIDs');
+        }
+    }
+
+    async function updateDidCheck(status: CheckDIDsResult) {
+        didCheck = status;
 
         // Update events queue metrics - reset first to clear stale data
         eventsQueueGauge.reset();
@@ -308,6 +333,18 @@ export function createGatekeeperApp(options: CreateGatekeeperAppOptions) {
         console.log('------------------------------------');
     }
 
+    // Schedules the next report only after this one finishes, so a scan that
+    // outlasts the interval delays the next one rather than overlapping it.
+    async function statusLoop() {
+        try {
+            await reportStatus();
+        }
+        catch (error: any) {
+            console.error(`Error in status update: ${error}`);
+        }
+        setTimeout(statusLoop, config.statusInterval * 60 * 1000);
+    }
+
     function formatDuration(seconds: number) {
         const secPerMin = 60;
         const secPerHour = secPerMin * 60;
@@ -370,6 +407,7 @@ export function createGatekeeperApp(options: CreateGatekeeperAppOptions) {
         gcLoop,
         getStatus,
         reportStatus,
+        statusLoop,
         setReady(value: boolean) {
             serverReady = value;
         },
@@ -448,7 +486,7 @@ async function main(startupComplete: () => void) {
 
     if (config.statusInterval > 0) {
         console.log(`Starting status update every ${config.statusInterval} minutes`);
-        setInterval(api.reportStatus, config.statusInterval * 60 * 1000);
+        setTimeout(api.statusLoop, config.statusInterval * 60 * 1000);
     }
     else {
         console.log(`Status update disabled`);
