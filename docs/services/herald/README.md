@@ -139,6 +139,7 @@ challenge response.
 | `POST` | `/oauth/token` | Exchange an authorization `code` (plus `code_verifier` when the code was issued with a PKCE challenge) for an `access_token` + `id_token`. Only `grant_type=authorization_code` is supported; there are no refresh tokens. Form-encoded body. |
 | `GET` | `/oauth/userinfo` | Bearer-token-protected. Returns `{ sub, name, preferred_username, picture, email, email_verified, updated_at }`. The `/oauth/.well-known/openid-configuration` discovery payload advertises `scopes_supported: ['openid','profile','email']` and `claims_supported: ['sub','name','preferred_username','picture','email','email_verified']`. |
 | `GET` | `/oauth/.well-known/jwks.json` | The Herald's ES256 public signing key. |
+| `POST` | `/oauth/clients` | Internal client registration — present in the reference but locked down by deployment policy. |
 
 **PKCE ([RFC 7636](https://www.rfc-editor.org/rfc/rfc7636)).** Both discovery documents advertise
 `code_challenge_methods_supported: ['S256']`. A client that sends `code_challenge` must also send
@@ -150,7 +151,6 @@ since it means the challenge was stripped from the authorization request
 ([RFC 9700 §2.1.1](https://www.rfc-editor.org/rfc/rfc9700#section-2.1.1)). Either failure returns
 `400 invalid_grant` and invalidates the code. PKCE is optional for registered clients, which
 authenticate with a client secret; clients that do not send a challenge are unaffected.
-| `POST` | `/oauth/clients` | Internal client registration — present in the reference but locked down by deployment policy. |
 
 ID tokens are signed with **ES256**. The signing keypair is generated
 on first startup and persisted at
