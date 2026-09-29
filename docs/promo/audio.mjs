@@ -179,11 +179,13 @@ pluck(S.end * BAR, 81, 0.16, 0, 3000, 0.9, 0.7);
 pluck(S.end * BAR + BEAT * 1.5, 76, 0.1, -0.5, 2400, 0.9, 0.7);
 pluck(S.end * BAR + BEAT * 3, 72, 0.08, 0.5, 2000, 1.2, 0.7);
 
-// Sidechain: duck everything but the kick-free end tail around each kick.
+// Sidechain: duck the mix after each kick. The first 12 ms stay at full level so
+// the kick's own transient passes through, then the mix drops and recovers.
 const duck = new Float32Array(LEN).fill(1);
+const HOLD = Math.floor(0.012 * SR);
 for (let bar = S.beat; bar < S.end; bar++) for (let b = 0; b < 4; b++) {
     const s = Math.floor((bar * BAR + b * BEAT) * SR);
-    for (let i = 0; i < BEAT * SR && s + i < LEN; i++) duck[s + i] = Math.min(duck[s + i], 0.45 + 0.55 * Math.min(1, i / (0.18 * SR)));
+    for (let i = HOLD; i < BEAT * SR && s + i < LEN; i++) duck[s + i] = Math.min(duck[s + i], 0.45 + 0.55 * Math.min(1, (i - HOLD) / (0.18 * SR)));
 }
 
 // Reverb: a small Schroeder network (parallel combs into series all-passes).
@@ -201,8 +203,6 @@ function reverb(inp) {
 }
 const wetL = reverb(revL), wetR = reverb(revR);
 
-// Kick bus is un-ducked: re-synthesize it separately would be costlier, so the
-// duck curve is applied to the whole mix except its first 12 ms after a beat.
 const out = new Int16Array(LEN * 2);
 let peak = 0;
 const mix = new Float32Array(LEN * 2);
