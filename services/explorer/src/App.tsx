@@ -23,6 +23,11 @@ const gatekeeper = new GatekeeperClient();
 // large node is minutes of Gatekeeper work, so poll rarely and never overlap.
 const EVENTS_REFRESH_MS = 60_000;
 
+// The client cannot cancel a fetch, so one started for an earlier date range or
+// visit to /events keeps the Gatekeeper busy after its results are discarded.
+// Later fetches wait for it instead of running alongside it.
+let eventsFetch: Promise<unknown> | undefined;
+
 interface SnackbarState {
     open: boolean;
     message: string;
@@ -52,7 +57,7 @@ function App() {
     });
 
     const navigate = useNavigate();
-    const showingEvents = useLocation().pathname === '/events';
+    const showingEvents = useLocation().pathname.replace(/\/+$/, '') === '/events';
 
     function handleViewDid(did: string) {
         navigate(`/search?did=${encodeURIComponent(did)}`);
@@ -151,14 +156,27 @@ function App() {
         // while the tab is hidden.
         async function refresh() {
             if (!document.hidden) {
+                if (eventsFetch) {
+                    await eventsFetch.catch(() => {});
+                }
+                // A newer effect replaced this one while it waited.
+                if (!isMounted) {
+                    return;
+                }
+                const current = fetchRange();
+                eventsFetch = current;
                 try {
-                    const fetched = await fetchRange();
+                    const fetched = await current;
                     if (isMounted) {
                         setRangeEvents(fetched);
                     }
                 } catch (err: any) {
                     if (isMounted) {
                         setError(err);
+                    }
+                } finally {
+                    if (eventsFetch === current) {
+                        eventsFetch = undefined;
                     }
                 }
             }
