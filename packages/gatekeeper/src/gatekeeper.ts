@@ -259,8 +259,9 @@ export default class Gatekeeper implements GatekeeperInterface {
     // follows those writes rather than each caller that makes one.
     private trackEventWrites(db: GatekeeperDb): GatekeeperDb {
         const index = this.eventIndex;
-        // Bound once per method: replay reads through this on every lookup.
-        const methods = new Map<PropertyKey, unknown>();
+        // Replay reads through this on every lookup, so wrap each method once,
+        // and again only if the method itself is replaced (as test spies do).
+        const methods = new Map<PropertyKey, { source: unknown; wrapped: unknown }>();
         const wrap = (target: GatekeeperDb, property: PropertyKey, value: (...args: any[]) => any) => {
             switch (property) {
             case 'addEvent':
@@ -295,8 +296,12 @@ export default class Gatekeeper implements GatekeeperInterface {
             get(target, property) {
                 const value = Reflect.get(target, property);
                 if (typeof value !== 'function') return value;
-                if (!methods.has(property)) methods.set(property, wrap(target, property, value));
-                return methods.get(property);
+                let method = methods.get(property);
+                if (method?.source !== value) {
+                    method = { source: value, wrapped: wrap(target, property, value) };
+                    methods.set(property, method);
+                }
+                return method.wrapped;
             }
         });
     }
