@@ -3,6 +3,7 @@ import express from 'express';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import crypto from 'crypto';
 import request from 'supertest';
 
 // The module reads ARCHON_HERALD_JWT_KEY_PATH at evaluation time and defaults it
@@ -579,5 +580,96 @@ describe('client registration', () => {
         // Past client auth (would be 401 otherwise), failing on the code instead.
         expect(response.status).toBe(400);
         expect(response.body).toMatchObject({ error: 'invalid_grant' });
+    });
+});
+
+describe('PKCE', () => {
+    const redirect = 'http://localhost:3001/callback';
+    const verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+    // RFC 7636 appendix B: BASE64URL(SHA256(verifier)).
+    const challengeFor = (v: string) => crypto.createHash('sha256').update(v).digest('base64url');
+
+    async function issueCode(query = '') {
+        const challengeDid = `did:cid:pkce-${Math.random().toString(36).slice(2)}`;
+        keymasterImpl = { createChallenge: jest.fn<any>().mockResolvedValue(challengeDid) };
+        const authorize = await request(app)
+            .get(`/oauth/authorize?client_id=demo-client&redirect_uri=${redirect}&response_type=code${query}`)
+            .set('Accept', 'application/json');
+        expect(authorize.status).toBe(200);
+        keymasterImpl = {
+            verifyResponse: jest.fn<any>().mockResolvedValue({ match: true, challenge: challengeDid, responder: 'did:cid:pkceuser' }),
+        };
+        const callback = await request(app).post('/oauth/callback').send({ response: 'did:cid:response' });
+        return new URL(callback.body.redirect).searchParams.get('code')!;
+    }
+
+    function exchange(code: string, extra: Record<string, string> = {}) {
+        return request(app).post('/oauth/token').send({
+            grant_type: 'authorization_code', code, redirect_uri: redirect,
+            client_id: 'demo-client', client_secret: 'demo-secret', ...extra,
+        });
+    }
+
+    it('matches the RFC 7636 S256 example', () => {
+        expect(challengeFor(verifier)).toBe('E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM');
+    });
+
+    it('advertises S256 in the discovery document', async () => {
+        const discovery = await request(app).get('/oauth/.well-known/openid-configuration');
+        expect(discovery.body.code_challenge_methods_supported).toEqual(['S256']);
+    });
+
+    it('issues tokens for the verifier that matches the challenge', async () => {
+        const code = await issueCode(`&code_challenge=${challengeFor(verifier)}&code_challenge_method=S256`);
+        const token = await exchange(code, { code_verifier: verifier });
+        expect(token.status).toBe(200);
+        expect(token.body.id_token).toBeDefined();
+    });
+
+    it('rejects a code whose challenge is answered by the wrong verifier, and burns the code', async () => {
+        const code = await issueCode(`&code_challenge=${challengeFor(verifier)}&code_challenge_method=S256`);
+        const wrong = await exchange(code, { code_verifier: 'x'.repeat(43) });
+        expect(wrong.status).toBe(400);
+        expect(wrong.body).toMatchObject({ error: 'invalid_grant' });
+
+        const retry = await exchange(code, { code_verifier: verifier });
+        expect(retry.status).toBe(400);
+        expect(retry.body).toMatchObject({ error: 'invalid_grant' });
+    });
+
+    it('rejects a code issued with a challenge when no verifier is sent', async () => {
+        const code = await issueCode(`&code_challenge=${challengeFor(verifier)}&code_challenge_method=S256`);
+        const token = await exchange(code);
+        expect(token.status).toBe(400);
+        expect(token.body).toMatchObject({ error: 'invalid_grant' });
+    });
+
+    it('rejects a verifier for a code issued without a challenge', async () => {
+        // A verifier the server never asked for means the challenge was stripped
+        // in transit (RFC 9700 §2.1.1); honouring it would hide the downgrade.
+        const code = await issueCode();
+        const token = await exchange(code, { code_verifier: verifier });
+        expect(token.status).toBe(400);
+        expect(token.body).toMatchObject({ error: 'invalid_grant' });
+    });
+
+    it('still serves clients that do not use PKCE', async () => {
+        const token = await exchange(await issueCode());
+        expect(token.status).toBe(200);
+    });
+
+    it.each([
+        ['a plain challenge', `&code_challenge=${verifier}&code_challenge_method=plain`],
+        ['a challenge without a method', `&code_challenge=${challengeFor(verifier)}`],
+        ['a method without a challenge', '&code_challenge_method=S256'],
+        ['a malformed challenge', '&code_challenge=short&code_challenge_method=S256'],
+    ])('rejects an authorization request with %s', async (_label, query) => {
+        keymasterImpl = { createChallenge: jest.fn<any>().mockResolvedValue('did:cid:unused') };
+        const authorize = await request(app)
+            .get(`/oauth/authorize?client_id=demo-client&redirect_uri=${redirect}&response_type=code${query}`)
+            .set('Accept', 'application/json');
+        expect(authorize.status).toBe(400);
+        expect(authorize.body).toMatchObject({ error: 'invalid_request' });
+        expect(keymasterImpl.createChallenge).not.toHaveBeenCalled();
     });
 });

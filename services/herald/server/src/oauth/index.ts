@@ -107,6 +107,7 @@ interface AuthCode {
     redirect_uri: string;
     did: string;
     scope: string;
+    code_challenge?: string;
     created_at: number;
     expires_at: number;
 }
@@ -152,6 +153,35 @@ function generateToken(): string {
     return crypto.randomBytes(48).toString('hex');
 }
 
+// PKCE (RFC 7636). Only S256 is accepted: `plain` sends the verifier itself in
+// the authorization request, which protects nothing (RFC 9700 §2.1.1). A
+// verifier is 43-128 unreserved characters; an S256 challenge is the 43-character
+// base64url SHA-256 of one.
+const PKCE_VERIFIER = /^[A-Za-z0-9\-._~]{43,128}$/;
+const PKCE_S256_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
+
+function pkceChallengeError(challenge: unknown, method: unknown): string | null {
+    if (challenge === undefined && method === undefined) {
+        return null;
+    }
+    if (typeof challenge !== 'string' || method !== 'S256') {
+        return 'PKCE requires code_challenge with code_challenge_method=S256';
+    }
+    if (!PKCE_S256_CHALLENGE.test(challenge)) {
+        return 'Malformed code_challenge';
+    }
+    return null;
+}
+
+function pkceVerifierMatches(verifier: unknown, challenge: string): boolean {
+    if (typeof verifier !== 'string' || !PKCE_VERIFIER.test(verifier)) {
+        return false;
+    }
+    const computed = Buffer.from(crypto.createHash('sha256').update(verifier).digest('base64url'));
+    const expected = Buffer.from(challenge);
+    return computed.length === expected.length && crypto.timingSafeEqual(computed, expected);
+}
+
 // Export for use by main server
 export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did: string) => any) {
     // Get keymaster lazily (it may not be initialized yet)
@@ -164,6 +194,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
         state: string;
         scope: string;
         challenge: string;
+        code_challenge?: string;
     }> = new Map();
     const adminApiKey = process.env.ARCHON_ADMIN_API_KEY || process.env.ARCHON_HERALD_ADMIN_API_KEY || '';
     const adminHeaderName = 'x-archon-admin-key';
@@ -202,7 +233,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
      */
     router.get('/authorize', async (req: Request, res: Response) => {
         try {
-            const { client_id, redirect_uri, response_type, state, scope } = req.query;
+            const { client_id, redirect_uri, response_type, state, scope, code_challenge, code_challenge_method } = req.query;
 
             // Validate required params
             if (!client_id || !redirect_uri || response_type !== 'code') {
@@ -229,6 +260,14 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                 });
             }
 
+            const pkceError = pkceChallengeError(code_challenge, code_challenge_method);
+            if (pkceError) {
+                return res.status(400).json({
+                    error: 'invalid_request',
+                    error_description: pkceError
+                });
+            }
+
             // Create DID challenge with OAuth context
             const drawbridgePublicHost = process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || `http://localhost:${process.env.ARCHON_DRAWBRIDGE_PORT || 4222}`;
             const publicUrl = `${drawbridgePublicHost.replace(/\/$/, '')}/names`;
@@ -248,7 +287,8 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                 redirect_uri: redirect_uri as string,
                 state: (state as string) || '',
                 scope: (scope as string) || 'openid profile',
-                challenge
+                challenge,
+                code_challenge: code_challenge as string | undefined
             });
 
             // Return challenge for client to display
@@ -416,6 +456,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                 redirect_uri: pending.redirect_uri,
                 did: userDID,
                 scope: pending.scope,
+                code_challenge: pending.code_challenge,
                 created_at: Date.now(),
                 expires_at: Date.now() + 600000 // 10 minutes
             };
@@ -466,7 +507,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
      */
     router.post('/token', async (req: Request, res: Response) => {
         try {
-            const { grant_type, code, redirect_uri } = req.body;
+            const { grant_type, code, redirect_uri, code_verifier } = req.body;
             
             // Extract client credentials from Basic auth header OR body
             let client_id = req.body.client_id;
@@ -530,6 +571,21 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
                 return res.status(400).json({
                     error: 'invalid_grant',
                     error_description: 'Code has expired'
+                });
+            }
+
+            // A code issued with a challenge needs its verifier. A verifier for a
+            // code issued without one means the challenge was stripped from the
+            // authorization request, so it is refused rather than ignored. Either
+            // failure burns the code.
+            const pkceOk = authCode.code_challenge
+                ? pkceVerifierMatches(code_verifier, authCode.code_challenge)
+                : code_verifier === undefined;
+            if (!pkceOk) {
+                authCodes.delete(code);
+                return res.status(400).json({
+                    error: 'invalid_grant',
+                    error_description: 'PKCE verification failed'
                 });
             }
 
@@ -666,6 +722,7 @@ export function createOAuthRoutes(getKeymaster: () => any, getMemberByDID: (did:
             response_types_supported: ['code'],
             subject_types_supported: ['public'],
             id_token_signing_alg_values_supported: ['ES256'],
+            code_challenge_methods_supported: ['S256'],
             scopes_supported: ['openid', 'profile', 'email'],
             claims_supported: ['sub', 'name', 'preferred_username', 'picture', 'email', 'email_verified']
         });

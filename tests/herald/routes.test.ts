@@ -94,6 +94,15 @@ describe('herald public endpoints', () => {
         });
     });
 
+    it('advertises PKCE S256 in the root OIDC discovery document', async () => {
+        const { app } = mount();
+
+        const response = await request(app).get('/.well-known/openid-configuration');
+
+        expect(response.status).toBe(200);
+        expect(response.body.code_challenge_methods_supported).toEqual(['S256']);
+    });
+
     it('advertises an explorer the visitor can actually reach', async () => {
         const { app } = mount();
 

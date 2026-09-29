@@ -127,18 +127,29 @@ challenge response.
 | `GET` | `/.well-known/names` | Same as `/api/registry`. |
 | `GET` | `/.well-known/names/:name` | Same as `/api/name/:name`. |
 | `GET` | `/.well-known/webfinger?resource=acct:name@domain` | RFC 7033. `domain` MUST equal `ARCHON_HERALD_DOMAIN` (when set). Returns a JRD with `subject`, `aliases: [<DID>]`, and `links`. The `https://w3id.org/did` link `href` is built as `https://${SERVICE_DOMAIN}/api/v1/did/${did}` — a hardcoded externally-resolvable DID URL that is not served by Herald or Drawbridge directly. |
-| `GET` | `/.well-known/openid-configuration` | OIDC discovery; advertises `/oauth/authorize`, `/oauth/token`, `/oauth/userinfo`. The root discovery payload does NOT include `jwks_uri`; only the `/oauth/.well-known/openid-configuration` variant advertises the JWKS endpoint. |
+| `GET` | `/.well-known/openid-configuration` | OIDC discovery; advertises `/oauth/authorize`, `/oauth/token`, `/oauth/userinfo` and `code_challenge_methods_supported: ['S256']`. The root discovery payload does NOT include `jwks_uri`; only the `/oauth/.well-known/openid-configuration` variant advertises the JWKS endpoint. |
 
 ### 2.8 OAuth 2.0 / OIDC (`/oauth`)
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| `GET` | `/oauth/authorize` | Authorization Code with PKCE flow. Triggers Herald login if the user isn't authenticated, then redirects with `?code=<authcode>` to the registered `redirect_uri`. |
+| `GET` | `/oauth/authorize` | Authorization Code flow, with optional PKCE (see below). Triggers Herald login if the user isn't authenticated, then redirects with `?code=<authcode>` to the registered `redirect_uri`. |
 | `POST` | `/oauth/callback` | Internal — completes the authorization code exchange started by `/oauth/authorize`. |
 | `GET` | `/oauth/poll` | Polling endpoint for desktop / native flows. |
-| `POST` | `/oauth/token` | Exchange `code` (or `refresh_token`) for an `access_token` + `id_token`. Form-encoded body. |
+| `POST` | `/oauth/token` | Exchange an authorization `code` (plus `code_verifier` when the code was issued with a PKCE challenge) for an `access_token` + `id_token`. Only `grant_type=authorization_code` is supported; there are no refresh tokens. Form-encoded body. |
 | `GET` | `/oauth/userinfo` | Bearer-token-protected. Returns `{ sub, name, preferred_username, picture, email, email_verified, updated_at }`. The `/oauth/.well-known/openid-configuration` discovery payload advertises `scopes_supported: ['openid','profile','email']` and `claims_supported: ['sub','name','preferred_username','picture','email','email_verified']`. |
 | `GET` | `/oauth/.well-known/jwks.json` | The Herald's ES256 public signing key. |
+
+**PKCE ([RFC 7636](https://www.rfc-editor.org/rfc/rfc7636)).** Both discovery documents advertise
+`code_challenge_methods_supported: ['S256']`. A client that sends `code_challenge` must also send
+`code_challenge_method=S256`; `plain`, a missing method, a method without a challenge, or a
+challenge that is not a 43-character base64url SHA-256 is rejected with `400 invalid_request`
+before any challenge DID is created. A code issued with a challenge is exchanged only with the
+matching `code_verifier`. A `code_verifier` sent for a code issued without a challenge is refused,
+since it means the challenge was stripped from the authorization request
+([RFC 9700 §2.1.1](https://www.rfc-editor.org/rfc/rfc9700#section-2.1.1)). Either failure returns
+`400 invalid_grant` and invalidates the code. PKCE is optional for registered clients, which
+authenticate with a client secret; clients that do not send a challenge are unaffected.
 | `POST` | `/oauth/clients` | Internal client registration — present in the reference but locked down by deployment policy. |
 
 ID tokens are signed with **ES256**. The signing keypair is generated
