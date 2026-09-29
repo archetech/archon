@@ -216,9 +216,10 @@ export function createGatekeeperApp(options: CreateGatekeeperAppOptions) {
         eventsQueue: [],
     };
 
-    // A scan holds the history read lock for its whole run, so overlapping scans
-    // queue resolves behind each other. Callers that arrive while one is running
-    // (the status loop, GC) share its result instead of starting another.
+    // A scan resolves every DID, taking the history lock chunk by chunk, so each
+    // overlapping scan adds its own lock-holding work that resolves queue behind.
+    // Callers that arrive while one is running (the status loop, GC) share its
+    // result instead of starting another.
     let didScan: Promise<void> | undefined;
 
     function checkDids(initialStatus?: CheckDIDsResult): Promise<void> {

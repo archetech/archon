@@ -1,9 +1,10 @@
 import { jest } from '@jest/globals';
 import { createGatekeeperApp } from '../../services/gatekeeper/server/src/gatekeeper-api.ts';
 
-// A DID status scan holds the history read lock for its whole run. Scans that
-// overlap queue user resolves behind every one of them, and on a large node a
-// fixed-interval timer stacked them until the process never recovered (#1331).
+// A DID status scan resolves every DID, taking the history lock for each chunk.
+// Overlapping scans multiply that lock contention, so user resolves queue behind
+// all of them, and on a large node a fixed-interval timer stacked them until the
+// process never recovered (#1331).
 
 const emptyStatus = {
     total: 0,
