@@ -11,7 +11,7 @@
   "author": "Archetech",
   "license": "MIT",
   "dependencies": {
-    "axios": "^1.18.0",
+    "axios": "^1.20.0",
     "dotenv": "^16.4.5",
     "express": "^5.2.1",
     "prom-client": "^15.1.3"
