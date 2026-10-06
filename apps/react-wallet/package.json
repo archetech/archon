@@ -14,7 +14,7 @@
   "license": "MIT",
   "dependencies": {
     "@capacitor-mlkit/barcode-scanning": "^7.3.0",
-    "@capacitor/android": "^7.4.4",
+    "@capacitor/android": "^7.6.9",
     "@capacitor/app": "^7.1.0",
     "@capacitor/core": "^7.4.4",
     "@capacitor/filesystem": "^7.1.8",
