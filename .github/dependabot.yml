@@ -58,3 +58,26 @@ updates:
         update-types:
           - "minor"
           - "patch"
+
+  # The Solana mediators get security updates only (limit 0 disables routine
+  # version updates). @solana/web3.js 3 is a rewrite with an async Keypair API
+  # that these mediators do not use yet, so its major versions are ignored.
+  - package-ecosystem: "npm"
+    directories:
+      - "/services/mediators/solana"
+      - "/services/mediators/solana-wallet"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "America/Toronto"
+    open-pull-requests-limit: 0
+    labels:
+      - "dependencies"
+      - "javascript"
+    commit-message:
+      prefix: "deps"
+    ignore:
+      - dependency-name: "@solana/web3.js"
+        update-types:
+          - "version-update:semver-major"
