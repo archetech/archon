@@ -12,7 +12,7 @@
   "author": "Archetech",
   "license": "MIT",
   "dependencies": {
-    "@solana/web3.js": "^1.98.4",
+    "@solana/web3.js": "^3.0.1",
     "axios": "^1.20.0",
     "bip39": "^3.1.0",
     "bs58": "^6.0.0",
