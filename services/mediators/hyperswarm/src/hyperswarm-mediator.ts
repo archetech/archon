@@ -16,6 +16,7 @@ import CipherNode from '@didcid/cipher/node';
 import { installProcessGuards } from '@didcid/common/process-guards';
 import config from './config.js';
 import { createEvents } from './events.js';
+import { NodeInfo, PeerTracker } from './peers.js';
 import { exit } from 'process';
 
 interface HyperMessage {
@@ -42,11 +43,6 @@ interface ExportQueueTask extends ImportQueueTask {
     conn: HyperswarmConnection;
 }
 
-interface NodeInfo {
-    name: string;
-    ipfs: any;
-}
-
 interface ConnectionInfo {
     connection: HyperswarmConnection;
     key: string;
@@ -67,10 +63,7 @@ const REGISTRY = 'hyperswarm';
 const BATCH_SIZE = 100;
 
 const connectionInfo: Record<string, ConnectionInfo> = {};
-const knownNodes: Record<string, NodeInfo> = {};
-const knownPeers: Record<string, string> = {};
-const addedPeers: Record<string, number> = {};
-const badPeers: Record<string, number> = {};
+let peers: PeerTracker | undefined;
 
 let swarm: Hyperswarm | null = null;
 let nodeKey = '';
@@ -108,6 +101,12 @@ const mediatorKnownNodes = new promClient.Gauge({
 const mediatorKnownPeers = new promClient.Gauge({
     name: 'mediator_known_peers',
     help: 'Number of known IPFS peers',
+});
+
+const mediatorPeerCandidates = new promClient.Gauge({
+    name: 'mediator_peer_candidates',
+    help: 'Announced node DIDs by IPFS peering state',
+    labelNames: ['state'],
 });
 
 const mediatorMessagesReceived = new promClient.Counter({
@@ -182,8 +181,14 @@ function updateGauges(): void {
     mediatorImportQueueDepth.set(importQueue.length());
     mediatorExportQueueDepth.set(exportQueue.length());
     mediatorSyncQueueDepth.set(syncQueue.length());
-    mediatorKnownNodes.set(Object.keys(knownNodes).length);
-    mediatorKnownPeers.set(Object.keys(knownPeers).length);
+    if (peers) {
+        const counts = peers.counts();
+        mediatorKnownNodes.set(Object.keys(peers.nodes()).length);
+        mediatorKnownPeers.set(peers.ipfsPeerCount());
+        for (const [state, count] of Object.entries(counts)) {
+            mediatorPeerCandidates.set({ state }, count);
+        }
+    }
 }
 
 function startMetricsServer(): void {
@@ -527,58 +532,6 @@ function newBatch(batch: Operation[]): boolean {
     return false;
 }
 
-async function addPeer(did: string): Promise<void> {
-    // Check peer suffix to avoid duplicate DID aliases
-    const suffix = did.split(':').pop() || '';
-
-    if (suffix in addedPeers) {
-        return;
-    }
-
-    console.log(`Adding peer ${did}...`);
-    addedPeers[suffix] = Date.now();
-
-    try {
-        const docs = await keymaster.resolveDID(did);
-        const data = docs.didDocumentData as { node: NodeInfo };
-
-        if (!data?.node || !data.node.ipfs) {
-            return;
-        }
-
-        const { id, addresses } = data.node.ipfs;
-
-        if (!id || !addresses) {
-            return;
-        }
-
-        if (id !== nodeInfo.ipfs.id) {
-            // A node should never add itself as a peer node
-            await ipfs.addPeeringPeer(id, addresses);
-        }
-
-        knownNodes[did] = {
-            name: data.node.name,
-            ipfs: {
-                id,
-                addresses,
-            },
-        };
-
-        knownPeers[id] = data.node.name;
-
-        console.log(`Added IPFS peer: ${did} ${JSON.stringify(knownNodes[did], null, 4)}`);
-    }
-    catch (error) {
-        if (!(did in badPeers)) {
-            // Store time of first error so we can later implement a retry mechanism
-            badPeers[did] = Date.now();
-            mediatorErrors.inc({ operation: 'peer' });
-            console.error(`Error adding IPFS peer: ${did}`, error);
-        }
-    }
-}
-
 async function receiveMsg(peerKey: string, json: string): Promise<void> {
     const conn = connectionInfo[peerKey];
     let msg;
@@ -627,10 +580,9 @@ async function receiveMsg(peerKey: string, json: string): Promise<void> {
     if (msg.type === 'ping') {
         connectionInfo[peerKey].nodeName = nodeName;
 
-        if (msg.peers) {
-            for (const did of msg.peers) {
-                addPeer(did);
-            }
+        if (msg.peers && peers) {
+            peers.offer(msg.peers);
+            void peers.reconcile();
         }
 
         return;
@@ -712,15 +664,18 @@ async function connectionLoop(): Promise<void> {
             time: new Date().toISOString(),
             node: nodeInfo.name,
             relays: [],
-            peers: Object.keys(knownNodes),
+            peers: Object.keys(peers?.nodes() ?? {}),
         };
 
         await relayMsg(msg);
 
+        // Retries peers whose earlier attempts failed once their backoff expires.
+        void peers?.reconcile();
+
         const peeringPeers = await ipfs.getPeeringPeers();
         console.log(`IPFS peers: ${peeringPeers.length}`);
         for (const peer of peeringPeers) {
-            console.log(`* peer ${peer.ID} (${knownPeers[peer.ID]})`);
+            console.log(`* peer ${peer.ID} (${peers?.peerName(peer.ID)})`);
         }
 
         console.log('connection loop waiting 60s...');
@@ -806,7 +761,20 @@ async function main(): Promise<void> {
         },
     };
 
-    knownNodes[nodeDID] = nodeInfo;
+    peers = new PeerTracker({
+        resolveNode: async did => {
+            const docs = await keymaster.resolveDID(did);
+            return (docs.didDocumentData as { node?: NodeInfo } | undefined)?.node;
+        },
+        addPeeringPeer: (id, addresses) => ipfs.addPeeringPeer(id, addresses),
+        onPeered: (did, node) => {
+            console.log(`Added IPFS peer: ${did} ${JSON.stringify(node, null, 4)}`);
+        },
+        onFailure: (did, reason, retryInMs) => {
+            mediatorErrors.inc({ operation: 'peer' });
+            console.error(`Error adding IPFS peer: ${did}: ${reason}; retrying in ${Math.round(retryInMs / 1000)}s`);
+        },
+    }, nodeDID, nodeInfo);
 
     startMetricsServer();
 
