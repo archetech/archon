@@ -69,19 +69,12 @@ pub(crate) async fn version(State(state): State<AppState>) -> impl IntoResponse 
 }
 
 pub(crate) async fn status(State(state): State<AppState>) -> Response {
-    if let Err(error) = crate::history::ensure_history_ready(&state).await {
-        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    let _history_guard = state.history_lock.lock().await;
-    if state.status_snapshot.lock().await.is_none() {
-        crate::resolver::refresh_metrics_snapshot_once(&state).await;
-    }
-    let dids = state
-        .status_snapshot
-        .lock()
-        .await
-        .clone()
-        .unwrap_or_default();
+    let dids = match crate::resolver::current_status(&state).await {
+        Ok(dids) => dids,
+        Err(error) => {
+            return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
+        }
+    };
     // DID counts are populated periodically by the status/gc loops (matching
     // TS, which only refreshes didCheck every statusInterval minutes), but
     // eventsQueue should always reflect the live in-memory queue so callers

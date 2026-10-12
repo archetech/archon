@@ -281,7 +281,7 @@ pub(crate) async fn handle_did_operation(
     // Invalidate the cached status snapshot so the next /status request
     // recomputes DID counts lazily instead of doing a full database scan
     // on every write (which was the dominant cost for dmail creation).
-    *state.status_snapshot.lock().await = None;
+    crate::resolver::invalidate_status_snapshot(state).await;
     update_search_doc(state, &did).await;
     state.verified_dids.lock().await.remove(&did);
 

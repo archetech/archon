@@ -32,8 +32,8 @@ use crate::{
         ipfs_get_stream, ipfs_get_text, list_dids, list_events, not_found, process_events_route, query_docs,
         ready, registries, remove_dids, resolve_did, search_docs, status, version,
     },
-    log_status_snapshot, refresh_metrics_snapshot, start_background_tasks,
-    CheckDidsResult, Config, EventRecord, JsonDb, Metrics, SearchIndex,
+    current_status, log_status_snapshot, start_background_tasks, CheckDidsResult, Config,
+    EventRecord, JsonDb, Metrics, SearchIndex, StatusScans,
 };
 
 #[derive(Clone)]
@@ -49,6 +49,7 @@ pub(crate) struct AppState {
     pub(crate) supported_registries: Arc<Mutex<Vec<String>>>,
     pub(crate) did_locks: Arc<Mutex<HashMap<String, Arc<Mutex<()>>>>>,
     pub(crate) status_snapshot: Arc<Mutex<Option<CheckDidsResult>>>,
+    pub(crate) status_scans: Arc<StatusScans>,
     pub(crate) search_index: Arc<Mutex<SearchIndex>>,
     pub(crate) candidate_history: Arc<Mutex<Option<HashMap<String, Vec<EventRecord>>>>>,
     pub(crate) dependents: Arc<Mutex<HashMap<String, std::collections::HashSet<String>>>>,
@@ -98,11 +99,8 @@ pub async fn run() -> Result<()> {
     crate::history::ensure_history_ready(&state).await?;
     // Nonempty recovery already builds search and status from its snapshot.
     // An empty database has no replay snapshot and needs only empty counters.
-    let needs_status = state.status_snapshot.lock().await.is_none();
-    if needs_status {
-        refresh_metrics_snapshot(&state).await?;
-    }
-    log_status_snapshot(&state).await;
+    let status = current_status(&state).await?;
+    log_status_snapshot(&state, &status);
 
     if config.status_interval_minutes > 0 {
         info!(
@@ -187,6 +185,7 @@ fn build_state(config: Config) -> Result<AppState> {
         supported_registries: Arc::new(Mutex::new(config.registries.clone())),
         did_locks: Arc::new(Mutex::new(HashMap::new())),
         status_snapshot: Arc::new(Mutex::new(None)),
+        status_scans: Arc::default(),
         search_index: Arc::new(Mutex::new(SearchIndex::default())),
         candidate_history: Arc::new(Mutex::new(None)),
         dependents: Arc::new(Mutex::new(HashMap::new())),

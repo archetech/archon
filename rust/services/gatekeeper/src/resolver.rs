@@ -1,10 +1,16 @@
 use crate::history_view::{history_entries, apply_transition};
-use std::{collections::HashMap, fs, time::Duration};
+use std::{
+    collections::HashMap,
+    fs,
+    sync::atomic::{AtomicU64, Ordering},
+    time::{Duration, Instant},
+};
 
 use anyhow::Result;
 use async_recursion::async_recursion;
 use serde::Serialize;
 use serde_json::{json, Value};
+use tokio::sync::Mutex;
 use tracing::info;
 
 use crate::store::ResolvedDoc;
@@ -92,6 +98,19 @@ pub(crate) struct CheckDidsResult {
     #[serde(rename = "eventsQueue")]
     pub(crate) events_queue: Vec<EventRecord>,
 }
+
+// Runtime status scans take history_lock one chunk at a time, so a replay can
+// publish between chunks. Invalidation bumps `generation`; a scan that overlaps
+// one still reports its counts but does not cache them. `latest` serializes
+// runtime scans, and callers that waited on one share its result.
+#[derive(Default)]
+pub(crate) struct StatusScans {
+    generation: AtomicU64,
+    completed: AtomicU64,
+    latest: Mutex<Option<CheckDidsResult>>,
+}
+
+const STATUS_SCAN_CHUNK: usize = 32;
 
 #[derive(Serialize, Default)]
 pub(crate) struct VerifyDbResult {
@@ -274,18 +293,53 @@ pub(crate) async fn resolve_local_doc_async(
     }))
 }
 
-pub(crate) async fn refresh_metrics_snapshot(state: &AppState) -> Result<()> {
+pub(crate) async fn refresh_metrics_snapshot(state: &AppState) -> Result<CheckDidsResult> {
     crate::history::ensure_history_ready(state).await?;
-    let _guard = state.history_lock.lock().await;
-    refresh_metrics_snapshot_once(state).await;
-    Ok(())
+    let mut latest = state.status_scans.latest.lock().await;
+    Ok(scan_status(state, &mut latest).await)
 }
 
-// Caller holds history_lock so an old snapshot cannot be published after replay.
-pub(crate) async fn refresh_metrics_snapshot_once(state: &AppState) {
+// The cached snapshot when it is current, otherwise the result of a scan,
+// shared with any scan that finished while this caller waited.
+pub(crate) async fn current_status(state: &AppState) -> Result<CheckDidsResult> {
+    crate::history::ensure_history_ready(state).await?;
+    if let Some(snapshot) = state.status_snapshot.lock().await.clone() {
+        return Ok(snapshot);
+    }
+    let completed = state.status_scans.completed.load(Ordering::SeqCst);
+    let mut latest = state.status_scans.latest.lock().await;
+    if let Some(snapshot) = state.status_snapshot.lock().await.clone() {
+        return Ok(snapshot);
+    }
+    if state.status_scans.completed.load(Ordering::SeqCst) != completed {
+        if let Some(result) = latest.clone() {
+            return Ok(result);
+        }
+    }
+    Ok(scan_status(state, &mut latest).await)
+}
+
+pub(crate) async fn invalidate_status_snapshot(state: &AppState) {
+    let mut snapshot = state.status_snapshot.lock().await;
+    state.status_scans.generation.fetch_add(1, Ordering::SeqCst);
+    *snapshot = None;
+}
+
+async fn scan_status(state: &AppState, latest: &mut Option<CheckDidsResult>) -> CheckDidsResult {
+    let generation = state.status_scans.generation.load(Ordering::SeqCst);
+    let started = Instant::now();
     let did_check = check_dids_impl(state, None, false).await;
-    *state.status_snapshot.lock().await = Some(did_check.clone());
+    info!("checkDIDs: {}ms", started.elapsed().as_millis());
+    {
+        let mut snapshot = state.status_snapshot.lock().await;
+        if state.status_scans.generation.load(Ordering::SeqCst) == generation {
+            *snapshot = Some(did_check.clone());
+        }
+    }
     update_metrics_from_check(state, &did_check).await;
+    *latest = Some(did_check.clone());
+    state.status_scans.completed.fetch_add(1, Ordering::SeqCst);
+    did_check
 }
 
 pub(crate) async fn build_search_index(state: &AppState) {
@@ -409,7 +463,7 @@ pub(crate) async fn update_metrics_from_check(state: &AppState, did_check: &Chec
 // derived views in one pass before releasing history_lock, without Redis reads.
 pub(crate) async fn build_startup_views(state: &AppState) {
     let mut index = crate::SearchIndex::default();
-    let status = scan_dids(state, None, Some(&mut index)).await;
+    let status = scan_dids(state, None, Some(&mut index), false).await;
     let size = index.size();
     *state.search_index.lock().await = index;
     *state.status_snapshot.lock().await = Some(status.clone());
@@ -422,13 +476,16 @@ pub(crate) async fn check_dids_impl(
     dids: Option<Vec<String>>,
     _chatty: bool,
 ) -> CheckDidsResult {
-    scan_dids(state, dids, None).await
+    scan_dids(state, dids, None, true).await
 }
 
+// With `lock_chunks`, each chunk sees complete publications but the counts can
+// span several; without it, the caller must already hold history_lock.
 async fn scan_dids(
     state: &AppState,
     dids: Option<Vec<String>>,
     mut search_index: Option<&mut crate::SearchIndex>,
+    lock_chunks: bool,
 ) -> CheckDidsResult {
     let dids = {
         let store = state.store.lock().await;
@@ -445,65 +502,77 @@ async fn scan_dids(
         "DB status check"
     };
     let mut progress = crate::progress::ProgressLogger::new(phase, dids.len());
-    for (index, did) in dids.iter().enumerate() {
-        let doc = {
-            let store = state.store.lock().await;
-            store.resolve_doc(&state.config, did, ResolveOptions::default())
-        };
-        progress.update(index + 1);
-        let Ok(doc) = doc else {
-            by_type.invalid += 1;
-            continue;
-        };
-
-        if let Some(index) = search_index.as_deref_mut() {
-            index.store(did, &doc);
-        }
-
-        match doc
-            .get("didDocumentRegistration")
-            .and_then(|value| value.get("type"))
-            .and_then(Value::as_str)
-        {
-            Some("agent") => by_type.agents += 1,
-            Some("asset") => by_type.assets += 1,
-            _ => {}
-        }
-
-        if doc
-            .get("didDocumentMetadata")
-            .and_then(|value| value.get("confirmed"))
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
-        {
-            by_type.confirmed += 1;
+    for (chunk_index, chunk) in dids.chunks(STATUS_SCAN_CHUNK).enumerate() {
+        let guard = if lock_chunks {
+            Some(state.history_lock.lock().await)
         } else {
-            by_type.unconfirmed += 1;
-        }
+            None
+        };
+        for (offset, did) in chunk.iter().enumerate() {
+            let index = chunk_index * STATUS_SCAN_CHUNK + offset;
+            let doc = {
+                let store = state.store.lock().await;
+                store.resolve_doc(&state.config, did, ResolveOptions::default())
+            };
+            progress.update(index + 1);
+            let Ok(doc) = doc else {
+                by_type.invalid += 1;
+                continue;
+            };
 
-        if doc
-            .get("didDocumentRegistration")
-            .and_then(|value| value.get("validUntil"))
-            .and_then(Value::as_str)
-            .is_some()
-        {
-            by_type.ephemeral += 1;
-        }
+            if let Some(index) = search_index.as_deref_mut() {
+                index.store(did, &doc);
+            }
 
-        if let Some(registry) = doc
-            .get("didDocumentRegistration")
-            .and_then(|value| value.get("registry"))
-            .and_then(Value::as_str)
-        {
-            *by_registry.entry(registry.to_string()).or_insert(0) += 1;
-        }
+            match doc
+                .get("didDocumentRegistration")
+                .and_then(|value| value.get("type"))
+                .and_then(Value::as_str)
+            {
+                Some("agent") => by_type.agents += 1,
+                Some("asset") => by_type.assets += 1,
+                _ => {}
+            }
 
-        if let Some(version) = doc
-            .get("didDocumentMetadata")
-            .and_then(|value| value.get("versionSequence"))
-            .and_then(Value::as_str)
-        {
-            *by_version.entry(version.to_string()).or_insert(0) += 1;
+            if doc
+                .get("didDocumentMetadata")
+                .and_then(|value| value.get("confirmed"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            {
+                by_type.confirmed += 1;
+            } else {
+                by_type.unconfirmed += 1;
+            }
+
+            if doc
+                .get("didDocumentRegistration")
+                .and_then(|value| value.get("validUntil"))
+                .and_then(Value::as_str)
+                .is_some()
+            {
+                by_type.ephemeral += 1;
+            }
+
+            if let Some(registry) = doc
+                .get("didDocumentRegistration")
+                .and_then(|value| value.get("registry"))
+                .and_then(Value::as_str)
+            {
+                *by_registry.entry(registry.to_string()).or_insert(0) += 1;
+            }
+
+            if let Some(version) = doc
+                .get("didDocumentMetadata")
+                .and_then(|value| value.get("versionSequence"))
+                .and_then(Value::as_str)
+            {
+                *by_version.entry(version.to_string()).or_insert(0) += 1;
+            }
+        }
+        drop(guard);
+        if lock_chunks {
+            tokio::task::yield_now().await;
         }
     }
 
@@ -629,10 +698,9 @@ pub(crate) fn start_background_tasks(state: AppState) {
             let interval = Duration::from_secs(interval_minutes * 60);
             tokio::time::sleep(interval).await;
             loop {
-                if let Err(error) = refresh_metrics_snapshot(&status_state).await {
-                    tracing::error!(%error, "Failed to refresh DID status");
-                } else {
-                    log_status_snapshot(&status_state).await;
+                match refresh_metrics_snapshot(&status_state).await {
+                    Ok(status) => log_status_snapshot(&status_state, &status),
+                    Err(error) => tracing::error!(%error, "Failed to refresh DID status"),
                 }
                 tokio::time::sleep(interval).await;
             }
@@ -665,23 +733,7 @@ pub(crate) fn start_background_tasks(state: AppState) {
     }
 }
 
-pub(crate) async fn log_status_snapshot(state: &AppState) {
-    if let Err(error) = crate::history::ensure_history_ready(state).await {
-        tracing::error!(%error, "Failed to read DID status");
-        return;
-    }
-    let _guard = state.history_lock.lock().await;
-    let cached = state.status_snapshot.lock().await.clone();
-    let status = if let Some(snapshot) = cached {
-        snapshot
-    } else {
-        let started = std::time::Instant::now();
-        let status = check_dids_impl(state, None, false).await;
-        let elapsed_ms = started.elapsed().as_millis();
-        info!("checkDIDs: {}ms", elapsed_ms);
-        *state.status_snapshot.lock().await = Some(status.clone());
-        status
-    };
+pub(crate) fn log_status_snapshot(state: &AppState, status: &CheckDidsResult) {
     info!("Status -----------------------------");
     info!("DID Database ({}):", state.config.db);
     info!("  Total: {}", status.total);
@@ -886,4 +938,121 @@ pub(crate) fn genesis_document(did: &str, anchor_operation: &Value) -> Result<Va
         doc["didDocumentData"] = data.clone();
     }
     Ok(doc)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::store::{DbBackend, JsonDbFile};
+    use crate::JsonDb;
+
+    // Three chunks: 32, 32 and 1 DIDs. Unresolvable entries keep the scan cheap.
+    const DIDS: usize = 2 * STATUS_SCAN_CHUNK + 1;
+
+    async fn scan_state() -> (AppState, tempfile::TempDir) {
+        let mut data = JsonDbFile::default();
+        for n in 0..DIDS {
+            let suffix = format!("bagaaierascan{n}");
+            data.dids.insert(
+                suffix.clone(),
+                vec![EventRecord {
+                    registry: "local".to_string(),
+                    time: "2026-10-12T00:00:00Z".to_string(),
+                    ordinal: Some(vec![0]),
+                    operation: json!({ "type": "update", "did": format!("did:cid:{suffix}") }),
+                    opid: Some(format!("scan-{n}")),
+                    did: Some(format!("did:cid:{suffix}")),
+                    registration: None,
+                }],
+            );
+        }
+        let db = JsonDb {
+            backend: DbBackend::Memory,
+            data,
+            redis_connection: None,
+            event_index: Default::default(),
+        };
+        let (state, directory) = crate::tests::make_state(db);
+        *state.history_ready.lock().await = true;
+        (state, directory)
+    }
+
+    // Takes history_lock as a reader would, as often as it can while the scan
+    // runs, invalidating the snapshot on the reads `invalidate_on` selects.
+    // Returns how many reads got the lock before the scan finished.
+    async fn read_during_scan(
+        state: &AppState,
+        scan: &tokio::task::JoinHandle<Result<CheckDidsResult>>,
+        invalidate_on: impl Fn(usize) -> bool,
+    ) -> usize {
+        let mut reads = 0;
+        while !scan.is_finished() {
+            let _read = state.history_lock.lock().await;
+            if !scan.is_finished() {
+                reads += 1;
+                if invalidate_on(reads) {
+                    invalidate_status_snapshot(state).await;
+                }
+            }
+        }
+        reads
+    }
+
+    #[tokio::test]
+    async fn status_scans_release_history_lock_between_chunks() {
+        for shared in [false, true] {
+            let (state, _directory) = scan_state().await;
+            let guard = state.history_lock.lock().await;
+            let scanning = state.clone();
+            let scan = tokio::spawn(async move {
+                if shared {
+                    current_status(&scanning).await
+                } else {
+                    refresh_metrics_snapshot(&scanning).await
+                }
+            });
+            tokio::task::yield_now().await;
+            drop(guard);
+            // One read after history recovery and one after each chunk; a scan
+            // holding the lock throughout admits only the first.
+            let reads = read_during_scan(&state, &scan, |_| false).await;
+            assert!(reads >= DIDS.div_ceil(STATUS_SCAN_CHUNK), "reads: {reads}");
+            assert_eq!(scan.await.unwrap().unwrap().total, DIDS);
+            assert!(state.status_snapshot.lock().await.is_some());
+        }
+    }
+
+    #[tokio::test]
+    async fn status_scan_overlapping_invalidation_is_not_cached() {
+        let (state, _directory) = scan_state().await;
+        let scanning = state.clone();
+        let scan = tokio::spawn(async move { refresh_metrics_snapshot(&scanning).await });
+        tokio::task::yield_now().await;
+        // A replay publishing between chunks invalidates the snapshot.
+        read_during_scan(&state, &scan, |read| read == 2).await;
+        assert_eq!(scan.await.unwrap().unwrap().total, DIDS);
+        assert!(state.status_snapshot.lock().await.is_none());
+
+        let status = current_status(&state).await.unwrap();
+        assert_eq!(status.total, DIDS);
+        assert!(state.status_snapshot.lock().await.is_some());
+    }
+
+    #[tokio::test]
+    async fn waiting_status_reads_share_a_finished_scan() {
+        let (state, _directory) = scan_state().await;
+        let latest = state.status_scans.latest.lock().await;
+        let reading = state.clone();
+        let read = tokio::spawn(async move { current_status(&reading).await });
+        tokio::task::yield_now().await;
+        // Simulate a scan that finished, uncached, while the read waited.
+        let mut latest = latest;
+        *latest = Some(CheckDidsResult {
+            total: 7,
+            ..Default::default()
+        });
+        state.status_scans.completed.fetch_add(1, Ordering::SeqCst);
+        drop(latest);
+        assert_eq!(read.await.unwrap().unwrap().total, 7);
+    }
 }

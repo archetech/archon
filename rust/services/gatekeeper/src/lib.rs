@@ -35,15 +35,17 @@ pub(crate) use proofs::{
     is_valid_did, verify_event_shape,
 };
 pub(crate) use resolver::{
-    build_search_index, classify_conformant_error, clear_search_index, delete_search_doc,
-    log_status_snapshot, query_docs_impl, refresh_metrics_snapshot, resolve_local_doc_async,
-    search_docs_impl, start_background_tasks, update_search_doc, verify_db_impl,
-    CheckDidsResult,
+    build_search_index, classify_conformant_error, clear_search_index, current_status,
+    delete_search_doc, log_status_snapshot, query_docs_impl, resolve_local_doc_async,
+    search_docs_impl, start_background_tasks, update_search_doc, verify_db_impl, CheckDidsResult,
+    StatusScans,
 };
 #[cfg(test)]
 pub(crate) use resolver::ResolveError;
 #[cfg(test)]
 pub(crate) use resolver::check_dids_impl;
+#[cfg(test)]
+pub(crate) use resolver::refresh_metrics_snapshot;
 pub(crate) use search_index::SearchIndex;
 pub(crate) use store::{
     chrono_like_now, event_record_to_value, past_cutoff,
@@ -135,6 +137,7 @@ mod tests {
             supported_registries: Arc::new(Mutex::new(config.registries.clone())),
             did_locks: Arc::new(Mutex::new(HashMap::new())),
             status_snapshot: Arc::new(Mutex::new(None)),
+            status_scans: Arc::default(),
             search_index: Arc::new(Mutex::new(SearchIndex::default())),
             candidate_history: Arc::new(Mutex::new(None)),
             dependents: Arc::new(Mutex::new(HashMap::new())),
