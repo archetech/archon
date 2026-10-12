@@ -1,6 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
-import { sendError } from './keymaster-error-status.js';
+import { sendError, sendNotFound } from './keymaster-error-status.js';
 
 export function createIdentityRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster, walletOperationsTotal, didNotFound: DIDNotFound } = options;
@@ -166,7 +166,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const docs = await getKeymaster().resolveDID(req.params.id, req.query);
             res.json({ docs });
         } catch (error: any) {
-            res.status(404).send(DIDNotFound);
+            sendNotFound(res, error, DIDNotFound);
         }
     });
 
@@ -550,7 +550,7 @@ export function createIdentityRouter(options: CreateKeymasterRouterOptions): exp
             const docs = await getKeymaster().resolveDID(req.params.id);
             res.json({ docs });
         } catch (error: any) {
-            res.status(404).send({ error: 'ID not found' });
+            sendNotFound(res, error, { error: 'ID not found' });
         }
     });
 

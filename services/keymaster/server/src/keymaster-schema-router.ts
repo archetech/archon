@@ -1,6 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
-import { sendError } from './keymaster-error-status.js';
+import { sendError, sendNotFound } from './keymaster-error-status.js';
 
 export function createSchemaRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -153,7 +153,7 @@ export function createSchemaRouter(options: CreateKeymasterRouterOptions): expre
             const schema = await getKeymaster().getSchema(req.params.id);
             res.json({ schema });
         } catch (error: any) {
-            res.status(404).send({ error: 'Schema not found' });
+            sendNotFound(res, error, { error: 'Schema not found' });
         }
     });
 

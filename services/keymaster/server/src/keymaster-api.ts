@@ -298,6 +298,9 @@ const server = app.listen(port, config.bindAddress, async () => {
         waitUntilReady: true,
         intervalSeconds: 5,
         chatty: true,
+        // Matches the Python service's Gatekeeper client, so a stalled
+        // Gatekeeper yields a 504 instead of a request that never returns.
+        timeoutMs: 30_000,
     });
 
     const wallet = await initWallet();

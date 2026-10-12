@@ -1,6 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
-import { sendError } from './keymaster-error-status.js';
+import { sendError, sendNotFound } from './keymaster-error-status.js';
 
 export function createDmailRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster, config } = options;
@@ -186,7 +186,7 @@ export function createDmailRouter(options: CreateKeymasterRouterOptions): expres
             const message = await getKeymaster().getDmailMessage(req.params.id);
             res.json({ message });
         } catch (error: any) {
-            res.status(404).send({ error: 'Dmail not found' });
+            sendNotFound(res, error, { error: 'Dmail not found' });
         }
     });
 

@@ -1429,8 +1429,14 @@ Error status is assigned by the *kind* of failure, not per route:
 | Bad or invalid input (`InvalidParameterError`, `InvalidDIDError`, `InvalidOperationError`, `KeymasterError`) | 400 |
 | Not found — an unknown ID (`UnknownIDError`) or an empty wallet store (`WalletNotFoundError`) | 404 |
 | Missing/incorrect passphrase or admin key | 401 / 403 |
-| An unavailable upstream service (`LightningUnavailableError`) | 503 |
-| Unexpected fault — gatekeeper or IPFS unreachable, any unhandled exception | 500 |
+| An unavailable upstream service (`LightningUnavailableError`), or a Gatekeeper that cannot be reached (`GatekeeperUnavailableError`) | 503 |
+| Gatekeeper did not respond within 30 seconds (`GatekeeperTimeoutError`) | 504 |
+| Unexpected fault — IPFS unreachable, any unhandled exception | 500 |
+
+Both services give their Gatekeeper client the same 30-second request timeout,
+and both clients raise `GatekeeperTimeoutError` or `GatekeeperUnavailableError`
+when no response arrives, so a Gatekeeper outage is reported as such rather than
+as an unexplained 500 or a request that never returns.
 
 Both services classify this way: the Python service as of #1107, the TypeScript
 service as of #1108. Before #1108 the TypeScript routes hardcoded a status in
@@ -1438,11 +1444,13 @@ each `catch` block, inconsistently — 57 answered 400, 79 answered 500, 22
 answered 404 for the same class of error — and a shared `sendError` helper
 (`keymaster-error-status.ts`) now replaces those with the classification above.
 
-Two deliberate exceptions remain, both returning **404** regardless of the error
-class because the not-found semantics are the point of the route: the
+Two deliberate exceptions remain, both returning **404** whatever the error
+class, because the not-found semantics are the point of the route: the
 resolve-style GETs (`GET /did/{id}`, `/ids/{id}`, `/assets/{id}`, `/groups/{name}`,
 `/schemas/{id}`, `/dmail/{id}`, `/aliases/{alias}`) answer 404 for any resolution
-failure. A malformed request body that fails JSON parsing before reaching the
+failure, except that a Gatekeeper timeout or outage keeps its 504 or 503: it is
+no evidence that the ID is unknown.
+A malformed request body that fails JSON parsing before reaching the
 keymaster (e.g. `POST /keys/sign`) surfaces as 500, since the parse error is not
 an Archon error.
 

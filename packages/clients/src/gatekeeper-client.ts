@@ -23,9 +23,31 @@ export * from './gatekeeper-types.js';
 const VERSION = '/api/v1';
 const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
 
-function throwError(error: AxiosError | any): never {
+// Raised when Gatekeeper accepted the request but did not answer in time.
+export class GatekeeperTimeoutError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'GatekeeperTimeoutError';
+    }
+}
+
+// Raised when no response came back at all: refused, unresolvable, reset.
+export class GatekeeperUnavailableError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'GatekeeperUnavailableError';
+    }
+}
+
+export function throwError(error: AxiosError | any): never {
     if (error.response) {
         throw error.response.data;
+    }
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+        throw new GatekeeperTimeoutError(`Gatekeeper did not respond: ${error.message}`);
+    }
+    if (error.request) {
+        throw new GatekeeperUnavailableError(`Gatekeeper unavailable: ${error.message || error.code}`);
     }
     throw error.message;
 }
@@ -72,6 +94,10 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
         if (options?.apiKey) {
             this.addCustomHeader(ARCHON_ADMIN_HEADER, options.apiKey);
+        }
+
+        if (options?.timeoutMs) {
+            this.axios.defaults.timeout = options.timeoutMs;
         }
 
         // Only used for unit testing

@@ -145,6 +145,8 @@ export interface GatekeeperClientOptions {
     chatty?: boolean;
     becomeChattyAfter?: number;
     maxRetries?: number;
+    // Per-request limit; by default requests wait for Gatekeeper indefinitely.
+    timeoutMs?: number;
 }
 
 export interface GetStatusResult {
