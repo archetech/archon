@@ -184,7 +184,7 @@ pub(crate) async fn rewind_registry(
         Ok(())
     }
     .await;
-    *state.status_snapshot.lock().await = None;
+    crate::resolver::invalidate_status_snapshot(state).await;
     if result.is_err() {
         *state.history_ready.lock().await = false;
     }
@@ -217,7 +217,7 @@ pub(crate) async fn remove_histories(state: &AppState, dids: &[String]) -> Resul
         Ok(())
     }
     .await;
-    *state.status_snapshot.lock().await = None;
+    crate::resolver::invalidate_status_snapshot(state).await;
     if result.is_err() {
         *state.history_ready.lock().await = false;
     }
@@ -502,7 +502,7 @@ async fn rebuild_histories(
         for target in changed {
             update_search_doc(state, &target).await;
         }
-        *state.status_snapshot.lock().await = None;
+        crate::resolver::invalidate_status_snapshot(state).await;
     }
     Ok(has_changes)
 }
