@@ -2,22 +2,28 @@
 
 Archon is a decentralized identity protocol implementing the W3C-compliant `did:cid` scheme.
 
+## Animated Walkthroughs
+
+Three-minute animated explanations of how Archon works, each viewable in the browser.
+
+- [How Archon Works](presentations/how-archon-works.html) — DID creation, resolution, updates, and registries
+- [One History, Everywhere](presentations/convergence.html) — how nodes converge on DID history: replay, forks, chain anchors, late evidence, and reorganizations
+- [Keys You Can Lose](presentations/recovery.html) — identity recovery and key rotation: one recovery phrase, wallet backup and restore, rotating keys, stolen old keys, and DID repair
+- [Proving What You Hold](presentations/credential-verification.html) — credential issuance, presentation, the five verification checks, request pairing, and verifying as of a past time
+- [Sign In With a DID](presentations/signin.html) — passwordless sign-in: challenge, wallet response, Herald verification, and OpenID Connect
+- [A Name for Your DID](presentations/names.html) — Archon addresses: claiming name@domain, resolving and publishing it, Herald's public pages, and using addresses for Lightning and email
+- [Messages Between DIDs](presentations/didcomm.html) — DIDComm in Archon: keys, envelopes, delivery through the relay and Tor, mediators, and protocols
+- [Shared, Sealed, Counted](presentations/assets.html) — groups, vaults and polls: nested membership, per-member vault keys, sealed ballots, and who can see what
+- [Paying a DID](presentations/payments.html) — Lightning in Archon: a wallet per DID, zaps to a DID or name@domain, onion endpoints, and pay-per-request L402 API access
+
 ## Protocol
 
 - [White Paper](WHITEPAPER.md) — full protocol specification (v1.1)
 - [DID Scheme](scheme.md) — the `did:cid` method specification
-- [Keys You Can Lose](presentations/recovery.html) — three-minute animated walkthrough of identity recovery and key rotation: one recovery phrase, wallet backup and restore, rotating keys, stolen old keys, and DID repair
 - [Sidetree and Archon Comparison](sidetree-archon-comparison.md) — deep dive on Archon's Sidetree lineage and design differences
 - [DIDComm Messaging Support](didcomm-design.md) — design doc for adding standards-based DIDComm v2 messaging
-- [Messages Between DIDs](presentations/didcomm.html) — three-minute animated walkthrough of DIDComm in Archon: keys, envelopes, delivery through the relay and Tor, mediators, and protocols
-- [A Name for Your DID](presentations/names.html) — three-minute animated walkthrough of Archon addresses: claiming name@domain, resolving and publishing it, Herald's public pages, and using addresses for Lightning and email
 - [did:cid Technical Presentation](presentations/did-cid-technical-presentation.md) — slide outline, speaker notes, and prep checklist
 - [Gatekeeper Resolution Infographic](presentations/gatekeeper-resolution-infographic.md) — visual brief for operation import and DID document replay
-- [Shared, Sealed, Counted](presentations/assets.html) — three-minute animated walkthrough of groups, vaults and polls: nested membership, per-member vault keys, sealed ballots, and who can see what
-- [How Archon Works](presentations/how-archon-works.html) — three-minute animated walkthrough of DID creation, resolution, updates, and registries
-- [Proving What You Hold](presentations/credential-verification.html) — three-minute animated walkthrough of credential issuance, presentation, the five verification checks, request pairing, and verifying as of a past time
-- [One History, Everywhere](presentations/convergence.html) — three-minute animated walkthrough of how nodes converge on DID history: replay, forks, chain anchors, late evidence, and reorganizations
-- [Sign In With a DID](presentations/signin.html) — three-minute animated walkthrough of passwordless sign-in: challenge, wallet response, Herald verification, and OpenID Connect
 
 ## Operations
 
@@ -30,7 +36,6 @@ Archon is a decentralized identity protocol implementing the W3C-compliant `did:
 
 - [Lightning Zap Sequence](lightning-zap-sequence.md) — DID-to-DID and LUD-16 payment flows
 - [Lightning Wallet Design](lightning-wallet-design.md) — wallet architecture and LNbits integration
-- [Paying a DID](presentations/payments.html) — three-minute animated walkthrough of Lightning in Archon: a wallet per DID, zaps to a DID or name@domain, onion endpoints, and pay-per-request L402 API access
 
 ## Service Specifications
 
