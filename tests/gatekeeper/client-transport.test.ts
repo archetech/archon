@@ -4,6 +4,7 @@ import GatekeeperClient, {
     GatekeeperTimeoutError,
     GatekeeperUnavailableError,
 } from '@didcid/clients/gatekeeper';
+import DrawbridgeClient from '@didcid/clients/drawbridge';
 
 // A Gatekeeper that stalls or is down used to surface as a bare string, which the
 // Keymaster service could not tell from any other failure (#1380). These use real
@@ -41,6 +42,29 @@ describe('GatekeeperClient transport failures', () => {
         const failure = gatekeeper.resolveDID(DID);
         await expect(failure).rejects.toBeInstanceOf(GatekeeperUnavailableError);
         await expect(failure).rejects.toThrow('Gatekeeper unavailable');
+    });
+
+    // The Keymaster service talks to its Gatekeeper URL through a
+    // DrawbridgeClient, whose Lightning routes need the same classification.
+    it('classifies Drawbridge Lightning requests the same way', async () => {
+        const stalled = http.createServer(() => { /* never responds */ });
+        const url = await listen(stalled);
+        try {
+            const drawbridge = await DrawbridgeClient.create({ url, timeoutMs: 100 });
+            await expect(drawbridge.createLightningWallet('wallet'))
+                .rejects.toBeInstanceOf(GatekeeperTimeoutError);
+        }
+        finally {
+            stalled.closeAllConnections();
+            await new Promise(resolve => stalled.close(resolve));
+        }
+
+        const closed = http.createServer();
+        const closedUrl = await listen(closed);
+        await new Promise(resolve => closed.close(resolve));
+        const drawbridge = await DrawbridgeClient.create({ url: closedUrl });
+        await expect(drawbridge.getLightningBalance('invoice-key'))
+            .rejects.toBeInstanceOf(GatekeeperUnavailableError);
     });
 
     it('still passes Gatekeeper error responses through unchanged', async () => {

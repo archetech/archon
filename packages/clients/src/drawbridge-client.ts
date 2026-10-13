@@ -8,16 +8,9 @@ import {
     LightningPaymentRecord,
     LightningPaymentStatus,
 } from './gatekeeper-types.js';
-import GatekeeperClient from './gatekeeper-client.js';
+import GatekeeperClient, { throwError } from './gatekeeper-client.js';
 
 export * from './gatekeeper-types.js';
-
-function throwError(error: any): never {
-    if (error.response) {
-        throw error.response.data;
-    }
-    throw error.message;
-}
 
 export default class DrawbridgeClient extends GatekeeperClient implements DrawbridgeInterface {
 
