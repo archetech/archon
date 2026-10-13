@@ -14,6 +14,7 @@ Three-minute animated explanations of how Archon works, each viewable in the bro
 - [Shared, Sealed, Counted](presentations/assets.html) — groups, vaults and polls: nested membership, per-member vault keys, sealed ballots, and who can see what
 - [Messages Between DIDs](presentations/didcomm.html) — DIDComm in Archon: keys, envelopes, delivery through the relay and Tor, mediators, and protocols
 - [Paying a DID](presentations/payments.html) — Lightning in Archon: a wallet per DID, zaps to a DID or name@domain, onion endpoints, and pay-per-request L402 API access
+- [An Identity for Your Agent](presentations/mcp.html) — Archon for AI agents through the MCP server: a local Keymaster, every command as a tool, an agent's own DID, credentials that show who stands behind it, context-sized results, and explicit confirmations for secrets and payments
 - [Anchored in a Block](presentations/anchoring.html) — how operations are registered on blockchains: per-registry queues, batches whose DID commits to their operations, one transaction per batch on Bitcoin, Zcash, Ethereum or Solana, importing on every node, confirmation and timestamps, and orphaned blocks
 - [One History, Everywhere](presentations/convergence.html) — how nodes converge on DID history: replay, forks, chain anchors, late evidence, and reorganizations
 
