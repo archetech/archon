@@ -6,14 +6,57 @@ from typing import Any
 import httpx
 
 
+GATEKEEPER_TIMEOUT_SECONDS = 30.0
+
+
+class GatekeeperTimeoutError(Exception):
+    """Gatekeeper accepted the request but did not answer in time."""
+
+
+class GatekeeperUnavailableError(Exception):
+    """No response came back from Gatekeeper at all: refused, unresolvable, reset."""
+
+
+class _GatekeeperHTTP:
+    """Translates httpx transport failures into the Gatekeeper errors above."""
+
+    def __init__(self, client: httpx.AsyncClient):
+        self._client = client
+
+    async def get(self, url: str, **kwargs: Any) -> httpx.Response:
+        return await self._send(self._client.get, url, **kwargs)
+
+    async def post(self, url: str, **kwargs: Any) -> httpx.Response:
+        return await self._send(self._client.post, url, **kwargs)
+
+    async def delete(self, url: str, **kwargs: Any) -> httpx.Response:
+        return await self._send(self._client.delete, url, **kwargs)
+
+    async def aclose(self) -> None:
+        await self._client.aclose()
+
+    @staticmethod
+    async def _send(method: Any, url: str, **kwargs: Any) -> httpx.Response:
+        try:
+            return await method(url, **kwargs)
+        except httpx.TimeoutException as error:
+            raise GatekeeperTimeoutError(
+                f"Gatekeeper did not respond within {GATEKEEPER_TIMEOUT_SECONDS:g}s"
+            ) from error
+        except httpx.TransportError as error:
+            raise GatekeeperUnavailableError(
+                f"Gatekeeper unavailable: {str(error) or type(error).__name__}"
+            ) from error
+
+
 class GatekeeperClient:
     def __init__(self, base_url: str, api_key: str | None = None):
         api = base_url.rstrip("/")
         self.url = api
-        self._client = httpx.AsyncClient(
-            base_url=f"{api}/api/v1", timeout=30.0,
+        self._client = _GatekeeperHTTP(httpx.AsyncClient(
+            base_url=f"{api}/api/v1", timeout=GATEKEEPER_TIMEOUT_SECONDS,
             headers={"X-Archon-Admin-Key": api_key} if api_key else {},
-        )
+        ))
 
     async def close(self) -> None:
         await self._client.aclose()

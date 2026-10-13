@@ -1,4 +1,5 @@
 import type express from 'express';
+import { GatekeeperTimeoutError, GatekeeperUnavailableError } from '@didcid/clients/gatekeeper';
 import {
     ArchonError,
     LightningUnavailableError,
@@ -14,6 +15,12 @@ import {
 export function statusForError(error: unknown): number {
     if (error instanceof UnknownIDError || error instanceof WalletNotFoundError) {
         return 404;
+    }
+    if (error instanceof GatekeeperTimeoutError) {
+        return 504;
+    }
+    if (error instanceof GatekeeperUnavailableError) {
+        return 503;
     }
     if (error instanceof LightningUnavailableError) {
         // An upstream service is down -- not the caller's fault, not this
@@ -31,4 +38,14 @@ export function statusForError(error: unknown): number {
 
 export function sendError(res: express.Response, error: unknown): void {
     res.status(statusForError(error)).send({ error: error instanceof Error ? error.toString() : String(error) });
+}
+
+// Resolve-style routes answer 404 for any failed resolution, but a Gatekeeper
+// that timed out or could not be reached is no evidence the ID is unknown.
+export function sendNotFound(res: express.Response, error: unknown, body: { error: string }): void {
+    if (error instanceof GatekeeperTimeoutError || error instanceof GatekeeperUnavailableError) {
+        sendError(res, error);
+        return;
+    }
+    res.status(404).send(body);
 }

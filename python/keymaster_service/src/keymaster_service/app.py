@@ -13,6 +13,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from keymaster.core import KeymasterError, UnknownIDError, WalletNotFoundError
+from keymaster.gatekeeper_client import GatekeeperTimeoutError, GatekeeperUnavailableError
 
 from .metrics import (
     http_request_duration_seconds,
@@ -133,9 +134,25 @@ async def http_error_handler(_: Request, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
 
 
+# An upstream outage is neither the caller's mistake nor a fault in this
+# service: 504 when Gatekeeper did not answer in time, 503 when it could not be
+# reached. Both are expected operational conditions, logged without a traceback.
+@app.exception_handler(GatekeeperTimeoutError)
+async def gatekeeper_timeout_handler(request: Request, exc: GatekeeperTimeoutError):
+    LOGGER.warning("%s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(status_code=504, content={"error": str(exc)})
+
+
+@app.exception_handler(GatekeeperUnavailableError)
+async def gatekeeper_unavailable_handler(request: Request, exc: GatekeeperUnavailableError):
+    LOGGER.warning("%s %s: %s", request.method, request.url.path, exc)
+    return JSONResponse(status_code=503, content={"error": str(exc)})
+
+
+# Starlette re-raises after this handler responds so the server logs the
+# traceback; logging it here as well wrote every traceback twice.
 @app.exception_handler(Exception)
 async def generic_error_handler(_: Request, exc: Exception):
-    LOGGER.exception("Unhandled exception", exc_info=exc)
     return JSONResponse(status_code=500, content={"error": str(exc)})
 
 

@@ -1,6 +1,6 @@
 import express from 'express';
 import type { CreateKeymasterRouterOptions } from './keymaster-router-types.js';
-import { sendError } from './keymaster-error-status.js';
+import { sendError, sendNotFound } from './keymaster-error-status.js';
 
 export function createAssetRouter(options: CreateKeymasterRouterOptions): express.Router {
     const { getKeymaster } = options;
@@ -143,7 +143,7 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
             const asset = await getKeymaster().resolveAsset(req.params.id);
             res.json({ asset });
         } catch (error: any) {
-            res.status(404).send({ error: 'Asset not found' });
+            sendNotFound(res, error, { error: 'Asset not found' });
         }
     });
 

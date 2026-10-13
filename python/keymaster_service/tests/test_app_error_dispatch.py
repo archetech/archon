@@ -20,6 +20,10 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from keymaster.core import KeymasterError, UnknownIDError, WalletNotFoundError  # noqa: E402
+from keymaster.gatekeeper_client import (  # noqa: E402
+    GatekeeperTimeoutError,
+    GatekeeperUnavailableError,
+)
 import keymaster_service.app as app_module  # noqa: E402
 
 
@@ -43,6 +47,14 @@ def _client() -> TestClient:
     async def _no_wallet():
         raise WalletNotFoundError("wallet store is empty")
 
+    @app.get("/gatekeeper-timeout")
+    async def _gatekeeper_timeout():
+        raise GatekeeperTimeoutError("Gatekeeper did not respond within 30s")
+
+    @app.get("/gatekeeper-unavailable")
+    async def _gatekeeper_unavailable():
+        raise GatekeeperUnavailableError("Gatekeeper unavailable: ConnectError")
+
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -57,6 +69,19 @@ def test_unknown_id_dispatches_to_404():
 
 def test_wallet_not_found_dispatches_to_404():
     assert _client().get("/no-wallet").status_code == 404
+
+
+def test_gatekeeper_timeout_dispatches_to_504_with_its_message():
+    # Was an unhandled httpx.ReadTimeout: 500 with {"error": ""} (#1380).
+    response = _client().get("/gatekeeper-timeout")
+    assert response.status_code == 504
+    assert response.json() == {"error": "Gatekeeper did not respond within 30s"}
+
+
+def test_gatekeeper_unavailable_dispatches_to_503_with_its_message():
+    response = _client().get("/gatekeeper-unavailable")
+    assert response.status_code == 503
+    assert response.json() == {"error": "Gatekeeper unavailable: ConnectError"}
 
 
 def test_did_repair_routes_accept_encoded_slashes(monkeypatch):
