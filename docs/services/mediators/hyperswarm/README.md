@@ -89,6 +89,16 @@ On startup, the mediator:
 3. On receiving `ping` messages with `peers[]`, resolves each peer DID,
    extracts `didDocumentData.node.ipfs`, and calls `ipfs peering add`.
 
+A peer is tracked by DID suffix, so aliases collapse to one entry. An attempt
+fails when the DID cannot be resolved, its document has no `node.ipfs`, or none
+of its addresses can be dialed; each can be transient (a busy Gatekeeper, a DID
+not yet imported, a briefly unreachable node). A failed peer is retried after
+1 minute, doubling to at most 30 minutes, until it succeeds. Pings and the
+60-second connection loop both trigger retries that are due; one pass runs at a
+time. Every DID that resolved to IPFS node info is announced in this node's
+`ping.peers[]`, including one it cannot dial yet: other nodes may reach it. A DID
+that resolves to this node's own IPFS node is ignored and not retried.
+
 The goal is convergent IPFS peering across the hyperswarm: every node
 discovers every other node's IPFS endpoint and pins peering with it.
 
@@ -184,7 +194,7 @@ Liveness + peer announcement.
 ```
 
 The receiver updates `connectionInfo[peerKey].nodeName` and walks
-`peers[]` to add new IPFS peerings.
+`peers[]` to add new IPFS peerings (see 2.3 for retries).
 
 ### 3.6 Batch size limit
 
@@ -358,6 +368,7 @@ Gatekeeper / Keymaster cleanup — those are HTTP clients.
 | `mediator_sync_queue_depth` | gauge | (none) |
 | `mediator_known_nodes` | gauge | (none) — DIDs with resolved `node.ipfs` info |
 | `mediator_known_peers` | gauge | (none) — distinct IPFS peer IDs |
+| `mediator_peer_candidates` | gauge | `state` (`pending`/`peered`/`retry`/`ignored`) — announced node DIDs by peering state |
 | `mediator_messages_received_total` | counter | `type` (`batch`/`queue`/`sync`/`ping`) |
 | `mediator_messages_relayed_total` | counter | (none) |
 | `mediator_operations_imported_total` | counter | (none) |

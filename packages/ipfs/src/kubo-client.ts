@@ -233,12 +233,14 @@ class KuboClient implements IPFSClient {
     // Peering.Peers is a list of permanent peers
     readonly PeeringPeers = 'Peering.Peers';
 
-    async addPeeringPeer(id: string, addresses: string[]): Promise<void> {
+    // Resolves true when the peer was written to Peering.Peers, false when it is
+    // this node or none of its addresses could be dialed.
+    async addPeeringPeer(id: string, addresses: string[]): Promise<boolean> {
         const peerID = await this.getPeerID();
 
         if (peerID === id) {
             // Not valid to add self as a peering peer
-            return;
+            return false;
         }
 
         // Filter addresses to only those we can connect to
@@ -253,7 +255,7 @@ class KuboClient implements IPFSClient {
         }
 
         if (validAddresses.length === 0) {
-            return;
+            return false;
         }
 
         const currentPeers: PeeringPeer[] = await this.getPeeringPeers();
@@ -269,6 +271,7 @@ class KuboClient implements IPFSClient {
         }
 
         await this.ipfs.config.set(this.PeeringPeers, currentPeers, { json: true });
+        return true;
     }
 
     async removePeeringPeer(id: string): Promise<void> {

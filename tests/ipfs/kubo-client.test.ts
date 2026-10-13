@@ -345,7 +345,7 @@ describe('KuboClient peering configuration', () => {
     it('refuses to add itself as a peering peer', async () => {
         const { client, rpc } = await connected();
 
-        await client.addPeeringPeer(PEER_ID, ['/ip4/1.2.3.4/tcp/4001']);
+        await expect(client.addPeeringPeer(PEER_ID, ['/ip4/1.2.3.4/tcp/4001'])).resolves.toBe(false);
 
         expect(rpc.config.set).not.toHaveBeenCalled();
     });
@@ -361,7 +361,8 @@ describe('KuboClient peering configuration', () => {
             },
         });
 
-        await client.addPeeringPeer(other, ['/ip4/1.2.3.4/tcp/bad', '/ip4/5.6.7.8/tcp/4001']);
+        await expect(client.addPeeringPeer(other, ['/ip4/1.2.3.4/tcp/bad', '/ip4/5.6.7.8/tcp/4001']))
+            .resolves.toBe(true);
 
         const [key, value, options] = rpc.config.set.mock.calls[0];
         expect(key).toBe('Peering.Peers');
@@ -377,7 +378,7 @@ describe('KuboClient peering configuration', () => {
             },
         });
 
-        await client.addPeeringPeer(other, ['/ip4/1.2.3.4/tcp/4001']);
+        await expect(client.addPeeringPeer(other, ['/ip4/1.2.3.4/tcp/4001'])).resolves.toBe(false);
 
         expect(rpc.config.set).not.toHaveBeenCalled();
     });
