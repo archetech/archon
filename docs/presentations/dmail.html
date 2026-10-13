@@ -787,7 +787,7 @@
   cv.addEventListener('click', () => setPlaying(!playing));
   seek.addEventListener('input', () => { t = parseFloat(seek.value); sync(); });
   player.addEventListener('keydown', ev => {
-    if (ev.target === seek) return;
+    if (ev.target !== player) return;
     if (ev.key === ' ' || ev.key === 'k') { ev.preventDefault(); setPlaying(!playing); }
     else if (ev.key === 'ArrowRight') { ev.preventDefault(); t = Math.min(TOTAL, t + 5); sync(); }
     else if (ev.key === 'ArrowLeft') { ev.preventDefault(); t = Math.max(0, t - 5); sync(); }
