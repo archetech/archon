@@ -7,14 +7,14 @@ Archon is a decentralized identity protocol implementing the W3C-compliant `did:
 Three-minute animated explanations of how Archon works, each viewable in the browser.
 
 - [How Archon Works](presentations/how-archon-works.html) — DID creation, resolution, updates, and registries
-- [One History, Everywhere](presentations/convergence.html) — how nodes converge on DID history: replay, forks, chain anchors, late evidence, and reorganizations
 - [Keys You Can Lose](presentations/recovery.html) — identity recovery and key rotation: one recovery phrase, wallet backup and restore, rotating keys, stolen old keys, and DID repair
 - [Proving What You Hold](presentations/credential-verification.html) — credential issuance, presentation, the five verification checks, request pairing, and verifying as of a past time
 - [Sign In With a DID](presentations/signin.html) — passwordless sign-in: challenge, wallet response, Herald verification, and OpenID Connect
 - [A Name for Your DID](presentations/names.html) — Archon addresses: claiming name@domain, resolving and publishing it, Herald's public pages, and using addresses for Lightning and email
-- [Messages Between DIDs](presentations/didcomm.html) — DIDComm in Archon: keys, envelopes, delivery through the relay and Tor, mediators, and protocols
 - [Shared, Sealed, Counted](presentations/assets.html) — groups, vaults and polls: nested membership, per-member vault keys, sealed ballots, and who can see what
+- [Messages Between DIDs](presentations/didcomm.html) — DIDComm in Archon: keys, envelopes, delivery through the relay and Tor, mediators, and protocols
 - [Paying a DID](presentations/payments.html) — Lightning in Archon: a wallet per DID, zaps to a DID or name@domain, onion endpoints, and pay-per-request L402 API access
+- [One History, Everywhere](presentations/convergence.html) — how nodes converge on DID history: replay, forks, chain anchors, late evidence, and reorganizations
 
 ## Protocol
 
