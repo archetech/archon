@@ -56,7 +56,7 @@ describe('PeerTracker', () => {
         expect(resolveNode).toHaveBeenCalledTimes(2);
         expect(tracker.nodes()[PEER_DID]).toEqual(PEER);
         expect(tracker.peerName(PEER.ipfs.id)).toBe('peer');
-        expect(tracker.counts()).toEqual({ pending: 0, peered: 1, retry: 0 });
+        expect(tracker.counts()).toEqual({ pending: 0, peered: 1, retry: 0, ignored: 0 });
     });
 
     it('retries a peer whose DID was not yet imported', async () => {
@@ -87,19 +87,26 @@ describe('PeerTracker', () => {
     });
 
     it('does not report an unreachable peer as peered, and retries it', async () => {
-        const { tracker, addPeeringPeer, failures, advance } = setup();
+        const peered: string[] = [];
+        const { tracker, addPeeringPeer, failures, advance } = setup({
+            onPeered: did => peered.push(did),
+        });
         addPeeringPeer.mockResolvedValueOnce(false);
 
         tracker.offer([PEER_DID]);
         await tracker.reconcile();
         expect(failures).toEqual(['no advertised IPFS address was reachable']);
-        expect(tracker.nodes()).not.toHaveProperty(PEER_DID);
-        expect(tracker.counts()).toEqual({ pending: 0, peered: 0, retry: 1 });
+        expect(peered).toEqual([]);
+        expect(tracker.peerName(PEER.ipfs.id)).toBeUndefined();
+        expect(tracker.counts()).toEqual({ pending: 0, peered: 0, retry: 1, ignored: 0 });
+        // Still announced: other nodes may be able to reach it.
+        expect(tracker.nodes()[PEER_DID]).toEqual(PEER);
 
         advance(RETRY_BASE_MS);
         await tracker.reconcile();
         expect(addPeeringPeer).toHaveBeenCalledTimes(2);
-        expect(tracker.nodes()[PEER_DID]).toEqual(PEER);
+        expect(peered).toEqual([PEER_DID]);
+        expect(tracker.counts().peered).toBe(1);
     });
 
     it('retries an IPFS peering error', async () => {
@@ -170,17 +177,26 @@ describe('PeerTracker', () => {
         expect(tracker.counts().peered).toBe(1);
     });
 
-    it('skips its own DID and does not peer with its own IPFS node', async () => {
-        const { tracker, resolveNode, addPeeringPeer } = setup();
+    it('skips its own DID and ignores another DID for its own IPFS node', async () => {
+        const peered: string[] = [];
+        const { tracker, resolveNode, addPeeringPeer, advance } = setup({
+            onPeered: did => peered.push(did),
+        });
+        const alias = 'did:cid:bagaaieraother';
         resolveNode.mockResolvedValue({ name: 'alias', ipfs: SELF.ipfs });
 
-        tracker.offer([SELF_DID, 'did:cid:bagaaieraother']);
+        tracker.offer([SELF_DID, alias]);
+        await tracker.reconcile();
+        advance(RETRY_MAX_MS);
         await tracker.reconcile();
 
         expect(resolveNode).toHaveBeenCalledTimes(1);
-        expect(resolveNode).toHaveBeenCalledWith('did:cid:bagaaieraother');
+        expect(resolveNode).toHaveBeenCalledWith(alias);
         expect(addPeeringPeer).not.toHaveBeenCalled();
-        expect(tracker.nodes()[SELF_DID]).toEqual(SELF);
+        expect(peered).toEqual([]);
+        expect(tracker.nodes()).toEqual({ [SELF_DID]: SELF });
+        expect(tracker.ipfsPeerCount()).toBe(0);
+        expect(tracker.counts()).toEqual({ pending: 0, peered: 0, retry: 0, ignored: 1 });
     });
 });
 
@@ -190,5 +206,24 @@ describe('describeError', () => {
         expect(describeError({ error: 'Gatekeeper unavailable' })).toBe('Gatekeeper unavailable');
         expect(describeError({ error: '' })).toBe('{"error":""}');
         expect(describeError('')).toBe('empty error');
+    });
+
+    it('describes an error object that cannot be serialized', () => {
+        const circular: Record<string, unknown> = {};
+        circular.self = circular;
+        expect(describeError(circular)).toBe('[object Object]');
+        expect(describeError({ size: 1n })).toBe('[object Object]');
+    });
+
+    it('still schedules a retry when the failure cannot be serialized', async () => {
+        const circular: Record<string, unknown> = {};
+        circular.self = circular;
+        const { tracker, resolveNode, failures } = setup();
+        resolveNode.mockRejectedValueOnce(circular);
+
+        tracker.offer([PEER_DID]);
+        await expect(tracker.reconcile()).resolves.toBeUndefined();
+        expect(failures).toEqual(['DID resolution failed: [object Object]']);
+        expect(tracker.counts().retry).toBe(1);
     });
 });

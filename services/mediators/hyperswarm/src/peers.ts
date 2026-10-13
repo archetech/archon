@@ -16,7 +16,8 @@ export interface PeerDeps {
     onPeered?: (did: string, node: NodeInfo) => void;
 }
 
-export type PeerStatus = 'pending' | 'peered' | 'retry';
+// `ignored` is terminal: the DID resolved to this node's own IPFS node.
+export type PeerStatus = 'pending' | 'peered' | 'retry' | 'ignored';
 
 interface PeerState {
     did: string;
@@ -46,7 +47,13 @@ export function describeError(error: unknown): string {
         if (typeof message === 'string' && message) {
             return message;
         }
-        return JSON.stringify(error);
+        try {
+            return JSON.stringify(error);
+        }
+        catch {
+            // Circular or BigInt-bearing objects cannot be serialized.
+            return Object.prototype.toString.call(error);
+        }
     }
     return String(error);
 }
@@ -58,7 +65,7 @@ export function describeError(error: unknown): string {
 // yet, or the peer may be briefly unreachable.
 export class PeerTracker {
     private readonly peers = new Map<string, PeerState>();
-    private readonly peered = new Map<string, NodeInfo>();
+    private readonly resolved = new Map<string, NodeInfo>();
     private readonly peerNames = new Map<string, string>();
     private reconciling?: Promise<void>;
     private readonly now: () => number;
@@ -94,9 +101,11 @@ export class PeerTracker {
         return this.reconciling;
     }
 
-    // Peered nodes plus this node, keyed by DID, as relayed in pings.
+    // This node plus every DID that resolved to another node's IPFS info,
+    // keyed by DID, as relayed in pings. A node this one cannot dial is still
+    // announced: other nodes may be able to reach it.
     nodes(): Record<string, NodeInfo> {
-        return { [this.selfDid]: this.self, ...Object.fromEntries(this.peered) };
+        return { [this.selfDid]: this.self, ...Object.fromEntries(this.resolved) };
     }
 
     peerName(ipfsId: string): string | undefined {
@@ -109,7 +118,7 @@ export class PeerTracker {
     }
 
     counts(): Record<PeerStatus, number> {
-        const counts: Record<PeerStatus, number> = { pending: 0, peered: 0, retry: 0 };
+        const counts: Record<PeerStatus, number> = { pending: 0, peered: 0, retry: 0, ignored: 0 };
         for (const peer of this.peers.values()) {
             counts[peer.status] += 1;
         }
@@ -126,7 +135,7 @@ export class PeerTracker {
     private nextDue(): PeerState | undefined {
         const now = this.now();
         for (const peer of this.peers.values()) {
-            if (peer.status !== 'peered' && peer.nextAttempt <= now) {
+            if ((peer.status === 'pending' || peer.status === 'retry') && peer.nextAttempt <= now) {
                 return peer;
             }
         }
@@ -152,23 +161,29 @@ export class PeerTracker {
             return;
         }
 
-        if (id !== this.self.ipfs.id) {
-            try {
-                if (!await this.deps.addPeeringPeer(id, addresses)) {
-                    this.fail(peer, 'no advertised IPFS address was reachable');
-                    return;
-                }
-            }
-            catch (error) {
-                this.fail(peer, `IPFS peering failed: ${describeError(error)}`);
-                return;
-            }
+        if (id === this.self.ipfs.id) {
+            // Another DID for this node; there is nothing to peer with.
+            peer.status = 'ignored';
+            peer.reason = 'resolves to this node';
+            return;
         }
 
         const info: NodeInfo = { name: node?.name ?? '', ipfs: { id, addresses } };
+        this.resolved.set(peer.did, info);
+
+        try {
+            if (!await this.deps.addPeeringPeer(id, addresses)) {
+                this.fail(peer, 'no advertised IPFS address was reachable');
+                return;
+            }
+        }
+        catch (error) {
+            this.fail(peer, `IPFS peering failed: ${describeError(error)}`);
+            return;
+        }
+
         peer.status = 'peered';
         peer.reason = undefined;
-        this.peered.set(peer.did, info);
         this.peerNames.set(id, info.name);
         this.deps.onPeered?.(peer.did, info);
     }
