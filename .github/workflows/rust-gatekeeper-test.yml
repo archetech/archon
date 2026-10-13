@@ -1,0 +1,99 @@
+name: rust-gatekeeper-test
+
+# A required check, so it runs for every PR: a workflow skipped by a path
+# filter never reports, and its required check would wait forever. The first
+# step decides whether the change touches anything the Rust tests depend on.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  test:
+    name: Rust Gatekeeper tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container: rust:1.90-trixie
+    services:
+      mongodb:
+        image: mongo:8.0
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:8.0.4-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TOKIO_WORKER_THREADS: 2
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 2
+
+      # A PR checkout is the merge commit and a push to main is a squash
+      # commit, so HEAD^1 is the base either way. A push of several commits
+      # (event.before is not HEAD^1) runs the tests unconditionally.
+      - name: Detect Rust Gatekeeper changes
+        id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          base=$(git rev-parse HEAD^1)
+          if [ "$EVENT_NAME" = push ] && [ "$BEFORE" != "$base" ]; then
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$base" HEAD | grep -qE '^(rust/services/gatekeeper/|tests/convergence/|tests/(fixtures|gatekeeper)/[^/]+\.json$|\.github/workflows/rust-gatekeeper-test\.yml$)'; then
+            echo "rust=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "rust=false" >> "$GITHUB_OUTPUT"
+            echo "No Rust Gatekeeper changes; skipping the test steps."
+          fi
+
+      - name: Cache Rust dependencies and test binaries
+        if: steps.changes.outputs.rust == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+            rust/services/gatekeeper/target
+          key: rust-gatekeeper-${{ runner.os }}-1.90-${{ hashFiles('rust/services/gatekeeper/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            rust-gatekeeper-${{ runner.os }}-1.90-${{ hashFiles('rust/services/gatekeeper/Cargo.lock') }}-
+
+      # Every library and integration test. The convergence:: library tests
+      # run in agent-convergence-proof.yml, on the same paths, and take minutes.
+      # Backend tests skip their Redis and MongoDB cases here; the next step
+      # runs those.
+      - name: Test library and integration targets
+        if: steps.changes.outputs.rust == 'true'
+        run: >-
+          cargo test --locked --manifest-path rust/services/gatekeeper/Cargo.toml
+          -j 2 -- --skip convergence::
+
+      # These reset their databases, so they run one at a time.
+      - name: Test Redis and MongoDB backends
+        if: steps.changes.outputs.rust == 'true'
+        env:
+          ARCHON_TEST_MONGODB_URL: mongodb://mongodb:27017
+          ARCHON_TEST_REDIS_URL: redis://redis:6379
+        run: >-
+          cargo test --locked --manifest-path rust/services/gatekeeper/Cargo.toml
+          -j 2 --test mongo_backend --test chain_reorg --test redis_compat -- --test-threads=1
