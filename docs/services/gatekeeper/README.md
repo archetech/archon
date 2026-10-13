@@ -1431,17 +1431,22 @@ including cursor iteration. The service runs on Tokio's multi-thread runtime;
 the synchronous store must not be invoked from a current-thread async runtime.
 This changes no collection schema.
 
-The `rust-mongodb-test` CI workflow runs the actual service against an isolated
-MongoDB 8.0 instance, covering startup, persistence/restart, queues, and chain
-receipt withdrawal/recovery. To run those checks locally, point
-`ARCHON_TEST_MONGODB_URL` at a disposable MongoDB instance and run:
+The `rust-gatekeeper-test` CI workflow runs every Rust Gatekeeper library and
+integration test except the `convergence::` library tests, which
+`agent-convergence-proof` runs. It then runs the actual service against isolated
+MongoDB 8.0 and Redis instances, covering startup, persistence/restart, queues,
+Redis compatibility with the TypeScript schema, and chain receipt
+withdrawal/recovery. To run those backend checks locally, point
+`ARCHON_TEST_MONGODB_URL` and `ARCHON_TEST_REDIS_URL` at disposable instances and
+run:
 
 ```sh
-cargo test --manifest-path rust/services/gatekeeper/Cargo.toml -j 2   --test mongo_backend --test chain_reorg -- --test-threads=1
+cargo test --manifest-path rust/services/gatekeeper/Cargo.toml -j 2 \
+  --test mongo_backend --test chain_reorg --test redis_compat -- --test-threads=1
 ```
 
 These tests use the `archon` database and include destructive reset operations;
-never point them at a production MongoDB server.
+never point them at a production MongoDB or Redis server.
 
 
 | Collection | Indexes |

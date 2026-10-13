@@ -1,0 +1,81 @@
+name: rust-gatekeeper-test
+
+on:
+  pull_request:
+    paths:
+      - 'rust/services/gatekeeper/**'
+      - 'tests/convergence/**'
+      - 'tests/fixtures/*.json'
+      - 'tests/gatekeeper/*.json'
+      - '.github/workflows/rust-gatekeeper-test.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'rust/services/gatekeeper/**'
+      - 'tests/convergence/**'
+      - 'tests/fixtures/*.json'
+      - 'tests/gatekeeper/*.json'
+      - '.github/workflows/rust-gatekeeper-test.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  test:
+    name: Rust Gatekeeper tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    container: rust:1.90-trixie
+    services:
+      mongodb:
+        image: mongo:8.0
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:8.0.4-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TOKIO_WORKER_THREADS: 2
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Cache Rust dependencies and test binaries
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            /usr/local/cargo/registry
+            /usr/local/cargo/git
+            rust/services/gatekeeper/target
+          key: rust-gatekeeper-${{ runner.os }}-1.90-${{ hashFiles('rust/services/gatekeeper/Cargo.lock') }}-${{ github.sha }}
+          restore-keys: |
+            rust-gatekeeper-${{ runner.os }}-1.90-${{ hashFiles('rust/services/gatekeeper/Cargo.lock') }}-
+
+      # Every library and integration test. The convergence:: library tests
+      # run in agent-convergence-proof.yml, on the same paths, and take minutes.
+      # Backend tests skip their Redis and MongoDB cases here; the next step
+      # runs those.
+      - name: Test library and integration targets
+        run: >-
+          cargo test --locked --manifest-path rust/services/gatekeeper/Cargo.toml
+          -j 2 -- --skip convergence::
+
+      # These reset their databases, so they run one at a time.
+      - name: Test Redis and MongoDB backends
+        env:
+          ARCHON_TEST_MONGODB_URL: mongodb://mongodb:27017
+          ARCHON_TEST_REDIS_URL: redis://redis:6379
+        run: >-
+          cargo test --locked --manifest-path rust/services/gatekeeper/Cargo.toml
+          -j 2 --test mongo_backend --test chain_reorg --test redis_compat -- --test-threads=1
