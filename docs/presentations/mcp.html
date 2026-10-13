@@ -457,8 +457,8 @@
   ];
   function s3(t) {
     heading(3, 'Every command is a tool', t);
-    T('160', 1080, 120, { f: DISP, s: 64, w: 800, c: C.cobalt, al: 'center', a: e(t, .4, 1) });
-    T('tools: archon_ + each Keymaster command', 1080, 150, { s: 14, c: C.soft, al: 'center', a: e(t, .6, 1.2) });
+    T('152', 1080, 120, { f: DISP, s: 64, w: 800, c: C.cobalt, al: 'center', a: e(t, .4, 1) });
+    T('tools: 149 Keymaster commands + 3 helpers', 1080, 150, { s: 14, c: C.soft, al: 'center', a: e(t, .6, 1.2) });
     GROUPS.forEach(([g, tools], i) => {
       const col = i % 2, row = Math.floor(i / 2);
       const x = 70 + col * 580, y = 190 + row * 92, a = e(t, 1.6 + i * .35, 2.2 + i * .35);
@@ -581,7 +581,7 @@
     heading(8, 'What stays where', t);
     const cols = [
       ['Your machine', ['the wallet and every private key', 'encrypted with the passphrase', 'set in the client’s config'], C.amber, 0],
-      ['The node', ['signed operations', 'public DID documents', 'nothing it could sign with'], C.ink, 4],
+      ['The node', ['signed operations', 'public DID documents', 'files and images you upload', 'vault and dmail ciphertext', 'nothing it could sign with'], C.ink, 4],
       ['The model', ['tool results it asked for', 'links, not floods, for big files', 'the recovery phrase only', 'with an explicit reveal: true'], C.cobalt, 8]
     ];
     cols.forEach(([title, lines, c, at], i) => {
@@ -596,7 +596,7 @@
   // ---------- scene 9: recap ----------
   const RECAP = [
     'a local MCP server with a full Keymaster inside',
-    'every Keymaster command as a tool, 160 in all',
+    'every Keymaster command as a tool, 152 in all',
     'a DID of the agent’s own, signed on your machine',
     'credentials that show who stands behind the agent',
     'an explicit yes before anything irreversible'
@@ -641,7 +641,7 @@
     [10, 16, 'The Archon MCP server runs on your own machine. Your AI client starts it and talks to it over stdio.'],
     [16, 22, 'Inside it is a full Keymaster, using the same encrypted wallet file as the Archon command line.'],
     [22, 28, 'It signs locally, and reaches an Archon node over HTTPS only to read and publish DIDs.'],
-    [28, 34, 'Every Keymaster command is an MCP tool, 160 in all: archon_ plus the command’s name.'],
+    [28, 34, 'Every Keymaster command is an MCP tool, named archon_ plus the command: 149 of them, plus 3 helpers.'],
     [34, 39, 'Identities, credentials, names, assets, vaults, polls, dmail, DIDComm and Lightning are all there.'],
     [39, 44, 'Tools that take an object declare its real shape, so a malformed call is rejected before it runs.'],
     [44, 50, 'Asked to set itself up, the agent calls archon_create_id with a name.'],
@@ -658,7 +658,7 @@
     [110, 115, 'Paying a Lightning invoice or zapping a DID needs confirmPayment: true.'],
     [115, 120, 'A read-only mode hides every tool that writes, and error messages are scrubbed of passphrases and keys.'],
     [120, 126, 'The wallet and its keys stay on your machine, encrypted with the passphrase set in the client’s config.'],
-    [126, 132, 'The node sees signed operations and public DID documents, nothing it could sign with.'],
+    [126, 132, 'The node sees signed operations, public DID documents, uploaded files and images, and ciphertext. Nothing it could sign with.'],
     [132, 140, 'The model sees the tool results it asked for. Without the passphrase, only the node status tools work.'],
     [140, 147, 'A DID for the agent, credentials that show who stands behind it, and a tool for everything Keymaster does.'],
     [147, 154, 'With the keys on your machine, and an explicit yes before anything irreversible.']
@@ -739,7 +739,7 @@
   cv.addEventListener('click', () => setPlaying(!playing));
   seek.addEventListener('input', () => { t = parseFloat(seek.value); sync(); });
   player.addEventListener('keydown', ev => {
-    if (ev.target === seek) return;
+    if (ev.target !== player) return;
     if (ev.key === ' ' || ev.key === 'k') { ev.preventDefault(); setPlaying(!playing); }
     else if (ev.key === 'ArrowRight') { ev.preventDefault(); t = Math.min(TOTAL, t + 5); sync(); }
     else if (ev.key === 'ArrowLeft') { ev.preventDefault(); t = Math.max(0, t - 5); sync(); }
