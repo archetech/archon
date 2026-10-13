@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>An Identity for Your Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #e8ecf1;
+    --panel: #f6f8fb;
+    --ink: #141d2b;
+    --soft: #5b6879;
+    --line: #c6cfdb;
+    --cobalt: #2a4fc4;
+    --amber: #c97a12;
+    --bar: #141d2b;
+    --bar-text: #e8ecf1;
+    --bar-soft: #9aa6b8;
+  }
+  html, body { background: var(--paper); color: var(--ink); }
+  body { margin: 0; font: 15px/1.55 "IBM Plex Sans", system-ui, sans-serif; padding-inline: 16px; padding-block: 28px 48px; }
+  .wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+  header h1 { font: 800 clamp(30px, 5vw, 46px)/1.05 "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif; margin: 0; letter-spacing: -0.5px; text-wrap: balance; }
+  header p { margin: 8px 0 0; color: var(--soft); max-width: 62ch; }
+  header .eyebrow { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 1.5px; text-transform: uppercase; color: var(--cobalt); margin: 0 0 8px; }
+
+  .player { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--bar); box-shadow: 0 18px 50px -24px rgba(20, 29, 43, .45); outline: none; }
+  .player:focus-visible { box-shadow: 0 0 0 3px var(--cobalt); }
+  .player:fullscreen { display: flex; flex-direction: column; justify-content: center; border-radius: 0; }
+  .player:fullscreen .stage { max-height: calc(100vh - 120px); aspect-ratio: 16 / 9; margin: 0 auto; width: min(100%, calc((100vh - 120px) * 16 / 9)); }
+  .stage { position: relative; aspect-ratio: 16 / 9; max-width: 100%; background: var(--paper); }
+  canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+  .bigplay { position: absolute; inset: 0; margin: auto; width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--ink); color: var(--paper); display: grid; place-items: center; cursor: pointer; box-shadow: 0 10px 30px -8px rgba(20, 29, 43, .6); }
+  .bigplay[hidden] { display: none; }
+  .bigplay svg { width: 30px; height: 30px; margin-left: 4px; }
+  .bigplay:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 3px; }
+
+  .caption { min-height: 3.4em; padding: 12px 20px; color: var(--bar-text); font-size: clamp(14px, 1.9vw, 18px); line-height: 1.45; display: flex; align-items: center; justify-content: center; text-align: center; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+  .caption span { max-width: 70ch; transition: opacity .25s; }
+
+  .controls { display: flex; align-items: center; gap: 14px; padding: 10px 16px 14px; color: var(--bar-text); }
+  .controls button { background: none; border: 0; color: inherit; width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; flex: none; }
+  .controls button:hover { background: rgba(255, 255, 255, .08); }
+  .controls button:focus-visible { outline: 2px solid #8ea6ff; }
+  .controls svg { width: 20px; height: 20px; }
+  .time { font: 500 13px "IBM Plex Mono", ui-monospace, monospace; color: var(--bar-soft); font-variant-numeric: tabular-nums; flex: none; }
+  .seek { position: relative; flex: 1; min-width: 0; height: 36px; display: flex; align-items: center; }
+  .seek input { width: 100%; margin: 0; appearance: none; -webkit-appearance: none; background: transparent; height: 36px; cursor: pointer; position: relative; z-index: 2; }
+  .seek input::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; margin-top: -5px; border: 0; }
+  .seek input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 0; }
+  .seek input:focus-visible { outline: 2px solid #8ea6ff; border-radius: 4px; }
+  .ticks { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+  .ticks i { position: absolute; top: 15px; width: 2px; height: 6px; background: var(--bar); }
+
+  .chapters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .chapters button { width: 100%; text-align: left; display: flex; gap: 10px; align-items: baseline; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
+  .chapters button:hover { border-color: var(--cobalt); }
+  .chapters button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  .chapters button[aria-current="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .chapters .n { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--cobalt); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .n { color: #8ea6ff; }
+  .chapters .t { font-weight: 600; flex: 1; }
+  .chapters .d { font: 400 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--soft); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .d { color: var(--bar-soft); }
+
+  details { border-top: 1px solid var(--line); padding-top: 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .transcript { max-width: 70ch; }
+  .transcript h3 { font: 700 17px "Bricolage Grotesque", system-ui, sans-serif; margin: 18px 0 4px; }
+  .transcript p { margin: 0 0 6px; color: var(--soft); }
+
+  @media (max-width: 560px) {
+    .controls { gap: 8px; padding-inline: 10px; }
+    .time { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">did:cid · mcp · three minutes</p>
+    <h1>An Identity for Your Agent</h1>
+    <p>An animated walkthrough of Archon for AI agents: the local MCP server and its in-process Keymaster, every Keymaster command as a tool, an agent creating its own DID, a credential that shows who stands behind it, results sized for a model’s context, the explicit confirmations that guard secrets and payments, and what stays on your machine. Everything on screen is drawn live with canvas code.</p>
+  </header>
+
+  <div class="player" id="player" tabindex="0" aria-label="Animation player. Space plays or pauses, arrow keys skip.">
+    <div class="stage">
+      <canvas id="cv" role="img" aria-label="Animated diagram of how AI agents use Archon through the MCP server. The caption below describes each scene."></canvas>
+      <button class="bigplay" id="bigplay" aria-label="Play animation" hidden>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+      </button>
+    </div>
+    <div class="caption"><span id="cap"></span></div>
+    <div class="controls">
+      <button id="pp" aria-label="Play"></button>
+      <div class="seek">
+        <input type="range" id="seek" min="0" max="154" step="0.05" value="0" aria-label="Seek">
+        <div class="ticks" id="ticks"></div>
+      </div>
+      <span class="time" id="time">0:00 / 2:34</span>
+      <button id="fs" aria-label="Full screen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <ol class="chapters" id="chapters"></ol>
+
+  <details>
+    <summary>Transcript</summary>
+    <div class="transcript" id="transcript"></div>
+  </details>
+</div>
+
+<script>
+(() => {
+  // ---------- palette & type ----------
+  const W = 1280, H = 720, TOTAL = 154;
+  const C = {
+    paper: '#e8ecf1', grid: '#dbe1e9', gridB: '#c6cfdb', panel: '#f6f8fb',
+    ink: '#141d2b', soft: '#5b6879', faint: '#8c98a8',
+    cobalt: '#2a4fc4', cobaltL: '#dde5fb',
+    amber: '#c97a12', amberL: '#fbecd3',
+    green: '#23835a', greenL: '#d6eee2',
+    red: '#c03b28', redL: '#f8dcd6'
+  };
+  const DISP = '"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif';
+  const SANS = '"IBM Plex Sans", system-ui, sans-serif';
+  const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
+
+  // ---------- math ----------
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const p = (t, a, b) => clamp((t - a) / (b - a));
+  const e = (t, a, b) => ease(p(t, a, b));
+  const rnd = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+  const hx = c => { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  const mix = (a, b, t) => { const A = hx(a), B = hx(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], clamp(t)))).join(',')})`; };
+  const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
+  const scram = (s, pr, t, seed) => {
+    const k = Math.floor(pr * s.length); let out = '';
+    for (let i = 0; i < s.length; i++) out += i < k ? s[i] : B32[Math.floor(rnd(seed * 97 + i * 13 + Math.floor(t * 18)) * 32)];
+    return out;
+  };
+
+  // ---------- canvas ----------
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  let scale = 1;
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    const d = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.max(1, Math.round(r.width * d));
+    cv.height = Math.max(1, Math.round(r.width * 9 / 16 * d));
+    scale = cv.width / W;
+    render();
+  }
+
+  // ---------- drawing primitives ----------
+  function T(s, x, y, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.font = `${o.w || 400} ${o.s || 16}px ${o.f || SANS}`;
+    ctx.fillStyle = o.c || C.ink; ctx.textAlign = o.al || 'left'; ctx.textBaseline = o.b || 'alphabetic';
+    if (o.ls) ctx.letterSpacing = o.ls + 'px';
+    ctx.fillText(s, x, y); ctx.restore();
+  }
+  function tw(s, size, font = SANS, weight = 400) { ctx.save(); ctx.font = `${weight} ${size}px ${font}`; const w = ctx.measureText(s).width; ctx.restore(); return w; }
+  function box(x, y, w, h, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, o.r ?? 10);
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 1.5; if (o.dash) ctx.setLineDash(o.dash); ctx.stroke(); }
+    ctx.restore();
+  }
+  const cbox = (cx, cy, w, h, o) => box(cx - w / 2, cy - h / 2, w, h, o);
+  function pop(cx, cy, pr, fn) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.globalAlpha *= pr;
+    const s = lerp(.88, 1, pr);
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+    fn(); ctx.restore();
+  }
+  function arrowHead(x, y, a, c, s) {
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.lineTo(x - s * Math.cos(a - .45), y - s * Math.sin(a - .45));
+    ctx.lineTo(x - s * Math.cos(a + .45), y - s * Math.sin(a + .45));
+    ctx.closePath(); ctx.fillStyle = c; ctx.fill();
+  }
+  function arrow(x1, y1, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, x = lerp(x1, x2, pr), y = lerp(y1, y2, pr);
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(x, y, Math.atan2(y2 - y1, x2 - x1), c, o.hs || 10);
+    ctx.restore();
+  }
+  const qpt = (x1, y1, cx, cy, x2, y2, t) => { const u = 1 - t; return [u * u * x1 + 2 * u * t * cx + t * t * x2, u * u * y1 + 2 * u * t * cy + t * t * y2]; };
+  function qarrow(x1, y1, cx, cy, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, N = 36;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1);
+    let prev = [x1, y1], cur = prev;
+    for (let i = 1; i <= N; i++) { const tt = pr * i / N; prev = cur; cur = qpt(x1, y1, cx, cy, x2, y2, tt); ctx.lineTo(cur[0], cur[1]); }
+    ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(cur[0], cur[1], Math.atan2(cur[1] - prev[1], cur[0] - prev[0]), c, o.hs || 10);
+    ctx.restore();
+  }
+  function dot(x, y, r, c, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill(); ctx.restore(); }
+  function packet(x1, y1, x2, y2, pr, c, r = 6) { if (pr <= 0 || pr >= 1) return; dot(lerp(x1, x2, pr), lerp(y1, y2, pr), r, c); }
+  function check(x, y, s, pr, c = C.green) {
+    if (pr <= 0) return;
+    const a = [x - s * .5, y], b = [x - s * .12, y + s * .38], d = [x + s * .55, y - s * .42];
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]);
+    const p1 = clamp(pr / .35); ctx.lineTo(lerp(a[0], b[0], p1), lerp(a[1], b[1], p1));
+    if (pr > .35) { const p2 = clamp((pr - .35) / .65); ctx.lineTo(lerp(b[0], d[0], p2), lerp(b[1], d[1], p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function cross(x, y, s, pr, c = C.red) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .22; ctx.lineCap = 'round';
+    const p1 = clamp(pr / .5), p2 = clamp((pr - .5) / .5);
+    ctx.beginPath(); ctx.moveTo(x - s / 2, y - s / 2); ctx.lineTo(lerp(x - s / 2, x + s / 2, p1), lerp(y - s / 2, y + s / 2, p1));
+    if (p2 > 0) { ctx.moveTo(x + s / 2, y - s / 2); ctx.lineTo(lerp(x + s / 2, x - s / 2, p2), lerp(y - s / 2, y + s / 2, p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function person(x, y, s, c) {
+    ctx.save(); ctx.fillStyle = c;
+    ctx.beginPath(); ctx.arc(x, y - s * .28, s * .2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y + s * .4, s * .36, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function keyIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .14; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y, s * .3, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + s * .3, y); ctx.lineTo(x + s * 1.05, y);
+    ctx.moveTo(x + s * .75, y); ctx.lineTo(x + s * .75, y + s * .24);
+    ctx.moveTo(x + s * .98, y); ctx.lineTo(x + s * .98, y + s * .2);
+    ctx.stroke(); ctx.restore();
+  }
+  function lockIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = s * .13;
+    ctx.beginPath(); ctx.arc(x, y - s * .08, s * .26, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(x - s * .42, y - s * .1, s * .84, s * .6, s * .1); ctx.fill();
+    ctx.restore();
+  }
+  function db(x, y, w, h, c) {
+    const rx = w / 2, ry = h * .15, top = y - h / 2, bot = y + h / 2;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.fillStyle = C.panel;
+    ctx.beginPath(); ctx.moveTo(x - rx, top + ry); ctx.lineTo(x - rx, bot - ry);
+    ctx.ellipse(x, bot - ry, rx, ry, 0, Math.PI, 0, true);
+    ctx.lineTo(x + rx, top + ry); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI, true);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI); ctx.stroke();
+    ctx.restore();
+  }
+  function hexagon(x, y, r, rot, o = {}) {
+    ctx.save(); ctx.beginPath();
+    for (let i = 0; i < 6; i++) { const a = rot + i * Math.PI / 3; const px = x + r * Math.cos(a), py = y + r * Math.sin(a); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.closePath();
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 2; ctx.stroke(); }
+    ctx.restore();
+  }
+  function pill(cx, cy, text, o = {}) {
+    const s = o.s || 15, pad = o.pad || 14, w = tw(text, s, o.f || SANS, o.w || 600) + pad * 2, h = s + 16;
+    pop(cx, cy, o.pr ?? 1, () => {
+      cbox(cx, cy, w, h, { fill: o.bg || C.panel, stroke: o.stroke || C.gridB, r: h / 2 });
+      T(text, cx, cy + 1, { s, w: o.w || 600, f: o.f || SANS, c: o.c || C.ink, al: 'center', b: 'middle' });
+    });
+  }
+  function codeLine(s, x, y, n, fs) {
+    const re = /("(?:[^"\\]|\\.)*"\s*:)|("(?:[^"\\]|\\.)*")|([{}\[\],])|(\b\d+\b)|([^"{}\[\],]+?(?=["{}\[\],]|\b\d+\b|$))/g;
+    ctx.save(); ctx.font = `400 ${fs}px ${MONO}`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    let m, cx = x, used = 0;
+    while ((m = re.exec(s)) && used < n) {
+      if (!m[0]) { re.lastIndex++; continue; }
+      const tok = m[0];
+      ctx.fillStyle = m[1] ? C.soft : m[2] ? C.cobalt : m[3] ? C.faint : m[4] ? C.amber : C.ink;
+      const show = tok.slice(0, n - used); used += tok.length;
+      ctx.fillText(show, cx, y); cx += ctx.measureText(show).width;
+    }
+    ctx.restore();
+  }
+  function card(x, y, w, title, lines, pr, o = {}) {
+    const fs = o.fs || 14, lh = o.lh || 22, top = 30 + 24;
+    const h = top + (lines.length - 1) * lh + 18;
+    const ly = i => y + top + i * lh;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    box(x, y, w, h, { fill: C.panel, stroke: C.gridB, r: 12 });
+    ctx.beginPath(); ctx.roundRect(x, y, w, 30, [12, 12, 0, 0]); ctx.fillStyle = o.hc || C.ink; ctx.fill();
+    T(title.toUpperCase(), x + 16, y + 20, { f: MONO, s: 12, w: 500, c: C.paper, ls: 1.2 });
+    let n = Math.floor(pr * lines.reduce((a, l) => a + l.length, 0));
+    lines.forEach((l, i) => {
+      const hl = o.hl && o.hl[i];
+      if (hl && hl[1] > 0) { ctx.save(); ctx.globalAlpha *= hl[1]; ctx.fillStyle = hl[0]; ctx.fillRect(x + 6, ly(i) - fs - 2, w - 12, lh); ctx.restore(); }
+      if (n > 0) { codeLine(l, x + 16, ly(i), n, fs); n -= l.length; }
+    });
+    ctx.restore();
+    return { h, ly };
+  }
+
+  // ---------- ambient network ----------
+  const NET = Array.from({ length: 46 }, (_, i) => ({ x: rnd(i * 3 + 1) * W, y: rnd(i * 3 + 2) * H, ph: rnd(i * 3 + 3) * 6.28 }));
+  function network(t, a) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    const P = NET.map(q => [q.x + Math.sin(t * .3 + q.ph) * 16, q.y + Math.cos(t * .25 + q.ph) * 12]);
+    ctx.lineWidth = 1;
+    for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+      const d = Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1]);
+      if (d < 175) { ctx.strokeStyle = `rgba(90,110,140,${(1 - d / 175) * .45})`; ctx.beginPath(); ctx.moveTo(P[i][0], P[i][1]); ctx.lineTo(P[j][0], P[j][1]); ctx.stroke(); }
+    }
+    P.forEach((q, i) => dot(q[0], q[1], i % 7 === 0 ? 4 : 2.5, i % 7 === 0 ? C.cobalt : C.faint, .8));
+    ctx.restore();
+  }
+
+  function background() {
+    ctx.fillStyle = C.paper; ctx.fillRect(0, 0, W, H);
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 40) { ctx.strokeStyle = x % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = x % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += 40) { ctx.strokeStyle = y % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = y % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+
+  function heading(n, title, t) {
+    const a = e(t, 0, .8);
+    T(`${String(n).padStart(2, '0')} / 09`, 56, 58, { f: MONO, s: 13, w: 500, c: C.cobalt, a, ls: 1.5 });
+    T(title, 56 + lerp(-12, 0, a), 94, { f: DISP, s: 32, w: 700, a });
+  }
+
+  // ---------- shared pieces ----------
+  function actor(x, y, name, role, c, a = 1, s = 56) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    T(role.toUpperCase(), x, y - s * .95, { f: MONO, s: 12, w: 500, c: C.soft, al: 'center', ls: 1.2 });
+    person(x, y, s, c);
+    T(name, x, y + s * 1.05, { s: 17, w: 600, al: 'center' });
+    ctx.restore();
+  }
+  function svc(cx, cy, w, title, sub, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    cbox(cx, cy, w, o.h || 70, { fill: o.fill || C.panel, stroke: o.stroke || C.ink, lw: 2, r: 12 });
+    T(title, cx, cy - 4, { f: DISP, s: 19, w: 700, al: 'center', c: o.c || C.ink });
+    T(sub, cx, cy + 18, { s: 12, c: o.sc || C.soft, al: 'center' });
+    ctx.restore();
+  }
+  // A robot head for the AI agent.
+  function bot(cx, cy, s, c, a = 1) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.strokeStyle = c; ctx.lineWidth = s * .07; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(cx, cy - s * .42); ctx.lineTo(cx, cy - s * .58); ctx.stroke();
+    dot(cx, cy - s * .62, s * .07, c);
+    cbox(cx, cy, s * .9, s * .72, { fill: C.panel, stroke: c, lw: s * .07, r: s * .16 });
+    dot(cx - s * .2, cy - s * .04, s * .08, c); dot(cx + s * .2, cy - s * .04, s * .08, c);
+    ctx.beginPath(); ctx.moveTo(cx - s * .16, cy + s * .18); ctx.lineTo(cx + s * .16, cy + s * .18); ctx.stroke();
+    ctx.restore();
+  }
+  function agentActor(x, y, name, role, c, a = 1, s = 60) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    T(role.toUpperCase(), x, y - s * .95, { f: MONO, s: 12, w: 500, c: C.soft, al: 'center', ls: 1.2 });
+    bot(x, y, s, c);
+    T(name, x, y + s * .95, { s: 17, w: 600, al: 'center' });
+    ctx.restore();
+  }
+  function toolCall(cx, cy, name, o = {}) {
+    pill(cx, cy, name, { pr: o.pr ?? 1, f: MONO, s: o.s || 14, w: 500, c: o.c || C.cobalt, bg: o.bg || C.cobaltL, stroke: o.stroke || C.cobalt });
+  }
+
+  // ---------- scene 1: title ----------
+  function s1(t) {
+    network(t, .55);
+    const g = ctx.createRadialGradient(640, 330, 40, 640, 330, 540);
+    g.addColorStop(0, 'rgba(232,236,241,0.97)'); g.addColorStop(1, 'rgba(232,236,241,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const sc = lerp(.97, 1, e(t, 0, 2.5));
+    ctx.save(); ctx.translate(640, 270); ctx.scale(sc, sc);
+    T('An Identity for Your Agent', 0, 0, { f: DISP, s: 84, w: 800, al: 'center', b: 'middle', ls: -2 });
+    ctx.restore();
+    T('How AI agents use Archon through the MCP server', 640, 360, { s: 25, c: C.soft, al: 'center', a: e(t, .8, 2.3) });
+    bot(640, 446, 64, C.cobalt, e(t, 2.2, 3));
+    [['A DID of its own', 335], ['Credentials that show who stands behind it', 583], ['A yes before anything irreversible', 888]].forEach(([s, x], i) =>
+      pill(x, 540, s, { pr: e(t, 4.4 + i * .4, 5 + i * .4), s: 14, c: C.soft }));
+  }
+
+  // ---------- scene 2: the MCP server ----------
+  const CONFIG = [
+    '"archon": {',
+    '  "command": "npx",',
+    '  "args": ["-y", "@didcid/mcp-server"],',
+    '  "env": {',
+    '    "ARCHON_NODE_URL": "https://archon.technology",',
+    '    "ARCHON_WALLET_PATH": "~/.archon/wallet.json",',
+    '    "ARCHON_PASSPHRASE": "…"',
+    '  }',
+    '}'
+  ];
+  function s2(t) {
+    heading(2, 'The MCP server', t);
+    // the machine
+    const ma = e(t, 0, .8);
+    box(60, 140, 780, 300, { fill: 'rgba(246,248,251,0.6)', stroke: C.gridB, lw: 2, r: 16, dash: [6, 6], a: ma });
+    T('YOUR MACHINE', 84, 168, { f: MONO, s: 12, w: 500, c: C.soft, ls: 1.2, a: ma });
+    svc(190, 280, 200, 'AI client', 'any MCP host', { a: e(t, .6, 1.2) });
+    bot(190, 210, 40, C.cobalt, e(t, .6, 1.2));
+    svc(520, 280, 260, 'Archon MCP server', '@didcid/mcp-server', { a: e(t, 1.2, 1.8), stroke: C.cobalt });
+    arrow(292, 270, 388, 270, e(t, 2, 2.6), { c: C.cobalt, hs: 8 });
+    arrow(388, 292, 292, 292, e(t, 2.4, 3), { c: C.cobalt, hs: 8 });
+    T('stdio', 340, 316, { f: MONO, s: 12, w: 500, c: C.cobalt, al: 'center', a: e(t, 2.6, 3.2) });
+    // keymaster + wallet inside
+    const ka = e(t, 6, 6.8);
+    if (ka > 0) {
+      ctx.save(); ctx.globalAlpha *= ka;
+      box(410, 340, 220, 80, { fill: C.panel, stroke: C.ink, r: 10 });
+      T('Keymaster, in process', 520, 368, { s: 14, w: 600, al: 'center' });
+      lockIcon(470, 396, 18, C.amber);
+      T('wallet.json', 530, 401, { f: MONO, s: 13, w: 500, al: 'center' });
+      ctx.restore();
+    }
+    T('the same wallet as the archon CLI', 520, 438, { s: 13, c: C.soft, al: 'center', a: e(t, 7.6, 8.2) });
+    // node
+    svc(1060, 280, 260, 'Archon node', 'Gatekeeper / Drawbridge', { a: e(t, 12, 12.6) });
+    arrow(652, 280, 928, 280, e(t, 12.6, 13.6), { c: C.ink, hs: 8 });
+    T('HTTPS: read and publish DIDs', 790, 266, { s: 13, w: 600, al: 'center', a: e(t, 13.2, 13.8) });
+    T('signing happens here, never there', 520, 172, { s: 13, w: 600, c: C.amber, al: 'center', a: e(t, 14.4, 15) });
+    card(60, 470, 620, 'mcp client config', CONFIG, p(t, 3.6, 7), { a: e(t, 3.2, 3.8), fs: 13, lh: 18, hc: C.ink });
+  }
+
+  // ---------- scene 3: every command is a tool ----------
+  const GROUPS = [
+    ['Wallet and IDs', 'create_id · rotate_keys · backup_wallet_did'],
+    ['Credentials', 'issue_credential · accept_credential · create_response'],
+    ['Names and aliases', 'add_address · publish_address · add_alias'],
+    ['Assets', 'create_asset_file · transfer_asset · clone_asset'],
+    ['Groups, vaults, polls', 'create_vault · add_vault_item · vote_poll'],
+    ['Messaging', 'create_dmail · send_dmail · send_didcomm'],
+    ['Lightning', 'lightning_invoice · lightning_pay · lightning_zap'],
+    ['Signing', 'sign_file · verify_file · encrypt_message']
+  ];
+  function s3(t) {
+    heading(3, 'Every command is a tool', t);
+    T('152', 1080, 120, { f: DISP, s: 64, w: 800, c: C.cobalt, al: 'center', a: e(t, .4, 1) });
+    T('tools: 149 Keymaster commands + 3 helpers', 1080, 150, { s: 14, c: C.soft, al: 'center', a: e(t, .6, 1.2) });
+    GROUPS.forEach(([g, tools], i) => {
+      const col = i % 2, row = Math.floor(i / 2);
+      const x = 70 + col * 580, y = 190 + row * 92, a = e(t, 1.6 + i * .35, 2.2 + i * .35);
+      box(x, y, 560, 76, { fill: C.panel, stroke: C.gridB, r: 12, a });
+      T(g, x + 20, y + 30, { s: 17, w: 600, a });
+      T('archon_' + tools.split(' · ').join(' · archon_'), x + 20, y + 56, { f: MONO, s: 12, w: 500, c: C.cobalt, a });
+    });
+    pill(640, 580, 'tools that take an object declare its real shape: bad input is rejected before it runs', { pr: e(t, 11.6, 12.2), s: 14, c: C.ink });
+  }
+
+  // ---------- scene 4: the agent gets a DID ----------
+  function s4(t) {
+    heading(4, 'The agent gets a DID', t);
+    agentActor(130, 300, 'Assistant', 'AI agent', C.cobalt, e(t, 0, .6));
+    toolCall(390, 230, 'archon_create_id { name: "assistant" }', { pr: e(t, .8, 1.4), s: 14 });
+    arrow(190, 280, 250, 246, e(t, .8, 1.4), { c: C.cobalt, hs: 8 });
+    // the wallet derives keys
+    const wa = e(t, 3, 3.8);
+    if (wa > 0) {
+      ctx.save(); ctx.globalAlpha *= wa;
+      box(250, 310, 360, 150, { fill: C.panel, stroke: C.ink, lw: 2, r: 12 });
+      T('LOCAL WALLET', 270, 338, { f: MONO, s: 11, w: 500, c: C.soft, ls: 1.1 });
+      T('recovery phrase', 270, 372, { s: 15, w: 600 });
+      arrow(400, 366, 452, 366, e(t, 4, 4.6), { c: C.ink, hs: 7 });
+      keyIcon(474, 366, 20, C.amber);
+      T('new key pair', 506, 372, { s: 15, w: 600, a: e(t, 4.4, 5) });
+      T('signs the create operation, here', 270, 430, { s: 14, c: C.soft, a: e(t, 5, 5.6) });
+      ctx.restore();
+    }
+    // out to the node
+    svc(1010, 380, 240, 'Archon node', 'receives the signed operation', { a: e(t, 6, 6.6) });
+    const fl = p(t, 6.6, 8);
+    if (fl > 0 && fl < 1) { const [px, py] = qpt(612, 400, 760, 330, 888, 380, ease(fl)); dot(px, py, 8, C.amber); }
+    arrow(612, 400, 886, 380, e(t, 6.6, 8), { c: C.faint, hs: 8, dash: [5, 6] });
+    T('only the signed operation leaves the machine', 760, 474, { s: 14, w: 600, c: C.amber, al: 'center', a: e(t, 8, 8.6) });
+    pill(640, 560, 'did:cid:bagaaiera…a9en7', { pr: e(t, 11, 11.6), f: MONO, s: 18, w: 500, c: C.cobalt, bg: C.cobaltL, stroke: C.cobalt });
+    T('it can sign, encrypt and be recognized', 640, 610, { s: 15, c: C.soft, al: 'center', a: e(t, 12, 12.6) });
+  }
+
+  // ---------- scene 5: who stands behind it ----------
+  const CRED = [
+    '"issuer": "did:cid:…a11ce",',
+    '"credentialSubject": {',
+    '  "id": "did:cid:…a9en7",',
+    '  "actsFor": "Alice",',
+    '  "may": "order office supplies"',
+    '}'
+  ];
+  function s5(t) {
+    heading(5, 'Who stands behind it', t);
+    T('A DID alone is just a key. What matters is who authorized it.', 640, 150, { s: 18, w: 600, al: 'center', a: e(t, .4, 1) });
+    actor(120, 300, 'Alice', 'Person', C.amber, e(t, 1.6, 2.2), 50);
+    agentActor(560, 300, 'Assistant', 'Agent', C.cobalt, e(t, 1.8, 2.4), 58);
+    svc(1060, 300, 220, 'Supplier', 'any site or service', { a: e(t, 2, 2.6) });
+    card(110, 436, 420, 'credential', CRED, p(t, 6.4, 9), { a: e(t, 6, 6.6), fs: 14, lh: 22, hc: C.amber });
+    toolCall(320, 250, 'archon_issue_credential', { pr: e(t, 6, 6.6), s: 13, c: C.amber, bg: C.amberL, stroke: C.amber });
+    arrow(176, 300, 496, 300, e(t, 7, 8), { c: C.amber, hs: 9 });
+    toolCall(560, 404, 'archon_accept_credential', { pr: e(t, 9.4, 10), s: 13 });
+    // challenge / response
+    msg(940, 640, 240, 'challenge: show who you act for', e(t, 12, 13.2), C.ink);
+    toolCall(790, 294, 'archon_create_response', { pr: e(t, 13.6, 14.2), s: 13 });
+    msg(640, 940, 350, 'response: the credential, signed', e(t, 14.6, 15.8), C.cobalt);
+    const va = e(t, 16.4, 17);
+    check(1000, 430, 18, va);
+    T('issued by Alice, held by this agent', 1060, 470, { s: 14, w: 600, al: 'center', a: va });
+    T('see Proving What You Hold', 1060, 494, { s: 13, c: C.soft, al: 'center', a: e(t, 17, 17.6) });
+  }
+  function msg(x1, x2, y, label, pr, c = C.ink) {
+    if (pr <= 0) return;
+    arrow(x1, y, x2, y, pr, { c, hs: 9 });
+    T(label, (x1 + x2) / 2, y - 10, { f: MONO, s: 13, w: 500, c, al: 'center', a: clamp(pr * 2 - 1) });
+  }
+
+  // ---------- scene 6: working with content ----------
+  function s6(t) {
+    heading(6, 'Results the model can use', t);
+    const rows = [
+      ['JSON', 'text, plus structuredContent', 'archon_resolve_did', 1],
+      ['an image', 'an image block the model can see', 'archon_get_asset_image', 3],
+      ['a small file', 'embedded as a resource', 'archon_get_asset_file', 5],
+      ['a file over 16 KiB', 'a resource_link: its DID, not base64', 'archon_get_asset_file', 7]
+    ];
+    rows.forEach(([what, how, tool, at], i) => {
+      const y = 180 + i * 86, a = e(t, at, at + .6);
+      box(70, y - 34, 1140, 72, { fill: C.panel, stroke: i === 3 ? C.cobalt : C.gridB, lw: i === 3 ? 2 : 1.5, r: 12, a });
+      T(what, 96, y + 8, { s: 18, w: 600, a });
+      T(how, 330, y + 8, { s: 16, c: C.soft, a });
+      T(tool, 1184, y + 8, { f: MONO, s: 13, w: 500, c: C.cobalt, al: 'right', a });
+    });
+    T('base64 costs about one token per three bytes: a 1 MB file would be ~350k tokens', 640, 538, { s: 15, w: 600, c: C.amber, al: 'center', a: e(t, 9, 9.6) });
+    pill(400, 600, 'any asset DID is an MCP resource, read on demand', { pr: e(t, 12.4, 13), s: 14, c: C.ink });
+    pill(900, 600, 'resources/list is empty: nothing disclosed unasked', { pr: e(t, 14, 14.6), s: 14, c: C.ink });
+  }
+
+  // ---------- scene 7: guardrails ----------
+  const GATES = [
+    ['confirm: true', 'destructive tools', 'archon_remove_id · archon_rotate_keys · archon_new_wallet', 2],
+    ['reveal: true', 'tools that show secrets', 'archon_show_mnemonic · archon_reveal_credential', 4.4],
+    ['confirmPayment: true', 'paying with Lightning', 'archon_lightning_pay · archon_lightning_zap', 6.8]
+  ];
+  function s7(t) {
+    heading(7, 'An explicit yes', t);
+    T('Some tools refuse to run unless the call itself says yes.', 640, 152, { s: 18, w: 600, al: 'center', a: e(t, .4, 1) });
+    GATES.forEach(([flag, what, tools, at], i) => {
+      const y = 220 + i * 100, a = e(t, at, at + .6);
+      box(70, y - 36, 1140, 84, { fill: C.panel, stroke: C.gridB, r: 12, a });
+      lockIcon(108, y + 4, 24, C.amber);
+      if (a > 0) { ctx.save(); ctx.globalAlpha *= a; ctx.restore(); }
+      T(flag, 140, y, { f: MONO, s: 18, w: 500, c: C.amber, a });
+      T(what, 140, y + 26, { s: 14, c: C.soft, a });
+      T(tools, 1184, y + 12, { f: MONO, s: 13, w: 500, c: C.cobalt, al: 'right', a });
+    });
+    pill(370, 560, 'ARCHON_MCP_READ_ONLY=true hides every tool that writes', { pr: e(t, 12, 12.6), s: 14, c: C.ink });
+    pill(920, 560, 'errors are scrubbed of passphrases, phrases and keys', { pr: e(t, 14.4, 15), s: 14, c: C.ink });
+    T('Failures come back as tool errors the agent can read.', 640, 620, { s: 14, c: C.soft, al: 'center', a: e(t, 17, 17.6) });
+  }
+
+  // ---------- scene 8: what stays where ----------
+  function s8(t) {
+    heading(8, 'What stays where', t);
+    const cols = [
+      ['Your machine', ['the wallet and every private key', 'encrypted with the passphrase', 'set in the client’s config'], C.amber, 0],
+      ['The node', ['signed operations', 'public DID documents', 'files and images you upload', 'vault and dmail ciphertext', 'nothing it could sign with'], C.ink, 4],
+      ['The model', ['tool results it asked for', 'links, not floods, for big files', 'the recovery phrase only', 'with an explicit reveal: true'], C.cobalt, 8]
+    ];
+    cols.forEach(([title, lines, c, at], i) => {
+      const x = 70 + i * 386, a = e(t, at, at + .8);
+      box(x, 150, 360, 340, { fill: C.panel, stroke: c, lw: 2, r: 14, a });
+      T(title, x + 24, 192, { f: DISP, s: 22, w: 700, c, a });
+      lines.forEach((l, j) => T(l, x + 24, 240 + j * 34, { s: 16, w: j === 0 ? 600 : 400, c: j === 0 ? C.ink : C.soft, a: e(t, at + .6 + j * .3, at + 1.2 + j * .3) }));
+    });
+    T('Without ARCHON_PASSPHRASE, only the node status tools work.', 640, 560, { s: 16, w: 600, al: 'center', a: e(t, 13, 13.6) });
+  }
+
+  // ---------- scene 9: recap ----------
+  const RECAP = [
+    'a local MCP server with a full Keymaster inside',
+    'every Keymaster command as a tool, 152 in all',
+    'a DID of the agent’s own, signed on your machine',
+    'credentials that show who stands behind the agent',
+    'an explicit yes before anything irreversible'
+  ];
+  function s9(t) {
+    const out = e(t, 7.6, 8.6);
+    ctx.save(); ctx.globalAlpha *= 1 - out;
+    heading(9, 'Recap', t);
+    T('Archon for AI agents', 110, 190, { f: DISP, s: 38, w: 800, a: e(t, .2, .8) });
+    RECAP.forEach((s, i) => {
+      const y = 258 + i * 60, a = e(t, .8 + i * .5, 1.4 + i * .5);
+      dot(132, y - 7, 18, C.greenL, a); check(132, y - 7, 18, a);
+      T(s, 168, y, { s: 23, w: 500, a });
+    });
+    ctx.restore();
+    if (out > 0) {
+      network(t, .5 * out);
+      const g = ctx.createRadialGradient(640, 360, 40, 640, 360, 520);
+      g.addColorStop(0, `rgba(232,236,241,${.97 * out})`); g.addColorStop(1, 'rgba(232,236,241,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      T('An Identity for Your Agent', 640, 320, { f: DISP, s: 76, w: 800, al: 'center', b: 'middle', ls: -2, a: out });
+      T('Keys on your machine. A yes before anything irreversible.', 640, 400, { s: 24, al: 'center', c: C.ink, a: e(t, 8.6, 9.4) });
+      T('npx @didcid/mcp-server · packages/mcp-server', 640, 458, { f: MONO, s: 18, w: 500, c: C.cobalt, al: 'center', a: e(t, 9.4, 10.2) });
+    }
+  }
+
+  // ---------- timeline ----------
+  const SCENES = [
+    { title: 'An Identity for Your Agent', start: 0, dur: 10, draw: s1 },
+    { title: 'The MCP server', start: 10, dur: 18, draw: s2 },
+    { title: 'Every command is a tool', start: 28, dur: 16, draw: s3 },
+    { title: 'The agent gets a DID', start: 44, dur: 16, draw: s4 },
+    { title: 'Who stands behind it', start: 60, dur: 20, draw: s5 },
+    { title: 'Results the model can use', start: 80, dur: 18, draw: s6 },
+    { title: 'An explicit yes', start: 98, dur: 22, draw: s7 },
+    { title: 'What stays where', start: 120, dur: 20, draw: s8 },
+    { title: 'Recap', start: 140, dur: 14, draw: s9 }
+  ];
+  const CUES = [
+    [0, 5, 'An AI agent can hold an Archon identity of its own, and use it through the Model Context Protocol.'],
+    [5, 10, 'This is how the Archon MCP server gives an agent a DID, credentials, mail and payments, with guardrails.'],
+    [10, 16, 'The Archon MCP server runs on your own machine. Your AI client starts it and talks to it over stdio.'],
+    [16, 22, 'Inside it is a full Keymaster, using the same encrypted wallet file as the Archon command line.'],
+    [22, 28, 'It signs locally, and reaches an Archon node over HTTPS only to read and publish DIDs.'],
+    [28, 34, 'Every Keymaster command is an MCP tool, named archon_ plus the command: 149 of them, plus 3 helpers.'],
+    [34, 39, 'Identities, credentials, names, assets, vaults, polls, dmail, DIDComm and Lightning are all there.'],
+    [39, 44, 'Tools that take an object declare its real shape, so a malformed call is rejected before it runs.'],
+    [44, 50, 'Asked to set itself up, the agent calls archon_create_id with a name.'],
+    [50, 55, 'Its keys come from the wallet’s recovery phrase. Only the signed create operation leaves the machine.'],
+    [55, 60, 'Now the agent has a DID of its own. It can sign, encrypt, and be recognized.'],
+    [60, 66, 'But a DID alone is just a key. What matters is who authorized the agent.'],
+    [66, 72, 'Alice issues her agent a credential saying it acts for her, and the agent accepts it into its wallet.'],
+    [72, 80, 'When a supplier asks with a challenge, the agent answers with that credential, and the supplier checks who issued it.'],
+    [80, 86, 'Results come back as MCP content: JSON as structured content, images as image blocks the model can see.'],
+    [86, 92, 'A file over 16 KiB comes back as a link, its DID, instead of base64 that would flood the model’s context.'],
+    [92, 98, 'Any asset DID is a resource the client can read on demand. The resource list stays empty, so nothing is disclosed unasked.'],
+    [98, 104, 'Some tools refuse to run unless the call itself says yes.'],
+    [104, 110, 'Destructive tools need confirm: true. Tools that show secrets, such as the recovery phrase, need reveal: true.'],
+    [110, 115, 'Paying a Lightning invoice or zapping a DID needs confirmPayment: true.'],
+    [115, 120, 'A read-only mode hides every tool that writes, and error messages are scrubbed of passphrases and keys.'],
+    [120, 126, 'The wallet and its keys stay on your machine, encrypted with the passphrase set in the client’s config.'],
+    [126, 132, 'The node sees signed operations, public DID documents, uploaded files and images, and ciphertext. Nothing it could sign with.'],
+    [132, 140, 'The model sees the tool results it asked for. Without the passphrase, only the node status tools work.'],
+    [140, 147, 'A DID for the agent, credentials that show who stands behind it, and a tool for everything Keymaster does.'],
+    [147, 154, 'With the keys on your machine, and an explicit yes before anything irreversible.']
+  ];
+
+  let t = 0, playing = false, last = 0;
+  function render() {
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.globalAlpha = 1;
+    background();
+    const i = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const sc = SCENES[i < 0 ? SCENES.length - 1 : i];
+    const lt = Math.min(t - sc.start, sc.dur - 1e-3);
+    const fin = sc.start === 0 ? 1 : clamp(lt / .5);
+    const fout = sc.start + sc.dur >= TOTAL ? 1 : clamp((sc.dur - lt) / .5);
+    ctx.save(); ctx.globalAlpha = Math.min(fin, fout);
+    sc.draw(lt);
+    ctx.restore();
+  }
+
+  // ---------- UI ----------
+  const $ = id => document.getElementById(id);
+  const pp = $('pp'), seek = $('seek'), timeEl = $('time'), cap = $('cap'), big = $('bigplay'), player = $('player');
+  const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>';
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  const chapList = $('chapters');
+  SCENES.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<button type="button"><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t"></span><span class="d">${fmt(s.start)}</span></button>`;
+    li.querySelector('.t').textContent = s.title;
+    li.querySelector('button').addEventListener('click', () => { t = s.start; if (!playing) setPlaying(true); sync(); });
+    chapList.appendChild(li);
+    if (i) { const tick = document.createElement('i'); tick.style.left = `calc(${s.start / TOTAL * 100}% - 1px)`; $('ticks').appendChild(tick); }
+  });
+  const chapBtns = [...chapList.querySelectorAll('button')];
+
+  const tr = $('transcript');
+  SCENES.forEach((s, i) => {
+    const h = document.createElement('h3'); h.textContent = `${String(i + 1).padStart(2, '0')} · ${s.title}`; tr.appendChild(h);
+    CUES.filter(c => c[0] >= s.start && c[0] < s.start + s.dur).forEach(c => { const pEl = document.createElement('p'); pEl.textContent = c[2]; tr.appendChild(pEl); });
+  });
+
+  let lastCue = -1, lastChap = -1;
+  function sync() {
+    seek.value = t.toFixed(2);
+    seek.style.setProperty('--pct', (t / TOTAL * 100) + '%');
+    timeEl.textContent = `${fmt(t)} / ${fmt(TOTAL)}`;
+    const ci = CUES.findIndex(c => t >= c[0] && t < c[1]);
+    const cue = ci < 0 ? CUES.length - 1 : ci;
+    if (cue !== lastCue) { cap.textContent = CUES[cue][2]; lastCue = cue; }
+    const ch = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const chap = ch < 0 ? SCENES.length - 1 : ch;
+    if (chap !== lastChap) { chapBtns.forEach((b, i) => b.setAttribute('aria-current', i === chap ? 'true' : 'false')); lastChap = chap; }
+    render();
+  }
+  function setPlaying(v) {
+    if (v && t >= TOTAL - .01) t = 0;
+    playing = v; last = performance.now();
+    pp.innerHTML = v ? ICON_PAUSE : ICON_PLAY;
+    pp.setAttribute('aria-label', v ? 'Pause' : 'Play');
+    big.hidden = v;
+    big.setAttribute('aria-label', t > 0 ? 'Resume animation' : 'Play animation');
+  }
+  function frame(now) {
+    if (playing) {
+      t = Math.min(TOTAL, t + Math.min(.1, (now - last) / 1000));
+      if (t >= TOTAL) setPlaying(false);
+      sync();
+    }
+    last = now;
+    requestAnimationFrame(frame);
+  }
+
+  pp.addEventListener('click', () => setPlaying(!playing));
+  big.addEventListener('click', () => setPlaying(true));
+  cv.addEventListener('click', () => setPlaying(!playing));
+  seek.addEventListener('input', () => { t = parseFloat(seek.value); sync(); });
+  player.addEventListener('keydown', ev => {
+    if (ev.target !== player) return;
+    if (ev.key === ' ' || ev.key === 'k') { ev.preventDefault(); setPlaying(!playing); }
+    else if (ev.key === 'ArrowRight') { ev.preventDefault(); t = Math.min(TOTAL, t + 5); sync(); }
+    else if (ev.key === 'ArrowLeft') { ev.preventDefault(); t = Math.max(0, t - 5); sync(); }
+  });
+  $('fs').addEventListener('click', () => {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else if (player.requestFullscreen) player.requestFullscreen().catch(() => {});
+    } catch (_) {}
+  });
+  document.addEventListener('fullscreenchange', () => requestAnimationFrame(resize));
+  new ResizeObserver(() => resize()).observe(cv);
+
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fontsReady = document.fonts ? Promise.race([
+    Promise.all([
+      document.fonts.load(`800 40px ${DISP}`), document.fonts.load(`700 40px ${DISP}`),
+      document.fonts.load(`400 16px ${SANS}`), document.fonts.load(`600 16px ${SANS}`),
+      document.fonts.load(`400 16px ${MONO}`), document.fonts.load(`500 16px ${MONO}`)
+    ]),
+    new Promise(r => setTimeout(r, 2000))
+  ]).catch(() => {}) : Promise.resolve();
+
+  setPlaying(false);
+  resize(); sync();
+  fontsReady.then(() => {
+    sync();
+    if (reduce) { t = 6; sync(); big.hidden = false; }
+    else setPlaying(true);
+    requestAnimationFrame(frame);
+  });
+})();
+</script>
+</body>
+</html>
