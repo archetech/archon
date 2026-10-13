@@ -525,7 +525,8 @@
       ctx.strokeStyle = C.gridB; ctx.lineWidth = 1.5;
       [[0, 1], [1, 2], [0, 3], [3, 4], [4, 2], [2, 5], [4, 5], [1, 3]].forEach(([i, j]) => { ctx.beginPath(); ctx.moveTo(N[i][0], N[i][1]); ctx.lineTo(N[j][0], N[j][1]); ctx.stroke(); });
       N.forEach(([x, y]) => nodeIcon(x, y, 16, C.cobalt));
-      T('Hyperswarm: every node gets the notice', 1020, 430, { s: 15, w: 600, al: 'center' });
+      T('Hyperswarm gossips it to connected nodes;', 1020, 430, { s: 15, w: 600, al: 'center' });
+      T('a node that connects later gets it when it syncs', 1020, 454, { s: 13, c: C.soft, al: 'center' });
       ctx.restore();
     }
     const pk = p(t, 10, 12.4);
@@ -541,7 +542,7 @@
     heading(5, 'Finding your mail', t);
     const L = [190, 640, 1090], top = 170, bot = 600;
     lifeline(L[0], top, bot, 'Bob’s wallet', 'refreshNotices', C.cobalt, e(t, 0, .6));
-    lifeline(L[1], top, bot, 'Gatekeeper', 'any node', C.ink, e(t, .3, .9));
+    lifeline(L[1], top, bot, 'Gatekeeper', 'Bob’s node', C.ink, e(t, .3, .9));
     lifeline(L[2], top, bot, 'The vault', 'did:cid:…d3a1', C.amber, e(t, .6, 1.2));
     msg(L[0], L[1], 252, 'search: notice.to contains did:…b0b', e(t, 1.4, 2.6), C.cobalt);
     msg(L[1], L[0], 300, '[ notice did:cid:…n071 ]', e(t, 4.4, 5.4), C.ink);
@@ -557,7 +558,7 @@
       ctx.save(); ctx.globalAlpha *= na;
       box(330, 520, 720, 64, { fill: C.panel, stroke: C.gridB, r: 12 });
       T('The same notices deliver polls, ballots and credentials.', 690, 548, { s: 16, w: 600, al: 'center' });
-      T('No mail server: any node’s Gatekeeper can answer the search.', 690, 572, { s: 14, c: C.soft, al: 'center' });
+      T('No mail server: any node that has the notice can answer the search.', 690, 572, { s: 14, c: C.soft, al: 'center' });
       ctx.restore();
     }
   }
@@ -692,8 +693,8 @@
     [38, 44, 'That key is wrapped separately for Alice, Bob and Carol, so each of them, and no one else, can open it.'],
     [44, 50, 'To send it, Alice’s wallet posts a notice: a small public asset naming the recipients and the dmail’s DID.'],
     [50, 56, 'The notice goes out over Hyperswarm and expires after seven days. The vault itself stays where it is.'],
-    [56, 62, 'Every node receives the notice. Alice’s own copy moves from draft to sent.'],
-    [62, 68, 'Bob’s wallet asks Gatekeeper for notices addressed to his DID. Any node can answer.'],
+    [56, 62, 'Hyperswarm gossips it to connected nodes; one that connects later gets it when it syncs. Alice’s copy moves to sent.'],
+    [62, 68, 'Bob’s wallet asks his node’s Gatekeeper for notices addressed to his DID. Any node holding the notice could answer.'],
     [68, 74, 'It checks the notice is for him, opens the DID it points to, and unwraps his copy of the vault key.'],
     [74, 80, 'The dmail lands in his inbox, unread. The same notices deliver polls, ballots and credentials.'],
     [80, 86, 'Inbox, sent, archived and the rest are tags kept in each wallet. Moving a message only changes its tags.'],
