@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Letters in a Vault</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #e8ecf1;
+    --panel: #f6f8fb;
+    --ink: #141d2b;
+    --soft: #5b6879;
+    --line: #c6cfdb;
+    --cobalt: #2a4fc4;
+    --amber: #c97a12;
+    --bar: #141d2b;
+    --bar-text: #e8ecf1;
+    --bar-soft: #9aa6b8;
+  }
+  html, body { background: var(--paper); color: var(--ink); }
+  body { margin: 0; font: 15px/1.55 "IBM Plex Sans", system-ui, sans-serif; padding-inline: 16px; padding-block: 28px 48px; }
+  .wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+  header h1 { font: 800 clamp(30px, 5vw, 46px)/1.05 "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif; margin: 0; letter-spacing: -0.5px; text-wrap: balance; }
+  header p { margin: 8px 0 0; color: var(--soft); max-width: 62ch; }
+  header .eyebrow { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 1.5px; text-transform: uppercase; color: var(--cobalt); margin: 0 0 8px; }
+
+  .player { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--bar); box-shadow: 0 18px 50px -24px rgba(20, 29, 43, .45); outline: none; }
+  .player:focus-visible { box-shadow: 0 0 0 3px var(--cobalt); }
+  .player:fullscreen { display: flex; flex-direction: column; justify-content: center; border-radius: 0; }
+  .player:fullscreen .stage { max-height: calc(100vh - 120px); aspect-ratio: 16 / 9; margin: 0 auto; width: min(100%, calc((100vh - 120px) * 16 / 9)); }
+  .stage { position: relative; aspect-ratio: 16 / 9; max-width: 100%; background: var(--paper); }
+  canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+  .bigplay { position: absolute; inset: 0; margin: auto; width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--ink); color: var(--paper); display: grid; place-items: center; cursor: pointer; box-shadow: 0 10px 30px -8px rgba(20, 29, 43, .6); }
+  .bigplay[hidden] { display: none; }
+  .bigplay svg { width: 30px; height: 30px; margin-left: 4px; }
+  .bigplay:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 3px; }
+
+  .caption { min-height: 3.4em; padding: 12px 20px; color: var(--bar-text); font-size: clamp(14px, 1.9vw, 18px); line-height: 1.45; display: flex; align-items: center; justify-content: center; text-align: center; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+  .caption span { max-width: 70ch; transition: opacity .25s; }
+
+  .controls { display: flex; align-items: center; gap: 14px; padding: 10px 16px 14px; color: var(--bar-text); }
+  .controls button { background: none; border: 0; color: inherit; width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; flex: none; }
+  .controls button:hover { background: rgba(255, 255, 255, .08); }
+  .controls button:focus-visible { outline: 2px solid #8ea6ff; }
+  .controls svg { width: 20px; height: 20px; }
+  .time { font: 500 13px "IBM Plex Mono", ui-monospace, monospace; color: var(--bar-soft); font-variant-numeric: tabular-nums; flex: none; }
+  .seek { position: relative; flex: 1; min-width: 0; height: 36px; display: flex; align-items: center; }
+  .seek input { width: 100%; margin: 0; appearance: none; -webkit-appearance: none; background: transparent; height: 36px; cursor: pointer; position: relative; z-index: 2; }
+  .seek input::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; margin-top: -5px; border: 0; }
+  .seek input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 0; }
+  .seek input:focus-visible { outline: 2px solid #8ea6ff; border-radius: 4px; }
+  .ticks { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+  .ticks i { position: absolute; top: 15px; width: 2px; height: 6px; background: var(--bar); }
+
+  .chapters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .chapters button { width: 100%; text-align: left; display: flex; gap: 10px; align-items: baseline; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
+  .chapters button:hover { border-color: var(--cobalt); }
+  .chapters button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  .chapters button[aria-current="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .chapters .n { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--cobalt); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .n { color: #8ea6ff; }
+  .chapters .t { font-weight: 600; flex: 1; }
+  .chapters .d { font: 400 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--soft); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .d { color: var(--bar-soft); }
+
+  details { border-top: 1px solid var(--line); padding-top: 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .transcript { max-width: 70ch; }
+  .transcript h3 { font: 700 17px "Bricolage Grotesque", system-ui, sans-serif; margin: 18px 0 4px; }
+  .transcript p { margin: 0 0 6px; color: var(--soft); }
+
+  @media (max-width: 560px) {
+    .controls { gap: 8px; padding-inline: 10px; }
+    .time { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">did:cid · dmail · three minutes</p>
+    <h1>Letters in a Vault</h1>
+    <p>An animated walkthrough of dmail, Archon’s encrypted mail between DIDs: writing a message, sealing it in a vault whose key is wrapped for each recipient, sending it with an expiring notice, how a wallet finds and files its mail, replies, Herald’s bridge to and from email, and what stays public or private. Everything on screen is drawn live with canvas code.</p>
+  </header>
+
+  <div class="player" id="player" tabindex="0" aria-label="Animation player. Space plays or pauses, arrow keys skip.">
+    <div class="stage">
+      <canvas id="cv" role="img" aria-label="Animated diagram of how dmail works in Archon. The caption below describes each scene."></canvas>
+      <button class="bigplay" id="bigplay" aria-label="Play animation" hidden>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+      </button>
+    </div>
+    <div class="caption"><span id="cap"></span></div>
+    <div class="controls">
+      <button id="pp" aria-label="Play"></button>
+      <div class="seek">
+        <input type="range" id="seek" min="0" max="154" step="0.05" value="0" aria-label="Seek">
+        <div class="ticks" id="ticks"></div>
+      </div>
+      <span class="time" id="time">0:00 / 2:34</span>
+      <button id="fs" aria-label="Full screen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <ol class="chapters" id="chapters"></ol>
+
+  <details>
+    <summary>Transcript</summary>
+    <div class="transcript" id="transcript"></div>
+  </details>
+</div>
+
+<script>
+(() => {
+  // ---------- palette & type ----------
+  const W = 1280, H = 720, TOTAL = 154;
+  const C = {
+    paper: '#e8ecf1', grid: '#dbe1e9', gridB: '#c6cfdb', panel: '#f6f8fb',
+    ink: '#141d2b', soft: '#5b6879', faint: '#8c98a8',
+    cobalt: '#2a4fc4', cobaltL: '#dde5fb',
+    amber: '#c97a12', amberL: '#fbecd3',
+    green: '#23835a', greenL: '#d6eee2',
+    red: '#c03b28', redL: '#f8dcd6'
+  };
+  const DISP = '"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif';
+  const SANS = '"IBM Plex Sans", system-ui, sans-serif';
+  const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
+
+  // ---------- math ----------
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const p = (t, a, b) => clamp((t - a) / (b - a));
+  const e = (t, a, b) => ease(p(t, a, b));
+  const rnd = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+  const hx = c => { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  const mix = (a, b, t) => { const A = hx(a), B = hx(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], clamp(t)))).join(',')})`; };
+  const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
+  const scram = (s, pr, t, seed) => {
+    const k = Math.floor(pr * s.length); let out = '';
+    for (let i = 0; i < s.length; i++) out += i < k ? s[i] : B32[Math.floor(rnd(seed * 97 + i * 13 + Math.floor(t * 18)) * 32)];
+    return out;
+  };
+
+  // ---------- canvas ----------
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  let scale = 1;
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    const d = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.max(1, Math.round(r.width * d));
+    cv.height = Math.max(1, Math.round(r.width * 9 / 16 * d));
+    scale = cv.width / W;
+    render();
+  }
+
+  // ---------- drawing primitives ----------
+  function T(s, x, y, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.font = `${o.w || 400} ${o.s || 16}px ${o.f || SANS}`;
+    ctx.fillStyle = o.c || C.ink; ctx.textAlign = o.al || 'left'; ctx.textBaseline = o.b || 'alphabetic';
+    if (o.ls) ctx.letterSpacing = o.ls + 'px';
+    ctx.fillText(s, x, y); ctx.restore();
+  }
+  function tw(s, size, font = SANS, weight = 400) { ctx.save(); ctx.font = `${weight} ${size}px ${font}`; const w = ctx.measureText(s).width; ctx.restore(); return w; }
+  function box(x, y, w, h, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, o.r ?? 10);
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 1.5; if (o.dash) ctx.setLineDash(o.dash); ctx.stroke(); }
+    ctx.restore();
+  }
+  const cbox = (cx, cy, w, h, o) => box(cx - w / 2, cy - h / 2, w, h, o);
+  function pop(cx, cy, pr, fn) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.globalAlpha *= pr;
+    const s = lerp(.88, 1, pr);
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+    fn(); ctx.restore();
+  }
+  function arrowHead(x, y, a, c, s) {
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.lineTo(x - s * Math.cos(a - .45), y - s * Math.sin(a - .45));
+    ctx.lineTo(x - s * Math.cos(a + .45), y - s * Math.sin(a + .45));
+    ctx.closePath(); ctx.fillStyle = c; ctx.fill();
+  }
+  function arrow(x1, y1, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, x = lerp(x1, x2, pr), y = lerp(y1, y2, pr);
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(x, y, Math.atan2(y2 - y1, x2 - x1), c, o.hs || 10);
+    ctx.restore();
+  }
+  const qpt = (x1, y1, cx, cy, x2, y2, t) => { const u = 1 - t; return [u * u * x1 + 2 * u * t * cx + t * t * x2, u * u * y1 + 2 * u * t * cy + t * t * y2]; };
+  function qarrow(x1, y1, cx, cy, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, N = 36;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1);
+    let prev = [x1, y1], cur = prev;
+    for (let i = 1; i <= N; i++) { const tt = pr * i / N; prev = cur; cur = qpt(x1, y1, cx, cy, x2, y2, tt); ctx.lineTo(cur[0], cur[1]); }
+    ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(cur[0], cur[1], Math.atan2(cur[1] - prev[1], cur[0] - prev[0]), c, o.hs || 10);
+    ctx.restore();
+  }
+  function dot(x, y, r, c, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill(); ctx.restore(); }
+  function packet(x1, y1, x2, y2, pr, c, r = 6) { if (pr <= 0 || pr >= 1) return; dot(lerp(x1, x2, pr), lerp(y1, y2, pr), r, c); }
+  function check(x, y, s, pr, c = C.green) {
+    if (pr <= 0) return;
+    const a = [x - s * .5, y], b = [x - s * .12, y + s * .38], d = [x + s * .55, y - s * .42];
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]);
+    const p1 = clamp(pr / .35); ctx.lineTo(lerp(a[0], b[0], p1), lerp(a[1], b[1], p1));
+    if (pr > .35) { const p2 = clamp((pr - .35) / .65); ctx.lineTo(lerp(b[0], d[0], p2), lerp(b[1], d[1], p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function cross(x, y, s, pr, c = C.red) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .22; ctx.lineCap = 'round';
+    const p1 = clamp(pr / .5), p2 = clamp((pr - .5) / .5);
+    ctx.beginPath(); ctx.moveTo(x - s / 2, y - s / 2); ctx.lineTo(lerp(x - s / 2, x + s / 2, p1), lerp(y - s / 2, y + s / 2, p1));
+    if (p2 > 0) { ctx.moveTo(x + s / 2, y - s / 2); ctx.lineTo(lerp(x + s / 2, x - s / 2, p2), lerp(y - s / 2, y + s / 2, p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function person(x, y, s, c) {
+    ctx.save(); ctx.fillStyle = c;
+    ctx.beginPath(); ctx.arc(x, y - s * .28, s * .2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y + s * .4, s * .36, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function keyIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .14; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y, s * .3, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + s * .3, y); ctx.lineTo(x + s * 1.05, y);
+    ctx.moveTo(x + s * .75, y); ctx.lineTo(x + s * .75, y + s * .24);
+    ctx.moveTo(x + s * .98, y); ctx.lineTo(x + s * .98, y + s * .2);
+    ctx.stroke(); ctx.restore();
+  }
+  function lockIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = s * .13;
+    ctx.beginPath(); ctx.arc(x, y - s * .08, s * .26, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(x - s * .42, y - s * .1, s * .84, s * .6, s * .1); ctx.fill();
+    ctx.restore();
+  }
+  function db(x, y, w, h, c) {
+    const rx = w / 2, ry = h * .15, top = y - h / 2, bot = y + h / 2;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.fillStyle = C.panel;
+    ctx.beginPath(); ctx.moveTo(x - rx, top + ry); ctx.lineTo(x - rx, bot - ry);
+    ctx.ellipse(x, bot - ry, rx, ry, 0, Math.PI, 0, true);
+    ctx.lineTo(x + rx, top + ry); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI, true);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI); ctx.stroke();
+    ctx.restore();
+  }
+  function hexagon(x, y, r, rot, o = {}) {
+    ctx.save(); ctx.beginPath();
+    for (let i = 0; i < 6; i++) { const a = rot + i * Math.PI / 3; const px = x + r * Math.cos(a), py = y + r * Math.sin(a); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.closePath();
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 2; ctx.stroke(); }
+    ctx.restore();
+  }
+  function pill(cx, cy, text, o = {}) {
+    const s = o.s || 15, pad = o.pad || 14, w = tw(text, s, o.f || SANS, o.w || 600) + pad * 2, h = s + 16;
+    pop(cx, cy, o.pr ?? 1, () => {
+      cbox(cx, cy, w, h, { fill: o.bg || C.panel, stroke: o.stroke || C.gridB, r: h / 2 });
+      T(text, cx, cy + 1, { s, w: o.w || 600, f: o.f || SANS, c: o.c || C.ink, al: 'center', b: 'middle' });
+    });
+  }
+  function codeLine(s, x, y, n, fs) {
+    const re = /("(?:[^"\\]|\\.)*"\s*:)|("(?:[^"\\]|\\.)*")|([{}\[\],])|(\b\d+\b)|([^"{}\[\],]+?(?=["{}\[\],]|\b\d+\b|$))/g;
+    ctx.save(); ctx.font = `400 ${fs}px ${MONO}`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    let m, cx = x, used = 0;
+    while ((m = re.exec(s)) && used < n) {
+      if (!m[0]) { re.lastIndex++; continue; }
+      const tok = m[0];
+      ctx.fillStyle = m[1] ? C.soft : m[2] ? C.cobalt : m[3] ? C.faint : m[4] ? C.amber : C.ink;
+      const show = tok.slice(0, n - used); used += tok.length;
+      ctx.fillText(show, cx, y); cx += ctx.measureText(show).width;
+    }
+    ctx.restore();
+  }
+  function card(x, y, w, title, lines, pr, o = {}) {
+    const fs = o.fs || 14, lh = o.lh || 22, top = 30 + 24;
+    const h = top + (lines.length - 1) * lh + 18;
+    const ly = i => y + top + i * lh;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    box(x, y, w, h, { fill: C.panel, stroke: C.gridB, r: 12 });
+    ctx.beginPath(); ctx.roundRect(x, y, w, 30, [12, 12, 0, 0]); ctx.fillStyle = o.hc || C.ink; ctx.fill();
+    T(title.toUpperCase(), x + 16, y + 20, { f: MONO, s: 12, w: 500, c: C.paper, ls: 1.2 });
+    let n = Math.floor(pr * lines.reduce((a, l) => a + l.length, 0));
+    lines.forEach((l, i) => {
+      const hl = o.hl && o.hl[i];
+      if (hl && hl[1] > 0) { ctx.save(); ctx.globalAlpha *= hl[1]; ctx.fillStyle = hl[0]; ctx.fillRect(x + 6, ly(i) - fs - 2, w - 12, lh); ctx.restore(); }
+      if (n > 0) { codeLine(l, x + 16, ly(i), n, fs); n -= l.length; }
+    });
+    ctx.restore();
+    return { h, ly };
+  }
+
+  // ---------- ambient network ----------
+  const NET = Array.from({ length: 46 }, (_, i) => ({ x: rnd(i * 3 + 1) * W, y: rnd(i * 3 + 2) * H, ph: rnd(i * 3 + 3) * 6.28 }));
+  function network(t, a) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    const P = NET.map(q => [q.x + Math.sin(t * .3 + q.ph) * 16, q.y + Math.cos(t * .25 + q.ph) * 12]);
+    ctx.lineWidth = 1;
+    for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+      const d = Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1]);
+      if (d < 175) { ctx.strokeStyle = `rgba(90,110,140,${(1 - d / 175) * .45})`; ctx.beginPath(); ctx.moveTo(P[i][0], P[i][1]); ctx.lineTo(P[j][0], P[j][1]); ctx.stroke(); }
+    }
+    P.forEach((q, i) => dot(q[0], q[1], i % 7 === 0 ? 4 : 2.5, i % 7 === 0 ? C.cobalt : C.faint, .8));
+    ctx.restore();
+  }
+
+  function background() {
+    ctx.fillStyle = C.paper; ctx.fillRect(0, 0, W, H);
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 40) { ctx.strokeStyle = x % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = x % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += 40) { ctx.strokeStyle = y % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = y % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+
+  function heading(n, title, t) {
+    const a = e(t, 0, .8);
+    T(`${String(n).padStart(2, '0')} / 09`, 56, 58, { f: MONO, s: 13, w: 500, c: C.cobalt, a, ls: 1.5 });
+    T(title, 56 + lerp(-12, 0, a), 94, { f: DISP, s: 32, w: 700, a });
+  }
+
+  // ---------- shared pieces ----------
+  function actor(x, y, name, role, c, a = 1, s = 56) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    T(role.toUpperCase(), x, y - s * .95, { f: MONO, s: 12, w: 500, c: C.soft, al: 'center', ls: 1.2 });
+    person(x, y, s, c);
+    T(name, x, y + s * 1.05, { s: 17, w: 600, al: 'center' });
+    ctx.restore();
+  }
+  function svc(cx, cy, w, title, sub, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    cbox(cx, cy, w, 70, { fill: o.fill || C.panel, stroke: o.stroke || C.ink, lw: 2, r: 12 });
+    T(title, cx, cy - 4, { f: DISP, s: 19, w: 700, al: 'center', c: o.c || C.ink });
+    T(sub, cx, cy + 18, { s: 12, c: o.sc || C.soft, al: 'center' });
+    ctx.restore();
+  }
+  function nodeIcon(cx, cy, s, c, a = 1) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    hexagon(cx, cy, s, Math.PI / 6, { fill: C.panel, stroke: c, lw: 2 });
+    dot(cx, cy, s * .28, c);
+    ctx.restore();
+  }
+  function envelope(cx, cy, w, c, a = 1, fill = C.panel) {
+    if (a <= 0) return;
+    const h = w * .66;
+    ctx.save(); ctx.globalAlpha *= a;
+    cbox(cx, cy, w, h, { fill, stroke: c, lw: 2, r: 4 });
+    ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(cx - w / 2 + 2, cy - h / 2 + 2); ctx.lineTo(cx, cy + h * .08); ctx.lineTo(cx + w / 2 - 2, cy - h / 2 + 2); ctx.stroke();
+    ctx.restore();
+  }
+  // A sequence-diagram lifeline with a labelled head.
+  function lifeline(x, top, bottom, title, sub, c, a) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    cbox(x, top, 220, 56, { fill: C.panel, stroke: c, lw: 2, r: 10 });
+    T(title, x, top - 2, { f: DISP, s: 17, w: 700, al: 'center' });
+    T(sub, x, top + 17, { s: 12, c: C.soft, al: 'center' });
+    ctx.strokeStyle = C.gridB; ctx.lineWidth = 2; ctx.setLineDash([5, 6]);
+    ctx.beginPath(); ctx.moveTo(x, top + 30); ctx.lineTo(x, bottom); ctx.stroke(); ctx.restore();
+  }
+  function msg(x1, x2, y, label, pr, c = C.ink, o = {}) {
+    if (pr <= 0) return;
+    arrow(x1, y, x2, y, pr, { c, hs: 9, dash: o.dash });
+    T(label, (x1 + x2) / 2, y - 10, { f: o.f || MONO, s: o.s || 13, w: 500, c, al: 'center', a: clamp(pr * 2 - 1) });
+  }
+  function tag(cx, cy, label, o = {}) {
+    pill(cx, cy, label, { pr: o.pr ?? 1, f: MONO, s: o.s || 13, w: 500, c: o.c || C.ink, bg: o.bg || C.panel, stroke: o.stroke || C.gridB });
+  }
+
+  // ---------- scene 1: title ----------
+  function s1(t) {
+    network(t, .55);
+    const g = ctx.createRadialGradient(640, 330, 40, 640, 330, 540);
+    g.addColorStop(0, 'rgba(232,236,241,0.97)'); g.addColorStop(1, 'rgba(232,236,241,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const sc = lerp(.97, 1, e(t, 0, 2.5));
+    ctx.save(); ctx.translate(640, 270); ctx.scale(sc, sc);
+    T('Letters in a Vault', 0, 0, { f: DISP, s: 100, w: 800, al: 'center', b: 'middle', ls: -2 });
+    ctx.restore();
+    T('How dmail carries encrypted mail between DIDs, and out to email', 640, 360, { s: 25, c: C.soft, al: 'center', a: e(t, .8, 2.3) });
+    envelope(640, 438, 64, C.cobalt, e(t, 2.2, 3), C.cobaltL);
+    lockIcon(640, 446, 22, C.cobalt);
+    [['A message is a vault', 455], ['Sending is a notice', 663], ['Folders stay in your wallet', 880]].forEach(([s, x], i) =>
+      pill(x, 540, s, { pr: e(t, 4.4 + i * .4, 5 + i * .4), s: 14, c: C.soft }));
+  }
+
+  // ---------- scene 2: writing a dmail ----------
+  const DRAFT = [
+    '{',
+    '  "to": ["bob@4tress.org"],',
+    '  "cc": ["carol"],',
+    '  "subject": "Lunch on Friday?",',
+    '  "body": "Noon at the usual place."',
+    '}'
+  ];
+  function s2(t) {
+    heading(2, 'Writing a dmail', t);
+    actor(110, 300, 'Alice', 'Sender', C.amber, e(t, 0, .6), 50);
+    card(220, 170, 470, 'alice’s message', DRAFT, p(t, .8, 4), { a: e(t, .5, 1.1), fs: 15, lh: 26, hc: C.amber });
+    // recipients resolve
+    const rows = [
+      ['bob@4tress.org', 'a name@domain address', 'did:cid:…b0b', 5.6],
+      ['carol', 'an alias in Alice’s wallet', 'did:cid:…ca401', 7]
+    ];
+    rows.forEach(([n, how, did, at], i) => {
+      const y = 200 + i * 92, a = e(t, at, at + .6);
+      T(n, 760, y, { f: MONO, s: 16, w: 500, c: C.cobalt, a });
+      T(how, 760, y + 22, { s: 13, c: C.soft, a });
+      arrow(990, y - 5, 1040, y - 5, e(t, at + .4, at + 1), { c: C.ink, hs: 7 });
+      T(did, 1052, y, { f: MONO, s: 15, w: 500, a: e(t, at + .8, at + 1.4) });
+    });
+    const ra = e(t, 9.4, 10);
+    T('Every recipient must be an agent DID.', 760, 400, { s: 15, w: 600, a: ra });
+    T('A subject and a body are required.', 760, 424, { s: 15, c: C.soft, a: ra });
+    // saved as a draft
+    const da = e(t, 11.6, 12.4);
+    if (da > 0) {
+      ctx.save(); ctx.globalAlpha *= da;
+      box(220, 470, 840, 110, { fill: C.panel, stroke: C.gridB, r: 12 });
+      T('createDmail', 250, 508, { f: MONO, s: 16, w: 500, c: C.cobalt });
+      T('stores the message, then files it in Alice’s wallet as', 250, 536, { s: 15, c: C.soft });
+      ctx.restore();
+    }
+    tag(642, 531, 'draft', { pr: e(t, 12.6, 13.2), c: C.amber, bg: C.amberL, stroke: C.amber });
+    T('Nothing is sent yet.', 640, 630, { s: 16, w: 600, al: 'center', a: e(t, 13.4, 14) });
+  }
+
+  // ---------- scene 3: sealed in a vault ----------
+  function s3(t) {
+    heading(3, 'Sealed in a vault', t);
+    const va = e(t, 0, .8);
+    if (va > 0) {
+      ctx.save(); ctx.globalAlpha *= va;
+      box(90, 150, 560, 430, { fill: C.panel, stroke: C.ink, lw: 2, r: 16 });
+      T('VAULT  did:cid:…d3a1', 116, 182, { f: MONO, s: 13, w: 500, c: C.soft, ls: 1 });
+      T('an asset DID owned by Alice', 116, 206, { s: 14, c: C.soft });
+      ctx.restore();
+    }
+    // items
+    const items = [['dmail', 'the message: to, cc, subject, body', 1.6, C.cobalt], ['menu.pdf', 'an attachment, another item', 4.6, C.ink]];
+    items.forEach(([n, d, at, c], i) => {
+      const y = 260 + i * 86, a = e(t, at, at + .6);
+      box(116, y - 30, 508, 64, { fill: C.paper, stroke: C.gridB, r: 10, a });
+      if (a > 0) { ctx.save(); ctx.globalAlpha *= a; lockIcon(146, y + 2, 22, c); ctx.restore(); }
+      T(n, 176, y, { f: MONO, s: 16, w: 500, c, a });
+      T(d, 176, y + 20, { s: 13, c: C.soft, a });
+    });
+    T('“dmail” is the one reserved item name', 370, 458, { s: 13, c: C.soft, al: 'center', a: e(t, 6, 6.6) });
+    T('items are encrypted to the vault’s own key', 370, 540, { s: 15, w: 600, al: 'center', a: e(t, 6.6, 7.2) });
+    // the vault key, wrapped per member
+    const ka = e(t, 8, 8.8);
+    if (ka > 0) {
+      ctx.save(); ctx.globalAlpha *= ka;
+      keyIcon(740, 230, 26, C.amber);
+      T('vault key', 790, 236, { s: 16, w: 600 });
+      ctx.restore();
+    }
+    const members = [['Alice', 'owner', C.amber], ['Bob', 'to', C.cobalt], ['Carol', 'cc', C.green]];
+    members.forEach(([n, role, c], i) => {
+      const y = 330 + i * 80, a = e(t, 9.6 + i * .6, 10.2 + i * .6);
+      qarrow(760, 254, 760, y - 20, 800, y - 6, e(t, 9.4 + i * .6, 10.2 + i * .6), { c: C.faint, hs: 7 });
+      if (a <= 0) return;
+      ctx.save(); ctx.globalAlpha *= a;
+      box(810, y - 30, 360, 60, { fill: C.panel, stroke: c, r: 10 });
+      person(845, y + 2, 34, c);
+      lockIcon(885, y + 2, 18, C.amber);
+      T(`a copy only ${n} can unwrap`, 910, y - 2, { s: 15, w: 600 });
+      T(role, 910, y + 18, { f: MONO, s: 12, w: 500, c: C.soft });
+      ctx.restore();
+    });
+    T('editing a draft adds any new recipients', 990, 590, { s: 14, c: C.soft, al: 'center', a: e(t, 14, 14.6) });
+  }
+
+  // ---------- scene 4: sending is a notice ----------
+  const NOTICE = [
+    '{ "notice": {',
+    '    "to": [ "did:cid:…b0b",',
+    '            "did:cid:…ca401" ],',
+    '    "dids": [ "did:cid:…d3a1" ]',
+    '} }'
+  ];
+  function s4(t) {
+    heading(4, 'Sending posts a notice', t);
+    actor(110, 290, 'Alice', 'Sender', C.amber, e(t, 0, .6), 50);
+    pill(110, 380, 'sendDmail', { pr: e(t, .6, 1.2), f: MONO, s: 14, w: 500, c: C.cobalt, bg: C.cobaltL, stroke: C.cobalt });
+    const cd = card(250, 170, 440, 'notice: a new asset DID', NOTICE, p(t, 1.6, 4.6), { a: e(t, 1.2, 1.8), fs: 15, lh: 26, hc: C.ink });
+    arrow(170, 290, 244, 250, e(t, 1, 1.6), { c: C.ink, hs: 8 });
+    tag(370, 380, 'registry: hyperswarm', { pr: e(t, 5.4, 6), s: 13 });
+    tag(590, 380, 'expires in 7 days', { pr: e(t, 6, 6.6), s: 13, c: C.amber, bg: C.amberL, stroke: C.amber });
+    T('it only points at the dmail; the vault itself does not move', 470, 440, { s: 15, w: 600, al: 'center', a: e(t, 7.4, 8) });
+    // gossip
+    const ga = e(t, 9, 9.8);
+    const N = [[860, 230], [980, 180], [1100, 240], [920, 340], [1060, 360], [1180, 300]];
+    if (ga > 0) {
+      ctx.save(); ctx.globalAlpha *= ga;
+      ctx.strokeStyle = C.gridB; ctx.lineWidth = 1.5;
+      [[0, 1], [1, 2], [0, 3], [3, 4], [4, 2], [2, 5], [4, 5], [1, 3]].forEach(([i, j]) => { ctx.beginPath(); ctx.moveTo(N[i][0], N[i][1]); ctx.lineTo(N[j][0], N[j][1]); ctx.stroke(); });
+      N.forEach(([x, y]) => nodeIcon(x, y, 16, C.cobalt));
+      T('Hyperswarm gossips it to connected nodes;', 1020, 430, { s: 15, w: 600, al: 'center' });
+      T('a node that connects later gets it when it syncs', 1020, 454, { s: 13, c: C.soft, al: 'center' });
+      ctx.restore();
+    }
+    const pk = p(t, 10, 12.4);
+    if (pk > 0 && pk < 1) { const k = Math.min(4, Math.floor(pk * 5)); const f = pk * 5 - k; const path = [0, 1, 2, 4, 5, 5]; const [a1, b1] = N[path[k]], [a2, b2] = N[path[k + 1]]; dot(lerp(a1, a2, f), lerp(b1, b2, f), 7, C.amber); }
+    // Alice refiles
+    tag(250, 560, 'draft', { pr: e(t, 13.4, 14) * (1 - e(t, 14.6, 15.2)), c: C.soft });
+    tag(250, 560, 'sent', { pr: e(t, 14.8, 15.4), c: C.green, bg: C.greenL, stroke: C.green });
+    T('Alice’s copy moves from draft to sent', 320, 566, { s: 15, c: C.soft, a: e(t, 13.4, 14) });
+  }
+
+  // ---------- scene 5: finding your mail ----------
+  function s5(t) {
+    heading(5, 'Finding your mail', t);
+    const L = [190, 640, 1090], top = 170, bot = 600;
+    lifeline(L[0], top, bot, 'Bob’s wallet', 'refreshNotices', C.cobalt, e(t, 0, .6));
+    lifeline(L[1], top, bot, 'Gatekeeper', 'Bob’s node', C.ink, e(t, .3, .9));
+    lifeline(L[2], top, bot, 'The vault', 'did:cid:…d3a1', C.amber, e(t, .6, 1.2));
+    msg(L[0], L[1], 252, 'search: notice.to contains did:…b0b', e(t, 1.4, 2.6), C.cobalt);
+    msg(L[1], L[0], 300, '[ notice did:cid:…n071 ]', e(t, 4.4, 5.4), C.ink);
+    const ca = e(t, 6.2, 6.8);
+    check(L[0] + 30, 340, 14, ca);
+    T('addressed to Bob? yes', L[0] + 50, 346, { s: 14, w: 600, a: ca });
+    msg(L[0], L[2], 400, 'open the DID it points to', e(t, 7.6, 8.8), C.ink);
+    msg(L[2], L[0], 448, 'a dmail · unwrap Bob’s key copy', e(t, 9.4, 10.6), C.amber);
+    tag(L[0] - 40, 500, 'inbox', { pr: e(t, 11, 11.6), c: C.cobalt, bg: C.cobaltL, stroke: C.cobalt });
+    tag(L[0] + 50, 500, 'unread', { pr: e(t, 11.4, 12), c: C.cobalt, bg: C.cobaltL, stroke: C.cobalt });
+    const na = e(t, 14, 14.6);
+    if (na > 0) {
+      ctx.save(); ctx.globalAlpha *= na;
+      box(330, 520, 720, 64, { fill: C.panel, stroke: C.gridB, r: 12 });
+      T('The same notices deliver polls, ballots and credentials.', 690, 548, { s: 16, w: 600, al: 'center' });
+      T('No mail server: any node that has the notice can answer the search.', 690, 572, { s: 14, c: C.soft, al: 'center' });
+      ctx.restore();
+    }
+  }
+
+  // ---------- scene 6: folders and replies ----------
+  function s6(t) {
+    heading(6, 'Folders, and replies', t);
+    const la = e(t, 0, .6);
+    box(70, 150, 520, 400, { fill: C.panel, stroke: C.gridB, r: 14, a: la });
+    T('Folders are tags in your wallet', 94, 190, { f: DISP, s: 21, w: 700, a: la });
+    const tags = [['inbox', 'unread'], ['draft'], ['sent'], ['archived'], ['deleted']];
+    tags.forEach((row, i) => {
+      const y = 246 + i * 52;
+      row.forEach((s, j) => tag(140 + j * 100, y, s, { pr: e(t, .8 + i * .3, 1.4 + i * .3), c: i === 0 ? C.cobalt : C.ink }));
+    });
+    T('kept only in the wallet,', 330, 300, { s: 15, w: 600, a: e(t, 3, 3.6) });
+    T('never published', 330, 324, { s: 15, w: 600, a: e(t, 3, 3.6) });
+    T('moving a message', 330, 380, { s: 14, c: C.soft, a: e(t, 3.6, 4.2) });
+    T('changes its tags,', 330, 402, { s: 14, c: C.soft, a: e(t, 3.6, 4.2) });
+    T('not the message', 330, 424, { s: 14, c: C.soft, a: e(t, 3.6, 4.2) });
+    T('After 7 days the notice expires and nodes delete it;', 94, 506, { s: 14, c: C.soft, a: e(t, 5, 5.6) });
+    T('the dmail itself stays in Alice’s vault.', 94, 528, { s: 14, c: C.soft, a: e(t, 5, 5.6) });
+    // replies
+    const ra = e(t, 7, 7.6);
+    box(690, 150, 520, 400, { fill: C.panel, stroke: C.gridB, r: 14, a: ra });
+    T('A reply is a new dmail', 714, 190, { f: DISP, s: 21, w: 700, a: ra });
+    envelope(790, 290, 70, C.amber, e(t, 7.6, 8.2));
+    T('Alice', 790, 340, { s: 14, w: 600, al: 'center', a: e(t, 7.6, 8.2) });
+    T('did:cid:…d3a1', 790, 362, { f: MONO, s: 12, w: 500, c: C.soft, al: 'center', a: e(t, 7.6, 8.2) });
+    envelope(1090, 290, 70, C.cobalt, e(t, 8.6, 9.2));
+    T('Bob', 1090, 340, { s: 14, w: 600, al: 'center', a: e(t, 8.6, 9.2) });
+    T('did:cid:…r3p1', 1090, 362, { f: MONO, s: 12, w: 500, c: C.soft, al: 'center', a: e(t, 8.6, 9.2) });
+    arrow(1048, 290, 832, 290, e(t, 9.6, 10.6), { c: C.cobalt, hs: 9 });
+    T('"reference": "did:cid:…d3a1"', 940, 272, { f: MONO, s: 13, w: 500, c: C.cobalt, al: 'center', a: e(t, 10.2, 10.8) });
+    T('its own vault, keys and notice;', 950, 440, { s: 15, w: 600, al: 'center', a: e(t, 11.6, 12.2) });
+    T('the reference threads it to the original', 950, 464, { s: 15, c: C.soft, al: 'center', a: e(t, 11.6, 12.2) });
+  }
+
+  // ---------- scene 7: out to email ----------
+  function s7(t) {
+    heading(7, 'Out to email, and back', t);
+    const L = [170, 640, 1110], top = 160, bot = 600;
+    lifeline(L[0], top, bot, 'Alice', 'alice@4tress.org', C.amber, e(t, 0, .6));
+    lifeline(L[1], top, bot, 'Herald', '4tress.org email bridge', C.ink, e(t, .3, .9));
+    lifeline(L[2], top, bot, 'Dave', 'dave@example.com', C.cobalt, e(t, .6, 1.2));
+    msg(L[0], L[1], 240, 'dmail to Herald: [email to dave@example.com] Hello', e(t, 1.6, 3), C.amber, { s: 12 });
+    T('Herald finds it like any recipient, through its notice', L[1] + 14, 280, { s: 13, c: C.soft, a: e(t, 3.4, 4) });
+    msg(L[1], L[2], 330, 'email · From: alice via 4tress <alice@4tress.org>', e(t, 4.6, 6), C.ink, { s: 12 });
+    T('Reply-To: reply+7f3k…@parse.4tress.org', (L[1] + L[2]) / 2, 352, { f: MONO, s: 12, w: 500, c: C.soft, al: 'center', a: e(t, 5.6, 6.2) });
+    msg(L[2], L[1], 420, 'reply → reply+7f3k…', e(t, 8.6, 9.8), C.cobalt);
+    T('the token threads the reply', (L[1] + L[2]) / 2, 442, { s: 13, c: C.soft, al: 'center', a: e(t, 9.4, 10) });
+    msg(L[1], L[0], 490, 'dmail: [email from dave@example.com] Re: Hello', e(t, 11, 12.4), C.amber, { s: 12 });
+    const na = e(t, 14.6, 15.2);
+    if (na > 0) {
+      ctx.save(); ctx.globalAlpha *= na;
+      box(150, 530, 980, 90, { fill: C.panel, stroke: C.gridB, r: 12 });
+      T('Email sent straight to alice@4tress.org arrives as dmail too. Likely spam is dropped.', 640, 564, { s: 15, w: 600, al: 'center' });
+      T('Herald is a recipient of what it carries, so it can read those messages.', 640, 592, { s: 14, c: C.soft, al: 'center' });
+      ctx.restore();
+    }
+  }
+
+  // ---------- scene 8: who sees what ----------
+  const PUBLIC = ['that Alice posted a notice', 'the recipients’ DIDs', 'the DID it points to', 'for 7 days, until it expires'];
+  const SEALED = ['subject and body', 'attachments', 'which recipients were to and which cc', 'the vault’s member list'];
+  function s8(t) {
+    heading(8, 'Who sees what', t);
+    const la = e(t, 0, .8);
+    box(70, 150, 540, 330, { fill: C.panel, stroke: C.gridB, r: 14, a: la });
+    T('Anyone can see', 94, 192, { f: DISP, s: 22, w: 700, a: la });
+    T('the notice is a public asset', 94, 216, { s: 13, c: C.soft, a: la });
+    PUBLIC.forEach((s, i) => { const y = 270 + i * 50, a = e(t, .8 + i * .4, 1.4 + i * .4); dot(110, y - 6, 9, C.faint, a); T(s, 132, y, { s: 18, w: 600, a }); });
+    const ra = e(t, 4.6, 5.4);
+    box(670, 150, 540, 330, { fill: C.panel, stroke: C.cobalt, lw: 2, r: 14, a: ra });
+    T('Only sender and recipients can read', 694, 192, { f: DISP, s: 22, w: 700, a: ra });
+    T('sealed in the vault, under keys wrapped for each of them', 694, 216, { s: 13, c: C.soft, a: ra });
+    SEALED.forEach((s, i) => { const y = 270 + i * 50, a = e(t, 5.4 + i * .4, 6 + i * .4); if (a > 0) { ctx.save(); ctx.globalAlpha *= a; lockIcon(712, y - 6, 18, C.cobalt); ctx.restore(); } T(s, 736, y, { s: 18, w: 600, a }); });
+    pill(640, 550, 'dmail works between Archon agents; DIDComm reaches other agents', { pr: e(t, 11, 11.6), s: 15, c: C.ink });
+    T('see Messages Between DIDs', 640, 594, { s: 13, c: C.soft, al: 'center', a: e(t, 11.6, 12.2) });
+  }
+
+  // ---------- scene 9: recap ----------
+  const RECAP = [
+    'a dmail is a vault: the message and attachments, encrypted',
+    'the vault key is wrapped for the sender and each recipient',
+    'sending posts a notice that expires in 7 days',
+    'wallets find their notices and file mail locally',
+    'Herald bridges dmail to email and back'
+  ];
+  function s9(t) {
+    const out = e(t, 7.6, 8.6);
+    ctx.save(); ctx.globalAlpha *= 1 - out;
+    heading(9, 'Recap', t);
+    T('Dmail in Archon', 110, 190, { f: DISP, s: 38, w: 800, a: e(t, .2, .8) });
+    RECAP.forEach((s, i) => {
+      const y = 258 + i * 60, a = e(t, .8 + i * .5, 1.4 + i * .5);
+      dot(132, y - 7, 18, C.greenL, a); check(132, y - 7, 18, a);
+      T(s, 168, y, { s: 23, w: 500, a });
+    });
+    ctx.restore();
+    if (out > 0) {
+      network(t, .5 * out);
+      const g = ctx.createRadialGradient(640, 360, 40, 640, 360, 520);
+      g.addColorStop(0, `rgba(232,236,241,${.97 * out})`); g.addColorStop(1, 'rgba(232,236,241,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      T('Letters in a Vault', 640, 320, { f: DISP, s: 88, w: 800, al: 'center', b: 'middle', ls: -2, a: out });
+      T('Mail between DIDs, with no mail server.', 640, 400, { s: 24, al: 'center', c: C.ink, a: e(t, 8.6, 9.4) });
+      T('docs/email-dmail-bridge.md · docs/services/keymaster', 640, 458, { f: MONO, s: 18, w: 500, c: C.cobalt, al: 'center', a: e(t, 9.4, 10.2) });
+    }
+  }
+
+  // ---------- timeline ----------
+  const SCENES = [
+    { title: 'Letters in a Vault', start: 0, dur: 10, draw: s1 },
+    { title: 'Writing a dmail', start: 10, dur: 16, draw: s2 },
+    { title: 'Sealed in a vault', start: 26, dur: 18, draw: s3 },
+    { title: 'Sending a notice', start: 44, dur: 18, draw: s4 },
+    { title: 'Finding your mail', start: 62, dur: 18, draw: s5 },
+    { title: 'Folders and replies', start: 80, dur: 16, draw: s6 },
+    { title: 'Out to email', start: 96, dur: 22, draw: s7 },
+    { title: 'Who sees what', start: 118, dur: 22, draw: s8 },
+    { title: 'Recap', start: 140, dur: 14, draw: s9 }
+  ];
+  const CUES = [
+    [0, 5, 'Dmail is Archon’s own mail: encrypted messages between DIDs, with no mail server in between.'],
+    [5, 10, 'This is how a message is written, sealed, delivered and filed, and how it reaches ordinary email.'],
+    [10, 15, 'Alice writes to Bob, copying Carol: recipients, a subject and a body.'],
+    [15, 20, 'Recipients can be DIDs, names in her wallet, or name@domain addresses. Each must resolve to an agent DID.'],
+    [20, 26, 'Her Keymaster stores the message and files it as a draft in her wallet. Nothing is sent yet.'],
+    [26, 32, 'The dmail is a vault: an asset DID that Alice owns. The message itself is an item called dmail.'],
+    [32, 38, 'Attachments are more items in the same vault. Every item is encrypted to the vault’s own key.'],
+    [38, 44, 'That key is wrapped separately for Alice, Bob and Carol, so each of them, and no one else, can open it.'],
+    [44, 50, 'To send it, Alice’s wallet posts a notice: a small public asset naming the recipients and the dmail’s DID.'],
+    [50, 56, 'The notice goes out over Hyperswarm and expires after seven days. The vault itself stays where it is.'],
+    [56, 62, 'Hyperswarm gossips it to connected nodes; one that connects later gets it when it syncs. Alice’s copy moves to sent.'],
+    [62, 68, 'Bob’s wallet asks his node’s Gatekeeper for notices addressed to his DID. Any node holding the notice could answer.'],
+    [68, 74, 'It checks the notice is for him, opens the DID it points to, and unwraps his copy of the vault key.'],
+    [74, 80, 'The dmail lands in his inbox, unread. The same notices deliver polls, ballots and credentials.'],
+    [80, 86, 'Inbox, sent, archived and the rest are tags kept in each wallet. Moving a message only changes its tags.'],
+    [86, 91, 'After seven days nodes delete the expired notice; the dmail itself stays in Alice’s vault.'],
+    [91, 96, 'A reply is a new dmail, with its own vault and notice, and a reference that threads it to the original.'],
+    [96, 102, 'Herald can bridge dmail to email. Alice addresses a dmail to Herald, with the email address in the subject.'],
+    [102, 108, 'Herald finds it through its notice and sends it as email from alice@4tress.org, with a reply token.'],
+    [108, 113, 'When Dave replies, the token threads his email back to Alice as a new dmail.'],
+    [113, 118, 'Email sent straight to her address arrives as dmail too. Herald can read what it carries.'],
+    [118, 124, 'The notice is public while it lasts: anyone can see that Alice notified these DIDs about that one.'],
+    [124, 130, 'The message is not. Subject, body, attachments, and which recipients were copied stay sealed in the vault.'],
+    [130, 135, 'Only the sender and the recipients hold a copy of the key.'],
+    [135, 140, 'Dmail works between Archon agents. For other agents, DIDComm is the standard path.'],
+    [140, 147, 'A vault for each message, a notice to deliver it, and folders that never leave the wallet.'],
+    [147, 154, 'Mail between DIDs, encrypted end to end, with no mail server to trust.']
+  ];
+
+  let t = 0, playing = false, last = 0;
+  function render() {
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.globalAlpha = 1;
+    background();
+    const i = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const sc = SCENES[i < 0 ? SCENES.length - 1 : i];
+    const lt = Math.min(t - sc.start, sc.dur - 1e-3);
+    const fin = sc.start === 0 ? 1 : clamp(lt / .5);
+    const fout = sc.start + sc.dur >= TOTAL ? 1 : clamp((sc.dur - lt) / .5);
+    ctx.save(); ctx.globalAlpha = Math.min(fin, fout);
+    sc.draw(lt);
+    ctx.restore();
+  }
+
+  // ---------- UI ----------
+  const $ = id => document.getElementById(id);
+  const pp = $('pp'), seek = $('seek'), timeEl = $('time'), cap = $('cap'), big = $('bigplay'), player = $('player');
+  const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>';
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  const chapList = $('chapters');
+  SCENES.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<button type="button"><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t"></span><span class="d">${fmt(s.start)}</span></button>`;
+    li.querySelector('.t').textContent = s.title;
+    li.querySelector('button').addEventListener('click', () => { t = s.start; if (!playing) setPlaying(true); sync(); });
+    chapList.appendChild(li);
+    if (i) { const tick = document.createElement('i'); tick.style.left = `calc(${s.start / TOTAL * 100}% - 1px)`; $('ticks').appendChild(tick); }
+  });
+  const chapBtns = [...chapList.querySelectorAll('button')];
+
+  const tr = $('transcript');
+  SCENES.forEach((s, i) => {
+    const h = document.createElement('h3'); h.textContent = `${String(i + 1).padStart(2, '0')} · ${s.title}`; tr.appendChild(h);
+    CUES.filter(c => c[0] >= s.start && c[0] < s.start + s.dur).forEach(c => { const pEl = document.createElement('p'); pEl.textContent = c[2]; tr.appendChild(pEl); });
+  });
+
+  let lastCue = -1, lastChap = -1;
+  function sync() {
+    seek.value = t.toFixed(2);
+    seek.style.setProperty('--pct', (t / TOTAL * 100) + '%');
+    timeEl.textContent = `${fmt(t)} / ${fmt(TOTAL)}`;
+    const ci = CUES.findIndex(c => t >= c[0] && t < c[1]);
+    const cue = ci < 0 ? CUES.length - 1 : ci;
+    if (cue !== lastCue) { cap.textContent = CUES[cue][2]; lastCue = cue; }
+    const ch = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const chap = ch < 0 ? SCENES.length - 1 : ch;
+    if (chap !== lastChap) { chapBtns.forEach((b, i) => b.setAttribute('aria-current', i === chap ? 'true' : 'false')); lastChap = chap; }
+    render();
+  }
+  function setPlaying(v) {
+    if (v && t >= TOTAL - .01) t = 0;
+    playing = v; last = performance.now();
+    pp.innerHTML = v ? ICON_PAUSE : ICON_PLAY;
+    pp.setAttribute('aria-label', v ? 'Pause' : 'Play');
+    big.hidden = v;
+    big.setAttribute('aria-label', t > 0 ? 'Resume animation' : 'Play animation');
+  }
+  function frame(now) {
+    if (playing) {
+      t = Math.min(TOTAL, t + Math.min(.1, (now - last) / 1000));
+      if (t >= TOTAL) setPlaying(false);
+      sync();
+    }
+    last = now;
+    requestAnimationFrame(frame);
+  }
+
+  pp.addEventListener('click', () => setPlaying(!playing));
+  big.addEventListener('click', () => setPlaying(true));
+  cv.addEventListener('click', () => setPlaying(!playing));
+  seek.addEventListener('input', () => { t = parseFloat(seek.value); sync(); });
+  player.addEventListener('keydown', ev => {
+    if (ev.target === seek) return;
+    if (ev.key === ' ' || ev.key === 'k') { ev.preventDefault(); setPlaying(!playing); }
+    else if (ev.key === 'ArrowRight') { ev.preventDefault(); t = Math.min(TOTAL, t + 5); sync(); }
+    else if (ev.key === 'ArrowLeft') { ev.preventDefault(); t = Math.max(0, t - 5); sync(); }
+  });
+  $('fs').addEventListener('click', () => {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else if (player.requestFullscreen) player.requestFullscreen().catch(() => {});
+    } catch (_) {}
+  });
+  document.addEventListener('fullscreenchange', () => requestAnimationFrame(resize));
+  new ResizeObserver(() => resize()).observe(cv);
+
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fontsReady = document.fonts ? Promise.race([
+    Promise.all([
+      document.fonts.load(`800 40px ${DISP}`), document.fonts.load(`700 40px ${DISP}`),
+      document.fonts.load(`400 16px ${SANS}`), document.fonts.load(`600 16px ${SANS}`),
+      document.fonts.load(`400 16px ${MONO}`), document.fonts.load(`500 16px ${MONO}`)
+    ]),
+    new Promise(r => setTimeout(r, 2000))
+  ]).catch(() => {}) : Promise.resolve();
+
+  setPlaying(false);
+  resize(); sync();
+  fontsReady.then(() => {
+    sync();
+    if (reduce) { t = 6; sync(); big.hidden = false; }
+    else setPlaying(true);
+    requestAnimationFrame(frame);
+  });
+})();
+</script>
+</body>
+</html>
