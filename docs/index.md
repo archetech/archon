@@ -12,6 +12,7 @@ Three-minute animated explanations of how Archon works, each viewable in the bro
 - [Sign In With a DID](presentations/signin.html) — passwordless sign-in: challenge, wallet response, Herald verification, and OpenID Connect
 - [A Name for Your DID](presentations/names.html) — Archon addresses: claiming name@domain, resolving and publishing it, Herald's public pages, and using addresses for Lightning and email
 - [Shared, Sealed, Counted](presentations/assets.html) — groups, vaults and polls: nested membership, per-member vault keys, sealed ballots, and who can see what
+- [Letters in a Vault](presentations/dmail.html) — dmail, Archon's encrypted mail between DIDs: messages sealed in a vault, delivery by expiring notice, wallet folders, replies, Herald's email bridge, and what stays public or private
 - [Messages Between DIDs](presentations/didcomm.html) — DIDComm in Archon: keys, envelopes, delivery through the relay and Tor, mediators, and protocols
 - [Paying a DID](presentations/payments.html) — Lightning in Archon: a wallet per DID, zaps to a DID or name@domain, onion endpoints, and pay-per-request L402 API access
 - [Anchored in a Block](presentations/anchoring.html) — how operations are registered on blockchains: per-registry queues, batches whose DID commits to their operations, one transaction per batch on Bitcoin, Zcash, Ethereum or Solana, importing on every node, confirmation and timestamps, and orphaned blocks
