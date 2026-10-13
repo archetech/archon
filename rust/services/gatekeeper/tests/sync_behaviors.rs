@@ -392,8 +392,9 @@ async fn sync_processing_rejects_signed_update_without_previd() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn sync_processing_rejects_duplicate_previd_branches() -> Result<()> {
+// Imports three updates that share a predecessor, delivered in `order`, and
+// returns the processing summary and the resolved document.
+async fn import_competing_branches(order: [usize; 3]) -> Result<(Value, Value)> {
     let service = spawn_json().await?;
 
     let agent_did = create_did(
@@ -407,44 +408,60 @@ async fn sync_processing_rejects_duplicate_previd_branches() -> Result<()> {
         .unwrap()
         .to_string();
 
-    let mut doc1 = agent_doc.clone();
-    doc1["didDocumentData"] = json!({ "branch": 1 });
-    let mut doc2 = agent_doc.clone();
-    doc2["didDocumentData"] = json!({ "branch": 2 });
-    let mut doc3 = agent_doc.clone();
-    doc3["didDocumentData"] = json!({ "branch": 3 });
-
-    let batch = vec![
+    // Sign only the document components, as Keymaster does. Resolution
+    // metadata carries the retrieval time and would make every run's
+    // operations, and so their CIDs, different.
+    let branch = |n: u64| {
+        let time = format!("2026-04-11T12:0{n}:00Z");
+        let doc = json!({
+            "didDocument": agent_doc["didDocument"],
+            "didDocumentData": { "branch": n },
+            "didDocumentRegistration": agent_doc["didDocumentRegistration"],
+        });
         make_event(
             "local",
-            "2026-04-11T12:01:00Z",
-            &[0],
-            create_update_operation(7, &agent_did, Some(&previd), "2026-04-11T12:01:00Z", doc1),
-        ),
-        make_event(
-            "local",
-            "2026-04-11T12:02:00Z",
-            &[1],
-            create_update_operation(7, &agent_did, Some(&previd), "2026-04-11T12:02:00Z", doc2),
-        ),
-        make_event(
-            "local",
-            "2026-04-11T12:03:00Z",
-            &[2],
-            create_update_operation(7, &agent_did, Some(&previd), "2026-04-11T12:03:00Z", doc3),
-        ),
-    ];
+            &time,
+            &[n - 1],
+            create_update_operation(7, &agent_did, Some(&previd), &time, doc),
+        )
+    };
+    let branches = [branch(1), branch(2), branch(3)];
+    let batch: Vec<Value> = order.iter().map(|&index| branches[index].clone()).collect();
 
     let imported = admin_post(&service, "batch/import", json!(batch)).await?;
     assert_eq!(imported["queued"], 3);
 
     let processed = admin_post(&service, "events/process", json!(null)).await?;
-    assert_eq!(processed["added"], 1);
-    assert_eq!(processed["rejected"], 2);
-    assert_eq!(processed["pending"], 0);
-
     let resolved = resolve_did(&service, &agent_did).await?;
-    assert_eq!(resolved["didDocumentMetadata"]["versionSequence"], "2");
+    Ok((processed, resolved))
+}
+
+// Competing unanchored successors resolve to the smallest canonical CID, so
+// exactly one branch is accepted and delivery order cannot change which.
+#[tokio::test]
+async fn sync_processing_rejects_duplicate_previd_branches() -> Result<()> {
+    let (forward, forward_doc) = import_competing_branches([0, 1, 2]).await?;
+    let (reverse, reverse_doc) = import_competing_branches([2, 1, 0]).await?;
+
+    for processed in [&forward, &reverse] {
+        assert_eq!(processed["pending"], 0);
+        assert_eq!(processed["merged"], 0);
+        let added = processed["added"].as_u64().unwrap();
+        let rejected = processed["rejected"].as_u64().unwrap();
+        assert!(added >= 1, "{processed}");
+        assert_eq!(added + rejected, 3, "{processed}");
+    }
+    for doc in [&forward_doc, &reverse_doc] {
+        assert_eq!(doc["didDocumentMetadata"]["versionSequence"], "2");
+    }
+    assert_eq!(
+        forward_doc["didDocumentData"],
+        reverse_doc["didDocumentData"]
+    );
+    assert_eq!(
+        forward_doc["didDocumentMetadata"]["versionId"],
+        reverse_doc["didDocumentMetadata"]["versionId"]
+    );
 
     Ok(())
 }
