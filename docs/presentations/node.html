@@ -434,7 +434,7 @@
     T('signed operations', 640, 208, { s: 12, c: C.soft, al: 'center', a: e(t, 3, 3.6) });
     // ports
     chip(280, 290, ':4224  public for resolution', { pr: e(t, 6.4, 7), c: C.green, bg: C.greenL, stroke: C.green });
-    chip(1000, 290, '127.0.0.1:4226  admin key on every route', { pr: e(t, 7.4, 8), c: C.amber, bg: C.amberL, stroke: C.amber });
+    chip(1000, 290, '127.0.0.1:4226  admin key on wallet routes', { pr: e(t, 7.4, 8), c: C.amber, bg: C.amberL, stroke: C.amber });
     // flavors
     const fa = e(t, 12, 12.8);
     if (fa > 0) {
@@ -453,14 +453,15 @@
   function s4(t) {
     heading(4, 'Starting one', t);
     terminal(70, 150, 700, [
-      ['$ docker compose -f docker/compose/minimal.yml up -d'],
+      ['$ export COMPOSE_FILE=docker/compose/minimal.yml'],
+      ['$ docker compose --env-file .env up -d'],
       ['  ipfs · redis · gatekeeper · keymaster', C.green],
       ['  hyperswarm-mediator · cli', C.green],
       ['$ ./archon create-id alice'],
       ['  did:cid:bagaaiera…a11ce', C.amber],
       ['$ ./archon resolve-id alice'],
       ['$ curl -s localhost:4224/api/v1/version']
-    ], p(t, .6, 9), { a: e(t, .2, .8), fs: 14, lh: 26 });
+    ], p(t, .6, 9), { a: e(t, .2, .8), fs: 14, lh: 24 });
     T('the minimal stack: six services, ready to try', 420, 412, { s: 14, c: C.soft, al: 'center', a: e(t, 3, 3.6) });
     T('./archon runs commands in the CLI container', 420, 436, { s: 14, c: C.soft, al: 'center', a: e(t, 6.4, 7) });
     // node identity
@@ -499,7 +500,7 @@
       T(p0, 96, y, { f: MONO, s: 15, w: 500, c, a });
       T(d, 1184, y, { s: 15, w: 600, al: 'right', a });
     });
-    T('without hyperswarm, DIDs stay on this node', 640, 616, { s: 14, w: 600, c: C.cobalt, al: 'center', a: e(t, 3.6, 4.2) * (1 - e(t, 7.4, 7.8)) });
+    T('without hyperswarm or a chain, DIDs stay on this node', 640, 616, { s: 14, w: 600, c: C.cobalt, al: 'center', a: e(t, 3.6, 4.2) * (1 - e(t, 7.4, 7.8)) });
     T('list each chain in ARCHON_GATEKEEPER_REGISTRIES; mediators only read until you enable export and fund the wallet', 640, 616, { s: 14, w: 600, c: C.amber, al: 'center', a: e(t, 7.8, 8.4) });
   }
 
@@ -655,13 +656,13 @@
     [16, 21, 'Two values are required: an admin key that guards every admin route, and a passphrase that encrypts the node’s wallet.'],
     [21, 26, 'Neither Gatekeeper nor Keymaster starts without the admin key, and Keymaster needs the passphrase. To change it later, use change-passphrase first.'],
     [26, 32, 'The core is four services: Redis stores DIDs, IPFS stores content, Gatekeeper validates and resolves, and Keymaster holds the wallet.'],
-    [32, 38, 'Gatekeeper’s port can be public; resolution needs no key. Keymaster binds to localhost, and every route needs the admin key.'],
+    [32, 38, 'Gatekeeper’s port can be public; resolution needs no key. Keymaster binds to localhost, and apart from readiness, version and passphrase login, its routes need the admin key.'],
     [38, 44, 'Gatekeeper comes in TypeScript or Rust, and Keymaster in TypeScript or Python. Each pair is a drop-in replacement.'],
     [44, 50, 'To try a node, start the minimal stack: six services, including the Hyperswarm mediator and a CLI container.'],
     [50, 55, 'The ./archon script runs commands in that container: create an identity, then resolve it back.'],
     [55, 60, 'On first start, Keymaster creates the node’s own agent DID. Mediators use it to speak for the node.'],
     [60, 66, 'The full docker-compose.yml includes everything, switched on by COMPOSE_PROFILES. With none set, only the core runs.'],
-    [66, 72, 'Add hyperswarm to share DIDs with other nodes. Without it, DIDs stay on this one.'],
+    [66, 72, 'Add hyperswarm to share DIDs with other nodes. With neither it nor a chain mediator, DIDs stay on this one.'],
     [72, 80, 'Each chain profile brings a mediator and its own wallet. Mediators only read until you enable export and fund the wallet.'],
     [80, 86, 'To serve the public, add Drawbridge: one front door for Gatekeeper, DIDComm mail, names and Lightning.'],
     [86, 92, 'Each upstream is its own profile: didcomm for mail, herald for names and sign-in, lightning for invoices and zaps.'],
