@@ -17,6 +17,7 @@ Three-minute animated explanations of how Archon works, each viewable in the bro
 - [Paying a DID](presentations/payments.html) — Lightning in Archon: a wallet per DID, zaps to a DID or name@domain, onion endpoints, and pay-per-request L402 API access
 - [An Identity for Your Agent](presentations/mcp.html) — Archon for AI agents through the MCP server: a local Keymaster, every command as a tool, an agent's own DID, credentials that show who stands behind it, context-sized results, and explicit confirmations for secrets and payments
 - [Anchored in a Block](presentations/anchoring.html) — how operations are registered on blockchains: per-registry queues, batches whose DID commits to their operations, one transaction per batch on Bitcoin, Zcash, Ethereum or Solana, importing on every node, confirmation and timestamps, and orphaned blocks
+- [Running a Node](presentations/node.html) — what an Archon node is made of and how to run one: required settings, the core services and their implementations, the minimal stack, Compose profiles, Drawbridge as the public front door, dashboards, and what to expose and back up
 - [One History, Everywhere](presentations/convergence.html) — how nodes converge on DID history: replay, forks, chain anchors, late evidence, and reorganizations
 
 ## Protocol

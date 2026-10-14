@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Running a Node</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #e8ecf1;
+    --panel: #f6f8fb;
+    --ink: #141d2b;
+    --soft: #5b6879;
+    --line: #c6cfdb;
+    --cobalt: #2a4fc4;
+    --amber: #c97a12;
+    --bar: #141d2b;
+    --bar-text: #e8ecf1;
+    --bar-soft: #9aa6b8;
+  }
+  html, body { background: var(--paper); color: var(--ink); }
+  body { margin: 0; font: 15px/1.55 "IBM Plex Sans", system-ui, sans-serif; padding-inline: 16px; padding-block: 28px 48px; }
+  .wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+  header h1 { font: 800 clamp(30px, 5vw, 46px)/1.05 "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif; margin: 0; letter-spacing: -0.5px; text-wrap: balance; }
+  header p { margin: 8px 0 0; color: var(--soft); max-width: 62ch; }
+  header .eyebrow { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; letter-spacing: 1.5px; text-transform: uppercase; color: var(--cobalt); margin: 0 0 8px; }
+
+  .player { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--bar); box-shadow: 0 18px 50px -24px rgba(20, 29, 43, .45); outline: none; }
+  .player:focus-visible { box-shadow: 0 0 0 3px var(--cobalt); }
+  .player:fullscreen { display: flex; flex-direction: column; justify-content: center; border-radius: 0; }
+  .player:fullscreen .stage { max-height: calc(100vh - 120px); aspect-ratio: 16 / 9; margin: 0 auto; width: min(100%, calc((100vh - 120px) * 16 / 9)); }
+  .stage { position: relative; aspect-ratio: 16 / 9; max-width: 100%; background: var(--paper); }
+  canvas { display: block; width: 100%; height: 100%; cursor: pointer; }
+  .bigplay { position: absolute; inset: 0; margin: auto; width: 84px; height: 84px; border-radius: 50%; border: 0; background: var(--ink); color: var(--paper); display: grid; place-items: center; cursor: pointer; box-shadow: 0 10px 30px -8px rgba(20, 29, 43, .6); }
+  .bigplay[hidden] { display: none; }
+  .bigplay svg { width: 30px; height: 30px; margin-left: 4px; }
+  .bigplay:focus-visible { outline: 3px solid var(--cobalt); outline-offset: 3px; }
+
+  .caption { min-height: 3.4em; padding: 12px 20px; color: var(--bar-text); font-size: clamp(14px, 1.9vw, 18px); line-height: 1.45; display: flex; align-items: center; justify-content: center; text-align: center; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+  .caption span { max-width: 70ch; transition: opacity .25s; }
+
+  .controls { display: flex; align-items: center; gap: 14px; padding: 10px 16px 14px; color: var(--bar-text); }
+  .controls button { background: none; border: 0; color: inherit; width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; cursor: pointer; flex: none; }
+  .controls button:hover { background: rgba(255, 255, 255, .08); }
+  .controls button:focus-visible { outline: 2px solid #8ea6ff; }
+  .controls svg { width: 20px; height: 20px; }
+  .time { font: 500 13px "IBM Plex Mono", ui-monospace, monospace; color: var(--bar-soft); font-variant-numeric: tabular-nums; flex: none; }
+  .seek { position: relative; flex: 1; min-width: 0; height: 36px; display: flex; align-items: center; }
+  .seek input { width: 100%; margin: 0; appearance: none; -webkit-appearance: none; background: transparent; height: 36px; cursor: pointer; position: relative; z-index: 2; }
+  .seek input::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-moz-range-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, #8ea6ff var(--pct, 0%), rgba(255, 255, 255, .16) var(--pct, 0%)); }
+  .seek input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; margin-top: -5px; border: 0; }
+  .seek input::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 0; }
+  .seek input:focus-visible { outline: 2px solid #8ea6ff; border-radius: 4px; }
+  .ticks { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+  .ticks i { position: absolute; top: 15px; width: 2px; height: 6px; background: var(--bar); }
+
+  .chapters { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .chapters button { width: 100%; text-align: left; display: flex; gap: 10px; align-items: baseline; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
+  .chapters button:hover { border-color: var(--cobalt); }
+  .chapters button:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 2px; }
+  .chapters button[aria-current="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .chapters .n { font: 500 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--cobalt); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .n { color: #8ea6ff; }
+  .chapters .t { font-weight: 600; flex: 1; }
+  .chapters .d { font: 400 12px "IBM Plex Mono", ui-monospace, monospace; color: var(--soft); font-variant-numeric: tabular-nums; }
+  .chapters button[aria-current="true"] .d { color: var(--bar-soft); }
+
+  details { border-top: 1px solid var(--line); padding-top: 14px; }
+  summary { cursor: pointer; font-weight: 600; }
+  .transcript { max-width: 70ch; }
+  .transcript h3 { font: 700 17px "Bricolage Grotesque", system-ui, sans-serif; margin: 18px 0 4px; }
+  .transcript p { margin: 0 0 6px; color: var(--soft); }
+
+  @media (max-width: 560px) {
+    .controls { gap: 8px; padding-inline: 10px; }
+    .time { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">did:cid · operations · three minutes</p>
+    <h1>Running a Node</h1>
+    <p>An animated walkthrough of running an Archon node: the required settings, the four core services and their two implementations, the minimal stack and the node’s own DID, Compose profiles for peers, chains and storage, Drawbridge as the public front door, dashboards and logs, and which ports to open and what to back up. Everything on screen is drawn live with canvas code.</p>
+  </header>
+
+  <div class="player" id="player" tabindex="0" aria-label="Animation player. Space plays or pauses, arrow keys skip.">
+    <div class="stage">
+      <canvas id="cv" role="img" aria-label="Animated diagram of an Archon node and how to run one. The caption below describes each scene."></canvas>
+      <button class="bigplay" id="bigplay" aria-label="Play animation" hidden>
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+      </button>
+    </div>
+    <div class="caption"><span id="cap"></span></div>
+    <div class="controls">
+      <button id="pp" aria-label="Play"></button>
+      <div class="seek">
+        <input type="range" id="seek" min="0" max="154" step="0.05" value="0" aria-label="Seek">
+        <div class="ticks" id="ticks"></div>
+      </div>
+      <span class="time" id="time">0:00 / 2:34</span>
+      <button id="fs" aria-label="Full screen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <ol class="chapters" id="chapters"></ol>
+
+  <details>
+    <summary>Transcript</summary>
+    <div class="transcript" id="transcript"></div>
+  </details>
+</div>
+
+<script>
+(() => {
+  // ---------- palette & type ----------
+  const W = 1280, H = 720, TOTAL = 154;
+  const C = {
+    paper: '#e8ecf1', grid: '#dbe1e9', gridB: '#c6cfdb', panel: '#f6f8fb',
+    ink: '#141d2b', soft: '#5b6879', faint: '#8c98a8',
+    cobalt: '#2a4fc4', cobaltL: '#dde5fb',
+    amber: '#c97a12', amberL: '#fbecd3',
+    green: '#23835a', greenL: '#d6eee2',
+    red: '#c03b28', redL: '#f8dcd6'
+  };
+  const DISP = '"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif';
+  const SANS = '"IBM Plex Sans", system-ui, sans-serif';
+  const MONO = '"IBM Plex Mono", ui-monospace, Menlo, monospace';
+
+  // ---------- math ----------
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  const p = (t, a, b) => clamp((t - a) / (b - a));
+  const e = (t, a, b) => ease(p(t, a, b));
+  const rnd = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+  const hx = c => { const n = parseInt(c.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  const mix = (a, b, t) => { const A = hx(a), B = hx(b); return `rgb(${A.map((v, i) => Math.round(lerp(v, B[i], clamp(t)))).join(',')})`; };
+  const B32 = 'abcdefghijklmnopqrstuvwxyz234567';
+  const scram = (s, pr, t, seed) => {
+    const k = Math.floor(pr * s.length); let out = '';
+    for (let i = 0; i < s.length; i++) out += i < k ? s[i] : B32[Math.floor(rnd(seed * 97 + i * 13 + Math.floor(t * 18)) * 32)];
+    return out;
+  };
+
+  // ---------- canvas ----------
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  let scale = 1;
+  function resize() {
+    const r = cv.getBoundingClientRect();
+    const d = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.max(1, Math.round(r.width * d));
+    cv.height = Math.max(1, Math.round(r.width * 9 / 16 * d));
+    scale = cv.width / W;
+    render();
+  }
+
+  // ---------- drawing primitives ----------
+  function T(s, x, y, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.font = `${o.w || 400} ${o.s || 16}px ${o.f || SANS}`;
+    ctx.fillStyle = o.c || C.ink; ctx.textAlign = o.al || 'left'; ctx.textBaseline = o.b || 'alphabetic';
+    if (o.ls) ctx.letterSpacing = o.ls + 'px';
+    ctx.fillText(s, x, y); ctx.restore();
+  }
+  function tw(s, size, font = SANS, weight = 400) { ctx.save(); ctx.font = `${weight} ${size}px ${font}`; const w = ctx.measureText(s).width; ctx.restore(); return w; }
+  function box(x, y, w, h, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, o.r ?? 10);
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 1.5; if (o.dash) ctx.setLineDash(o.dash); ctx.stroke(); }
+    ctx.restore();
+  }
+  const cbox = (cx, cy, w, h, o) => box(cx - w / 2, cy - h / 2, w, h, o);
+  function pop(cx, cy, pr, fn) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.globalAlpha *= pr;
+    const s = lerp(.88, 1, pr);
+    ctx.translate(cx, cy); ctx.scale(s, s); ctx.translate(-cx, -cy);
+    fn(); ctx.restore();
+  }
+  function arrowHead(x, y, a, c, s) {
+    ctx.beginPath(); ctx.moveTo(x, y);
+    ctx.lineTo(x - s * Math.cos(a - .45), y - s * Math.sin(a - .45));
+    ctx.lineTo(x - s * Math.cos(a + .45), y - s * Math.sin(a + .45));
+    ctx.closePath(); ctx.fillStyle = c; ctx.fill();
+  }
+  function arrow(x1, y1, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, x = lerp(x1, x2, pr), y = lerp(y1, y2, pr);
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x, y); ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(x, y, Math.atan2(y2 - y1, x2 - x1), c, o.hs || 10);
+    ctx.restore();
+  }
+  const qpt = (x1, y1, cx, cy, x2, y2, t) => { const u = 1 - t; return [u * u * x1 + 2 * u * t * cx + t * t * x2, u * u * y1 + 2 * u * t * cy + t * t * y2]; };
+  function qarrow(x1, y1, cx, cy, x2, y2, pr, o = {}) {
+    if (pr <= 0) return;
+    const c = o.c || C.ink, N = 36;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    ctx.strokeStyle = c; ctx.lineWidth = o.lw || 2; ctx.lineCap = 'round';
+    if (o.dash) ctx.setLineDash(o.dash);
+    ctx.beginPath(); ctx.moveTo(x1, y1);
+    let prev = [x1, y1], cur = prev;
+    for (let i = 1; i <= N; i++) { const tt = pr * i / N; prev = cur; cur = qpt(x1, y1, cx, cy, x2, y2, tt); ctx.lineTo(cur[0], cur[1]); }
+    ctx.stroke(); ctx.setLineDash([]);
+    if (o.head !== false) arrowHead(cur[0], cur[1], Math.atan2(cur[1] - prev[1], cur[0] - prev[0]), c, o.hs || 10);
+    ctx.restore();
+  }
+  function dot(x, y, r, c, a = 1) { if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill(); ctx.restore(); }
+  function packet(x1, y1, x2, y2, pr, c, r = 6) { if (pr <= 0 || pr >= 1) return; dot(lerp(x1, x2, pr), lerp(y1, y2, pr), r, c); }
+  function check(x, y, s, pr, c = C.green) {
+    if (pr <= 0) return;
+    const a = [x - s * .5, y], b = [x - s * .12, y + s * .38], d = [x + s * .55, y - s * .42];
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]);
+    const p1 = clamp(pr / .35); ctx.lineTo(lerp(a[0], b[0], p1), lerp(a[1], b[1], p1));
+    if (pr > .35) { const p2 = clamp((pr - .35) / .65); ctx.lineTo(lerp(b[0], d[0], p2), lerp(b[1], d[1], p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function cross(x, y, s, pr, c = C.red) {
+    if (pr <= 0) return;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .22; ctx.lineCap = 'round';
+    const p1 = clamp(pr / .5), p2 = clamp((pr - .5) / .5);
+    ctx.beginPath(); ctx.moveTo(x - s / 2, y - s / 2); ctx.lineTo(lerp(x - s / 2, x + s / 2, p1), lerp(y - s / 2, y + s / 2, p1));
+    if (p2 > 0) { ctx.moveTo(x + s / 2, y - s / 2); ctx.lineTo(lerp(x + s / 2, x - s / 2, p2), lerp(y - s / 2, y + s / 2, p2)); }
+    ctx.stroke(); ctx.restore();
+  }
+  function person(x, y, s, c) {
+    ctx.save(); ctx.fillStyle = c;
+    ctx.beginPath(); ctx.arc(x, y - s * .28, s * .2, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y + s * .4, s * .36, Math.PI, 0); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  function keyIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = s * .14; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x, y, s * .3, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + s * .3, y); ctx.lineTo(x + s * 1.05, y);
+    ctx.moveTo(x + s * .75, y); ctx.lineTo(x + s * .75, y + s * .24);
+    ctx.moveTo(x + s * .98, y); ctx.lineTo(x + s * .98, y + s * .2);
+    ctx.stroke(); ctx.restore();
+  }
+  function lockIcon(x, y, s, c) {
+    ctx.save(); ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = s * .13;
+    ctx.beginPath(); ctx.arc(x, y - s * .08, s * .26, Math.PI, 0); ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(x - s * .42, y - s * .1, s * .84, s * .6, s * .1); ctx.fill();
+    ctx.restore();
+  }
+  function db(x, y, w, h, c) {
+    const rx = w / 2, ry = h * .15, top = y - h / 2, bot = y + h / 2;
+    ctx.save(); ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.fillStyle = C.panel;
+    ctx.beginPath(); ctx.moveTo(x - rx, top + ry); ctx.lineTo(x - rx, bot - ry);
+    ctx.ellipse(x, bot - ry, rx, ry, 0, Math.PI, 0, true);
+    ctx.lineTo(x + rx, top + ry); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI, true);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, top + ry, rx, ry, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI); ctx.stroke();
+    ctx.restore();
+  }
+  function hexagon(x, y, r, rot, o = {}) {
+    ctx.save(); ctx.beginPath();
+    for (let i = 0; i < 6; i++) { const a = rot + i * Math.PI / 3; const px = x + r * Math.cos(a), py = y + r * Math.sin(a); i ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+    ctx.closePath();
+    if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(); }
+    if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = o.lw || 2; ctx.stroke(); }
+    ctx.restore();
+  }
+  function pill(cx, cy, text, o = {}) {
+    const s = o.s || 15, pad = o.pad || 14, w = tw(text, s, o.f || SANS, o.w || 600) + pad * 2, h = s + 16;
+    pop(cx, cy, o.pr ?? 1, () => {
+      cbox(cx, cy, w, h, { fill: o.bg || C.panel, stroke: o.stroke || C.gridB, r: h / 2 });
+      T(text, cx, cy + 1, { s, w: o.w || 600, f: o.f || SANS, c: o.c || C.ink, al: 'center', b: 'middle' });
+    });
+  }
+  function codeLine(s, x, y, n, fs) {
+    const re = /("(?:[^"\\]|\\.)*"\s*:)|("(?:[^"\\]|\\.)*")|([{}\[\],])|(\b\d+\b)|([^"{}\[\],]+?(?=["{}\[\],]|\b\d+\b|$))/g;
+    ctx.save(); ctx.font = `400 ${fs}px ${MONO}`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    let m, cx = x, used = 0;
+    while ((m = re.exec(s)) && used < n) {
+      if (!m[0]) { re.lastIndex++; continue; }
+      const tok = m[0];
+      ctx.fillStyle = m[1] ? C.soft : m[2] ? C.cobalt : m[3] ? C.faint : m[4] ? C.amber : C.ink;
+      const show = tok.slice(0, n - used); used += tok.length;
+      ctx.fillText(show, cx, y); cx += ctx.measureText(show).width;
+    }
+    ctx.restore();
+  }
+  function card(x, y, w, title, lines, pr, o = {}) {
+    const fs = o.fs || 14, lh = o.lh || 22, top = 30 + 24;
+    const h = top + (lines.length - 1) * lh + 18;
+    const ly = i => y + top + i * lh;
+    ctx.save(); ctx.globalAlpha *= (o.a ?? 1);
+    box(x, y, w, h, { fill: C.panel, stroke: C.gridB, r: 12 });
+    ctx.beginPath(); ctx.roundRect(x, y, w, 30, [12, 12, 0, 0]); ctx.fillStyle = o.hc || C.ink; ctx.fill();
+    T(title.toUpperCase(), x + 16, y + 20, { f: MONO, s: 12, w: 500, c: C.paper, ls: 1.2 });
+    let n = Math.floor(pr * lines.reduce((a, l) => a + l.length, 0));
+    lines.forEach((l, i) => {
+      const hl = o.hl && o.hl[i];
+      if (hl && hl[1] > 0) { ctx.save(); ctx.globalAlpha *= hl[1]; ctx.fillStyle = hl[0]; ctx.fillRect(x + 6, ly(i) - fs - 2, w - 12, lh); ctx.restore(); }
+      if (n > 0) { codeLine(l, x + 16, ly(i), n, fs); n -= l.length; }
+    });
+    ctx.restore();
+    return { h, ly };
+  }
+
+  // ---------- ambient network ----------
+  const NET = Array.from({ length: 46 }, (_, i) => ({ x: rnd(i * 3 + 1) * W, y: rnd(i * 3 + 2) * H, ph: rnd(i * 3 + 3) * 6.28 }));
+  function network(t, a) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    const P = NET.map(q => [q.x + Math.sin(t * .3 + q.ph) * 16, q.y + Math.cos(t * .25 + q.ph) * 12]);
+    ctx.lineWidth = 1;
+    for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+      const d = Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1]);
+      if (d < 175) { ctx.strokeStyle = `rgba(90,110,140,${(1 - d / 175) * .45})`; ctx.beginPath(); ctx.moveTo(P[i][0], P[i][1]); ctx.lineTo(P[j][0], P[j][1]); ctx.stroke(); }
+    }
+    P.forEach((q, i) => dot(q[0], q[1], i % 7 === 0 ? 4 : 2.5, i % 7 === 0 ? C.cobalt : C.faint, .8));
+    ctx.restore();
+  }
+
+  function background() {
+    ctx.fillStyle = C.paper; ctx.fillRect(0, 0, W, H);
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += 40) { ctx.strokeStyle = x % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = x % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += 40) { ctx.strokeStyle = y % 200 === 0 ? C.gridB : C.grid; ctx.globalAlpha = y % 200 === 0 ? .5 : .55; ctx.beginPath(); ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); ctx.stroke(); }
+    ctx.globalAlpha = 1;
+  }
+
+  function heading(n, title, t) {
+    const a = e(t, 0, .8);
+    T(`${String(n).padStart(2, '0')} / 09`, 56, 58, { f: MONO, s: 13, w: 500, c: C.cobalt, a, ls: 1.5 });
+    T(title, 56 + lerp(-12, 0, a), 94, { f: DISP, s: 32, w: 700, a });
+  }
+
+  // ---------- shared pieces ----------
+  function svc(cx, cy, w, title, sub, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha *= a;
+    cbox(cx, cy, w, o.h || 70, { fill: o.fill || C.panel, stroke: o.stroke || C.ink, lw: 2, r: 12, dash: o.dash });
+    T(title, cx, cy - 4, { f: DISP, s: o.ts || 19, w: 700, al: 'center', c: o.c || C.ink });
+    T(sub, cx, cy + 18, { s: 12, c: o.sc || C.soft, al: 'center' });
+    ctx.restore();
+  }
+  function chip(cx, cy, label, o = {}) {
+    pill(cx, cy, label, { pr: o.pr ?? 1, f: MONO, s: o.s || 13, w: 500, c: o.c || C.ink, bg: o.bg || C.panel, stroke: o.stroke || C.gridB });
+  }
+  function terminal(x, y, w, lines, pr, o = {}) {
+    const a = o.a ?? 1; if (a <= 0) return;
+    const lh = o.lh || 26, h = 44 + lines.length * lh;
+    ctx.save(); ctx.globalAlpha *= a;
+    box(x, y, w, h, { fill: C.ink, r: 12 });
+    [C.red, C.amber, C.green].forEach((c, i) => dot(x + 20 + i * 16, y + 18, 5, c));
+    let n = Math.floor(pr * lines.reduce((s, l) => s + l[0].length, 0));
+    lines.forEach(([l, c], i) => {
+      if (n <= 0) return;
+      const show = l.slice(0, n); n -= l.length;
+      T(show, x + 20, y + 54 + i * lh, { f: MONO, s: o.fs || 15, w: 500, c: c || C.paper });
+    });
+    ctx.restore();
+    return h;
+  }
+
+  // ---------- scene 1: title ----------
+  function s1(t) {
+    network(t, .55);
+    const g = ctx.createRadialGradient(640, 330, 40, 640, 330, 540);
+    g.addColorStop(0, 'rgba(232,236,241,0.97)'); g.addColorStop(1, 'rgba(232,236,241,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const sc = lerp(.97, 1, e(t, 0, 2.5));
+    ctx.save(); ctx.translate(640, 270); ctx.scale(sc, sc);
+    T('Running a Node', 0, 0, { f: DISP, s: 110, w: 800, al: 'center', b: 'middle', ls: -2 });
+    ctx.restore();
+    T('What an Archon node is made of, and how to run your own', 640, 360, { s: 25, c: C.soft, al: 'center', a: e(t, .8, 2.3) });
+    db(640, 446, 70, 60, C.cobalt);
+    [['Docker Compose', 400], ['Profiles add what you need', 620], ['One public front door', 860]].forEach(([s, x], i) =>
+      pill(x, 540, s, { pr: e(t, 4.4 + i * .4, 5 + i * .4), s: 14, c: C.soft }));
+  }
+
+  // ---------- scene 2: setting up ----------
+  function s2(t) {
+    heading(2, 'Setting up', t);
+    terminal(70, 150, 640, [
+      ['$ git clone https://github.com/archetech/archon.git'],
+      ['$ cd archon && cp sample.env .env'],
+      ['$ mkdir -p data'],
+      ['$ openssl rand -hex 32', C.faint],
+      ['9f2c…41ab', C.amber]
+    ], p(t, .6, 5), { a: e(t, .2, .8) });
+    const ea = e(t, 6, 6.8);
+    if (ea > 0) {
+      ctx.save(); ctx.globalAlpha *= ea;
+      box(760, 150, 450, 300, { fill: C.panel, stroke: C.ink, lw: 2, r: 12 });
+      T('.env', 784, 182, { f: MONO, s: 15, w: 500, c: C.soft });
+      const rows = [
+        ['ARCHON_UID / ARCHON_GID', 'containers run as you', C.ink, 6.4],
+        ['ARCHON_ADMIN_API_KEY', 'guards every admin route', C.amber, 7.4],
+        ['ARCHON_PASSPHRASE', 'encrypts the node’s wallet', C.amber, 8.4],
+        ['COMPOSE_PROFILES', 'which optional services run', C.cobalt, 9.4]
+      ];
+      rows.forEach(([k, d, c, at], i) => {
+        const y = 226 + i * 56, a = e(t, at, at + .6);
+        T(k, 784, y, { f: MONO, s: 15, w: 500, c, a });
+        T(d, 784, y + 20, { s: 13, c: C.soft, a });
+      });
+      ctx.restore();
+    }
+    pill(640, 520, 'everything the node keeps lives under ./data', { pr: e(t, 3, 3.6), s: 15, c: C.ink });
+    T('Neither Gatekeeper nor Keymaster starts without the admin key; Keymaster needs the passphrase too.', 640, 580, { s: 15, w: 600, al: 'center', a: e(t, 11, 11.6) });
+    T('To change the passphrase later, run change-passphrase first: editing .env alone locks the wallet.', 640, 606, { s: 14, c: C.soft, al: 'center', a: e(t, 12.4, 13) });
+  }
+
+  // ---------- scene 3: the core ----------
+  function s3(t) {
+    heading(3, 'The core', t);
+    svc(280, 220, 260, 'Gatekeeper', 'validates, stores, resolves', { a: e(t, .4, 1) });
+    svc(1000, 220, 260, 'Keymaster', 'the node’s wallet and keys', { a: e(t, .8, 1.4), stroke: C.amber });
+    svc(280, 400, 220, 'Redis', 'DID store', { a: e(t, 1.2, 1.8), ts: 17 });
+    svc(640, 400, 220, 'IPFS', 'content by CID', { a: e(t, 1.6, 2.2), ts: 17 });
+    arrow(280, 256, 280, 362, e(t, 2, 2.6), { c: C.faint, hs: 7 });
+    arrow(412, 246, 600, 362, e(t, 2.2, 2.8), { c: C.faint, hs: 7 });
+    arrow(870, 220, 412, 220, e(t, 2.6, 3.2), { c: C.faint, hs: 7 });
+    T('signed operations', 640, 208, { s: 12, c: C.soft, al: 'center', a: e(t, 3, 3.6) });
+    // ports
+    chip(280, 290, ':4224  public for resolution', { pr: e(t, 6.4, 7), c: C.green, bg: C.greenL, stroke: C.green });
+    chip(1000, 290, '127.0.0.1:4226  admin key on wallet routes', { pr: e(t, 7.4, 8), c: C.amber, bg: C.amberL, stroke: C.amber });
+    // flavors
+    const fa = e(t, 12, 12.8);
+    if (fa > 0) {
+      ctx.save(); ctx.globalAlpha *= fa;
+      box(100, 490, 1080, 110, { fill: C.panel, stroke: C.gridB, r: 12 });
+      T('TWO IMPLEMENTATIONS EACH, DROP-IN REPLACEMENTS', 130, 520, { f: MONO, s: 11, w: 500, c: C.soft, ls: 1.1 });
+      T('ARCHON_GATEKEEPER_FLAVOR', 130, 556, { f: MONO, s: 15, w: 500 });
+      T('ts  or  rust', 130, 580, { f: MONO, s: 14, w: 500, c: C.cobalt });
+      T('ARCHON_KEYMASTER_FLAVOR', 660, 556, { f: MONO, s: 15, w: 500 });
+      T('ts  or  py', 660, 580, { f: MONO, s: 14, w: 500, c: C.cobalt });
+      ctx.restore();
+    }
+  }
+
+  // ---------- scene 4: starting one ----------
+  function s4(t) {
+    heading(4, 'Starting one', t);
+    terminal(70, 150, 700, [
+      ['$ export COMPOSE_FILE=docker/compose/minimal.yml'],
+      ['$ docker compose --env-file .env up -d'],
+      ['  ipfs · redis · gatekeeper · keymaster', C.green],
+      ['  hyperswarm-mediator · cli', C.green],
+      ['$ ./archon create-id alice'],
+      ['  did:cid:bagaaiera…a11ce', C.amber],
+      ['$ ./archon resolve-id alice'],
+      ['$ curl -s localhost:4224/api/v1/version']
+    ], p(t, .6, 9), { a: e(t, .2, .8), fs: 14, lh: 24 });
+    T('the minimal stack: six services, ready to try', 420, 412, { s: 14, c: C.soft, al: 'center', a: e(t, 3, 3.6) });
+    T('./archon runs commands in the CLI container', 420, 436, { s: 14, c: C.soft, al: 'center', a: e(t, 6.4, 7) });
+    // node identity
+    const na = e(t, 11, 11.8);
+    if (na > 0) {
+      ctx.save(); ctx.globalAlpha *= na;
+      box(820, 150, 390, 290, { fill: C.panel, stroke: C.cobalt, lw: 2, r: 12 });
+      T('THE NODE’S OWN DID', 844, 180, { f: MONO, s: 11, w: 500, c: C.soft, ls: 1.1 });
+      person(870, 236, 44, C.cobalt);
+      T('ARCHON_NODE_ID', 910, 232, { f: MONO, s: 15, w: 500, c: C.cobalt });
+      T('created by Keymaster on first start', 910, 254, { s: 13, c: C.soft });
+      T('Mediators speak for the node with it:', 844, 316, { s: 14, w: 600 });
+      T('· peering records on Hyperswarm', 844, 344, { s: 14, c: C.soft });
+      T('· the batches it anchors on chains', 844, 370, { s: 14, c: C.soft });
+      ctx.restore();
+    }
+    pill(640, 540, 'the full docker-compose.yml is the same core, plus everything below', { pr: e(t, 14, 14.6), s: 14, c: C.ink });
+  }
+
+  // ---------- scene 5: profiles ----------
+  const PROFILES = [
+    ['hyperswarm', 'share DIDs with peers', C.cobalt, 1.6],
+    ['btc-mainnet · zcash-mainnet · eth-mainnet · sol-mainnet', 'a chain mediator and its wallet', C.amber, 6.6],
+    ['drawbridge · herald · lightning · tor · didcomm', 'a public front door and what it fronts', C.green, 10],
+    ['observability', 'Prometheus and Grafana', C.ink, 11],
+    ['pinning · filecoin', 'paid storage for content', C.ink, 11.6],
+    ['explorer · react-wallet · *-client', 'browser UIs', C.ink, 12.2]
+  ];
+  function s5(t) {
+    heading(5, 'Profiles add what you need', t);
+    chip(640, 150, 'COMPOSE_PROFILES=hyperswarm,btc-mainnet,drawbridge,…', { pr: e(t, .4, 1), s: 15, c: C.cobalt, bg: C.cobaltL, stroke: C.cobalt });
+    T('with no profiles, only the core runs', 640, 192, { s: 14, c: C.soft, al: 'center', a: e(t, 1, 1.6) });
+    PROFILES.forEach(([p0, d, c, at], i) => {
+      const y = 246 + i * 58, a = e(t, at, at + .6);
+      box(70, y - 30, 1140, 50, { fill: C.panel, stroke: i === 0 ? C.cobalt : i === 1 ? C.amber : C.gridB, lw: i < 2 ? 2 : 1.5, r: 10, a });
+      T(p0, 96, y, { f: MONO, s: 15, w: 500, c, a });
+      T(d, 1184, y, { s: 15, w: 600, al: 'right', a });
+    });
+    T('without hyperswarm or a chain, DIDs stay on this node', 640, 616, { s: 14, w: 600, c: C.cobalt, al: 'center', a: e(t, 3.6, 4.2) * (1 - e(t, 7.4, 7.8)) });
+    T('list each chain in ARCHON_GATEKEEPER_REGISTRIES; mediators only read until you enable export and fund the wallet', 640, 616, { s: 14, w: 600, c: C.amber, al: 'center', a: e(t, 7.8, 8.4) });
+  }
+
+  // ---------- scene 6: a public front door ----------
+  function s6(t) {
+    heading(6, 'A public front door', t);
+    svc(160, 330, 200, 'Clients', 'wallets, peers, sites', { a: e(t, 0, .6) });
+    svc(520, 330, 240, 'Drawbridge', ':4222 · the public port', { a: e(t, .6, 1.2), stroke: C.green });
+    arrow(262, 330, 398, 330, e(t, 1, 1.6), { c: C.ink, hs: 8 });
+    // onion
+    const oa = e(t, 9.6, 10.4);
+    if (oa > 0) {
+      ctx.save(); ctx.globalAlpha *= oa;
+      [0, 1, 2].forEach(k => { ctx.strokeStyle = mix(C.cobalt, C.panel, k * .3); ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(520, 200, 30 - k * 8, 36 - k * 10, 0, 0, Math.PI * 2); ctx.stroke(); });
+      T('tor: an onion address too', 520, 160 - 4, { s: 13, w: 600, al: 'center' });
+      ctx.restore();
+    }
+    arrow(520, 238, 520, 292, e(t, 10, 10.6), { c: C.cobalt, hs: 7, dash: [5, 5] });
+    const ups = [
+      ['Gatekeeper', 'DIDs and resolution', 'always', 3],
+      ['DIDComm relay', 'mail for DIDs', 'didcomm', 4],
+      ['Herald', 'names and sign-in', 'herald', 5],
+      ['Lightning mediator', 'invoices, zaps, L402', 'lightning', 6]
+    ];
+    ups.forEach(([n, d, prof, at], i) => {
+      const y = 160 + i * 96, a = e(t, at, at + .6);
+      svc(960, y, 300, n, d, { a, h: 64, ts: 17 });
+      chip(1150, y - 34, prof, { pr: a, s: 11, c: C.soft });
+      arrow(642, 330, 806, y, e(t, at + .2, at + .8), { c: C.faint, hs: 7 });
+    });
+    pill(520, 470, 'L402 can charge per request', { pr: e(t, 11.4, 12), s: 14, c: C.amber, bg: C.amberL, stroke: C.amber });
+    const ba = e(t, 13, 13.6);
+    if (ba > 0) {
+      ctx.save(); ctx.globalAlpha *= ba;
+      box(70, 530, 1140, 76, { fill: C.panel, stroke: C.gridB, r: 12 });
+      T('Drawbridge offers whatever its upstream URLs point at.', 640, 562, { s: 16, w: 600, al: 'center' });
+      T('Blank the URL of any service you don’t run, or it advertises a service that isn’t there.', 640, 588, { s: 14, c: C.soft, al: 'center' });
+      ctx.restore();
+    }
+  }
+
+  // ---------- scene 7: watching it ----------
+  function s7(t) {
+    heading(7, 'Watching it', t);
+    const ga = e(t, 0, .8);
+    if (ga > 0) {
+      ctx.save(); ctx.globalAlpha *= ga;
+      box(70, 150, 760, 400, { fill: C.panel, stroke: C.ink, lw: 2, r: 14 });
+      T('Grafana · a chain mediator dashboard', 96, 184, { s: 16, w: 600 });
+      ctx.restore();
+    }
+    const panels = [['blocks scanned', 'line', C.cobalt], ['batches anchored', 'bars', C.amber], ['fee estimate', 'line', C.ink], ['wallet balance', 'stat', C.green]];
+    panels.forEach(([n, kind, c], i) => {
+      const x = 96 + (i % 2) * 362, y = 210 + Math.floor(i / 2) * 166, a = e(t, 1 + i * .5, 1.6 + i * .5);
+      if (a <= 0) return;
+      ctx.save(); ctx.globalAlpha *= a;
+      box(x, y, 340, 148, { fill: C.paper, stroke: C.gridB, r: 10 });
+      T(n, x + 16, y + 26, { s: 13, w: 600, c: C.soft });
+      const pr = e(t, 1.4 + i * .5, 4 + i * .5);
+      if (kind === 'line') {
+        ctx.strokeStyle = c; ctx.lineWidth = 2.5; ctx.beginPath();
+        for (let k = 0; k <= 30 * pr; k++) { const xx = x + 20 + k * 10, yy = y + 120 - (i === 0 ? k * 2.6 : 30 + Math.sin(k * .6) * 14 + rnd(k) * 10); k ? ctx.lineTo(xx, yy) : ctx.moveTo(xx, yy); }
+        ctx.stroke();
+      } else if (kind === 'bars') {
+        for (let k = 0; k < 12 * pr; k++) box(x + 22 + k * 25, y + 130 - (14 + rnd(k + 9) * 60), 16, 14 + rnd(k + 9) * 60, { fill: c, r: 2 });
+      } else {
+        T('0.0042 BTC', x + 170, y + 100, { f: DISP, s: 32, w: 700, c, al: 'center', a: pr });
+      }
+      ctx.restore();
+    });
+    const ra = e(t, 6, 6.8);
+    T('observability', 880, 190, { f: MONO, s: 16, w: 500, c: C.cobalt, a: ra });
+    T('Prometheus scrapes every service', 880, 222, { s: 15, a: ra });
+    T('Grafana ships with dashboards,', 880, 250, { s: 15, a: ra });
+    T('one per chain mediator', 880, 274, { s: 15, a: ra });
+    const la = e(t, 12, 12.6);
+    T('change the default admin / admin login', 880, 340, { s: 15, w: 600, c: C.amber, a: la });
+    terminal(850, 380, 380, [['$ docker compose logs -f gatekeeper'], ['Gatekeeper history replay: 36998/36998 DIDs', C.green]], p(t, 13, 15.4), { a: e(t, 12.6, 13.2), fs: 12, lh: 24 });
+  }
+
+  // ---------- scene 8: keeping it safe ----------
+  const OPEN = [['4001', 'IPFS swarm'], ['4222', 'Drawbridge'], ['9736', 'Lightning peers'], ['4224', 'Gatekeeper, or behind a proxy']];
+  const BACKUP = [['./data/cln-mainnet/', 'Lightning funds and channels', C.red], ['./data/tor-drawbridge/', 'your onion address', C.amber], ['the wallet’s recovery phrase', 'the node’s identity', C.amber], ['all of ./data', 'everything else', C.ink]];
+  function s8(t) {
+    heading(8, 'Keeping it safe', t);
+    const la = e(t, 0, .6);
+    box(70, 150, 540, 400, { fill: C.panel, stroke: C.gridB, r: 14, a: la });
+    T('Open only what must be public', 94, 190, { f: DISP, s: 21, w: 700, a: la });
+    OPEN.forEach(([pt, d], i) => {
+      const y = 246 + i * 52, a = e(t, .8 + i * .4, 1.4 + i * .4);
+      chip(140, y - 6, pt, { pr: a, c: C.green, bg: C.greenL, stroke: C.green });
+      T(d, 196, y, { s: 16, w: 600, a });
+    });
+    T('everything else on 127.0.0.1;', 94, 482, { s: 15, w: 600, a: e(t, 4.6, 5.2) });
+    T('HTTPS through a reverse proxy', 94, 506, { s: 15, c: C.soft, a: e(t, 5.2, 5.8) });
+    const ra = e(t, 12, 12.6);
+    box(670, 150, 540, 400, { fill: C.panel, stroke: C.gridB, r: 14, a: ra });
+    T('Back up', 694, 190, { f: DISP, s: 21, w: 700, a: ra });
+    BACKUP.forEach(([pth, d, c], i) => {
+      const y = 246 + i * 64, a = e(t, 12.6 + i * .5, 13.2 + i * .5);
+      T(pth, 694, y, { f: MONO, s: 15, w: 500, c, a });
+      T(d, 694, y + 22, { s: 14, c: C.soft, a });
+    });
+    T('see Keys You Can Lose', 940, 520, { s: 13, c: C.soft, al: 'center', a: e(t, 16, 16.6) });
+  }
+
+  // ---------- scene 9: recap ----------
+  const RECAP = [
+    'copy sample.env; set the admin key and the passphrase',
+    'four core services, with Keymaster on localhost',
+    'profiles add peers, chains, a gateway and dashboards',
+    'Drawbridge is the one public front door',
+    'open little, bind the rest locally, back up ./data'
+  ];
+  function s9(t) {
+    const out = e(t, 7.6, 8.6);
+    ctx.save(); ctx.globalAlpha *= 1 - out;
+    heading(9, 'Recap', t);
+    T('Running a node', 110, 190, { f: DISP, s: 38, w: 800, a: e(t, .2, .8) });
+    RECAP.forEach((s, i) => {
+      const y = 258 + i * 60, a = e(t, .8 + i * .5, 1.4 + i * .5);
+      dot(132, y - 7, 18, C.greenL, a); check(132, y - 7, 18, a);
+      T(s, 168, y, { s: 23, w: 500, a });
+    });
+    ctx.restore();
+    if (out > 0) {
+      network(t, .5 * out);
+      const g = ctx.createRadialGradient(640, 360, 40, 640, 360, 520);
+      g.addColorStop(0, `rgba(232,236,241,${.97 * out})`); g.addColorStop(1, 'rgba(232,236,241,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      T('Running a Node', 640, 320, { f: DISP, s: 96, w: 800, al: 'center', b: 'middle', ls: -2, a: out });
+      T('The same software public nodes run, on your own machine.', 640, 400, { s: 24, al: 'center', c: C.ink, a: e(t, 8.6, 9.4) });
+      T('docs/deployment.md · docs/services', 640, 458, { f: MONO, s: 18, w: 500, c: C.cobalt, al: 'center', a: e(t, 9.4, 10.2) });
+    }
+  }
+
+  // ---------- timeline ----------
+  const SCENES = [
+    { title: 'Running a Node', start: 0, dur: 10, draw: s1 },
+    { title: 'Setting up', start: 10, dur: 16, draw: s2 },
+    { title: 'The core', start: 26, dur: 18, draw: s3 },
+    { title: 'Starting one', start: 44, dur: 16, draw: s4 },
+    { title: 'Profiles', start: 60, dur: 20, draw: s5 },
+    { title: 'A public front door', start: 80, dur: 20, draw: s6 },
+    { title: 'Watching it', start: 100, dur: 18, draw: s7 },
+    { title: 'Keeping it safe', start: 118, dur: 22, draw: s8 },
+    { title: 'Recap', start: 140, dur: 14, draw: s9 }
+  ];
+  const CUES = [
+    [0, 5, 'An Archon node is a set of services running in Docker: the same software public nodes run, on your own machine.'],
+    [5, 10, 'This is what runs, how to start one, how to add peers, chains and a public gateway, and how to keep it safe.'],
+    [10, 16, 'Clone the repository and copy sample.env to .env. Everything the node keeps lives under ./data.'],
+    [16, 21, 'Two values are required: an admin key that guards every admin route, and a passphrase that encrypts the node’s wallet.'],
+    [21, 26, 'Neither Gatekeeper nor Keymaster starts without the admin key, and Keymaster needs the passphrase. To change it later, use change-passphrase first.'],
+    [26, 32, 'The core is four services: Redis stores DIDs, IPFS stores content, Gatekeeper validates and resolves, and Keymaster holds the wallet.'],
+    [32, 38, 'Gatekeeper’s port can be public; resolution needs no key. Keymaster binds to localhost, and apart from readiness, version and passphrase login, its routes need the admin key.'],
+    [38, 44, 'Gatekeeper comes in TypeScript or Rust, and Keymaster in TypeScript or Python. Each pair is a drop-in replacement.'],
+    [44, 50, 'To try a node, start the minimal stack: six services, including the Hyperswarm mediator and a CLI container.'],
+    [50, 55, 'The ./archon script runs commands in that container: create an identity, then resolve it back.'],
+    [55, 60, 'On first start, Keymaster creates the node’s own agent DID. Mediators use it to speak for the node.'],
+    [60, 66, 'The full docker-compose.yml includes everything, switched on by COMPOSE_PROFILES. With none set, only the core runs.'],
+    [66, 72, 'Add hyperswarm to share DIDs with other nodes. With neither it nor a chain mediator, DIDs stay on this one.'],
+    [72, 80, 'Each chain profile brings a mediator and its own wallet. Mediators only read until you enable export and fund the wallet.'],
+    [80, 86, 'To serve the public, add Drawbridge: one front door for Gatekeeper, DIDComm mail, names and Lightning.'],
+    [86, 92, 'Each upstream is its own profile: didcomm for mail, herald for names and sign-in, lightning for invoices and zaps.'],
+    [92, 100, 'tor adds an onion address, L402 can charge per request, and Drawbridge offers only what its upstream URLs point at.'],
+    [100, 106, 'The observability profile adds Prometheus, which scrapes every service, and Grafana with ready-made dashboards.'],
+    [106, 112, 'Each chain mediator has its own dashboard: scanning, anchors, fees and the wallet’s balance.'],
+    [112, 118, 'Change Grafana’s default login, and follow any service with docker compose logs.'],
+    [118, 124, 'Open only what must be public: the IPFS swarm, Drawbridge, and Lightning’s peer port. Gatekeeper is public, or behind a proxy.'],
+    [124, 130, 'Bind everything else to localhost, and put HTTPS in front with a reverse proxy.'],
+    [130, 135, 'Back up all of ./data. The Lightning directory holds funds, and the Tor keys hold your onion address.'],
+    [135, 140, 'And keep the wallet’s recovery phrase somewhere safe: it is the node’s identity.'],
+    [140, 147, 'A core of four services, profiles for everything else, and a single public front door.'],
+    [147, 154, 'The same software public nodes run, so anyone can run their own.']
+  ];
+
+  let t = 0, playing = false, last = 0;
+  function render() {
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.globalAlpha = 1;
+    background();
+    const i = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const sc = SCENES[i < 0 ? SCENES.length - 1 : i];
+    const lt = Math.min(t - sc.start, sc.dur - 1e-3);
+    const fin = sc.start === 0 ? 1 : clamp(lt / .5);
+    const fout = sc.start + sc.dur >= TOTAL ? 1 : clamp((sc.dur - lt) / .5);
+    ctx.save(); ctx.globalAlpha = Math.min(fin, fout);
+    sc.draw(lt);
+    ctx.restore();
+  }
+
+  // ---------- UI ----------
+  const $ = id => document.getElementById(id);
+  const pp = $('pp'), seek = $('seek'), timeEl = $('time'), cap = $('cap'), big = $('bigplay'), player = $('player');
+  const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>';
+  const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+  const chapList = $('chapters');
+  SCENES.forEach((s, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<button type="button"><span class="n">${String(i + 1).padStart(2, '0')}</span><span class="t"></span><span class="d">${fmt(s.start)}</span></button>`;
+    li.querySelector('.t').textContent = s.title;
+    li.querySelector('button').addEventListener('click', () => { t = s.start; if (!playing) setPlaying(true); sync(); });
+    chapList.appendChild(li);
+    if (i) { const tick = document.createElement('i'); tick.style.left = `calc(${s.start / TOTAL * 100}% - 1px)`; $('ticks').appendChild(tick); }
+  });
+  const chapBtns = [...chapList.querySelectorAll('button')];
+
+  const tr = $('transcript');
+  SCENES.forEach((s, i) => {
+    const h = document.createElement('h3'); h.textContent = `${String(i + 1).padStart(2, '0')} · ${s.title}`; tr.appendChild(h);
+    CUES.filter(c => c[0] >= s.start && c[0] < s.start + s.dur).forEach(c => { const pEl = document.createElement('p'); pEl.textContent = c[2]; tr.appendChild(pEl); });
+  });
+
+  let lastCue = -1, lastChap = -1;
+  function sync() {
+    seek.value = t.toFixed(2);
+    seek.style.setProperty('--pct', (t / TOTAL * 100) + '%');
+    timeEl.textContent = `${fmt(t)} / ${fmt(TOTAL)}`;
+    const ci = CUES.findIndex(c => t >= c[0] && t < c[1]);
+    const cue = ci < 0 ? CUES.length - 1 : ci;
+    if (cue !== lastCue) { cap.textContent = CUES[cue][2]; lastCue = cue; }
+    const ch = SCENES.findIndex(s => t >= s.start && t < s.start + s.dur);
+    const chap = ch < 0 ? SCENES.length - 1 : ch;
+    if (chap !== lastChap) { chapBtns.forEach((b, i) => b.setAttribute('aria-current', i === chap ? 'true' : 'false')); lastChap = chap; }
+    render();
+  }
+  function setPlaying(v) {
+    if (v && t >= TOTAL - .01) t = 0;
+    playing = v; last = performance.now();
+    pp.innerHTML = v ? ICON_PAUSE : ICON_PLAY;
+    pp.setAttribute('aria-label', v ? 'Pause' : 'Play');
+    big.hidden = v;
+    big.setAttribute('aria-label', t > 0 ? 'Resume animation' : 'Play animation');
+  }
+  function frame(now) {
+    if (playing) {
+      t = Math.min(TOTAL, t + Math.min(.1, (now - last) / 1000));
+      if (t >= TOTAL) setPlaying(false);
+      sync();
+    }
+    last = now;
+    requestAnimationFrame(frame);
+  }
+
+  pp.addEventListener('click', () => setPlaying(!playing));
+  big.addEventListener('click', () => setPlaying(true));
+  cv.addEventListener('click', () => setPlaying(!playing));
+  seek.addEventListener('input', () => { t = parseFloat(seek.value); sync(); });
+  player.addEventListener('keydown', ev => {
+    if (ev.target !== player) return;
+    if (ev.key === ' ' || ev.key === 'k') { ev.preventDefault(); setPlaying(!playing); }
+    else if (ev.key === 'ArrowRight') { ev.preventDefault(); t = Math.min(TOTAL, t + 5); sync(); }
+    else if (ev.key === 'ArrowLeft') { ev.preventDefault(); t = Math.max(0, t - 5); sync(); }
+  });
+  $('fs').addEventListener('click', () => {
+    try {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else if (player.requestFullscreen) player.requestFullscreen().catch(() => {});
+    } catch (_) {}
+  });
+  document.addEventListener('fullscreenchange', () => requestAnimationFrame(resize));
+  new ResizeObserver(() => resize()).observe(cv);
+
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const fontsReady = document.fonts ? Promise.race([
+    Promise.all([
+      document.fonts.load(`800 40px ${DISP}`), document.fonts.load(`700 40px ${DISP}`),
+      document.fonts.load(`400 16px ${SANS}`), document.fonts.load(`600 16px ${SANS}`),
+      document.fonts.load(`400 16px ${MONO}`), document.fonts.load(`500 16px ${MONO}`)
+    ]),
+    new Promise(r => setTimeout(r, 2000))
+  ]).catch(() => {}) : Promise.resolve();
+
+  setPlaying(false);
+  resize(); sync();
+  fontsReady.then(() => {
+    sync();
+    if (reduce) { t = 6; sync(); big.hidden = false; }
+    else setPlaying(true);
+    requestAnimationFrame(frame);
+  });
+})();
+</script>
+</body>
+</html>
