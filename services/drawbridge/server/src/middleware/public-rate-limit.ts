@@ -44,6 +44,8 @@ export interface PublicRateLimitOptions {
     windowSeconds: number;
     // Requests that spend the byte budget rather than the read budget.
     isDeposit?: (req: Request) => boolean;
+    // The 429 body, for a surface whose protocol defines one.
+    refusalBody?: Record<string, unknown>;
     logger?: { warn: (obj: unknown, msg: string) => void };
 }
 
@@ -173,7 +175,7 @@ export function publicRateLimit(options: PublicRateLimitOptions) {
 
             if (refused) {
                 res.set('Retry-After', String(Math.max(1, refused.resetAt - Math.floor(Date.now() / 1000))));
-                res.status(429).json({
+                res.status(429).json(options.refusalBody ?? {
                     error: 'Rate limit exceeded',
                     resetAt: refused.resetAt,
                 });
@@ -208,4 +210,32 @@ export function byMethod(buckets: { read: RequestHandler, write: RequestHandler 
         const bucket = safe ? buckets.read : buckets.write;
         bucket(req, res, next);
     };
+}
+
+// Herald's Personal Agent Protocol endpoints are POSTs but not name writes:
+// token requests, device polling every few seconds, sign-in pages and the
+// wallet's response. Charging them to the name-write budget would refuse a
+// sign-in that follows the advertised polling interval, so they get a bucket
+// of their own. Writes to the account through Poppy's API (`/poppy/api/*`)
+// stay on the name-write budget.
+//
+// The path is taken as Herald will see it: the proxy strips `/names` and
+// resolves the rest with `new URL`, which removes dot segments, including
+// percent-encoded ones. Matching the raw path instead would let
+// `/names/poppy/%2e%2e/api/send-email` claim this budget for an email write.
+export function heraldUpstreamPath(req: Request): string {
+    return new URL(req.originalUrl.replace(/^\/names/, '') || '/', 'http://herald').pathname;
+}
+
+export function isPoppyAuthRequest(req: Request): boolean {
+    if (req.method !== 'POST') {
+        return false;
+    }
+    const path = heraldUpstreamPath(req);
+    return path.startsWith('/poppy/') && !path.startsWith('/poppy/api/');
+}
+
+export function byHeraldRoute(buckets: { read: RequestHandler, write: RequestHandler, poppyAuth: RequestHandler }): RequestHandler {
+    const methods = byMethod(buckets);
+    return (req, res, next) => (isPoppyAuthRequest(req) ? buckets.poppyAuth : methods)(req, res, next);
 }

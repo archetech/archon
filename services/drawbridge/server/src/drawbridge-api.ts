@@ -9,7 +9,10 @@ import GatekeeperClient from '@didcid/clients/gatekeeper';
 
 import config from './config.js';
 import { RedisStore } from './store.js';
-import { byMethod, publicRateLimit } from './middleware/public-rate-limit.js';
+import { byHeraldRoute, publicRateLimit } from './middleware/public-rate-limit.js';
+import { normalizePath } from './metrics-path.js';
+import { REDACTED_LOG_PATHS } from './log-redaction.js';
+import { buildProxyBody, proxyHeraldRequest } from './herald-proxy.js';
 import { createAuthMiddleware } from './middleware/auth.js';
 import { loadPricingFromEnv } from './pricing.js';
 import { createV1Router } from './v1-router.js';
@@ -100,53 +103,6 @@ async function resolveDidCommEndpoint(): Promise<string | null> {
     return onion ? `http://${onion}:${config.port}/didcomm` : null;
 }
 
-function normalizePath(path: string): string {
-    return path
-        .replace(/\/did\/(?:did:[^/]+|did%3[aA][^/]+)/, '/did/:did')
-        .replace(/\/identifiers\/(?:did:[^/]+|did%3[aA][^/]+)/, '/identifiers/:did')
-        .replace(/\/invoice\/(?:did:[^/]+|did%3[aA][^/]+)/, '/invoice/:did')
-        .replace(/\/ipfs\/json\/[^/]+/, '/ipfs/json/:cid')
-        .replace(/\/ipfs\/text\/[^/]+/, '/ipfs/text/:cid')
-        .replace(/\/ipfs\/data\/[^/]+/, '/ipfs/data/:cid')
-        .replace(/\/ipfs\/stream\/[^/]+/, '/ipfs/stream/:cid')
-        .replace(/\/queue\/[^/]+/, '/queue/:registry')
-        .replace(/\/block\/[^/]+\/latest/, '/block/:registry/latest')
-        .replace(/\/block\/[^/]+\/[^/]+/, '/block/:registry/:blockId')
-        .replace(/\/payments\/[^/]+/, '/payments/:did');
-}
-
-function buildProxyBody(req: express.Request): BodyInit | undefined {
-    if (req.method === 'GET' || req.method === 'HEAD') {
-        return undefined;
-    }
-
-    const contentType = req.headers['content-type'] || '';
-
-    if (Buffer.isBuffer(req.body)) {
-        return new Uint8Array(req.body);
-    }
-
-    if (typeof req.body === 'string') {
-        return req.body;
-    }
-
-    if (req.body && typeof req.body === 'object' && Object.keys(req.body).length > 0) {
-        if (contentType.includes('application/x-www-form-urlencoded')) {
-            return new URLSearchParams(
-                Object.entries(req.body).flatMap(([key, value]) => {
-                    if (Array.isArray(value)) {
-                        return value.map(item => [key, String(item)] as [string, string]);
-                    }
-                    return [[key, String(value)] as [string, string]];
-                })
-            ).toString();
-        }
-        return JSON.stringify(req.body);
-    }
-
-    return undefined;
-}
-
 // Generic reverse proxy to an internal service, stripping a path prefix.
 async function proxyRequest(req: express.Request, res: express.Response, baseURL: string, prefixToStrip: string) {
     const upstreamPath = prefixToStrip
@@ -185,58 +141,6 @@ async function proxyRequest(req: express.Request, res: express.Response, baseURL
         }
         res.setHeader(key, value);
     });
-    const buffer = Buffer.from(await upstream.arrayBuffer());
-    res.send(buffer);
-}
-
-async function proxyHeraldRequest(req: express.Request, res: express.Response, prefixToStrip = '/names') {
-    const upstreamPath = prefixToStrip
-        ? (req.originalUrl.replace(new RegExp(`^${prefixToStrip}`), '') || '/')
-        : req.originalUrl;
-    const upstreamUrl = new URL(upstreamPath, config.heraldURL);
-
-    const headers = new Headers();
-    for (const [name, value] of Object.entries(req.headers)) {
-        if (!value || name === 'host' || name === 'content-length') {
-            continue;
-        }
-
-        if (Array.isArray(value)) {
-            for (const item of value) {
-                headers.append(name, item);
-            }
-        }
-        else {
-            headers.set(name, value);
-        }
-    }
-
-    const body = buildProxyBody(req);
-    if (body && !headers.has('content-type')) {
-        headers.set('content-type', 'application/json');
-    }
-
-    const upstream = await fetch(upstreamUrl, {
-        method: req.method,
-        headers,
-        body,
-        redirect: 'manual',
-    });
-
-    res.status(upstream.status);
-
-    upstream.headers.forEach((value, key) => {
-        if (key === 'content-length' || key === 'transfer-encoding' || key === 'connection') {
-            return;
-        }
-        res.setHeader(key, value);
-    });
-
-    const setCookies = (upstream.headers as any).getSetCookie?.();
-    if (Array.isArray(setCookies) && setCookies.length > 0) {
-        res.setHeader('Set-Cookie', setCookies);
-    }
-
     const buffer = Buffer.from(await upstream.arrayBuffer());
     res.send(buffer);
 }
@@ -306,7 +210,7 @@ async function main() {
     });
 
     if (process.env.NODE_ENV === 'production') {
-        app.use((pinoHttp as any)({ logger }));
+        app.use((pinoHttp as any)({ logger, redact: { paths: REDACTED_LOG_PATHS, censor: '[redacted]' } }));
     } else {
         app.use(morgan('dev'));
     }
@@ -443,9 +347,20 @@ async function main() {
         logger,
     });
 
-    // Herald is fronted by two mounts and carries both kinds of traffic, so the
-    // bucket is chosen per request rather than per route.
-    const heraldRateLimit = byMethod({ read: publicReadRateLimit, write: nameWriteRateLimit });
+    const poppyAuthRateLimit = publicRateLimit({
+        store,
+        name: 'poppy:auth',
+        readPerSourceMax: config.poppyAuthPerSource,
+        readGlobalMax: config.poppyAuthGlobal,
+        windowSeconds: config.publicRateLimitWindow,
+        // Poppy defines this body at its token and sign-in endpoints (4.3).
+        refusalBody: { error: 'rate_limited' },
+        logger,
+    });
+
+    // Herald is fronted by two mounts and carries several kinds of traffic, so
+    // the bucket is chosen per request rather than per route.
+    const heraldRateLimit = byHeraldRoute({ read: publicReadRateLimit, write: nameWriteRateLimit, poppyAuth: poppyAuthRateLimit });
 
     // Public invoice endpoint — no auth required
     app.get('/invoice/:did', publicReadRateLimit, async (req, res) => {
@@ -463,7 +378,7 @@ async function main() {
 
     app.use('/.well-known', heraldRateLimit, async (req, res) => {
         try {
-            await proxyHeraldRequest(req, res, '');
+            await proxyHeraldRequest(req, res, config.heraldURL, '');
         } catch (error: any) {
             logger.error({ err: error, path: req.originalUrl }, 'Herald proxy error');
             res.status(502).json({ error: 'Upstream herald error' });
@@ -476,7 +391,7 @@ async function main() {
             return;
         }
         try {
-            await proxyHeraldRequest(req, res);
+            await proxyHeraldRequest(req, res, config.heraldURL);
         } catch (error: any) {
             logger.error({ err: error, path: req.originalUrl }, 'Herald proxy error');
             res.status(502).json({ error: 'Upstream herald error' });

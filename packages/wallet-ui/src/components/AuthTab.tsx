@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
-    Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
+    Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
     Divider, MenuItem, Paper, Select, TextField, IconButton, InputAdornment, Tooltip, Typography
 } from "@mui/material";
 import { CameraAlt, CheckCircle, Login, Warning } from "@mui/icons-material";
@@ -13,9 +13,18 @@ import { usePlatformCapabilities } from "../contexts/PlatformCapabilities";
 import PageHeader from "./layout/PageHeader";
 import ActionMenu from "./layout/ActionMenu";
 
+// What the challenge's issuer says a response grants, such as connecting an
+// agent to an account. It is shown with the destination so the person
+// answering can tell a sign-in from an authorization someone sent them.
+function challengeDescription(challenge: { description?: unknown } | undefined): string {
+    const text = challenge?.description;
+    return typeof text === 'string' ? text.slice(0, 500) : '';
+}
+
 interface AutoLoginState {
     responseDID: string;
     callbackUrl: string;
+    description: string;
     fulfilled: number;
     requested: number;
     match: boolean;
@@ -25,6 +34,7 @@ interface AutoLoginState {
 function AuthTab() {
     const [authDID, setAuthDID] = useState<string>("");
     const [callback, setCallback] = useState<string>("");
+    const [description, setDescription] = useState<string>("");
     const [challenge, setChallenge] = useState<string>("");
     const [response, setResponse] = useState<string>("");
     const [disableSendResponse, setDisableSendResponse] = useState<boolean>(true);
@@ -77,7 +87,7 @@ function AuthTab() {
 
         try {
             const asset = await keymaster.resolveAsset(challengeDID);
-            const challengeData = (asset as { challenge: { callback?: string; credentials?: { schema: string; issuers?: string[] }[] } }).challenge;
+            const challengeData = (asset as { challenge: { callback?: string; description?: string; credentials?: { schema: string; issuers?: string[] }[] } }).challenge;
             const callbackUrl = challengeData?.callback || "";
 
             const responseDID = await keymaster.createResponse(challengeDID, { retries: 10 });
@@ -91,6 +101,7 @@ function AuthTab() {
             setAutoLogin({
                 responseDID,
                 callbackUrl,
+                description: challengeDescription(challengeData),
                 fulfilled: responseData.fulfilled,
                 requested: responseData.requested,
                 match: responseData.match,
@@ -209,9 +220,11 @@ function AuthTab() {
             await setResponse(response);
 
             const asset = await keymaster.resolveAsset(challenge);
-            const callback = (asset as { challenge: { callback: string } }).challenge.callback;
+            const challengeData = (asset as { challenge: { callback: string; description?: string } }).challenge;
+            const callback = challengeData.callback;
 
             await setCallback(callback);
+            setDescription(challengeDescription(challengeData));
 
             if (callback) {
                 await setDisableSendResponse(false);
@@ -303,6 +316,12 @@ function AuthTab() {
                     </Typography>
 
                     <Divider sx={{ mb: 2 }} />
+
+                    {autoLogin.description && (
+                        <Alert severity="info" sx={{ mb: 2 }}>
+                            {autoLogin.description}
+                        </Alert>
+                    )}
 
                     {autoLogin.callbackUrl && (
                         <Box sx={{ mb: 2 }}>
@@ -461,6 +480,12 @@ function AuthTab() {
                             className="text-field top"
                         />
                     </Box>
+
+                    {description && callback && (
+                        <Alert severity="info" sx={{ mt: 1 }}>
+                            {description}
+                        </Alert>
+                    )}
 
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
                         <Button

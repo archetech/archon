@@ -34,3 +34,7 @@ export const SENDGRID_FROM_EMAIL = process.env.ARCHON_HERALD_SENDGRID_FROM_EMAIL
 export const SENDGRID_PARSE_DOMAIN = process.env.ARCHON_HERALD_SENDGRID_PARSE_DOMAIN || `parse.${SERVICE_DOMAIN}`;
 export const OWNER_DID = process.env.ARCHON_HERALD_OWNER_DID || '';
 export const WEBHOOK_SECRET = process.env.ARCHON_HERALD_WEBHOOK_SECRET || '';
+// Personal Agent Protocol (Poppy) Company support; see docs/plans/poppy-1395.md.
+export const POPPY_ENABLED = process.env.ARCHON_HERALD_POPPY_ENABLED === 'true';
+export const POPPY_STORE = process.env.ARCHON_HERALD_POPPY_STORE || 'redis';
+export const REDIS_URL = process.env.ARCHON_HERALD_REDIS_URL || process.env.ARCHON_REDIS_URL || 'redis://localhost:6379';

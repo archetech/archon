@@ -1628,6 +1628,7 @@ function ViewProfile() {
                         </TableRow>
                     </TableBody>
                 </Table>
+                {profile.isUser && <ConnectedAgents />}
                 <Box sx={{ mt: 3 }}>
                     <Button component={Link} to="/" variant="outlined">
                         ← Back to Home
@@ -1636,6 +1637,83 @@ function ViewProfile() {
             </Box>
         </div>
     )
+}
+
+interface AgentConnection {
+    id: string;
+    clientId: string;
+    name: string;
+    domain: string;
+    scope: string[];
+    createdAt: string;
+    lastUsedAt: string;
+    expiresAt: string;
+}
+
+// Personal agents the User connected through the Personal Agent Protocol.
+// Hidden when the node does not enable it.
+function ConnectedAgents() {
+    const [connections, setConnections] = useState<AgentConnection[] | null>(null);
+    const [error, setError] = useState<string>('');
+
+    useEffect(() => {
+        api.get('/poppy/connections')
+            .then(response => setConnections(response.data.connections))
+            .catch(() => setConnections(null));
+    }, []);
+
+    async function disconnect(connection: AgentConnection) {
+        if (!window.confirm(`Disconnect ${connection.name} (${connection.domain})? It will lose access to your account.`)) {
+            return;
+        }
+        setError('');
+        try {
+            await api.delete(`/poppy/connections/${encodeURIComponent(connection.id)}`);
+            setConnections(current => (current ?? []).filter(item => item.id !== connection.id));
+        }
+        catch {
+            setError('Failed to disconnect the agent');
+        }
+    }
+
+    if (!connections) {
+        return null;
+    }
+
+    return (
+        <Box sx={{ mt: 4 }}>
+            <Typography variant="h6">Connected agents</Typography>
+            {connections.length === 0 ? (
+                <Typography color="text.secondary">No personal agents are connected to your account.</Typography>
+            ) : (
+                <Table sx={{ width: '100%' }}>
+                    <TableBody>
+                        {connections.map(connection => (
+                            <TableRow key={connection.id}>
+                                <TableCell>
+                                    <strong>{connection.name}</strong>
+                                    <Typography variant="body2" style={{ fontFamily: 'Courier' }}>{connection.domain}</Typography>
+                                </TableCell>
+                                <TableCell>{connection.scope.join(', ')}</TableCell>
+                                <TableCell>
+                                    Last used {format(new Date(connection.lastUsedAt), 'yyyy-MM-dd')}
+                                    <Typography variant="body2" color="text.secondary">
+                                        Expires {format(new Date(connection.expiresAt), 'yyyy-MM-dd')}
+                                    </Typography>
+                                </TableCell>
+                                <TableCell align="right">
+                                    <Button variant="outlined" color="error" onClick={() => disconnect(connection)}>
+                                        Disconnect
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            )}
+            {error && <Alert severity="error" sx={{ mt: 1 }}>{error}</Alert>}
+        </Box>
+    );
 }
 
 function ViewCredential() {
