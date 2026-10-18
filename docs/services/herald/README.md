@@ -197,9 +197,16 @@ a unique `jti`; DPoP Proofs are checked against the public URL built from
 `ARCHON_DRAWBRIDGE_PUBLIC_HOST`, not the `Host` header. Session Tokens last one hour,
 Account Tokens 90 days. One-way transitions (binding a Session to its DID, answering a
 sign-in, consuming a device approval, touching a grant a revocation may have deleted) are
-single atomic Redis operations, so concurrent requests cannot both win. Herald's own rate
-limits are per `client_id` or global; per-address limits are Drawbridge's, since Herald
-cannot trust forwarded addresses. A Session is signed in to at most one DID, and API requests
+single atomic Redis operations, so concurrent requests cannot both win. Per-address
+limits are Drawbridge's, since Herald cannot trust forwarded addresses. Herald's own limits
+are keyed on what an attacker cannot rotate for free (the authenticated `client_id`, or the
+agent domain a sign-in page is for: 60 pages a minute each), and its global caps (new
+agents, failed user codes, sign-in pages) equal Drawbridge's global allowance of 1200 a
+minute, so no single source can exhaust them for others. Only failed user codes are
+counted. The wallet challenge carries a `description` naming the agent, its domain, the
+access requested and, for Device Sign-In, the user code; wallets show it with the
+destination, so a challenge forwarded from someone else's sign-in page is recognizable.
+The consent page renders its QR code as inline SVG and loads no third-party script. A Session is signed in to at most one DID, and API requests
 check on each call that the Session is still signed in, so revocation and
 disconnection take effect at once. State lives in Redis (`ARCHON_HERALD_REDIS_URL`
 or `ARCHON_REDIS_URL`) under the `<ARCHON_HERALD_NAME>:poppy` prefix; bearer

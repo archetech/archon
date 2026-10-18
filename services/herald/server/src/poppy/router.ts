@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import express, { Request, Response, Router } from 'express';
-import { AgentDirectory, AgentError, type Agent } from './agents.js';
+import QRCode from 'qrcode';
+import { AgentDirectory, AgentError, clientIdDomain, type Agent } from './agents.js';
 import { AssertionError, verifyAssertion } from './assertions.js';
 import {
     SCOPES,
@@ -159,15 +160,26 @@ export function createPoppy(options: PoppyOptions): Poppy {
     const cookiePath = new URL(config.issuer).pathname;
     const secureCookie = config.issuer.startsWith('https:');
 
-    // Drawbridge limits requests per source address in front of Herald.
-    // Herald cannot tell sources apart (it sees Drawbridge, and forwarded
-    // headers are caller-controlled), so its own limits are per client_id
-    // after authentication, and otherwise global.
+    // Drawbridge limits requests per source address in front of Herald (120
+    // a minute by default, 1200 for all sources together). Herald cannot tell
+    // sources apart: it sees Drawbridge, and forwarded headers are
+    // caller-controlled. So its own limits are keyed on something an attacker
+    // cannot rotate for free (the authenticated client_id, or the agent domain
+    // a sign-in page is for), and its global caps sit at Drawbridge's global
+    // allowance, so no single source can exhaust them for everyone else.
+    const GLOBAL_PER_MINUTE = 1200;
     const tokenLimiter = new RateLimiter(300, 60_000, now);
-    const newClientLimiter = new RateLimiter(60, 60_000, now);
-    const userCodeLimiter = new RateLimiter(60, 60_000, now);
+    const newClientLimiter = new RateLimiter(GLOBAL_PER_MINUTE, 60_000, now);
+    // Only failed user-code entries are counted. 20^8 codes that expire in ten
+    // minutes leave guessing hopeless at this rate.
+    const userCodeFailureLimiter = new RateLimiter(GLOBAL_PER_MINUTE, 60_000, now);
     // Each sign-in page creates a wallet challenge.
-    const signInLimiter = new RateLimiter(120, 60_000, now);
+    const signInPerAgentLimiter = new RateLimiter(60, 60_000, now);
+    const signInLimiter = new RateLimiter(GLOBAL_PER_MINUTE, 60_000, now);
+
+    function takeSignIn(agentDomain: string): number {
+        return signInPerAgentLimiter.take(agentDomain) || signInLimiter.take('all');
+    }
     const knownClients = new Set<string>();
     const MAX_KNOWN_CLIENTS = 10_000;
 
@@ -408,8 +420,8 @@ export function createPoppy(options: PoppyOptions): Poppy {
         if (!device || device.clientId !== agent.clientId) {
             throw new OAuthError(400, 'invalid_grant', 'unknown device_code');
         }
+        // The record outlives expires_in, so every late poll gets this answer.
         if (device.expiresAt <= now()) {
-            await store.deleteDevice(deviceHash, device);
             throw new OAuthError(400, 'expired_token', 'the device code has expired');
         }
 
@@ -540,11 +552,21 @@ export function createPoppy(options: PoppyOptions): Poppy {
         return url.href;
     }
 
+    // Shown by the wallet that answers the challenge. Without it, a challenge
+    // forwarded from someone else's sign-in page looks like an ordinary
+    // sign-in, and answering it would connect their agent to this account.
+    function describeSignIn(signIn: { clientName: string; domain: string; scope: string[]; userCode?: string }): string {
+        const name = signIn.clientName.replace(/\s+/g, ' ').slice(0, 80);
+        const allowed = signIn.scope.map(scope => SCOPES[scope as keyof typeof SCOPES] ?? scope).join('; ');
+        const code = signIn.userCode ? ` Code ${signIn.userCode}.` : '';
+        return `Connect the agent “${name}” from ${signIn.domain} to your ${config.organizationName} account, allowing it to: ${allowed}.${code} Continue only if you started this from your own agent.`;
+    }
+
     async function startSignIn(res: Response, signIn: Omit<SignIn, 'id' | 'browserSecretHash' | 'csrfHash' | 'expiresAt' | 'challenge'>) {
         const id = randomSecret('sgn_', 16);
         const browserSecret = randomSecret('', 32);
         const csrf = randomSecret('', 24);
-        const challenge = await accounts.createChallenge(`${config.issuer}/signin/response`);
+        const challenge = await accounts.createChallenge(`${config.issuer}/signin/response`, describeSignIn(signIn));
         const record: SignIn = {
             ...signIn,
             id,
@@ -562,6 +584,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
             maxAge: config.codeSeconds * 1000,
         });
         const challengeUrl = `${config.walletUrl}?challenge=${encodeURIComponent(challenge)}`;
+        const challengeQrSvg = await QRCode.toString(challengeUrl, { type: 'svg', margin: 2, errorCorrectionLevel: 'M' });
         sendPage(res, 200, nonce => consentPage({
             nonce,
             organization: config.organizationName,
@@ -571,6 +594,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
             scope: signIn.scope,
             accessDays: Math.round(config.accountTokenSeconds / 86400),
             challengeUrl,
+            challengeQrSvg,
             statusUrl: `${config.issuer}/signin/${id}/status`,
             decideUrl: `${config.issuer}/signin/${id}/decide`,
             csrf,
@@ -601,7 +625,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
             return;
         }
 
-        const wait = signInLimiter.take('all');
+        const wait = takeSignIn(agent.domain);
         if (wait) {
             res.set('Retry-After', String(wait));
             sendPage(res, 429, nonce => errorPage(nonce, config.organizationName, 'Too many sign-in attempts. Wait a minute and try again.'));
@@ -658,23 +682,26 @@ export function createPoppy(options: PoppyOptions): Poppy {
 
     router.post('/device', async (req: Request, res: Response) => {
         const entered = normalizeUserCode(req.body?.user_code);
-        const wait = userCodeLimiter.take('all');
-        if (wait) {
+        const tooMany = (wait: number) => {
             res.set('Retry-After', String(wait));
             sendPage(res, 429, nonce => deviceEntryPage(nonce, config.organizationName, urls.deviceVerification, entered,
                 'Too many attempts. Wait a minute and try again.'));
-            return;
+        };
+        const blocked = userCodeFailureLimiter.peek('all');
+        if (blocked) {
+            return tooMany(blocked);
         }
         const hash = entered ? await store.getDeviceHashByUserCode(entered) : null;
-        if (hash && signInLimiter.take('all')) {
-            sendPage(res, 429, nonce => errorPage(nonce, config.organizationName, 'Too many sign-in attempts. Wait a minute and try again.'));
-            return;
-        }
         const device = hash ? await store.getDevice(hash) : null;
         if (!hash || !device || device.expiresAt <= now() || await store.getDeviceDecision(hash)) {
+            userCodeFailureLimiter.take('all');
             sendPage(res, 400, nonce => deviceEntryPage(nonce, config.organizationName, urls.deviceVerification, entered,
                 'That code is not valid or has expired. Check it against the one your agent shows.'));
             return;
+        }
+        const wait = takeSignIn(clientIdDomain(device.clientId) ?? device.clientId);
+        if (wait) {
+            return tooMany(wait);
         }
         try {
             const agent = await loadAgent(device.clientId);

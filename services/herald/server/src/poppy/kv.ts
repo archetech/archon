@@ -87,8 +87,10 @@ export class MemoryKV implements PoppyKV {
         return true;
     }
 
+    // Like Redis DEL, removes the key whether it holds a value or a set.
     async del(key: string): Promise<void> {
         this.values.delete(key);
+        this.sets.delete(key);
     }
 
     private liveSet(key: string) {

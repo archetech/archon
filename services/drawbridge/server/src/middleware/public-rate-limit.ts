@@ -44,6 +44,8 @@ export interface PublicRateLimitOptions {
     windowSeconds: number;
     // Requests that spend the byte budget rather than the read budget.
     isDeposit?: (req: Request) => boolean;
+    // The 429 body, for a surface whose protocol defines one.
+    refusalBody?: Record<string, unknown>;
     logger?: { warn: (obj: unknown, msg: string) => void };
 }
 
@@ -173,7 +175,7 @@ export function publicRateLimit(options: PublicRateLimitOptions) {
 
             if (refused) {
                 res.set('Retry-After', String(Math.max(1, refused.resetAt - Math.floor(Date.now() / 1000))));
-                res.status(429).json({
+                res.status(429).json(options.refusalBody ?? {
                     error: 'Rate limit exceeded',
                     resetAt: refused.resetAt,
                 });

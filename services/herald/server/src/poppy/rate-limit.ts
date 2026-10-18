@@ -30,6 +30,16 @@ export class RateLimiter {
         return 0;
     }
 
+    // Returns the seconds to wait if the key is at its limit, without counting.
+    peek(key: string): number {
+        const now = this.now();
+        const window = this.windows.get(key);
+        if (!window || now - window.start >= this.windowMs || window.count < this.limit) {
+            return 0;
+        }
+        return Math.max(1, Math.ceil((window.start + this.windowMs - now) / 1000));
+    }
+
     private prune(now: number): void {
         for (const [key, window] of this.windows) {
             if (now - window.start >= this.windowMs) {

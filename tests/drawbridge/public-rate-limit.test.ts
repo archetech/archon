@@ -414,3 +414,20 @@ describe('byHeraldRoute', () => {
         expect(keys).toEqual(['names:write:read:global', 'public:read:global']);
     });
 });
+
+describe('protocol-defined refusals', () => {
+    it('answers with the configured body, keeping Retry-After', async () => {
+        const { store } = countingStore({ 'poppy:auth:read:global': 0 });
+        const app = express();
+        app.use(publicRateLimit({
+            store, name: 'poppy:auth', readPerSourceMax: 1, readGlobalMax: 1, windowSeconds: 60,
+            refusalBody: { error: 'rate_limited' },
+        }), (_req, res) => res.json({ ok: true }));
+
+        const response = await request(app).post('/names/poppy/token');
+
+        expect(response.status).toBe(429);
+        expect(response.body).toEqual({ error: 'rate_limited' });
+        expect(response.headers['retry-after']).toBeDefined();
+    });
+});

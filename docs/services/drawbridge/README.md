@@ -143,7 +143,9 @@ budget is deliberately small — 10 claims a minute clears any human.
 device polling every five seconds, sign-in pages and wallet responses are POSTs, but
 not name writes; on the write budget, a device sign-in that follows the advertised
 polling interval would be refused. Account writes through Poppy's API
-(`/names/poppy/api/*`) stay on the write budget.
+(`/names/poppy/api/*`) stay on the write budget. The bucket is chosen from the path Herald
+receives after dot-segment removal, and its 429 body is `{"error":"rate_limited"}`, as
+Poppy requires.
 
 **Per-source keying applies only when the source identifies a client**, exactly
 as on `/didcomm`: `trust proxy` is not configured, so behind the bundled Tor
@@ -624,6 +626,10 @@ in [§2.7](#27-route-normalization-for-metrics).
 `pino` at `LOG_LEVEL` (default `info`); HTTP via `pino-http` in
 production or `morgan('dev')` otherwise. Errors logged as structured
 `{ err }` objects with the upstream URL when a proxy call fails.
+
+The `pino-http` request log redacts headers that carry bearer secrets:
+`authorization`, `dpop`, `cookie` and `x-archon-admin-key` on requests, and
+`set-cookie` and `location` (which can carry authorization codes) on responses.
 
 No log lines are contractual for downstream consumers.
 
