@@ -189,7 +189,7 @@ async function startSession(userId = 'usr_alice_1', sessionId?: string) {
     return token(form, await agent.proof('POST', TOKEN));
 }
 
-async function api(method: 'get' | 'put' | 'delete', path: string, accessToken: string, body?: unknown) {
+async function api(method: 'get' | 'put' | 'delete', path: string, accessToken: string, body?: object) {
     const url = `${API}${path}`;
     const req = request(app)[method](`/poppy/api${path}`)
         .set('Authorization', `DPoP ${accessToken}`)
