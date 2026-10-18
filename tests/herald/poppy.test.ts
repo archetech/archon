@@ -99,8 +99,11 @@ class TestAgent {
     }
 }
 
+let fetches: string[] = [];
+
 function fetcherFor(docs: () => Docs) {
     return async (url: string) => {
+        fetches.push(url);
         const body = docs()[url];
         if (body === undefined) {
             return new Response('not found', { status: 404 });
@@ -155,6 +158,7 @@ let app: express.Express;
 let kv: MemoryKV;
 
 beforeEach(async () => {
+    fetches = [];
     agent = await new TestAgent().init();
     docs = agent.docs();
     kv = new MemoryKV();
@@ -725,11 +729,6 @@ describe('Device Sign-In', () => {
         const decided = await approveOnPage(device.user_code, ALICE, 'approve');
         expect(decided.status).toBe(200);
 
-        // Waiting past the enlarged interval is simulated by a fresh poll window.
-        const store = new PoppyStore(kv);
-        const hash = crypto.createHash('sha256').update(device.device_code).digest('base64url');
-        const record = await store.getDeviceByHash(hash);
-        await store.putDeviceByHash(hash, { ...record!, lastPollAt: undefined });
 
         const signIn = await poll(device.device_code, session.body.session_id);
         expect(signIn.status).toBe(200);
@@ -748,5 +747,169 @@ describe('Device Sign-In', () => {
         const response = await request(app).post('/poppy/device').type('form').send({ user_code: 'BBBB-BBBB' });
         expect(response.status).toBe(400);
         expect(response.headers['set-cookie']).toBeUndefined();
+    });
+});
+
+describe('concurrent and repeated requests', () => {
+    async function exchange(redirect: URL, verifier: string, sessionId: string) {
+        return token({
+            grant_type: 'authorization_code',
+            code: redirect.searchParams.get('code')!,
+            redirect_uri: REDIRECT,
+            code_verifier: verifier,
+            session_id: sessionId,
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN));
+    }
+
+    it('rejects scopes inherited from Object.prototype', async () => {
+        const response = await request(app).post('/poppy/device_authorization').type('form')
+            .send({ scope: 'constructor', ...await agent.clientAuth() });
+        expect(response.body.error).toBe('invalid_scope');
+        const page = await request(app).get('/poppy/authorize').query({
+            response_type: 'code', client_id: AGENT_ID, redirect_uri: REDIRECT, scope: 'toString',
+            code_challenge: 'x'.repeat(43), code_challenge_method: 'S256',
+        });
+        expect(new URL(page.headers.location).searchParams.get('error')).toBe('invalid_scope');
+    });
+
+    it('binds a Session to one account when two code exchanges race', async () => {
+        const session = await startSession();
+        const alice = await directSignIn(ALICE, 'poppy:read');
+        const bob = await directSignIn(BOB, 'poppy:read');
+        const results = await Promise.all([
+            exchange(alice.redirect, alice.verifier, session.body.session_id),
+            exchange(bob.redirect, bob.verifier, session.body.session_id),
+        ]);
+        expect(results.map(result => result.status).sort()).toEqual([200, 400]);
+        expect(results.find(result => result.status === 400)!.body.error).toBe('account_mismatch');
+        // The losing account is left with no Account Token.
+        const connected = [...await poppy.listConnections(ALICE), ...await poppy.listConnections(BOB)];
+        expect(connected).toHaveLength(1);
+    });
+
+    it('acts on a consent decision only once', async () => {
+        const page = await request(app).get('/poppy/authorize').query({
+            response_type: 'code', client_id: AGENT_ID, redirect_uri: REDIRECT, scope: 'poppy:read',
+            code_challenge: 'x'.repeat(43), code_challenge_method: 'S256',
+        });
+        const cookie = page.headers['set-cookie'][0].split(';')[0];
+        const csrf = /"csrf":"([^"]+)"/.exec(page.text)![1];
+        const decideUrl = /"decideUrl":"([^"]+)"/.exec(page.text)![1].replace(ISSUER, '/poppy');
+        const walletChallenge = decodeURIComponent(/challenge=([^"&]+)/.exec(page.text)![1]);
+        await request(app).post('/poppy/signin/response')
+            .send({ response: JSON.stringify({ challenge: walletChallenge, responder: ALICE }) }).expect(200);
+        // A second wallet response cannot change the account.
+        await request(app).post('/poppy/signin/response')
+            .send({ response: JSON.stringify({ challenge: walletChallenge, responder: BOB }) }).expect(409);
+
+        const decide = () => request(app).post(decideUrl).set('Cookie', cookie).set('X-Poppy-CSRF', csrf)
+            .send({ decision: 'approve', scope: ['poppy:read'] });
+        const results = await Promise.all([decide(), decide()]);
+        expect(results.map(result => result.status).sort()).toEqual([200, 409]);
+    });
+
+    it('issues one Account Token from one device approval, however many polls race', async () => {
+        const session = await startSession();
+        const device = (await request(app).post('/poppy/device_authorization').type('form')
+            .send({ scope: 'poppy:read', ...await agent.clientAuth() })).body;
+        const page = await request(app).post('/poppy/device').type('form').send({ user_code: device.user_code });
+        const cookie = page.headers['set-cookie'][0].split(';')[0];
+        const csrf = /"csrf":"([^"]+)"/.exec(page.text)![1];
+        const decideUrl = /"decideUrl":"([^"]+)"/.exec(page.text)![1].replace(ISSUER, '/poppy');
+        const walletChallenge = decodeURIComponent(/challenge=([^"&]+)/.exec(page.text)![1]);
+        await request(app).post('/poppy/signin/response')
+            .send({ response: JSON.stringify({ challenge: walletChallenge, responder: ALICE }) }).expect(200);
+        await request(app).post(decideUrl).set('Cookie', cookie).set('X-Poppy-CSRF', csrf)
+            .send({ decision: 'approve', scope: ['poppy:read'] }).expect(200);
+
+        const poll = async () => token({
+            grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+            device_code: device.device_code,
+            session_id: session.body.session_id,
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN));
+        const results = await Promise.all([poll(), poll(), poll()]);
+        expect(results.filter(result => result.status === 200)).toHaveLength(1);
+        expect(await poppy.listConnections(ALICE)).toHaveLength(1);
+    });
+
+    it('keeps a device decision when a poll writes its polling state afterwards', async () => {
+        const store = new PoppyStore(kv);
+        const device = { clientId: AGENT_ID, scope: ['poppy:read'], userCode: 'BCDF-GHJK', interval: 5, expiresAt: Date.now() + 60_000 };
+        await store.putDevice('pdc_test', device);
+        const hash = crypto.createHash('sha256').update('pdc_test').digest('base64url');
+        expect(await store.decideDevice(hash, device, { approved: true, did: ALICE, scope: ['poppy:read'] })).toBe(true);
+        await store.putDevicePolling(hash, device, { interval: 5, lastPollAt: Date.now() });
+        expect(await store.getDeviceDecision(hash)).toMatchObject({ approved: true, did: ALICE });
+        expect(await store.decideDevice(hash, device, { approved: false })).toBe(false);
+    });
+
+    it('does not recreate a grant that was revoked while a refresh was in flight', async () => {
+        const { signIn } = await signedIn();
+        const store = new PoppyStore(kv);
+        const grant = (await store.getGrantByToken(signIn.refresh_token))!;
+        await store.revokeGrant(grant);
+        expect(await store.touchGrant(grant)).toBe(false);
+        expect(await store.getGrant(grant.id)).toBeNull();
+        expect(await poppy.listConnections(ALICE)).toEqual([]);
+    });
+
+    it('disconnects every grant an agent holds for the account', async () => {
+        const first = await signedIn(ALICE, 'poppy:read');
+        const second = await signedIn(ALICE, 'poppy:write');
+        const connections = await poppy.listConnections(ALICE);
+        expect(connections).toHaveLength(1);
+        expect(connections[0].scope).toEqual(['poppy:read', 'poppy:write']);
+
+        expect(await poppy.disconnect(ALICE, connections[0].id)).toBe(true);
+        for (const { signIn } of [first, second]) {
+            const account = await api('get', '/account', signIn.access_token);
+            expect(account.status).toBe(403);
+        }
+        expect(await poppy.listConnections(ALICE)).toEqual([]);
+    });
+});
+
+describe('agent metadata fetching', () => {
+    it('shares one fetch between concurrent requests for the same agent', async () => {
+        const directory = new AgentDirectory(fetcherFor(() => docs));
+        fetches = [];
+        await Promise.all([directory.get(AGENT_ID), directory.get(AGENT_ID), directory.get(AGENT_ID)]);
+        expect(fetches.filter(url => url === AGENT_ID)).toHaveLength(1);
+        expect(fetches.filter(url => url.endsWith('/jwks.json'))).toHaveLength(1);
+    });
+
+    it('caches a bounded number of documents', async () => {
+        const directory = new AgentDirectory(fetcherFor(() => ({})));
+        for (let i = 0; i < 1005; i++) {
+            await directory.get(`https://agent${i}.example/agent.json`).catch(() => undefined);
+        }
+        fetches = [];
+        // The earliest entries were evicted, so they are fetched again.
+        await directory.get('https://agent0.example/agent.json').catch(() => undefined);
+        expect(fetches).toEqual(['https://agent0.example/agent.json']);
+    });
+
+    it('spends the new-client budget before fetching for an unknown agent at /authorize', async () => {
+        for (let i = 0; i < 60; i++) {
+            await request(app).get('/poppy/authorize').query({ client_id: `https://a${i}.example/agent.json`, redirect_uri: REDIRECT });
+        }
+        fetches = [];
+        const response = await request(app).get('/poppy/authorize').query({ client_id: 'https://late.example/agent.json', redirect_uri: REDIRECT });
+        expect(response.status).toBe(400);
+        expect(response.text).toContain('too many new client_id values');
+        expect(fetches).toEqual([]);
+    });
+});
+
+describe('index lifetimes', () => {
+    it('expires Session and grant indexes with their grant', async () => {
+        let now = 1_000_000;
+        const memory = new MemoryKV(() => now);
+        await memory.addToSet('grant-sessions:g', 'ses_1', 60);
+        expect(await memory.members('grant-sessions:g')).toEqual(['ses_1']);
+        now += 61_000;
+        expect(await memory.members('grant-sessions:g')).toEqual([]);
     });
 });

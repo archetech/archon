@@ -173,41 +173,81 @@ interface CacheEntry<T> {
     fetchedAt: number;
 }
 
-export class AgentDirectory {
-    private readonly metadata = new Map<string, CacheEntry<ClientMetadata>>();
-    private readonly keySets = new Map<string, CacheEntry<JSONWebKeySet>>();
+// Caches documents by URL. Callers name the URLs, so the cache is bounded:
+// expired entries are evicted first, then the oldest. Concurrent misses for
+// one URL share a single fetch, so the refetch throttle holds under load.
+class DocumentCache<T> {
+    private readonly entries = new Map<string, CacheEntry<T>>();
+    private readonly inFlight = new Map<string, Promise<T>>();
 
-    constructor(private readonly fetcher: Fetcher, private readonly now: () => number = Date.now) {}
+    constructor(
+        private readonly fetcher: Fetcher,
+        private readonly load: (url: string, body: unknown) => T,
+        private readonly now: () => number,
+        private readonly maxEntries: number,
+    ) {}
 
-    private async cached<T>(
-        cache: Map<string, CacheEntry<T>>,
-        url: string,
-        load: (body: unknown) => T,
-        refresh = false,
-    ): Promise<T> {
-        const entry = cache.get(url);
+    get(url: string, refresh = false): Promise<T> {
+        const entry = this.entries.get(url);
         const now = this.now();
         const fresh = entry && entry.expiresAt > now;
         // A refresh is honoured at most once per interval per URL, counting
         // failures, so a stream of bad requests cannot drive repeated fetches.
         const throttled = entry && now - entry.fetchedAt < REFETCH_INTERVAL_MS;
         if (entry && (throttled || (fresh && !refresh))) {
-            if (entry.value !== undefined) {
-                return entry.value;
-            }
-            throw new AgentError(entry.error || `could not load ${url}`);
+            return entry.value !== undefined
+                ? Promise.resolve(entry.value)
+                : Promise.reject(new AgentError(entry.error || `could not load ${url}`));
         }
+        let pending = this.inFlight.get(url);
+        if (!pending) {
+            pending = this.fetch(url).finally(() => this.inFlight.delete(url));
+            this.inFlight.set(url, pending);
+        }
+        return pending;
+    }
+
+    private async fetch(url: string): Promise<T> {
+        const now = this.now();
         try {
             const { body, ttl } = await fetchJson(this.fetcher, url);
-            const value = load(body);
-            cache.set(url, { value, expiresAt: now + ttl * 1000, fetchedAt: now });
+            const value = this.load(url, body);
+            this.store(url, { value, expiresAt: now + ttl * 1000, fetchedAt: now });
             return value;
         }
         catch (error) {
             const message = error instanceof AgentError ? error.message : `could not load ${url}`;
-            cache.set(url, { error: message, expiresAt: now + REFETCH_INTERVAL_MS, fetchedAt: now });
+            this.store(url, { error: message, expiresAt: now + REFETCH_INTERVAL_MS, fetchedAt: now });
             throw error instanceof AgentError ? error : new AgentError(message);
         }
+    }
+
+    private store(url: string, entry: CacheEntry<T>): void {
+        this.entries.delete(url);
+        if (this.entries.size >= this.maxEntries) {
+            const now = this.now();
+            for (const [key, value] of this.entries) {
+                if (value.expiresAt <= now) {
+                    this.entries.delete(key);
+                }
+            }
+            while (this.entries.size >= this.maxEntries) {
+                this.entries.delete(this.entries.keys().next().value!);
+            }
+        }
+        this.entries.set(url, entry);
+    }
+}
+
+const MAX_CACHED_DOCUMENTS = 1000;
+
+export class AgentDirectory {
+    private readonly metadata: DocumentCache<ClientMetadata>;
+    private readonly keySets: DocumentCache<JSONWebKeySet>;
+
+    constructor(fetcher: Fetcher, now: () => number = Date.now) {
+        this.metadata = new DocumentCache(fetcher, validateClientMetadata, now, MAX_CACHED_DOCUMENTS);
+        this.keySets = new DocumentCache(fetcher, (_url, body) => validateJwks(body), now, MAX_CACHED_DOCUMENTS);
     }
 
     async get(clientId: string, refreshKeys = false): Promise<Agent> {
@@ -215,8 +255,8 @@ export class AgentDirectory {
         if (!domain) {
             throw new AgentError('client_id must be an HTTPS URL');
         }
-        const metadata = await this.cached(this.metadata, clientId, body => validateClientMetadata(clientId, body));
-        const jwks = await this.cached(this.keySets, metadata.jwks_uri, validateJwks, refreshKeys);
+        const metadata = await this.metadata.get(clientId);
+        const jwks = await this.keySets.get(metadata.jwks_uri, refreshKeys);
         return { clientId, domain, metadata, jwks };
     }
 }

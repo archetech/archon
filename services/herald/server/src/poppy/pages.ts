@@ -167,7 +167,9 @@ ${scopes}
     document.getElementById('done-text').textContent = text;
     show('done');
   }
+  var buttons = form.querySelectorAll('button');
   async function decide(decision) {
+    buttons.forEach(function (b) { b.disabled = true; });
     var scope = Array.prototype.slice.call(form.querySelectorAll('input[name=scope]:checked')).map(function (el) { return el.value; });
     var res = await fetch(cfg.decideUrl, {
       method: 'POST',
@@ -176,7 +178,7 @@ ${scopes}
       body: JSON.stringify({ decision: decision, scope: scope })
     });
     var data = await res.json().catch(function () { return {}; });
-    if (!res.ok) { document.getElementById('error').textContent = data.error_description || 'Something went wrong.'; return; }
+    if (!res.ok) { document.getElementById('error').textContent = data.error_description || 'Something went wrong.'; buttons.forEach(function (b) { b.disabled = false; }); return; }
     if (data.redirect) { window.location.assign(data.redirect); return; }
     finish(data.message || 'Done. You can close this page.');
   }

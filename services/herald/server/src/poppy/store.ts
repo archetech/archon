@@ -3,6 +3,13 @@ import type { PoppyKV } from './kv.js';
 
 // Durable Poppy state. Bearer secrets (Session Tokens, Account Tokens,
 // authorization and device codes) are stored only as SHA-256 hashes.
+//
+// Herald may run several requests for the same Session, sign-in or device
+// code at once, so every one-way transition is decided by one atomic store
+// operation: binding a Session to an account, authenticating or deciding a
+// sign-in, deciding and consuming a device authorization, and touching a grant
+// that a revocation may have just deleted. Records that such transitions
+// depend on are written once and never rewritten.
 
 export interface Session {
     id: string;
@@ -10,9 +17,6 @@ export interface Session {
     userId: string;
     createdAt: number;
     expiresAt: number;
-    // The account (DID) this Session has ever been signed in to. It never
-    // changes once set, even after sign-out (spec 4.4).
-    account?: string;
     // The Account Token grant it is signed in with now, if any.
     grantId?: string;
 }
@@ -69,23 +73,30 @@ export interface SignIn {
     deviceCodeHash?: string;
     userCode?: string;
     challenge?: string;
-    did?: string;
-    name?: string;
-    status: 'pending' | 'authenticated' | 'done';
     expiresAt: number;
+}
+
+export interface SignInAccount {
+    did: string;
+    name?: string;
 }
 
 export interface DeviceAuthorization {
     clientId: string;
     scope: string[];
     userCode: string;
-    status: 'pending' | 'approved' | 'denied';
-    did?: string;
-    grantedScope?: string[];
     interval: number;
-    lastPollAt?: number;
     expiresAt: number;
 }
+
+export interface DevicePolling {
+    interval: number;
+    lastPollAt: number;
+}
+
+export type DeviceDecision =
+    | { approved: true; did: string; scope: string[] }
+    | { approved: false };
 
 export function randomSecret(prefix: string, bytes = 32): string {
     return `${prefix}${crypto.randomBytes(bytes).toString('base64url')}`;
@@ -95,6 +106,7 @@ export function hashSecret(secret: string): string {
     return crypto.createHash('sha256').update(secret, 'utf8').digest('base64url');
 }
 
+// Device records outlive expires_in so a late poll gets expired_token.
 const DEVICE_GRACE_MS = 10 * 60 * 1000;
 
 function ttlUntil(expiresAt: number, now: number): number {
@@ -113,7 +125,11 @@ export class PoppyStore {
         await this.kv.set(key, JSON.stringify(value), ttlUntil(expiresAt, this.now()));
     }
 
-    // Sessions
+    private ttl(expiresAt: number): number {
+        return ttlUntil(expiresAt, this.now());
+    }
+
+    // ---------- Sessions ----------
 
     async putSession(session: Session): Promise<void> {
         await this.putJson(`session:${session.id}`, session, session.expiresAt);
@@ -127,7 +143,23 @@ export class PoppyStore {
         return session && session.expiresAt > this.now() ? session : null;
     }
 
-    // Session Tokens
+    // Records the grant a Session is signed in with, without recreating a
+    // Session that has ended meanwhile.
+    async setSessionGrant(session: Session, grantId: string | undefined): Promise<boolean> {
+        return this.kv.setIfPresent(`session:${session.id}`, JSON.stringify({ ...session, grantId }), this.ttl(session.expiresAt));
+    }
+
+    // A Session is signed in to at most one account, ever (spec 4.4). The
+    // first DID to bind wins; returns whether `did` is that account.
+    async bindSessionAccount(session: Session, did: string): Promise<boolean> {
+        const key = `session-account:${session.id}`;
+        if (await this.kv.setIfAbsent(key, did, this.ttl(session.expiresAt))) {
+            return true;
+        }
+        return (await this.kv.get(key)) === did;
+    }
+
+    // ---------- Session Tokens ----------
 
     async putSessionToken(token: string, record: SessionToken): Promise<void> {
         await this.putJson(`stoken:${hashSecret(token)}`, record, record.expiresAt);
@@ -138,12 +170,13 @@ export class PoppyStore {
         return record && record.expiresAt > this.now() ? record : null;
     }
 
-    // Account Token grants
+    // ---------- Account Token grants ----------
 
     async putGrant(grant: Grant): Promise<void> {
+        const ttl = this.ttl(grant.expiresAt);
         await this.putJson(`grant:${grant.id}`, grant, grant.expiresAt);
-        await this.kv.set(`grant-token:${grant.tokenHash}`, grant.id, ttlUntil(grant.expiresAt, this.now()));
-        await this.kv.addToSet(`grants-by-did:${grant.did}`, grant.id);
+        await this.kv.set(`grant-token:${grant.tokenHash}`, grant.id, ttl);
+        await this.kv.addToSet(`grants-by-did:${grant.did}`, grant.id, ttl);
     }
 
     async getGrant(id: string): Promise<Grant | null> {
@@ -159,12 +192,14 @@ export class PoppyStore {
         return id ? this.getGrant(id) : null;
     }
 
-    async touchGrant(grant: Grant): Promise<void> {
-        await this.putJson(`grant:${grant.id}`, { ...grant, lastUsedAt: this.now() }, grant.expiresAt);
+    // Records use of a grant. Returns false, and writes nothing, when the
+    // grant was revoked after the caller read it.
+    async touchGrant(grant: Grant): Promise<boolean> {
+        return this.kv.setIfPresent(`grant:${grant.id}`, JSON.stringify({ ...grant, lastUsedAt: this.now() }), this.ttl(grant.expiresAt));
     }
 
-    async addGrantSession(grantId: string, sessionId: string): Promise<void> {
-        await this.kv.addToSet(`grant-sessions:${grantId}`, sessionId);
+    async addGrantSession(grant: Grant, sessionId: string): Promise<void> {
+        await this.kv.addToSet(`grant-sessions:${grant.id}`, sessionId, this.ttl(grant.expiresAt));
     }
 
     async listGrantsForDid(did: string): Promise<Grant[]> {
@@ -182,7 +217,7 @@ export class PoppyStore {
     }
 
     // Revokes a grant and signs out every Session signed in with it. The
-    // Sessions continue signed out and keep their account (spec 4.9).
+    // Sessions continue signed out, bound to their account (spec 4.9).
     async revokeGrant(grant: Grant): Promise<void> {
         await this.kv.del(`grant:${grant.id}`);
         await this.kv.del(`grant-token:${grant.tokenHash}`);
@@ -190,13 +225,13 @@ export class PoppyStore {
         for (const sessionId of await this.kv.members(`grant-sessions:${grant.id}`)) {
             const session = await this.getSession(sessionId);
             if (session?.grantId === grant.id) {
-                await this.putSession({ ...session, grantId: undefined });
+                await this.setSessionGrant(session, undefined);
             }
         }
         await this.kv.del(`grant-sessions:${grant.id}`);
     }
 
-    // Authorization codes, single use
+    // ---------- Authorization codes, single use ----------
 
     async putAuthCode(code: string, record: AuthCode, expiresAt: number): Promise<void> {
         await this.putJson(`code:${hashSecret(code)}`, record, expiresAt);
@@ -210,12 +245,12 @@ export class PoppyStore {
         return raw ? JSON.parse(raw) as AuthCode : null;
     }
 
-    // Sign-in requests in progress, for both Direct and Device Sign-In
+    // ---------- Sign-in requests, for Direct and Device Sign-In ----------
 
     async putSignIn(signIn: SignIn): Promise<void> {
         await this.putJson(`signin:${signIn.id}`, signIn, signIn.expiresAt);
         if (signIn.challenge) {
-            await this.kv.set(`challenge:${signIn.challenge}`, signIn.id, ttlUntil(signIn.expiresAt, this.now()));
+            await this.kv.set(`challenge:${signIn.challenge}`, signIn.id, this.ttl(signIn.expiresAt));
         }
     }
 
@@ -232,19 +267,34 @@ export class PoppyStore {
         return id ? this.getSignIn(id) : null;
     }
 
-    // Device authorizations
+    // The first wallet response for a sign-in decides its account.
+    async authenticateSignIn(signIn: SignIn, account: SignInAccount): Promise<boolean> {
+        return this.kv.setIfAbsent(`signin-account:${signIn.id}`, JSON.stringify(account), this.ttl(signIn.expiresAt));
+    }
+
+    async getSignInAccount(signIn: SignIn): Promise<SignInAccount | null> {
+        return this.getJson<SignInAccount>(`signin-account:${signIn.id}`);
+    }
+
+    // Only one decision is acted on, however many times the page submits.
+    async claimSignInDecision(signIn: SignIn): Promise<boolean> {
+        return this.kv.setIfAbsent(`signin-decided:${signIn.id}`, '1', this.ttl(signIn.expiresAt));
+    }
+
+    async isSignInDecided(signIn: SignIn): Promise<boolean> {
+        return (await this.kv.get(`signin-decided:${signIn.id}`)) !== null;
+    }
+
+    // ---------- Device authorizations ----------
 
     async putDevice(deviceCode: string, record: DeviceAuthorization): Promise<void> {
-        await this.putDeviceByHash(hashSecret(deviceCode), record);
+        const hash = hashSecret(deviceCode);
+        const ttl = this.ttl(record.expiresAt + DEVICE_GRACE_MS);
+        await this.kv.set(`device:${hash}`, JSON.stringify(record), ttl);
+        await this.kv.set(`usercode:${record.userCode}`, hash, this.ttl(record.expiresAt));
     }
 
-    async putDeviceByHash(hash: string, record: DeviceAuthorization): Promise<void> {
-        // Kept past expires_in so a late poll gets expired_token, not invalid_grant.
-        await this.putJson(`device:${hash}`, record, record.expiresAt + DEVICE_GRACE_MS);
-        await this.kv.set(`usercode:${record.userCode}`, hash, ttlUntil(record.expiresAt, this.now()));
-    }
-
-    async getDeviceByHash(hash: string): Promise<DeviceAuthorization | null> {
+    async getDevice(hash: string): Promise<DeviceAuthorization | null> {
         return this.getJson<DeviceAuthorization>(`device:${hash}`);
     }
 
@@ -252,8 +302,33 @@ export class PoppyStore {
         return this.kv.get(`usercode:${userCode}`);
     }
 
-    async deleteDevice(hash: string, userCode: string): Promise<void> {
+    // Polling state lives apart from the decision, so a poll cannot undo one.
+    async getDevicePolling(hash: string): Promise<DevicePolling | null> {
+        return this.getJson<DevicePolling>(`device-poll:${hash}`);
+    }
+
+    async putDevicePolling(hash: string, device: DeviceAuthorization, polling: DevicePolling): Promise<void> {
+        await this.kv.set(`device-poll:${hash}`, JSON.stringify(polling), this.ttl(device.expiresAt + DEVICE_GRACE_MS));
+    }
+
+    // The User's decision is recorded once.
+    async decideDevice(hash: string, device: DeviceAuthorization, decision: DeviceDecision): Promise<boolean> {
+        return this.kv.setIfAbsent(`device-decision:${hash}`, JSON.stringify(decision), this.ttl(device.expiresAt + DEVICE_GRACE_MS));
+    }
+
+    async getDeviceDecision(hash: string): Promise<DeviceDecision | null> {
+        return this.getJson<DeviceDecision>(`device-decision:${hash}`);
+    }
+
+    // Consumes the decision; only one poll receives it.
+    async takeDeviceDecision(hash: string): Promise<DeviceDecision | null> {
+        const raw = await this.kv.take(`device-decision:${hash}`);
+        return raw ? JSON.parse(raw) as DeviceDecision : null;
+    }
+
+    async deleteDevice(hash: string, device: DeviceAuthorization): Promise<void> {
         await this.kv.del(`device:${hash}`);
-        await this.kv.del(`usercode:${userCode}`);
+        await this.kv.del(`usercode:${device.userCode}`);
+        await this.kv.del(`device-poll:${hash}`);
     }
 }

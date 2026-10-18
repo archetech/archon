@@ -187,7 +187,7 @@ public host must be HTTPS. Design notes are in `docs/plans/poppy-1395.md`.
 | `GET` | `/poppy/api/names/{name}`, `/members/{name}`, `/dids/{did}`, `/directory` | Lookups, open to signed-out Sessions. `/dids` accepts DIDs only, never wallet aliases. |
 | `GET` | `/poppy/api/account`, `/account/credential` | The signed-in User's profile and membership credential (`poppy:read`). |
 | `PUT`/`DELETE` | `/poppy/api/account/name` | Claim, change or release the User's name, with the same rules as `PUT /api/name` (`poppy:write`). |
-| `GET`/`DELETE` | `/api/poppy/connections[/:id]` | Session-authenticated account settings: the agents connected to the signed-in DID, and disconnecting one. |
+| `GET`/`DELETE` | `/api/poppy/connections[/:id]` | Session-authenticated account settings: one entry per agent connected to the signed-in DID; disconnecting one revokes all of that agent's Account Tokens for the account. |
 
 Agent client metadata and key sets are fetched without redirects through the
 destination-validating public HTTPS transport, limited to 100 KB and five seconds,
@@ -195,7 +195,11 @@ cached for one minute to one day, and refetched for an unknown `kid` at most onc
 per 30 seconds. Assertions must name the issuer as a single-string `aud` and carry
 a unique `jti`; DPoP Proofs are checked against the public URL built from
 `ARCHON_DRAWBRIDGE_PUBLIC_HOST`, not the `Host` header. Session Tokens last one hour,
-Account Tokens 90 days. A Session is signed in to at most one DID, and API requests
+Account Tokens 90 days. One-way transitions (binding a Session to its DID, answering a
+sign-in, consuming a device approval, touching a grant a revocation may have deleted) are
+single atomic Redis operations, so concurrent requests cannot both win. Herald's own rate
+limits are per `client_id` or global; per-address limits are Drawbridge's, since Herald
+cannot trust forwarded addresses. A Session is signed in to at most one DID, and API requests
 check on each call that the Session is still signed in, so revocation and
 disconnection take effect at once. State lives in Redis (`ARCHON_HERALD_REDIS_URL`
 or `ARCHON_REDIS_URL`) under the `<ARCHON_HERALD_NAME>:poppy` prefix; bearer

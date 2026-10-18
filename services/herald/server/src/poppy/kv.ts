@@ -3,14 +3,20 @@ import { Redis } from 'ioredis';
 // The small key-value surface the Personal Agent Protocol state needs: values
 // with expiry, an atomic first-writer claim for replay caches, an atomic
 // read-and-delete for single-use codes, and sets for per-account indexes.
-// Values are JSON strings; TTLs are seconds.
+// Values are JSON strings; TTLs are seconds. Every operation that decides a
+// race (claims, consumption, conditional replacement) is a single atomic
+// store command, so concurrent Herald requests agree on the winner.
 export interface PoppyKV {
     get(key: string): Promise<string | null>;
     set(key: string, value: string, ttlSeconds?: number): Promise<void>;
     setIfAbsent(key: string, value: string, ttlSeconds: number): Promise<boolean>;
+    // Replaces a value only while the key still exists, so a write racing a
+    // deletion cannot bring the key back.
+    setIfPresent(key: string, value: string, ttlSeconds: number): Promise<boolean>;
     take(key: string): Promise<string | null>;
     del(key: string): Promise<void>;
-    addToSet(key: string, member: string): Promise<void>;
+    // The set's lifetime is extended to at least ttlSeconds on each add.
+    addToSet(key: string, member: string, ttlSeconds: number): Promise<void>;
     removeFromSet(key: string, member: string): Promise<void>;
     members(key: string): Promise<string[]>;
     close?(): Promise<void>;
@@ -25,7 +31,7 @@ interface MemoryEntry {
 // signs every agent out.
 export class MemoryKV implements PoppyKV {
     private readonly values = new Map<string, MemoryEntry>();
-    private readonly sets = new Map<string, Set<string>>();
+    private readonly sets = new Map<string, { members: Set<string>; expiresAt: number }>();
 
     constructor(private readonly now: () => number = Date.now) {}
 
@@ -57,6 +63,14 @@ export class MemoryKV implements PoppyKV {
         return true;
     }
 
+    async setIfPresent(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+        if (!this.live(key)) {
+            return false;
+        }
+        await this.set(key, value, ttlSeconds);
+        return true;
+    }
+
     async take(key: string): Promise<string | null> {
         const entry = this.live(key);
         this.values.delete(key);
@@ -67,21 +81,32 @@ export class MemoryKV implements PoppyKV {
         this.values.delete(key);
     }
 
-    async addToSet(key: string, member: string): Promise<void> {
-        let set = this.sets.get(key);
-        if (!set) {
-            set = new Set();
-            this.sets.set(key, set);
+    private liveSet(key: string) {
+        const set = this.sets.get(key);
+        if (set && set.expiresAt <= this.now()) {
+            this.sets.delete(key);
+            return undefined;
         }
-        set.add(member);
+        return set;
+    }
+
+    async addToSet(key: string, member: string, ttlSeconds: number): Promise<void> {
+        const expiresAt = this.now() + ttlSeconds * 1000;
+        const set = this.liveSet(key);
+        if (set) {
+            set.members.add(member);
+            set.expiresAt = Math.max(set.expiresAt, expiresAt);
+        } else {
+            this.sets.set(key, { members: new Set([member]), expiresAt });
+        }
     }
 
     async removeFromSet(key: string, member: string): Promise<void> {
-        this.sets.get(key)?.delete(member);
+        this.liveSet(key)?.members.delete(member);
     }
 
     async members(key: string): Promise<string[]> {
-        return [...(this.sets.get(key) ?? [])];
+        return [...(this.liveSet(key)?.members ?? [])];
     }
 }
 
@@ -113,6 +138,11 @@ export class RedisKV implements PoppyKV {
         return result === 'OK';
     }
 
+    async setIfPresent(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+        const result = await this.redis.set(this.k(key), value, 'EX', Math.max(1, Math.ceil(ttlSeconds)), 'XX');
+        return result === 'OK';
+    }
+
     async take(key: string): Promise<string | null> {
         return this.redis.getdel(this.k(key));
     }
@@ -121,8 +151,14 @@ export class RedisKV implements PoppyKV {
         await this.redis.del(this.k(key));
     }
 
-    async addToSet(key: string, member: string): Promise<void> {
-        await this.redis.sadd(this.k(key), member);
+    async addToSet(key: string, member: string, ttlSeconds: number): Promise<void> {
+        const ttl = Math.max(1, Math.ceil(ttlSeconds));
+        await this.redis.multi()
+            .sadd(this.k(key), member)
+            // GT keeps a longer lifetime already set by another member.
+            .expire(this.k(key), ttl, 'GT')
+            .expire(this.k(key), ttl, 'NX')
+            .exec();
     }
 
     async removeFromSet(key: string, member: string): Promise<void> {

@@ -50,7 +50,7 @@ export interface Poppy {
     router: Router;
     wellKnown: Router;
     listConnections(did: string): Promise<PoppyConnection[]>;
-    disconnect(did: string, grantId: string): Promise<boolean>;
+    disconnect(did: string, agentId: string): Promise<boolean>;
 }
 
 const JWT_BEARER = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
@@ -106,7 +106,7 @@ function parseScope(value: string | undefined, allowEmpty = false): string[] {
     if (!allowEmpty && scopes.length === 0) {
         throw new OAuthError(400, 'invalid_scope', 'scope is required');
     }
-    const unknown = scopes.filter(scope => !(scope in SCOPES));
+    const unknown = scopes.filter(scope => !Object.hasOwn(SCOPES, scope));
     if (unknown.length) {
         throw new OAuthError(400, 'invalid_scope', `unknown scope ${unknown[0]}`);
     }
@@ -131,12 +131,6 @@ function userCode(): string {
 function normalizeUserCode(value: unknown): string {
     const letters = String(value ?? '').toUpperCase().replace(/[^A-Z]/g, '');
     return letters.length === 8 ? `${letters.slice(0, 4)}-${letters.slice(4)}` : '';
-}
-
-function clientAddress(req: Request): string {
-    const forwarded = req.headers['x-forwarded-for'];
-    const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim();
-    return first || req.ip || 'unknown';
 }
 
 function readCookie(req: Request, name: string): string | undefined {
@@ -165,12 +159,41 @@ export function createPoppy(options: PoppyOptions): Poppy {
     const cookiePath = new URL(config.issuer).pathname;
     const secureCookie = config.issuer.startsWith('https:');
 
+    // Drawbridge limits requests per source address in front of Herald.
+    // Herald cannot tell sources apart (it sees Drawbridge, and forwarded
+    // headers are caller-controlled), so its own limits are per client_id
+    // after authentication, and otherwise global.
     const tokenLimiter = new RateLimiter(300, 60_000, now);
     const newClientLimiter = new RateLimiter(60, 60_000, now);
-    const userCodeLimiter = new RateLimiter(10, 60_000, now);
-    // Each sign-in page creates a wallet challenge, so pages are limited per address.
-    const signInLimiter = new RateLimiter(30, 60_000, now);
+    const userCodeLimiter = new RateLimiter(60, 60_000, now);
+    // Each sign-in page creates a wallet challenge.
+    const signInLimiter = new RateLimiter(120, 60_000, now);
     const knownClients = new Set<string>();
+    const MAX_KNOWN_CLIENTS = 10_000;
+
+    // Loads an agent's metadata. A client_id not yet verified here spends the
+    // new-client budget first, because loading it fetches from the agent.
+    async function loadAgent(clientId: string): Promise<Agent> {
+        if (!knownClients.has(clientId)) {
+            const wait = newClientLimiter.take('new');
+            if (wait) {
+                throw new OAuthError(429, 'rate_limited', 'too many new client_id values', wait);
+            }
+        }
+        try {
+            return await agents.get(clientId);
+        }
+        catch (error) {
+            throw new OAuthError(401, 'invalid_client', error instanceof AgentError ? error.message : 'client metadata could not be loaded');
+        }
+    }
+
+    function rememberClient(clientId: string): void {
+        if (knownClients.size >= MAX_KNOWN_CLIENTS) {
+            knownClients.clear();
+        }
+        knownClients.add(clientId);
+    }
 
     // ---------- client authentication (4.1) ----------
 
@@ -181,20 +204,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
         }
         const assertion = required(body, 'client_assertion');
 
-        if (!knownClients.has(clientId)) {
-            const wait = newClientLimiter.take('new');
-            if (wait) {
-                throw new OAuthError(429, 'rate_limited', 'too many new client_id values', wait);
-            }
-        }
-
-        let agent: Agent;
-        try {
-            agent = await agents.get(clientId);
-        }
-        catch (error) {
-            throw new OAuthError(401, 'invalid_client', error instanceof AgentError ? error.message : 'client metadata could not be loaded');
-        }
+        const agent = await loadAgent(clientId);
         try {
             const { payload } = await verifyAssertion(assertion, agent, agents, config.issuer, store.kv, now);
             if (payload.sub !== clientId) {
@@ -205,7 +215,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
             throw new OAuthError(401, 'invalid_client', error instanceof Error ? error.message : 'client assertion rejected');
         }
 
-        knownClients.add(clientId);
+        rememberClient(clientId);
         // Charged only after the signature and replay checks, so nobody else
         // can use up an agent's allowance.
         const wait = tokenLimiter.take(clientId);
@@ -279,20 +289,25 @@ export function createPoppy(options: PoppyOptions): Poppy {
         };
     }
 
+    const ACCOUNT_MISMATCH = 'this Session is, or was, signed in to a different account';
+
     async function signInSession(session: Session, grant: Grant): Promise<Session> {
-        if (session.account && session.account !== grant.did) {
-            throw new OAuthError(400, 'account_mismatch', 'this Session is, or was, signed in to a different account');
+        if (!await store.bindSessionAccount(session, grant.did)) {
+            throw new OAuthError(400, 'account_mismatch', ACCOUNT_MISMATCH);
         }
-        const updated = { ...session, account: grant.did, grantId: grant.id };
-        await store.putSession(updated);
-        await store.addGrantSession(grant.id, session.id);
-        return updated;
+        await store.addGrantSession(grant, session.id);
+        if (!await store.setSessionGrant(session, grant.id)) {
+            throw new OAuthError(400, 'invalid_session', 'the Session has ended');
+        }
+        return { ...session, grantId: grant.id };
     }
 
     // Completes a sign-in: a new Account Token and a signed-in Session Token.
+    // The Session is bound to the account before the grant exists, so a
+    // request that loses the binding leaves no usable Account Token behind.
     async function completeSignIn(session: Session, agent: Agent, did: string, scope: string[], jkt: string) {
-        if (session.account && session.account !== did) {
-            throw new OAuthError(400, 'account_mismatch', 'this Session is, or was, signed in to a different account');
+        if (!await store.bindSessionAccount(session, did)) {
+            throw new OAuthError(400, 'account_mismatch', ACCOUNT_MISMATCH);
         }
         const accountToken = randomSecret('pat_');
         const grant: Grant = {
@@ -349,9 +364,10 @@ export function createPoppy(options: PoppyOptions): Poppy {
     }
 
     async function refreshTokenGrant(req: Request, agent: Agent, jkt: string) {
+        const revoked = () => new OAuthError(400, 'invalid_grant', 'the Account Token is invalid, expired or revoked');
         const grant = await store.getGrantByToken(param(req.body, 'refresh_token'));
         if (!grant || grant.clientId !== agent.clientId) {
-            throw new OAuthError(400, 'invalid_grant', 'the Account Token is invalid, expired or revoked');
+            throw revoked();
         }
         const requested = param(req.body, 'scope');
         const scope = requested === undefined ? grant.scope : parseScope(requested);
@@ -360,40 +376,57 @@ export function createPoppy(options: PoppyOptions): Poppy {
         }
         const session = await sessionFor(param(req.body, 'session_id'), agent.clientId, grant.userId)
             ?? await newSession(agent.clientId, grant.userId);
+        // A revocation may land at any point here. Touching never recreates a
+        // deleted grant, and the check after signing in undoes the Session's
+        // link to a grant revoked meanwhile, so revocation always wins.
+        if (!await store.touchGrant(grant)) {
+            throw revoked();
+        }
         const signedIn = await signInSession(session, grant);
-        await store.touchGrant(grant);
+        if (!await store.getGrant(grant.id)) {
+            await store.setSessionGrant(signedIn, undefined);
+            throw revoked();
+        }
         return issueSessionToken(signedIn, jkt, scope, grant);
     }
 
     async function deviceCodeGrant(req: Request, agent: Agent, jkt: string) {
         const deviceHash = hashSecret(required(req.body, 'device_code'));
         const session = await sessionFor(required(req.body, 'session_id'), agent.clientId);
-        const device = await store.getDeviceByHash(deviceHash);
+        const device = await store.getDevice(deviceHash);
         if (!device || device.clientId !== agent.clientId) {
             throw new OAuthError(400, 'invalid_grant', 'unknown device_code');
         }
         if (device.expiresAt <= now()) {
-            await store.deleteDevice(deviceHash, device.userCode);
+            await store.deleteDevice(deviceHash, device);
             throw new OAuthError(400, 'expired_token', 'the device code has expired');
         }
-        if (device.status === 'denied') {
-            await store.deleteDevice(deviceHash, device.userCode);
-            throw new OAuthError(400, 'access_denied', 'the User declined');
-        }
-        if (device.status === 'pending') {
-            const tooSoon = device.lastPollAt !== undefined && now() - device.lastPollAt < device.interval * 1000;
-            await store.putDeviceByHash(deviceHash, {
-                ...device,
+
+        const decision = await store.getDeviceDecision(deviceHash);
+        if (!decision) {
+            const polling = await store.getDevicePolling(deviceHash);
+            const interval = polling?.interval ?? device.interval;
+            const tooSoon = polling !== null && now() - polling.lastPollAt < interval * 1000;
+            await store.putDevicePolling(deviceHash, device, {
                 lastPollAt: now(),
-                interval: tooSoon ? device.interval + 5 : device.interval,
+                interval: tooSoon ? interval + 5 : interval,
             });
             if (tooSoon) {
                 throw new OAuthError(400, 'slow_down', 'poll no faster than the interval');
             }
             throw new OAuthError(400, 'authorization_pending', 'the User has not finished signing in');
         }
-        await store.deleteDevice(deviceHash, device.userCode);
-        return completeSignIn(session!, agent, device.did!, device.grantedScope!, jkt);
+
+        // Only the poll that consumes the decision acts on it.
+        const taken = await store.takeDeviceDecision(deviceHash);
+        if (!taken) {
+            throw new OAuthError(400, 'invalid_grant', 'the device code has already been used');
+        }
+        await store.deleteDevice(deviceHash, device);
+        if (!taken.approved) {
+            throw new OAuthError(400, 'access_denied', 'the User declined');
+        }
+        return completeSignIn(session!, agent, taken.did, taken.scope, jkt);
     }
 
     // ---------- router ----------
@@ -460,7 +493,6 @@ export function createPoppy(options: PoppyOptions): Poppy {
                 clientId: agent.clientId,
                 scope,
                 userCode: code,
-                status: 'pending',
                 interval: config.deviceIntervalSeconds,
                 expiresAt,
             });
@@ -496,7 +528,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
         return url.href;
     }
 
-    async function startSignIn(res: Response, signIn: Omit<SignIn, 'id' | 'browserSecretHash' | 'csrfHash' | 'status' | 'expiresAt' | 'challenge'>) {
+    async function startSignIn(res: Response, signIn: Omit<SignIn, 'id' | 'browserSecretHash' | 'csrfHash' | 'expiresAt' | 'challenge'>) {
         const id = randomSecret('sgn_', 16);
         const browserSecret = randomSecret('', 32);
         const csrf = randomSecret('', 24);
@@ -507,7 +539,6 @@ export function createPoppy(options: PoppyOptions): Poppy {
             browserSecretHash: hashSecret(browserSecret),
             csrfHash: hashSecret(csrf),
             challenge,
-            status: 'pending',
             expiresAt: now() + config.codeSeconds * 1000,
         };
         await store.putSignIn(record);
@@ -545,7 +576,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
             if (!clientId) {
                 throw new Error('client_id is missing');
             }
-            agent = await agents.get(clientId);
+            agent = await loadAgent(clientId);
             // Errors are shown here rather than redirected until the
             // redirect_uri is known to belong to the agent.
             if (!agent.metadata.redirect_uris.includes(redirectUri)) {
@@ -558,7 +589,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
             return;
         }
 
-        const wait = signInLimiter.take(clientAddress(req));
+        const wait = signInLimiter.take('all');
         if (wait) {
             res.set('Retry-After', String(wait));
             sendPage(res, 429, nonce => errorPage(nonce, config.organizationName, 'Too many sign-in attempts. Wait a minute and try again.'));
@@ -615,7 +646,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
 
     router.post('/device', async (req: Request, res: Response) => {
         const entered = normalizeUserCode(req.body?.user_code);
-        const wait = userCodeLimiter.take(clientAddress(req));
+        const wait = userCodeLimiter.take('all');
         if (wait) {
             res.set('Retry-After', String(wait));
             sendPage(res, 429, nonce => deviceEntryPage(nonce, config.organizationName, urls.deviceVerification, entered,
@@ -623,18 +654,18 @@ export function createPoppy(options: PoppyOptions): Poppy {
             return;
         }
         const hash = entered ? await store.getDeviceHashByUserCode(entered) : null;
-        if (hash && signInLimiter.take(clientAddress(req))) {
+        if (hash && signInLimiter.take('all')) {
             sendPage(res, 429, nonce => errorPage(nonce, config.organizationName, 'Too many sign-in attempts. Wait a minute and try again.'));
             return;
         }
-        const device = hash ? await store.getDeviceByHash(hash) : null;
-        if (!hash || !device || device.status !== 'pending' || device.expiresAt <= now()) {
+        const device = hash ? await store.getDevice(hash) : null;
+        if (!hash || !device || device.expiresAt <= now() || await store.getDeviceDecision(hash)) {
             sendPage(res, 400, nonce => deviceEntryPage(nonce, config.organizationName, urls.deviceVerification, entered,
                 'That code is not valid or has expired. Check it against the one your agent shows.'));
             return;
         }
         try {
-            const agent = await agents.get(device.clientId);
+            const agent = await loadAgent(device.clientId);
             await startSignIn(res, {
                 kind: 'device',
                 clientId: agent.clientId,
@@ -671,9 +702,9 @@ export function createPoppy(options: PoppyOptions): Poppy {
             res.status(404).json({ error: 'sign_in_not_found' });
             return;
         }
-        res.json(signIn.status === 'authenticated'
-            ? { status: signIn.status, did: signIn.did, name: signIn.name }
-            : { status: signIn.status });
+        const account = await store.getSignInAccount(signIn);
+        const status = await store.isSignInDecided(signIn) ? 'done' : account ? 'authenticated' : 'pending';
+        res.json(status === 'authenticated' ? { status, did: account!.did, name: account!.name } : { status });
     });
 
     router.post('/signin/:id/decide', async (req: Request, res: Response) => {
@@ -684,14 +715,19 @@ export function createPoppy(options: PoppyOptions): Poppy {
             res.status(403).json({ error: 'access_denied', error_description: 'This sign-in page has expired. Start again from your agent.' });
             return;
         }
-        if (signIn.status !== 'authenticated' || !signIn.did) {
+        const account = await store.getSignInAccount(signIn);
+        if (!account) {
             res.status(409).json({ error: 'invalid_request', error_description: 'Sign in with your wallet first.' });
+            return;
+        }
+        // The first submission decides; repeats (a double click) change nothing.
+        if (!await store.claimSignInDecision(signIn)) {
+            res.status(409).json({ error: 'invalid_request', error_description: 'This sign-in has already been answered.' });
             return;
         }
         const selected = Array.isArray(req.body?.scope) ? req.body.scope : [];
         const granted = signIn.scope.filter(scope => selected.includes(scope));
         const approved = req.body?.decision === 'approve' && granted.length > 0;
-        await store.putSignIn({ ...signIn, status: 'done' });
 
         if (signIn.kind === 'direct') {
             if (!approved) {
@@ -703,24 +739,20 @@ export function createPoppy(options: PoppyOptions): Poppy {
                 clientId: signIn.clientId,
                 redirectUri: signIn.redirectUri!,
                 codeChallenge: signIn.codeChallenge!,
-                did: signIn.did,
+                did: account.did,
                 scope: granted,
             }, now() + config.codeSeconds * 1000);
             res.json({ redirect: redirectWith(signIn.redirectUri!, { code, state: signIn.state, iss: config.issuer }) });
             return;
         }
 
-        const device = await store.getDeviceByHash(signIn.deviceCodeHash!);
-        if (!device || device.status !== 'pending' || device.expiresAt <= now()) {
-            res.status(410).json({ error: 'expired_token', error_description: 'This request has expired. Start again from your agent.' });
+        const device = await store.getDevice(signIn.deviceCodeHash!);
+        const decided = device && device.expiresAt > now() && await store.decideDevice(signIn.deviceCodeHash!, device,
+            approved ? { approved: true, did: account.did, scope: granted } : { approved: false });
+        if (!decided) {
+            res.status(410).json({ error: 'expired_token', error_description: 'This request has expired or was already answered. Start again from your agent.' });
             return;
         }
-        await store.putDeviceByHash(signIn.deviceCodeHash!, {
-            ...device,
-            status: approved ? 'approved' : 'denied',
-            did: approved ? signIn.did : undefined,
-            grantedScope: approved ? granted : undefined,
-        });
         res.json({ message: approved
             ? 'Connected. You can close this page and return to your agent.'
             : 'Declined. Nothing was connected.' });
@@ -740,17 +772,17 @@ export function createPoppy(options: PoppyOptions): Poppy {
                 return;
             }
             const signIn = await store.getSignInByChallenge(verify.challenge);
-            if (!signIn || signIn.status !== 'pending') {
+            if (!signIn) {
                 res.status(400).json({ error: 'unknown_challenge' });
                 return;
             }
             await accounts.ensureUser(verify.responder);
-            await store.putSignIn({
-                ...signIn,
-                status: 'authenticated',
-                did: verify.responder,
-                name: await accounts.nameOf(verify.responder),
-            });
+            const account = { did: verify.responder, name: await accounts.nameOf(verify.responder) };
+            // The first response decides the account; a later one cannot replace it.
+            if (!await store.authenticateSignIn(signIn, account)) {
+                res.status(409).json({ error: 'already_answered' });
+                return;
+            }
             res.json({ ok: true });
         }
         catch {
@@ -774,29 +806,41 @@ export function createPoppy(options: PoppyOptions): Poppy {
 
     // ---------- account settings ----------
 
-    async function listConnections(did: string): Promise<PoppyConnection[]> {
-        const grants = await store.listGrantsForDid(did);
-        return grants
-            .sort((a, b) => b.lastUsedAt - a.lastUsedAt)
-            .map(grant => ({
-                id: grant.id,
-                clientId: grant.clientId,
-                name: grant.clientName,
-                domain: grant.domain,
-                scope: grant.scope,
-                createdAt: new Date(grant.createdAt).toISOString(),
-                lastUsedAt: new Date(grant.lastUsedAt).toISOString(),
-                expiresAt: new Date(grant.expiresAt).toISOString(),
-            }));
+    // One entry per agent: signing in again adds a grant rather than
+    // replacing one, and disconnecting an agent revokes all of its grants
+    // for the account (guides, "Account settings").
+    function agentId(clientId: string): string {
+        return `agt_${hashSecret(clientId).slice(0, 22)}`;
     }
 
-    async function disconnect(did: string, grantId: string): Promise<boolean> {
-        const grant = await store.getGrant(grantId);
-        if (!grant || grant.did !== did) {
-            return false;
+    async function listConnections(did: string): Promise<PoppyConnection[]> {
+        const byAgent = new Map<string, Grant[]>();
+        for (const grant of await store.listGrantsForDid(did)) {
+            byAgent.set(grant.clientId, [...(byAgent.get(grant.clientId) ?? []), grant]);
         }
-        await store.revokeGrant(grant);
-        return true;
+        return [...byAgent.values()]
+            .map(grants => {
+                const latest = grants.reduce((a, b) => (b.lastUsedAt > a.lastUsedAt ? b : a));
+                return {
+                    id: agentId(latest.clientId),
+                    clientId: latest.clientId,
+                    name: latest.clientName,
+                    domain: latest.domain,
+                    scope: [...new Set(grants.flatMap(grant => grant.scope))].sort(),
+                    createdAt: new Date(Math.min(...grants.map(grant => grant.createdAt))).toISOString(),
+                    lastUsedAt: new Date(latest.lastUsedAt).toISOString(),
+                    expiresAt: new Date(Math.max(...grants.map(grant => grant.expiresAt))).toISOString(),
+                };
+            })
+            .sort((a, b) => b.lastUsedAt.localeCompare(a.lastUsedAt));
+    }
+
+    async function disconnect(did: string, id: string): Promise<boolean> {
+        const grants = (await store.listGrantsForDid(did)).filter(grant => agentId(grant.clientId) === id);
+        for (const grant of grants) {
+            await store.revokeGrant(grant);
+        }
+        return grants.length > 0;
     }
 
     return { router, wellKnown, listConnections, disconnect };
