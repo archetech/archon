@@ -18,7 +18,8 @@ export interface AccountResult {
 // What Herald provides to Poppy. Implemented in routes.ts over the same
 // helpers its own routes use, so both apply identical rules.
 export interface PoppyAccounts {
-    createChallenge(callback: string): Promise<string>;
+    // `description` is shown by the wallet answering the challenge.
+    createChallenge(callback: string, description: string): Promise<string>;
     verifyResponse(response: string): Promise<{ match: boolean; challenge?: string; responder?: string }>;
     ensureUser(did: string): Promise<void>;
     nameOf(did: string): Promise<string | undefined>;

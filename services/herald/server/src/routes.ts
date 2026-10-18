@@ -527,9 +527,9 @@ export function createHeraldRoutes(ctx: HeraldContext): {
 
     function poppyAccounts(): PoppyAccounts {
         return {
-            async createChallenge(callback: string) {
-                // @ts-ignore - callback is carried in the challenge for the wallet
-                return ctx.keymaster.createChallenge({ callback });
+            async createChallenge(callback: string, description: string) {
+                // @ts-ignore - callback and description are carried in the challenge for the wallet
+                return ctx.keymaster.createChallenge({ callback, description });
             },
             async verifyResponse(response: string) {
                 const verify = await ctx.keymaster.verifyResponse(response, { retries: 10 });

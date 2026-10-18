@@ -198,6 +198,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [idList, setIdList] = useState(null);
     const [challenge, setChallenge] = useState(null);
     const [callback, setCallback] = useState(null);
+    // What the challenge's issuer says a response grants, shown before Send.
+    const [challengeDescription, setChallengeDescription] = useState('');
     const [widget, setWidget] = useState(false);
     const [response, setResponse] = useState(null);
     const [accessGranted, setAccessGranted] = useState(false);
@@ -1867,8 +1869,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
             const asset = await keymaster.resolveAsset(challenge);
             const callback = asset.challenge.callback;
+            const description = asset.challenge.description;
 
             setCallback(callback);
+            setChallengeDescription(typeof description === 'string' ? description.slice(0, 500) : '');
 
             if (callback) {
                 setDisableSendResponse(false);
@@ -7751,6 +7755,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                 margin="normal"
                                                 inputProps={{ maxLength: 85, style: { fontFamily: 'Courier', fontSize: '0.8em' } }}
                                             />
+                                            {challengeDescription && callback && (
+                                                <Alert severity="info" sx={{ mt: 1 }}>{challengeDescription}</Alert>
+                                            )}
                                             <br />
                                             <Grid container direction="row" justifyContent="flex-start" alignItems="center" spacing={3}>
                                                 <Grid item>
