@@ -913,3 +913,112 @@ describe('index lifetimes', () => {
         expect(await memory.members('grant-sessions:g')).toEqual([]);
     });
 });
+
+describe('second review', () => {
+    async function openDevicePage(userCode: string, did: string) {
+        const page = await request(app).post('/poppy/device').type('form').send({ user_code: userCode });
+        expect(page.status).toBe(200);
+        const cookie = page.headers['set-cookie'][0].split(';')[0];
+        const csrf = /"csrf":"([^"]+)"/.exec(page.text)![1];
+        const decideUrl = /"decideUrl":"([^"]+)"/.exec(page.text)![1].replace(ISSUER, '/poppy');
+        const walletChallenge = decodeURIComponent(/challenge=([^"&]+)/.exec(page.text)![1]);
+        await request(app).post('/poppy/signin/response')
+            .send({ response: JSON.stringify({ challenge: walletChallenge, responder: did }) }).expect(200);
+        return () => request(app).post(decideUrl).set('Cookie', cookie).set('X-Poppy-CSRF', csrf)
+            .send({ decision: 'approve', scope: ['poppy:read'] });
+    }
+
+    async function authorizeDevice() {
+        return (await request(app).post('/poppy/device_authorization').type('form')
+            .send({ scope: 'poppy:read', ...await agent.clientAuth() })).body;
+    }
+
+    async function poll(deviceCode: string, sessionId: string, extra: Record<string, string> = {}) {
+        return token({
+            grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+            device_code: deviceCode,
+            session_id: sessionId,
+            ...extra,
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN));
+    }
+
+    it('accepts one device decision even from two open consent pages', async () => {
+        const session = await startSession();
+        const device = await authorizeDevice();
+        const first = await openDevicePage(device.user_code, ALICE);
+        const second = await openDevicePage(device.user_code, ALICE);
+
+        expect((await first()).status).toBe(200);
+        expect((await poll(device.device_code, session.body.session_id)).status).toBe(200);
+        // The second page answers after the decision was consumed.
+        expect((await second()).status).toBe(410);
+        expect((await poll(device.device_code, session.body.session_id)).body.error).toBe('invalid_grant');
+        expect((await poppy.listConnections(ALICE))).toHaveLength(1);
+    });
+
+    it('lets a revocation clear only the grant it revoked from a Session', async () => {
+        const store = new PoppyStore(kv);
+        const session = { id: 'ses_x', clientId: AGENT_ID, userId: 'usr_1', createdAt: Date.now(), expiresAt: Date.now() + 60_000 };
+        await store.putSession(session);
+        expect(await store.setSessionGrant(session, 'grt_a')).toBe(true);
+        // A concurrent sign-in moves the Session to grant B before A's revocation clears it.
+        expect(await store.setSessionGrant(session, 'grt_b')).toBe(true);
+        await store.clearSessionGrant(session.id, 'grt_a');
+        expect(await store.getSessionGrant(session.id)).toBe('grt_b');
+        await store.clearSessionGrant(session.id, 'grt_b');
+        expect(await store.getSessionGrant(session.id)).toBeNull();
+    });
+
+    it('accepts the DPoP authentication scheme in any case', async () => {
+        const session = await startSession();
+        const response = await request(app).get('/poppy/api/directory')
+            .set('Authorization', `dpop ${session.body.access_token}`)
+            .set('DPoP', await agent.proof('GET', `${API}/directory`, session.body.access_token));
+        expect(response.status).toBe(200);
+    });
+
+    it('narrows the Session Token at the code exchange and keeps the Account Token whole', async () => {
+        const session = await startSession();
+        const { redirect, verifier } = await directSignIn(ALICE);
+        const response = await token({
+            grant_type: 'authorization_code',
+            code: redirect.searchParams.get('code')!,
+            redirect_uri: REDIRECT,
+            code_verifier: verifier,
+            session_id: session.body.session_id,
+            scope: 'poppy:read',
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN));
+        expect(response.body.scope).toBe('poppy:read');
+        expect((await api('put', '/account/name', response.body.access_token, { name: 'x' })).status).toBe(403);
+        expect((await poppy.listConnections(ALICE))[0].scope).toEqual(['poppy:read', 'poppy:write']);
+    });
+
+    it('rejects widening scopes at the code exchange', async () => {
+        const session = await startSession();
+        const { redirect, verifier } = await directSignIn(ALICE, 'poppy:read');
+        const response = await token({
+            grant_type: 'authorization_code',
+            code: redirect.searchParams.get('code')!,
+            redirect_uri: REDIRECT,
+            code_verifier: verifier,
+            session_id: session.body.session_id,
+            scope: 'poppy:read poppy:write',
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN));
+        expect(response.body.error).toBe('invalid_scope');
+    });
+
+    it('narrows and rejects scopes at the device exchange', async () => {
+        const session = await startSession();
+        const device = await authorizeDevice();
+        await (await openDevicePage(device.user_code, ALICE))();
+        expect((await poll(device.device_code, session.body.session_id, { scope: 'poppy:write' })).body.error).toBe('invalid_scope');
+
+        // A rejected request leaves the approval for a correct one.
+        const signIn = await poll(device.device_code, session.body.session_id, { scope: 'poppy:read' });
+        expect(signIn.status).toBe(200);
+        expect(signIn.body.scope).toBe('poppy:read');
+    });
+});

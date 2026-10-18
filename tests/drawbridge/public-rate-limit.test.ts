@@ -3,7 +3,7 @@ import { readFileSync } from 'fs';
 import express from 'express';
 import request from 'supertest';
 
-import { byMethod, publicRateLimit, isMeaningfulSource } from '../../services/drawbridge/server/src/middleware/public-rate-limit.ts';
+import { byHeraldRoute, byMethod, publicRateLimit, isMeaningfulSource } from '../../services/drawbridge/server/src/middleware/public-rate-limit.ts';
 import type { DrawbridgeStore, RateLimitResult } from '../../services/drawbridge/server/src/types.ts';
 
 // A store that actually counts, so the buckets can be driven independently
@@ -248,6 +248,8 @@ describe('drawbridge rate limit config validation', () => {
         'ARCHON_DRAWBRIDGE_EXPLORER_READ_GLOBAL',
         'ARCHON_DRAWBRIDGE_NAME_WRITE_PER_SOURCE',
         'ARCHON_DRAWBRIDGE_NAME_WRITE_GLOBAL',
+        'ARCHON_DRAWBRIDGE_POPPY_AUTH_PER_SOURCE',
+        'ARCHON_DRAWBRIDGE_POPPY_AUTH_GLOBAL',
         'ARCHON_DRAWBRIDGE_PUBLIC_RATE_LIMIT_WINDOW',
     ];
 
@@ -357,5 +359,46 @@ describe('byMethod', () => {
         await request(app)[method]('/names/api/name').send({ name: 'alice' });
 
         expect(keys).toEqual(['names:write:read:global']);
+    });
+});
+
+// Device polling every five seconds is 12 POSTs a minute; on the name-write
+// budget (10 per source) a sign-in that follows the advertised interval would
+// be refused, so Poppy's authentication requests get their own bucket.
+describe('byHeraldRoute', () => {
+    function mountRoutes() {
+        const { store, keys } = countingStore();
+        const bucket = (name: string, max: number) => publicRateLimit({
+            store, name, readPerSourceMax: max, readGlobalMax: max * 10, windowSeconds: 60,
+        });
+        const app = express();
+        app.use(express.json());
+        app.use('/names', byHeraldRoute({
+            read: bucket('public', 120),
+            write: bucket('names:write', 10),
+            poppyAuth: bucket('poppy:auth', 120),
+        }), (_req, res) => res.json({ proxied: true }));
+        return { app, keys };
+    }
+
+    it.each(['/poppy/token', '/poppy/revoke', '/poppy/device_authorization', '/poppy/device', '/poppy/signin/response'])(
+        'charges POST %s to the Poppy authentication budget', async (path) => {
+            const { app, keys } = mountRoutes();
+            await request(app).post(`/names${path}`).send({});
+            expect(keys).toEqual(['poppy:auth:read:global']);
+        });
+
+    it('keeps account writes through the Poppy API on the name-write budget', async () => {
+        const { app, keys } = mountRoutes();
+        await request(app).put('/names/poppy/api/account/name').send({ name: 'alice' });
+        await request(app).post('/names/poppy/api/account/name').send({ name: 'alice' });
+        expect(keys).toEqual(['names:write:read:global', 'names:write:read:global']);
+    });
+
+    it('keeps other Herald writes and reads on their budgets', async () => {
+        const { app, keys } = mountRoutes();
+        await request(app).put('/names/api/name').send({ name: 'alice' });
+        await request(app).get('/names/poppy/authorize');
+        expect(keys).toEqual(['names:write:read:global', 'public:read:global']);
     });
 });

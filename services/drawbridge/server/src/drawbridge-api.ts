@@ -9,7 +9,7 @@ import GatekeeperClient from '@didcid/clients/gatekeeper';
 
 import config from './config.js';
 import { RedisStore } from './store.js';
-import { byMethod, publicRateLimit } from './middleware/public-rate-limit.js';
+import { byHeraldRoute, publicRateLimit } from './middleware/public-rate-limit.js';
 import { createAuthMiddleware } from './middleware/auth.js';
 import { loadPricingFromEnv } from './pricing.js';
 import { createV1Router } from './v1-router.js';
@@ -443,9 +443,18 @@ async function main() {
         logger,
     });
 
-    // Herald is fronted by two mounts and carries both kinds of traffic, so the
-    // bucket is chosen per request rather than per route.
-    const heraldRateLimit = byMethod({ read: publicReadRateLimit, write: nameWriteRateLimit });
+    const poppyAuthRateLimit = publicRateLimit({
+        store,
+        name: 'poppy:auth',
+        readPerSourceMax: config.poppyAuthPerSource,
+        readGlobalMax: config.poppyAuthGlobal,
+        windowSeconds: config.publicRateLimitWindow,
+        logger,
+    });
+
+    // Herald is fronted by two mounts and carries several kinds of traffic, so
+    // the bucket is chosen per request rather than per route.
+    const heraldRateLimit = byHeraldRoute({ read: publicReadRateLimit, write: nameWriteRateLimit, poppyAuth: poppyAuthRateLimit });
 
     // Public invoice endpoint — no auth required
     app.get('/invoice/:did', publicReadRateLimit, async (req, res) => {

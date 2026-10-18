@@ -209,3 +209,18 @@ export function byMethod(buckets: { read: RequestHandler, write: RequestHandler 
         bucket(req, res, next);
     };
 }
+
+// Herald's Personal Agent Protocol endpoints are POSTs but not name writes:
+// token requests, device polling every few seconds, sign-in pages and the
+// wallet's response. Charging them to the name-write budget would refuse a
+// sign-in that follows the advertised polling interval, so they get a bucket
+// of their own. Writes to the account through Poppy's API (`/poppy/api/*`)
+// stay on the name-write budget.
+export function isPoppyAuthRequest(req: Request): boolean {
+    return req.method === 'POST' && req.path.startsWith('/poppy/') && !req.path.startsWith('/poppy/api/');
+}
+
+export function byHeraldRoute(buckets: { read: RequestHandler, write: RequestHandler, poppyAuth: RequestHandler }): RequestHandler {
+    const methods = byMethod(buckets);
+    return (req, res, next) => (isPoppyAuthRequest(req) ? buckets.poppyAuth : methods)(req, res, next);
+}

@@ -79,7 +79,8 @@ export function createApiRouter({ config, store, accounts, now }: ApiOptions): R
                 return;
             }
             const authorization = req.headers.authorization || '';
-            const match = /^DPoP\s+([A-Za-z0-9\-._~+/]+=*)$/.exec(authorization);
+            // Authentication schemes are case-insensitive (RFC 9110 §11.1).
+            const match = /^DPoP\s+([A-Za-z0-9\-._~+/]+=*)$/i.exec(authorization);
             if (!match) {
                 challenge(res, 401, authorization ? 'invalid_token' : undefined);
                 return;
@@ -116,8 +117,9 @@ export function createApiRouter({ config, store, accounts, now }: ApiOptions): R
             let did: string | undefined;
             if (record.signedIn && record.grantId) {
                 const session = await store.getSession(record.sessionId);
-                const grant = await store.getGrant(record.grantId);
-                if (session?.grantId === record.grantId && grant && grant.did === record.did) {
+                const current = session ? await store.getSessionGrant(session.id) : null;
+                const grant = current === record.grantId ? await store.getGrant(record.grantId) : null;
+                if (grant && grant.did === record.did) {
                     did = grant.did;
                 }
             }

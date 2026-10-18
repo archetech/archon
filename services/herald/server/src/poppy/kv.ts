@@ -14,6 +14,8 @@ export interface PoppyKV {
     // deletion cannot bring the key back.
     setIfPresent(key: string, value: string, ttlSeconds: number): Promise<boolean>;
     take(key: string): Promise<string | null>;
+    // Deletes the key only while it still holds `value`.
+    deleteIfEquals(key: string, value: string): Promise<boolean>;
     del(key: string): Promise<void>;
     // The set's lifetime is extended to at least ttlSeconds on each add.
     addToSet(key: string, member: string, ttlSeconds: number): Promise<void>;
@@ -75,6 +77,14 @@ export class MemoryKV implements PoppyKV {
         const entry = this.live(key);
         this.values.delete(key);
         return entry?.value ?? null;
+    }
+
+    async deleteIfEquals(key: string, value: string): Promise<boolean> {
+        if (this.live(key)?.value !== value) {
+            return false;
+        }
+        this.values.delete(key);
+        return true;
     }
 
     async del(key: string): Promise<void> {
@@ -145,6 +155,14 @@ export class RedisKV implements PoppyKV {
 
     async take(key: string): Promise<string | null> {
         return this.redis.getdel(this.k(key));
+    }
+
+    async deleteIfEquals(key: string, value: string): Promise<boolean> {
+        const deleted = await this.redis.eval(
+            "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) else return 0 end",
+            1, this.k(key), value,
+        );
+        return deleted === 1;
     }
 
     async del(key: string): Promise<void> {

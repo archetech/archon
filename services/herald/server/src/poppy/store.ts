@@ -17,8 +17,6 @@ export interface Session {
     userId: string;
     createdAt: number;
     expiresAt: number;
-    // The Account Token grant it is signed in with now, if any.
-    grantId?: string;
 }
 
 export interface SessionToken {
@@ -143,10 +141,23 @@ export class PoppyStore {
         return session && session.expiresAt > this.now() ? session : null;
     }
 
-    // Records the grant a Session is signed in with, without recreating a
-    // Session that has ended meanwhile.
-    async setSessionGrant(session: Session, grantId: string | undefined): Promise<boolean> {
-        return this.kv.setIfPresent(`session:${session.id}`, JSON.stringify({ ...session, grantId }), this.ttl(session.expiresAt));
+    // The grant a Session is signed in with now, kept apart from the Session
+    // record so that signing out can clear it only while it still names the
+    // revoked grant: a concurrent sign-in with another grant survives.
+    async getSessionGrant(sessionId: string): Promise<string | null> {
+        return this.kv.get(`session-grant:${sessionId}`);
+    }
+
+    async setSessionGrant(session: Session, grantId: string): Promise<boolean> {
+        if (!await this.getSession(session.id)) {
+            return false;
+        }
+        await this.kv.set(`session-grant:${session.id}`, grantId, this.ttl(session.expiresAt));
+        return true;
+    }
+
+    async clearSessionGrant(sessionId: string, grantId: string): Promise<void> {
+        await this.kv.deleteIfEquals(`session-grant:${sessionId}`, grantId);
     }
 
     // A Session is signed in to at most one account, ever (spec 4.4). The
@@ -223,10 +234,7 @@ export class PoppyStore {
         await this.kv.del(`grant-token:${grant.tokenHash}`);
         await this.kv.removeFromSet(`grants-by-did:${grant.did}`, grant.id);
         for (const sessionId of await this.kv.members(`grant-sessions:${grant.id}`)) {
-            const session = await this.getSession(sessionId);
-            if (session?.grantId === grant.id) {
-                await this.setSessionGrant(session, undefined);
-            }
+            await this.clearSessionGrant(sessionId, grant.id);
         }
         await this.kv.del(`grant-sessions:${grant.id}`);
     }
@@ -320,10 +328,10 @@ export class PoppyStore {
         return this.getJson<DeviceDecision>(`device-decision:${hash}`);
     }
 
-    // Consumes the decision; only one poll receives it.
-    async takeDeviceDecision(hash: string): Promise<DeviceDecision | null> {
-        const raw = await this.kv.take(`device-decision:${hash}`);
-        return raw ? JSON.parse(raw) as DeviceDecision : null;
+    // The decision stays until the device code expires, so it keeps guarding
+    // against a second decision; a separate marker lets exactly one poll act on it.
+    async consumeDeviceDecision(hash: string, device: DeviceAuthorization): Promise<boolean> {
+        return this.kv.setIfAbsent(`device-consumed:${hash}`, '1', this.ttl(device.expiresAt + DEVICE_GRACE_MS));
     }
 
     async deleteDevice(hash: string, device: DeviceAuthorization): Promise<void> {

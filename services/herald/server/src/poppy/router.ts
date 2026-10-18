@@ -299,13 +299,13 @@ export function createPoppy(options: PoppyOptions): Poppy {
         if (!await store.setSessionGrant(session, grant.id)) {
             throw new OAuthError(400, 'invalid_session', 'the Session has ended');
         }
-        return { ...session, grantId: grant.id };
+        return session;
     }
 
     // Completes a sign-in: a new Account Token and a signed-in Session Token.
     // The Session is bound to the account before the grant exists, so a
     // request that loses the binding leaves no usable Account Token behind.
-    async function completeSignIn(session: Session, agent: Agent, did: string, scope: string[], jkt: string) {
+    async function completeSignIn(session: Session, agent: Agent, did: string, scope: string[], tokenScope: string[], jkt: string) {
         if (!await store.bindSessionAccount(session, did)) {
             throw new OAuthError(400, 'account_mismatch', ACCOUNT_MISMATCH);
         }
@@ -326,13 +326,27 @@ export function createPoppy(options: PoppyOptions): Poppy {
         await store.putGrant(grant);
         const signedIn = await signInSession(session, grant);
         return {
-            ...await issueSessionToken(signedIn, jkt, scope, grant),
+            ...await issueSessionToken(signedIn, jkt, tokenScope, grant),
             refresh_token: accountToken,
             refresh_token_expires_in: config.accountTokenSeconds,
         };
     }
 
     // ---------- grant handlers ----------
+
+    // Any token request may ask for fewer scopes than were granted (4.3);
+    // the Account Token keeps the granted ones.
+    function narrowScope(body: Record<string, unknown>, granted: string[]): string[] {
+        const requested = param(body, 'scope');
+        if (requested === undefined) {
+            return granted;
+        }
+        const scope = parseScope(requested);
+        if (!scope.every(item => granted.includes(item))) {
+            throw new OAuthError(400, 'invalid_scope', 'scope can only narrow what was granted');
+        }
+        return scope;
+    }
 
     async function jwtBearerGrant(req: Request, agent: Agent, jkt: string) {
         const { payload } = await verifyAssertion(param(req.body, 'assertion'), agent, agents, config.issuer, store.kv, now)
@@ -360,7 +374,8 @@ export function createPoppy(options: PoppyOptions): Poppy {
         if (!pkceMatches(verifier, record.codeChallenge)) {
             throw new OAuthError(400, 'invalid_grant', 'code_verifier does not match');
         }
-        return completeSignIn(session!, agent, record.did, record.scope, jkt);
+        const scope = narrowScope(req.body, record.scope);
+        return completeSignIn(session!, agent, record.did, record.scope, scope, jkt);
     }
 
     async function refreshTokenGrant(req: Request, agent: Agent, jkt: string) {
@@ -369,11 +384,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
         if (!grant || grant.clientId !== agent.clientId) {
             throw revoked();
         }
-        const requested = param(req.body, 'scope');
-        const scope = requested === undefined ? grant.scope : parseScope(requested);
-        if (!scope.every(item => grant.scope.includes(item))) {
-            throw new OAuthError(400, 'invalid_scope', 'scope can only narrow the Account Token');
-        }
+        const scope = narrowScope(req.body, grant.scope);
         const session = await sessionFor(param(req.body, 'session_id'), agent.clientId, grant.userId)
             ?? await newSession(agent.clientId, grant.userId);
         // A revocation may land at any point here. Touching never recreates a
@@ -384,7 +395,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
         }
         const signedIn = await signInSession(session, grant);
         if (!await store.getGrant(grant.id)) {
-            await store.setSessionGrant(signedIn, undefined);
+            await store.clearSessionGrant(signedIn.id, grant.id);
             throw revoked();
         }
         return issueSessionToken(signedIn, jkt, scope, grant);
@@ -417,16 +428,17 @@ export function createPoppy(options: PoppyOptions): Poppy {
             throw new OAuthError(400, 'authorization_pending', 'the User has not finished signing in');
         }
 
+        // Checked before consuming, so a bad request does not use up an approval.
+        const scope = decision.approved ? narrowScope(req.body, decision.scope) : [];
         // Only the poll that consumes the decision acts on it.
-        const taken = await store.takeDeviceDecision(deviceHash);
-        if (!taken) {
+        if (!await store.consumeDeviceDecision(deviceHash, device)) {
             throw new OAuthError(400, 'invalid_grant', 'the device code has already been used');
         }
         await store.deleteDevice(deviceHash, device);
-        if (!taken.approved) {
+        if (!decision.approved) {
             throw new OAuthError(400, 'access_denied', 'the User declined');
         }
-        return completeSignIn(session!, agent, taken.did, taken.scope, jkt);
+        return completeSignIn(session!, agent, decision.did, decision.scope, scope, jkt);
     }
 
     // ---------- router ----------
