@@ -164,6 +164,44 @@ Test a fresh OAuth instance against the persisted key and verify an earlier
 ID token, rather than checking only that a key file exists. Opaque access
 tokens and authorization codes remain in memory and do not survive restart.
 
+### 2.8a Personal Agent Protocol Company (`/poppy`, opt-in)
+
+With `ARCHON_HERALD_POPPY_ENABLED=true`, Herald acts as a Company under the
+[Personal Agent Protocol](https://personalagentprotocol.org/docs/spec) (Poppy,
+Draft 0.1): personal agents discover it, start Sessions, sign Users in with their
+Archon wallet, and use an OpenAPI interface. The issuer is
+`${ARCHON_DRAWBRIDGE_PUBLIC_HOST}/names/poppy`, separate from the OIDC issuer at
+`/names`, so Poppy's metadata cannot change what OIDC relying parties do. The
+public host must be HTTPS. Design notes are in `docs/plans/poppy-1395.md`.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/.well-known/poppy.json` | Discovery document: organization name (`ARCHON_HERALD_DOMAIN`) and domain (the public host), issuer, Direct and Device Sign-In scopes, the OpenAPI interface. |
+| `GET` | `/.well-known/oauth-authorization-server/names/poppy` | RFC 8414 metadata with `poppy_domains` and `dpop_signing_alg_values_supported: ['ES256','RS256']`. |
+| `POST` | `/poppy/token` | JWT-bearer (Sessions), `authorization_code`, `refresh_token` (Account Tokens) and `device_code` grants. Every request carries a `private_key_jwt` client assertion and a DPoP Proof; tokens are DPoP-bound. |
+| `POST` | `/poppy/revoke` | RFC 7009 revocation of an Account Token by the client it was issued to; signs out the Sessions using it. |
+| `GET` | `/poppy/authorize` | Direct Sign-In consent page (PKCE S256 only). The User signs in by answering a wallet challenge, then chooses which scopes to grant. |
+| `POST` | `/poppy/device_authorization`, `GET`/`POST` `/poppy/device` | Device Sign-In: codes for the agent, and the page where the User enters the user code before the same wallet sign-in and consent. |
+| `POST` | `/poppy/signin/response` | The wallet posts its challenge response here. |
+| `GET` | `/poppy/openapi.json` | OpenAPI 3.1 description of `/poppy/api`. |
+| `GET` | `/poppy/api/names/{name}`, `/members/{name}`, `/dids/{did}`, `/directory` | Lookups, open to signed-out Sessions. `/dids` accepts DIDs only, never wallet aliases. |
+| `GET` | `/poppy/api/account`, `/account/credential` | The signed-in User's profile and membership credential (`poppy:read`). |
+| `PUT`/`DELETE` | `/poppy/api/account/name` | Claim, change or release the User's name, with the same rules as `PUT /api/name` (`poppy:write`). |
+| `GET`/`DELETE` | `/api/poppy/connections[/:id]` | Session-authenticated account settings: the agents connected to the signed-in DID, and disconnecting one. |
+
+Agent client metadata and key sets are fetched without redirects through the
+destination-validating public HTTPS transport, limited to 100 KB and five seconds,
+cached for one minute to one day, and refetched for an unknown `kid` at most once
+per 30 seconds. Assertions must name the issuer as a single-string `aud` and carry
+a unique `jti`; DPoP Proofs are checked against the public URL built from
+`ARCHON_DRAWBRIDGE_PUBLIC_HOST`, not the `Host` header. Session Tokens last one hour,
+Account Tokens 90 days. A Session is signed in to at most one DID, and API requests
+check on each call that the Session is still signed in, so revocation and
+disconnection take effect at once. State lives in Redis (`ARCHON_HERALD_REDIS_URL`
+or `ARCHON_REDIS_URL`) under the `<ARCHON_HERALD_NAME>:poppy` prefix; bearer
+secrets are stored only as SHA-256 hashes. Mediated Sign-In is not offered:
+Archon accounts have no passwords.
+
 ### 2.9 Admin (owner-only)
 
 | Method | Path | Notes |
@@ -444,6 +482,9 @@ gateway at `ipns://<key-id>/`.
 | `ARCHON_DRAWBRIDGE_PORT` | `4222` | Used to compute `PUBLIC_URL`. |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | `http://localhost:${DRAWBRIDGE_PORT}` | External canonical URL of the Drawbridge that fronts this Herald; used to build `PUBLIC_URL = <host>/names`. |
 | `ARCHON_ADMIN_API_KEY` (or `ARCHON_HERALD_ADMIN_API_KEY`) | empty | Used by the Keymaster client when in shared mode. |
+| `ARCHON_HERALD_POPPY_ENABLED` | `false` | Serves the Personal Agent Protocol Company endpoints (§2.8a). |
+| `ARCHON_HERALD_POPPY_STORE` | `redis` | `redis`, or `memory` for single-process development (state is lost on restart). |
+| `ARCHON_HERALD_REDIS_URL` (or `ARCHON_REDIS_URL`) | `redis://localhost:6379` | Redis for Poppy state and the `redis` database backend. |
 
 ### 8.3 Public URL convention
 

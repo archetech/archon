@@ -1,6 +1,11 @@
 # Personal Agent Protocol support (#1395)
 
-Status: proposed; nothing built. Based on Draft 0.1 of the
+Status: milestones 1–3 implemented in Herald behind `ARCHON_HERALD_POPPY_ENABLED`,
+with the recommended decision for each item below: the OpenAPI interface (no MCP
+server yet), Direct and Device Sign-In, Account Tokens, revocation and account
+settings. Tests use a signed test Personal Agent; the kit validator passes
+`poppy.json` offline, and a live validator run needs an HTTPS test deployment.
+Endpoints are specified in `docs/services/herald/README.md` §2.8a. Based on Draft 0.1 of the
 [specification](https://personalagentprotocol.org/docs/spec), the
 [guides](https://personalagentprotocol.org/docs/guides) and the Company
 implementation kit, as read on 2026-10-18.

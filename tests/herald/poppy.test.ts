@@ -1,0 +1,752 @@
+import crypto from 'crypto';
+import express from 'express';
+import request from 'supertest';
+import { SignJWT, exportJWK, generateKeyPair, type JWK } from 'jose';
+
+import { AgentDirectory } from '../../services/herald/server/src/poppy/agents.ts';
+import type { AccountResult, PoppyAccounts } from '../../services/herald/server/src/poppy/api.ts';
+import { createPoppyConfig } from '../../services/herald/server/src/poppy/config.ts';
+import { MemoryKV } from '../../services/herald/server/src/poppy/kv.ts';
+import { createPoppy, type Poppy } from '../../services/herald/server/src/poppy/router.ts';
+import { PoppyStore } from '../../services/herald/server/src/poppy/store.ts';
+
+// Herald as a Personal Agent Protocol Company (Draft 0.1), exercised by a test
+// Personal Agent that signs real ES256 client assertions, Session assertions
+// and DPoP Proofs. Client metadata is served by an injected fetcher, since the
+// production transport refuses anything but public HTTPS addresses.
+
+const ORIGIN = 'https://archon.test';
+const ISSUER = `${ORIGIN}/names/poppy`;
+const TOKEN = `${ISSUER}/token`;
+const API = `${ISSUER}/api`;
+const AGENT_ID = 'https://agent.example/agent.json';
+const REDIRECT = 'https://agent.example/oauth/callback';
+const ALICE = 'did:cid:alice';
+const BOB = 'did:cid:bob';
+
+type Docs = Record<string, unknown>;
+
+class TestAgent {
+    private key!: CryptoKey;
+    readonly kid: string;
+    publicJwk!: JWK;
+    dpopKey!: CryptoKey;
+    dpopJwk!: JWK;
+
+    constructor(readonly clientId = AGENT_ID) {
+        this.kid = clientId === AGENT_ID ? 'agent-key-1' : 'agent-key-2';
+    }
+
+    async init(): Promise<this> {
+        const { privateKey, publicKey } = await generateKeyPair('ES256', { extractable: true });
+        this.key = privateKey as CryptoKey;
+        this.publicJwk = { ...await exportJWK(publicKey), kid: this.kid, alg: 'ES256', use: 'sig' };
+        await this.newDpopKey();
+        return this;
+    }
+
+    async newDpopKey(): Promise<void> {
+        const { privateKey, publicKey } = await generateKeyPair('ES256', { extractable: true });
+        this.dpopKey = privateKey as CryptoKey;
+        this.dpopJwk = await exportJWK(publicKey);
+    }
+
+    docs(): Docs {
+        return {
+            [this.clientId]: {
+                client_id: this.clientId,
+                client_name: 'Example Agent',
+                logo_uri: 'https://agent.example/logo.png',
+                jwks_uri: 'https://agent.example/jwks.json',
+                redirect_uris: [REDIRECT],
+                token_endpoint_auth_method: 'private_key_jwt',
+            },
+            'https://agent.example/jwks.json': { keys: [this.publicJwk] },
+        };
+    }
+
+    async assertion(claims: Record<string, unknown> = {}, header: Record<string, unknown> = {}): Promise<string> {
+        const now = Math.floor(Date.now() / 1000);
+        return new SignJWT({ jti: crypto.randomBytes(16).toString('base64url'), ...claims })
+            .setProtectedHeader({ alg: 'ES256', kid: this.kid, ...header })
+            .setIssuer(this.clientId)
+            .setSubject(String(claims.sub ?? this.clientId))
+            .setAudience((claims.aud as string) ?? ISSUER)
+            .setIssuedAt(now)
+            .setExpirationTime(now + 60)
+            .sign(this.key);
+    }
+
+    async clientAuth(): Promise<Record<string, string>> {
+        return {
+            client_id: this.clientId,
+            client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+            client_assertion: await this.assertion(),
+        };
+    }
+
+    async proof(method: string, url: string, accessToken?: string, key = this.dpopKey, jwk = this.dpopJwk): Promise<string> {
+        const claims: Record<string, unknown> = {
+            jti: crypto.randomBytes(16).toString('base64url'),
+            htm: method,
+            htu: url,
+            iat: Math.floor(Date.now() / 1000),
+        };
+        if (accessToken) {
+            claims.ath = crypto.createHash('sha256').update(accessToken).digest('base64url');
+        }
+        return new SignJWT(claims).setProtectedHeader({ typ: 'dpop+jwt', alg: 'ES256', jwk }).sign(key);
+    }
+}
+
+function fetcherFor(docs: () => Docs) {
+    return async (url: string) => {
+        const body = docs()[url];
+        if (body === undefined) {
+            return new Response('not found', { status: 404 });
+        }
+        return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+    };
+}
+
+function fakeAccounts() {
+    let counter = 0;
+    const users: Record<string, { name?: string; credentialDid?: string }> = {
+        [ALICE]: { name: 'alice', credentialDid: 'did:cid:alice-credential' },
+        [BOB]: { name: 'bob' },
+    };
+    const accounts: PoppyAccounts = {
+        async createChallenge() { counter += 1; return `did:cid:challenge-${counter}`; },
+        async verifyResponse(response: string) {
+            const { challenge, responder } = JSON.parse(response);
+            return { match: true, challenge, responder };
+        },
+        async ensureUser(did: string) { users[did] ??= {}; },
+        async nameOf(did: string) { return users[did]?.name; },
+        async lookupName(name: string) {
+            const entry = Object.entries(users).find(([, user]) => user.name === name);
+            return entry ? { name, did: entry[0] } : null;
+        },
+        async member(name: string) { return (await accounts.lookupName(name)) ? { didDocument: { id: name } } : null; },
+        async resolveDid(did: string) { return did.startsWith('did:') ? { didDocument: { id: did } } : null; },
+        async directory() { return { version: 1, names: { alice: ALICE, bob: BOB } }; },
+        async profile(did: string) { return users[did] ? { did, ...users[did] } : null; },
+        async credential(did: string): Promise<AccountResult> {
+            return users[did]?.credentialDid
+                ? { status: 200, body: { credentialDid: users[did].credentialDid } }
+                : { status: 404, body: { error: 'credential_not_found' } };
+        },
+        async setName(did: string, name: unknown): Promise<AccountResult> {
+            users[did] = { ...users[did], name: String(name) };
+            return { status: 200, body: { ok: true, name } };
+        },
+        async deleteName(did: string): Promise<AccountResult> {
+            delete users[did].name;
+            return { status: 200, body: { ok: true } };
+        },
+    };
+    return { accounts, users };
+}
+
+let agent: TestAgent;
+let docs: Docs;
+let poppy: Poppy;
+let app: express.Express;
+let kv: MemoryKV;
+
+beforeEach(async () => {
+    agent = await new TestAgent().init();
+    docs = agent.docs();
+    kv = new MemoryKV();
+    const config = createPoppyConfig(ORIGIN, 'archon.test', 'https://wallet.archon.test');
+    poppy = createPoppy({
+        config,
+        store: new PoppyStore(kv),
+        agents: new AgentDirectory(fetcherFor(() => docs)),
+        accounts: fakeAccounts().accounts,
+    });
+    app = express();
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
+    app.use('/poppy', poppy.router);
+    app.use(poppy.wellKnown);
+});
+
+async function token(form: Record<string, string>, dpop?: string) {
+    const req = request(app).post('/poppy/token').type('form').send(form);
+    return dpop === undefined ? req : req.set('DPoP', dpop);
+}
+
+async function startSession(userId = 'usr_alice_1', sessionId?: string) {
+    const form: Record<string, string> = {
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: await agent.assertion({ sub: userId }),
+        ...await agent.clientAuth(),
+    };
+    if (sessionId) {
+        form.session_id = sessionId;
+    }
+    return token(form, await agent.proof('POST', TOKEN));
+}
+
+async function api(method: 'get' | 'put' | 'delete', path: string, accessToken: string, body?: unknown) {
+    const url = `${API}${path}`;
+    const req = request(app)[method](`/poppy/api${path}`)
+        .set('Authorization', `DPoP ${accessToken}`)
+        .set('DPoP', await agent.proof(method.toUpperCase(), url, accessToken));
+    return body === undefined ? req : req.send(body);
+}
+
+// Drives Direct Sign-In through the consent page, the wallet response and the
+// User's decision, and returns the redirect the browser is sent to.
+async function directSignIn(did: string, scope = 'poppy:read poppy:write', approve: string[] | null = scope.split(' ')) {
+    const verifier = crypto.randomBytes(32).toString('base64url');
+    const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+    const page = await request(app).get('/poppy/authorize').query({
+        response_type: 'code',
+        client_id: AGENT_ID,
+        redirect_uri: REDIRECT,
+        scope,
+        state: 'st-1',
+        code_challenge: challenge,
+        code_challenge_method: 'S256',
+    });
+    expect(page.status).toBe(200);
+    const cookie = page.headers['set-cookie'][0].split(';')[0];
+    const csrf = /"csrf":"([^"]+)"/.exec(page.text)![1];
+    const statusUrl = /"statusUrl":"([^"]+)"/.exec(page.text)![1].replace(ISSUER, '/poppy');
+    const decideUrl = /"decideUrl":"([^"]+)"/.exec(page.text)![1].replace(ISSUER, '/poppy');
+    const walletChallenge = decodeURIComponent(/challenge=([^"&]+)/.exec(page.text)![1]);
+
+    await request(app).post('/poppy/signin/response')
+        .send({ response: JSON.stringify({ challenge: walletChallenge, responder: did }) })
+        .expect(200);
+    const status = await request(app).get(statusUrl).set('Cookie', cookie);
+    expect(status.body).toMatchObject({ status: 'authenticated', did });
+
+    const decided = await request(app).post(decideUrl).set('Cookie', cookie).set('X-Poppy-CSRF', csrf)
+        .send({ decision: approve ? 'approve' : 'decline', scope: approve ?? [] });
+    expect(decided.status).toBe(200);
+    return { redirect: new URL(decided.body.redirect), verifier, page };
+}
+
+async function signedIn(did = ALICE, scope = 'poppy:read poppy:write') {
+    const session = await startSession();
+    const { redirect, verifier } = await directSignIn(did, scope);
+    const response = await token({
+        grant_type: 'authorization_code',
+        code: redirect.searchParams.get('code')!,
+        redirect_uri: REDIRECT,
+        code_verifier: verifier,
+        session_id: session.body.session_id,
+        ...await agent.clientAuth(),
+    }, await agent.proof('POST', TOKEN));
+    expect(response.status).toBe(200);
+    return { session: session.body, signIn: response.body };
+}
+
+describe('discovery', () => {
+    it('publishes poppy.json naming the issuer, sign-in types and the OpenAPI interface', async () => {
+        const response = await request(app).get('/.well-known/poppy.json').expect(200);
+        expect(response.body).toEqual({
+            protocol_version: '0.1',
+            organization: { name: 'archon.test', domain: 'archon.test' },
+            auth: {
+                issuer: ISSUER,
+                direct: { scopes: ['poppy:read', 'poppy:write'] },
+                device: { scopes: ['poppy:read', 'poppy:write'] },
+            },
+            apis: [expect.objectContaining({ type: 'openapi', url: `${ISSUER}/openapi.json` })],
+        });
+    });
+
+    it('publishes RFC 8414 metadata at the issuer path with poppy_domains and ES256 DPoP', async () => {
+        const response = await request(app).get('/.well-known/oauth-authorization-server/names/poppy').expect(200);
+        expect(response.body).toMatchObject({
+            issuer: ISSUER,
+            token_endpoint: TOKEN,
+            revocation_endpoint: `${ISSUER}/revoke`,
+            authorization_endpoint: `${ISSUER}/authorize`,
+            device_authorization_endpoint: `${ISSUER}/device_authorization`,
+            poppy_domains: ['archon.test'],
+        });
+        expect(response.body.dpop_signing_alg_values_supported).toContain('ES256');
+    });
+
+    it('serves an OpenAPI 3.1 description whose server is the API base', async () => {
+        const response = await request(app).get('/poppy/openapi.json').expect(200);
+        expect(response.body.openapi).toBe('3.1.0');
+        expect(response.body.servers).toEqual([{ url: API }]);
+    });
+});
+
+describe('signed-out Sessions', () => {
+    it('starts a DPoP-bound signed-out Session and renews it', async () => {
+        const first = await startSession();
+        expect(first.status).toBe(200);
+        expect(first.headers['cache-control']).toBe('no-store');
+        expect(first.body).toMatchObject({ token_type: 'DPoP', scope: '', signed_in: false });
+        expect(first.body.expires_in).toBeGreaterThan(0);
+
+        const renewed = await startSession('usr_alice_1', first.body.session_id);
+        expect(renewed.status).toBe(200);
+        expect(renewed.body.session_id).toBe(first.body.session_id);
+        expect(renewed.body.access_token).not.toBe(first.body.access_token);
+    });
+
+    it('refuses to renew a Session for a different User ID', async () => {
+        const first = await startSession('usr_alice_1');
+        const other = await startSession('usr_bob_1', first.body.session_id);
+        expect(other.status).toBe(400);
+        expect(other.body.error).toBe('invalid_session');
+    });
+
+    it('rejects a client assertion addressed to the token endpoint', async () => {
+        const response = await token({
+            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            assertion: await agent.assertion({ sub: 'usr_1' }),
+            client_id: AGENT_ID,
+            client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+            client_assertion: await agent.assertion({ aud: TOKEN }),
+        }, await agent.proof('POST', TOKEN));
+        expect(response.status).toBe(401);
+        expect(response.body.error).toBe('invalid_client');
+    });
+
+    it('rejects a Session assertion with an audience array', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        const array = await new SignJWT({ jti: crypto.randomBytes(16).toString('base64url'), aud: [ISSUER, 'https://other.example'] })
+            .setProtectedHeader({ alg: 'ES256', kid: 'agent-key-1' })
+            .setIssuer(AGENT_ID).setSubject('usr_1').setIssuedAt(now).setExpirationTime(now + 60)
+            .sign((agent as any).key);
+        const response = await token({
+            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            assertion: array,
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN));
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('invalid_grant');
+    });
+
+    it('rejects a reused assertion jti', async () => {
+        const clientAuth = await agent.clientAuth();
+        const form = {
+            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            assertion: await agent.assertion({ sub: 'usr_1' }),
+            ...clientAuth,
+        };
+        expect((await token(form, await agent.proof('POST', TOKEN))).status).toBe(200);
+        const replay = await token({ ...form, assertion: await agent.assertion({ sub: 'usr_1' }) }, await agent.proof('POST', TOKEN));
+        expect(replay.status).toBe(401);
+        expect(replay.body.error).toBe('invalid_client');
+    });
+
+    it('rejects a browser assertion at the token endpoint', async () => {
+        const response = await token({
+            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            assertion: await agent.assertion({ sub: 'usr_1' }, { typ: 'poppy-browser+jwt' }),
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN));
+        expect(response.body.error).toBe('invalid_grant');
+    });
+
+    it('rejects an agent whose metadata does not name itself', async () => {
+        docs[AGENT_ID] = { ...(docs[AGENT_ID] as object), client_id: 'https://agent.example/other.json' };
+        const response = await startSession();
+        expect(response.status).toBe(401);
+        expect(response.body.error).toBe('invalid_client');
+    });
+
+    it('rejects an agent whose key set is on another domain', async () => {
+        docs[AGENT_ID] = { ...(docs[AGENT_ID] as object), jwks_uri: 'https://keys.example/jwks.json' };
+        const response = await startSession();
+        expect(response.body.error).toBe('invalid_client');
+    });
+
+    it('rejects a key set holding a private key', async () => {
+        docs['https://agent.example/jwks.json'] = { keys: [{ ...agent.publicJwk, d: 'secret' }] };
+        const response = await startSession();
+        expect(response.body.error).toBe('invalid_client');
+    });
+
+    it('requires a DPoP Proof at the token endpoint', async () => {
+        const response = await token({
+            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            assertion: await agent.assertion({ sub: 'usr_1' }),
+            ...await agent.clientAuth(),
+        });
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('invalid_dpop_proof');
+    });
+
+    it('rejects a replayed DPoP Proof at the token endpoint', async () => {
+        const proof = await agent.proof('POST', TOKEN);
+        const form = async () => ({
+            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            assertion: await agent.assertion({ sub: 'usr_1' }),
+            ...await agent.clientAuth(),
+        });
+        expect((await token(await form(), proof)).status).toBe(200);
+        const replay = await token(await form(), proof);
+        expect(replay.body.error).toBe('invalid_dpop_proof');
+    });
+
+    it('rejects a DPoP Proof for another URL', async () => {
+        const response = await token({
+            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            assertion: await agent.assertion({ sub: 'usr_1' }),
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', 'https://archon.test/names/oauth/token'));
+        expect(response.body.error).toBe('invalid_dpop_proof');
+    });
+
+    it('rejects repeated form parameters', async () => {
+        const response = await request(app).post('/poppy/token')
+            .type('form')
+            .send('grant_type=refresh_token&grant_type=authorization_code')
+            .set('DPoP', await agent.proof('POST', TOKEN));
+        expect(response.body.error).toBe('invalid_request');
+    });
+});
+
+describe('the OpenAPI interface', () => {
+    it('answers guest lookups with a signed-out Session Token', async () => {
+        const session = await startSession();
+        const response = await api('get', '/names/alice', session.body.access_token);
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ name: 'alice', did: ALICE });
+    });
+
+    it('requires a Session Token on every request', async () => {
+        const response = await request(app).get('/poppy/api/directory');
+        expect(response.status).toBe(401);
+        expect(response.headers['www-authenticate']).toMatch(/^DPoP /);
+    });
+
+    it('refuses a Bearer Session Token outside MCP', async () => {
+        const session = await startSession();
+        const response = await request(app).get('/poppy/api/directory').set('Authorization', `Bearer ${session.body.access_token}`);
+        expect(response.status).toBe(401);
+        expect(response.headers['www-authenticate']).toContain('error="invalid_token"');
+    });
+
+    it('refuses a token in the URL', async () => {
+        const session = await startSession();
+        const response = await request(app).get('/poppy/api/directory').query({ access_token: session.body.access_token });
+        expect(response.status).toBe(400);
+    });
+
+    it('refuses a proof from a key other than the one the token is bound to', async () => {
+        const session = await startSession();
+        const { privateKey, publicKey } = await generateKeyPair('ES256', { extractable: true });
+        const proof = await agent.proof('GET', `${API}/directory`, session.body.access_token, privateKey as CryptoKey, await exportJWK(publicKey));
+        const response = await request(app).get('/poppy/api/directory')
+            .set('Authorization', `DPoP ${session.body.access_token}`).set('DPoP', proof);
+        expect(response.status).toBe(401);
+        expect(response.headers['www-authenticate']).toContain('error="invalid_dpop_proof"');
+    });
+
+    it('asks a signed-out Session to sign in for account access', async () => {
+        const session = await startSession();
+        const response = await api('get', '/account', session.body.access_token);
+        expect(response.status).toBe(403);
+        expect(response.headers['www-authenticate']).toContain('error="sign_in_required"');
+    });
+
+    it('does not resolve wallet aliases as DIDs', async () => {
+        const session = await startSession();
+        const response = await api('get', '/dids/herald', session.body.access_token);
+        expect(response.status).toBe(404);
+    });
+});
+
+describe('Direct Sign-In', () => {
+    it('shows the agent, its domain and the scopes, and blocks framing', async () => {
+        const { page } = await directSignIn(ALICE);
+        expect(page.text).toContain('Example Agent');
+        expect(page.text).toContain('agent.example');
+        expect(page.text).toContain('poppy:write');
+        expect(page.headers['content-security-policy']).toContain("frame-ancestors 'none'");
+    });
+
+    it('redirects with a code, the state and iss, and signs the Session in', async () => {
+        const { session, signIn } = await signedIn();
+        expect(signIn).toMatchObject({
+            token_type: 'DPoP',
+            scope: 'poppy:read poppy:write',
+            session_id: session.session_id,
+            signed_in: true,
+        });
+        expect(signIn.refresh_token).toMatch(/^pat_/);
+
+        const account = await api('get', '/account', signIn.access_token);
+        expect(account.status).toBe(200);
+        expect(account.body).toMatchObject({ did: ALICE, name: 'alice' });
+
+        const renamed = await api('put', '/account/name', signIn.access_token, { name: 'alicia' });
+        expect(renamed.status).toBe(200);
+    });
+
+    it('includes iss and state in the redirect', async () => {
+        await startSession();
+        const { redirect } = await directSignIn(ALICE);
+        expect(redirect.origin + redirect.pathname).toBe(REDIRECT);
+        expect(redirect.searchParams.get('state')).toBe('st-1');
+        expect(redirect.searchParams.get('iss')).toBe(ISSUER);
+    });
+
+    it('grants only the scopes the User approved', async () => {
+        const session = await startSession();
+        const { redirect, verifier } = await directSignIn(ALICE, 'poppy:read poppy:write', ['poppy:read']);
+        const response = await token({
+            grant_type: 'authorization_code',
+            code: redirect.searchParams.get('code')!,
+            redirect_uri: REDIRECT,
+            code_verifier: verifier,
+            session_id: session.body.session_id,
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN));
+        expect(response.body.scope).toBe('poppy:read');
+        const write = await api('put', '/account/name', response.body.access_token, { name: 'x' });
+        expect(write.status).toBe(403);
+        expect(write.headers['www-authenticate']).toContain('error="insufficient_scope"');
+    });
+
+    it('sends access_denied with iss when the User declines', async () => {
+        const { redirect } = await directSignIn(ALICE, 'poppy:read', null);
+        expect(redirect.searchParams.get('error')).toBe('access_denied');
+        expect(redirect.searchParams.get('iss')).toBe(ISSUER);
+        expect(redirect.searchParams.has('code')).toBe(false);
+    });
+
+    it('does not redirect to a redirect_uri the agent did not register', async () => {
+        const response = await request(app).get('/poppy/authorize').query({
+            response_type: 'code', client_id: AGENT_ID, redirect_uri: 'https://evil.example/cb',
+            scope: 'poppy:read', code_challenge: 'x'.repeat(43), code_challenge_method: 'S256',
+        });
+        expect(response.status).toBe(400);
+        expect(response.headers.location).toBeUndefined();
+    });
+
+    it('redirects invalid_scope with iss for an unknown scope', async () => {
+        const response = await request(app).get('/poppy/authorize').query({
+            response_type: 'code', client_id: AGENT_ID, redirect_uri: REDIRECT, state: 's',
+            scope: 'poppy:admin', code_challenge: 'x'.repeat(43), code_challenge_method: 'S256',
+        });
+        expect(response.status).toBe(303);
+        const location = new URL(response.headers.location);
+        expect(location.searchParams.get('error')).toBe('invalid_scope');
+        expect(location.searchParams.get('iss')).toBe(ISSUER);
+    });
+
+    it('requires PKCE with S256', async () => {
+        const response = await request(app).get('/poppy/authorize').query({
+            response_type: 'code', client_id: AGENT_ID, redirect_uri: REDIRECT, scope: 'poppy:read',
+            code_challenge: 'x'.repeat(43), code_challenge_method: 'plain',
+        });
+        expect(new URL(response.headers.location).searchParams.get('error')).toBe('invalid_request');
+    });
+
+    it('refuses a decision without the page’s CSRF value', async () => {
+        const page = await request(app).get('/poppy/authorize').query({
+            response_type: 'code', client_id: AGENT_ID, redirect_uri: REDIRECT, scope: 'poppy:read',
+            code_challenge: 'x'.repeat(43), code_challenge_method: 'S256',
+        });
+        const cookie = page.headers['set-cookie'][0].split(';')[0];
+        const decideUrl = /"decideUrl":"([^"]+)"/.exec(page.text)![1].replace(ISSUER, '/poppy');
+        const response = await request(app).post(decideUrl).set('Cookie', cookie)
+            .send({ decision: 'approve', scope: ['poppy:read'] });
+        expect(response.status).toBe(403);
+    });
+
+    it('accepts a code only once', async () => {
+        const session = await startSession();
+        const { redirect, verifier } = await directSignIn(ALICE, 'poppy:read');
+        const exchange = async () => token({
+            grant_type: 'authorization_code',
+            code: redirect.searchParams.get('code')!,
+            redirect_uri: REDIRECT,
+            code_verifier: verifier,
+            session_id: session.body.session_id,
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN));
+        expect((await exchange()).status).toBe(200);
+        const again = await exchange();
+        expect(again.body.error).toBe('invalid_grant');
+    });
+
+    it('refuses to sign a Session in to a second account', async () => {
+        const { session } = await signedIn(ALICE);
+        const { redirect, verifier } = await directSignIn(BOB, 'poppy:read');
+        const response = await token({
+            grant_type: 'authorization_code',
+            code: redirect.searchParams.get('code')!,
+            redirect_uri: REDIRECT,
+            code_verifier: verifier,
+            session_id: session.session_id,
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN));
+        expect(response.body.error).toBe('account_mismatch');
+    });
+});
+
+describe('Account Tokens and signing out', () => {
+    async function refresh(accountToken: string, extra: Record<string, string> = {}) {
+        return token({
+            grant_type: 'refresh_token',
+            refresh_token: accountToken,
+            ...extra,
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN));
+    }
+
+    it('starts a new signed-in Session from an Account Token, narrowed on request', async () => {
+        const { signIn } = await signedIn();
+        const response = await refresh(signIn.refresh_token, { scope: 'poppy:read' });
+        expect(response.status).toBe(200);
+        expect(response.body).toMatchObject({ signed_in: true, scope: 'poppy:read' });
+        expect(response.body.session_id).not.toBe(signIn.session_id);
+        expect(response.body.refresh_token).toBeUndefined();
+    });
+
+    it('cannot widen the scopes of an Account Token', async () => {
+        const session = await startSession();
+        const { redirect, verifier } = await directSignIn(ALICE, 'poppy:read');
+        const signIn = (await token({
+            grant_type: 'authorization_code',
+            code: redirect.searchParams.get('code')!,
+            redirect_uri: REDIRECT,
+            code_verifier: verifier,
+            session_id: session.body.session_id,
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN))).body;
+        const response = await refresh(signIn.refresh_token, { scope: 'poppy:read poppy:write' });
+        expect(response.body.error).toBe('invalid_scope');
+    });
+
+    it('accepts an Account Token only from the client it was issued to', async () => {
+        const { signIn } = await signedIn();
+        // A second agent on its own domain, with its own keys.
+        const other = await new TestAgent('https://other.example/agent.json').init();
+        const otherDocs = other.docs() as Record<string, any>;
+        docs['https://other.example/agent.json'] = { ...otherDocs['https://other.example/agent.json'], jwks_uri: 'https://other.example/jwks.json', redirect_uris: [] };
+        docs['https://other.example/jwks.json'] = { keys: [other.publicJwk] };
+        const response = await token({
+            grant_type: 'refresh_token',
+            refresh_token: signIn.refresh_token,
+            ...await other.clientAuth(),
+        }, await other.proof('POST', TOKEN));
+        expect(response.body.error).toBe('invalid_grant');
+    });
+
+    it('signs out at once when the Account Token is revoked', async () => {
+        const { signIn } = await signedIn();
+        const revoked = await request(app).post('/poppy/revoke').type('form').send({
+            token: signIn.refresh_token,
+            token_type_hint: 'refresh_token',
+            ...await agent.clientAuth(),
+        });
+        expect(revoked.status).toBe(200);
+
+        const account = await api('get', '/account', signIn.access_token);
+        expect(account.status).toBe(403);
+        expect(account.headers['www-authenticate']).toContain('error="sign_in_required"');
+        expect((await refresh(signIn.refresh_token)).body.error).toBe('invalid_grant');
+
+        // The Session continues signed out, and only for the same account.
+        const renewed = await startSession('usr_alice_1', signIn.session_id);
+        expect(renewed.body.signed_in).toBe(false);
+    });
+
+    it('lists connected agents for account settings and disconnects them', async () => {
+        const { signIn } = await signedIn();
+        const connections = await poppy.listConnections(ALICE);
+        expect(connections).toEqual([expect.objectContaining({
+            clientId: AGENT_ID,
+            name: 'Example Agent',
+            domain: 'agent.example',
+            scope: ['poppy:read', 'poppy:write'],
+        })]);
+        expect(await poppy.disconnect(BOB, connections[0].id)).toBe(false);
+        expect(await poppy.disconnect(ALICE, connections[0].id)).toBe(true);
+        expect(await poppy.listConnections(ALICE)).toEqual([]);
+        expect((await refresh(signIn.refresh_token)).body.error).toBe('invalid_grant');
+    });
+});
+
+describe('Device Sign-In', () => {
+    async function authorizeDevice(scope = 'poppy:read') {
+        const response = await request(app).post('/poppy/device_authorization').type('form')
+            .send({ scope, ...await agent.clientAuth() });
+        expect(response.status).toBe(200);
+        return response.body;
+    }
+
+    async function poll(deviceCode: string, sessionId: string) {
+        return token({
+            grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+            device_code: deviceCode,
+            session_id: sessionId,
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN));
+    }
+
+    async function approveOnPage(userCode: string, did: string, decision: 'approve' | 'decline') {
+        const opened = await request(app).get('/poppy/device').query({ user_code: userCode });
+        expect(opened.status).toBe(200);
+        const page = await request(app).post('/poppy/device').type('form').send({ user_code: userCode.toLowerCase() });
+        expect(page.status).toBe(200);
+        expect(page.text).toContain(userCode);
+        const cookie = page.headers['set-cookie'][0].split(';')[0];
+        const csrf = /"csrf":"([^"]+)"/.exec(page.text)![1];
+        const decideUrl = /"decideUrl":"([^"]+)"/.exec(page.text)![1].replace(ISSUER, '/poppy');
+        const walletChallenge = decodeURIComponent(/challenge=([^"&]+)/.exec(page.text)![1]);
+        await request(app).post('/poppy/signin/response')
+            .send({ response: JSON.stringify({ challenge: walletChallenge, responder: did }) }).expect(200);
+        return request(app).post(decideUrl).set('Cookie', cookie).set('X-Poppy-CSRF', csrf)
+            .send({ decision, scope: ['poppy:read'] });
+    }
+
+    it('issues a device code and user code', async () => {
+        const device = await authorizeDevice();
+        expect(device.user_code).toMatch(/^[A-Z]{4}-[A-Z]{4}$/);
+        expect(device.verification_uri).toBe(`${ISSUER}/device`);
+        expect(device.verification_uri_complete).toContain(encodeURIComponent(device.user_code));
+        expect(device.interval).toBe(5);
+    });
+
+    it('stays pending until the User approves, and does not approve on opening the link', async () => {
+        const session = await startSession();
+        const device = await authorizeDevice();
+        await request(app).get('/poppy/device').query({ user_code: device.user_code });
+        expect((await poll(device.device_code, session.body.session_id)).body.error).toBe('authorization_pending');
+        expect((await poll(device.device_code, session.body.session_id)).body.error).toBe('slow_down');
+
+        const decided = await approveOnPage(device.user_code, ALICE, 'approve');
+        expect(decided.status).toBe(200);
+
+        // Waiting past the enlarged interval is simulated by a fresh poll window.
+        const store = new PoppyStore(kv);
+        const hash = crypto.createHash('sha256').update(device.device_code).digest('base64url');
+        const record = await store.getDeviceByHash(hash);
+        await store.putDeviceByHash(hash, { ...record!, lastPollAt: undefined });
+
+        const signIn = await poll(device.device_code, session.body.session_id);
+        expect(signIn.status).toBe(200);
+        expect(signIn.body).toMatchObject({ signed_in: true, scope: 'poppy:read' });
+        expect(signIn.body.refresh_token).toMatch(/^pat_/);
+    });
+
+    it('returns access_denied when the User declines', async () => {
+        const session = await startSession();
+        const device = await authorizeDevice();
+        await approveOnPage(device.user_code, ALICE, 'decline');
+        expect((await poll(device.device_code, session.body.session_id)).body.error).toBe('access_denied');
+    });
+
+    it('rejects an unknown user code without starting a sign-in', async () => {
+        const response = await request(app).post('/poppy/device').type('form').send({ user_code: 'BBBB-BBBB' });
+        expect(response.status).toBe(400);
+        expect(response.headers['set-cookie']).toBeUndefined();
+    });
+});

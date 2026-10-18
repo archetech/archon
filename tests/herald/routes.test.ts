@@ -81,6 +81,14 @@ function mount(overrides: { db?: any; keymaster?: any; session?: any } = {}) {
 }
 
 describe('herald public endpoints', () => {
+    it('serves no Personal Agent Protocol endpoints unless enabled', async () => {
+        const { app } = mount({ session: { user: { did: 'did:cid:alice' } } });
+
+        expect((await request(app).get('/.well-known/poppy.json')).status).toBe(404);
+        expect((await request(app).post('/poppy/token')).status).toBe(404);
+        expect((await request(app).get('/api/poppy/connections')).status).toBe(404);
+    });
+
     it('reports service configuration', async () => {
         const { app } = mount();
 

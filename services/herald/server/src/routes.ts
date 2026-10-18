@@ -14,13 +14,24 @@ import type KeymasterClient from '@didcid/clients/keymaster';
 import type { DatabaseInterface, User } from './db/interfaces.js';
 import type { EmailBridge } from './email-bridge.js';
 import { createOAuthRoutes } from './oauth/index.js';
+import { fetchPublicHttpsOnce } from '@didcid/common/net-node';
+import { AgentDirectory } from './poppy/agents.js';
+import type { AccountResult, PoppyAccounts } from './poppy/api.js';
+import { createPoppyConfig } from './poppy/config.js';
+import { MemoryKV, RedisKV, type PoppyKV } from './poppy/kv.js';
+import { createPoppy, type Poppy } from './poppy/router.js';
+import { PoppyStore } from './poppy/store.js';
 import {
+    DRAWBRIDGE_PUBLIC_HOST,
     EXPLORER_URL,
     IPFS_API_URL,
     IPNS_KEY_NAME,
     MEMBERSHIP_SCHEMA_DID,
     OWNER_DID,
+    POPPY_ENABLED,
+    POPPY_STORE,
     PUBLIC_URL,
+    REDIS_URL,
     SENDGRID_API_KEY,
     SENDGRID_FROM_EMAIL,
     SERVICE_DOMAIN,
@@ -44,6 +55,8 @@ export interface HeraldContext {
     db: DatabaseInterface;
     emailBridge: EmailBridge | null;
     serviceDID: string;
+    // Overrides the Personal Agent Protocol store, for tests.
+    poppyKv?: PoppyKV;
 }
 
 // A manifest entry is whatever its subject published there. `publishCredential`
@@ -317,6 +330,41 @@ export function createHeraldRoutes(ctx: HeraldContext): {
         return user;
     }
 
+    async function claimName(did: string, name: unknown): Promise<AccountResult> {
+        const validation = validateName(name);
+        if (!validation.ok) {
+            return { status: 400, body: { ok: false, message: validation.message } };
+        }
+        const trimmedName = validation.trimmedName!;
+
+        const user = await ensureUser(did);
+
+        if (!(await checkNameAvailability(trimmedName, did))) {
+            return { status: 409, body: { ok: false, message: 'Name already taken' } };
+        }
+
+        user.name = trimmedName;
+        await issueOrUpdateCredential(did, user, trimmedName);
+        await ctx.db.setUser(did, user);
+
+        let credential = null;
+        if (user.credentialDid) {
+            credential = await ctx.keymaster.getCredential(user.credentialDid);
+        }
+
+        return {
+            status: 200,
+            body: {
+                ok: true,
+                name: trimmedName,
+                did,
+                credentialDid: user.credentialDid,
+                credentialIssuedAt: user.credentialIssuedAt,
+                credential,
+            },
+        };
+    }
+
     async function findNameDid(name: string): Promise<string | null> {
         return ctx.db.findDidByName(name);
     }
@@ -477,6 +525,89 @@ export function createHeraldRoutes(ctx: HeraldContext): {
     router.options('/api/{*path}', cors(corsOptions));
     router.options('/.well-known/{*path}', cors(corsOptions));
 
+    function poppyAccounts(): PoppyAccounts {
+        return {
+            async createChallenge(callback: string) {
+                // @ts-ignore - callback is carried in the challenge for the wallet
+                return ctx.keymaster.createChallenge({ callback });
+            },
+            async verifyResponse(response: string) {
+                const verify = await ctx.keymaster.verifyResponse(response, { retries: 10 });
+                return { match: Boolean(verify.match), challenge: verify.challenge, responder: verify.responder };
+            },
+            async ensureUser(did: string) {
+                await ensureUser(did);
+            },
+            async nameOf(did: string) {
+                return (await ctx.db.getUser(did))?.name;
+            },
+            async lookupName(raw: string) {
+                const name = raw.trim().toLowerCase();
+                const did = await findNameDid(name);
+                return did ? { name, did } : null;
+            },
+            async member(raw: string) {
+                const memberDid = await findNameDid(raw.trim().toLowerCase());
+                if (!memberDid) {
+                    return null;
+                }
+                const didDoc = await ctx.keymaster.resolveDID(memberDid);
+                const manifest = (didDoc.didDocumentData as { manifest?: Record<string, any> })?.manifest ?? {};
+                return { ...didDoc, credentialStatus: await checkManifest(ctx.keymaster, memberDid, manifest) };
+            },
+            async resolveDid(did: string) {
+                // Only DIDs: the keymaster would also resolve this wallet's aliases.
+                if (!/^did:[a-z0-9]+:\S+$/.test(did)) {
+                    return null;
+                }
+                try {
+                    return await ctx.keymaster.resolveDID(did);
+                }
+                catch {
+                    return null;
+                }
+            },
+            async directory() {
+                return buildRegistry(await listUsers());
+            },
+            async profile(did: string) {
+                const user = await ctx.db.getUser(did);
+                return user ? {
+                    did,
+                    name: user.name,
+                    credentialDid: user.credentialDid,
+                    credentialIssuedAt: user.credentialIssuedAt,
+                } : null;
+            },
+            async credential(did: string) {
+                const user = await ctx.db.getUser(did);
+                if (!user?.credentialDid) {
+                    return { status: 404, body: { error: 'credential_not_found' } };
+                }
+                return {
+                    status: 200,
+                    body: {
+                        credentialDid: user.credentialDid,
+                        credentialIssuedAt: user.credentialIssuedAt,
+                        credential: await ctx.keymaster.getCredential(user.credentialDid),
+                    },
+                };
+            },
+            setName: claimName,
+            async deleteName(did: string) {
+                const user = await ctx.db.getUser(did);
+                const deletedName = user?.name;
+                if (!user || !deletedName) {
+                    return { status: 404, body: { ok: false, message: 'No name to delete' } };
+                }
+                await revokeCredential(user, deletedName);
+                delete user.name;
+                await ctx.db.setUser(did, user);
+                return { status: 200, body: { ok: true, message: `name '${deletedName}' deleted and credential revoked` } };
+            },
+        };
+    }
+
     // Helper function for OAuth
     async function getMemberByDID(did: string): Promise<any> {
         const user = await ctx.db.getUser(did);
@@ -494,6 +625,56 @@ export function createHeraldRoutes(ctx: HeraldContext): {
     const oauthRouter = createOAuthRoutes(() => ctx.keymaster, getMemberByDID);
     router.use('/oauth', oauthRouter);
     console.log('OAuth routes mounted at /oauth');
+
+    // Personal Agent Protocol (Poppy) Company endpoints, opt-in.
+    let poppy: Poppy | null = null;
+    if (POPPY_ENABLED) {
+        if (!DRAWBRIDGE_PUBLIC_HOST.startsWith('https://')) {
+            console.warn('Poppy: ARCHON_DRAWBRIDGE_PUBLIC_HOST is not HTTPS; Personal Agents will not accept this issuer');
+        }
+        const kv = ctx.poppyKv
+            ?? (POPPY_STORE === 'memory' ? new MemoryKV() : new RedisKV(REDIS_URL, `${SERVICE_NAME}:poppy`));
+        poppy = createPoppy({
+            config: createPoppyConfig(DRAWBRIDGE_PUBLIC_HOST, SERVICE_DOMAIN || SERVICE_NAME, WALLET_URL),
+            store: new PoppyStore(kv),
+            agents: new AgentDirectory(fetchPublicHttpsOnce),
+            accounts: poppyAccounts(),
+        });
+        router.use('/poppy', poppy.router);
+        router.use(poppy.wellKnown);
+        console.log('Poppy Company endpoints mounted at /poppy');
+    }
+
+    // Personal Agents connected to the signed-in User's account, for Herald's
+    // account settings (Poppy guides, "Account settings").
+    router.get('/api/poppy/connections', isAuthenticated, async (req: Request, res: Response) => {
+        if (!poppy) {
+            res.status(404).json({ error: 'Personal Agent Protocol is not enabled' });
+            return;
+        }
+        try {
+            res.json({ connections: await poppy.listConnections(req.session.user!.did) });
+        }
+        catch (error) {
+            console.log(error);
+            res.status(500).json({ error: 'Could not list connected agents' });
+        }
+    });
+
+    router.delete('/api/poppy/connections/:id', isAuthenticated, async (req: Request, res: Response) => {
+        if (!poppy) {
+            res.status(404).json({ error: 'Personal Agent Protocol is not enabled' });
+            return;
+        }
+        try {
+            const removed = await poppy.disconnect(req.session.user!.did, String(req.params.id));
+            res.status(removed ? 200 : 404).json({ ok: removed });
+        }
+        catch (error) {
+            console.log(error);
+            res.status(500).json({ error: 'Could not disconnect the agent' });
+        }
+    });
 
     // OIDC Discovery at root level (required by spec)
     router.get('/.well-known/openid-configuration', (_req: Request, res: Response) => {
@@ -966,37 +1147,8 @@ export function createHeraldRoutes(ctx: HeraldContext): {
                 return;
             }
 
-            const validation = validateName(req.body.name);
-            if (!validation.ok) {
-                res.status(400).json({ ok: false, message: validation.message });
-                return;
-            }
-            const trimmedName = validation.trimmedName!;
-
-            const user = await ensureUser(did);
-
-            if (!(await checkNameAvailability(trimmedName, did))) {
-                res.status(409).json({ ok: false, message: 'Name already taken' });
-                return;
-            }
-
-            user.name = trimmedName;
-            await issueOrUpdateCredential(did, user, trimmedName);
-            await ctx.db.setUser(did, user);
-
-            let credential = null;
-            if (user.credentialDid) {
-                credential = await ctx.keymaster.getCredential(user.credentialDid);
-            }
-
-            res.json({
-                ok: true,
-                name: trimmedName,
-                did,
-                credentialDid: user.credentialDid,
-                credentialIssuedAt: user.credentialIssuedAt,
-                credential,
-            });
+            const result = await claimName(did, req.body.name);
+            res.status(result.status).json(result.body);
         }
         catch (error) {
             console.log(error);
