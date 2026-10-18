@@ -10,6 +10,7 @@ import GatekeeperClient from '@didcid/clients/gatekeeper';
 import config from './config.js';
 import { RedisStore } from './store.js';
 import { byHeraldRoute, publicRateLimit } from './middleware/public-rate-limit.js';
+import { normalizePath } from './metrics-path.js';
 import { createAuthMiddleware } from './middleware/auth.js';
 import { loadPricingFromEnv } from './pricing.js';
 import { createV1Router } from './v1-router.js';
@@ -98,21 +99,6 @@ async function resolveDidCommEndpoint(): Promise<string | null> {
     }
     const onion = await onionReachability.verifiedHostname();
     return onion ? `http://${onion}:${config.port}/didcomm` : null;
-}
-
-function normalizePath(path: string): string {
-    return path
-        .replace(/\/did\/(?:did:[^/]+|did%3[aA][^/]+)/, '/did/:did')
-        .replace(/\/identifiers\/(?:did:[^/]+|did%3[aA][^/]+)/, '/identifiers/:did')
-        .replace(/\/invoice\/(?:did:[^/]+|did%3[aA][^/]+)/, '/invoice/:did')
-        .replace(/\/ipfs\/json\/[^/]+/, '/ipfs/json/:cid')
-        .replace(/\/ipfs\/text\/[^/]+/, '/ipfs/text/:cid')
-        .replace(/\/ipfs\/data\/[^/]+/, '/ipfs/data/:cid')
-        .replace(/\/ipfs\/stream\/[^/]+/, '/ipfs/stream/:cid')
-        .replace(/\/queue\/[^/]+/, '/queue/:registry')
-        .replace(/\/block\/[^/]+\/latest/, '/block/:registry/latest')
-        .replace(/\/block\/[^/]+\/[^/]+/, '/block/:registry/:blockId')
-        .replace(/\/payments\/[^/]+/, '/payments/:did');
 }
 
 function buildProxyBody(req: express.Request): BodyInit | undefined {

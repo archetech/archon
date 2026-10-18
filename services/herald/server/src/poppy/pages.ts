@@ -171,14 +171,21 @@ ${scopes}
   async function decide(decision) {
     buttons.forEach(function (b) { b.disabled = true; });
     var scope = Array.prototype.slice.call(form.querySelectorAll('input[name=scope]:checked')).map(function (el) { return el.value; });
-    var res = await fetch(cfg.decideUrl, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-Poppy-CSRF': cfg.csrf },
-      body: JSON.stringify({ decision: decision, scope: scope })
-    });
+    function fail(text) {
+      document.getElementById('error').textContent = text;
+      buttons.forEach(function (b) { b.disabled = false; });
+    }
+    var res;
+    try {
+      res = await fetch(cfg.decideUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-Poppy-CSRF': cfg.csrf },
+        body: JSON.stringify({ decision: decision, scope: scope })
+      });
+    } catch (e) { fail('Could not reach the server. Check your connection and try again.'); return; }
     var data = await res.json().catch(function () { return {}; });
-    if (!res.ok) { document.getElementById('error').textContent = data.error_description || 'Something went wrong.'; buttons.forEach(function (b) { b.disabled = false; }); return; }
+    if (!res.ok) { fail(data.error_description || 'Something went wrong.'); return; }
     if (data.redirect) { window.location.assign(data.redirect); return; }
     finish(data.message || 'Done. You can close this page.');
   }
