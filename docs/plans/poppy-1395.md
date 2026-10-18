@@ -1,136 +1,162 @@
 # Personal Agent Protocol support (#1395)
 
-Status: proposed. Phase 0 has not started. Based on Draft 0.1 of the
-[specification](https://personalagentprotocol.org/docs/spec) and
-[guides](https://personalagentprotocol.org/docs/guides) as read on 2026-10-18.
+Status: proposed; nothing built. Based on Draft 0.1 of the
+[specification](https://personalagentprotocol.org/docs/spec), the
+[guides](https://personalagentprotocol.org/docs/guides) and the Company
+implementation kit, as read on 2026-10-18.
 
-## How Poppy maps onto Archon
+## Direction
 
-In Poppy, the Personal Agent is a server on an HTTPS domain. Its `client_id` is a
-URL on that domain serving its OAuth Client ID Metadata Document, and one signing
-key, published at `jwks_uri`, signs every client and Session assertion. Users are
-not identified by the agent's keys. The agent gives each User a separate opaque
-User ID at each Company, holds a DPoP key per User per Company, and stores the
-User's Account Token (refresh token) after sign-in.
+Archon implements Poppy as a **Company**, not as a Personal Agent. A Herald domain
+such as archon.social publishes a `poppy.json`, and Personal Agents (ChatGPT- or
+Meta-style products) can use Archon on their Users' behalf: look up names, resolve
+DIDs and verify proofs while signed out, and manage the User's Herald account once
+the User signs in with their Archon wallet.
 
-An Archon node therefore acts as a Personal Agent on its own domain (archon.social,
-a 4tress domain, or any self-hosted node) for the DIDs in its wallet. An Archon DID
-is not presented to Companies.
+Why not the Personal Agent side: it is generic OAuth-client plumbing that uses none
+of Archon's machinery; the named Personal Agent partners are OpenAI and Meta, whose
+products would speak Poppy themselves; Companies allowlist agents by `client_id`, so
+an unknown domain is likely held to guest access; and a hosted agent would hold every
+User's refresh tokens for their other accounts. The Company side gives Archon reach
+into those agents through the channel Companies are adopting, and builds on what
+Herald already runs: wallet sign-in, an OAuth/OIDC provider with a persisted ES256
+key, public pages behind Drawbridge, and name and profile APIs.
 
-Constraints from the draft that shape the design:
+Two live Companies show the expected shape. Stacktree (`stacktr.ee`, live since
+2026-10-11) and Ample Computer (`ample.computer`, live since 2026-10-17) both offer
+signed-out Sessions, Direct Sign-In and Account Tokens, and expose an MCP server
+(Stacktree also an OpenAPI description). Neither implements Device or Mediated
+Sign-In, browser sessions, conversations, or extensions.
 
-- **Signing algorithm.** The spec mandates none, but the guides say "support ES256
-  and RS256, and sign with ES256 when you can", and Ample Computer accepts only
-  ES256 or RS256 client assertions. ES256K and EdDSA cannot be relied on.
-  Keymaster has no P-256 keys. The agent's long-lived key belongs to the operator,
-  not a User, and the guides say to keep it on the server, as Herald already does
-  with its persisted ES256 OIDC key (`services/herald/server/src/oauth/index.ts`).
-  DPoP keys are ephemeral and unpublished; WebCrypto suffices. Phase 1 therefore
-  needs no new Keymaster key type.
-- **User IDs.** They MUST NOT contain or be derived from personal information, and
-  the guides say a derived ID must start from an internal ID that is itself random.
-  A DID is a public identifier shared across Companies, so store a random ID per
-  (DID, `auth.issuer`) rather than deriving one from the DID.
-- **Secrets.** Account Tokens MUST NOT enter model context, messages, logs, or
-  URLs. The guides extend this to Session Tokens, private keys, device codes, and
-  one-time codes. No tool output may contain them.
-- **Company content.** Everything a Company returns is untrusted data, never
-  instructions (§8.1).
-- **Trust.** Companies allowlist or block by `client_id`. A self-hosted domain may
-  be conformant and still refused.
+## How Poppy maps onto Herald
 
-Live Companies to test against: Stacktree (`https://stacktr.ee`, live since
-2026-10-11) and Ample Computer (`https://ample.computer`, live since 2026-10-17).
-Both offer signed-out Sessions and an MCP server. Upstream issues relevant to this
-work: client assertion `aud` (#2), User ID controls (#11), and DPoP metadata
-conflicting with existing MCP clients (#12), in
-`personal-agent-protocol/personal-agent-protocol`. Feedback is taken as GitHub
-issues there, not only by email.
+| Poppy | Herald |
+| --- | --- |
+| Company | One Herald domain. Each node's Herald is a separate Company. |
+| `auth.issuer` | A dedicated issuer, e.g. `https://<domain>/names/poppy`, kept apart from Herald's existing OIDC issuer (`/names`) so Poppy's metadata cannot change how existing OIDC relying parties behave. Ample Computer did the same after Stacktree reported the conflict (upstream #12). |
+| Account | A DID registered with Herald. A Session is signed in to at most one DID (§4.4). |
+| Signing in | Herald's existing wallet challenge: the User scans or opens the challenge in their Archon wallet and Herald verifies the response. The User's keys never leave the wallet. |
+| Personal Agent | Any `client_id` URL serving client metadata and a JWKS; verified on each Session start. |
+| User ID | Opaque `sub` chosen by the agent; stored with the Session, never shown or linked to the DID until the User signs in. |
+
+Mediated Sign-In does not apply: Archon accounts have no passwords to submit.
+
+Writes that need the User's own signature (creating DIDs, issuing credentials,
+updating DID documents) cannot be performed by the Company, because the keys live in
+the User's wallet. They stay out of scope unless a later flow has the wallet approve
+each operation; the Operations extension is the place to evaluate that.
 
 ## Decisions
 
-1. **Placement.** Recommended: a new `services/poppy` behind Drawbridge, under a
-   `poppy` Compose profile. Keymaster keeps identity and secrets; the service is the
-   OAuth client and transport, the same split agreed for DIDComm sends. Herald is
-   the alternative, but Herald is an OAuth provider and this is a client.
-2. **Tenancy.** Recommended: single-tenant first, acting only for the node wallet's
-   DIDs. A hosted domain serving many Users needs per-User authentication to the
-   service and is a later phase.
+1. **What Personal Agents can do.** Recommended starting set:
+   - Signed out (what any website visitor can do): look up a name, read a public
+     member profile, resolve a DID through Gatekeeper, read the directory.
+   - Signed in, `poppy:read`: the User's profile and name, and their Herald
+     membership credential.
+   - Signed in, `poppy:write`: claim, change or release the User's name.
+   - Candidates to decide on: verifying a credential or challenge response for an
+     agent (useful, but makes Herald a verification service), and sending email
+     through the Herald bridge (abuse and spoofing risk).
+2. **Interface type.** Recommended: OpenAPI first, then MCP. Every listed API must
+   accept Session Tokens (§6): DPoP for OpenAPI, Bearer for MCP. Archon's
+   `@didcid/mcp-server` is a local stdio server over the User's wallet, so the MCP
+   API would be a new remote Streamable HTTP server with RFC 9728 protected resource
+   metadata, not that package.
+3. **Agent policy.** Recommended: accept any `client_id` (no registration), with
+   per-`client_id` and new-client rate limits as the guides suggest for guest
+   access.
+4. **State.** Sessions, Account Token records, `jti` replay and DPoP nonces need
+   expiring shared state. Herald's default store is a JSON file
+   (`ARCHON_HERALD_DB=json`); recommended to use Redis, already in the core stack,
+   for replay and nonces.
 
-## Phase 0: spike
+## Milestones
 
-Throwaway; not merged as product code.
+The milestones follow the kit's validator (`kit/company/validate` in
+`personal-agent-protocol/personal-agent-protocol`), which acts as a test Personal
+Agent and checks each milestone against a live deployment. Each milestone is done
+when the validator reports no MUST failures for it on a test deployment.
 
-- Publish a static client metadata document and JWKS on an HTTPS host. Signed-out
-  Sessions need no redirect, so a static host suffices.
-- Against both live Companies, script: discovery, the issuer and `poppy_domains`
-  check (§3.2), client and Session assertions with `aud` set to `auth.issuer`, a
-  DPoP signed-out Session including a nonce retry, a Bearer Session Token for the
-  MCP server with `resource`, and listing its tools.
-- Try ES256K and EdDSA client assertions too, to settle the algorithm question in
-  #1395 from real servers.
+### 1. Foundation
 
-Gate: a signed-out Session reaches both Companies' MCP servers. Otherwise stop, or
-report the failure upstream.
+- `/.well-known/poppy.json` on the Herald domain. `organization.domain` is the serving host after
+  redirects. List only what is live.
+- RFC 8414 metadata for the Poppy issuer at
+  `/.well-known/oauth-authorization-server/names/poppy`, with `poppy_domains`,
+  `token_endpoint`, `revocation_endpoint` and `dpop_signing_alg_values_supported`
+  including ES256. Drawbridge already forwards all of `/.well-known` to Herald.
+- Agent verification: fetch the `client_id` URL without following redirects through
+  the shared destination-validating HTTPS transport (`packages/common/src/net-node.ts`),
+  with size and time limits; check `client_id`, and that `jwks_uri` and
+  `redirect_uris` are HTTPS on the same domain; cache within bounds; refetch on an
+  unknown `kid` at most once per key URL per interval, counting failures (Ample
+  Computer's report).
+- Token endpoint: JWT-bearer grant with `private_key_jwt` client assertion and DPoP
+  Proof; both assertions verified against the agent's JWKS with `aud` equal to the
+  issuer as a single string; reused `jti` rejected; signed-out Session Tokens with a
+  lifetime of hours; renewal by `session_id`; `scope` and `resource` accepted; OAuth
+  error codes from §4.2.
+- DPoP verification per RFC 9449 §4.3, with optional nonces.
 
-## Phase 1: `services/poppy`
+### 2. Interfaces
 
-- Public routes through Drawbridge (which forwards only whitelisted upstream
-  paths): `/poppy/agent.json`, `/poppy/jwks.json`, `/poppy/callback`.
-- ES256 signing key persisted under `./data` with a `kid`. Import with
-  `{ extractable: true }` (the Herald persistence bug). Follow the guides on
-  rotation: publish a new key before signing with it, keep the old one until its
-  assertions expire.
-- Discovery through the shared public HTTPS transport that validates connected
-  destinations. Follow redirects only to HTTPS, with limits on redirect count,
-  response size and time. Cache metadata within bounds.
-- Sessions: JWT-bearer signed-out Sessions and renewal (§4.2); DPoP proofs signed
-  per request with per-server nonce handling (§4.3); fresh assertion and proof on
-  every retry; Bearer tokens only for MCP, scoped by `resource`.
-- Sign-in: Direct (PKCE S256, single-use `state`, exact `iss` check) and Device
-  (`interval`, `slow_down`). Mediated Sign-In deferred because it handles
-  passwords.
-- Account Tokens encrypted at rest under the wallet; replaced when the Company
-  rotates them, deleted on `invalid_grant`, revoked at sign-out (§4.8, §4.9).
-- Internal API protected by `X-Archon-Admin-Key`.
-- Tests against an in-repo fake Company: wrong `aud`, swapped `iss`, reused `jti`,
-  nonce challenge, `account_mismatch`, `invalid_session`, `rate_limited` with
-  `Retry-After`, and secret redaction in logs. An optional live test against
-  Stacktree.
+- OpenAPI 3.1 description of the agreed API subset, listed in `apis`.
+- Middleware on those Herald routes accepting DPoP Session Tokens, passing the
+  verified `client_id`, User ID, account and scopes to the handlers; errors in
+  `WWW-Authenticate` (`invalid_token`, `sign_in_required`, `insufficient_scope`).
+  Existing cookie and Bearer authentication for Herald's own clients is unchanged.
+- Signed-out Sessions allowed exactly what a signed-out visitor can do.
+- Later: the remote MCP server, Bearer tokens issued only for its `resource`, and
+  protected resource metadata naming the Poppy issuer.
 
-## Phase 2: surfaces
+### 3. Sign-in
 
-- MCP tools: `poppy_discover`, `poppy_start_session`, `poppy_sign_in` (returns a
-  link for the User; never handles credentials), `poppy_call` (proxies a Company
-  MCP or OpenAPI call and labels the result as untrusted Company content), and
-  `poppy_sign_out`. Read-only tools first; writes marked mutating.
-- CLI commands in `scripts/archon-cli.js`, `packages/keymaster/src/cli.ts` and
-  `python/keymaster/src/keymaster/cli.py`, with MCP mappings, if the feature is
-  exposed through the CLI.
-- Wallet: a "Connected companies" list with Disconnect. Either the standalone
-  clients get it too, or the allowlist in `tests/wallet/ui-capability-parity.test.ts`
-  records why not.
+- Direct Sign-In: authorization code with PKCE (S256 only), exact `redirect_uri`
+  match against the agent's metadata, `iss` on every redirect (RFC 9207). The
+  consent page shows the agent's name, logo and `client_id` domain, and each
+  requested scope as a choice; the User signs in with the wallet challenge.
+- Device Sign-In: device authorization request with client assertion; verification
+  page with the same consent; polling with `authorization_pending`, `slow_down`,
+  `access_denied`, `expired_token`. Opening the link must not approve by itself.
+  This suits the wallet's scan-to-sign-in flow.
+- Account Tokens: refresh grant with client assertion and DPoP; accepted only from
+  the issuing `client_id`; `scope` may narrow only; `account_mismatch` when a
+  Session was signed in to another DID; revocation endpoint.
+- Account settings in Herald's UI: list the agents connected to the User's DID and
+  let the User disconnect each one.
 
-## Phase 3: deferred until needed
+### Later, on demand
 
-Conversations (§7), browser sessions (§5), Mediated Sign-In (§4.7), and the
-Operations extension.
+Conversations (§7) with a Company Agent, browser sessions (§5), and the Operations
+extension for wallet-approved writes.
 
-## Phase 4: verifiable agent identity (optional)
+## Testing
 
-Per-Company `client_id` allowlisting favors large domains. Archon can offer a
-verifiable link for self-hosted agents: client metadata naming the node's DID, the
-DID document listing the `client_id` and JWKS key, and optionally a credential
-vouching for the agent. Poppy declares identity extensible, so this would be an
-extension proposal or feedback issue upstream, written after Phases 0–1 and only
-with maintainer approval. A recoverable P-256 key in Keymaster may be justified at
-that point.
+- Unit and route tests in `tests/herald` with a fake Personal Agent: wrong `aud`,
+  redirecting or cross-domain client metadata, reused `jti`, nonce challenge,
+  token reuse across `client_id`s, `account_mismatch`, scope narrowing, and secret
+  redaction in logs.
+- The kit validator against a test deployment for each milestone.
+- An implementation report filed upstream once milestone 3 passes, if the
+  maintainer agrees.
+
+## Upstream identity feedback (parallel, optional)
+
+Poppy's trust in an agent stops at its domain, and delegation stays inside each
+Company. Archon's DIDs and credentials could supply what is missing: client
+metadata naming the agent's DID, a DID document listing the `client_id` and JWKS
+key, and credentials vouching for an agent or for a User's delegation. Poppy
+declares identity extensible. Any proposal goes upstream as a feedback issue or
+extension only with maintainer approval, preferably after milestone 1 gives it an
+implementation behind it.
 
 ## Risks
 
-- Draft churn before 1.0, possibly incompatible. Keep spec-facing code in one
-  module and record the draft version implemented.
-- Self-hosted `client_id`s refused in practice. Phase 0 cannot measure this, since
-  both test Companies accept unknown agents; Phase 4 is the response.
-- Secrets or Company content reaching the model. Treat as design constraints from
-  Phase 1, enforced by tests.
+- Draft churn before 1.0, possibly incompatible. Keep the Poppy code in its own
+  Herald module and record the draft version implemented.
+- Abuse of guest access by anonymous agents. Rate-limit by `client_id`, by User ID
+  and by Session.
+- Unauthenticated requests making Herald fetch remote metadata. Throttle fetches
+  and validate destinations at connection time.
+- Confusing Poppy's issuer with Herald's OIDC issuer. Keep them separate and test
+  that existing OIDC sign-in is unaffected.
