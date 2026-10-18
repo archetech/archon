@@ -22,7 +22,7 @@ import {
 } from './store.js';
 import { createApiRouter, type PoppyAccounts } from './api.js';
 
-// Personal Agent Protocol (Draft 0.1) Company endpoints for Herald: the token
+// Personal Agent Protocol (draft 0.2) Company endpoints for Herald: the token
 // endpoint (4.2, 4.4-4.8), revocation (4.9), Direct and Device Sign-In with an
 // Archon wallet (4.5, 4.6), and the OpenAPI interface (section 6). Mediated
 // Sign-In (4.7) does not apply: Archon accounts have no passwords to submit.

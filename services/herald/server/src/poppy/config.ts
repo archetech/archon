@@ -4,7 +4,10 @@
 // `/names`. Keeping them apart stops Poppy's metadata from changing how
 // existing OIDC relying parties behave.
 
-export const POPPY_PROTOCOL_VERSION = '0.1';
+// Draft 0.2: assertions name the issuer as aud. Frozen 0.1 named the token
+// endpoint, which let a Company replay assertions addressed to an endpoint
+// another Company's metadata named (upstream #2).
+export const POPPY_PROTOCOL_VERSION = '0.2';
 
 export const SCOPES = {
     'poppy:read': 'View your Herald profile, name and membership credential',

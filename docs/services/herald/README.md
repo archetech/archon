@@ -168,7 +168,7 @@ tokens and authorization codes remain in memory and do not survive restart.
 
 With `ARCHON_HERALD_POPPY_ENABLED=true`, Herald acts as a Company under the
 [Personal Agent Protocol](https://personalagentprotocol.org/docs/spec) (Poppy,
-Draft 0.1): personal agents discover it, start Sessions, sign Users in with their
+draft 0.2; `poppy.json` advertises `protocol_version: "0.2"`): personal agents discover it, start Sessions, sign Users in with their
 Archon wallet, and use an OpenAPI interface. The issuer is
 `${ARCHON_DRAWBRIDGE_PUBLIC_HOST}/names/poppy`, separate from the OIDC issuer at
 `/names`, so Poppy's metadata cannot change what OIDC relying parties do. The

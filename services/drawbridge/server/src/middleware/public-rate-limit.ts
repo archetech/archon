@@ -216,8 +216,21 @@ export function byMethod(buckets: { read: RequestHandler, write: RequestHandler 
 // sign-in that follows the advertised polling interval, so they get a bucket
 // of their own. Writes to the account through Poppy's API (`/poppy/api/*`)
 // stay on the name-write budget.
+//
+// The path is taken as Herald will see it: the proxy strips `/names` and
+// resolves the rest with `new URL`, which removes dot segments, including
+// percent-encoded ones. Matching the raw path instead would let
+// `/names/poppy/%2e%2e/api/send-email` claim this budget for an email write.
+export function heraldUpstreamPath(req: Request): string {
+    return new URL(req.originalUrl.replace(/^\/names/, '') || '/', 'http://herald').pathname;
+}
+
 export function isPoppyAuthRequest(req: Request): boolean {
-    return req.method === 'POST' && req.path.startsWith('/poppy/') && !req.path.startsWith('/poppy/api/');
+    if (req.method !== 'POST') {
+        return false;
+    }
+    const path = heraldUpstreamPath(req);
+    return path.startsWith('/poppy/') && !path.startsWith('/poppy/api/');
 }
 
 export function byHeraldRoute(buckets: { read: RequestHandler, write: RequestHandler, poppyAuth: RequestHandler }): RequestHandler {

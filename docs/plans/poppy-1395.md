@@ -5,8 +5,12 @@ with the recommended decision for each item below: the OpenAPI interface (no MCP
 server yet), Direct and Device Sign-In, Account Tokens, revocation and account
 settings. Tests use a signed test Personal Agent; the kit validator passes
 `poppy.json` offline, and a live validator run needs an HTTPS test deployment.
-Endpoints are specified in `docs/services/herald/README.md` §2.8a. Based on Draft 0.1 of the
-[specification](https://personalagentprotocol.org/docs/spec), the
+Endpoints are specified in `docs/services/herald/README.md` §2.8a. Herald implements
+draft 0.2. On 2026-10-18 upstream froze 0.1 as published on 2026-10-09 and moved later
+changes into 0.2; the one that matters here is that client and Session assertions name
+the issuer as `aud` (0.1 had the token endpoint), closing a cross-Company replay
+(upstream #2). The plan below was written from the then-current draft, labelled 0.1 at
+the time, of the [specification](https://personalagentprotocol.org/docs/spec), the
 [guides](https://personalagentprotocol.org/docs/guides) and the Company
 implementation kit, as read on 2026-10-18.
 

@@ -10,7 +10,7 @@ import { MemoryKV } from '../../services/herald/server/src/poppy/kv.ts';
 import { createPoppy, type Poppy } from '../../services/herald/server/src/poppy/router.ts';
 import { PoppyStore } from '../../services/herald/server/src/poppy/store.ts';
 
-// Herald as a Personal Agent Protocol Company (Draft 0.1), exercised by a test
+// Herald as a Personal Agent Protocol Company (draft 0.2), exercised by a test
 // Personal Agent that signs real ES256 client assertions, Session assertions
 // and DPoP Proofs. Client metadata is served by an injected fetcher, since the
 // production transport refuses anything but public HTTPS addresses.
@@ -253,7 +253,7 @@ describe('discovery', () => {
     it('publishes poppy.json naming the issuer, sign-in types and the OpenAPI interface', async () => {
         const response = await request(app).get('/.well-known/poppy.json').expect(200);
         expect(response.body).toEqual({
-            protocol_version: '0.1',
+            protocol_version: '0.2',
             organization: { name: 'archon.test', domain: 'archon.test' },
             auth: {
                 issuer: ISSUER,

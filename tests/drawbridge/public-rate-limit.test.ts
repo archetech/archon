@@ -395,6 +395,18 @@ describe('byHeraldRoute', () => {
         expect(keys).toEqual(['names:write:read:global', 'names:write:read:global']);
     });
 
+    it.each([
+        '/names/poppy/%2e%2e/api/send-email',
+        '/names/poppy/%2E%2E/api/name',
+        '/names/poppy/.%2e/api/send-email',
+        '/names/poppy/../api/send-email',
+        '/names/poppy/%2e%2e/poppy/api/account/name',
+    ])('charges %s as the path Herald will see, not as Poppy authentication', async (path) => {
+        const { app, keys } = mountRoutes();
+        await request(app).post(path).send({});
+        expect(keys).toEqual(['names:write:read:global']);
+    });
+
     it('keeps other Herald writes and reads on their budgets', async () => {
         const { app, keys } = mountRoutes();
         await request(app).put('/names/api/name').send({ name: 'alice' });
