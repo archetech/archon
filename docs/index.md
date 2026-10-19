@@ -22,8 +22,10 @@ Three-minute animated explanations of how Archon works, each viewable in the bro
 
 ## Protocol
 
-- [White Paper](WHITEPAPER.md) — full protocol specification (v1.1)
-- [DID Scheme](scheme.md) — the `did:cid` method specification
+- [did:cid Method Specification](https://archetech.com/didcid-specs/) — the normative definition of the protocol ([source](https://github.com/archetech/didcid-specs))
+- [White Paper](WHITEPAPER.md) — protocol design and rationale (v1.2)
+- [DID Scheme](scheme.md) — the `did:cid` method as Archon implements it (informative)
+- [Governance](https://github.com/archetech/archon/blob/main/GOVERNANCE.md) — Archon is governed by the [Archonomicon](https://github.com/archetech/archonomicon)
 - [Sidetree and Archon Comparison](sidetree-archon-comparison.md) — deep dive on Archon's Sidetree lineage and design differences
 - [DIDComm Messaging Support](didcomm-design.md) — design doc for adding standards-based DIDComm v2 messaging
 - [did:cid Technical Presentation](presentations/did-cid-technical-presentation.md) — slide outline, speaker notes, and prep checklist

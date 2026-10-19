@@ -14,3 +14,13 @@
     - An easy check is to run `./kc perf-test` (to create 100 local ephemeral credentials) followed by `./admin verify-db` (to garbage-collect the test credentials)
 5. Merge the PR with squashed commits
 6. Use [conventional commit](https://www.conventionalcommits.org/en/v1.0.0/) prefixes for the merge commit message
+
+## Protocol changes
+
+Archon is governed by the [Archonomicon](GOVERNANCE.md). A change that affects which operations are accepted or how a DID resolves is a protocol change, and it starts in the [did:cid specification](https://github.com/archetech/didcid-specs), not here:
+
+- The specification describes the change and references signed test vectors for it, which every implementation must pass before the change may be released (Archonomicon rule 45).
+- The specification records the evidence that the change leaves every accepted history unchanged (rule 46), and proofs of affected properties must still check (rule 49).
+- Making an implementation match the specification is a fix, not a protocol change (rule 47).
+
+See [GOVERNANCE.md](GOVERNANCE.md) for what the rules require and who decides.
