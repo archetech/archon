@@ -293,6 +293,39 @@ pub(crate) fn chrono_like_now() -> String {
     datetime.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }
 
+/// Keys examined per SCAN step: large enough to keep round trips few, small
+/// enough that no step holds Redis for long.
+const REDIS_SCAN_COUNT: usize = 10_000;
+
+/// Collects the keys matching `pattern` with SCAN, stopping once `limit` are
+/// found. KEYS would block Redis while it walks every key in the database,
+/// block checkpoints included (#1407). SCAN may return a key more than once.
+fn redis_scan_keys(
+    conn: &mut redis::Connection,
+    pattern: &str,
+    limit: Option<usize>,
+) -> Result<Vec<String>> {
+    let mut found = Vec::new();
+    let mut cursor = 0u64;
+    loop {
+        let (next, keys): (u64, Vec<String>) = redis::cmd("SCAN")
+            .arg(cursor)
+            .arg("MATCH")
+            .arg(pattern)
+            .arg("COUNT")
+            .arg(REDIS_SCAN_COUNT)
+            .query(conn)?;
+        found.extend(keys);
+        if limit.is_some_and(|limit| found.len() >= limit) || next == 0 {
+            break;
+        }
+        cursor = next;
+    }
+    found.sort();
+    found.dedup();
+    Ok(found)
+}
+
 impl JsonDb {
     // Accepted-history writes go through these, so the event index cannot miss
     // one, whichever caller or backend makes it. Creates and follow-ups may
@@ -1863,6 +1896,18 @@ impl JsonDb {
         }
     }
 
+    /// Whether any DID is stored, without listing them all.
+    pub(crate) fn has_dids(&self, prefix: &str) -> bool {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self
+                .with_redis_connection(|conn, namespace| {
+                    Ok(!redis_scan_keys(conn, &format!("{namespace}/dids/*"), Some(1))?.is_empty())
+                })
+                .unwrap_or(false);
+        }
+        !self.list_dids(prefix, None).is_empty()
+    }
+
     fn list_dids(&self, prefix: &str, requested: Option<&[String]>) -> Vec<String> {
         if matches!(self.backend, DbBackend::Redis { .. }) {
             if let Some(items) = requested {
@@ -1871,13 +1916,13 @@ impl JsonDb {
 
             return self
                 .with_redis_connection(|conn, namespace| {
-                    let mut suffixes = conn
-                        .keys::<_, Vec<String>>(format!("{namespace}/dids/*"))
+                    let mut suffixes = redis_scan_keys(conn, &format!("{namespace}/dids/*"), None)
                         .context("failed to scan redis did keys")?
                         .into_iter()
                         .filter_map(|key| key.rsplit('/').next().map(ToString::to_string))
                         .collect::<Vec<_>>();
                     suffixes.sort();
+                    suffixes.dedup();
                     Ok(suffixes
                         .into_iter()
                         .map(|suffix| format!("{prefix}:{suffix}"))
@@ -2287,8 +2332,7 @@ impl DbBackend {
                 let mut conn = client
                     .get_connection()
                     .context("failed to connect to redis")?;
-                let keyspace_size = conn
-                    .keys::<_, Vec<String>>(format!("{namespace}/*"))
+                let keyspace_size = redis_scan_keys(&mut conn, &format!("{namespace}/*"), None)
                     .context("failed to scan redis namespace for guardrail")?
                     .len();
                 let _ = data;
