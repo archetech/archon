@@ -4,6 +4,8 @@
 
 Report suspected vulnerabilities privately via [GitHub Security Advisories](https://github.com/archetech/archon/security/advisories/new). Please do not open a public issue for an unpatched vulnerability.
 
+This is the channel that [Archonomicon](GOVERNANCE.md) rule 52 names for vulnerabilities in the `did:cid` protocol or any implementation of it. Players do not disclose a reported vulnerability until a fix has been released, and rules 53 to 56 govern emergency fixes and telling node operators to upgrade.
+
 A past point-in-time review is kept in [SECURITY_AUDIT.md](SECURITY_AUDIT.md).
 
 ---

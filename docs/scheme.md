@@ -1,4 +1,6 @@
-# The `did:cid` Method Specification
+# The `did:cid` Method in Archon
+
+> **Informative.** The normative definition of the protocol is the [did:cid Method Specification](https://archetech.com/didcid-specs/) ([source](https://github.com/archetech/didcid-specs)), under [Archonomicon](https://github.com/archetech/archonomicon) rule 42 (see [Governance](https://github.com/archetech/archon/blob/main/GOVERNANCE.md)). This document describes the method as Archon implements it. Where the two differ, the specification governs, and the difference is a defect to correct (rule 43).
 
 
 ## Abstract

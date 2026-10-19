@@ -20,6 +20,10 @@ Archon is designed to run either as a **full trustless node** (your own Gatekeep
 
 For protocol internals and rationale, see the [white paper](docs/WHITEPAPER.md). For service-level documentation visit [archetech.github.io/archon](https://archetech.github.io/archon) or the per-service READMEs linked throughout this file.
 
+## Governance
+
+Archon is governed by the [Archonomicon](https://github.com/archetech/archonomicon). The `did:cid` protocol is defined by the [did:cid Method Specification](https://archetech.com/didcid-specs/), which every implementation here must follow, and protocol changes are made there first. See [GOVERNANCE.md](GOVERNANCE.md).
+
 ## Quick start
 
 Recommended system requirements:
