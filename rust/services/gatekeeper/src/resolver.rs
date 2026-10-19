@@ -386,7 +386,7 @@ async fn ensure_search_index_ready(state: &AppState) {
 
     let has_dids = {
         let store = state.store.lock().await;
-        !store.list_dids(&state.config.did_prefix, None).is_empty()
+        store.has_dids(&state.config.did_prefix)
     };
 
     if has_dids {

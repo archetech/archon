@@ -96,4 +96,4 @@ jobs:
           ARCHON_TEST_REDIS_URL: redis://redis:6379
         run: >-
           cargo test --locked --manifest-path rust/services/gatekeeper/Cargo.toml
-          -j 2 --test mongo_backend --test chain_reorg --test redis_compat -- --test-threads=1
+          -j 2 --test mongo_backend --test chain_reorg --test redis_compat --test redis_scan -- --test-threads=1

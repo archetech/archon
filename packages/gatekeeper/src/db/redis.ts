@@ -4,6 +4,10 @@ import { GatekeeperDb, GatekeeperEvent, Operation, BlockId, BlockInfo } from '..
 
 const REDIS_NOT_STARTED_ERROR = 'Redis not started. Call start() first.';
 
+// Keys examined per SCAN step: large enough to keep round trips few, small
+// enough that no step holds Redis for long.
+const SCAN_COUNT = 10_000;
+
 export default class DbRedis implements GatekeeperDb {
     private readonly dbName: string;
     private redis: Redis | null;
@@ -165,9 +169,19 @@ export default class DbRedis implements GatekeeperDb {
             throw new Error(REDIS_NOT_STARTED_ERROR)
         }
 
-        const keys = await this.redis.keys(`${this.dbName}/dids/*`);
-        // Extract the id part from the key
-        return keys.map(key => key.split('/').pop() || '');
+        // KEYS would block Redis while it walks every key in the database,
+        // block checkpoints included, not only DIDs; SCAN takes it in steps
+        // that each block briefly (#1407). SCAN may repeat a key.
+        const ids = new Set<string>();
+        let cursor = '0';
+        do {
+            const [next, keys] = await this.redis.scan(cursor, 'MATCH', `${this.dbName}/dids/*`, 'COUNT', SCAN_COUNT);
+            cursor = next;
+            for (const key of keys) {
+                ids.add(key.split('/').pop() || '');
+            }
+        } while (cursor !== '0');
+        return [...ids];
     }
 
     private queueKey(registry: string): string {
