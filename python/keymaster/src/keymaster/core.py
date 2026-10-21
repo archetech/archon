@@ -4267,7 +4267,10 @@ class Keymaster:
         refs = doc.get("didDocument", {}).get("keyAgreement") or []
         if not refs:
             raise KeymasterError("DID has no published keyAgreement key; call publish_didcomm first")
-        kid = refs[0]
+        # A JWE recipient kid must be a whole DID URL; did:peer:2 references
+        # its methods relatively.
+        did = doc.get("didDocument", {}).get("id")
+        kid = (_absolute_key_id(refs[0], did) if did else None) or refs[0]
         vm = self._find_verification_method(doc, kid)
         if not vm:
             raise KeymasterError("keyAgreement verification method not found")
@@ -4290,6 +4293,10 @@ class Keymaster:
                     ],
                 }
             }
+        # did:peer:2 is deterministic too, and universal resolvers often lack
+        # the driver for it.
+        if did.startswith("did:peer:2."):
+            return {"didDocument": dc.resolve_did_peer_2(did)}
         return await self.resolve_did(did)
 
     async def _node_didcomm_endpoint_uri(self) -> str | None:
