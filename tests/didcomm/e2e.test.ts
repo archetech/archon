@@ -113,6 +113,32 @@ describe('DIDComm relay end-to-end', () => {
         expect(again).toHaveLength(0);
     });
 
+    // A sender outside Archon reads the published service and POSTs the packed
+    // envelope to its uri as-is, without Archon's /api/v1/messages suffix.
+    it('accepts an envelope POSTed to the published uri as-is', async () => {
+        await keymaster.createId('Alice');
+        const bobDid = await keymaster.createId('Bob');
+        await keymaster.publishDidComm(endpoint, 'Alice');
+        await keymaster.publishDidComm(endpoint, 'Bob');
+
+        const doc = await keymaster.resolveDID(bobDid);
+        const service = doc.didDocument?.service?.find(s => s.type === 'DIDCommMessaging');
+        const { uri } = service?.serviceEndpoint as { uri: string };
+
+        const body = { text: 'from a spec-following sender' };
+        const envelope = await keymaster.packDidComm({ type: 'https://x/1/msg', body }, bobDid, { name: 'Alice' });
+        const response = await fetch(uri, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/didcomm-encrypted+json' },
+            body: envelope,
+        });
+        expect(response.status).toBe(200);
+
+        const received = await keymaster.receiveDidComm({ name: 'Bob' });
+        expect(received).toHaveLength(1);
+        expect(received[0].message.body).toEqual(body);
+    });
+
     it('leaves messages in the mailbox when ack is false', async () => {
         const bobDid = await keymaster.createId('Bob');
         await keymaster.createId('Alice');

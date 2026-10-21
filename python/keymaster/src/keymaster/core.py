@@ -4509,10 +4509,9 @@ class Keymaster:
         service_id = f"{did}#didcomm"
         services = [s for s in did_document.get("service") or [] if s.get("id") != service_id]
         if endpoint:
-            service_endpoint: Any = (
-                {"uri": endpoint, "accept": ["didcomm/v2"], "routingKeys": routing_keys}
-                if routing_keys else endpoint
-            )
+            # Always the DIDComm v2 object form: didcomm-rust and the senders
+            # built on it reject a bare string.
+            service_endpoint = {"uri": endpoint, "accept": ["didcomm/v2"], "routingKeys": routing_keys or []}
             services.append({"id": service_id, "type": "DIDCommMessaging", "serviceEndpoint": service_endpoint})
         if services:
             did_document["service"] = services

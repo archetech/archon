@@ -3065,15 +3065,13 @@ export default class Keymaster implements KeymasterInterface {
         const services = (didDocument.service || []).filter(s => s.id !== serviceId);
 
         if (endpoint) {
-            // When routing keys are present, advertise the DIDComm object form so
+            // Always the DIDComm v2 object form: didcomm-rust and the senders
+            // built on it reject a bare string. Routing keys, when present, make
             // senders wrap in a Forward to the mediator.
-            const serviceEndpoint = routingKeys && routingKeys.length > 0
-                ? { uri: endpoint, accept: ['didcomm/v2'], routingKeys }
-                : endpoint;
             services.push({
                 id: serviceId,
                 type: 'DIDCommMessaging',
-                serviceEndpoint,
+                serviceEndpoint: { uri: endpoint, accept: ['didcomm/v2'], routingKeys: routingKeys ?? [] },
             });
         }
 

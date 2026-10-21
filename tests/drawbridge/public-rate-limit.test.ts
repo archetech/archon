@@ -126,6 +126,19 @@ describe('public rate limit middleware', () => {
         expect(keys).toContain('didcomm:deposit:global');
     });
 
+    // The published DIDComm uri is the mount itself, and spec-following
+    // senders deposit there rather than at /api/v1/messages.
+    it('charges a POST to the surface root as a deposit', async () => {
+        const { store, keys } = countingStore();
+        const app = mount(store);
+
+        await request(app).get('/didcomm');
+        await request(app).post('/didcomm').send({ message: 'hello' });
+        await request(app).post('/didcomm/').send({ message: 'hello' });
+
+        expect(keys).toEqual(['didcomm:read:global', 'didcomm:deposit:global', 'didcomm:deposit:global']);
+    });
+
     it('keys a real public source separately, in addition to the global bucket', async () => {
         const { store, keys } = countingStore();
         const app = express();

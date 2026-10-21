@@ -80,8 +80,16 @@ export function isMeaningfulSource(ip: string): boolean {
     return true;
 }
 
+// The DIDComm relay stores an envelope POSTed to its messages route or to its
+// base, the published uri that spec-following senders deliver to. Classify the
+// path the relay will see: the proxy rebuilds the URL, which resolves dot
+// segments, encoded ones (`%2e`) included, that req.path still carries.
 function defaultIsDeposit(req: Request): boolean {
-    return req.method === 'POST' && /\/messages\/?$/.test(req.path);
+    if (req.method !== 'POST') {
+        return false;
+    }
+    const path = new URL(req.path, 'http://upstream').pathname;
+    return path === '/' || /\/messages\/?$/.test(path);
 }
 
 // Body parsers run before this middleware, so the parsed body is the honest
