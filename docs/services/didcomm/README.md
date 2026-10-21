@@ -446,6 +446,15 @@ SIGTERM/SIGINT closes the HTTP listener; the Redis backend disconnects on
 - **Tor / NAT.** Because the recipient *pulls* its mail (it never needs an
   inbound connection), the relay works for offline/NAT'd agents and pairs
   naturally with a Tor hidden service.
+- **didcomm-rust agents and assertion keys.** didcomm-rust, and the agents
+  built on it (`didcomm-node`, the DIF DIDComm demo, Credo-compatible
+  consumers, didcomm-python), cannot parse a DID document that contains a
+  `Multikey` verification method, which `publish-assertion-key` adds for
+  `eddsa-jcs-2022` credentials. They fail to resolve the whole document, so they
+  cannot message that identity. Keep an identity that must be reachable from
+  them free of an assertion key, and issue credentials from a separate
+  identity. See *Known limitation: didcomm-rust* in
+  [`docs/scheme.md`](../../scheme.md).
 
 ---
 
