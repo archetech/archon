@@ -65,6 +65,7 @@ the inbound envelope, which is `application/didcomm-encrypted+json`
 | Method | Path | Notes |
 | --- | --- | --- |
 | `POST` | `/api/v1/messages` | Store an encrypted envelope for its recipient(s). |
+| `POST` | `/` | The same, at the relay's base. A published `DIDCommMessaging` uri is the base, and a sender following the DIDComm v2 spec posts to it as-is. |
 
 Request body, accepted in three forms (in priority order):
 
@@ -296,7 +297,8 @@ load:
 | `ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_GLOBAL_BYTES` | 64 MB | bytes, whole surface |
 | `ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW` | 60s | window for all four |
 
-**Deposits are budgeted in bytes, not requests.** A request ceiling loose
+**Deposits are budgeted in bytes, not requests.** A deposit is a `POST` to
+`/didcomm/api/v1/messages` or to `/didcomm` itself. A request ceiling loose
 enough for normal traffic still permits a couple of dozen max-size
 envelopes, and a couple of dozen is all it takes to fill the storage cap —
 a request count is simply not the resource being consumed. Reads
@@ -430,8 +432,11 @@ SIGTERM/SIGINT closes the HTTP listener; the Redis backend disconnects on
   proxies the relay at `/didcomm` (`ARCHON_DIDCOMM_URL`, default
   `http://didcomm:4236`), so a node can expose a single public endpoint.
   A DID advertises its mailbox by publishing a `DIDCommMessaging` service
-  endpoint (via `publishDidComm`) pointing at that public URL; `sendDidComm`
-  posts to `<endpoint>/api/v1/messages`. `publishDidComm` with no explicit
+  endpoint (via `publishDidComm`) pointing at that public URL, always in the
+  DIDComm v2 object form `{ uri, accept: ["didcomm/v2"], routingKeys }`;
+  didcomm-rust and the agents built on it reject a bare-string endpoint.
+  `sendDidComm` posts to `<endpoint>/api/v1/messages`; other senders post to
+  the uri itself, which the relay accepts at its base. `publishDidComm` with no explicit
   endpoint auto-discovers the endpoint from the gateway
   (`GET /api/v1/didcomm-endpoint`), the same way `publishLightning` learns its
   public host: it uses `<ARCHON_DRAWBRIDGE_PUBLIC_HOST>/didcomm`, falling back to

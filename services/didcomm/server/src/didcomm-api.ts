@@ -54,7 +54,7 @@ export function createApp(deps: AppDeps): Express {
 
     // Inbound delivery — anyone may deliver an (encrypted) envelope. Routed to
     // the recipient mailbox(es) by the JWE recipient kids.
-    v1.post('/messages', async (req, res) => {
+    const deposit = async (req: express.Request, res: express.Response) => {
         try {
             let packed: string;
             if (typeof req.body === 'string') {
@@ -107,7 +107,13 @@ export function createApp(deps: AppDeps): Express {
             }
             res.status(400).send({ error: error.toString() });
         }
-    });
+    };
+
+    v1.post('/messages', deposit);
+
+    // The published DIDCommMessaging uri is the relay's base, and a sender
+    // following the spec POSTs the envelope to it as-is.
+    app.post('/', deposit);
 
     // Single-use challenge for proving DID control on fetch/remove.
     v1.get('/challenge', async (_req, res) => {
