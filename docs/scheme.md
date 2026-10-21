@@ -881,7 +881,18 @@ The registered Ed25519 suite ([W3C vc-di-eddsa][vc-di-eddsa]), implemented as
 specified, so a conforming verifier can check an Archon credential without
 knowing anything about Archon. It requires a `Multikey` verification method with
 `publicKeyMultibase`; Archon publishes one at the `#key-assertion-1` fragment,
-listed under both `assertionMethod` and `authentication`.
+listed under both `assertionMethod` and `authentication`. Publishing it is opt-in
+(`publish-assertion-key`).
+
+**Known limitation: didcomm-rust.** didcomm-rust, and the agents built on it
+(`didcomm-node`, the DIF DIDComm demo, Credo-compatible consumers,
+didcomm-python), parse DID documents into a closed set of verification method
+types that does not include `Multikey`. A document containing any `Multikey`
+method fails to parse as a whole, so those agents cannot send DIDComm messages
+to an identity that has published an assertion key, even though its
+key-agreement key is a supported type. An identity that must be reachable from
+didcomm-rust agents should not publish an assertion key; issue `eddsa-jcs-2022`
+credentials from a separate identity instead.
 
 The signed payload is `SHA-256(JCS(proof configuration)) || SHA-256(JCS(unsecured
 document))`, where the proof configuration is the proof without `proofValue` and
