@@ -116,6 +116,19 @@ def test_did_key_roundtrip():
     assert resolved["publicJwk"]["x"] == BOB["publicJwk"]["x"]
 
 
+def test_normalize_rejects_wrong_length_multibase_key():
+    # A did:peer:2 copies its key material verbatim, so a well-formed base58
+    # string with a valid codec prefix but a short payload can reach here.
+    import pytest
+    from bip_utils import Base58Encoder
+
+    short_x25519 = "z" + Base58Encoder.Encode(bytes([0xec, 0x01]) + bytes([7] * 31))
+    short_ed25519 = "z" + Base58Encoder.Encode(bytes([0xed, 0x01]) + bytes([7] * 31))
+    for multibase in (short_x25519, short_ed25519, "z1"):
+        with pytest.raises(ValueError, match="key material"):
+            dc.normalize_x25519_public_key({"publicKeyMultibase": multibase})
+
+
 def test_did_key_ed25519_w3c_vector():
     # W3C did:key test vector: z6Mk… (Ed25519) -> z6LS… (derived X25519 key agreement).
     did = "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"

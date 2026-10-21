@@ -470,6 +470,12 @@ function x25519MultibaseToBytes(multibase: string): Uint8Array {
         throw new Error('Unsupported multibase key material');
     }
     const key = decoded.slice(2);
+    // Both codecs carry a 32-byte key. A multibase can be well-formed base58 with
+    // a valid prefix yet a wrong-length payload (e.g. a did:peer:2 copies its key
+    // material verbatim); reject it here rather than feed a short key into ECDH.
+    if (key.length !== 32) {
+        throw new Error('Unsupported multibase key material');
+    }
     if (decoded[0] === MULTICODEC_X25519_PUB) {
         return key;
     }

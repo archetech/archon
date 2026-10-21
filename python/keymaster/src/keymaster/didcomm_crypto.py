@@ -561,6 +561,11 @@ def _x25519_multibase_to_bytes(multibase: str) -> bytes:
     if len(decoded) < 3 or decoded[1] != 0x01:
         raise ValueError("Unsupported multibase key material")
     key = decoded[2:]
+    # Both codecs carry a 32-byte key. A multibase can be well-formed base58 with
+    # a valid prefix yet a wrong-length payload (e.g. a did:peer:2 copies its key
+    # material verbatim); reject it here rather than feed a short key into ECDH.
+    if len(key) != 32:
+        raise ValueError("Unsupported multibase key material")
     if decoded[0] == _MULTICODEC_X25519_PUB:
         return key
     if decoded[0] == _MULTICODEC_ED25519_PUB:

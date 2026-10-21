@@ -1,4 +1,5 @@
 import CipherNode from '@didcid/cipher/node';
+import { base58btc } from 'multiformats/bases/base58';
 import {
     aesKeyWrap,
     aesKeyUnwrap,
@@ -207,6 +208,17 @@ describe('did:key resolution (cross-method)', () => {
 
     it('rejects non-X25519 JWK material', () => {
         expect(() => normalizeX25519PublicKey({ publicKeyJwk: { kty: 'EC', crv: 'secp256k1', x: 'a', y: 'b' } })).toThrow();
+    });
+
+    it('rejects multibase key material of the wrong length', () => {
+        // A did:peer:2 copies its key material verbatim, so a well-formed base58
+        // string with a valid codec prefix but a short payload can reach here.
+        const shortX25519 = base58btc.encode(new Uint8Array([0xec, 0x01, ...new Uint8Array(31).fill(7)]));
+        const shortEd25519 = base58btc.encode(new Uint8Array([0xed, 0x01, ...new Uint8Array(31).fill(7)]));
+        expect(() => normalizeX25519PublicKey({ publicKeyMultibase: shortX25519 })).toThrow(/key material/);
+        expect(() => normalizeX25519PublicKey({ publicKeyMultibase: shortEd25519 })).toThrow(/key material/);
+        // too few bytes to even carry a prefix
+        expect(() => normalizeX25519PublicKey({ publicKeyMultibase: 'z1' })).toThrow(/key material/);
     });
 });
 
