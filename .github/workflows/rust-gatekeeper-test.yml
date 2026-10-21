@@ -23,7 +23,11 @@ jobs:
     container: rust:1.90-trixie
     services:
       mongodb:
-        image: mongo:8.0
+        # The runner's Ubuntu kernel (7.0.0-*-azure) carries the upstream 7.0.14
+        # rseq fix, but mongod 8.0.34 and earlier read the version from uname and
+        # refuse to start (SERVER-121912, SERVER-136848). 8.0.35 fixes the check
+        # (SERVER-131779); return to mongo:8.0 once that image is published.
+        image: mongo:8.2.12
         options: >-
           --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1}).ok'"
           --health-interval 5s
