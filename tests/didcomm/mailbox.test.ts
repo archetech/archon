@@ -250,10 +250,10 @@ describe('deposit route capacity', () => {
 
         try {
             const { app } = appWithEgress();
-            const response = await deliver(app, 'https://192.168.0.255');
+            const response = await deliver(app, 'https://192.168.0.255/didcomm');
 
             expect(response.status).toBe(200);
-            expect(attempted).toEqual(['https://192.168.0.255/api/v1/messages']);
+            expect(attempted).toEqual(['https://192.168.0.255/didcomm']);
         }
         finally {
             globalThis.fetch = realFetch;
@@ -328,10 +328,10 @@ describe('deposit route capacity', () => {
 
         try {
             const { app } = appWithEgress({ allowInsecureEgress: true });
-            const response = await deliver(app, 'http://127.0.0.1:4236');
+            const response = await deliver(app, 'http://127.0.0.1:4236/didcomm');
 
             expect(response.status).toBe(200);
-            expect(attempted).toEqual(['http://127.0.0.1:4236/api/v1/messages']);
+            expect(attempted).toEqual(['http://127.0.0.1:4236/didcomm']);
         }
         finally {
             globalThis.fetch = realFetch;

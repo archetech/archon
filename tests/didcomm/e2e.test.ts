@@ -139,6 +139,43 @@ describe('DIDComm relay end-to-end', () => {
         expect(received[0].message.body).toEqual(body);
     });
 
+    // A non-Archon mailbox serves only the uri it publishes; DIDComm v2 senders
+    // POST the envelope there as-is (#1419).
+    it('delivers to a non-Archon mailbox at its published uri', async () => {
+        const received: Array<{ path: string; contentType?: string; body: string }> = [];
+        const foreign = express();
+        foreign.use(express.text({ type: '*/*' }));
+        foreign.post('/mediator/inbox', (req, res) => {
+            received.push({ path: req.originalUrl, contentType: req.headers['content-type'], body: req.body });
+            res.status(202).end();
+        });
+        foreign.use((_req, res) => { res.status(404).end(); });
+        const foreignServer = await new Promise<Server>(resolve => {
+            const s = foreign.listen(0, () => resolve(s));
+        });
+
+        try {
+            await keymaster.createId('Alice');
+            const bobDid = await keymaster.createId('Bob');
+            await keymaster.publishDidComm(endpoint, 'Alice');
+            const foreignUri = `http://localhost:${(foreignServer.address() as any).port}/mediator/inbox`;
+            await keymaster.publishDidComm(foreignUri, 'Bob');
+
+            await keymaster.sendDidComm({ type: 'https://x/1/msg', body: { text: 'to a foreign mailbox' } }, bobDid, { name: 'Alice' });
+
+            expect(received).toHaveLength(1);
+            expect(received[0].path).toBe('/mediator/inbox');
+            expect(received[0].contentType).toMatch(/application\/didcomm-encrypted\+json/);
+            expect(JSON.parse(received[0].body).recipients[0].header.kid).toMatch(/^did:/);
+        }
+        finally {
+            await new Promise<void>(resolve => {
+                foreignServer.close(() => resolve());
+                foreignServer.closeAllConnections?.();
+            });
+        }
+    });
+
     it('leaves messages in the mailbox when ack is false', async () => {
         const bobDid = await keymaster.createId('Bob');
         await keymaster.createId('Alice');

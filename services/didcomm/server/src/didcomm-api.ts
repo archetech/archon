@@ -241,11 +241,12 @@ export function createApp(deps: AppDeps): Express {
                 fetchOptions.dispatcher = socksDispatcher({ type: 5, host: host || 'localhost', port: parseInt(port || '9050', 10) });
             }
 
-            const target = `${endpoint.replace(/\/+$/, '')}/api/v1/messages`;
+            // DIDComm v2 delivers to the recipient's published uri as-is. Archon
+            // relays accept it at their base, like any other mediator.
             // Only the SOCKS-dispatched path needs undici's fetch; clearnet stays
             // on the built-in one, which the rest of the service uses.
             const doFetch = fetchOptions.dispatcher ? socksEgress.fetch : fetch;
-            const response = await doFetch(target, fetchOptions);
+            const response = await doFetch(endpoint, fetchOptions);
             if (response.status >= 300 && response.status < 400) {
                 // Say what happened: a bare "failed: 307" reads like the recipient
                 // is broken rather than like a rule we enforce.

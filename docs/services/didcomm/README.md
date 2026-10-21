@@ -155,7 +155,8 @@ and `express.json` are both capped at `ARCHON_DIDCOMM_UPLOAD_LIMIT`
 ### 2.7 Outbound delivery (DID-control auth)
 
 `POST /api/v1/deliver` takes `{ did, challenge, signature, endpoint, message }`
-and forwards the opaque envelope to `<endpoint>/api/v1/messages`. This is the
+and POSTs the opaque envelope to `endpoint` as-is, the recipient's published
+`DIDCommMessaging` uri, as DIDComm v2 specifies. This is the
 single egress path: the keymaster performs crypto only and never dials
 recipients itself, which is what lets a browser wallet reach a `.onion`
 recipient. Destinations ending in `.onion` are dialled through the SOCKS proxy
@@ -435,8 +436,8 @@ SIGTERM/SIGINT closes the HTTP listener; the Redis backend disconnects on
   endpoint (via `publishDidComm`) pointing at that public URL, always in the
   DIDComm v2 object form `{ uri, accept: ["didcomm/v2"], routingKeys }`;
   didcomm-rust and the agents built on it reject a bare-string endpoint.
-  `sendDidComm` posts to `<endpoint>/api/v1/messages`; other senders post to
-  the uri itself, which the relay accepts at its base. `publishDidComm` with no explicit
+  Senders, `sendDidComm` included, post to the uri itself, which the relay
+  accepts at its base. `publishDidComm` with no explicit
   endpoint auto-discovers the endpoint from the gateway
   (`GET /api/v1/didcomm-endpoint`), the same way `publishLightning` learns its
   public host: it uses `<ARCHON_DRAWBRIDGE_PUBLIC_HOST>/didcomm`, falling back to
