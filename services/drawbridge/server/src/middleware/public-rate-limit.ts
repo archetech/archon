@@ -80,8 +80,10 @@ export function isMeaningfulSource(ip: string): boolean {
     return true;
 }
 
+// The DIDComm relay stores an envelope POSTed to its messages route or to its
+// base, the published uri that spec-following senders deliver to.
 function defaultIsDeposit(req: Request): boolean {
-    return req.method === 'POST' && /\/messages\/?$/.test(req.path);
+    return req.method === 'POST' && (req.path === '/' || /\/messages\/?$/.test(req.path));
 }
 
 // Body parsers run before this middleware, so the parsed body is the honest

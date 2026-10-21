@@ -131,7 +131,7 @@ describe('publishDidComm', () => {
         expect(doc.didDocument?.service).toContainEqual({
             id: `${did}#didcomm`,
             type: 'DIDCommMessaging',
-            serviceEndpoint: endpoint,
+            serviceEndpoint: { uri: endpoint, accept: ['didcomm/v2'], routingKeys: [] },
         });
     });
 
@@ -147,7 +147,7 @@ describe('publishDidComm', () => {
         expect(doc.didDocument?.service).toContainEqual({
             id: `${did}#didcomm`,
             type: 'DIDCommMessaging',
-            serviceEndpoint: 'https://node.example/didcomm',
+            serviceEndpoint: { uri: 'https://node.example/didcomm', accept: ['didcomm/v2'], routingKeys: [] },
         });
     });
 

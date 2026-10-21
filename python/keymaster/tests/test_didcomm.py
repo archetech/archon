@@ -151,6 +151,34 @@ def test_credential_and_presentation_builders():
     assert pres["thid"] == "req-1" and p.attached_json(pres) == vp
 
 
+def test_publish_didcomm_advertises_the_object_service_endpoint(testbed):
+    # didcomm-rust and the senders built on it reject a bare-string
+    # serviceEndpoint, so the object form is published with or without routing.
+    from .helpers import run
+
+    km = testbed.keymaster
+    did = run(km.create_id("Alice", {"registry": "local"}))
+    endpoint = "https://relay.example/didcomm"
+
+    def service():
+        doc = run(km.resolve_did(did))["didDocument"]
+        return [s for s in doc["service"] if s["id"] == f"{did}#didcomm"]
+
+    run(km.publish_didcomm(endpoint))
+    assert service() == [{
+        "id": f"{did}#didcomm",
+        "type": "DIDCommMessaging",
+        "serviceEndpoint": {"uri": endpoint, "accept": ["didcomm/v2"], "routingKeys": []},
+    }]
+
+    run(km.publish_didcomm(endpoint, routing_keys=["did:test:mediator#key-agreement-1"]))
+    assert service()[0]["serviceEndpoint"] == {
+        "uri": endpoint,
+        "accept": ["didcomm/v2"],
+        "routingKeys": ["did:test:mediator#key-agreement-1"],
+    }
+
+
 def test_send_didcomm_requires_a_node_gateway():
     # A gatekeeper with no `url` (and no override) means no node gateway to reach
     # the DIDComm service -> send_didcomm errors before any network/crypto work.
