@@ -311,7 +311,7 @@ is the single egress point (and the only component with Tor access). The split:
 - *didcomm service = transport* — `POST /api/v1/deliver` (reached via Drawbridge's `/didcomm`
   mount, which already proxies it; authenticated by a **signed challenge** proving the sender
   controls a DID; SSRF-guarded — clearnet must be https + non-private) delivers the opaque envelope
-  to `<endpoint>/api/v1/messages`, dialing `.onion` over a SOCKS5 Tor proxy (`fetch-socks` →
+  to the recipient's published uri as-is, dialing `.onion` over a SOCKS5 Tor proxy (`fetch-socks` →
   `ARCHON_DIDCOMM_TOR_PROXY`, default `tor:9050`, the lightning-mediator pattern).
 
 A node URL is **required** — `sendDidComm` with no gateway to reach is a hard error; there is **no
