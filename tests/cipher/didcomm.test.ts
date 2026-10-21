@@ -10,6 +10,7 @@ import {
     unpackDidCommMessage,
     getEnvelopeInfo,
     didKeyToX25519,
+    resolveDidPeer2,
     normalizeX25519PublicKey,
     wrapForward,
     parseForward,
@@ -206,6 +207,65 @@ describe('did:key resolution (cross-method)', () => {
 
     it('rejects non-X25519 JWK material', () => {
         expect(() => normalizeX25519PublicKey({ publicKeyJwk: { kty: 'EC', crv: 'secp256k1', x: 'a', y: 'b' } })).toThrow();
+    });
+});
+
+describe('did:peer:2 resolution', () => {
+    // The example in the peer DID method specification, Method 2.
+    const SPEC_DID = 'did:peer:2.Vz6Mkj3PUd1WjvaDhNZhhhXQdz5UnZXmS7ehtx8bsPpD47kKc.Ez6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHA6Ly9leGFtcGxlLmNvbS9kaWRjb21tIiwiYSI6WyJkaWRjb21tL3YyIl0sInIiOlsiZGlkOmV4YW1wbGU6MTIzNDU2Nzg5YWJjZGVmZ2hpI2tleS0xIl19fQ.SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHA6Ly9leGFtcGxlLmNvbS9hbm90aGVyIiwiYSI6WyJkaWRjb21tL3YyIl0sInIiOlsiZGlkOmV4YW1wbGU6MTIzNDU2Nzg5YWJjZGVmZ2hpI2tleS0yIl19fQ';
+
+    it('resolves the specification example', () => {
+        expect(resolveDidPeer2(SPEC_DID)).toEqual({
+            '@context': ['https://www.w3.org/ns/did/v1', 'https://w3id.org/security/multikey/v1'],
+            id: SPEC_DID,
+            verificationMethod: [
+                { id: '#key-1', controller: SPEC_DID, type: 'Multikey', publicKeyMultibase: 'z6Mkj3PUd1WjvaDhNZhhhXQdz5UnZXmS7ehtx8bsPpD47kKc' },
+                { id: '#key-2', controller: SPEC_DID, type: 'Multikey', publicKeyMultibase: 'z6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR' },
+            ],
+            authentication: ['#key-1'],
+            keyAgreement: ['#key-2'],
+            service: [
+                {
+                    type: 'DIDCommMessaging',
+                    serviceEndpoint: { uri: 'http://example.com/didcomm', accept: ['didcomm/v2'], routingKeys: ['did:example:123456789abcdefghi#key-1'] },
+                    id: '#service',
+                },
+                {
+                    type: 'DIDCommMessaging',
+                    serviceEndpoint: { uri: 'http://example.com/another', accept: ['didcomm/v2'], routingKeys: ['did:example:123456789abcdefghi#key-2'] },
+                    id: '#service-1',
+                },
+            ],
+        });
+    });
+
+    it('ignores a fragment or query on the DID', () => {
+        expect(resolveDidPeer2(`${SPEC_DID}#key-2`).id).toBe(SPEC_DID);
+    });
+
+    it('maps every purpose code to its relationship, numbering keys in DID order', () => {
+        const key = 'z6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR';
+        const doc = resolveDidPeer2(`did:peer:2.A${key}.E${key}.V${key}.I${key}.D${key}`);
+        expect(doc.assertionMethod).toEqual(['#key-1']);
+        expect(doc.keyAgreement).toEqual(['#key-2']);
+        expect(doc.authentication).toEqual(['#key-3']);
+        expect(doc.capabilityInvocation).toEqual(['#key-4']);
+        expect(doc.capabilityDelegation).toEqual(['#key-5']);
+        expect(doc.service).toBeUndefined();
+    });
+
+    it('keeps a service id the DID supplies', () => {
+        const service = Buffer.from(JSON.stringify({ id: '#didcomm', t: 'dm', s: 'https://example.com' })).toString('base64url');
+        const doc = resolveDidPeer2(`did:peer:2.Ez6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR.S${service}`);
+        expect(doc.service).toEqual([{ id: '#didcomm', type: 'DIDCommMessaging', serviceEndpoint: 'https://example.com' }]);
+    });
+
+    it('rejects malformed DIDs', () => {
+        expect(() => resolveDidPeer2('did:peer:0z6Mkj3PUd1WjvaDhNZhhhXQdz5UnZXmS7ehtx8bsPpD47kKc')).toThrow(/did:peer:2/);
+        expect(() => resolveDidPeer2('did:peer:2.Xz6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR')).toThrow(/Invalid/);
+        expect(() => resolveDidPeer2('did:peer:2.E6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR')).toThrow(/Invalid/);
+        expect(() => resolveDidPeer2('did:peer:2.Ez0OIl')).toThrow();
+        expect(() => resolveDidPeer2(`did:peer:2.S${Buffer.from('[1]').toString('base64url')}`)).toThrow(/not an object/);
     });
 });
 

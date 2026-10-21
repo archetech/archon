@@ -104,6 +104,7 @@ import {
     verifyJws,
     getEnvelopeInfo,
     didKeyToX25519,
+    resolveDidPeer2,
     normalizeX25519PublicKey,
     wrapForward,
     parseForward,
@@ -3143,7 +3144,10 @@ export default class Keymaster implements KeymasterInterface {
         if (refs.length === 0) {
             throw new KeymasterError('DID has no published keyAgreement key; call publishDidComm first');
         }
-        const kid = refs[0];
+        // A JWE recipient kid must be a whole DID URL; did:peer:2 references
+        // its methods relatively.
+        const did = doc.didDocument?.id;
+        const kid = did ? this.absoluteKeyId(refs[0], did) : refs[0];
         const vm = this.findVerificationMethod(doc, kid);
         if (!vm) {
             throw new KeymasterError('keyAgreement verification method not found');
@@ -3170,6 +3174,11 @@ export default class Keymaster implements KeymasterInterface {
                     verificationMethod: [{ id: kid, controller: did, type: 'JsonWebKey2020', publicKeyJwk: publicJwk }],
                 },
             };
+        }
+        // did:peer:2 is deterministic too, and universal resolvers often lack
+        // the driver for it.
+        if (did.startsWith('did:peer:2.')) {
+            return { didDocument: resolveDidPeer2(did) } as DidCidDocument;
         }
         return this.resolveDID(did);
     }

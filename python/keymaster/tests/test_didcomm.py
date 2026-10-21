@@ -9,6 +9,7 @@ the Python port interoperates byte-for-byte with the JS / reference library
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -120,6 +121,138 @@ def test_did_key_ed25519_w3c_vector():
     did = "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK"
     resolved = dc.did_key_to_x25519(did)
     assert resolved["kid"].endswith("z6LSj72tK8brWgZja8NLRwPigth2T9QRiG1uH9oKZuKjdh9p")
+
+
+# The example in the peer DID method specification, Method 2.
+PEER2_SPEC_DID = (
+    "did:peer:2.Vz6Mkj3PUd1WjvaDhNZhhhXQdz5UnZXmS7ehtx8bsPpD47kKc.Ez6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR"
+    ".SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHA6Ly9leGFtcGxlLmNvbS9kaWRjb21tIiwiYSI6WyJkaWRjb21tL3YyIl0sInIiOlsiZGlkOmV4YW1wbGU6MTIzNDU2Nzg5YWJjZGVmZ2hpI2tleS0xIl19fQ"
+    ".SeyJ0IjoiZG0iLCJzIjp7InVyaSI6Imh0dHA6Ly9leGFtcGxlLmNvbS9hbm90aGVyIiwiYSI6WyJkaWRjb21tL3YyIl0sInIiOlsiZGlkOmV4YW1wbGU6MTIzNDU2Nzg5YWJjZGVmZ2hpI2tleS0yIl19fQ"
+)
+
+
+def test_did_peer_2_spec_example():
+    assert dc.resolve_did_peer_2(PEER2_SPEC_DID) == {
+        "@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/multikey/v1"],
+        "id": PEER2_SPEC_DID,
+        "verificationMethod": [
+            {"id": "#key-1", "controller": PEER2_SPEC_DID, "type": "Multikey", "publicKeyMultibase": "z6Mkj3PUd1WjvaDhNZhhhXQdz5UnZXmS7ehtx8bsPpD47kKc"},
+            {"id": "#key-2", "controller": PEER2_SPEC_DID, "type": "Multikey", "publicKeyMultibase": "z6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR"},
+        ],
+        "authentication": ["#key-1"],
+        "keyAgreement": ["#key-2"],
+        "service": [
+            {
+                "type": "DIDCommMessaging",
+                "serviceEndpoint": {"uri": "http://example.com/didcomm", "accept": ["didcomm/v2"], "routingKeys": ["did:example:123456789abcdefghi#key-1"]},
+                "id": "#service",
+            },
+            {
+                "type": "DIDCommMessaging",
+                "serviceEndpoint": {"uri": "http://example.com/another", "accept": ["didcomm/v2"], "routingKeys": ["did:example:123456789abcdefghi#key-2"]},
+                "id": "#service-1",
+            },
+        ],
+    }
+    assert dc.resolve_did_peer_2(f"{PEER2_SPEC_DID}#key-2")["id"] == PEER2_SPEC_DID
+
+
+def test_did_peer_2_purposes_and_service_ids():
+    import base64
+    import json as jsonlib
+
+    key = "z6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR"
+    doc = dc.resolve_did_peer_2(f"did:peer:2.A{key}.E{key}.V{key}.I{key}.D{key}")
+    assert doc["assertionMethod"] == ["#key-1"]
+    assert doc["keyAgreement"] == ["#key-2"]
+    assert doc["authentication"] == ["#key-3"]
+    assert doc["capabilityInvocation"] == ["#key-4"]
+    assert doc["capabilityDelegation"] == ["#key-5"]
+    assert "service" not in doc
+
+    named = base64.urlsafe_b64encode(jsonlib.dumps({"id": "#didcomm", "t": "dm", "s": "https://example.com"}).encode()).decode().rstrip("=")
+    assert dc.resolve_did_peer_2(f"did:peer:2.E{key}.S{named}")["service"] == [
+        {"id": "#didcomm", "type": "DIDCommMessaging", "serviceEndpoint": "https://example.com"}
+    ]
+
+
+def test_did_peer_2_rejects_malformed_dids():
+    import base64
+    import pytest
+
+    with pytest.raises(ValueError, match="did:peer:2"):
+        dc.resolve_did_peer_2("did:peer:0z6Mkj3PUd1WjvaDhNZhhhXQdz5UnZXmS7ehtx8bsPpD47kKc")
+    with pytest.raises(ValueError, match="Invalid"):
+        dc.resolve_did_peer_2("did:peer:2.Xz6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR")
+    with pytest.raises(ValueError, match="Invalid"):
+        dc.resolve_did_peer_2("did:peer:2.E6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR")
+    with pytest.raises(Exception):
+        dc.resolve_did_peer_2("did:peer:2.Ez0OIl")
+    with pytest.raises(ValueError, match="not an object"):
+        dc.resolve_did_peer_2("did:peer:2.S" + base64.urlsafe_b64encode(b"[1]").decode().rstrip("="))
+
+
+def _foreign_did_peer_2(seed_byte: int) -> dict[str, Any]:
+    # A did:peer:2 agent (as the DIF demo, Credo and Aries mediators use), whose
+    # X25519 keypair we hold. Its key-agreement key is #key-1, the only key.
+    kp = dc.generate_x25519_jwk(bytes([seed_byte] * 32))
+    did = "did:peer:2.E" + dc.x25519_jwk_to_did_key(kp["publicJwk"])[len("did:key:"):]
+    return {"did": did, "kid": f"{did}#key-1", "kp": kp}
+
+
+def test_unpack_didcomm_from_did_peer_2_without_the_gatekeeper(testbed, monkeypatch):
+    import json as jsonlib
+    from .helpers import run
+
+    km = testbed.keymaster
+    alice_did = run(km.create_id("Alice", {"registry": "local"}))
+    run(km.publish_didcomm("https://relay.example/didcomm", "Alice"))
+    alice_doc = run(km.resolve_did(alice_did))["didDocument"]
+    alice_ka_id = alice_doc["keyAgreement"][0]
+    alice_ka = next(vm for vm in alice_doc["verificationMethod"] if vm["id"] == alice_ka_id)
+
+    peer = _foreign_did_peer_2(0x51)
+    message = {"id": "p1", "typ": "application/didcomm-plain+json", "type": "https://x/1/msg",
+               "from": peer["did"], "to": [alice_did], "body": {"text": "peer hello"}}
+    packed = dc.pack_encrypted(
+        jsonlib.dumps(message).encode(),
+        [{"kid": alice_ka_id, "publicJwk": alice_ka["publicKeyJwk"]}],
+        {"kid": peer["kid"], "privateJwk": peer["kp"]["privateJwk"]},
+        "A256CBC-HS512",
+    )
+
+    # A gatekeeper (or its universal resolver) without a did:peer driver.
+    from keymaster.core import KeymasterError
+
+    resolve_did = km.resolve_did
+
+    async def no_peer_driver(did, *args, **kwargs):
+        if did.startswith("did:peer:"):
+            raise KeymasterError("unsupported DID method")
+        return await resolve_did(did, *args, **kwargs)
+
+    monkeypatch.setattr(km, "resolve_did", no_peer_driver)
+
+    result = run(km.unpack_didcomm(packed, {"name": "Alice"}))
+    assert result["message"]["body"] == {"text": "peer hello"}
+    assert result["metadata"]["authenticated"] is True
+    assert result["metadata"]["sender"] == peer["kid"]
+
+
+def test_pack_didcomm_to_did_peer_2_addresses_the_absolute_kid(testbed):
+    import json as jsonlib
+    from .helpers import run
+
+    km = testbed.keymaster
+    run(km.create_id("Alice", {"registry": "local"}))
+    run(km.publish_didcomm("https://relay.example/didcomm", "Alice"))
+    peer = _foreign_did_peer_2(0x52)
+
+    packed = run(km.pack_didcomm({"type": "https://x/1/msg", "body": {"text": "reply"}}, peer["did"], {"name": "Alice", "anoncrypt": True}))
+
+    assert [r["header"]["kid"] for r in jsonlib.loads(packed)["recipients"]] == [peer["kid"]]
+    plaintext, _ = dc.unpack_encrypted(packed, {"kid": peer["kid"], "privateJwk": peer["kp"]["privateJwk"]})
+    assert jsonlib.loads(plaintext)["body"] == {"text": "reply"}
 
 
 # --- protocol builders -------------------------------------------------------

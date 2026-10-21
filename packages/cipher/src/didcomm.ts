@@ -504,6 +504,98 @@ export function didKeyToX25519(did: string): { kid: string; publicJwk: OkpJwkPub
     return { kid: `${base}#${fragment}`, publicJwk: { kty: 'OKP', crv: 'X25519', x: b64uEncode(x25519Key) } };
 }
 
+const DID_PEER_2_RELATIONSHIPS: Record<string, string> = {
+    A: 'assertionMethod',
+    E: 'keyAgreement',
+    V: 'authentication',
+    I: 'capabilityInvocation',
+    D: 'capabilityDelegation',
+};
+
+const DID_PEER_2_KEY_NAMES: Record<string, string> = { t: 'type', s: 'serviceEndpoint', r: 'routingKeys', a: 'accept' };
+
+// Abbreviations apply to key names at any depth, and to the service type value.
+function expandDidPeer2Names(value: unknown): unknown {
+    if (Array.isArray(value)) {
+        return value.map(expandDidPeer2Names);
+    }
+    if (value && typeof value === 'object') {
+        return Object.fromEntries(Object.entries(value).map(([key, item]) =>
+            [DID_PEER_2_KEY_NAMES[key] ?? key, expandDidPeer2Names(item)]));
+    }
+    return value;
+}
+
+export interface DidPeer2Document {
+    '@context': string[];
+    id: string;
+    verificationMethod: Array<{ id: string; type: string; controller: string; publicKeyMultibase: string }>;
+    service?: Array<Record<string, unknown>>;
+    [relationship: string]: unknown;
+}
+
+/**
+ * Resolve a `did:peer:2` to its DID document, as the peer DID method
+ * specification defines it: keys become `Multikey` methods `#key-1`, `#key-2`,
+ * ... in DID order, each referenced from its purpose's relationship, and
+ * services are decoded with their abbreviations expanded.
+ */
+export function resolveDidPeer2(did: string): DidPeer2Document {
+    const base = did.split(/[?#]/)[0];
+    if (!base.startsWith('did:peer:2.')) {
+        throw new Error('Not a did:peer:2');
+    }
+
+    const doc: DidPeer2Document = {
+        '@context': ['https://www.w3.org/ns/did/v1', 'https://w3id.org/security/multikey/v1'],
+        id: base,
+        verificationMethod: [],
+    };
+    const services: Array<Record<string, unknown>> = [];
+
+    for (const element of base.slice('did:peer:2.'.length).split('.')) {
+        const purpose = element.charAt(0);
+        const value = element.slice(1);
+
+        if (purpose === 'S') {
+            const json = new TextDecoder().decode(b64uDecode(value.replace(/=+$/, '')));
+            const service = expandDidPeer2Names(JSON.parse(json)) as Record<string, unknown>;
+            if (!service || typeof service !== 'object' || Array.isArray(service)) {
+                throw new Error('did:peer:2 service is not an object');
+            }
+            if (service.type === 'dm') {
+                service.type = 'DIDCommMessaging';
+            }
+            services.push(service);
+            continue;
+        }
+
+        const relationship = DID_PEER_2_RELATIONSHIPS[purpose];
+        if (!relationship || !value.startsWith('z')) {
+            throw new Error(`Invalid did:peer:2 element: ${element}`);
+        }
+        base58btc.decode(value); // throws on malformed key material
+
+        const id = `#key-${doc.verificationMethod.length + 1}`;
+        doc.verificationMethod.push({ id, type: 'Multikey', controller: base, publicKeyMultibase: value });
+        doc[relationship] = [...((doc[relationship] as string[] | undefined) ?? []), id];
+    }
+
+    // Services without an id are #service, then #service-1, #service-2, ...
+    let unnamed = 0;
+    for (const service of services) {
+        if (service.id === undefined) {
+            service.id = unnamed === 0 ? '#service' : `#service-${unnamed}`;
+            unnamed++;
+        }
+    }
+    if (services.length > 0) {
+        doc.service = services;
+    }
+
+    return doc;
+}
+
 /**
  * Normalize a DID-document verification method's key material to an X25519 JWK,
  * accepting `publicKeyJwk` (OKP/X25519) or `publicKeyMultibase` (X25519 or

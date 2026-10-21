@@ -384,6 +384,69 @@ describe('packDidComm / unpackDidComm (cross-method: Archon did:cid <-> did:key)
     });
 });
 
+describe('packDidComm / unpackDidComm (cross-method: Archon did:cid <-> did:peer:2)', () => {
+    const body = { text: 'peer hello' };
+
+    // A did:peer:2 agent (as the DIF demo, Credo and Aries mediators use), whose
+    // X25519 keypair we hold. Its key-agreement key is #key-1, the only key.
+    function foreignDidPeer2(seedByte: number) {
+        const kp = cipher.generateX25519Jwk(new Uint8Array(32).fill(seedByte));
+        const multibase = x25519JwkToDidKey(kp.publicJwk).slice('did:key:'.length);
+        const did = `did:peer:2.E${multibase}`;
+        return { did, kid: `${did}#key-1`, kp };
+    }
+
+    it('did:peer:2 -> Archon (authcrypt): decrypts without asking the gatekeeper', async () => {
+        await keymaster.createId('Alice');
+        await keymaster.publishDidComm(undefined, 'Alice');
+
+        const aliceDoc = await keymaster.resolveDID('Alice');
+        const aliceKaId = aliceDoc.didDocument!.keyAgreement![0];
+        const aliceKaVm = aliceDoc.didDocument!.verificationMethod!.find(v => v.id === aliceKaId)!;
+
+        const peer = foreignDidPeer2(0x51);
+        const message = { id: 'p1', typ: 'application/didcomm-plain+json', type: 'https://x/1/msg', from: peer.did, to: [aliceDoc.didDocument!.id], body };
+        const packed = packEncrypted(
+            new TextEncoder().encode(JSON.stringify(message)),
+            [{ kid: aliceKaId, publicJwk: aliceKaVm.publicKeyJwk as any }],
+            { kid: peer.kid, privateJwk: peer.kp.privateJwk },
+            'A256CBC-HS512',
+        );
+
+        // A gatekeeper (or its universal resolver) without a did:peer driver.
+        const resolveDID = gatekeeper.resolveDID.bind(gatekeeper);
+        const spy = jest.spyOn(gatekeeper, 'resolveDID').mockImplementation(async (did, options) => {
+            if (did?.startsWith('did:peer:')) {
+                throw new Error('unsupported DID method');
+            }
+            return resolveDID(did, options);
+        });
+
+        try {
+            const { message: out, metadata } = await keymaster.unpackDidComm(packed, { name: 'Alice' });
+            expect(out.body).toEqual(body);
+            expect(metadata.authenticated).toBe(true);
+            expect(metadata.sender).toBe(peer.kid);
+            expect(spy.mock.calls.some(([did]) => did?.startsWith('did:peer:'))).toBe(false);
+        }
+        finally {
+            spy.mockRestore();
+        }
+    });
+
+    it('Archon -> did:peer:2: addresses the absolute key-agreement kid', async () => {
+        await keymaster.createId('Alice');
+        await keymaster.publishDidComm(undefined, 'Alice');
+        const peer = foreignDidPeer2(0x52);
+
+        const packed = await keymaster.packDidComm({ type: 'https://x/1/msg', body }, peer.did, { name: 'Alice', anoncrypt: true });
+
+        expect(JSON.parse(packed).recipients.map((r: any) => r.header.kid)).toEqual([peer.kid]);
+        const { plaintext } = unpackEncrypted(packed, { kid: peer.kid, privateJwk: peer.kp.privateJwk });
+        expect(JSON.parse(new TextDecoder().decode(plaintext)).body).toEqual(body);
+    });
+});
+
 describe('authenticated sender binding', () => {
     // packDidComm already strips a caller-supplied `from` and sets it itself, so
     // the threat is a foreign agent: anyone may send us DIDComm, and an envelope

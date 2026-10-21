@@ -586,6 +586,76 @@ def did_key_to_x25519(did: str) -> dict[str, Any]:
     return {"kid": f"{base}#{fragment}", "publicJwk": {"kty": "OKP", "crv": "X25519", "x": b64url(x25519_key)}}
 
 
+_DID_PEER_2_RELATIONSHIPS = {
+    "A": "assertionMethod",
+    "E": "keyAgreement",
+    "V": "authentication",
+    "I": "capabilityInvocation",
+    "D": "capabilityDelegation",
+}
+
+_DID_PEER_2_KEY_NAMES = {"t": "type", "s": "serviceEndpoint", "r": "routingKeys", "a": "accept"}
+
+
+def _expand_did_peer_2_names(value: Any) -> Any:
+    # Abbreviations apply to key names at any depth, and to the service type value.
+    if isinstance(value, list):
+        return [_expand_did_peer_2_names(item) for item in value]
+    if isinstance(value, dict):
+        return {_DID_PEER_2_KEY_NAMES.get(key, key): _expand_did_peer_2_names(item) for key, item in value.items()}
+    return value
+
+
+def resolve_did_peer_2(did: str) -> dict[str, Any]:
+    """Resolve a did:peer:2 to its DID document, as the peer DID method
+    specification defines it: keys become Multikey methods #key-1, #key-2, ...
+    in DID order, each referenced from its purpose's relationship, and services
+    are decoded with their abbreviations expanded. Mirrors resolveDidPeer2 in
+    the TypeScript cipher."""
+    base = did.split("?")[0].split("#")[0]
+    if not base.startswith("did:peer:2."):
+        raise ValueError("Not a did:peer:2")
+
+    doc: dict[str, Any] = {
+        "@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/multikey/v1"],
+        "id": base,
+        "verificationMethod": [],
+    }
+    services: list[dict[str, Any]] = []
+
+    for element in base[len("did:peer:2."):].split("."):
+        purpose, value = element[:1], element[1:]
+
+        if purpose == "S":
+            service = _expand_did_peer_2_names(json.loads(ub64url(value.rstrip("="))))
+            if not isinstance(service, dict):
+                raise ValueError("did:peer:2 service is not an object")
+            if service.get("type") == "dm":
+                service["type"] = "DIDCommMessaging"
+            services.append(service)
+            continue
+
+        relationship = _DID_PEER_2_RELATIONSHIPS.get(purpose)
+        if not relationship or not value.startswith("z"):
+            raise ValueError(f"Invalid did:peer:2 element: {element}")
+        Base58Decoder.Decode(value[1:])  # raises on malformed key material
+
+        vm_id = f"#key-{len(doc['verificationMethod']) + 1}"
+        doc["verificationMethod"].append({"id": vm_id, "type": "Multikey", "controller": base, "publicKeyMultibase": value})
+        doc.setdefault(relationship, []).append(vm_id)
+
+    # Services without an id are #service, then #service-1, #service-2, ...
+    unnamed = 0
+    for service in services:
+        if "id" not in service:
+            service["id"] = "#service" if unnamed == 0 else f"#service-{unnamed}"
+            unnamed += 1
+    if services:
+        doc["service"] = services
+
+    return doc
+
+
 def normalize_x25519_public_key(vm: dict[str, Any]) -> dict[str, str]:
     jwk = vm.get("publicKeyJwk")
     if jwk:
