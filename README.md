@@ -29,7 +29,7 @@ Archon is governed by the [Archonomicon](https://github.com/archetech/archonomic
 Recommended system requirements:
 
 - GNU/Linux OS with [docker](https://www.docker.com/) for containerized operation
-- node 22.23.2 and npm 10.9.2 for manual and local operation
+- node 22.23.4 and npm 10.9.2 for manual and local operation
 - minimum of 8Gb RAM if operating a full trustless node
 
 ```
