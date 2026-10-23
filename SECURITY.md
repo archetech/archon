@@ -71,7 +71,7 @@ The cost is that the mnemonic is a **funds-bearing** secret, not only an identit
 
 Two operational consequences follow from the mediators fetching rather than holding the seed:
 
-- **`GET /api/v1/wallet/mnemonic` returns the decrypted mnemonic.** It sits behind the admin-key middleware, but that middleware **passes the request through when `ARCHON_ADMIN_API_KEY` is unset** — a deliberate development-mode behaviour that the Keymaster warns about at startup (`Warning: ARCHON_ADMIN_API_KEY is not set — admin routes are unprotected`). On a node reachable beyond localhost without that variable set, the mnemonic is readable by anyone who can reach the port. Set it.
+- **`GET /api/v1/wallet/mnemonic` returns the decrypted mnemonic.** It sits behind the admin-key middleware, which fails closed: both Keymaster ports refuse to start without `ARCHON_ADMIN_API_KEY`, and answer 403 if no key is configured. That makes the admin key equivalent to the mnemonic itself — anyone holding it can read the seed — so generate a long random key (`openssl rand -hex 32`) and keep it out of anything you would not put the seed phrase in.
 - **The plaintext mnemonic crosses the service boundary** on each fetch — at startup, and again on the metrics interval for backends that need it. Within a Docker network that is contained, but it means Keymaster's port is as sensitive as the wallet file itself, and exposing it beyond the compose network changes the threat model entirely.
 
 ### Nostr keys are the DID key in another format

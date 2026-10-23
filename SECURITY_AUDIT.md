@@ -8,6 +8,34 @@
 
 ---
 
+## Status on `main` — October 23, 2026
+
+The sections below describe the audited commit, `daf2c2ac`, and their file and line citations refer to that commit. This section records what has changed since, as verified against `main` @ `34192f66`.
+
+| ID | Status on `main` | Changed by |
+|----|------------------|------------|
+| C-01 | ✅ Fixed | #866 |
+| H-01 | ✅ Fixed: both Keymaster ports fail closed, refuse to start without a key, and compare it in constant time | #1048 |
+| H-02 | ✅ Key disclosure fixed in both ports: `/login` answers 403 when no passphrase is configured, and both services refuse to start without one. ⚠️ Still open: the TS service compares the passphrase with `!==`, and neither port rate-limits `/login` | #1048 |
+| H-03 | ❌ Still present: `cors()` with all origins on TS Keymaster and Gatekeeper, `CorsLayer` with `Any` on the Rust Gatekeeper | — |
+| H-04 | ⚠️ Changed: `sqlite3`, and the `node-gyp`/`tar` chain under it, are gone from the runtime tree (`node:sqlite`); `@hono/node-server` is now 2.x. `ip` remains a runtime dependency of `@didcid/ipfs` with no fixed release | #963 |
+| M-01 | ❌ Still present: `X-DID` is unauthenticated, and no service sets `trust proxy` | — |
+| M-02 | ❌ Still present: usage is still incremented on `finish`, after the check | — |
+| M-03 | ⚠️ Reduced, not fixed: 40 `error.toString()` sites (was 182), and Keymaster's shared error helper still sends raw error text; the Python service's exception handlers return `str(exc)` | #1111 |
+| M-04 | ❌ Still present: the webhook still fails open when the secret is unset, and the secret is still a query parameter | — |
+| M-05 | ⚠️ Partially fixed: `sample.env` now ships `CHANGE_ME` placeholders for `ARCHON_ADMIN_API_KEY` and `ARCHON_PASSPHRASE`, though nothing rejects the placeholder itself; the `bitcoin.conf` test-network credentials are unchanged | #1017, #1070 |
+| M-06 | ❌ Still present in both ports | — |
+| M-07 | ❌ Still present: `client.name` unescaped, no SRI on the CDN script | — |
+| L-01–L-04 | ❌ Still present (L-04 also applies to the Python Keymaster's `/metrics`) | — |
+| L-05 | ✅ Fixed: `/invoice/:did` is rate-limited | #1046 |
+| L-06 | ✅ Fixed for the admin key in both Keymaster ports. The TS `/login` passphrase comparison (H-02) and Herald's webhook secret comparison (M-04) are still not constant-time | #1048 |
+| L-07 | ❌ Still present (`apps/browser-extension/src/contentScript/contentScript.ts`) | — |
+| L-08 | ⚠️ Corrected: `.npmrc` already set `minimum-release-age` and Dependabot already had a cooldown at the audited commit, and `@capacitor/core` was `^7.4.4`, not an alpha; all services have since moved to Express 5 (#1024). `@noble/ciphers` is still 0.x | #1024 |
+
+Report anything new privately per [`SECURITY.md`](SECURITY.md).
+
+---
+
 ## Methodology & Tools (all outputs verified)
 
 | Tool | Version | Coverage | Result |
@@ -32,7 +60,7 @@ Positive: secrets hygiene is clean (zero real secrets in 1,992 commits), Drawbri
 | Severity | Count |
 |----------|-------|
 | 🔴 Critical | 1 (fixed — PR #866) |
-| 🟠 High | 4 (H-01 partially fixed — PR #868) |
+| 🟠 High | 4 (H-01 fixed — #868, #1048; H-02 key disclosure fixed — #1048) |
 | 🟡 Medium | 7 |
 | 🔵 Low | 8 |
 | ✅ Positive/Fixed | 9 |
@@ -79,7 +107,7 @@ The middleware chain (`createAuthMiddleware`) ran subscription-auth first on eve
 ### H-01: Admin auth fails open by default — Gatekeeper fixed, Keymaster outstanding
 
 **Severity:** 🟠 High (remaining: TS Keymaster, Python Keymaster)
-**Status:** ⚠️ Partially fixed — [PR #868](https://github.com/archetech/archon/pull/868), merged 2026-08-08, closed both Gatekeeper ports.
+**Status:** ✅ Fixed on `main`. [PR #868](https://github.com/archetech/archon/pull/868), merged 2026-08-08, closed both Gatekeeper ports; [PR #1048](https://github.com/archetech/archon/pull/1048), merged 2026-09-04, closed both Keymaster ports. The router-wide mount was kept and made fail-closed. The text below describes the audited commit.
 
 **Still fail-open:**
 - `services/keymaster/server/src/keymaster-admin.ts:11-16`
@@ -106,6 +134,7 @@ How far that reaches depends on the service's host binding, which differs:
 ### H-02: `/api/v1/login` discloses the admin API key when passphrase is unset
 
 **Severity:** 🟠 High on the Python service (fresh deployments); 🔵 Low (startup window only) on the TS service — see "Reachability" below
+**Status:** ✅ Key disclosure fixed on `main` by [PR #1048](https://github.com/archetech/archon/pull/1048): `/login` answers 403 when no passphrase is configured, and both services refuse to start without one, which also closes the TS startup window. ⚠️ Still open: the TS service compares the passphrase with `!==`, and neither port rate-limits `/login`. The text below describes the audited commit.
 **Locations:** `python/keymaster_service/src/keymaster_service/app.py:148-157`; same source shape in `services/keymaster/server/src/keymaster-public-router.ts:100-115`
 
 ```ts
@@ -144,6 +173,7 @@ Additionally, on both ports: passphrase comparison is non-constant-time (`!==` /
 ### H-04: Vulnerable dependencies in runtime paths
 
 **Severity:** 🟠 High
+**Status:** ⚠️ Changed on `main`: the `tar` chain came in through `sqlite3`, which [#963](https://github.com/archetech/archon/pull/963) removed in favour of `node:sqlite`, and `@hono/node-server` is now 2.x. `ip` is still a runtime dependency of `@didcid/ipfs`, with no fixed release.
 **Source:** `npm audit` (30 total: 1 critical / 17 high / 5 moderate / 7 low)
 
 Runtime-relevant (selection):
@@ -210,10 +240,10 @@ The consent page interpolates `client.name` unescaped into HTML. Client registra
 | L-02 | `<all_urls>` content script + host permissions persist (Feb H-07). Partially mitigated: handoff messages now validate (`isDidLike`, action allowlist) and NIP-07 has per-origin consent with auto-approve list. | `apps/browser-extension/src/static/manifest.json` |
 | L-03 | `wasm-unsafe-eval` in extension CSP (Feb M-11) — required by crypto deps; document and scope tightly. | manifest.json |
 | L-04 | `/metrics` publicly mounted before auth middleware on TS services. | keymaster-api.ts:150, gatekeeper-api.ts:161 |
-| L-05 | Public `GET /invoice/:did` on Drawbridge creates invoices via the Lightning mediator with no auth — resource-abuse/spam vector (rate limiting not applied on this path). | drawbridge-api.ts:397 |
-| L-06 | Admin-key comparison not timing-safe in TS Keymaster (`!==`) or the Python service (plain `!=`; `hmac.compare_digest` is used nowhere under `python/keymaster_service/src/`). ✅ Both Gatekeeper ports fixed in #868 (`timingSafeEqual` / `constant_time_eq`); Drawbridge and Herald were already constant-time. | `keymaster-admin.ts`, `keymaster_service/app.py:131` |
+| L-05 | Public `GET /invoice/:did` on Drawbridge creates invoices via the Lightning mediator with no auth — resource-abuse/spam vector (rate limiting not applied on this path). ✅ Fixed in #1046: the route is now rate-limited. | drawbridge-api.ts:397 |
+| L-06 | Admin-key comparison not timing-safe in TS Keymaster (`!==`) or the Python service (plain `!=`; `hmac.compare_digest` is used nowhere under `python/keymaster_service/src/`). ✅ Both Gatekeeper ports fixed in #868 (`timingSafeEqual` / `constant_time_eq`), and both Keymaster ports in #1048 (`timingSafeEqual` / `hmac.compare_digest`); Drawbridge and Herald were already constant-time for the admin key. | `keymaster-admin.ts`, `keymaster_service/app.py:131` |
 | L-07 | `window.postMessage(..., "*")` for NIP-07 responses (semgrep `wildcard-postmessage-configuration`); low impact since responses target the requesting page, but `messageTargetOrigin` is available and unused there. | contentScript.ts:28-40 |
-| L-08 | Dev-chain dependency hygiene: `dependabot-missing-cooldown`, `.npmrc` missing `minimum-release-age`, Express 4.x maintenance mode, `@noble/ciphers` 0.x, alpha `@capacitor/core` (carried from Feb). | assorted |
+| L-08 | Dev-chain dependency hygiene: `dependabot-missing-cooldown`, `.npmrc` missing `minimum-release-age`, Express 4.x maintenance mode, `@noble/ciphers` 0.x, alpha `@capacitor/core` (carried from Feb). ⚠️ Correction: at the audited commit `.npmrc` already set `minimum-release-age`, the main npm Dependabot block already had a cooldown, and `@capacitor/core` was `^7.4.4`, not an alpha. All services have since moved to Express 5 (#1024). `@noble/ciphers` is still 0.x. | assorted |
 
 ---
 
@@ -248,7 +278,7 @@ other tracking surface.
 
 | Feb ID | Finding | Status Aug 2026 |
 |--------|---------|-----------------|
-| C-01..C-03 | Unauthenticated admin endpoints | ⚠️ Partially — Gatekeeper (TS + Rust) fails closed as of #868; TS and Python Keymaster still fail open (see H-01) |
+| C-01..C-03 | Unauthenticated admin endpoints | ✅ Fixed — Gatekeeper (TS + Rust) fails closed as of #868, TS and Python Keymaster as of #1048 (see H-01) |
 | C-04 | Wallet in git | ✅ Resolved — verified no wallet files tracked |
 | H-01 | No TLS | ℹ️ Unchanged by design (reverse proxy terminates TLS; nginx example provided) |
 | H-02 | No security headers | ⚠️ Still absent on TS services |
@@ -262,8 +292,8 @@ other tracking surface.
 | M-01 | No input-validation library/schema | ❌ Still present — no schema-validation dependency in any `services/*/server/package.json` |
 | M-02 | Error message leaks | ❌ Still present — 182 sites (M-03) |
 | M-03 | NoSQL injection | ✅ Fixed — `$in`-only custom matcher |
-| M-04 | Empty passphrase fallback in Keymaster | ❌ Still present in the config layer, and it is the trigger for H-02 (live on Python; TS refuses to run with it) |
-| M-05 | Default creds in sample.env | ❌ Still present (M-05) |
+| M-04 | Empty passphrase fallback in Keymaster | ✅ Fixed — both Keymaster services refuse to start without a passphrase (#1048) |
+| M-05 | Default creds in sample.env | ⚠️ Partially fixed — `CHANGE_ME` placeholders for the admin key and passphrase (#1017, #1070); `bitcoin.conf` test credentials unchanged (M-05) |
 | M-06 | No container health checks | ✅ Fixed — healthchecks on core and Drawbridge-stack services |
 | M-07 | No resource limits | ❌ Still present — no `mem_limit` / `cpus` / `deploy.resources` in any compose file |
 | M-08 | No network segmentation | ❌ Still present — flat default network, no `networks:` definitions |
@@ -272,13 +302,13 @@ other tracking surface.
 | M-11 | `wasm-unsafe-eval` in extension CSP | ⚠️ Present, accepted — required by crypto deps (L-03 this report) |
 | M-12 | PBKDF2 env override | ❌ Still present (M-06) |
 | L-01 | `mongo:8.0` not patch-pinned | ❌ Still present — `docker/compose/core.yml:3` |
-| L-02 | Build tools in final image | ❌ Still present — `docker/Dockerfile.hyperswarm:5` installs `python3 make g++` in a single-stage build |
+| L-02 | Build tools in final image | ✅ Fixed — `docker/Dockerfile.hyperswarm` is now two-stage (#995), and the toolchain install was dropped (#1047) |
 | L-03 | CLI container idles on `tail -f` | ❌ Still present — `docker/Dockerfile.cli:21`; accepted (interactive `docker compose exec` container) |
 | L-04 | No `security_opt` / capability dropping | ❌ Still present — neither appears in any compose file |
 | L-05 | No restart policies | ⚠️ Mostly absent — only `docker/compose/lightning.yml` sets `restart:` |
 | L-06 | `@noble/ciphers` on 0.x | ❌ Still present (folded into L-08 this report) |
-| L-07 | `@capacitor/core` alpha | ❌ Still present (folded into L-08 this report) |
-| L-08 | Express 4.x maintenance mode | ❌ Still present (folded into L-08 this report) |
+| L-07 | `@capacitor/core` alpha | ✅ Not applicable — `@capacitor/core` was already `^7.4.4` at the audited commit (see L-08) |
+| L-08 | Express 4.x maintenance mode | ✅ Fixed — all services on Express 5 (#1024) |
 | L-09 | `/metrics` public | ❌ Still present (L-04 this report) |
 | L-10 | Redis unauthenticated | ⚠️ Unchanged, accepted — no `requirepass`, but bound `127.0.0.1:6379` and docker-network-isolated |
 | L-11 | Bitcoin RPC hardcoded creds | ⚠️ Unchanged, accepted — test networks only; host ports localhost-bound (carried into M-05) |
@@ -289,8 +319,8 @@ other tracking surface.
 ## 8. Remediation Priorities
 
 1. **C-01** — ✅ Done: PR #866, merged 2026-08-08. Any L402 deployment running a build older than that merge is still bypassable and should be updated.
-2. **H-02** — Stop returning the admin key from `/login` without passphrase verification. Python first (live); TS is a startup-window edge case, best closed by validating the passphrase before `app.listen`.
-3. **H-01** — ⚠️ Half done: both Gatekeeper ports fixed in #868 (merged). Remaining: TS Keymaster (`keymaster-admin.ts`) and Python (`hmac.compare_digest`), which need a decision about the router-wide mount first. Do **not** "fix" this by host-binding Gatekeeper's compose port — that port is public by design for DID resolution (`docs/deployment.md:648`); the admin key is the control.
+2. **H-02** — ✅ Key disclosure done: #1048. Remaining: constant-time passphrase comparison in the TS service, and rate limiting on `/login`.
+3. **H-01** — ✅ Done: Gatekeeper in #868, Keymaster in #1048. Do **not** "fix" this by host-binding Gatekeeper's compose port — that port is public by design for DID resolution; the admin key is the control.
 4. **H-03** — CORS allowlist.
 5. **H-04** — `tar` override; `@hono/node-server` pin. The vulnerable `@libp2p/kad-dht` no longer ships: `@didcid/ipfs` dropped Helia (#1078), and the copy `filecoin-pin` brings to the Filecoin wallet is 16.3.0 (#1078).
 6. **M-01/M-02** — Stop trusting `X-DID`; atomic check-and-increment for macaroon uses.
