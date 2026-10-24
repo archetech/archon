@@ -13,8 +13,8 @@ it.
 
 Two decisions shape everything else:
 
-1. **Every published object is a DID.** A post, an essay, a paper, a reply, a review,
-   a reaction and a follow are each an Archon asset. Archon's existing machinery then
+1. **Every published object is a DID.** A post, an essay, a paper, a reply, a review
+   and a reaction are each an Archon asset. Archon's existing machinery then
    supplies permalinks, ownership, edit history, deletion, gossip and optional chain
    timestamps.
 2. **Applications live outside the wallet.** The user's wallet holds the root
@@ -51,7 +51,7 @@ Two decisions shape everything else:
 |---|---|
 | **Memeplex** | The protocol: object schemas, the delegation profile, the attribution rules, and the query conventions. |
 | **Memepool** | The first client and indexer, run by the project. |
-| **object** | Any Memeplex asset DID: post, article, paper, reply, review, reaction, follow. |
+| **object** | Any Memeplex asset DID: post, article, paper, reply, review, reaction. |
 | **author** | The user DID an object is attributed to. |
 | **publisher** | The agent DID that controls an object: the author itself, or a delegated client. |
 
@@ -116,7 +116,6 @@ its operations, which resolution already reports.
 | `reply` | Comment in a thread | required | Same fields as `post`; also carries `root`. |
 | `review` | Structured assessment | required | `verdict` (free text or schema-defined), optional `rating`, body. A review can itself be replied to. |
 | `reaction` | Like, boost, emoji | required | `value`. Withdrawn by deleting it. |
-| `follow` | Follow a user | required: the followed user's DID | No other fields. Unfollow by deleting it. |
 
 `parent` is the one link from a response to what it responds to; `kind` says how. This
 keeps every response, of whatever kind, reachable from its parent with one query.
@@ -147,6 +146,23 @@ On `hyperswarm`, an object's time is the signed `proof.created` of its operation
 the publisher chooses. Anyone who needs a time a publisher cannot choose can move the
 object to a chain registry, after which its anchoring bounds it. Most objects never
 need this; a paper establishing priority might.
+
+## Follows
+
+A follow is not a publication. It has no content anyone reads, quotes or cites, nobody
+responds to it, and it is current state the reader toggles rather than a work
+addressed to an audience. Memeplex therefore defines publications and responses only,
+and treats a follow list as the reader's own preference.
+
+By default a client keeps follows **private**: on the device, or in a vault the user
+owns so that several clients share them. Timelines are computed for the reader, so the
+network never needs to know whom anyone follows. This is closer to Substack's reading
+privacy than to Twitter's public graph.
+
+A public social graph (follower counts, graph-based discovery) can be added later if
+something needs it. The candidates are a `follows` list in the user's own DID data,
+written by the wallet, or a single per-user state asset kept apart from publications
+and editable by a delegated client. Neither is part of v1.
 
 ## Delegation
 
@@ -227,7 +243,6 @@ actions to be a subset of the parent's and its expiry to be no later.
 | `memeplex:reply` | create `reply` objects |
 | `memeplex:review` | create `review` objects |
 | `memeplex:react` | create and delete `reaction` objects |
-| `memeplex:follow` | create and delete `follow` objects |
 | `memeplex:edit` | update objects published under this capability |
 | `memeplex:delete` | delete objects published under this capability |
 
@@ -356,12 +371,12 @@ cover the controller, which is why objects carry `author` in their data.
 |---|---|
 | Everything by a user | `{ "where": { "memeplex.author": { "$in": ["did:cid:…user"] } } }` |
 | A whole thread | `{ "where": { "memeplex.root": { "$in": ["did:cid:…root"] } } }` |
-| Every response to an object, or every follow of a user | `{ "where": { "memeplex.parent": { "$in": ["did:cid:…"] } } }` |
+| Every response to an object | `{ "where": { "memeplex.parent": { "$in": ["did:cid:…"] } } }` |
 | Objects under one capability | `{ "where": { "memeplex.capability.id": { "$in": ["did:cid:…handle"] } } }` |
 | A tag | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
 
-Only one condition and only `$in` are supported, so a client separates replies, reviews,
-reactions and follows by `kind` after the query. Results are unsorted and unpaged, and
+Only one condition and only `$in` are supported, so a client separates replies, reviews
+and reactions by `kind` after the query. Results are unsorted and unpaged, and
 they are not attributions: the matches still have to pass the attribution check,
 because anyone can write any `author` into an object they publish.
 
@@ -372,8 +387,8 @@ Timelines, ranking, full-text search and counts need an indexer. The Memepool in
 - follows new activity through `GET /api/v1/events` (filtered by time and registry),
   and resolves objects whose data has a `memeplex` member;
 - verifies attribution once per version and stores the result;
-- builds timelines from follows, thread trees, reply and reaction counts, and per-tag
-  feeds;
+- builds timelines for the set of authors a reader supplies (see Follows), thread
+  trees, reply and reaction counts, and per-tag feeds;
 - serves them to clients over HTTP, behind Drawbridge like other public surfaces.
 
 The indexer is a cache of public data. Anyone can run one, and a client can always fall
@@ -399,8 +414,8 @@ out, but cost per object should be measured, not assumed.
 Benchmark before building the client, on an isolated node with production-like Redis
 persistence, in both Gatekeeper ports:
 
-- create 1, 5 and 10 million Memeplex objects with a realistic mix (mostly short posts,
-  reactions and follows, some replies, few articles), across a realistic number of
+- create 1, 5 and 10 million Memeplex objects with a realistic mix (mostly short posts
+  and reactions, some replies, few articles), across a realistic number of
   authors;
 - measure creation throughput, Hyperswarm propagation to a second node, startup replay
   time, resolve latency, `query` latency for `author`, `root` and `parent`, the memory
@@ -409,8 +424,8 @@ persistence, in both Gatekeeper ports:
   from fixed cost.
 
 Every delegated object embeds its capability, so measure object size with a realistic
-chain as well. The results decide whether reactions and follows, the most numerous
-kinds, stay as individual DIDs or are batched.
+chain as well. The results decide whether reactions, the most numerous kind, stay as
+individual DIDs or are batched.
 
 ## Security considerations
 
@@ -458,7 +473,9 @@ kinds, stay as individual DIDs or are batched.
   capabilities be able to narrow further (for example, replies only within one thread)?
 - **Revocation record.** Is `memeplex.revocations` in the user's DID data the right
   place, given that every revocation then updates the user's DID?
-- **Reactions and follows.** Individual DIDs or batched, pending the benchmark.
+- **Reactions.** Individual DIDs or batched, pending the benchmark.
+- **Public follows.** Whether Memeplex should ever define a public follow list (see
+  Follows), and if so, where it lives.
 - **Paper identity.** Is `supersedes` enough for arXiv-style versioning and citation,
   or do papers need a stable series identifier?
 - **Content availability.** Who pins long-form content and papers, and for how long?
