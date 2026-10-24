@@ -1,0 +1,492 @@
+# Memeplex: delegated publishing on Archon (#1436)
+
+Status: design. Nothing described here is implemented. This document expands the
+design record in #1436 into something an implementer can work from, and records the
+decisions taken so far and the questions still open.
+
+## Summary
+
+**Memeplex** is an open publishing protocol on Archon that covers the ground of
+Twitter, Substack and arXiv: short posts, long essays and papers, and the replies,
+reviews, comments and reactions around them. **Memepool** is the first client built on
+it.
+
+Two decisions shape everything else:
+
+1. **Every published object is a DID.** A post, an essay, a paper, a reply, a review
+   and a reaction are each an Archon asset. Archon's existing machinery then
+   supplies permalinks, ownership, edit history, deletion, gossip and optional chain
+   timestamps.
+2. **Applications live outside the wallet.** The user's wallet holds the root
+   identity and delegates scoped, revocable authority to a separate client using an
+   existing standard, Authorization Capabilities (ZCAP). The client publishes under its
+   own agent DID, and verifiers attribute its objects to the user through the
+   capability. This needs no protocol change.
+
+## Goals
+
+- Publishing of any length, from a one-line post to a paper, under one model.
+- Responses (replies, quotes, reviews, comments, reactions) are first-class objects
+  that link to what they respond to, so threads and review histories form a graph any
+  node can walk.
+- Authorship is verifiable by anyone, without trusting the client or an indexer.
+- A client never holds the user's root key, and the user can cut a client off with
+  one wallet action.
+- Several independent clients can implement Memeplex; Memepool is one of them.
+
+## Non-goals
+
+- **No protocol change.** Gatekeeper's single-controller rule and its authorization
+  model are unchanged. Delegation lives in signed capabilities and verifier logic.
+- **No private content in v1.** Objects are public plaintext. Private circles (for
+  example on group vaults, as in #1044) are later work.
+- **No central ranking or moderation.** Indexers and clients may rank and filter, but
+  the raw graph is public and anyone can aggregate it differently (as in #937).
+- **No payment rail.** Tipping can use the existing `#lightning` service entries
+  (`publish-lightning`, zaps) but is not part of the protocol.
+
+## Names
+
+| Name | What it is |
+|---|---|
+| **Memeplex** | The protocol: object schemas, the delegation profile, the attribution rules, and the query conventions. |
+| **Memepool** | The first client and indexer, run by the project. |
+| **object** | Any Memeplex asset DID: post, article, paper, reply, review, reaction. |
+| **author** | The user DID an object is attributed to. |
+| **publisher** | The agent DID that controls an object: the author itself, or a delegated client. |
+
+The name puns on the memetic *meme pool* and Bitcoin's *mempool*: objects gossip on
+Hyperswarm first and can be anchored on a chain later.
+
+## Archon primitives used
+
+Everything below exists today; the references are to `packages/keymaster/src/keymaster.ts`
+and the Gatekeeper documentation.
+
+| Need | Primitive |
+|---|---|
+| Create an object | `createAsset(data, { registry, controller })`. Assets must be controlled by an agent DID. The default registry is `hyperswarm`. |
+| Edit an object | `updateDID` / `mergeData`. Each update is a new version; earlier versions stay resolvable (`resolve-did-version`, `versionTime`, `versionSequence`). |
+| Delete an object | `revokeDID`. Resolution reports `deactivated`, and deletion clears the document data while keeping registration metadata. |
+| Anchor an object | `changeRegistry` to a chain registry (BTC, ZEC, ETH, SOL) gives the object a chain-backed timestamp. |
+| Move an object | `transferAsset` to another agent DID. |
+| Large content | IPFS via the Gatekeeper data API (`createFile` stores `{ cid, filename, type, bytes }`). Operations are limited to 64 Ki JSON code units in both Gatekeeper ports. |
+| Signed delegation | Data Integrity proofs, which Archon already produces for operations (`proofPurpose: capabilityInvocation`) and credentials. |
+| Revocable handle | An issuer-owned asset holding the capability, bound to its own DID the way credentials are (#948), and deactivated to revoke. |
+| Historical checks | Resolution at `versionTime`, as used by historical `verifyResponse` (#1299). |
+| Discovery | Gatekeeper `POST /api/v1/query` (`$in` match on a `didDocumentData` path) and `GET /api/v1/events` (paged event feed by time and registry). |
+
+## Object model
+
+Every object is an asset whose `didDocumentData` carries one `memeplex` member. Keeping
+everything under one key avoids collisions with other data and gives queries a fixed
+prefix.
+
+```jsonc
+{
+  "memeplex": {
+    "v": 1,
+    "kind": "post",                 // see kinds below
+    "author": "did:cid:…user",      // the attributed user
+    "capability": { … },            // the delegated zcap; omitted when the author publishes directly
+
+    // content: inline text, or a reference for anything large
+    "text": "…",
+    "content": { "cid": "…", "type": "text/markdown", "bytes": 48213 },
+
+    // links
+    "parent": "did:cid:…",          // the object or DID this one responds to
+    "root": "did:cid:…",            // the thread root, for one-query thread loading
+    "quotes": ["did:cid:…"],
+    "tags": ["cryptography", "did"]
+  }
+}
+```
+
+The object carries no timestamp of its own. Its creation and update times are those of
+its operations, which resolution already reports.
+
+### Kinds
+
+| Kind | Purpose | `parent` | Notes |
+|---|---|---|---|
+| `post` | Short text, Twitter-like | — | Usually inline `text`. |
+| `article` | Long-form essay, Substack-like | — | `title`, `summary`; body as `content` on IPFS. |
+| `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs), `content` (PDF or source), optional `supersedes` for a new revision. |
+| `reply` | Comment in a thread | required | Same fields as `post`; also carries `root`. |
+| `review` | Structured assessment | required | `verdict` (free text or schema-defined), optional `rating`, body. A review can itself be replied to. |
+| `reaction` | Like, boost, emoji | required | `value`. Withdrawn by deleting it. |
+
+`parent` is the one link from a response to what it responds to; `kind` says how. This
+keeps every response, of whatever kind, reachable from its parent with one query.
+
+Kinds are an open set: a client ignores kinds it does not understand. New kinds are
+added by agreement, not by registry.
+
+### Content and size
+
+Inline `text` is for content that fits comfortably inside one operation. Anything
+larger, or any binary, goes to IPFS and is referenced from `content`. Updating the
+content of an article is a normal update that replaces the reference; the old
+reference stays in the previous version.
+
+### Edits, deletion and revisions
+
+- **Edit:** an update to the object. Every version remains resolvable, so a client can
+  show "edited" with the full history.
+- **Delete:** `revokeDID`. Clients show a tombstone: the object existed, was deleted,
+  and when.
+- **Paper revisions:** an edit changes the object in place. A formally new revision of
+  a paper should instead be a new `paper` object with `supersedes`, so citations of the
+  earlier revision stay stable.
+
+### Timestamps and anchoring
+
+On `hyperswarm`, an object's time is the signed `proof.created` of its operation, which
+the publisher chooses. Anyone who needs a time a publisher cannot choose can move the
+object to a chain registry, after which its anchoring bounds it. Most objects never
+need this; a paper establishing priority might.
+
+## Follows
+
+A follow is not a publication. It has no content anyone reads, quotes or cites, nobody
+responds to it, and it is current state the reader toggles rather than a work
+addressed to an audience. Memeplex therefore defines publications and responses only,
+and treats a follow list as the reader's own preference.
+
+By default a client keeps follows **private**: on the device, or in a vault the user
+owns so that several clients share them. Timelines are computed for the reader, so the
+network never needs to know whom anyone follows. This is closer to Substack's reading
+privacy than to Twitter's public graph.
+
+A public social graph (follower counts, graph-based discovery) can be added later if
+something needs it. The candidates are a `follows` list in the user's own DID data,
+written by the wallet, or a single per-user state asset kept apart from publications
+and editable by a delegated client. Neither is part of v1.
+
+## Delegation
+
+### Standards considered
+
+Delegation should use an existing standard rather than a Memeplex-specific credential.
+The Decentralized Identity Foundation's review of delegated-authorization options found
+two with chained delegation: ZCAP and UCAN.
+
+| | ZCAP (Authorization Capabilities) | UCAN | Plain verifiable credential |
+|---|---|---|---|
+| Maintainer | W3C Credentials Community Group | UCAN working group | — (convention only) |
+| Version | v0.4.0 draft; revival proposed April 2026 | v1.0.0 release candidates | No delegation schema exists; only community drafts and sector profiles |
+| Encoding | JSON-LD, Data Integrity proofs | DAG-CBOR envelope, varsig signatures | JSON-LD |
+| Scope | `invocationTarget` plus `allowedAction` | `cmd` hierarchy plus a policy language | Whatever the schema says |
+| Chaining | `parentCapability`; child may only narrow the parent | `aud`→`iss` proof chain; may only narrow | Not defined |
+| Expiry | Required; child no later than parent; verifiers SHOULD reject more than 3 months out | `exp` required but may be `null` | Optional |
+| Revocation | Largely unspecified (a verifier-side endpoint) | Separate revocation spec | Archon: deactivate the credential DID |
+| Fit with Archon | Archon already signs Data Integrity proofs and names `capabilityInvocation` as its operation proof purpose | Needs DAG-CBOR and varsig codecs Archon does not have | Native, but invents its own semantics |
+
+**Decision: use the ZCAP data model**, signed with the Data Integrity proofs Archon
+already produces, and supply revocation from Archon, which ZCAP leaves unspecified.
+UCAN's command hierarchy and policy language are attractive, but its encoding is
+foreign to everything else Archon signs. A plain credential would reinvent exactly the
+semantics (attenuation, chaining, expiry) that ZCAP already defines.
+
+### Parties
+
+- **User:** an agent DID whose wallet holds the root key.
+- **Client:** an agent DID created by the application, holding its own key. Agents
+  are self-controlled, so the user cannot own the client's DID.
+
+### Capabilities
+
+The **root capability** names the user's DID as its target and its controller, and is
+never stored or signed (a ZCAP root is identified by its target):
+
+```jsonc
+{
+  "@context": "https://w3id.org/zcap/v1",
+  "id": "urn:zcap:root:did%3Acid%3A…user",
+  "controller": "did:cid:…user",
+  "invocationTarget": "did:cid:…user"
+}
+```
+
+The wallet **delegates** from the root to the client:
+
+```jsonc
+{
+  "@context": ["https://w3id.org/zcap/v1", "https://w3id.org/security/suites/…"],
+  "id": "did:cid:…handle",              // the asset that holds this capability (see Revocation)
+  "parentCapability": "urn:zcap:root:did%3Acid%3A…user",
+  "invocationTarget": "did:cid:…user",
+  "controller": "did:cid:…client",
+  "allowedAction": ["memeplex:post", "memeplex:reply", "memeplex:react", "memeplex:edit"],
+  "expires": "2027-01-24T18:00:00Z",
+  "proof": {
+    "type": "DataIntegrityProof",
+    "proofPurpose": "capabilityDelegation",
+    "capabilityChain": ["urn:zcap:root:did%3Acid%3A…user"],
+    "verificationMethod": "did:cid:…user#key-1",
+    "created": "2026-10-24T18:00:00Z",
+    "proofValue": "…"
+  }
+}
+```
+
+A client may delegate a narrower capability onward, for example to a scheduling bot,
+with this capability as `parentCapability`. ZCAP's rules then require the child's
+actions to be a subset of the parent's and its expiry to be no later.
+
+### Actions
+
+| `allowedAction` | Allows the controller to |
+|---|---|
+| `memeplex:post` | create `post`, `article` and `paper` objects |
+| `memeplex:reply` | create `reply` objects |
+| `memeplex:review` | create `review` objects |
+| `memeplex:react` | create and delete `reaction` objects |
+| `memeplex:edit` | update objects published under this capability |
+| `memeplex:delete` | delete objects published under this capability |
+
+A client asks for the actions it needs; the wallet shows them and the user approves a
+subset.
+
+### Expiry and renewal
+
+ZCAP requires an expiry, and verifiers should reject one more than three months out. A
+wallet therefore renews a client's capability before it expires, by delegating a new
+capability with a new handle. Objects published under the old one stay attributed (the
+attribution check uses the object's own time), so renewal costs one wallet action per
+period and nothing else.
+
+### Issuance flow
+
+1. The client creates its agent DID and shows it to the user, for example as a QR code
+   or a deep link into the wallet.
+2. The wallet shows the requested actions and expiry, creates the handle asset, signs
+   the capability with the handle's DID as its `id`, and stores the signed capability in
+   the handle.
+3. The client fetches the capability from the handle and embeds it as
+   `memeplex.capability` in every object it publishes for that user. ZCAP verifiers do
+   not fetch capabilities by ID during chain verification, so each object carries what
+   is needed to verify it.
+
+A client may hold capabilities from several users (a shared device, or a service
+publishing for many people); the `author` and `capability` fields keep them apart.
+
+### Invocation
+
+In ZCAP terms, publishing an object is an invocation of the capability. Archon already
+signs every operation with `proofPurpose: capabilityInvocation`; the client's signature
+on the object's create or update operation is the invocation proof, and the action is
+implied by the object's kind and operation (create, update or delete).
+
+## Attribution
+
+A verifier attributes object *O* to user *U* as follows.
+
+**Direct publishing.** If `O.memeplex.capability` is absent, *O* is attributed to *U*
+when *O*'s controller is *U* and `O.memeplex.author` is *U*.
+
+**Delegated publishing.** Otherwise, with *Z* = `O.memeplex.capability` and *T* = the
+time of the version being checked, walk the ZCAP chain:
+
+1. *Z*'s chain ends at the root capability whose `invocationTarget` and `controller`
+   are *U*, and `O.memeplex.author` is *U*.
+2. Each delegation proof in the chain verifies, signed by a key of the previous link's
+   controller (for the first link, *U*'s key as resolved at the proof's time).
+3. Each link narrows its parent: actions a subset, expiry no later.
+4. *O*'s controller is *Z*'s `controller`, and the operation's signature verifies
+   against that controller's key.
+5. *T* is before each link's `expires`.
+6. The object's kind and operation are within *Z*'s `allowedAction`.
+7. Each link's handle, resolved at *T*, exists, is not deactivated, and holds a
+   capability with the same `id`. Because the capability names its handle, a copy
+   under another asset fails here.
+8. The revocation snapshot, if any, admits this version (next section).
+
+If any step fails, the object is shown as unattributed: it exists, but not as *U*'s.
+
+Steps 1–6 follow the ZCAP verification algorithm; steps 7 and 8 are the Archon
+revocation profile. A shared verifier library should implement them once for clients
+and indexers alike.
+
+## Revocation
+
+ZCAP leaves revocation largely to the verifier. Memeplex supplies it from Archon: each
+delegated capability lives in an asset owned by its delegator (the **handle**), and
+deactivating the handle with `revokeDID` revokes the capability. From then on step 7
+fails for any version whose time is after the revocation. This is the same binding
+Archon credentials use (#948): the handle's DID is the capability's `id`, so it is
+created first and the signed capability is written into it with an update.
+
+### The backdating gap
+
+On `hyperswarm`, *T* is the publisher-chosen `proof.created`. A client that keeps its
+key after revocation (a stolen device, a rogue app) can create objects or edits dated
+before the revocation, and step 7 would accept them. Gatekeeper does not bound
+Hyperswarm times by receipt, and adding such a bound is a protocol decision outside
+this design.
+
+Options:
+
+1. **Revocation snapshot (recommended).** When revoking, the wallet first queries the
+   objects published under the handle (`memeplex.capability.id $in [handle]`) and
+   records the set it accepts, mapping each object DID to its version sequence at that
+   moment. The record goes into the user's DID data under `memeplex.revocations[handle]`,
+   with the set on IPFS if it is large. Step 8 then admits only versions in the
+   snapshot. Objects the wallet's node had not yet seen are lost, which is the right
+   failure direction.
+2. **Anchoring.** Attribute only versions anchored on a chain before the revocation's
+   anchor. This is sound but slow and costly for ordinary posts.
+3. **First-seen time.** Indexers record when they first observed each version and
+   distrust versions first seen after the revocation. This is useful as a client-side
+   heuristic but is not verifiable by others.
+
+The snapshot needs nothing new from the protocol, and a user who suspects a compromise
+can also date the snapshot earlier than the revocation to disown recent objects.
+
+### Who controls published objects
+
+The client controls the objects it publishes. Consequences:
+
+- The user cannot edit or delete them directly. After revocation they no longer count
+  as the user's beyond the snapshot, but they remain on the network.
+- A cooperating client can hand objects over with `transferAsset` to the user's DID; a
+  rogue or abandoned one will not.
+
+Decision (from #1436): accept this for v1. If usage shows users need direct control,
+the alternatives are a delegation term requiring transfer on request (unenforced), or a
+protocol change letting Gatekeeper accept operations on a user's assets signed by a key
+the user's capability names. The latter changes protocol authorization and needs its
+own decision.
+
+## Discovery and indexing
+
+### Direct queries
+
+Gatekeeper keeps an in-memory index of every DID's `didDocumentData`, and
+`POST /api/v1/query` matches a path against a list of values. That index does not
+cover the controller, which is why objects carry `author` in their data.
+
+| Question | Query |
+|---|---|
+| Everything by a user | `{ "where": { "memeplex.author": { "$in": ["did:cid:…user"] } } }` |
+| A whole thread | `{ "where": { "memeplex.root": { "$in": ["did:cid:…root"] } } }` |
+| Every response to an object | `{ "where": { "memeplex.parent": { "$in": ["did:cid:…"] } } }` |
+| Objects under one capability | `{ "where": { "memeplex.capability.id": { "$in": ["did:cid:…handle"] } } }` |
+| A tag | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
+
+Only one condition and only `$in` are supported, so a client separates replies, reviews
+and reactions by `kind` after the query. Results are unsorted and unpaged, and
+they are not attributions: the matches still have to pass the attribution check,
+because anyone can write any `author` into an object they publish.
+
+### Indexer
+
+Timelines, ranking, full-text search and counts need an indexer. The Memepool indexer:
+
+- follows new activity through `GET /api/v1/events` (filtered by time and registry),
+  and resolves objects whose data has a `memeplex` member;
+- verifies attribution once per version and stores the result;
+- builds timelines for the set of authors a reader supplies (see Follows), thread
+  trees, reply and reaction counts, and per-tag feeds;
+- serves them to clients over HTTP, behind Drawbridge like other public surfaces.
+
+The indexer is a cache of public data. Anyone can run one, and a client can always fall
+back to direct queries and its own verification.
+
+## Moderation and reputation
+
+There is no central moderator. Viewers choose which judgments to apply:
+
+- **Block lists and labels** are credentials or objects issued by communities that
+  name DIDs or objects (as in #937). A client applies the lists its user trusts.
+- **Reviews** are objects, so a review's own reputation is visible: who wrote it, who
+  replied, whether it was retracted.
+- **Unattributed objects** (failed delegation, revoked client) are hidden or marked by
+  default.
+
+## Scale
+
+Objects as DIDs puts every object through Gatekeeper storage, gossip, replay and the
+in-memory search index on every node. The protocol has no fixed limit that rules this
+out, but cost per object should be measured, not assumed.
+
+Benchmark before building the client, on an isolated node with production-like Redis
+persistence, in both Gatekeeper ports:
+
+- create 1, 5 and 10 million Memeplex objects with a realistic mix (mostly short posts
+  and reactions, some replies, few articles), across a realistic number of
+  authors;
+- measure creation throughput, Hyperswarm propagation to a second node, startup replay
+  time, resolve latency, `query` latency for `author`, `root` and `parent`, the memory
+  used by the search index, and storage;
+- compare startup against the current production dataset to separate per-object cost
+  from fixed cost.
+
+Every delegated object embeds its capability, so measure object size with a realistic
+chain as well. The results decide whether reactions, the most numerous kind, stay as
+individual DIDs or are batched.
+
+## Security considerations
+
+- **Spoofed authorship.** Anyone can publish an object claiming any `author`.
+  Attribution, not the data, decides authorship. Clients must never display an
+  unverified `author` as fact.
+- **Capability copying.** Prevented by the capability's handle-bound `id` and step 7.
+- **Backdating after revocation.** Addressed by the revocation snapshot.
+- **Over-broad actions.** Wallets should default to narrow actions, and show which
+  clients hold which actions. ZCAP's mandatory expiry bounds a forgotten delegation.
+- **Spam.** Object creation on `hyperswarm` is free. Indexers will need rate limits or
+  cost per author (for example L402 on publishing through a hosted node, or ranking by
+  trust graph). Not designed here.
+- **Content addressing of large bodies.** IPFS content is available only while someone
+  pins it. The project's pinning work (`ARCHON_GATEKEEPER_REGISTRIES_PIN`) is one
+  option; long-term availability of papers needs an explicit answer.
+
+## Milestones
+
+1. **Benchmark** objects-as-DIDs at the volumes above (Scale).
+2. **Schemas:** the object schema and the Memeplex ZCAP profile (actions, handle,
+   revocation), with signed fixtures.
+3. **Verifier library:** attribution steps 1–8, shared by clients and the indexer, with
+   cross-checks against real signed objects, including revoked, expired, widened and
+   copied capabilities.
+4. **Direct publishing:** create, edit, delete and query objects from the existing CLI
+   and SDKs with no delegation; this works with today's `create-asset-json`.
+5. **Delegation:** wallet UI to grant, renew, list and revoke capabilities, including
+   the revocation snapshot.
+6. **Indexer.**
+7. **Memepool client.**
+8. **Moderation:** block lists and labels.
+
+## Open questions
+
+- **Delegation key.** ZCAP seeds the chain from the target's `capabilityDelegation`
+  verification relationship, which Archon DID documents do not carry today. Either the
+  Memeplex profile accepts a key in `capabilityInvocation` (which Archon uses for
+  operations) as delegation authority, or agent documents gain `capabilityDelegation`.
+- **Cryptosuite.** Archon's secp256k1 proofs use an unregistered cryptosuite because no
+  registered suite covers secp256k1. Generic ZCAP libraries will not verify them, so
+  interoperability beyond Memeplex verifiers may need the `eddsa-jcs-2022` assertion
+  keys Archon already supports.
+- **Action vocabulary.** Is the action table the right granularity, and should
+  capabilities be able to narrow further (for example, replies only within one thread)?
+- **Revocation record.** Is `memeplex.revocations` in the user's DID data the right
+  place, given that every revocation then updates the user's DID?
+- **Reactions.** Individual DIDs or batched, pending the benchmark.
+- **Public follows.** Whether Memeplex should ever define a public follow list (see
+  Follows), and if so, where it lives.
+- **Paper identity.** Is `supersedes` enough for arXiv-style versioning and citation,
+  or do papers need a stable series identifier?
+- **Content availability.** Who pins long-form content and papers, and for how long?
+
+## References
+
+- ZCAP: [Authorization Capabilities v0.4.0](https://w3c-ccg.github.io/zcap-spec/), W3C
+  Credentials Community Group draft; [revival proposal, April 2026](https://lists.w3.org/Archives/Public/public-credentials/2026Apr/0029.html)
+- UCAN: [specification](https://github.com/ucan-wg/spec) and
+  [delegation](https://github.com/ucan-wg/delegation)
+- #937: thin agent marketplace (attestations, opt-in block lists)
+- #1044: encrypted messageboard where each post is a DID owned by its author
+- #1299: historical verification of credential responses
+- #108 / #948: credentials name the asset that holds them
