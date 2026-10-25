@@ -23,7 +23,7 @@
     "morgan": "^1.12.1",
     "multer": "^2.4.0",
     "qrcode": "^1.5.4",
-    "undici": "^7.30.0"
+    "undici": "^7.30.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.18",
