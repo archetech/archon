@@ -96,6 +96,7 @@ prefix.
 
     // links
     "parent": "did:cid:…",          // the object or DID this one responds to
+    "parentVersion": "bafyrei…",    // optional: the parent's versionId this one responds to
     "root": "did:cid:…",            // the thread root, for one-query thread loading
     "quotes": ["did:cid:…"],
     "tags": ["cryptography", "did"]
@@ -112,7 +113,7 @@ its operations, which resolution already reports.
 |---|---|---|---|
 | `post` | Short text, Twitter-like | — | Usually inline `text`. |
 | `article` | Long-form essay, Substack-like | — | `title`, `summary`; body as `content` on IPFS. |
-| `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs), `content` (PDF or source), optional `supersedes` for a new revision. |
+| `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs), `content` (PDF or source). Revised by editing; see Revisions and citation. |
 | `reply` | Comment in a thread | required | Same fields as `post`; also carries `root`. |
 | `review` | Written assessment | required | `verdict` (free text or schema-defined), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
 | `reaction` | Like, boost, emoji | required | `value`. Withdrawn by deleting it. |
@@ -120,7 +121,9 @@ its operations, which resolution already reports.
 | `tag` | Label applied to someone else's object | required | `tag`, a normalized string (see Tags). Withdrawn by deleting it. |
 
 `parent` is the one link from a response to what it responds to; `kind` says how. This
-keeps every response, of whatever kind, reachable from its parent with one query.
+keeps every response, of whatever kind, reachable from its parent with one query. A
+response that assessed one particular revision also names it in `parentVersion` (see
+Revisions and citation). `parent` itself stays the bare DID, so the query still finds it.
 
 Kinds are an open set: a client ignores kinds it does not understand. New kinds are
 added by agreement, not by registry.
@@ -150,7 +153,7 @@ shortened.
                 "tags": ["archon", "publishing"] } }
 ```
 
-**paper**: a second revision, superseding the first
+**paper**: revised in place; each revision is a version of the same DID
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "paper", "author": "did:cid:…alice",
@@ -158,7 +161,6 @@ shortened.
                 "abstract": "We show that nodes receiving the same signed operations …",
                 "authors": ["did:cid:…alice", "did:cid:…bob"],
                 "content": { "cid": "bafybei…", "type": "application/pdf", "bytes": 912340 },
-                "supersedes": "did:cid:…paper-v1",
                 "tags": ["distributed-systems", "did"] } }
 ```
 
@@ -173,11 +175,11 @@ shortened.
                 "quotes": ["did:cid:…carol-post"] } }
 ```
 
-**review**
+**review**: pins the revision it assessed
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "review", "author": "did:cid:…carol",
-                "parent": "did:cid:…paper-v2",
+                "parent": "did:cid:…paper", "parentVersion": "bafyreirev2…",
                 "verdict": "minor revisions",
                 "text": "The convergence argument holds, but section 4 assumes …" } }
 ```
@@ -193,7 +195,8 @@ shortened.
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "rating", "author": "did:cid:…carol",
-                "parent": "did:cid:…paper-v2", "rating": 3, "min": 1, "max": 5 } }
+                "parent": "did:cid:…paper", "parentVersion": "bafyreirev2…",
+                "rating": 3, "min": 1, "max": 5 } }
 ```
 
 **tag**: a community labeller marking a post
@@ -210,7 +213,8 @@ down, and ratings stay comparable:
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "rating", "author": "did:cid:…user",
-                "parent": "did:cid:…paper", "rating": 3, "min": 1, "max": 5 } }
+                "parent": "did:cid:…paper", "parentVersion": "bafyreirev2…",
+                "rating": 3, "min": 1, "max": 5 } }
 ```
 
 - `rating`, `min` and `max` are integers with `min < max` and
@@ -222,7 +226,9 @@ down, and ratings stay comparable:
   four-step scale. Clients that display normalized values should not present them as
   "n out of max".
 - An author has one rating per parent. Changing it is an edit, so the history stays
-  visible; aggregators count each author's current attributed version once.
+  visible; aggregators count each author's current attributed version once. Rating a
+  new revision of the parent is also an edit, which updates `parentVersion`; the
+  earlier rating and the revision it rated remain in the history.
 - Equal values are not equally precise: a 5-point scale and a 100-point scale cluster
   differently. Aggregators that care can group by `max − min`.
 
@@ -259,9 +265,25 @@ reference stays in the previous version.
   show "edited" with the full history.
 - **Delete:** `revokeDID`. Clients show a tombstone: the object existed, was deleted,
   and when.
-- **Paper revisions:** an edit changes the object in place. A formally new revision of
-  a paper should instead be a new `paper` object with `supersedes`, so citations of the
-  earlier revision stay stable.
+
+### Revisions and citation
+
+A revision is an edit: the object keeps its DID, and every earlier revision stays
+resolvable. This is arXiv's model, with the DID as the identifier and its versions as
+`v1`, `v2` and so on.
+
+- **Citing the work** uses the bare DID, which always resolves to the latest revision.
+- **Citing one revision** uses a DID URL with the revision's `versionId`, the canonical
+  CID of the operation that produced it: `did:cid:…?versionId=bafyrei…`. Gatekeeper
+  resolves it in both ports (#1462, #1463).
+- **Not by sequence number or time.** `versionSequence` names a position, which a
+  preferred sibling can take over, and on `hyperswarm` a version's time is chosen by
+  its publisher. Only `versionId` names fixed content, so an author cannot change what
+  a citation points to after the fact.
+- **Responses pin what they assessed.** A `review` or `rating` of an article or paper
+  sets `parentVersion` to the `versionId` it assessed. Clients show "reviewed an
+  earlier revision" when that is not the current version, so a review of v1 is never
+  presented as a review of v2. Replies, reactions and tags usually omit it.
 
 ### Timestamps and anchoring
 
@@ -676,8 +698,6 @@ stay as individual DIDs or are batched.
 - **Reactions, ratings and tags.** Individual DIDs or batched, pending the benchmark.
 - **Public follows.** Whether Memeplex should ever define a public follow list (see
   Follows), and if so, where it lives.
-- **Paper identity.** Is `supersedes` enough for arXiv-style versioning and citation,
-  or do papers need a stable series identifier?
 - **Content availability.** Who pins long-form content and papers, and for how long?
 
 ## References
@@ -689,4 +709,5 @@ stay as individual DIDs or are batched.
 - #937: thin agent marketplace (attestations, opt-in block lists)
 - #1044: encrypted messageboard where each post is a DID owned by its author
 - #1299: historical verification of credential responses
+- #1462 / #1463: Gatekeeper resolution by `versionId`
 - #108 / #948: credentials name the asset that holds them
