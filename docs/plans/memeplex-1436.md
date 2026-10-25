@@ -504,11 +504,14 @@ attributed to *U* only if all of these hold:
    creation.
 2. It leaves `author` and `kind` unchanged. (A deletion clears the data; the check
    applies to the predecessor.)
-3. *A* is *U* (direct), or *capability-ok(Z, U, A, X, T)* holds for the capability *Z*
-   the version carries and *X* = `memeplex:edit` or `memeplex:delete`, or the kind's own
-   action where that action covers it (`memeplex:react` and `memeplex:tag` cover
-   deletion; `memeplex:rate` covers editing and deletion). *Z* may be a renewal rather
-   than the creating capability, but its controller must be *A*.
+3. *A* is *U* (direct), or *capability-ok(Z, U, A, X, T)* holds with *X* =
+   `memeplex:edit` or `memeplex:delete`, or the kind's own action where that action
+   covers it (`memeplex:react` and `memeplex:tag` cover deletion; `memeplex:rate` covers
+   editing and deletion). For an update, *Z* is the capability the new version carries;
+   it may be a renewal rather than the creating capability, but its controller must be
+   *A*. A deletion carries no data, so for a deletion *Z* is the capability its
+   predecessor carries. To delete under a renewal, a client first installs the renewal
+   with an attributed update.
 4. If it changes the controller, the new controller is *U*: a client may hand an object
    back to its author, after which later versions are direct. Any other transfer ends
    attribution for every later version.
@@ -538,10 +541,19 @@ this design.
 
 Options:
 
-1. **Revocation snapshot (recommended).** When revoking, the wallet first queries the
-   objects published under the handle (`memeplex.capability.id $in [handle]`) and
-   records the set it accepts, mapping each object DID to the `versionId` (the
-   canonical operation CID) of its accepted version at that moment. The record goes
+1. **Revocation snapshot (recommended).** When revoking, the wallet first finds every
+   object whose history depends on the handle, and records the set it accepts, mapping
+   each object DID to the `versionId` (the canonical operation CID) of its accepted
+   version at that moment.
+
+   The current capability is not enough to find them. An object created under the
+   handle and later edited under a renewal no longer carries it, and objects published
+   under capabilities delegated *from* the handle carry their own. Missing either would
+   drop its creation from the snapshot and break the whole lineage. So the wallet
+   queries the user's objects by author (`memeplex.author $in [user]`; `author` never
+   changes), walks each object's history, and includes the object if any version's
+   capability chain contains the handle. Deleted objects no longer match the author
+   query; only their tombstones lose attribution. The record goes
    into the user's DID data under `memeplex.revocations[handle]`, with the set on IPFS
    if it is large. Step 8 then admits a version only if its `versionId` is in the
    snapshot or is an ancestor of one, reached through signed `previd` links. Objects
