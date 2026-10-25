@@ -125,6 +125,84 @@ keeps every response, of whatever kind, reachable from its parent with one query
 Kinds are an open set: a client ignores kinds it does not understand. New kinds are
 added by agreement, not by registry.
 
+### Examples
+
+One object of each kind, showing each object's `didDocumentData`. All but the reply are
+published directly by their author. The reply is published by a delegated client, so it
+carries a capability (abbreviated here; see Delegation for the full form). DIDs are
+shortened.
+
+**post**
+
+```jsonc
+{ "memeplex": { "v": 1, "kind": "post", "author": "did:cid:…alice",
+                "text": "Every post on Memepool is a DID. This one too.",
+                "tags": ["archon", "memeplex"] } }
+```
+
+**article**: the body lives on IPFS
+
+```jsonc
+{ "memeplex": { "v": 1, "kind": "article", "author": "did:cid:…alice",
+                "title": "Why every post should be a DID",
+                "summary": "Permalinks, edit history and provable timestamps for free.",
+                "content": { "cid": "bafkrei…", "type": "text/markdown", "bytes": 48213 },
+                "tags": ["archon", "publishing"] } }
+```
+
+**paper**: a second revision, superseding the first
+
+```jsonc
+{ "memeplex": { "v": 1, "kind": "paper", "author": "did:cid:…alice",
+                "title": "Convergent Replay of Signed DID Histories",
+                "abstract": "We show that nodes receiving the same signed operations …",
+                "authors": ["did:cid:…alice", "did:cid:…bob"],
+                "content": { "cid": "bafybei…", "type": "application/pdf", "bytes": 912340 },
+                "supersedes": "did:cid:…paper-v1",
+                "tags": ["distributed-systems", "did"] } }
+```
+
+**reply**: published by Bob's client under his capability, quoting another post
+
+```jsonc
+{ "memeplex": { "v": 1, "kind": "reply", "author": "did:cid:…bob",
+                "capability": { "id": "did:cid:…handle", "controller": "did:cid:…bobs-client",
+                                "allowedAction": ["memeplex:post", "memeplex:reply"], "…": "…" },
+                "parent": "did:cid:…alice-post", "root": "did:cid:…alice-post",
+                "text": "Including the reactions? See the scale section.",
+                "quotes": ["did:cid:…carol-post"] } }
+```
+
+**review**
+
+```jsonc
+{ "memeplex": { "v": 1, "kind": "review", "author": "did:cid:…carol",
+                "parent": "did:cid:…paper-v2",
+                "verdict": "minor revisions",
+                "text": "The convergence argument holds, but section 4 assumes …" } }
+```
+
+**reaction**
+
+```jsonc
+{ "memeplex": { "v": 1, "kind": "reaction", "author": "did:cid:…dave",
+                "parent": "did:cid:…alice-post", "value": "❤️" } }
+```
+
+**rating**: three stars out of five
+
+```jsonc
+{ "memeplex": { "v": 1, "kind": "rating", "author": "did:cid:…carol",
+                "parent": "did:cid:…paper-v2", "rating": 3, "min": 1, "max": 5 } }
+```
+
+**tag**: a community labeller marking a post
+
+```jsonc
+{ "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…spamwatch",
+                "parent": "did:cid:…some-post", "tag": "spam" } }
+```
+
 ### Ratings
 
 A rating states its own scale, so clients can use 5 stars, 0–100 or thumbs up and
