@@ -237,6 +237,48 @@ async fn universal_resolver_surface_returns_fixture_stable_did_resolution_result
     );
     assert!(historical["didDocumentMetadata"].get("updated").is_none());
 
+    // versionId selects one operation on both surfaces: the verified conformant
+    // resolver and the internal /did resolver.
+    for (url, verified) in [
+        (format!("{}/1.0/identifiers/{did}", service.root_url), true),
+        (format!("{}/did/{did}", service.base_url), false),
+    ] {
+        let response = service
+            .client
+            .get(format!("{url}?versionId={version_id}"))
+            .send()
+            .await?;
+        assert!(response.status().is_success());
+        let by_id = response.json::<Value>().await?;
+        assert_eq!(by_id["didDocumentMetadata"]["versionSequence"], "1");
+        assert_eq!(
+            by_id["didDocumentMetadata"]["versionId"],
+            version_id.as_str()
+        );
+
+        let response = service
+            .client
+            .get(format!("{url}?versionId=bafkreinosuchoperation"))
+            .send()
+            .await?;
+        if verified {
+            assert_eq!(response.status().as_u16(), 404);
+        }
+        let unknown = response.json::<Value>().await?;
+        assert_eq!(unknown["didResolutionMetadata"]["error"], "notFound");
+
+        let response = service
+            .client
+            .get(format!("{url}?versionId={version_id}&versionSequence=1"))
+            .send()
+            .await?;
+        if verified {
+            assert_eq!(response.status().as_u16(), 400);
+        }
+        let conflict = response.json::<Value>().await?;
+        assert_eq!(conflict["didResolutionMetadata"]["error"], "invalidOptions");
+    }
+
     let response = service
         .client
         .get(format!("{}/1.0/identifiers/{did}", service.root_url))

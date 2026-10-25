@@ -1177,12 +1177,25 @@ export default class Gatekeeper implements GatekeeperInterface {
         did?: string,
         options?: ResolveDIDOptions & { versionOrdinal?: { registry: string, ordinal: number[] } }
     ): Promise<DidCidDocument> {
-        const { versionTime, versionSequence, versionOrdinal, confirm = false, verify = false } = options || {};
+        const { versionTime, versionSequence, versionId: requestedId, versionOrdinal, confirm = false, verify = false } = options || {};
 
         if (!did || !isValidDID(did)) {
             return {
                 didResolutionMetadata: {
                     error: "invalidDid"
+                },
+                didDocument: {},
+                didDocumentMetadata: {}
+            };
+        }
+
+        // DID Resolution makes versionId and versionTime mutually exclusive; a
+        // sequence is a third selector for the same thing, so it is excluded too.
+        if (requestedId !== undefined &&
+            (typeof requestedId !== 'string' || !requestedId || versionTime !== undefined || versionSequence !== undefined)) {
+            return {
+                didResolutionMetadata: {
+                    error: "invalidOptions"
                 },
                 didDocument: {},
                 didDocumentMetadata: {}
@@ -1203,6 +1216,9 @@ export default class Gatekeeper implements GatekeeperInterface {
 
         const anchor = events[0];
         let doc = await this.generateDoc(anchor.operation, did);
+        // A retrieval alias names the same operation as its canonical CID, as for previd.
+        const targetId = requestedId === undefined ? undefined : await this.canonicalReference(requestedId);
+        let targetFound = false;
 
         if (versionTime && doc.didDocumentRegistration?.created && new Date(doc.didDocumentRegistration.created) > new Date(versionTime)) {
             // TBD What to return if DID was created after specified time?
@@ -1281,6 +1297,8 @@ export default class Gatekeeper implements GatekeeperInterface {
             // Verification needs each predecessor's metadata. Ordinary resolution
             // needs the CID and block bounds only for the version it returns.
             const { versionId, timestamp } = verify ? await metadataFor(event, projectionRegistry) : {};
+            const reachesTarget = async () => targetId !== undefined &&
+                (versionId ?? await this.generateCID(operation)) === targetId;
 
             if (operation.type === 'create') {
                 if (verify) {
@@ -1300,6 +1318,10 @@ export default class Gatekeeper implements GatekeeperInterface {
                     timestamp,
                 };
                 selected = { event, registry: projectionRegistry };
+                if (await reachesTarget()) {
+                    targetFound = true;
+                    break;
+                }
                 continue;
             }
 
@@ -1345,6 +1367,10 @@ export default class Gatekeeper implements GatekeeperInterface {
                     timestamp,
                 };
                 selected = { event, registry: projectionRegistry };
+                if (await reachesTarget()) {
+                    targetFound = true;
+                    break;
+                }
                 continue;
             }
 
@@ -1363,7 +1389,24 @@ export default class Gatekeeper implements GatekeeperInterface {
                     timestamp,
                 };
                 selected = { event, registry: projectionRegistry };
+                if (await reachesTarget()) {
+                    targetFound = true;
+                    break;
+                }
             }
+        }
+
+        // The requested operation is not in the accepted history this resolution
+        // walked: unknown, displaced by a preferred sibling, or (with confirm)
+        // not yet confirmed.
+        if (targetId !== undefined && !targetFound) {
+            return {
+                didResolutionMetadata: {
+                    error: "notFound"
+                },
+                didDocument: {},
+                didDocumentMetadata: {}
+            };
         }
 
         if (!verify && selected && doc.didDocumentMetadata) {

@@ -588,6 +588,35 @@ async function runConfirmParity() {
         throw new Error(`confirm parity: confirmed resolution must stop at v1 and say so, got v${metadata.versionSequence} confirmed=${metadata.confirmed}`);
     }
     console.log('ok confirm parity: both ports stop a confirmed resolution before the first unconfirmed event');
+
+    // versionId (#1462): v1 is confirmed, v2 is not. Both ports must select the
+    // named operation, refuse unknown and conflicting selectors identically, and
+    // leave an unconfirmed operation out of a confirmed resolution.
+    const v1Id = tsV1.body.didDocumentMetadata.versionId;
+    const v2Id = tsPlain.body.didDocumentMetadata.versionId;
+    const cases = [
+        [`/api/v1/did/${did}?versionId=${v1Id}`, '1'],
+        [`/api/v1/did/${did}?versionId=${v2Id}`, '2'],
+        [`/api/v1/did/${did}?versionId=${v2Id}&confirm=true`, 'notFound'],
+        [`/api/v1/did/${did}?versionId=bafkreinosuchoperation`, 'notFound'],
+        [`/api/v1/did/${did}?versionId=${v1Id}&versionSequence=1`, 'invalidOptions'],
+        [`/1.0/identifiers/${did}?versionId=${v1Id}`, '1'],
+        [`/1.0/identifiers/${did}?versionId=${v2Id}`, 'notFound'],
+        [`/1.0/identifiers/${did}?versionId=${v1Id}&versionTime=2026-04-11T12:06:00Z`, 'invalidOptions'],
+    ];
+    // The conformant surface answers application/did+ld+json, which request() leaves unparsed.
+    const parsed = body => (typeof body === 'string' ? JSON.parse(body) : body);
+    for (const [path, expected] of cases) {
+        const [ts, rust] = await both(get(path));
+        assertEqual(`versionId parity: ${path} status`, ts.status, rust.status);
+        const [tsBody, rustBody] = [parsed(ts.body), parsed(rust.body)];
+        assertEqual(`versionId parity: ${path}`, normalizeJson(tsBody), normalizeJson(rustBody));
+        const actual = tsBody.didResolutionMetadata?.error ?? tsBody.didDocumentMetadata?.versionSequence;
+        if (actual !== expected) {
+            throw new Error(`versionId parity: ${path} expected ${expected}, got ${actual}`);
+        }
+    }
+    console.log('ok versionId parity: both ports select, refuse and confirm-filter versionId identically');
 }
 
 await resetServiceState(tsBaseUrl);

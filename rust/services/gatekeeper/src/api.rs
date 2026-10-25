@@ -260,6 +260,7 @@ pub(crate) async fn list_dids(
             .get("versionSequence")
             .and_then(Value::as_u64)
             .and_then(|value| usize::try_from(value).ok()),
+        version_id: None,
         confirm: payload
             .get("confirm")
             .and_then(Value::as_bool)
@@ -1244,6 +1245,7 @@ pub(crate) async fn resolve_did(
         version_sequence: query
             .get("versionSequence")
             .and_then(|value| value.parse::<usize>().ok()),
+        version_id: query.get("versionId").cloned(),
         confirm: query
             .get("confirm")
             .map(|value| value == "true")
@@ -1257,6 +1259,9 @@ pub(crate) async fn resolve_did(
 
     let local_doc = match resolve_local_doc_async(&state, &did, resolve_options.clone()).await {
         Ok(doc) => doc,
+        Err(error) if is_valid_did(&did) && crate::resolver::is_invalid_options(&error) => {
+            did_resolution_error_doc("invalidOptions")
+        }
         Err(_) => {
             // Use the same syntax check as the conformant surface. This previously
             // tested only for a `did:` prefix, so a DID that is syntactically
@@ -1279,7 +1284,9 @@ pub(crate) async fn resolve_did(
     };
 
     let already_fallback = headers.get("x-archon-confirm-fallback").is_some();
-    let pending_successor = if resolve_options.confirm && !already_fallback
+    let pending_successor = if resolve_options.confirm
+        && resolve_options.version_id.is_none()
+        && !already_fallback
         && !state.config.confirm_fallback_url.trim().is_empty()
         && local_doc.pointer("/didResolutionMetadata/error").is_none()
     {
@@ -1357,7 +1364,11 @@ pub(crate) async fn resolve_did(
         .and_then(Value::as_bool)
         .unwrap_or(false);
 
+    // A versionId names one operation; a peer's latest confirmed state is not an
+    // answer to that question, so it is never delegated.
+    // Mirrors services/gatekeeper/server/src/confirm-fallback.ts.
     if resolve_options.confirm
+        && resolve_options.version_id.is_none()
         && !already_fallback
         && (local_doc.pointer("/didResolutionMetadata/error").and_then(Value::as_str) == Some("notFound")
             || (!has_resolver_error && (!local_confirmed || pending_successor)))
@@ -1430,6 +1441,7 @@ async fn resolve_conformant(
         version_sequence: query
             .get("versionSequence")
             .and_then(|value| value.parse::<usize>().ok()),
+        version_id: query.get("versionId").cloned(),
         confirm: true,
         verify: true,
         version_ordinal: None,

@@ -87,7 +87,7 @@ unhandled paths.
 | `GET` | `/api/v1/registries` | no | JSON array of supported registry names. |
 | `POST` | `/api/v1/did` | no | Submit a `create`, `update`, or `delete` operation. Create returns the new DID string; update/delete return `true`. See [§7](#7-did-create--update--delete-validation). |
 | `POST` | `/api/v1/did/generate` | no | Deterministic DID generation without persistence. Body: `Operation`. Returns: DID string. |
-| `GET` | `/api/v1/did/:did` | no | Resolve a DID (internal resolver; returns the full document set incl. `didDocumentData`/`didDocumentRegistration`, see [§3.7](#37-didciddocument-resolution-result)). Query params: `versionTime` (ISO 8601), `versionSequence` (int), `confirm` (`"true"`/`"false"`), `verify` (`"true"`/`"false"`). See [§6](#6-did-resolution-algorithm). For the standards-conformant surface see [§2.6](#26-conformant-did-resolution-surface). |
+| `GET` | `/api/v1/did/:did` | no | Resolve a DID (internal resolver; returns the full document set incl. `didDocumentData`/`didDocumentRegistration`, see [§3.7](#37-didciddocument-resolution-result)). Query params: `versionTime` (ISO 8601), `versionSequence` (int), `versionId` (operation CID), `confirm` (`"true"`/`"false"`), `verify` (`"true"`/`"false"`). See [§6](#6-did-resolution-algorithm). For the standards-conformant surface see [§2.6](#26-conformant-did-resolution-surface). |
 | `POST` | `/api/v1/dids/` | no | List DIDs. Body: `GetDIDOptions`. Only `/dids/` is registered explicitly; Express matches both `/dids` and `/dids/`. |
 | `POST` | `/api/v1/dids/remove` | yes | Body: array of DIDs. Returns boolean. |
 | `POST` | `/api/v1/dids/export` | no | Body: `{ "dids": string[] | undefined }`. Returns `GatekeeperEvent[][]` (one inner array per DID). |
@@ -185,7 +185,8 @@ which permits only three top-level members in a resolution result.
 
 Shared behavior:
 
-- **Query params:** `versionTime` (ISO 8601) and `versionSequence` (int) only.
+- **Query params:** `versionTime` (ISO 8601), `versionSequence` (int) and
+  `versionId` (operation CID) only.
   Unlike `/api/v1/did/:did`, the non-standard `confirm`/`verify` params are
   NOT accepted; this surface always resolves with `confirm: true, verify:
   true` (confirmed, cryptographically verified state). Clients needing raw or
@@ -212,7 +213,7 @@ Shared behavior:
   a resolution loop and would return an external resolver's representation.
   Clients that want fallback/import-propagation behavior use `/api/v1/did/:did`.
 - **Errors:**
-  - `invalidDid` -> HTTP 400; `notFound` -> HTTP 404.
+  - `invalidDid` -> HTTP 400; `invalidOptions` -> HTTP 400; `notFound` -> HTTP 404.
   - For `/:did`, errors are reported in `didResolutionMetadata.error` and the
     body remains triple-shaped (`didDocument: null`, `didDocumentMetadata:
     {}`).
@@ -397,7 +398,7 @@ standards-conformant `/1.0/identifiers/:did` surface returns only the
   "didDocumentRegistration": DocumentRegistration,
   "didResolutionMetadata": {
     "retrieved": "<RFC 3339>",                 // server time of resolution
-    "error": "notFound" | "invalidDid"         // present iff resolution failed
+    "error": "notFound" | "invalidDid" | "invalidOptions"  // present iff resolution failed
   }
 }
 ```
@@ -408,6 +409,7 @@ standards-conformant `/1.0/identifiers/:did` surface returns only the
 {
   "versionTime": "<RFC 3339>",                 // stop when resolution time > versionTime (§6)
   "versionSequence": <int>,                    // stop replay when versionSequence reached
+  "versionId": "<CID>",                        // stop after the operation with this canonical CID (§6.6)
   "confirm": true | false,                     // stop on first unconfirmed event
   "verify": true | false                       // re-verify every signature during resolution
 }
@@ -697,6 +699,9 @@ if events.is_empty():
     return { didResolutionMetadata: { error: "notFound" }, didDocument: {}, didDocumentMetadata: {} }
 if !is_valid_did(did):
     return { didResolutionMetadata: { error: "invalidDid" }, didDocument: {}, didDocumentMetadata: {} }
+if options.versionId is present and (options.versionId == "" or options.versionTime or options.versionSequence):
+    return { didResolutionMetadata: { error: "invalidOptions" }, didDocument: {}, didDocumentMetadata: {} }
+target := options.versionId and canonical_reference(options.versionId)   // §6.6
 
 anchor   := events[0]
 doc      := generate_initial_doc(anchor)            // §6.1
@@ -704,6 +709,7 @@ versionN := 1
 confirmed := true                                   // create is always confirmed by definition
 
 for event in events[1:]:
+    if target and doc.metadata.versionId == target: break
     resolutionTime := event.time
     if options.versionTime and resolutionTime > options.versionTime: break
     if options.versionSequence and versionN == options.versionSequence: break
@@ -717,6 +723,9 @@ for event in events[1:]:
             throw "Invalid operation: previd"
 
     apply(event, doc, &mut versionN)                  // §6.2
+
+if target and doc.metadata.versionId != target:
+    return { didResolutionMetadata: { error: "notFound" }, didDocument: {}, didDocumentMetadata: {} }
 
 doc.didResolutionMetadata := { retrieved: now() }
 return doc
@@ -874,6 +883,31 @@ dereference resources. Standard document metadata (`created`, `updated`,
 `timestamp`) is omitted here and exposed by `/registration`.
 
 ---
+
+### 6.6 Selecting a version by `versionId`
+
+`versionId` is the DID Core version selector: the canonical CID of one
+operation in the DID's accepted history. Resolution returns the document as of
+that operation, with that operation's metadata.
+
+- **Identity:** a retrieval alias retained in the operation cache resolves to
+  its canonical CID first, exactly as for `previd`. Peer-supplied identifiers
+  are not trusted.
+- **Not in the history walked:** if no applied operation has the requested CID,
+  resolution fails with `notFound`. Never fall back to the latest version.
+  This covers an unknown CID, an operation displaced by a preferred sibling,
+  and, with `confirm`, an operation not yet confirmed.
+- **Exclusive:** DID Resolution makes `versionId` and `versionTime` mutually
+  exclusive, and `versionSequence` is a third selector for the same thing.
+  Combining `versionId` with either, or passing it empty, fails with
+  `invalidOptions`.
+- **Why not `versionSequence`:** a sequence number names a position, not
+  content. Unanchored competing successors are ordered by canonical CID, so a
+  later-arriving sibling can take over a sequence number. Only `versionId`
+  identifies fixed content.
+- **No delegation:** a `confirm=true` request with `versionId` is never sent to
+  the confirmed-Gatekeeper peer. The peer's latest confirmed state does not
+  answer a request for one named operation.
 
 ## 7. DID create / update / delete validation
 

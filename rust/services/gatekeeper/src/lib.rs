@@ -1216,6 +1216,61 @@ mod tests {
             Value::String("created".to_string())
         );
 
+        let by_id = |version_id: &str, confirm: bool| {
+            db.resolve_doc(
+                &config,
+                did,
+                ResolveOptions {
+                    version_id: Some(version_id.to_string()),
+                    confirm,
+                    ..ResolveOptions::default()
+                },
+            )
+        };
+        let genesis = by_id("create-op", false).expect("genesis versionId should resolve");
+        assert_eq!(genesis["didDocumentMetadata"]["versionSequence"], "1");
+        assert_eq!(genesis["didDocumentMetadata"]["versionId"], "create-op");
+        let middle = by_id("update-op", false).expect("middle versionId should resolve");
+        assert_eq!(middle["didDocumentMetadata"]["versionSequence"], "2");
+        assert_eq!(middle["didDocumentMetadata"]["versionId"], "update-op");
+        assert_eq!(
+            middle["didDocumentData"]["displayName"],
+            Value::String("updated".to_string())
+        );
+        let latest = by_id("late-update-op", false).expect("latest versionId should resolve");
+        assert_eq!(latest["didDocumentMetadata"]["versionSequence"], "3");
+        // An operation outside the accepted history is notFound, never the latest version.
+        let unknown = by_id("no-such-op", false).expect_err("unknown versionId must fail");
+        assert!(unknown.chain().any(|cause| matches!(
+            cause.downcast_ref::<crate::resolver::ResolveError>(),
+            Some(crate::resolver::ResolveError::NotFound)
+        )));
+        // With confirm, an unconfirmed operation is not in the history walked.
+        assert!(by_id("update-op", true).is_err());
+        assert!(by_id("create-op", true).is_ok());
+        // versionId is mutually exclusive with the other version selectors.
+        for options in [
+            ResolveOptions {
+                version_id: Some("update-op".to_string()),
+                version_sequence: Some(2),
+                ..ResolveOptions::default()
+            },
+            ResolveOptions {
+                version_id: Some("update-op".to_string()),
+                version_time: Some("2026-04-11T12:06:00Z".to_string()),
+                ..ResolveOptions::default()
+            },
+            ResolveOptions {
+                version_id: Some(String::new()),
+                ..ResolveOptions::default()
+            },
+        ] {
+            let error = db
+                .resolve_doc(&config, did, options)
+                .expect_err("conflicting options must fail");
+            assert!(crate::resolver::is_invalid_options(&error));
+        }
+
         let by_time = db
             .resolve_doc(
                 &config,
