@@ -281,33 +281,66 @@ implied by the object's kind and operation (create, update or delete).
 
 ## Attribution
 
-A verifier attributes object *O* to user *U* as follows.
+Attribution is decided **per version**, along the object's accepted history. The
+current controller is not evidence of authorship: an asset transfer needs only the
+previous owner's signature, so anyone can create an object naming *U* as author and
+then transfer it to *U* without *U* signing anything.
 
-**Direct publishing.** If `O.memeplex.capability` is absent, *O* is attributed to *U*
-when *O*'s controller is *U* and `O.memeplex.author` is *U*.
+### Capability check
 
-**Delegated publishing.** Otherwise, with *Z* = `O.memeplex.capability` and *T* = the
-time of the version being checked, walk the ZCAP chain:
+*capability-ok(Z, U, A, X, T)* holds when capability *Z* lets controller *A* perform
+action *X* for user *U* at time *T*:
 
 1. *Z*'s chain ends at the root capability whose `invocationTarget` and `controller`
-   are *U*, and `O.memeplex.author` is *U*.
+   are *U*.
 2. Each delegation proof in the chain verifies, signed by a key of the previous link's
    controller (for the first link, *U*'s key as resolved at the proof's time).
 3. Each link narrows its parent: actions a subset, expiry no later.
-4. *O*'s controller is *Z*'s `controller`, and the operation's signature verifies
-   against that controller's key.
+4. *Z*'s `controller` is *A*.
 5. *T* is before each link's `expires`.
-6. The object's kind and operation are within *Z*'s `allowedAction`.
+6. *X* is within *Z*'s `allowedAction`.
 7. Each link's handle, resolved at *T*, exists, is not deactivated, and holds a
    capability with the same `id`. Because the capability names its handle, a copy
    under another asset fails here.
-8. The revocation snapshot, if any, admits this version (next section).
-
-If any step fails, the object is shown as unattributed: it exists, but not as *U*'s.
+8. Any revocation or expiry snapshot for a link admits this version (see Revocation).
 
 Steps 1–6 follow the ZCAP verification algorithm; steps 7 and 8 are the Archon
-revocation profile. A shared verifier library should implement them once for clients
-and indexers alike.
+revocation profile.
+
+### Creation
+
+The create operation decides whether an object is a publication by *U* at all. Let *A*
+be the controller the create operation names and signs with, and *T* its time.
+
+- **Direct:** `memeplex.capability` is absent, `memeplex.author` is *U*, and *A* is *U*.
+- **Delegated:** `memeplex.author` is *U*, and *capability-ok(Z, U, A, X, T)* holds for
+  *Z* = `memeplex.capability` and *X* the creating action for the object's kind
+  (`memeplex:post`, `memeplex:reply`, `memeplex:review` or `memeplex:react`).
+
+An object whose creation is not attributed is never attributed, whatever its later
+versions say.
+
+### Later versions
+
+An update or deletion, signed by its predecessor's controller *A* at time *T*, is
+attributed to *U* only if all of these hold:
+
+1. Its predecessor version is attributed to *U*, so attribution runs unbroken from the
+   creation.
+2. It leaves `author` and `kind` unchanged. (A deletion clears the data; the check
+   applies to the predecessor.)
+3. *A* is *U* (direct), or *capability-ok(Z, U, A, X, T)* holds for the capability *Z*
+   the version carries and *X* = `memeplex:edit` or `memeplex:delete`. *Z* may be a
+   renewal rather than the creating capability, but its controller must be *A*.
+4. If it changes the controller, the new controller is *U*: a client may hand an object
+   back to its author, after which later versions are direct. Any other transfer ends
+   attribution for every later version.
+
+A version that fails is shown as unattributed and stops the lineage: later versions
+built on it are unattributed too. Earlier attributed versions stay attributed.
+
+A shared verifier library should implement these rules once for clients and indexers
+alike.
 
 ## Revocation
 
@@ -330,11 +363,17 @@ Options:
 
 1. **Revocation snapshot (recommended).** When revoking, the wallet first queries the
    objects published under the handle (`memeplex.capability.id $in [handle]`) and
-   records the set it accepts, mapping each object DID to its version sequence at that
-   moment. The record goes into the user's DID data under `memeplex.revocations[handle]`,
-   with the set on IPFS if it is large. Step 8 then admits only versions in the
-   snapshot. Objects the wallet's node had not yet seen are lost, which is the right
-   failure direction.
+   records the set it accepts, mapping each object DID to the `versionId` (the
+   canonical operation CID) of its accepted version at that moment. The record goes
+   into the user's DID data under `memeplex.revocations[handle]`, with the set on IPFS
+   if it is large. Step 8 then admits a version only if its `versionId` is in the
+   snapshot or is an ancestor of one, reached through signed `previd` links. Objects
+   the wallet's node had not yet seen are lost, which is the right failure direction.
+
+   The snapshot names operations, not sequence numbers, because a sequence number does
+   not identify content: a revoked client could publish a backdated sibling at the same
+   sequence that Archon's sibling ordering prefers over the snapshotted version. Under
+   the `versionId` rule that sibling is simply unattributed.
 2. **Anchoring.** Attribute only versions anchored on a chain before the revocation's
    anchor. This is sound but slow and costly for ordinary posts.
 3. **First-seen time.** Indexers record when they first observed each version and
@@ -342,7 +381,15 @@ Options:
    heuristic but is not verifiable by others.
 
 The snapshot needs nothing new from the protocol, and a user who suspects a compromise
-can also date the snapshot earlier than the revocation to disown recent objects.
+can also take it from an earlier point to disown recent objects.
+
+### Expiry has the same gap
+
+After `expires`, a client that still has its key can publish objects dated before the
+expiry, and step 5 accepts them. On `hyperswarm`, expiry therefore bounds a delegation
+only when the wallet also records a snapshot for it, as for revocation. The wallet
+should do so when it renews a capability and when one lapses. Without a snapshot,
+expiry bounds only anchored publications.
 
 ### Who controls published objects
 
@@ -384,9 +431,22 @@ because anyone can write any `author` into an object they publish.
 
 Timelines, ranking, full-text search and counts need an indexer. The Memepool indexer:
 
-- follows new activity through `GET /api/v1/events` (filtered by time and registry),
-  and resolves objects whose data has a `memeplex` member;
-- verifies attribution once per version and stores the result;
+- discovers new activity through `GET /api/v1/events` and resolves objects whose data
+  has a `memeplex` member;
+- remembers every DID it has indexed and processes every later event for those DIDs,
+  including deletions. A deleted object's data is cleared, so it no longer carries a
+  `memeplex` member, and filtering on that member would leave stale posts and
+  reactions in the index instead of tombstones;
+- reconciles periodically against full state, because the events feed is ordered by
+  event time, not arrival. A late or backdated publication can land behind any
+  polling watermark, and replay can displace a branch without emitting a new event.
+  Reconciliation re-resolves the indexed DIDs and re-reads the events feed over its
+  whole range;
+- verifies attribution per version and records what each result depended on: the
+  capability handles in the chain, the author's DID (which holds revocation records),
+  and the controllers whose keys signed. When any of those change, the indexer
+  re-verifies the affected versions, so a later revocation snapshot can disown objects
+  it had already accepted;
 - builds timelines for the set of authors a reader supplies (see Follows), thread
   trees, reply and reaction counts, and per-tag feeds;
 - serves them to clients over HTTP, behind Drawbridge like other public surfaces.
@@ -433,9 +493,13 @@ individual DIDs or are batched.
   Attribution, not the data, decides authorship. Clients must never display an
   unverified `author` as fact.
 - **Capability copying.** Prevented by the capability's handle-bound `id` and step 7.
-- **Backdating after revocation.** Addressed by the revocation snapshot.
+- **Backdating after revocation or expiry.** Addressed by snapshots bound to operation
+  CIDs.
 - **Over-broad actions.** Wallets should default to narrow actions, and show which
-  clients hold which actions. ZCAP's mandatory expiry bounds a forgotten delegation.
+  clients hold which actions. ZCAP's mandatory expiry bounds a forgotten delegation
+  only for anchored publications, or with an expiry snapshot (see Revocation).
+- **Transferred objects.** Ownership is not authorship; attribution follows the
+  creation and signed lineage, never the current controller.
 - **Spam.** Object creation on `hyperswarm` is free. Indexers will need rate limits or
   cost per author (for example L402 on publishing through a hosted node, or ranking by
   trust graph). Not designed here.
@@ -448,9 +512,10 @@ individual DIDs or are batched.
 1. **Benchmark** objects-as-DIDs at the volumes above (Scale).
 2. **Schemas:** the object schema and the Memeplex ZCAP profile (actions, handle,
    revocation), with signed fixtures.
-3. **Verifier library:** attribution steps 1–8, shared by clients and the indexer, with
+3. **Verifier library:** the attribution rules, shared by clients and the indexer, with
    cross-checks against real signed objects, including revoked, expired, widened and
-   copied capabilities.
+   copied capabilities, transferred objects, edit-only capabilities, and backdated
+   siblings.
 4. **Direct publishing:** create, edit, delete and query objects from the existing CLI
    and SDKs with no delegation; this works with today's `create-asset-json`.
 5. **Delegation:** wallet UI to grant, renew, list and revoke capabilities, including
@@ -473,6 +538,9 @@ individual DIDs or are batched.
   capabilities be able to narrow further (for example, replies only within one thread)?
 - **Revocation record.** Is `memeplex.revocations` in the user's DID data the right
   place, given that every revocation then updates the user's DID?
+- **Change feed.** Should Gatekeeper offer an arrival-ordered change feed? It would
+  let indexers follow new and displaced versions directly, instead of reconciling
+  periodically against full state.
 - **Reactions.** Individual DIDs or batched, pending the benchmark.
 - **Public follows.** Whether Memeplex should ever define a public follow list (see
   Follows), and if so, where it lives.
