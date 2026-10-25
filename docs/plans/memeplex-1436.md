@@ -288,7 +288,7 @@ actions to be a subset of the parent's and its expiry to be no later.
 | `memeplex:reply` | create `reply` objects |
 | `memeplex:review` | create `review` objects |
 | `memeplex:react` | create and delete `reaction` objects |
-| `memeplex:rate` | create `rating` objects |
+| `memeplex:rate` | create, edit and delete `rating` objects |
 | `memeplex:tag` | create and delete `tag` objects |
 | `memeplex:edit` | update objects published under this capability |
 | `memeplex:delete` | delete objects published under this capability |
@@ -378,8 +378,10 @@ attributed to *U* only if all of these hold:
 2. It leaves `author` and `kind` unchanged. (A deletion clears the data; the check
    applies to the predecessor.)
 3. *A* is *U* (direct), or *capability-ok(Z, U, A, X, T)* holds for the capability *Z*
-   the version carries and *X* = `memeplex:edit` or `memeplex:delete`. *Z* may be a
-   renewal rather than the creating capability, but its controller must be *A*.
+   the version carries and *X* = `memeplex:edit` or `memeplex:delete`, or the kind's own
+   action where that action covers it (`memeplex:react` and `memeplex:tag` cover
+   deletion; `memeplex:rate` covers editing and deletion). *Z* may be a renewal rather
+   than the creating capability, but its controller must be *A*.
 4. If it changes the controller, the new controller is *U*: a client may hand an object
    back to its author, after which later versions are direct. Any other transfer ends
    attribution for every later version.
