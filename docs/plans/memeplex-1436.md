@@ -18,10 +18,10 @@ Two decisions shape everything else:
    supplies permalinks, ownership, edit history, deletion, gossip and optional chain
    timestamps.
 2. **Applications live outside the wallet.** The user's wallet holds the root
-   identity and delegates scoped, revocable authority to a separate client using an
-   existing standard, Authorization Capabilities (ZCAP). The client publishes under its
-   own agent DID, and verifiers attribute its objects to the user through the
-   capability. This needs no protocol change.
+   identity and gives a separate client a scoped, revocable **grant**: an ordinary
+   asset the user creates, naming the client and what it may do. The client publishes
+   under its own agent DID, and verifiers attribute its objects to the user through the
+   grant. This needs no protocol change.
 
 ## Goals
 
@@ -37,7 +37,7 @@ Two decisions shape everything else:
 ## Non-goals
 
 - **No protocol change.** Gatekeeper's single-controller rule and its authorization
-  model are unchanged. Delegation lives in signed capabilities and verifier logic.
+  model are unchanged. Delegation lives in grant assets and verifier logic.
 - **No private content in v1.** Objects are public plaintext. Private circles (for
   example on group vaults, as in #1044) are later work.
 - **No central ranking or moderation.** Indexers and clients may rank and filter, but
@@ -49,7 +49,7 @@ Two decisions shape everything else:
 
 | Name | What it is |
 |---|---|
-| **Memeplex** | The protocol: object schemas, the delegation profile, the attribution rules, and the query conventions. |
+| **Memeplex** | The protocol: object schemas, grants, the attribution rules, and the query conventions. |
 | **Memepool** | The first client and indexer, run by the project. |
 | **object** | Any Memeplex asset DID: post, article, paper, reply, review, reaction, rating, tag. |
 | **author** | The user DID an object is attributed to. |
@@ -71,8 +71,7 @@ and the Gatekeeper documentation.
 | Anchor an object | `changeRegistry` to a chain registry (BTC, ZEC, ETH, SOL) gives the object a chain-backed timestamp. |
 | Move an object | `transferAsset` to another agent DID. |
 | Large content | IPFS via the Gatekeeper data API (`createFile` stores `{ cid, filename, type, bytes }`). Operations are limited to 64 Ki JSON code units in both Gatekeeper ports. |
-| Signed delegation | Data Integrity proofs, which Archon already produces for operations (`proofPurpose: capabilityInvocation`) and credentials. |
-| Revocable handle | An issuer-owned asset holding the capability, bound to its own DID the way credentials are (#948), and deactivated to revoke. |
+| Delegation | A grant: an asset the user creates and controls, naming the client and its actions. Revoked with `revokeDID`. |
 | Historical checks | Resolution at `versionTime`, as used by historical `verifyResponse` (#1299). |
 | Discovery | Gatekeeper `POST /api/v1/query` (`$in` match on a `didDocumentData` path) and `GET /api/v1/events` (paged event feed by time and registry). |
 
@@ -88,7 +87,7 @@ prefix.
     "v": 1,
     "kind": "post",                 // see kinds below
     "author": "did:cid:…user",      // the attributed user
-    "capability": "did:cid:…",      // the handle holding the delegated zcap; omitted when the author publishes directly
+    "grant": "did:cid:…",           // the grant it was published under; omitted when the author publishes directly
 
     // content: inline text, or a reference for anything large
     "text": "…",
@@ -132,7 +131,7 @@ added by agreement, not by registry.
 
 One object of each kind, showing each object's `didDocumentData`. All but the reply are
 published directly by their author. The reply is published by a delegated client, so it
-names the handle of its capability (see Delegation). DIDs are
+names the grant it was published under (see Delegation). DIDs are
 shortened.
 
 **post**
@@ -164,11 +163,11 @@ shortened.
                 "tags": ["distributed-systems", "did"] } }
 ```
 
-**reply**: published by Bob's client under his capability, quoting another post
+**reply**: published by Bob's client under his grant, quoting another post
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "reply", "author": "did:cid:…bob",
-                "capability": "did:cid:…bobs-handle",
+                "grant": "did:cid:…bobs-grant",
                 "parent": "did:cid:…alice-post", "root": "did:cid:…alice-post",
                 "text": "Including the reactions? See the scale section.",
                 "quotes": ["did:cid:…carol-post"] } }
@@ -337,78 +336,34 @@ and editable by a delegated client. Neither is part of v1.
 
 ## Delegation
 
-### Standards considered
+### Grants
 
-Delegation should use an existing standard rather than a Memeplex-specific credential.
-The Decentralized Identity Foundation's review of delegated-authorization options found
-two with chained delegation: ZCAP and UCAN.
-
-| | ZCAP (Authorization Capabilities) | UCAN | Plain verifiable credential |
-|---|---|---|---|
-| Maintainer | W3C Credentials Community Group | UCAN working group | — (convention only) |
-| Version | v0.4.0 draft; revival proposed April 2026 | v1.0.0 release candidates | No delegation schema exists; only community drafts and sector profiles |
-| Encoding | JSON-LD, Data Integrity proofs | DAG-CBOR envelope, varsig signatures | JSON-LD |
-| Scope | `invocationTarget` plus `allowedAction` | `cmd` hierarchy plus a policy language | Whatever the schema says |
-| Chaining | `parentCapability`; child may only narrow the parent | `aud`→`iss` proof chain; may only narrow | Not defined |
-| Expiry | Required; child no later than parent; verifiers SHOULD reject more than 3 months out | `exp` required but may be `null` | Optional |
-| Revocation | Largely unspecified (a verifier-side endpoint) | Separate revocation spec | Archon: deactivate the credential DID |
-| Fit with Archon | Archon already signs Data Integrity proofs and names `capabilityInvocation` as its operation proof purpose | Needs DAG-CBOR and varsig codecs Archon does not have | Native, but invents its own semantics |
-
-**Decision: use the ZCAP data model**, signed with the Data Integrity proofs Archon
-already produces, and supply revocation from Archon, which ZCAP leaves unspecified.
-UCAN's command hierarchy and policy language are attractive, but its encoding is
-foreign to everything else Archon signs. A plain credential would reinvent exactly the
-semantics (attenuation, chaining, expiry) that ZCAP already defines.
-
-### Parties
-
-- **User:** an agent DID whose wallet holds the root key.
-- **Client:** an agent DID created by the application, holding its own key. Agents
-  are self-controlled, so the user cannot own the client's DID.
-
-### Capabilities
-
-The **root capability** names the user's DID as its target and its controller, and is
-never stored or signed (a ZCAP root is identified by its target):
+A **grant** lets one client publish for one user. It is an asset the user's wallet
+creates, so it is signed with the user's own key and controlled by the user:
 
 ```jsonc
-{
-  "@context": "https://w3id.org/zcap/v1",
-  "id": "urn:zcap:root:did%3Acid%3A…user",
-  "controller": "did:cid:…user",
-  "invocationTarget": "did:cid:…user"
-}
+{ "memeplexGrant": { "v": 1,
+                     "client": "did:cid:…client",
+                     "actions": ["memeplex:post", "memeplex:reply", "memeplex:react", "memeplex:edit"] } }
 ```
 
-The wallet **delegates** from the root to the client:
+- **Client:** the agent DID the application created, holding its own key. Agents are
+  self-controlled, so the user cannot own the client's DID; the grant is how the user
+  vouches for it.
+- **Actions:** what the client may do (table below). The user can narrow a grant by
+  editing it; each object is checked against the grant as it stood when the object was
+  published.
+- **Revocation:** the wallet deletes the grant with `revokeDID`.
+- **No expiry and no chains.** A grant lasts until it is revoked, and a client cannot
+  pass it on: only the user can create a grant. Wallets list active grants so unused
+  ones can be revoked.
 
-```jsonc
-{
-  "@context": ["https://w3id.org/zcap/v1", "https://w3id.org/security/suites/…"],
-  "id": "did:cid:…handle",              // the asset that holds this capability (see Revocation)
-  "parentCapability": "urn:zcap:root:did%3Acid%3A…user",
-  "invocationTarget": "did:cid:…user",
-  "controller": "did:cid:…client",
-  "allowedAction": ["memeplex:post", "memeplex:reply", "memeplex:react", "memeplex:edit"],
-  "expires": "2027-01-24T18:00:00Z",
-  "proof": {
-    "type": "DataIntegrityProof",
-    "proofPurpose": "capabilityDelegation",
-    "capabilityChain": ["urn:zcap:root:did%3Acid%3A…user"],
-    "verificationMethod": "did:cid:…user#key-1",
-    "created": "2026-10-24T18:00:00Z",
-    "proofValue": "…"
-  }
-}
-```
-
-A client may delegate a narrower capability onward, for example to a scheduling bot,
-with this capability as `parentCapability`. ZCAP's rules then require the child's
-actions to be a subset of the parent's and its expiry to be no later.
+Grants use their own `memeplexGrant` data member, not `memeplex`, so indexers never
+mistake one for a publication.
 
 ### Actions
 
-| `allowedAction` | Allows the controller to |
+| Action | Allows the client to |
 |---|---|
 | `memeplex:post` | create `post`, `article` and `paper` objects |
 | `memeplex:reply` | create `reply` objects |
@@ -416,59 +371,32 @@ actions to be a subset of the parent's and its expiry to be no later.
 | `memeplex:react` | create and delete `reaction` objects |
 | `memeplex:rate` | create, edit and delete `rating` objects |
 | `memeplex:tag` | create and delete `tag` objects |
-| `memeplex:edit` | update objects published under this capability |
-| `memeplex:delete` | delete objects published under this capability |
+| `memeplex:edit` | update objects published under this grant |
+| `memeplex:delete` | delete objects published under this grant |
 
 A client asks for the actions it needs; the wallet shows them and the user approves a
 subset.
 
-### Expiry and renewal
-
-ZCAP requires an expiry, and verifiers should reject one more than three months out. A
-wallet therefore renews a client's capability before it expires, by delegating a new
-capability with a new handle. Objects published under the old one stay attributed (the
-attribution check uses the object's own time), so renewal costs one wallet action per
-period and nothing else.
-
-### Issuance flow
+### Flow
 
 1. The client creates its agent DID and shows it to the user, for example as a QR code
    or a deep link into the wallet.
-2. The wallet shows the requested actions and expiry, creates the handle asset, signs
-   the capability with the handle's DID as its `id`, and stores the signed capability in
-   the handle.
-3. The client names the handle's DID as `memeplex.capability` in every object it
-   publishes for that user.
+2. The wallet shows the requested actions and creates the grant.
+3. The client names the grant's DID as `memeplex.grant` in every object it publishes
+   for that user.
 
-A client may hold capabilities from several users (a shared device, or a service
-publishing for many people); the `author` and `capability` fields keep them apart.
+A client may hold grants from several users (a shared device, or a service publishing
+for many people); the `author` and `grant` fields keep them apart.
 
-### Capabilities are referenced, not embedded
+### Standards considered
 
-ZCAP says verifiers must not fetch capabilities by ID during chain verification, so a
-ZCAP invocation normally carries its whole chain. Memeplex departs from that
-deliberately: an object names its capability's handle DID, and verifiers resolve it.
-
-- **The capability already is a DID.** It lives in its handle, and the handle's DID is
-  its `id`. Embedding it would put a second copy in every object.
-- **Verification resolves the handle anyway.** The revocation check (step 7) resolves
-  the handle at the object's time, which yields the capability as it stood then. An
-  embedded copy would never be the authoritative one.
-- **The reasons for ZCAP's rule do not apply.** The rule protects verifiers that
-  cannot trust a fetched copy or must verify offline. Archon resolution is signed and
-  versioned, and attribution already depends on resolving the author's and the
-  client's DIDs.
-- **Objects stay small.** A chain is large, and objects are numerous.
-
-A delegated child capability names its parent the same way: its `parentCapability` is
-the parent's handle DID.
-
-### Invocation
-
-In ZCAP terms, publishing an object is an invocation of the capability. Archon already
-signs every operation with `proofPurpose: capabilityInvocation`; the client's signature
-on the object's create or update operation is the invocation proof, and the action is
-implied by the object's kind and operation (create, update or delete).
+ZCAP (W3C CCG Authorization Capabilities) and UCAN were considered. Both exist mainly
+for chained delegation and for verifying a capability without fetching anything.
+Memeplex needs neither: one level of delegation is enough, and Archon verification
+already resolves DIDs. A grant asset already has what those formats add: it is signed
+by the user, versioned, resolvable as of any past time, and revoked by deactivation.
+Adopting either standard would add a proof format and verification rules without
+adding protection.
 
 ## Attribution
 
@@ -477,41 +405,30 @@ current controller is not evidence of authorship: an asset transfer needs only t
 previous owner's signature, so anyone can create an object naming *U* as author and
 then transfer it to *U* without *U* signing anything.
 
-### Capability check
+### Grant check
 
-*capability-ok(Z, U, A, X, T)* holds when capability *Z* lets controller *A* perform
-action *X* for user *U* at time *T*:
+*grant-ok(G, U, A, X, T)* holds when grant *G* lets client *A* perform action *X* for
+user *U* at time *T*:
 
-1. *Z*'s chain ends at the root capability whose `invocationTarget` and `controller`
-   are *U*.
-2. Each delegation proof in the chain verifies, signed by a key of the previous link's
-   controller (for the first link, *U*'s key as resolved at the proof's time).
-3. Each link narrows its parent: actions a subset, expiry no later.
-4. *Z*'s `controller` is *A*.
-5. *T* is before each link's `expires`.
-6. *X* is within *Z*'s `allowedAction`.
-7. Each link's handle, resolved at *T*, exists, is not deactivated, and holds a
-   capability whose `id` is that handle's DID. *Z* itself is read from the handle the
-   object names, and each parent from the handle its `parentCapability` names, so every
-   link is the version in force at *T*. A copy of a capability placed in some other
-   asset fails here, because its `id` names a different DID.
-8. For each link, any revocation or expiry snapshot its delegator recorded admits this
-   version (see Revocation).
-
-Steps 1–6 follow the ZCAP verification algorithm; steps 7 and 8 are the Archon
-revocation profile.
+1. *G*'s create operation names *U* as its controller and is signed by *U*. (A grant
+   someone else created and then transferred to *U* does not count, for the same reason
+   as above.)
+2. *G* resolved at *T* exists, is not deactivated, and is still controlled by *U*.
+3. Its `client` is *A*.
+4. *X* is in its `actions`.
+5. If *U* recorded a revocation snapshot for *G*, the snapshot admits this version (see
+   Revocation).
 
 ### Creation
 
 The create operation decides whether an object is a publication by *U* at all. Let *A*
 be the controller the create operation names and signs with, and *T* its time.
 
-- **Direct:** `memeplex.capability` is absent, `memeplex.author` is *U*, and *A* is *U*.
-- **Delegated:** `memeplex.author` is *U*, and *capability-ok(Z, U, A, X, T)* holds for
-  *Z* the capability held by the handle `memeplex.capability` names, and *X* the creating
-  action for the object's kind
-  (`memeplex:post`, `memeplex:reply`, `memeplex:review`, `memeplex:react`,
-  `memeplex:rate` or `memeplex:tag`).
+- **Direct:** `memeplex.grant` is absent, `memeplex.author` is *U*, and *A* is *U*.
+- **Delegated:** `memeplex.author` is *U*, and *grant-ok(G, U, A, X, T)* holds for *G* =
+  `memeplex.grant` and *X* the creating action for the object's kind (`memeplex:post`,
+  `memeplex:reply`, `memeplex:review`, `memeplex:react`, `memeplex:rate` or
+  `memeplex:tag`).
 
 An object whose creation is not attributed is never attributed, whatever its later
 versions say.
@@ -523,16 +440,13 @@ attributed to *U* only if all of these hold:
 
 1. Its predecessor version is attributed to *U*, so attribution runs unbroken from the
    creation.
-2. It leaves `author` and `kind` unchanged. (A deletion clears the data; the check
-   applies to the predecessor.)
-3. *A* is *U* (direct), or *capability-ok(Z, U, A, X, T)* holds with *X* =
+2. It leaves `author`, `kind` and `grant` unchanged: an object stays under the grant it
+   was created under. (A deletion clears the data; the check applies to the
+   predecessor.)
+3. *A* is *U* (direct), or *grant-ok(G, U, A, X, T)* holds for that grant with *X* =
    `memeplex:edit` or `memeplex:delete`, or the kind's own action where that action
    covers it (`memeplex:react` and `memeplex:tag` cover deletion; `memeplex:rate` covers
-   editing and deletion). For an update, *Z* is the capability the new version carries;
-   it may be a renewal rather than the creating capability, but its controller must be
-   *A*. A deletion carries no data, so for a deletion *Z* is the capability its
-   predecessor carries. To delete under a renewal, a client first installs the renewal
-   with an attributed update.
+   editing and deletion).
 4. If it changes the controller, the new controller is *U*: a client may hand an object
    back to its author, after which later versions are direct. Any other transfer ends
    attribution for every later version.
@@ -545,66 +459,39 @@ alike.
 
 ## Revocation
 
-ZCAP leaves revocation largely to the verifier. Memeplex supplies it from Archon: each
-delegated capability lives in an asset owned by its delegator (the **handle**), and
-deactivating the handle with `revokeDID` revokes the capability. From then on step 7
-fails for any version whose time is after the revocation. This is the same binding
-Archon credentials use (#948): the handle's DID is the capability's `id`, so it is
-created first and the signed capability is written into it with an update.
+The wallet revokes a grant with `revokeDID`. From then on step 2 of the grant check
+fails for any version whose time is after the revocation.
 
 ### The backdating gap
 
 On `hyperswarm`, *T* is the publisher-chosen `proof.created`. A client that keeps its
 key after revocation (a stolen device, a rogue app) can create objects or edits dated
-before the revocation, and step 7 would accept them. Gatekeeper does not bound
+before the revocation, and the grant check would accept them. Gatekeeper does not bound
 Hyperswarm times by receipt, and adding such a bound is a protocol decision outside
 this design.
 
-Options:
+The fix is a **revocation snapshot**. Before revoking, the wallet queries the objects
+published under the grant (`memeplex.grant $in [grant]`; an object never changes its
+grant, so this finds every live one) and records, for each, the `versionId` (canonical
+operation CID) of its accepted version at that moment. The record goes into the user's
+DID data under `memeplex.revocations[grant]`, with the set on IPFS if it is large. Step
+5 of the grant check then admits a version only if its `versionId` is in the snapshot or
+is an ancestor of one, through signed `previd` links.
 
-1. **Revocation snapshot (recommended).** When revoking, the delegator first finds every
-   object whose history depends on the handle, and records the set it accepts, mapping
-   each object DID to the `versionId` (the canonical operation CID) of its accepted
-   version at that moment.
+- Objects the wallet's node had not yet seen are lost, which is the right failure
+  direction. Deleted objects no longer match the query; only their tombstones lose
+  attribution.
+- The snapshot names operations, not sequence numbers. A sequence number does not
+  identify content: a revoked client could publish a backdated sibling at the same
+  sequence that Archon's sibling ordering prefers. That sibling is simply not in the
+  snapshot.
+- A user who suspects a compromise can take the snapshot from an earlier point to
+  disown recent objects.
 
-   The current capability is not enough to find them. An object created under the
-   handle and later edited under a renewal no longer carries it, and objects published
-   under capabilities delegated *from* the handle carry their own. Missing either would
-   drop its creation from the snapshot and break the whole lineage. So the wallet
-   queries the user's objects by author (`memeplex.author $in [user]`; `author` never
-   changes), walks each object's history, and includes the object if any version's
-   capability chain contains the handle. Deleted objects no longer match the author
-   query; only their tombstones lose attribution. The delegator records the snapshot in
-   its **own** DID data, under `memeplex.revocations[handle]`, with the set on IPFS if
-   it is large. Only the handle's owner can deactivate the handle, and only it can write
-   its own DID, so the record is authenticated by the same key that revokes. For a
-   capability the wallet issued, that is the user's DID; for one a client delegated
-   onward (user → client → bot), it is the client's DID, so a client can revoke what it
-   delegated without involving the user. Step 8 then admits a version only if its `versionId` is in the
-   snapshot or is an ancestor of one, reached through signed `previd` links. Objects
-   the delegator's node had not yet seen are lost, which is the right failure direction.
-
-   The snapshot names operations, not sequence numbers, because a sequence number does
-   not identify content: a revoked client could publish a backdated sibling at the same
-   sequence that Archon's sibling ordering prefers over the snapshotted version. Under
-   the `versionId` rule that sibling is simply unattributed.
-2. **Anchoring.** Attribute only versions anchored on a chain before the revocation's
-   anchor. This is sound but slow and costly for ordinary posts.
-3. **First-seen time.** Indexers record when they first observed each version and
-   distrust versions first seen after the revocation. This is useful as a client-side
-   heuristic but is not verifiable by others.
-
-The snapshot needs nothing new from the protocol, and a user who suspects a compromise
-can also take it from an earlier point to disown recent objects.
-
-### Expiry has the same gap
-
-After `expires`, a client that still has its key can publish objects dated before the
-expiry, and step 5 accepts them. On `hyperswarm`, expiry therefore bounds a delegation
-only when its delegator also records a snapshot for it, as for revocation. The
-delegator (the wallet, or a client for capabilities it delegated onward) should do so
-when it renews a capability and when one lapses. Without a snapshot,
-expiry bounds only anchored publications.
+Two weaker alternatives were considered. Attributing only versions anchored on a chain
+before the revocation is sound but slow and costly for ordinary posts. Distrusting
+versions an indexer first saw after the revocation is a useful client-side heuristic,
+but other parties cannot verify it.
 
 ### Who controls published objects
 
@@ -616,10 +503,10 @@ The client controls the objects it publishes. Consequences:
   rogue or abandoned one will not.
 
 Decision (from #1436): accept this for v1. If usage shows users need direct control,
-the alternatives are a delegation term requiring transfer on request (unenforced), or a
+the alternatives are a grant term requiring transfer on request (unenforced), or a
 protocol change letting Gatekeeper accept operations on a user's assets signed by a key
-the user's capability names. The latter changes protocol authorization and needs its
-own decision.
+the user's grant names. The latter changes protocol authorization and needs its own
+decision.
 
 ## Discovery and indexing
 
@@ -635,7 +522,7 @@ cover the controller, which is why objects carry `author` in their data.
 | A whole thread | `{ "where": { "memeplex.root": { "$in": ["did:cid:…root"] } } }` |
 | Every response to an object | `{ "where": { "memeplex.parent": { "$in": ["did:cid:…"] } } }` |
 | Boosts and quote posts of an object | `{ "where": { "memeplex.quotes[*]": { "$in": ["did:cid:…"] } } }` |
-| Objects under one capability | `{ "where": { "memeplex.capability": { "$in": ["did:cid:…handle"] } } }` |
+| Objects under one grant | `{ "where": { "memeplex.grant": { "$in": ["did:cid:…grant"] } } }` |
 | Objects an author tagged | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
 | Tags others applied (their `parent`s are the tagged objects) | `{ "where": { "memeplex.tag": { "$in": ["cryptography"] } } }` |
 
@@ -660,10 +547,9 @@ Timelines, ranking, full-text search and counts need an indexer. The Memepool in
   Reconciliation re-resolves the indexed DIDs and re-reads the events feed over its
   whole range;
 - verifies attribution per version and records what each result depended on: the
-  capability handles in the chain, each link's delegator DID (which holds that link's
-  revocation and expiry snapshots), and the controllers whose keys signed. When any of those change, the indexer
-  re-verifies the affected versions, so a later revocation snapshot can disown objects
-  it had already accepted;
+  grant, the author's DID (which holds revocation snapshots), and the controllers
+  whose keys signed. When any of those change, the indexer re-verifies the affected
+  versions, so a later revocation snapshot can disown objects it had already accepted;
 - builds timelines for the set of authors a reader supplies (see Follows), thread
   trees, reply, reaction and boost counts, and per-tag feeds;
 - serves them to clients over HTTP, behind Drawbridge like other public surfaces.
@@ -711,12 +597,11 @@ stay as individual DIDs or are batched.
 - **Spoofed authorship.** Anyone can publish an object claiming any `author`.
   Attribution, not the data, decides authorship. Clients must never display an
   unverified `author` as fact.
-- **Capability copying.** Prevented by the capability's handle-bound `id` and step 7.
-- **Backdating after revocation or expiry.** Addressed by snapshots bound to operation
-  CIDs.
-- **Over-broad actions.** Wallets should default to narrow actions, and show which
-  clients hold which actions. ZCAP's mandatory expiry bounds a forgotten delegation
-  only for anchored publications, or with an expiry snapshot (see Revocation).
+- **Forged grants.** A grant counts only if the user created it; one created by
+  someone else and transferred to the user fails the grant check.
+- **Backdating after revocation.** Addressed by snapshots bound to operation CIDs.
+- **Over-broad or forgotten grants.** Wallets should default to narrow actions, list
+  active grants with the actions they allow, and make revoking one a single action.
 - **Transferred objects.** Ownership is not authorship; attribution follows the
   creation and signed lineage, never the current controller.
 - **Spam.** Object creation on `hyperswarm` is free. Indexers will need rate limits or
@@ -729,34 +614,26 @@ stay as individual DIDs or are batched.
 ## Milestones
 
 1. **Benchmark** objects-as-DIDs at the volumes above (Scale).
-2. **Schemas:** the object schema and the Memeplex ZCAP profile (actions, handle,
-   revocation), with signed fixtures.
+2. **Schemas:** the object schema and the grant schema, with signed fixtures.
 3. **Verifier library:** the attribution rules, shared by clients and the indexer, with
-   cross-checks against real signed objects, including revoked, expired, widened and
-   copied capabilities, transferred objects, edit-only capabilities, and backdated
-   siblings.
+   cross-checks against real signed objects, including revoked and forged grants,
+   transferred objects, edit-only grants, and backdated siblings.
 4. **Direct publishing:** create, edit, delete and query objects from the existing CLI
    and SDKs with no delegation; this works with today's `create-asset-json`.
-5. **Delegation:** wallet UI to grant, renew, list and revoke capabilities, including
-   the revocation snapshot.
+5. **Delegation:** wallet UI to create, list and revoke grants, including the
+   revocation snapshot.
 6. **Indexer.**
 7. **Memepool client.**
 8. **Moderation:** block lists and labels.
 
 ## Open questions
 
-- **Delegation key.** ZCAP seeds the chain from the target's `capabilityDelegation`
-  verification relationship, which Archon DID documents do not carry today. Either the
-  Memeplex profile accepts a key in `capabilityInvocation` (which Archon uses for
-  operations) as delegation authority, or agent documents gain `capabilityDelegation`.
-- **Cryptosuite.** Archon's secp256k1 proofs use an unregistered cryptosuite because no
-  registered suite covers secp256k1. Generic ZCAP libraries will not verify them, so
-  interoperability beyond Memeplex verifiers may need the `eddsa-jcs-2022` assertion
-  keys Archon already supports.
-- **Action vocabulary.** Is the action table the right granularity, and should
-  capabilities be able to narrow further (for example, replies only within one thread)?
-- **Revocation record.** Is `memeplex.revocations` in each delegator's DID data the
-  right place, given that every revocation then updates the delegator's DID?
+- **Action vocabulary.** Is the action table the right granularity, and should grants
+  be able to narrow further (for example, replies only within one thread)?
+- **Revocation record.** Is `memeplex.revocations` in the user's DID data the right
+  place, given that every revocation then updates the user's DID?
+- **Expiry.** Should grants carry an optional expiry? On `hyperswarm` an expiry has the
+  same backdating gap as revocation, so it would need a snapshot when it lapses.
 - **Change feed.** Should Gatekeeper offer an arrival-ordered change feed? It would
   let indexers follow new and displaced versions directly, instead of reconciling
   periodically against full state.
@@ -770,12 +647,9 @@ stay as individual DIDs or are batched.
 
 ## References
 
-- ZCAP: [Authorization Capabilities v0.4.0](https://w3c-ccg.github.io/zcap-spec/), W3C
-  Credentials Community Group draft; [revival proposal, April 2026](https://lists.w3.org/Archives/Public/public-credentials/2026Apr/0029.html)
-- UCAN: [specification](https://github.com/ucan-wg/spec) and
-  [delegation](https://github.com/ucan-wg/delegation)
+- ZCAP: [Authorization Capabilities v0.4.0](https://w3c-ccg.github.io/zcap-spec/) and
+  UCAN: [specification](https://github.com/ucan-wg/spec), considered and not adopted
 - #937: thin agent marketplace (attestations, opt-in block lists)
 - #1044: encrypted messageboard where each post is a DID owned by its author
 - #1299: historical verification of credential responses
 - #1462 / #1463: Gatekeeper resolution by `versionId`
-- #108 / #948: credentials name the asset that holds them
