@@ -214,10 +214,15 @@ Memeplex-specific list has to be maintained:
   `emoji-test.txt`. `❤️` is valid; the unqualified `❤` and arbitrary text are not.
   Each emoji therefore has one encoding, and counts never split across encodings.
 - **Counted by base emoji.** Skin-tone modifiers (U+1F3FB–U+1F3FF) are allowed in
-  `value`, but for counting and comparison a reaction is keyed by its emoji with any
-  modifier removed, so 👍🏽 counts as 👍 and counts never split. Whether to offer or
-  display tones is each client's choice. Memepool offers no tone picker and renders
-  every reaction as its base emoji.
+  `value`, but for counting and comparison a reaction is keyed by its **base emoji**:
+  the fully-qualified RGI emoji that Unicode's `emoji-test.txt` lists as the untoned
+  form of `value`. Removing the modifier code points is not enough. ☝🏽 without its
+  modifier is the unqualified `☝`, whose base is `☝️`. A toned multi-person sequence can
+  have a different base: 👩🏽‍🤝‍👩🏻's base is 👭. Implementations derive the mapping from
+  `emoji-test.txt`, which lists each toned emoji with its base. 👍🏽 therefore counts as
+  👍, and counts never split.
+- **Tones are a client choice.** Whether to offer or display tones is up to each
+  client. Memepool offers no tone picker and renders every reaction as its base emoji.
 - **Invalid values are ignored.** A reaction whose `value` breaks these rules is not
   counted or displayed.
 
@@ -351,9 +356,10 @@ and treats a follow list as the reader's own preference.
 By default a client keeps follows **private**: on the device, or in a vault the user
 owns so that several clients share them. Follows are never published, so the network
 does not learn whom anyone follows. A hosted indexer that builds a reader's timeline
-does learn the set of authors it is asked about. Readers who want that private too
-compute their timeline locally, from direct queries per author, or use an indexer they
-run or trust. This is closer to Substack's reading
+does learn the set of authors it is asked about. Computing the timeline locally does not
+by itself avoid this: per-author queries go to a Gatekeeper over HTTP, so a remote
+Gatekeeper sees the same author set. Readers who want their follows private from every
+service query a Gatekeeper and indexer they run or trust. This is closer to Substack's reading
 privacy than to Twitter's public graph.
 
 A public social graph (follower counts, graph-based discovery) can be added later if
