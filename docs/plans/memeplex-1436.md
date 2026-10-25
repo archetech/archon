@@ -213,9 +213,11 @@ Memeplex-specific list has to be maintained:
   recommended (RGI) set, in the fully-qualified form listed in Unicode's
   `emoji-test.txt`. `❤️` is valid; the unqualified `❤` and arbitrary text are not.
   Each emoji therefore has one encoding, and counts never split across encodings.
-- **No skin-tone modifiers.** The five modifiers U+1F3FB–U+1F3FF are not allowed.
-  Clients that offer a tone picker strip the modifier before publishing. Other
-  multi-character emoji (🧑‍💻, 🏳️‍🌈) are allowed.
+- **Counted by base emoji.** Skin-tone modifiers (U+1F3FB–U+1F3FF) are allowed in
+  `value`, but for counting and comparison a reaction is keyed by its emoji with any
+  modifier removed, so 👍🏽 counts as 👍 and counts never split. Whether to offer or
+  display tones is each client's choice. Memepool offers no tone picker and renders
+  every reaction as its base emoji.
 - **Invalid values are ignored.** A reaction whose `value` breaks these rules is not
   counted or displayed.
 
