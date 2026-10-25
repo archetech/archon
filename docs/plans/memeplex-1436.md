@@ -221,7 +221,12 @@ Memeplex-specific list has to be maintained:
 - **Invalid values are ignored.** A reaction whose `value` breaks these rules is not
   counted or displayed.
 
-A boost or repost is not a reaction; it is a `post` that quotes the original.
+A boost or repost is not a reaction; it is a `post` that quotes the original. A
+**plain boost** has `quotes: [original]` and no `text`, and clients show the original
+as "Alice boosted". A **quote post** adds `text`, shown above the original. Neither
+sets `parent`: a boost shares the original with the booster's own audience instead of
+joining its thread. A reply that also quotes something is still a reply, because
+`parent` decides thread membership and `quotes` only embeds.
 
 ### Ratings
 
@@ -586,6 +591,7 @@ cover the controller, which is why objects carry `author` in their data.
 | Everything by a user | `{ "where": { "memeplex.author": { "$in": ["did:cid:…user"] } } }` |
 | A whole thread | `{ "where": { "memeplex.root": { "$in": ["did:cid:…root"] } } }` |
 | Every response to an object | `{ "where": { "memeplex.parent": { "$in": ["did:cid:…"] } } }` |
+| Boosts and quote posts of an object | `{ "where": { "memeplex.quotes[*]": { "$in": ["did:cid:…"] } } }` |
 | Objects under one capability | `{ "where": { "memeplex.capability.id": { "$in": ["did:cid:…handle"] } } }` |
 | Objects an author tagged | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
 | Tags others applied (their `parent`s are the tagged objects) | `{ "where": { "memeplex.tag": { "$in": ["cryptography"] } } }` |
@@ -616,7 +622,7 @@ Timelines, ranking, full-text search and counts need an indexer. The Memepool in
   re-verifies the affected versions, so a later revocation snapshot can disown objects
   it had already accepted;
 - builds timelines for the set of authors a reader supplies (see Follows), thread
-  trees, reply and reaction counts, and per-tag feeds;
+  trees, reply, reaction and boost counts, and per-tag feeds;
 - serves them to clients over HTTP, behind Drawbridge like other public surfaces.
 
 The indexer is a cache of public data. Anyone can run one, and a client can always fall
