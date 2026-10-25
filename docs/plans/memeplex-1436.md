@@ -432,12 +432,20 @@ user *U* at time *T*:
 1. *G*'s create operation names *U* as its controller and is signed by *U*. (A grant
    someone else created and then transferred to *U* does not count, for the same reason
    as above.)
-2. *G* resolved at *T* exists, is not deactivated, and is still controlled by *U*. Its
-   `client` and `actions` are read from its creation; later updates are ignored.
+2. *T* is not earlier than *G*'s creation time, and *G* resolved at *T* is not
+   deactivated and is still controlled by *U*. The creation-time comparison is explicit
+   because resolving a DID at a time before its creation returns the creation version
+   rather than failing; without it, a client could date an object before it received
+   the grant. *G*'s `client` and `actions` are read from its creation; later updates are
+   ignored.
 3. Its `client` is *A*.
 4. *X* is in its `actions`.
-5. If *U* recorded a revocation snapshot for *G*, the snapshot admits this version (see
-   Revocation).
+5. If *G* is deactivated in its latest state, *U*'s revocation snapshot for *G* admits
+   this version (see Revocation). Until that snapshot is visible, the version is
+   **unverified**: neither attributed nor rejected. This fails closed, because the
+   grant's deletion and the snapshot live in different DIDs and can reach a verifier in
+   either order. A grant revoked without any snapshot disowns everything published
+   under it.
 
 ### Creation
 
@@ -490,7 +498,8 @@ before the revocation, and the grant check would accept them. Gatekeeper does no
 Hyperswarm times by receipt, and adding such a bound is a protocol decision outside
 this design.
 
-The fix is a **revocation snapshot**. Before revoking, the wallet queries the objects
+The fix is a **revocation snapshot**. Before revoking, the wallet records the snapshot
+in the user's DID; only then does it deactivate the grant. It queries the objects
 published under the grant (`memeplex.grant $in [grant]`; an object never changes its
 grant, so this finds every live one) and records, for each, the `versionId` (canonical
 operation CID) of its accepted version at that moment. The record goes into the user's
