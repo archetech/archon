@@ -495,7 +495,8 @@ action *X* for user *U* at time *T*:
    object names, and each parent from the handle its `parentCapability` names, so every
    link is the version in force at *T*. A copy of a capability placed in some other
    asset fails here, because its `id` names a different DID.
-8. Any revocation or expiry snapshot for a link admits this version (see Revocation).
+8. For each link, any revocation or expiry snapshot its delegator recorded admits this
+   version (see Revocation).
 
 Steps 1–6 follow the ZCAP verification algorithm; steps 7 and 8 are the Archon
 revocation profile.
@@ -561,7 +562,7 @@ this design.
 
 Options:
 
-1. **Revocation snapshot (recommended).** When revoking, the wallet first finds every
+1. **Revocation snapshot (recommended).** When revoking, the delegator first finds every
    object whose history depends on the handle, and records the set it accepts, mapping
    each object DID to the `versionId` (the canonical operation CID) of its accepted
    version at that moment.
@@ -573,11 +574,15 @@ Options:
    queries the user's objects by author (`memeplex.author $in [user]`; `author` never
    changes), walks each object's history, and includes the object if any version's
    capability chain contains the handle. Deleted objects no longer match the author
-   query; only their tombstones lose attribution. The record goes
-   into the user's DID data under `memeplex.revocations[handle]`, with the set on IPFS
-   if it is large. Step 8 then admits a version only if its `versionId` is in the
+   query; only their tombstones lose attribution. The delegator records the snapshot in
+   its **own** DID data, under `memeplex.revocations[handle]`, with the set on IPFS if
+   it is large. Only the handle's owner can deactivate the handle, and only it can write
+   its own DID, so the record is authenticated by the same key that revokes. For a
+   capability the wallet issued, that is the user's DID; for one a client delegated
+   onward (user → client → bot), it is the client's DID, so a client can revoke what it
+   delegated without involving the user. Step 8 then admits a version only if its `versionId` is in the
    snapshot or is an ancestor of one, reached through signed `previd` links. Objects
-   the wallet's node had not yet seen are lost, which is the right failure direction.
+   the delegator's node had not yet seen are lost, which is the right failure direction.
 
    The snapshot names operations, not sequence numbers, because a sequence number does
    not identify content: a revoked client could publish a backdated sibling at the same
@@ -596,8 +601,9 @@ can also take it from an earlier point to disown recent objects.
 
 After `expires`, a client that still has its key can publish objects dated before the
 expiry, and step 5 accepts them. On `hyperswarm`, expiry therefore bounds a delegation
-only when the wallet also records a snapshot for it, as for revocation. The wallet
-should do so when it renews a capability and when one lapses. Without a snapshot,
+only when its delegator also records a snapshot for it, as for revocation. The
+delegator (the wallet, or a client for capabilities it delegated onward) should do so
+when it renews a capability and when one lapses. Without a snapshot,
 expiry bounds only anchored publications.
 
 ### Who controls published objects
@@ -654,8 +660,8 @@ Timelines, ranking, full-text search and counts need an indexer. The Memepool in
   Reconciliation re-resolves the indexed DIDs and re-reads the events feed over its
   whole range;
 - verifies attribution per version and records what each result depended on: the
-  capability handles in the chain, the author's DID (which holds revocation records),
-  and the controllers whose keys signed. When any of those change, the indexer
+  capability handles in the chain, each link's delegator DID (which holds that link's
+  revocation and expiry snapshots), and the controllers whose keys signed. When any of those change, the indexer
   re-verifies the affected versions, so a later revocation snapshot can disown objects
   it had already accepted;
 - builds timelines for the set of authors a reader supplies (see Follows), thread
@@ -749,8 +755,8 @@ stay as individual DIDs or are batched.
   keys Archon already supports.
 - **Action vocabulary.** Is the action table the right granularity, and should
   capabilities be able to narrow further (for example, replies only within one thread)?
-- **Revocation record.** Is `memeplex.revocations` in the user's DID data the right
-  place, given that every revocation then updates the user's DID?
+- **Revocation record.** Is `memeplex.revocations` in each delegator's DID data the
+  right place, given that every revocation then updates the delegator's DID?
 - **Change feed.** Should Gatekeeper offer an arrival-ordered change feed? It would
   let indexers follow new and displaced versions directly, instead of reconciling
   periodically against full state.
