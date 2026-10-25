@@ -54,7 +54,7 @@ const ResolveOptionsSchema = z.object({
 const ConfirmSchema = z.object({ confirm: z.literal(true) });
 const RevealSchema = z.object({ reveal: z.literal(true) });
 const ConfirmPaymentSchema = z.object({ confirmPayment: z.literal(true) });
-const JsonObjectSchema = z.record(z.unknown());
+const JsonObjectSchema = z.record(z.string(), z.unknown());
 
 // Input schemas for tools whose keymaster method needs a specific shape. Two rules learned
 // the hard way, both about .passthrough():
@@ -95,13 +95,13 @@ const WalletFileSchema = z.object({
     // malformed regardless. A v1 wallet's `names` (renamed to `aliases` by upgradeWallet)
     // survives via passthrough.
     counter: z.number(),
-    ids: z.record(z.object({
+    ids: z.record(z.string(), z.object({
         did: z.string(),
         account: z.number(),
         index: z.number(),
     }).passthrough()),
     current: z.string().optional(),
-    aliases: z.record(z.string()).optional(),
+    aliases: z.record(z.string(), z.string()).optional(),
 }).passthrough();
 // StoredWallet is a union: restore accepts an encrypted backup (WalletEncFile) or a wallet
 // whose metadata is unencrypted (WalletFile), and saveWallet decrypts the former. Neither
@@ -183,8 +183,8 @@ const DidDocumentOutputSchema = z.object({
         keyAgreement: z.array(z.unknown()).optional(),
         service: z.array(z.unknown()).optional(),
     }).passthrough().optional(),
-    didDocumentMetadata: z.record(z.unknown()).optional(),
-    didResolutionMetadata: z.record(z.unknown()).optional(),
+    didDocumentMetadata: z.record(z.string(), z.unknown()).optional(),
+    didResolutionMetadata: z.record(z.string(), z.unknown()).optional(),
     didDocumentData: z.unknown().optional(),
     didDocumentRegistration: z.unknown().optional(),
 }).passthrough();
@@ -208,7 +208,7 @@ const ViewPollOutputSchema = z.object({
     voteExpired: z.boolean(),
     hasVoted: z.boolean(),
     ballots: z.array(z.unknown()).optional(),
-    results: z.record(z.unknown()).optional(),
+    results: z.record(z.string(), z.unknown()).optional(),
 }).passthrough();
 const ViewBallotOutputSchema = z.object({
     poll: z.string(),

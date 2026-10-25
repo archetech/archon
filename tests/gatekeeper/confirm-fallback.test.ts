@@ -29,6 +29,12 @@ describe('confirmed resolution fallback', () => {
         expect(shouldTryConfirmFallback(doc(false), { confirm: true }, '')).toBe(false);
     });
 
+    it('should not try fallback for a versionId request', () => {
+        expect(shouldTryConfirmFallback(doc(false), { confirm: true, versionId: 'bafkreiop' }, 'https://peer.example')).toBe(false);
+        const missing = { ...doc(), didResolutionMetadata: { error: 'notFound' as const } };
+        expect(shouldTryConfirmFallback(missing, { confirm: true, versionId: 'bafkreiop' }, 'https://peer.example')).toBe(false);
+    });
+
     it('should not try fallback on fallback requests', () => {
         expect(shouldTryConfirmFallback(doc(false), { confirm: true }, 'https://peer.example', true)).toBe(false);
     });

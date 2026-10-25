@@ -215,6 +215,27 @@ describe('GET /1.0/identifiers/:did (conformant resolution)', () => {
         expect(res.body.didDocumentMetadata.versionSequence).toBe('1');
     });
 
+    it('honors the versionId selector and rejects conflicting or unknown ones', async () => {
+        const genesis = await gatekeeper.resolveDID(agentDid);
+        const versionId = genesis.didDocumentMetadata!.versionId!;
+
+        const found = await request(app).get(`/1.0/identifiers/${agentDid}?versionId=${versionId}`);
+        expect(found.status).toBe(200);
+        expect(found.body.didDocumentMetadata.versionId).toBe(versionId);
+
+        const data = await request(app).get(`/1.0/identifiers/${assetDid}/data?versionId=bafkreinosuchoperation`);
+        expect(data.status).toBe(404);
+        expect(data.body).toEqual({ error: 'notFound' });
+
+        const unknown = await request(app).get(`/1.0/identifiers/${agentDid}?versionId=bafkreinosuchoperation`);
+        expect(unknown.status).toBe(404);
+        expect(unknown.body.didResolutionMetadata.error).toBe('notFound');
+
+        const conflict = await request(app).get(`/1.0/identifiers/${agentDid}?versionId=${versionId}&versionSequence=1`);
+        expect(conflict.status).toBe(400);
+        expect(conflict.body.didResolutionMetadata.error).toBe('invalidOptions');
+    });
+
     it('normalizes DID Core metadata datetimes on current and historical responses', async () => {
         const resolveDID = async (_did: string, options: any) => ({
             didDocument: { id: agentDid },

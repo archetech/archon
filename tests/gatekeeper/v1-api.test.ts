@@ -329,6 +329,16 @@ describe('/api/v1 DID routes', () => {
         });
     });
 
+    it('passes versionId through', async () => {
+        const { app, gatekeeper } = mount();
+
+        await request(app).get('/api/v1/did/did:cid:abc?versionId=bafkreiop&confirm=true');
+        expect(gatekeeper.resolveDID).toHaveBeenCalledWith('did:cid:abc', {
+            versionId: 'bafkreiop',
+            confirm: true,
+        });
+    });
+
     it('answers 404 when the gatekeeper throws while resolving', async () => {
         const { app, gatekeeper } = mount();
         gatekeeper.resolveDID = boom();

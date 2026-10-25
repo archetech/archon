@@ -30,6 +30,8 @@ pub(crate) enum ResolveError {
     NotFound,
     /// An operation in the chain failed validation (bad proof, previd, or structure).
     InvalidOperation,
+    /// The resolution options conflict (versionId with versionTime or versionSequence).
+    InvalidOptions,
 }
 
 impl std::fmt::Display for ResolveError {
@@ -37,6 +39,7 @@ impl std::fmt::Display for ResolveError {
         match self {
             ResolveError::NotFound => write!(f, "DID not found"),
             ResolveError::InvalidOperation => write!(f, "Invalid operation"),
+            ResolveError::InvalidOptions => write!(f, "Invalid options"),
         }
     }
 }
@@ -51,6 +54,21 @@ pub(crate) fn not_found(detail: &'static str) -> anyhow::Error {
 /// An invalid-operation resolution failure carrying a specific diagnostic message.
 pub(crate) fn invalid_operation(detail: &'static str) -> anyhow::Error {
     anyhow::Error::from(ResolveError::InvalidOperation).context(detail)
+}
+
+/// A conflicting-options resolution failure carrying a specific diagnostic message.
+pub(crate) fn invalid_options(detail: &'static str) -> anyhow::Error {
+    anyhow::Error::from(ResolveError::InvalidOptions).context(detail)
+}
+
+/// Whether a resolution error is a conflicting-options failure.
+pub(crate) fn is_invalid_options(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<ResolveError>(),
+            Some(ResolveError::InvalidOptions)
+        )
+    })
 }
 
 /// Classify an error from `resolve_local_doc_async` for the conformant `/1.0/identifiers` surface:
@@ -69,6 +87,8 @@ pub(crate) fn classify_conformant_error(did: &str, error: &anyhow::Error) -> (u1
 
     if !is_valid_did(did) {
         (400, "invalidDid")
+    } else if is_invalid_options(error) {
+        (400, "invalidOptions")
     } else if is_did_level {
         (404, "notFound")
     } else {
@@ -130,6 +150,13 @@ pub(crate) async fn resolve_local_doc_async(
         let store = state.store.lock().await;
         return store.resolve_doc(&state.config, did, options);
     }
+
+    crate::store::validate_version_options(&options)?;
+    // A retrieval alias names the same operation as its canonical CID, as for previd.
+    let target_id = match options.version_id.as_deref() {
+        Some(id) => Some(state.store.lock().await.canonical_reference(id)),
+        None => None,
+    };
 
     let events = {
         let store = state.store.lock().await;
@@ -207,6 +234,10 @@ pub(crate) async fn resolve_local_doc_async(
         let operation = &event.operation;
         let operation_time = standard_datetime(&event.time);
 
+        if target_id.as_deref() == Some(resolved.version_id.as_str()) {
+            break;
+        }
+
         if past_cutoff(&options, event) {
             break;
         }
@@ -253,6 +284,16 @@ pub(crate) async fn resolve_local_doc_async(
                 .await
                 .build_timestamp(registry, &resolved.version_id, event);
         }
+    }
+
+    // The requested operation is not in the accepted history this resolution
+    // walked: unknown, displaced by a preferred sibling, or (with confirm)
+    // not yet confirmed.
+    if target_id
+        .as_deref()
+        .is_some_and(|target| target != resolved.version_id)
+    {
+        return Err(not_found("versionId not in accepted history"));
     }
 
     if let Some(registration) = resolved.did_document_registration.as_object_mut() {

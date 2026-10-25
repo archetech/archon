@@ -52,6 +52,8 @@ export interface VerifyDbResult {
 export interface ResolveDIDOptions {
     versionTime?: string;
     versionSequence?: number;
+    /** Canonical CID of one operation in the accepted history. Mutually exclusive with versionTime and versionSequence. */
+    versionId?: string;
     confirm?: boolean;
     verify?: boolean;
 }
