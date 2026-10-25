@@ -40,7 +40,7 @@
     "@didcid/keymaster": "^0.7.0",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "dotenv": "^16.4.5",
-    "zod": "^3.25.76"
+    "zod": "^4.6.6"
   },
   "repository": {
     "type": "git",
