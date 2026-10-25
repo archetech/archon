@@ -66,7 +66,7 @@ and the Gatekeeper documentation.
 | Need | Primitive |
 |---|---|
 | Create an object | `createAsset(data, { registry, controller })`. Assets must be controlled by an agent DID. The default registry is `hyperswarm`. |
-| Edit an object | `updateDID` / `mergeData`. Each update is a new version; earlier versions stay resolvable (`resolve-did-version`, `versionTime`, `versionSequence`). |
+| Edit an object | `updateDID` / `mergeData`. Each update is a new version; earlier versions in the accepted history stay resolvable (`versionId`, `versionTime`, `versionSequence`). |
 | Delete an object | `revokeDID`. Resolution reports `deactivated`, and deletion clears the document data while keeping registration metadata. |
 | Anchor an object | Create it on a chain registry (BTC, ZEC, ETH, SOL), or `changeRegistry` to one and then publish an update there; see Timestamps and anchoring. |
 | Move an object | `transferAsset` to another agent DID. |
@@ -286,15 +286,15 @@ reference stays in the previous version.
 
 ### Edits, deletion and revisions
 
-- **Edit:** an update to the object. Every version remains resolvable, so a client can
-  show "edited" with the full history.
+- **Edit:** an update to the object. Earlier versions remain resolvable while they are
+  in the accepted history, so a client can show "edited" with the full history.
 - **Delete:** `revokeDID`. Clients show a tombstone: the object existed, was deleted,
   and when.
 
 ### Revisions and citation
 
-A revision is an edit: the object keeps its DID, and every earlier revision stays
-resolvable. This is arXiv's model, with the DID as the identifier and its versions as
+A revision is an edit: the object keeps its DID, and earlier revisions stay resolvable
+while they remain in its accepted history. This is arXiv's model, with the DID as the identifier and its versions as
 `v1`, `v2` and so on.
 
 - **Citing the work** uses the bare DID, which always resolves to the latest revision.
@@ -305,6 +305,13 @@ resolvable. This is arXiv's model, with the DID as the identifier and its versio
   preferred sibling can take over, and on `hyperswarm` a version's time is chosen by
   its publisher. Only `versionId` names fixed content, so an author cannot change what
   a citation points to after the fact.
+- **A cited revision can disappear.** The object's controller can publish a competing
+  successor that Archon's sibling ordering prefers, displacing the cited revision from
+  the accepted history; resolving its `versionId` then returns `notFound`. That is the
+  honest answer to an equivocating author, not an error. Clients show the citation as
+  "revision no longer in the history" and never substitute another revision. A
+  reviewer who needs the assessed content to survive this keeps its `content` CID, and
+  pins it (see Content availability under Security considerations).
 - **Responses pin what they assessed.** A `review` or `rating` of an article or paper
   sets `parentVersion` to the `versionId` it assessed. Clients show "reviewed an
   earlier revision" when that is not the current version, so a review of v1 is never
@@ -360,9 +367,11 @@ creates, so it is signed with the user's own key and controlled by the user:
 - **Client:** the agent DID the application created, holding its own key. Agents are
   self-controlled, so the user cannot own the client's DID; the grant is how the user
   vouches for it.
-- **Actions:** what the client may do (table below). The user can narrow a grant by
-  editing it; each object is checked against the grant as it stood when the object was
-  published.
+- **Actions:** what the client may do (table below).
+- **Immutable.** A grant is never edited, and verifiers read it as created. Narrowing
+  one by editing it would have the same backdating gap as revocation: the client could
+  keep publishing with dates before the edit. To narrow a grant, the wallet revokes it
+  (with its snapshot) and creates a narrower one.
 - **Revocation:** the wallet deletes the grant with `revokeDID`.
 - **No expiry and no chains.** A grant lasts until it is revoked, and a client cannot
   pass it on: only the user can create a grant. Wallets list active grants so unused
@@ -423,7 +432,8 @@ user *U* at time *T*:
 1. *G*'s create operation names *U* as its controller and is signed by *U*. (A grant
    someone else created and then transferred to *U* does not count, for the same reason
    as above.)
-2. *G* resolved at *T* exists, is not deactivated, and is still controlled by *U*.
+2. *G* resolved at *T* exists, is not deactivated, and is still controlled by *U*. Its
+   `client` and `actions` are read from its creation; later updates are ignored.
 3. Its `client` is *A*.
 4. *X* is in its `actions`.
 5. If *U* recorded a revocation snapshot for *G*, the snapshot admits this version (see
@@ -617,9 +627,11 @@ stay as individual DIDs or are batched.
 - **Spam.** Object creation on `hyperswarm` is free. Indexers will need rate limits or
   cost per author (for example L402 on publishing through a hosted node, or ranking by
   trust graph). Not designed here.
-- **Content addressing of large bodies.** IPFS content is available only while someone
-  pins it. The project's pinning work (`ARCHON_GATEKEEPER_REGISTRIES_PIN`) is one
-  option; long-term availability of papers needs an explicit answer.
+- **Content availability.** IPFS content is available only while someone pins it.
+  Registry pinning (`ARCHON_GATEKEEPER_REGISTRIES_PIN`) pins operation JSON only, not
+  the article or PDF bytes an object's `content.cid` references. Those need explicit
+  pinning by the publisher, the indexer or a pinning service; long-term availability of
+  papers needs an explicit answer.
 
 ## Milestones
 
