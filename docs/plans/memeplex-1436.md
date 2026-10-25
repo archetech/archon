@@ -13,8 +13,8 @@ it.
 
 Two decisions shape everything else:
 
-1. **Every published object is a DID.** A post, an essay, a paper, a reply, a review
-   and a reaction are each an Archon asset. Archon's existing machinery then
+1. **Every published object is a DID.** A post, an essay, a paper, a reply, a review,
+   a reaction, a rating and a tag are each an Archon asset. Archon's existing machinery then
    supplies permalinks, ownership, edit history, deletion, gossip and optional chain
    timestamps.
 2. **Applications live outside the wallet.** The user's wallet holds the root
@@ -51,7 +51,7 @@ Two decisions shape everything else:
 |---|---|
 | **Memeplex** | The protocol: object schemas, the delegation profile, the attribution rules, and the query conventions. |
 | **Memepool** | The first client and indexer, run by the project. |
-| **object** | Any Memeplex asset DID: post, article, paper, reply, review, reaction. |
+| **object** | Any Memeplex asset DID: post, article, paper, reply, review, reaction, rating, tag. |
 | **author** | The user DID an object is attributed to. |
 | **publisher** | The agent DID that controls an object: the author itself, or a delegated client. |
 
@@ -114,14 +114,59 @@ its operations, which resolution already reports.
 | `article` | Long-form essay, Substack-like | — | `title`, `summary`; body as `content` on IPFS. |
 | `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs), `content` (PDF or source), optional `supersedes` for a new revision. |
 | `reply` | Comment in a thread | required | Same fields as `post`; also carries `root`. |
-| `review` | Structured assessment | required | `verdict` (free text or schema-defined), optional `rating`, body. A review can itself be replied to. |
+| `review` | Written assessment | required | `verdict` (free text or schema-defined), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
 | `reaction` | Like, boost, emoji | required | `value`. Withdrawn by deleting it. |
+| `rating` | Score on the author's own scale | required | Integers `rating`, `min`, `max` (see Ratings). One per author per parent; changed by editing, withdrawn by deleting. |
+| `tag` | Label applied to someone else's object | required | `tag`, a normalized string (see Tags). Withdrawn by deleting it. |
 
 `parent` is the one link from a response to what it responds to; `kind` says how. This
 keeps every response, of whatever kind, reachable from its parent with one query.
 
 Kinds are an open set: a client ignores kinds it does not understand. New kinds are
 added by agreement, not by registry.
+
+### Ratings
+
+A rating states its own scale, so clients can use 5 stars, 0–100 or thumbs up and
+down, and ratings stay comparable:
+
+```jsonc
+{ "memeplex": { "v": 1, "kind": "rating", "author": "did:cid:…user",
+                "parent": "did:cid:…paper", "rating": 3, "min": 1, "max": 5 } }
+```
+
+- `rating`, `min` and `max` are integers with `min < max` and
+  `min ≤ rating ≤ max`.
+- The comparable value is `(rating − min) / (max − min)`, from 0 (worst) to 1 (best).
+  Three stars on a 1–5 scale is 0.5; 80 on 0–100 is 0.8; a thumbs up `(1, 0, 1)` is 1.
+  Centred scales work too: `(0, −2, 2)` is 0.5.
+- Four stars out of five, `(4, 1, 5)`, is **0.75, not 0.8**: it is three steps up a
+  four-step scale. Clients that display normalized values should not present them as
+  "n out of max".
+- An author has one rating per parent. Changing it is an edit, so the history stays
+  visible; aggregators count each author's current attributed version once.
+- Equal values are not equally precise: a 5-point scale and a 100-point scale cluster
+  differently. Aggregators that care can group by `max − min`.
+
+A like stays a `reaction` ("I appreciate this"); a `rating` judges quality.
+
+### Tags
+
+An object's author describes it with the `tags` field inside the object. Anyone else
+labels it with a `tag` object whose `parent` is the labelled object:
+
+```jsonc
+{ "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…labeller",
+                "parent": "did:cid:…post", "tag": "cryptography" } }
+```
+
+Tag values, in both places, are normalized before publishing: Unicode NFC, trimmed,
+lower-case, internal whitespace collapsed to a single hyphen. Otherwise one tag
+splinters across spellings.
+
+Third-party tags are signed, attributed judgments like any other object, so their
+weight depends on who applied them. Moderation labels are tags too (see Moderation and
+reputation).
 
 ### Content and size
 
@@ -243,6 +288,8 @@ actions to be a subset of the parent's and its expiry to be no later.
 | `memeplex:reply` | create `reply` objects |
 | `memeplex:review` | create `review` objects |
 | `memeplex:react` | create and delete `reaction` objects |
+| `memeplex:rate` | create `rating` objects |
+| `memeplex:tag` | create and delete `tag` objects |
 | `memeplex:edit` | update objects published under this capability |
 | `memeplex:delete` | delete objects published under this capability |
 
@@ -315,7 +362,8 @@ be the controller the create operation names and signs with, and *T* its time.
 - **Direct:** `memeplex.capability` is absent, `memeplex.author` is *U*, and *A* is *U*.
 - **Delegated:** `memeplex.author` is *U*, and *capability-ok(Z, U, A, X, T)* holds for
   *Z* = `memeplex.capability` and *X* the creating action for the object's kind
-  (`memeplex:post`, `memeplex:reply`, `memeplex:review` or `memeplex:react`).
+  (`memeplex:post`, `memeplex:reply`, `memeplex:review`, `memeplex:react`,
+  `memeplex:rate` or `memeplex:tag`).
 
 An object whose creation is not attributed is never attributed, whatever its later
 versions say.
@@ -420,10 +468,11 @@ cover the controller, which is why objects carry `author` in their data.
 | A whole thread | `{ "where": { "memeplex.root": { "$in": ["did:cid:…root"] } } }` |
 | Every response to an object | `{ "where": { "memeplex.parent": { "$in": ["did:cid:…"] } } }` |
 | Objects under one capability | `{ "where": { "memeplex.capability.id": { "$in": ["did:cid:…handle"] } } }` |
-| A tag | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
+| Objects an author tagged | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
+| Tags others applied (their `parent`s are the tagged objects) | `{ "where": { "memeplex.tag": { "$in": ["cryptography"] } } }` |
 
-Only one condition and only `$in` are supported, so a client separates replies, reviews
-and reactions by `kind` after the query. Results are unsorted and unpaged, and
+Only one condition and only `$in` are supported, so a client separates replies,
+reviews, reactions, ratings and tags by `kind` after the query. Results are unsorted and unpaged, and
 they are not attributions: the matches still have to pass the attribution check,
 because anyone can write any `author` into an object they publish.
 
@@ -458,8 +507,11 @@ back to direct queries and its own verification.
 
 There is no central moderator. Viewers choose which judgments to apply:
 
-- **Block lists and labels** are credentials or objects issued by communities that
-  name DIDs or objects (as in #937). A client applies the lists its user trusts.
+- **Labels are tags.** A community labels an object ("spam", "misleading",
+  "nsfw") by publishing a `tag` object from its own DID. A client applies the tags
+  from the labellers its reader trusts and ignores the rest, so moderation needs no
+  separate mechanism. Block lists of DIDs remain credentials issued by those
+  communities (as in #937).
 - **Reviews** are objects, so a review's own reputation is visible: who wrote it, who
   replied, whether it was retracted.
 - **Unattributed objects** (failed delegation, revoked client) are hidden or marked by
@@ -474,8 +526,8 @@ out, but cost per object should be measured, not assumed.
 Benchmark before building the client, on an isolated node with production-like Redis
 persistence, in both Gatekeeper ports:
 
-- create 1, 5 and 10 million Memeplex objects with a realistic mix (mostly short posts
-  and reactions, some replies, few articles), across a realistic number of
+- create 1, 5 and 10 million Memeplex objects with a realistic mix (mostly short posts,
+  reactions, ratings and tags, some replies, few articles), across a realistic number of
   authors;
 - measure creation throughput, Hyperswarm propagation to a second node, startup replay
   time, resolve latency, `query` latency for `author`, `root` and `parent`, the memory
@@ -484,8 +536,8 @@ persistence, in both Gatekeeper ports:
   from fixed cost.
 
 Every delegated object embeds its capability, so measure object size with a realistic
-chain as well. The results decide whether reactions, the most numerous kind, stay as
-individual DIDs or are batched.
+chain as well. The results decide whether reactions, ratings and tags, the most numerous kinds,
+stay as individual DIDs or are batched.
 
 ## Security considerations
 
@@ -541,7 +593,7 @@ individual DIDs or are batched.
 - **Change feed.** Should Gatekeeper offer an arrival-ordered change feed? It would
   let indexers follow new and displaced versions directly, instead of reconciling
   periodically against full state.
-- **Reactions.** Individual DIDs or batched, pending the benchmark.
+- **Reactions, ratings and tags.** Individual DIDs or batched, pending the benchmark.
 - **Public follows.** Whether Memeplex should ever define a public follow list (see
   Follows), and if so, where it lives.
 - **Paper identity.** Is `supersedes` enough for arXiv-style versioning and citation,
