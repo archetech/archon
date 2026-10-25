@@ -221,12 +221,17 @@ Memeplex-specific list has to be maintained:
 - **Invalid values are ignored.** A reaction whose `value` breaks these rules is not
   counted or displayed.
 
-A boost or repost is not a reaction; it is a `post` that quotes the original. A
-**plain boost** has `quotes: [original]` and no `text`, and clients show the original
-as "Alice boosted". A **quote post** adds `text`, shown above the original. Neither
-sets `parent`: a boost shares the original with the booster's own audience instead of
-joining its thread. A reply that also quotes something is still a reply, because
-`parent` decides thread membership and `quotes` only embeds.
+### Boosts and quote posts
+
+A boost (repost) is a `post` that quotes the original:
+
+- A **plain boost** has `quotes: [original]` and no `text`. Clients show the original
+  as "Alice boosted".
+- A **quote post** adds `text`, shown above the original.
+
+Neither sets `parent`: a boost shares the original with the booster's own audience
+instead of joining its thread. A reply that also quotes something is still a reply,
+because `parent` decides thread membership and `quotes` only embeds.
 
 ### Ratings
 
