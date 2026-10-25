@@ -88,7 +88,7 @@ prefix.
     "v": 1,
     "kind": "post",                 // see kinds below
     "author": "did:cid:…user",      // the attributed user
-    "capability": { … },            // the delegated zcap; omitted when the author publishes directly
+    "capability": "did:cid:…",      // the handle holding the delegated zcap; omitted when the author publishes directly
 
     // content: inline text, or a reference for anything large
     "text": "…",
@@ -132,7 +132,7 @@ added by agreement, not by registry.
 
 One object of each kind, showing each object's `didDocumentData`. All but the reply are
 published directly by their author. The reply is published by a delegated client, so it
-carries a capability (abbreviated here; see Delegation for the full form). DIDs are
+names the handle of its capability (see Delegation). DIDs are
 shortened.
 
 **post**
@@ -168,8 +168,7 @@ shortened.
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "reply", "author": "did:cid:…bob",
-                "capability": { "id": "did:cid:…handle", "controller": "did:cid:…bobs-client",
-                                "allowedAction": ["memeplex:post", "memeplex:reply"], "…": "…" },
+                "capability": "did:cid:…bobs-handle",
                 "parent": "did:cid:…alice-post", "root": "did:cid:…alice-post",
                 "text": "Including the reactions? See the scale section.",
                 "quotes": ["did:cid:…carol-post"] } }
@@ -438,13 +437,31 @@ period and nothing else.
 2. The wallet shows the requested actions and expiry, creates the handle asset, signs
    the capability with the handle's DID as its `id`, and stores the signed capability in
    the handle.
-3. The client fetches the capability from the handle and embeds it as
-   `memeplex.capability` in every object it publishes for that user. ZCAP verifiers do
-   not fetch capabilities by ID during chain verification, so each object carries what
-   is needed to verify it.
+3. The client names the handle's DID as `memeplex.capability` in every object it
+   publishes for that user.
 
 A client may hold capabilities from several users (a shared device, or a service
 publishing for many people); the `author` and `capability` fields keep them apart.
+
+### Capabilities are referenced, not embedded
+
+ZCAP says verifiers must not fetch capabilities by ID during chain verification, so a
+ZCAP invocation normally carries its whole chain. Memeplex departs from that
+deliberately: an object names its capability's handle DID, and verifiers resolve it.
+
+- **The capability already is a DID.** It lives in its handle, and the handle's DID is
+  its `id`. Embedding it would put a second copy in every object.
+- **Verification resolves the handle anyway.** The revocation check (step 7) resolves
+  the handle at the object's time, which yields the capability as it stood then. An
+  embedded copy would never be the authoritative one.
+- **The reasons for ZCAP's rule do not apply.** The rule protects verifiers that
+  cannot trust a fetched copy or must verify offline. Archon resolution is signed and
+  versioned, and attribution already depends on resolving the author's and the
+  client's DIDs.
+- **Objects stay small.** A chain is large, and objects are numerous.
+
+A delegated child capability names its parent the same way: its `parentCapability` is
+the parent's handle DID.
 
 ### Invocation
 
@@ -474,8 +491,10 @@ action *X* for user *U* at time *T*:
 5. *T* is before each link's `expires`.
 6. *X* is within *Z*'s `allowedAction`.
 7. Each link's handle, resolved at *T*, exists, is not deactivated, and holds a
-   capability with the same `id`. Because the capability names its handle, a copy
-   under another asset fails here.
+   capability whose `id` is that handle's DID. *Z* itself is read from the handle the
+   object names, and each parent from the handle its `parentCapability` names, so every
+   link is the version in force at *T*. A copy of a capability placed in some other
+   asset fails here, because its `id` names a different DID.
 8. Any revocation or expiry snapshot for a link admits this version (see Revocation).
 
 Steps 1–6 follow the ZCAP verification algorithm; steps 7 and 8 are the Archon
@@ -488,7 +507,8 @@ be the controller the create operation names and signs with, and *T* its time.
 
 - **Direct:** `memeplex.capability` is absent, `memeplex.author` is *U*, and *A* is *U*.
 - **Delegated:** `memeplex.author` is *U*, and *capability-ok(Z, U, A, X, T)* holds for
-  *Z* = `memeplex.capability` and *X* the creating action for the object's kind
+  *Z* the capability held by the handle `memeplex.capability` names, and *X* the creating
+  action for the object's kind
   (`memeplex:post`, `memeplex:reply`, `memeplex:review`, `memeplex:react`,
   `memeplex:rate` or `memeplex:tag`).
 
@@ -609,7 +629,7 @@ cover the controller, which is why objects carry `author` in their data.
 | A whole thread | `{ "where": { "memeplex.root": { "$in": ["did:cid:…root"] } } }` |
 | Every response to an object | `{ "where": { "memeplex.parent": { "$in": ["did:cid:…"] } } }` |
 | Boosts and quote posts of an object | `{ "where": { "memeplex.quotes[*]": { "$in": ["did:cid:…"] } } }` |
-| Objects under one capability | `{ "where": { "memeplex.capability.id": { "$in": ["did:cid:…handle"] } } }` |
+| Objects under one capability | `{ "where": { "memeplex.capability": { "$in": ["did:cid:…handle"] } } }` |
 | Objects an author tagged | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
 | Tags others applied (their `parent`s are the tagged objects) | `{ "where": { "memeplex.tag": { "$in": ["cryptography"] } } }` |
 
@@ -677,8 +697,7 @@ persistence, in both Gatekeeper ports:
 - compare startup against the current production dataset to separate per-object cost
   from fixed cost.
 
-Every delegated object embeds its capability, so measure object size with a realistic
-chain as well. The results decide whether reactions, ratings and tags, the most numerous kinds,
+The results decide whether reactions, ratings and tags, the most numerous kinds,
 stay as individual DIDs or are batched.
 
 ## Security considerations
