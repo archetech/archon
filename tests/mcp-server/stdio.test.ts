@@ -64,7 +64,7 @@ describe('mcp server stdio smoke', () => {
                 name: 'archon_create_id',
                 arguments: {},
             });
-            expect(expectToolError(invalidArgsResult)).toContain('Required');
+            expect(expectToolError(invalidArgsResult)).toContain('expected string, received undefined');
         } finally {
             await client.close();
         }

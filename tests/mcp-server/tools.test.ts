@@ -404,7 +404,7 @@ describe('mcp server tools', () => {
         expect(runtime.keymaster.repairDID).not.toHaveBeenCalled();
 
         const rejected = await server.tools.get('archon_repair_did')!.handler({ did: 'Alice' });
-        expect(expectFail(rejected)).toContain('Invalid literal value');
+        expect(expectFail(rejected)).toContain('Invalid input: expected true');
         expect(runtime.keymaster.repairDID).not.toHaveBeenCalled();
 
         const repaired = expectOk(await server.tools.get('archon_repair_did')!.handler({ did: 'Alice', confirm: true }));
@@ -419,7 +419,7 @@ describe('mcp server tools', () => {
 
         const response = await server.tools.get('archon_revoke_did')!.handler({ did: 'did:cid:alice' });
 
-        expect(expectFail(response)).toContain('Invalid literal value');
+        expect(expectFail(response)).toContain('Invalid input: expected true');
         expect(runtime.keymaster.revokeDID).not.toHaveBeenCalled();
     });
 
@@ -430,7 +430,7 @@ describe('mcp server tools', () => {
 
         const response = await server.tools.get('archon_show_mnemonic')!.handler({});
 
-        expect(expectFail(response)).toContain('Invalid literal value');
+        expect(expectFail(response)).toContain('Invalid input: expected true');
         expect(runtime.keymaster.decryptMnemonic).not.toHaveBeenCalled();
     });
 
@@ -451,7 +451,7 @@ describe('mcp server tools', () => {
 
         const response = await server.tools.get('archon_create_id')!.handler({});
 
-        expect(expectFail(response)).toContain('Required');
+        expect(expectFail(response)).toContain('expected string, received undefined');
         expect(runtime.keymaster.createId).not.toHaveBeenCalled();
     });
 
