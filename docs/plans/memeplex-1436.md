@@ -68,7 +68,7 @@ and the Gatekeeper documentation.
 | Create an object | `createAsset(data, { registry, controller })`. Assets must be controlled by an agent DID. The default registry is `hyperswarm`. |
 | Edit an object | `updateDID` / `mergeData`. Each update is a new version; earlier versions stay resolvable (`resolve-did-version`, `versionTime`, `versionSequence`). |
 | Delete an object | `revokeDID`. Resolution reports `deactivated`, and deletion clears the document data while keeping registration metadata. |
-| Anchor an object | `changeRegistry` to a chain registry (BTC, ZEC, ETH, SOL) gives the object a chain-backed timestamp. |
+| Anchor an object | Create it on a chain registry (BTC, ZEC, ETH, SOL), or `changeRegistry` to one and then publish an update there; see Timestamps and anchoring. |
 | Move an object | `transferAsset` to another agent DID. |
 | Large content | IPFS via the Gatekeeper data API (`createFile` stores `{ cid, filename, type, bytes }`). Operations are limited to 64 Ki JSON code units in both Gatekeeper ports. |
 | Delegation | A grant: an asset the user creates and controls, naming the client and its actions. Revoked with `revokeDID`. |
@@ -313,9 +313,19 @@ resolvable. This is arXiv's model, with the DID as the identifier and its versio
 ### Timestamps and anchoring
 
 On `hyperswarm`, an object's time is the signed `proof.created` of its operation, which
-the publisher chooses. Anyone who needs a time a publisher cannot choose can move the
-object to a chain registry, after which its anchoring bounds it. Most objects never
-need this; a paper establishing priority might.
+the publisher chooses. Anyone who needs a time a publisher cannot choose has two ways
+to get one:
+
+- **Create the object on a chain registry.** Its creation is anchored once the chain
+  includes it.
+- **Migrate it.** `changeRegistry` to a chain registry, then publish an update on that
+  registry. The migration itself is confirmed by the *old* registry, so it gives no
+  chain timestamp; only operations after it are anchored. The chain timestamp bounds
+  the update that was included, and therefore the content as of that version, not the
+  earlier `hyperswarm` versions.
+
+Either way the time exists only after actual chain inclusion. Most objects never need
+this; a paper establishing priority might.
 
 ## Follows
 
