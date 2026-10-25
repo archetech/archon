@@ -253,7 +253,12 @@ down, and ratings stay comparable:
   four-step scale. Clients that display normalized values should not present them as
   "n out of max".
 - An author has one rating per parent. Changing it is an edit, so the history stays
-  visible; aggregators count each author's current attributed version once. Rating a
+  visible; aggregators count each author's current attributed version once. Two
+  clients can still each create a rating for the same author and parent. So that
+  independent indexers agree, the author's rating is the attributed, undeleted rating
+  object whose current version has the latest operation time, with ties broken by the
+  smallest canonical `versionId`. Deleting that object makes the next one by the same
+  rule current; with none left, the author has no rating. Rating a
   new revision of the parent is also an edit, which updates `parentVersion`; the
   earlier rating and the revision it rated remain in the history.
 - Equal values are not equally precise: a 5-point scale and a 100-point scale cluster
@@ -344,8 +349,11 @@ addressed to an audience. Memeplex therefore defines publications and responses 
 and treats a follow list as the reader's own preference.
 
 By default a client keeps follows **private**: on the device, or in a vault the user
-owns so that several clients share them. Timelines are computed for the reader, so the
-network never needs to know whom anyone follows. This is closer to Substack's reading
+owns so that several clients share them. Follows are never published, so the network
+does not learn whom anyone follows. A hosted indexer that builds a reader's timeline
+does learn the set of authors it is asked about. Readers who want that private too
+compute their timeline locally, from direct queries per author, or use an indexer they
+run or trust. This is closer to Substack's reading
 privacy than to Twitter's public graph.
 
 A public social graph (follower counts, graph-based discovery) can be added later if
@@ -510,8 +518,13 @@ DID data under `memeplex.revocations[grant]`, with the set on IPFS if it is larg
 is an ancestor of one, through signed `previd` links.
 
 - Objects the wallet's node had not yet seen are lost, which is the right failure
-  direction. Deleted objects no longer match the query; only their tombstones lose
-  attribution.
+  direction.
+- Deleted objects no longer match the query, because deletion clears their data. A
+  wallet that can find them, for example through an indexer (which remembers deleted
+  DIDs), includes each with the `versionId` of its deletion, which admits the whole
+  history before it. A deleted object the wallet does not find loses attribution for
+  its **entire** history, not just its tombstone: earlier versions stay resolvable but
+  show as unattributed.
 - The snapshot names operations, not sequence numbers. A sequence number does not
   identify content: a revoked client could publish a backdated sibling at the same
   sequence that Archon's sibling ordering prefers. That sibling is simply not in the
