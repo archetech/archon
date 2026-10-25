@@ -605,6 +605,15 @@
           },
           {
             "in": "query",
+            "name": "versionId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Canonical CID of one operation in the DID's accepted history (a retrieval alias of it is also accepted). Returns the document as of that operation, or `notFound` if the operation is not in the accepted history. Cannot be combined with `versionTime` or `versionSequence` (`invalidOptions`).\n"
+          },
+          {
+            "in": "query",
             "name": "confirm",
             "required": false,
             "schema": {
@@ -2707,6 +2716,15 @@
               "type": "integer"
             },
             "description": "Resolve a specific version of the DID Document."
+          },
+          {
+            "in": "query",
+            "name": "versionId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Canonical CID of one operation in the accepted history. `notFound` (404) if it is not in that history; `invalidOptions` (400) if combined with `versionTime` or `versionSequence`.\n"
           }
         ],
         "responses": {
@@ -2748,7 +2766,7 @@
             }
           },
           "400": {
-            "description": "The DID is syntactically invalid (error in didResolutionMetadata)."
+            "description": "The DID is syntactically invalid (invalidDid), or the version options conflict (invalidOptions). The error is in didResolutionMetadata.\n"
           },
           "404": {
             "description": "The DID does not exist or cannot be resolved (error in didResolutionMetadata)."
@@ -2794,6 +2812,15 @@
               "type": "integer"
             },
             "description": "Dereference the data at a specific version of the DID Document."
+          },
+          {
+            "in": "query",
+            "name": "versionId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Canonical CID of one operation in the accepted history. `notFound` (404) if it is not in that history; `invalidOptions` (400) if combined with `versionTime` or `versionSequence`.\n"
           }
         ],
         "responses": {
@@ -2809,7 +2836,7 @@
             }
           },
           "400": {
-            "description": "The DID is syntactically invalid.",
+            "description": "The DID is syntactically invalid, or the version options conflict.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2876,6 +2903,15 @@
               "type": "integer"
             },
             "description": "Dereference the registration at a specific version of the DID Document."
+          },
+          {
+            "in": "query",
+            "name": "versionId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Canonical CID of one operation in the accepted history. `notFound` (404) if it is not in that history; `invalidOptions` (400) if combined with `versionTime` or `versionSequence`.\n"
           }
         ],
         "responses": {
@@ -2891,7 +2927,7 @@
             }
           },
           "400": {
-            "description": "The DID is syntactically invalid.",
+            "description": "The DID is syntactically invalid, or the version options conflict.",
             "content": {
               "application/json": {
                 "schema": {

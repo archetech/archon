@@ -343,6 +343,15 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
      *         description: >
      *           Specific version of the DID Document to retrieve. Versioning increments each time an `update` or `delete` operation occurs.
      *       - in: query
+     *         name: versionId
+     *         required: false
+     *         schema:
+     *           type: string
+     *         description: >
+     *           Canonical CID of one operation in the DID's accepted history (a retrieval alias of it is also accepted).
+     *           Returns the document as of that operation, or `notFound` if the operation is not in the accepted
+     *           history. Cannot be combined with `versionTime` or `versionSequence` (`invalidOptions`).
+     *       - in: query
      *         name: confirm
      *         required: false
      *         schema:
@@ -520,10 +529,14 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
     router.get('/did/:did', async (req, res) => {
         try {
             const options: ResolveDIDOptions = {};
-            const { versionTime, versionSequence, confirm, verify } = req.query;
+            const { versionTime, versionSequence, versionId, confirm, verify } = req.query;
     
             if (typeof versionTime === 'string') {
                 options.versionTime = versionTime;
+            }
+
+            if (typeof versionId === 'string') {
+                options.versionId = versionId;
             }
     
             if (typeof versionSequence === 'string') {

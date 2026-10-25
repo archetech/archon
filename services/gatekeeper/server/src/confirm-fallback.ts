@@ -11,7 +11,10 @@ export function shouldTryConfirmFallback(
     alreadyFallback: boolean = false,
     latest?: DidCidDocument
 ): boolean {
+    // A versionId names one operation; a peer's latest confirmed state is not an
+    // answer to that question, so it is never delegated.
     return options.confirm === true &&
+        options.versionId === undefined &&
         Boolean(confirmFallbackURL) &&
         !alreadyFallback &&
         (doc.didResolutionMetadata?.error === 'notFound' ||

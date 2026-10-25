@@ -98,6 +98,10 @@ pub(crate) trait GatekeeperDb {
 pub(crate) struct ResolveOptions {
     pub(crate) version_time: Option<String>,
     pub(crate) version_sequence: Option<usize>,
+    /// Canonical CID (or retained retrieval alias) of one operation in the
+    /// accepted history. Mutually exclusive with `version_time` and
+    /// `version_sequence`.
+    pub(crate) version_id: Option<String>,
     /// A chain position, as (registry, ordinal). Not a resolution mode a
     /// caller can ask for -- the resolution surface is time- and
     /// sequence-based and ordinals are registry-internal -- but what
@@ -162,6 +166,22 @@ pub(crate) fn standard_datetime(time: &str) -> String {
 
 /// Whether resolution stops before this event: by ordinal if the event is on
 /// the cutoff's registry, by time otherwise.
+/// DID Resolution makes versionId and versionTime mutually exclusive; a
+/// sequence is a third selector for the same thing, so it is excluded too.
+pub(crate) fn validate_version_options(options: &ResolveOptions) -> Result<()> {
+    if let Some(version_id) = options.version_id.as_deref() {
+        if version_id.is_empty()
+            || options.version_time.is_some()
+            || options.version_sequence.is_some()
+        {
+            return Err(crate::resolver::invalid_options(
+                "versionId cannot be combined with versionTime or versionSequence",
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn past_cutoff(options: &ResolveOptions, event: &EventRecord) -> bool {
     if let Some((registry, ordinal)) = options.version_ordinal.as_ref() {
         if event.registry == *registry {
@@ -2063,6 +2083,12 @@ impl JsonDb {
 
     fn resolve_doc(&self, _config: &Config, did: &str, options: ResolveOptions) -> Result<Value> {
         let _ = did.split(':').next_back().context("invalid did suffix")?;
+        validate_version_options(&options)?;
+        // A retrieval alias names the same operation as its canonical CID, as for previd.
+        let target_id = options
+            .version_id
+            .as_deref()
+            .map(|id| self.canonical_reference(id));
         let events = self.get_events(did);
         if events.is_empty() {
             anyhow::bail!("DID not found");
@@ -2160,6 +2186,10 @@ impl JsonDb {
         for (event, expected_registry, event_confirmed) in history_entries(&events).skip(1) {
             let operation_time = standard_datetime(&event.time);
 
+            if target_id.as_deref() == Some(state.version_id.as_str()) {
+                break;
+            }
+
             if past_cutoff(&options, event) {
                 break;
             }
@@ -2185,6 +2215,18 @@ impl JsonDb {
             if let Some(registry) = expected_registry {
                 state.timestamp = self.build_timestamp(registry, &state.version_id, event);
             }
+        }
+
+        // The requested operation is not in the accepted history this resolution
+        // walked: unknown, displaced by a preferred sibling, or (with confirm)
+        // not yet confirmed.
+        if target_id
+            .as_deref()
+            .is_some_and(|target| target != state.version_id)
+        {
+            return Err(crate::resolver::not_found(
+                "versionId not in accepted history",
+            ));
         }
 
         if let Some(registration) = state.did_document_registration.as_object_mut() {

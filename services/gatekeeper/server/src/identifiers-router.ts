@@ -221,10 +221,14 @@ export function createIdentifiersRouter(
         req: express.Request
     ): Promise<{ ok: true; doc: DidCidDocument } | { ok: false; status: number; didResolutionMetadata: any }> {
         const options: ResolveDIDOptions = { confirm: true, verify: true };
-        const { versionTime, versionSequence } = req.query;
+        const { versionTime, versionSequence, versionId } = req.query;
 
         if (typeof versionTime === 'string') {
             options.versionTime = versionTime;
+        }
+
+        if (typeof versionId === 'string') {
+            options.versionId = versionId;
         }
 
         if (typeof versionSequence === 'string') {
@@ -237,7 +241,8 @@ export function createIdentifiersRouter(
         const doc = await gatekeeper.resolveDID(req.params.did as string, options);
 
         if (doc.didResolutionMetadata?.error) {
-            const status = doc.didResolutionMetadata.error === 'invalidDid' ? 400 : 404;
+            const error = doc.didResolutionMetadata.error;
+            const status = error === 'invalidDid' || error === 'invalidOptions' ? 400 : 404;
             return { ok: false, status, didResolutionMetadata: doc.didResolutionMetadata };
         }
 
@@ -280,6 +285,14 @@ export function createIdentifiersRouter(
      *         schema:
      *           type: integer
      *         description: Resolve a specific version of the DID Document.
+     *       - in: query
+     *         name: versionId
+     *         required: false
+     *         schema:
+     *           type: string
+     *         description: >
+     *           Canonical CID of one operation in the accepted history. `notFound` (404) if it is not in that
+     *           history; `invalidOptions` (400) if combined with `versionTime` or `versionSequence`.
      *     responses:
      *       200:
      *         description: The DID Resolution result (standard triple).
@@ -305,7 +318,9 @@ export function createIdentifiersRouter(
      *                 didDocumentMetadata:
      *                   type: object
      *       400:
-     *         description: The DID is syntactically invalid (error in didResolutionMetadata).
+     *         description: >
+     *           The DID is syntactically invalid (invalidDid), or the version options conflict
+     *           (invalidOptions). The error is in didResolutionMetadata.
      *       404:
      *         description: The DID does not exist or cannot be resolved (error in didResolutionMetadata).
      *       406:
@@ -406,6 +421,14 @@ export function createIdentifiersRouter(
      *         schema:
      *           type: integer
      *         description: Dereference the data at a specific version of the DID Document.
+     *       - in: query
+     *         name: versionId
+     *         required: false
+     *         schema:
+     *           type: string
+     *         description: >
+     *           Canonical CID of one operation in the accepted history. `notFound` (404) if it is not in that
+     *           history; `invalidOptions` (400) if combined with `versionTime` or `versionSequence`.
      *     responses:
      *       200:
      *         description: The dereferenced data resource.
@@ -415,7 +438,7 @@ export function createIdentifiersRouter(
      *               type: object
      *               description: Arbitrary data attached to the DID (empty object for agent DIDs).
      *       400:
-     *         description: The DID is syntactically invalid.
+     *         description: The DID is syntactically invalid, or the version options conflict.
      *         content:
      *           application/json:
      *             schema:
@@ -488,6 +511,14 @@ export function createIdentifiersRouter(
      *         schema:
      *           type: integer
      *         description: Dereference the registration at a specific version of the DID Document.
+     *       - in: query
+     *         name: versionId
+     *         required: false
+     *         schema:
+     *           type: string
+     *         description: >
+     *           Canonical CID of one operation in the accepted history. `notFound` (404) if it is not in that
+     *           history; `invalidOptions` (400) if combined with `versionTime` or `versionSequence`.
      *     responses:
      *       200:
      *         description: The dereferenced registration resource.
@@ -497,7 +528,7 @@ export function createIdentifiersRouter(
      *               type: object
      *               description: Method-specific anchoring/provenance data.
      *       400:
-     *         description: The DID is syntactically invalid.
+     *         description: The DID is syntactically invalid, or the version options conflict.
      *         content:
      *           application/json:
      *             schema:
