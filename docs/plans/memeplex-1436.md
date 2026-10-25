@@ -116,7 +116,7 @@ its operations, which resolution already reports.
 | `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs), `content` (PDF or source). Revised by editing; see Revisions and citation. |
 | `reply` | Comment in a thread | required | Same fields as `post`; also carries `root`. |
 | `review` | Written assessment | required | `verdict` (free text or schema-defined), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
-| `reaction` | Like, boost, emoji | required | `value`. Withdrawn by deleting it. |
+| `reaction` | Like or other emoji response | required | `value`, one emoji (see Reactions). Withdrawn by deleting it. |
 | `rating` | Score on the author's own scale | required | Integers `rating`, `min`, `max` (see Ratings). One per author per parent; changed by editing, withdrawn by deleting. |
 | `tag` | Label applied to someone else's object | required | `tag`, a normalized string (see Tags). Withdrawn by deleting it. |
 
@@ -205,6 +205,23 @@ shortened.
 { "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…spamwatch",
                 "parent": "did:cid:…some-post", "tag": "spam" } }
 ```
+
+### Reactions
+
+A reaction's `value` is a single Unicode emoji, so every client can render it and no
+Memeplex-specific list has to be maintained:
+
+- **One emoji, in its canonical form.** `value` is exactly one emoji from Unicode's
+  recommended (RGI) set, in the fully-qualified form listed in Unicode's
+  `emoji-test.txt`. `❤️` is valid; the unqualified `❤` and arbitrary text are not.
+  Each emoji therefore has one encoding, and counts never split across encodings.
+- **No skin-tone modifiers.** The five modifiers U+1F3FB–U+1F3FF are not allowed.
+  Clients that offer a tone picker strip the modifier before publishing. Other
+  multi-character emoji (🧑‍💻, 🏳️‍🌈) are allowed.
+- **Invalid values are ignored.** A reaction whose `value` breaks these rules is not
+  counted or displayed.
+
+A boost or repost is not a reaction; it is a `post` that quotes the original.
 
 ### Ratings
 
@@ -699,6 +716,9 @@ stay as individual DIDs or are batched.
 - **Public follows.** Whether Memeplex should ever define a public follow list (see
   Follows), and if so, where it lives.
 - **Content availability.** Who pins long-form content and papers, and for how long?
+- **Custom emoji.** Should reactions also allow community emoji, as a shortcode plus
+  an image CID (in the style of Nostr's NIP-30), with clients that lack support
+  showing the shortcode?
 
 ## References
 
