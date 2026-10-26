@@ -213,16 +213,9 @@ Memeplex-specific list has to be maintained:
   recommended (RGI) set, in the fully-qualified form listed in Unicode's
   `emoji-test.txt`. `❤️` is valid; the unqualified `❤` and arbitrary text are not.
   Each emoji therefore has one encoding, and counts never split across encodings.
-- **Counted by base emoji.** Skin-tone modifiers (U+1F3FB–U+1F3FF) are allowed in
-  `value`, but for counting and comparison a reaction is keyed by its **base emoji**:
-  the fully-qualified RGI emoji that Unicode's `emoji-test.txt` lists as the untoned
-  form of `value`. Removing the modifier code points is not enough. ☝🏽 without its
-  modifier is the unqualified `☝`, whose base is `☝️`. A toned multi-person sequence can
-  have a different base: 👩🏽‍🤝‍👩🏻's base is 👭. Implementations derive the mapping from
-  `emoji-test.txt`, which lists each toned emoji with its base. 👍🏽 therefore counts as
-  👍, and counts never split.
-- **Tones are a client choice.** Whether to offer or display tones is up to each
-  client. Memepool offers no tone picker and renders every reaction as its base emoji.
+- **Variants are allowed.** Skin-tone variants are valid RGI emoji. How to group
+  variants when counting or displaying reactions is up to each client and indexer
+  (see Memepool for its choice).
 - **Invalid values are ignored.** A reaction whose `value` breaks these rules is not
   counted or displayed.
 
@@ -286,8 +279,8 @@ lower-case, internal whitespace collapsed to a single hyphen. Otherwise one tag
 splinters across spellings.
 
 Third-party tags are signed, attributed judgments like any other object, so their
-weight depends on who applied them. Moderation labels are tags too (see Moderation and
-reputation).
+weight depends on who applied them. Moderation labels are tags too (see Memepool:
+Moderation).
 
 ### Content and size
 
@@ -346,26 +339,12 @@ to get one:
 Either way the time exists only after actual chain inclusion. Most objects never need
 this; a paper establishing priority might.
 
-## Follows
+## Follows are not objects
 
 A follow is not a publication. It has no content anyone reads, quotes or cites, nobody
 responds to it, and it is current state the reader toggles rather than a work
-addressed to an audience. Memeplex therefore defines publications and responses only,
-and treats a follow list as the reader's own preference.
-
-By default a client keeps follows **private**: on the device, or in a vault the user
-owns so that several clients share them. Follows are never published, so the network
-does not learn whom anyone follows. A hosted indexer that builds a reader's timeline
-does learn the set of authors it is asked about. Computing the timeline locally does not
-by itself avoid this: per-author queries go to a Gatekeeper over HTTP, so a remote
-Gatekeeper sees the same author set. Readers who want their follows private from every
-service query a Gatekeeper and indexer they run or trust. This is closer to Substack's reading
-privacy than to Twitter's public graph.
-
-A public social graph (follower counts, graph-based discovery) can be added later if
-something needs it. The candidates are a `follows` list in the user's own DID data,
-written by the wallet, or a single per-user state asset kept apart from publications
-and editable by a delegated client. Neither is part of v1.
+addressed to an audience. Memeplex therefore defines no follow kind: whom a reader
+follows is the reader's own preference, kept by their client (see Memepool).
 
 ## Delegation
 
@@ -377,13 +356,14 @@ creates, so it is signed with the user's own key and controlled by the user:
 ```jsonc
 { "memeplexGrant": { "v": 1,
                      "client": "did:cid:…client",
-                     "actions": ["memeplex:post", "memeplex:reply", "memeplex:react", "memeplex:edit"] } }
+                     "actions": ["memeplex:post", "memeplex:reply", "memeplex:react"] } }
 ```
 
 - **Client:** the agent DID the application created, holding its own key. Agents are
   self-controlled, so the user cannot own the client's DID; the grant is how the user
   vouches for it.
-- **Actions:** what the client may do (table below).
+- **Actions:** which kinds the client may create (table below). A client may always
+  edit and delete the objects it published under the grant.
 - **Immutable.** A grant is never edited, and verifiers read it as created. Narrowing
   one by editing it would have the same backdating gap as revocation: the client could
   keep publishing with dates before the edit. To narrow a grant, the wallet revokes it
@@ -398,16 +378,14 @@ mistake one for a publication.
 
 ### Actions
 
-| Action | Allows the client to |
+| Action | Lets the client create |
 |---|---|
-| `memeplex:post` | create `post`, `article` and `paper` objects |
-| `memeplex:reply` | create `reply` objects |
-| `memeplex:review` | create `review` objects |
-| `memeplex:react` | create and delete `reaction` objects |
-| `memeplex:rate` | create, edit and delete `rating` objects |
-| `memeplex:tag` | create and delete `tag` objects |
-| `memeplex:edit` | update objects published under this grant |
-| `memeplex:delete` | delete objects published under this grant |
+| `memeplex:post` | `post`, `article` and `paper` objects |
+| `memeplex:reply` | `reply` objects |
+| `memeplex:review` | `review` objects |
+| `memeplex:react` | `reaction` objects |
+| `memeplex:rate` | `rating` objects |
+| `memeplex:tag` | `tag` objects |
 
 A client asks for the actions it needs; the wallet shows them and the user approves a
 subset.
@@ -442,8 +420,8 @@ then transfer it to *U* without *U* signing anything.
 
 ### Grant check
 
-*grant-ok(G, U, A, X, T)* holds when grant *G* lets client *A* perform action *X* for
-user *U* at time *T*:
+*grant-ok(G, U, A, T)* holds when grant *G* lets client *A* act for user *U* at time
+*T*:
 
 1. *G*'s create operation names *U* as its controller and is signed by *U*. (A grant
    someone else created and then transferred to *U* does not count, for the same reason
@@ -455,8 +433,7 @@ user *U* at time *T*:
    the grant. *G*'s `client` and `actions` are read from its creation; later updates are
    ignored.
 3. Its `client` is *A*.
-4. *X* is in its `actions`.
-5. If *G* is deactivated in its latest state, *U*'s revocation snapshot for *G* admits
+4. If *G* is deactivated in its latest state, *U*'s revocation snapshot for *G* admits
    this version (see Revocation). Until that snapshot is visible, the version is
    **unverified**: neither attributed nor rejected. This fails closed, because the
    grant's deletion and the snapshot live in different DIDs and can reach a verifier in
@@ -469,10 +446,9 @@ The create operation decides whether an object is a publication by *U* at all. L
 be the controller the create operation names and signs with, and *T* its time.
 
 - **Direct:** `memeplex.grant` is absent, `memeplex.author` is *U*, and *A* is *U*.
-- **Delegated:** `memeplex.author` is *U*, and *grant-ok(G, U, A, X, T)* holds for *G* =
-  `memeplex.grant` and *X* the creating action for the object's kind (`memeplex:post`,
-  `memeplex:reply`, `memeplex:review`, `memeplex:react`, `memeplex:rate` or
-  `memeplex:tag`).
+- **Delegated:** `memeplex.author` is *U*, *grant-ok(G, U, A, T)* holds for *G* =
+  `memeplex.grant`, and the grant's `actions` include the action for the object's kind
+  (see Actions).
 
 An object whose creation is not attributed is never attributed, whatever its later
 versions say.
@@ -487,10 +463,8 @@ attributed to *U* only if all of these hold:
 2. It leaves `author`, `kind` and `grant` unchanged: an object stays under the grant it
    was created under. (A deletion clears the data; the check applies to the
    predecessor.)
-3. *A* is *U* (direct), or *grant-ok(G, U, A, X, T)* holds for that grant with *X* =
-   `memeplex:edit` or `memeplex:delete`, or the kind's own action where that action
-   covers it (`memeplex:react` and `memeplex:tag` cover deletion; `memeplex:rate` covers
-   editing and deletion).
+3. *A* is *U* (direct), or *grant-ok(G, U, A, T)* holds for that grant. Any client
+   holding the grant may edit or delete what it published under it.
 4. If it changes the controller, the new controller is *U*: a client may hand an object
    back to its author, after which later versions are direct. Any other transfer ends
    attribution for every later version.
@@ -520,7 +494,7 @@ published under the grant (`memeplex.grant $in [grant]`; an object never changes
 grant, so this finds every live one) and records, for each, the `versionId` (canonical
 operation CID) of its accepted version at that moment. The record goes into the user's
 DID data under `memeplex.revocations[grant]`, with the set on IPFS if it is large. Step
-5 of the grant check then admits a version only if its `versionId` is in the snapshot or
+4 of the grant check then admits a version only if its `versionId` is in the snapshot or
 is an ancestor of one, through signed `previd` links.
 
 - Objects the wallet's node had not yet seen are lost, which is the right failure
@@ -558,9 +532,7 @@ protocol change letting Gatekeeper accept operations on a user's assets signed b
 the user's grant names. The latter changes protocol authorization and needs its own
 decision.
 
-## Discovery and indexing
-
-### Direct queries
+## Queries
 
 Gatekeeper keeps an in-memory index of every DID's `didDocumentData`, and
 `POST /api/v1/query` matches a path against a list of values. That index does not
@@ -580,6 +552,37 @@ Only one condition and only `$in` are supported, so a client separates replies,
 reviews, reactions, ratings and tags by `kind` after the query. Results are unsorted and unpaged, and
 they are not attributions: the matches still have to pass the attribution check,
 because anyone can write any `author` into an object they publish.
+
+## Memepool
+
+Everything above is the Memeplex protocol: what any client must publish and how any
+verifier attributes it. This section records choices specific to Memepool, the first
+client and indexer. Other clients may choose differently.
+
+### Reactions
+
+Memepool offers no skin-tone picker, and counts and renders every reaction as its base
+emoji: the fully-qualified RGI emoji that Unicode's `emoji-test.txt` lists as the
+untoned form of the reaction's `value`. Removing the modifier code points is not
+enough: ☝🏽 without its modifier is the unqualified `☝`, whose base is `☝️`, and a toned
+multi-person sequence can have a different base (👩🏽‍🤝‍👩🏻's base is 👭). The mapping is
+derived from `emoji-test.txt`, which lists each toned emoji with its base.
+
+### Follows
+
+Memepool keeps follows **private**: on the device, or in a vault the user owns so that
+several clients share them. Follows are never published, so the network does not learn
+whom anyone follows. A hosted indexer that builds a reader's timeline does learn the set
+of authors it is asked about, and computing the timeline locally does not by itself
+avoid this: per-author queries go to a Gatekeeper over HTTP, so a remote Gatekeeper sees
+the same author set. Readers who want their follows private from every service query a
+Gatekeeper and indexer they run or trust. This is closer to Substack's reading privacy
+than to Twitter's public graph.
+
+A public social graph (follower counts, graph-based discovery) can be added later if
+something needs it. The candidates are a `follows` list in the user's own DID data,
+written by the wallet, or a single per-user state asset kept apart from publications.
+Neither is part of v1.
 
 ### Indexer
 
@@ -607,7 +610,7 @@ Timelines, ranking, full-text search and counts need an indexer. The Memepool in
 The indexer is a cache of public data. Anyone can run one, and a client can always fall
 back to direct queries and its own verification.
 
-## Moderation and reputation
+### Moderation
 
 There is no central moderator. Viewers choose which judgments to apply:
 
@@ -620,6 +623,11 @@ There is no central moderator. Viewers choose which judgments to apply:
   replied, whether it was retracted.
 - **Unattributed objects** (failed delegation, revoked client) are hidden or marked by
   default.
+
+### Wallet
+
+The wallet lists active grants with the actions they allow, defaults to narrow actions,
+and makes revoking a grant, snapshot included, a single action.
 
 ## Scale
 
@@ -650,8 +658,8 @@ stay as individual DIDs or are batched.
 - **Forged grants.** A grant counts only if the user created it; one created by
   someone else and transferred to the user fails the grant check.
 - **Backdating after revocation.** Addressed by snapshots bound to operation CIDs.
-- **Over-broad or forgotten grants.** Wallets should default to narrow actions, list
-  active grants with the actions they allow, and make revoking one a single action.
+- **Over-broad or forgotten grants.** Mitigated by wallet design (see Memepool:
+  Wallet).
 - **Transferred objects.** Ownership is not authorship; attribution follows the
   creation and signed lineage, never the current controller.
 - **Spam.** Object creation on `hyperswarm` is free. Indexers will need rate limits or
@@ -669,7 +677,7 @@ stay as individual DIDs or are batched.
 2. **Schemas:** the object schema and the grant schema, with signed fixtures.
 3. **Verifier library:** the attribution rules, shared by clients and the indexer, with
    cross-checks against real signed objects, including revoked and forged grants,
-   transferred objects, edit-only grants, and backdated siblings.
+   transferred objects, and backdated siblings.
 4. **Direct publishing:** create, edit, delete and query objects from the existing CLI
    and SDKs with no delegation; this works with today's `create-asset-json`.
 5. **Delegation:** wallet UI to create, list and revoke grants, including the
@@ -680,8 +688,9 @@ stay as individual DIDs or are batched.
 
 ## Open questions
 
-- **Action vocabulary.** Is the action table the right granularity, and should grants
-  be able to narrow further (for example, replies only within one thread)?
+- **Action vocabulary.** Is one action per creatable kind the right granularity, and
+  should grants be able to narrow further (for example, replies only within one
+  thread)?
 - **Revocation record.** Is `memeplex.revocations` in the user's DID data the right
   place, given that every revocation then updates the user's DID?
 - **Expiry.** Should grants carry an optional expiry? On `hyperswarm` an expiry has the
@@ -691,7 +700,7 @@ stay as individual DIDs or are batched.
   periodically against full state.
 - **Reactions, ratings and tags.** Individual DIDs or batched, pending the benchmark.
 - **Public follows.** Whether Memeplex should ever define a public follow list (see
-  Follows), and if so, where it lives.
+  Memepool: Follows), and if so, where it lives.
 - **Content availability.** Who pins long-form content and papers, and for how long?
 - **Custom emoji.** Should reactions also allow community emoji, as a shortcode plus
   an image CID (in the style of Nostr's NIP-30), with clients that lack support
