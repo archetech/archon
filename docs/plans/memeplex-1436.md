@@ -113,13 +113,52 @@ its operations, which resolution already reports.
 | `article` | Long-form essay, Substack-like | — | `title`, `summary`; body as `content` on IPFS. |
 | `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs; see Coauthors), `content` (the readable paper, usually PDF), optional `source` (LaTeX source). Revised by editing; see Revisions and citation. |
 | `reply` | Comment in a thread | required | Same fields as `post`. |
-| `review` | Written assessment | required | `verdict` (free text or schema-defined), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
+| `review` | Written assessment | required | `verdict` (short free text), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
 | `reaction` | Like or other emoji response | required | `value`, one emoji (see Reactions). Withdrawn by deleting it. |
 | `rating` | Score on the author's own scale | required | Integers `rating`, `min`, `max` (see Ratings). One per author per parent; changed by editing, withdrawn by deleting. |
 | `tag` | Label applied to someone else's object | required | `tag`, a normalized string (see Tags). Withdrawn by deleting it. |
 
 `parent` is the one link from a response to what it responds to; `kind` says how. This
 keeps every response, of whatever kind, reachable from its parent with one query.
+
+### Fields
+
+| Field | Type | Kinds |
+|---|---|---|
+| `v` | integer, `1` | all; required |
+| `kind` | string | all; required |
+| `author` | DID | all; required |
+| `grant` | DID | all; present exactly when a client publishes under a grant |
+| `text` | string, at most 10,000 code points | post, article, reply, review |
+| `content` | `{ cid, type, bytes }` | post, article, paper, reply, review |
+| `parent`, `parentVersion` | DID, `versionId` | reply, review, reaction, rating, tag; required |
+| `quotes` | 1–10 `{ did, version }` pairs | post, article, paper, reply, review |
+| `tags` | 1–20 normalized strings, each at most 64 code points | post, article, paper, reply, review |
+| `title` | string, at most 300 code points | article, paper; required |
+| `summary` | string, at most 1,000 code points | article |
+| `abstract` | string, at most 5,000 code points | paper; required |
+| `authors` | 1–100 distinct DIDs, including `author` | paper; required |
+| `source` | `{ cid, type, bytes }` | paper |
+| `verdict` | string, at most 300 code points | review; required |
+| `value` | one emoji (see Reactions) | reaction; required |
+| `rating`, `min`, `max` | integers (see Ratings) | rating; required |
+| `tag` | normalized string, at most 64 code points (see Tags) | tag; required |
+
+- **Body.** `text` and `content` are mutually exclusive. An article, reply or review
+  has one of them; a paper has `content`; a post has `text`, `content` or `quotes` (a
+  plain boost has only `quotes`).
+- **References.** `cid` is an IPFS CID string, `bytes` a nonnegative integer, and
+  `type` one of the media types under Text formatting. A `version` or `parentVersion`
+  is a canonical operation CID.
+- **Strictness.** A field from this table on a kind that does not list it makes the
+  object invalid, as does a missing required field. A field not in the table is
+  ignored, so a later optional field (see Schemas) does not invalidate objects for
+  clients that predate it.
+- **Lengths** count Unicode code points. The whole operation must still fit
+  Gatekeeper's 64 Ki limit.
+
+A verdict is free text so that venues can use their own wording ("accept", "minor
+revisions"). A venue that needs a fixed vocabulary defines an extension kind.
 
 ### Version pinning
 
@@ -130,8 +169,8 @@ Protocol's strong references do:
   bare DID, so the "every response to an object" query still finds it, and
   `parentVersion` is the `versionId` of the revision the author saw.
 - **`quotes` entries** are `{ "did", "version" }` pairs.
-- **Images** referenced by `did:` pin the image asset's version in the DID URL:
-  `![alt](did:cid:…?versionId=bafyrei…)`. An `ipfs:` image is a fixed CID already.
+- **Images** pin the image asset's version in the DID URL:
+  `![alt](did:cid:…?versionId=bafyrei…)`.
 
 A reference then always means the content the author responded to, quoted or showed,
 even after the target is edited. Clients may mark a response whose `parentVersion` is
@@ -251,6 +290,9 @@ Memeplex-specific list has to be maintained:
   (see Memepool for its choice).
 - **Invalid values are ignored.** A reaction whose `value` breaks these rules is not
   counted or displayed.
+- **Counted once per author.** An author can react to one object with several emoji,
+  but each emoji counts at most once per author, even if two clients each published
+  it.
 
 ### Boosts and quote posts
 
@@ -310,7 +352,8 @@ labels it with a `tag` object whose `parent` is the labelled object:
 
 Tag values, in both places, are normalized before publishing: Unicode NFC, trimmed,
 lower-case, internal whitespace collapsed to a single hyphen. Otherwise one tag
-splinters across spellings.
+splinters across spellings. Like a reaction, a tag value counts at most once per
+labeller and object.
 
 Third-party tags are signed, attributed judgments like any other object, so their
 weight depends on who applied them. Moderation labels are tags too (see Memepool:
@@ -350,11 +393,11 @@ Every client renders the same text the same way:
   `javascript:` and `data:`, are not followed.
 - **Images are Markdown images,** in any kind: `![alt text](did:cid:…)`. There is no
   separate attachment field; a client may lay out a short post's images as a gallery.
-  - **Content-addressed only.** The source is a version-pinned `did:` URL (an Archon
-    image asset, created with `createImage`, whose data gives the IPFS CID, type, width
-    and height; see Version pinning) or `ipfs:` (a raw CID). `https:` images are not loaded: every reader's client would
-    fetch them, telling the host who is reading, and the image could change after
-    publication.
+  - **Image assets only.** The source is a version-pinned `did:` URL naming an Archon
+    image asset, created with `createImage`, whose data gives the IPFS CID, type,
+    size, width and height (see Version pinning). Other sources are not loaded. An
+    `https:` image would be fetched by every reader's client, telling the host who is
+    reading, and could change after publication.
   - **Types:** `image/png`, `image/jpeg`, `image/webp` and `image/gif`. No SVG, which can
     carry script.
   - **Size:** at most 10 MB per image; clients check the asset's `bytes` before
@@ -436,7 +479,8 @@ creates, so it is signed with the user's own key and controlled by the user:
 ```jsonc
 { "memeplexGrant": { "v": 1,
                      "client": "did:cid:…client",
-                     "actions": ["memeplex:post", "memeplex:reply", "memeplex:react"] } }
+                     "actions": ["memeplex:post", "memeplex:reply", "memeplex:react"],
+                     "nonce": "Qm9vdHN0cmFwIG5vbmNl" } }
 ```
 
 - **Client:** the agent DID the application created, holding its own key. Agents are
@@ -444,6 +488,8 @@ creates, so it is signed with the user's own key and controlled by the user:
   vouches for it.
 - **Actions:** which kinds the client may create (table below). A client may always
   edit and delete the objects it published under the grant.
+- **Nonce:** copied from the client's grant request so the client can find this grant
+  (see Flow). It carries no authority.
 - **Immutable.** Verifiers read `client` and `actions` as created. Narrowing a grant by
   editing it would have the same backdating gap as revocation: the client could keep
   publishing with dates before the edit. To narrow a grant, the wallet revokes it and
@@ -468,15 +514,35 @@ mistake one for a publication.
 | `memeplex:rate` | `rating` objects |
 | `memeplex:tag` | `tag` objects |
 
+For an extension kind, the action is the kind itself, its schema DID URL; the wallet
+shows the schema's title.
+
 A client asks for the actions it needs; the wallet shows them and the user approves a
 subset.
 
 ### Flow
 
-1. The client creates its agent DID and shows it to the user, for example as a QR code
-   or a deep link into the wallet.
-2. The wallet shows the requested actions and creates the grant.
-3. The client names the grant's DID as `memeplex.grant` in every object it publishes
+1. The client creates its agent DID and a **grant request**:
+
+   ```jsonc
+   { "memeplexGrantRequest": { "v": 1,
+                               "client": "did:cid:…client",
+                               "name": "Memepool",
+                               "actions": ["memeplex:post", "memeplex:reply", "memeplex:react"],
+                               "nonce": "Qm9vdHN0cmFwIG5vbmNl" } }
+   ```
+
+   `nonce` is at least 128 random bits, base64url-encoded. The client shows the request
+   as base64url-encoded JSON, in a QR code or a link the wallet accepts.
+2. The wallet shows the client DID, the claimed `name` (labelled as the client's own
+   claim) and the requested actions. The user approves a subset, and the wallet creates
+   the grant with that subset and the request's `client` and `nonce`.
+3. The client finds the grant with a query for `memeplexGrant.client` (see Queries),
+   keeps the one carrying its nonce, and checks *grant-ok* for itself. The grant's
+   creator is the user. Anyone who saw the request could create a grant with the same
+   nonce from a different DID, so the client shows the user's identity and asks for
+   confirmation before publishing.
+4. The client names the grant's DID as `memeplex.grant` in every object it publishes
    for that user.
 
 A client may hold grants from several users (a shared device, or a service publishing
@@ -499,6 +565,26 @@ current controller is not evidence of authorship: an asset transfer needs only t
 previous owner's signature, so anyone can create an object naming *U* as author and
 then transfer it to *U* without *U* signing anything.
 
+### Evidence
+
+A verifier reads an object's accepted history from Gatekeeper's export
+(`POST /api/v1/dids/export`, `exportDIDs` in the SDK): its events in predecessor
+order. For each version it takes:
+
+- **versionId:** the canonical CID of the event's operation (the event's `opid`,
+  computed as Gatekeeper computes it when absent). `previd` names the predecessor.
+- **Signer:** the DID in the operation's `proof.verificationMethod`. Gatekeeper
+  accepted the operation only if that DID controlled the predecessor, or for a
+  creation, is the controller the operation names. A verifier that trusts its
+  Gatekeeper does not re-check signatures.
+- **Controller and data:** from the create operation for the creation, and from
+  resolving the object at the version's `versionId` for later versions.
+- **Time *T*:** the event's `time`. Resolution compares this same value against
+  `versionTime`, so the grant check's step 2 compares like with like. On `hyperswarm`
+  it is the creation's `created` and an update's or deletion's `proof.created`.
+
+The grant's own history is read the same way.
+
 ### Grant check
 
 *grant-ok(G, U, A, T)* holds when grant *G* lets client *A* act for user *U* at time
@@ -518,7 +604,8 @@ then transfer it to *U* without *U* signing anything.
    version just before deactivation admits this version (see Revocation). A grant
    revoked without a snapshot disowns everything published under it. If the snapshot's
    IPFS content cannot be fetched, the version is **unverified**: neither attributed nor
-   rejected.
+   rejected. Clients show it like an unattributed version but labelled unverified, and
+   verifiers retry the fetch; once it succeeds the version is decided either way.
 
 ### Creation
 
@@ -540,9 +627,10 @@ attributed to *U* only if all of these hold:
 
 1. Its predecessor version is attributed to *U*, so attribution runs unbroken from the
    creation.
-2. It leaves `author`, `kind` and `grant` unchanged: an object stays under the grant it
-   was created under. (A deletion clears the data; the check applies to the
-   predecessor.)
+2. It leaves `author`, `kind`, `grant` and `parent` unchanged: an object stays under
+   the grant it was created under, and a response stays in its thread. `parentVersion`
+   may change, so a review or rating can move to a newer revision of its parent. (A
+   deletion clears the data; the check applies to the predecessor.)
 3. *A* is *U* (direct), or *grant-ok(G, U, A, T)* holds for that grant. Any client
    holding the grant may edit or delete what it published under it.
 4. It does not change the controller. A transfer ends attribution for that version and
@@ -573,8 +661,21 @@ changes its grant, so this finds every live one) and records, for each, the
 `versionId` (canonical operation CID) of its accepted version at that moment. It
 stores that set on IPFS and revokes in two operations on the grant:
 
-1. an update adding `"snapshot": "<CID of the set>"` to the grant's data;
+1. an update adding `"snapshot": "<CID of the set>"` to the grant's `memeplexGrant`
+   data;
 2. `revokeDID`.
+
+The set is a JSON object stored through the Gatekeeper data API's JSON encoding
+(`addJSON`), mapping each object DID to one `versionId`:
+
+```jsonc
+{ "memeplexSnapshot": { "v": 1,
+                        "grant": "did:cid:…grant",
+                        "versions": { "did:cid:…post": "bafyrei…",
+                                      "did:cid:…reply": "bafyrei…" } } }
+```
+
+A snapshot whose `grant` is not the grant being checked admits nothing.
 
 Deletion clears the grant's data, but the version before it stays resolvable, so
 verifiers read the snapshot there. Step 4 of the grant check admits a version only if
@@ -634,6 +735,7 @@ cover the controller, which is why objects carry `author` in their data.
 | Every response to an object | `{ "where": { "memeplex.parent": { "$in": ["did:cid:…"] } } }` |
 | Boosts and quote posts of an object | `{ "where": { "memeplex.quotes[*].did": { "$in": ["did:cid:…"] } } }` |
 | Objects under one grant | `{ "where": { "memeplex.grant": { "$in": ["did:cid:…grant"] } } }` |
+| Grants naming a client | `{ "where": { "memeplexGrant.client": { "$in": ["did:cid:…client"] } } }` |
 | Objects an author tagged | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
 | Tags others applied (their `parent`s are the tagged objects) | `{ "where": { "memeplex.tag": { "$in": ["cryptography"] } } }` |
 
