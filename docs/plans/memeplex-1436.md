@@ -21,8 +21,8 @@ Two decisions shape everything else:
    identity and gives a separate client a scoped, revocable **grant**: an ordinary
    asset the user creates, naming the client and what it may do. The client publishes
    under its own agent DID, and verifiers attribute its objects to the user through the
-   grant. Every object is published under a grant; a user who publishes from their
-   own wallet grants themselves. A grant and the objects published under it are
+   grant. Every object is published by a client under a grant; a user who wants to
+   publish without an application runs their own client. A grant and the objects published under it are
    anchored on one chain registry, so a revoked client cannot backdate its way past
    the revocation. This needs no protocol change.
 
@@ -56,7 +56,7 @@ Two decisions shape everything else:
 | **Memepool** | The first client and indexer, run by the project. |
 | **object** | Any Memeplex asset DID: post, article, paper, reply, review, reaction, rating, tag. |
 | **author** | The user DID an object is attributed to. |
-| **publisher** | The agent DID that controls an object: the client its grant names, which may be the author itself. |
+| **publisher** | The agent DID that controls an object: the client its grant names, never the author itself. |
 
 The name puns on the memetic *meme pool* and Bitcoin's *mempool*: objects gossip on
 Hyperswarm first and are then anchored on a chain.
@@ -203,7 +203,7 @@ Memeplex specification lists the schema DID and pinned `versionId` for each core
 
 One object of each kind, showing each object's `didDocumentData`. Each names the grant
 it was published under (see Delegation): the reply comes from Bob's Memepool client,
-and the paper from Alice's own wallet under a grant to herself. DIDs are shortened.
+and the paper from a client Alice runs herself. DIDs are shortened.
 
 **post**
 
@@ -229,7 +229,7 @@ and the paper from Alice's own wallet under a grant to herself. DIDs are shorten
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "paper", "author": "did:cid:…alice",
-                "grant": "did:cid:…alice-self",
+                "grant": "did:cid:…alice-own-client",
                 "title": "Convergent Replay of Signed DID Histories",
                 "abstract": "We show that nodes receiving the same signed operations …",
                 "authors": ["did:cid:…alice", "did:cid:…bob"],
@@ -489,11 +489,12 @@ creates, so it is signed with the user's own key and controlled by the user:
                      "nonce": "Qm9vdHN0cmFwIG5vbmNl" } }
 ```
 
-- **Client:** the agent DID that publishes, holding its own key. For an application,
-  that is an agent DID it created; agents are self-controlled, so the user cannot own
-  it, and the grant is how the user vouches for it. A user who publishes from their own
-  wallet or the CLI names themselves: a **self-grant**, which also keeps the objects
-  under the user's own control.
+- **Client:** the agent DID that publishes, holding its own key, and never the user's
+  own DID: the user's identity key does not sign publications. Agents are
+  self-controlled, so the user cannot own the client's DID; the grant is how the user
+  vouches for it. A user who wants to publish without an application, or to keep
+  control of their objects, runs their own client: an agent DID they create, hold the
+  key for, and grant like any other.
 - **Actions:** which kinds the client may create (table below). A client may always
   edit and delete the objects it published under the grant.
 - **Nonce:** copied from the client's grant request so the client can find this grant
@@ -613,7 +614,7 @@ position *P* on *G*'s registry:
    a deletion.
 3. *G*'s creation is anchored on *R* before *P*.
 4. *G* is not deleted, or its deletion is pending or anchored after *P*.
-5. *G*'s `client` is *A*.
+5. *G*'s `client` is *A*, and *A* is not *U*.
 
 The check compares chain positions on one registry, never clocks (see Revocation).
 
@@ -693,9 +694,8 @@ Consequences:
   Its sibling would be anchored later, and after the deletion.
 - **No disowning.** A user cannot disown objects anchored before the revocation, even
   ones a compromised client published before the user noticed.
-- **One rule for everyone.** A self-grant follows the same rules, so a user publishing
-  from their own wallet waits for anchoring like any client, and the verifier has a
-  single path.
+- **One rule for everyone.** A client the user runs follows the same rules as any
+  application, so the verifier has a single path.
 
 Two alternatives were considered. A **revocation snapshot**, recorded in the grant
 just before deletion and listing the `versionId` of every object to keep, gives
@@ -712,8 +712,8 @@ The grant's client controls the objects published under it. Consequences:
   they no longer count as the user's beyond what was anchored before it, but they
   remain on the network.
 - Transferring an object ends its attribution, so a client cannot hand objects over to
-  the user. A user who wants an object under their own control republishes it under a
-  self-grant.
+  the user. A user who wants an object under their own control republishes it through
+  a client they run.
 
 Decision (from #1436): accept this for v1. If usage shows users need direct control of
 an application's objects, the alternative is a protocol change letting Gatekeeper
@@ -880,9 +880,9 @@ The results size node hardware and show where optimization will be needed first.
 3. **Verifier library:** the attribution rules, shared by clients and the indexer, with
    cross-checks against real signed objects, including revoked and forged grants,
    transferred objects, and backdated siblings.
-4. **Self-published objects:** create a self-grant, then create, edit, delete and
-   query objects on its registry from the existing CLI and SDKs; this works with
-   today's asset commands.
+4. **CLI client:** create an agent DID as the client, grant it from the user's
+   identity, then create, edit, delete and query objects on the grant's registry from
+   the existing CLI and SDKs; this works with today's asset commands.
 5. **Delegation:** wallet UI to create, list and revoke grants on a chain registry.
 6. **Indexer.**
 7. **Memepool client.**
