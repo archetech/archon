@@ -113,7 +113,7 @@ its operations, which resolution already reports.
 |---|---|---|---|
 | `post` | Short text, Twitter-like | — | Usually inline `text`. |
 | `article` | Long-form essay, Substack-like | — | `title`, `summary`; body as `content` on IPFS. |
-| `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs; see Coauthors), `content` (the readable paper, usually PDF), optional `source` (LaTeX source). Revised by editing; see Revisions and citation. |
+| `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs; see Coauthors), `content` (the paper in Markdown), optional `pdf` and `source` (LaTeX) downloads. Revised by editing; see Revisions and citation. |
 | `reply` | Comment in a thread | required | Same fields as `post`. |
 | `boost` | Reshare to the booster's own audience | required | Optional `text`, making it a quote post (see Boosts and quote posts). |
 | `review` | Written assessment | required | `verdict` (short free text), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
@@ -141,6 +141,7 @@ keeps every response, of whatever kind, reachable from its parent with one query
 | `abstract` | string, at most 5,000 code points | paper; required |
 | `authors` | 1–100 distinct DIDs, including `author` | paper; required |
 | `source` | `{ cid, type, bytes }` | paper |
+| `pdf` | `{ cid, type, bytes }` | paper |
 | `verdict` | string, at most 300 code points | review; required |
 | `value` | one emoji (see Reactions) | reaction; required |
 | `rating`, `min`, `max` | integers (see Ratings) | rating; required |
@@ -150,7 +151,7 @@ keeps every response, of whatever kind, reachable from its parent with one query
   has one of them; a paper has `content`; a post has `text` or `content`; a boost
   has `text` or nothing.
 - **References.** `cid` is an IPFS CID string, `bytes` a nonnegative integer, and
-  `type` one of the media types under Text formatting. A `parentVersion` is a
+  `type` the media type Text formatting allows for that field. A `parentVersion` is a
   canonical operation CID.
 - **Strictness.** A field from this table on a kind that does not list it makes the
   object invalid, as does a missing required field. A field not in the table is
@@ -231,7 +232,8 @@ and the paper from a client Alice runs herself. DIDs are shortened.
                 "title": "Convergent Replay of Signed DID Histories",
                 "abstract": "We show that nodes receiving the same signed operations …",
                 "authors": ["did:cid:…alice", "did:cid:…bob"],
-                "content": { "cid": "bafybei…", "type": "application/pdf", "bytes": 912340 },
+                "content": { "cid": "bafkrei…", "type": "text/markdown", "bytes": 61207 },
+                "pdf": { "cid": "bafybei…", "type": "application/pdf", "bytes": 912340 },
                 "source": { "cid": "bafybei…", "type": "application/x-tex", "bytes": 84112 },
                 "tags": ["distributed-systems", "did"] } }
 ```
@@ -440,10 +442,19 @@ Every client renders the same text the same way:
 - **Graceful fallback.** A client may show any `text` as plain text, and math as its
   LaTeX source; both stay readable.
 
-`content.type` is one of `text/markdown`, `text/plain` or `application/pdf`. A paper's
-`source` may also be `application/x-tex` or a source archive (`application/gzip`), as
-arXiv accepts. Clients offer source for download rather than rendering it. Clients may
-support other types, and others may ignore them.
+`content.type` is always `text/markdown`, for every kind, papers included: one body
+format means one renderer, and every body reflows on small screens, works with screen
+readers, can be searched, and can embed figures and other objects. A paper may also
+carry two downloads, which clients offer but never render:
+
+- **`pdf`** (`application/pdf`): the typeset version of record, for readers who want
+  the author's exact layout and for printing. Clients do not embed a PDF viewer, which
+  would be a large attack surface for untrusted files.
+- **`source`**: LaTeX (`application/x-tex`) or a source archive (`application/gzip`),
+  as arXiv accepts.
+
+Pandoc converts most LaTeX papers to Markdown with math well enough; the PDF covers
+what the conversion loses (custom macros, complex tables, exact figure placement).
 
 ### Edits, deletion and revisions
 
