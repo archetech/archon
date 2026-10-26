@@ -21,9 +21,10 @@ Two decisions shape everything else:
    identity and gives a separate client a scoped, revocable **grant**: an ordinary
    asset the user creates, naming the client and what it may do. The client publishes
    under its own agent DID, and verifiers attribute its objects to the user through the
-   grant. A grant and the objects published under it are anchored on one chain
-   registry, so a revoked client cannot backdate its way past the revocation. This
-   needs no protocol change.
+   grant. Every object is published under a grant; a user who publishes from their
+   own wallet grants themselves. A grant and the objects published under it are
+   anchored on one chain registry, so a revoked client cannot backdate its way past
+   the revocation. This needs no protocol change.
 
 ## Goals
 
@@ -55,10 +56,10 @@ Two decisions shape everything else:
 | **Memepool** | The first client and indexer, run by the project. |
 | **object** | Any Memeplex asset DID: post, article, paper, reply, review, reaction, rating, tag. |
 | **author** | The user DID an object is attributed to. |
-| **publisher** | The agent DID that controls an object: the author itself, or a delegated client. |
+| **publisher** | The agent DID that controls an object: the client its grant names, which may be the author itself. |
 
 The name puns on the memetic *meme pool* and Bitcoin's *mempool*: objects gossip on
-Hyperswarm first and can be anchored on a chain later.
+Hyperswarm first and are then anchored on a chain.
 
 ## Archon primitives used
 
@@ -67,7 +68,7 @@ and the Gatekeeper documentation.
 
 | Need | Primitive |
 |---|---|
-| Create an object | `createAsset(data, { registry, controller })`. Assets must be controlled by an agent DID. The default registry is `hyperswarm`. |
+| Create an object | `createAsset(data, { registry, controller })`. Assets must be controlled by an agent DID. Memeplex objects use their grant's chain registry. |
 | Edit an object | `updateDID` / `mergeData`. Each update is a new version; earlier versions in the accepted history stay resolvable (`versionId`, `versionTime`, `versionSequence`). |
 | Delete an object | `revokeDID`. Resolution reports `deactivated`, and deletion clears the document data while keeping registration metadata. |
 | Anchor an object | Create it on a chain registry (BTC, ZEC, ETH, SOL), or `changeRegistry` to one and then publish an update there; see Timestamps and anchoring. |
@@ -89,7 +90,7 @@ prefix.
     "v": 1,
     "kind": "post",                 // see kinds below
     "author": "did:cid:…user",      // the attributed user
-    "grant": "did:cid:…",           // the grant it was published under; omitted when the author publishes directly
+    "grant": "did:cid:…",           // the grant it was published under
 
     // content: inline text, or a reference for anything large
     "text": "…",
@@ -130,7 +131,7 @@ keeps every response, of whatever kind, reachable from its parent with one query
 | `v` | integer, `1` | all; required |
 | `kind` | string | all; required |
 | `author` | DID | all; required |
-| `grant` | DID | all; present exactly when a client publishes under a grant |
+| `grant` | DID | all; required |
 | `text` | string, at most 10,000 code points | post, article, reply, review |
 | `content` | `{ cid, type, bytes }` | post, article, paper, reply, review |
 | `parent`, `parentVersion` | DID, `versionId` | reply, review, reaction, rating, tag; required |
@@ -200,15 +201,15 @@ Memeplex specification lists the schema DID and pinned `versionId` for each core
 
 ### Examples
 
-One object of each kind, showing each object's `didDocumentData`. All but the reply are
-published directly by their author. The reply is published by a delegated client, so it
-names the grant it was published under (see Delegation). DIDs are
-shortened.
+One object of each kind, showing each object's `didDocumentData`. Each names the grant
+it was published under (see Delegation): the reply comes from Bob's Memepool client,
+and the paper from Alice's own wallet under a grant to herself. DIDs are shortened.
 
 **post**
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "post", "author": "did:cid:…alice",
+                "grant": "did:cid:…alice-memepool",
                 "text": "Every post on Memepool is a DID. So is this photo.\n\n![A canvas tent full of people facing a projector screen](did:cid:…photo?versionId=bafyreiimg…)",
                 "tags": ["archon", "memeplex"] } }
 ```
@@ -217,6 +218,7 @@ shortened.
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "article", "author": "did:cid:…alice",
+                "grant": "did:cid:…alice-memepool",
                 "title": "Why every post should be a DID",
                 "summary": "Permalinks, edit history and provable timestamps for free.",
                 "content": { "cid": "bafkrei…", "type": "text/markdown", "bytes": 48213 },
@@ -227,6 +229,7 @@ shortened.
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "paper", "author": "did:cid:…alice",
+                "grant": "did:cid:…alice-self",
                 "title": "Convergent Replay of Signed DID Histories",
                 "abstract": "We show that nodes receiving the same signed operations …",
                 "authors": ["did:cid:…alice", "did:cid:…bob"],
@@ -249,6 +252,7 @@ shortened.
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "review", "author": "did:cid:…carol",
+                "grant": "did:cid:…carol-grant",
                 "parent": "did:cid:…paper", "parentVersion": "bafyreirev2…",
                 "verdict": "minor revisions",
                 "text": "The convergence argument holds, but section 4 assumes …" } }
@@ -258,6 +262,7 @@ shortened.
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "reaction", "author": "did:cid:…dave",
+                "grant": "did:cid:…dave-grant",
                 "parent": "did:cid:…alice-post", "parentVersion": "bafyreipost…",
                 "value": "❤️" } }
 ```
@@ -266,6 +271,7 @@ shortened.
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "rating", "author": "did:cid:…carol",
+                "grant": "did:cid:…carol-grant",
                 "parent": "did:cid:…paper", "parentVersion": "bafyreirev2…",
                 "rating": 3, "min": 1, "max": 5 } }
 ```
@@ -274,6 +280,7 @@ shortened.
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…spamwatch",
+                "grant": "did:cid:…spamwatch-grant",
                 "parent": "did:cid:…some-post", "parentVersion": "bafyreispam…",
                 "tag": "spam" } }
 ```
@@ -315,6 +322,7 @@ down, and ratings stay comparable:
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "rating", "author": "did:cid:…user",
+                "grant": "did:cid:…grant",
                 "parent": "did:cid:…paper", "parentVersion": "bafyreirev2…",
                 "rating": 3, "min": 1, "max": 5 } }
 ```
@@ -331,8 +339,10 @@ down, and ratings stay comparable:
   visible; aggregators count each author's current attributed version once. Two
   clients can still each create a rating for the same author and parent. So that
   independent indexers agree, the author's rating is the attributed, undeleted rating
-  object whose current version has the latest operation time, with ties broken by the
-  smallest canonical `versionId`. Deleting that object makes the next one by the same
+  object whose current version was anchored latest, by its anchoring block's time, with
+  ties broken by the smallest canonical `versionId`. Block times are set by the chain,
+  not the signer, and stay comparable when the ratings were published under grants on
+  different registries. Deleting that object makes the next one by the same
   rule current; with none left, the author has no rating. Rating a
   new revision of the parent is also an edit, which updates `parentVersion`; the
   earlier rating and the revision it rated remain in the history.
@@ -348,6 +358,7 @@ labels it with a `tag` object whose `parent` is the labelled object:
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…labeller",
+                "grant": "did:cid:…grant",
                 "parent": "did:cid:…post", "parentVersion": "bafyrei…",
                 "tag": "cryptography" } }
 ```
@@ -433,40 +444,29 @@ while they remain in its accepted history. This is arXiv's model, with the DID a
   CID of the operation that produced it: `did:cid:…?versionId=bafyrei…`. Gatekeeper
   resolves it in both ports (#1462, #1463).
 - **Not by sequence number or time.** `versionSequence` names a position, which a
-  preferred sibling can take over, and on `hyperswarm` a version's time is chosen by
-  its publisher. Only `versionId` names fixed content, so an author cannot change what
-  a citation points to after the fact.
-- **A cited revision can disappear.** The object's controller can publish a competing
-  successor that Archon's sibling ordering prefers, displacing the cited revision from
-  the accepted history; resolving its `versionId` then returns `notFound`. That is the
-  honest answer to an equivocating author, not an error. Clients show the citation as
-  "revision no longer in the history" and never substitute another revision. On a
-  chain registry, Gatekeeper prefers the sibling anchored first, so only a revision
-  still pending can be displaced this way. A
-  reviewer who needs the assessed content to survive this keeps its `content` CID, and
-  pins it (see Content availability under Security considerations).
+  preferred sibling can take over, and a version's time is not known until it is
+  anchored. Only `versionId` names fixed content, so an author cannot change what a
+  citation points to after the fact.
+- **A pending revision can disappear.** Until a revision is anchored, the object's
+  controller can publish a competing successor that Archon's sibling ordering prefers,
+  displacing it from the accepted history; resolving its `versionId` then returns
+  `notFound`. That is the honest answer to an equivocating author, not an error.
+  Clients show the citation as "revision no longer in the history" and never
+  substitute another revision. Once a revision is anchored, Gatekeeper prefers it over
+  any sibling anchored later, so citing anchored revisions avoids this. A reviewer who
+  needs the assessed content itself to survive keeps its `content` CID, and pins it
+  (see Content availability under Security considerations).
 - **Responses pin what they assessed.** Every response names the revision it
   responded to in `parentVersion` (see Version pinning), so a review of v1 is never
   presented as a review of v2.
 
 ### Timestamps and anchoring
 
-On `hyperswarm`, an object's time is the signed `proof.created` of its operation, which
-the publisher chooses. Anyone who needs a time a publisher cannot choose has two ways
-to get one:
-
-- **Create the object on a chain registry.** Its creation is anchored once the chain
-  includes it.
-- **Migrate it.** `changeRegistry` to a chain registry, then publish an update on that
-  registry. The migration itself is confirmed by the *old* registry, so it gives no
-  chain timestamp; only operations after it are anchored. The chain timestamp bounds
-  the update that was included, and therefore the content as of that version, not the
-  earlier `hyperswarm` versions. This is for direct objects only: a delegated object
-  that changes registry loses attribution.
-
-Either way the time exists only after actual chain inclusion. Delegated objects are
-always created on their grant's chain registry (see Delegation), so they are anchored
-anyway. Direct objects rarely need this; a paper establishing priority might.
+Every object is created on its grant's chain registry (see Delegation), so every
+version is anchored once the chain includes its batch. Its time is then the anchoring
+block's time, which the publisher cannot choose: a paper establishing priority needs
+nothing extra. Before anchoring, a version carries only its signed `proof.created`,
+which the publisher chooses; clients show such versions as pending.
 
 ## Follows are not objects
 
@@ -489,9 +489,11 @@ creates, so it is signed with the user's own key and controlled by the user:
                      "nonce": "Qm9vdHN0cmFwIG5vbmNl" } }
 ```
 
-- **Client:** the agent DID the application created, holding its own key. Agents are
-  self-controlled, so the user cannot own the client's DID; the grant is how the user
-  vouches for it.
+- **Client:** the agent DID that publishes, holding its own key. For an application,
+  that is an agent DID it created; agents are self-controlled, so the user cannot own
+  it, and the grant is how the user vouches for it. A user who publishes from their own
+  wallet or the CLI names themselves: a **self-grant**, which also keeps the objects
+  under the user's own control.
 - **Actions:** which kinds the client may create (table below). A client may always
   edit and delete the objects it published under the grant.
 - **Nonce:** copied from the client's grant request so the client can find this grant
@@ -620,16 +622,16 @@ The check compares chain positions on one registry, never clocks (see Revocation
 The create operation decides whether an object is a publication by *U* at all. Let *A*
 be the controller the create operation names and signs with.
 
-- **Direct:** `memeplex.grant` is absent, `memeplex.author` is *U*, and *A* is *U*. Any
-  registry may be used, `hyperswarm` included.
-- **Delegated:** `memeplex.author` is *U*; the object is created on *G*'s registry *R*,
-  for *G* = `memeplex.grant`; *grant-ok(G, U, A, P)* holds for the creation's position
-  *P* on *R*; and the grant's `actions` include the action for the object's kind (see
-  Actions).
+It is attributed to *U* when all of these hold, for *G* = `memeplex.grant`:
 
-A delegated creation that is not yet anchored is **pending**: neither attributed nor
-rejected, and decided once it is anchored. An object whose creation is not attributed
-is never attributed, whatever its later versions say.
+1. `memeplex.author` is *U*.
+2. The object is created on *G*'s registry *R*.
+3. *grant-ok(G, U, A, P)* holds for the creation's position *P* on *R*.
+4. *G*'s `actions` include the action for the object's kind (see Actions).
+
+A creation that is not yet anchored is **pending**: neither attributed nor rejected,
+and decided once it is anchored. An object whose creation is not attributed is never
+attributed, whatever its later versions say.
 
 ### Later versions
 
@@ -642,9 +644,8 @@ only if all of these hold:
    the grant it was created under, and a response stays in its thread. `parentVersion`
    may change, so a review or rating can move to a newer revision of its parent. (A
    deletion clears the data; the check applies to the predecessor.)
-3. *A* is *U* (direct), or *grant-ok(G, U, A, P)* holds for that grant at the
-   version's position *P* on the grant's registry. Any client holding the grant may
-   edit or delete what it published under it.
+3. *grant-ok(G, U, A, P)* holds for that grant at the version's position *P* on the
+   grant's registry. The client may edit or delete what it published under the grant.
 4. It changes neither the controller nor the registry. A transfer or a
    `changeRegistry` ends attribution for that version and every later one.
 
@@ -661,7 +662,7 @@ The wallet revokes a grant with `revokeDID`. Revocation takes effect at the dele
 position on the grant's registry: versions anchored before it keep their attribution,
 and versions anchored after it, or never, have none.
 
-### Why delegated objects are anchored
+### Why objects are anchored
 
 On `hyperswarm`, a version's time is the `proof.created` its signer chooses. A client
 that keeps its key after revocation (a stolen device, a rogue app) could sign objects
@@ -677,7 +678,7 @@ through block timestamps, which drift (Bitcoin allows about two hours).
 
 Consequences:
 
-- **Pending until anchored.** A delegated object gossips on Hyperswarm at once, so
+- **Pending until anchored.** An object gossips on Hyperswarm at once, so
   readers see it within seconds, but it is attributed only once its batch is anchored:
   minutes on SOL or ETH, longer on BTC, depending on the mediator's batch interval.
   Clients show it as pending until then.
@@ -692,8 +693,9 @@ Consequences:
   Its sibling would be anchored later, and after the deletion.
 - **No disowning.** A user cannot disown objects anchored before the revocation, even
   ones a compromised client published before the user noticed.
-- **Direct publishing is unaffected.** The user's own objects need no grant and no
-  time check, so they may stay on `hyperswarm`.
+- **One rule for everyone.** A self-grant follows the same rules, so a user publishing
+  from their own wallet waits for anchoring like any client, and the verifier has a
+  single path.
 
 Two alternatives were considered. A **revocation snapshot**, recorded in the grant
 just before deletion and listing the `versionId` of every object to keep, gives
@@ -704,17 +706,19 @@ a useful client-side heuristic, but other parties cannot verify it.
 
 ### Who controls published objects
 
-The client controls the objects it publishes. Consequences:
+The grant's client controls the objects published under it. Consequences:
 
-- The user cannot edit or delete them directly. After revocation they no longer count
-  as the user's beyond what was anchored before it, but they remain on the network.
+- The user cannot edit or delete an application's objects directly. After revocation
+  they no longer count as the user's beyond what was anchored before it, but they
+  remain on the network.
 - Transferring an object ends its attribution, so a client cannot hand objects over to
-  the user. A user who wants an object under their own control republishes it directly.
+  the user. A user who wants an object under their own control republishes it under a
+  self-grant.
 
-Decision (from #1436): accept this for v1. If usage shows users need direct control,
-the alternative is a protocol change letting Gatekeeper accept operations on a user's assets signed by a key
-the user's grant names. The latter changes protocol authorization and needs its own
-decision.
+Decision (from #1436): accept this for v1. If usage shows users need direct control of
+an application's objects, the alternative is a protocol change letting Gatekeeper
+accept operations on a user's assets signed by a key the user's grant names. That
+changes protocol authorization and needs its own decision.
 
 ## Queries
 
@@ -848,7 +852,7 @@ The results size node hardware and show where optimization will be needed first.
   unverified `author` as fact.
 - **Forged grants.** A grant counts only if the user created it; one created by
   someone else and transferred to the user fails the grant check.
-- **Backdating after revocation.** Addressed by anchoring grants and delegated objects
+- **Backdating after revocation.** Addressed by anchoring grants and their objects
   on one chain registry and comparing positions, not times. The remaining window is
   the time until the deletion is anchored.
 - **Over-broad or forgotten grants.** Mitigated by wallet design (see Memepool:
@@ -858,7 +862,8 @@ The results size node hardware and show where optimization will be needed first.
 - **Rendering untrusted text.** Every object's text is attacker-controlled. The
   formatting rules (no raw HTML, safe link schemes, untrusted math) are what keep a
   post from becoming script in every client; renderers must follow them exactly.
-- **Spam.** Object creation on `hyperswarm` is free. Indexers will need rate limits or
+- **Spam.** Every object is anchored, so the anchoring node pays a share of a batch
+  transaction for it, but per object that is small. Indexers will need rate limits or
   cost per author (for example L402 on publishing through a hosted node, or ranking by
   trust graph). Not designed here.
 - **Content availability.** IPFS content is available only while someone pins it.
@@ -875,8 +880,9 @@ The results size node hardware and show where optimization will be needed first.
 3. **Verifier library:** the attribution rules, shared by clients and the indexer, with
    cross-checks against real signed objects, including revoked and forged grants,
    transferred objects, and backdated siblings.
-4. **Direct publishing:** create, edit, delete and query objects from the existing CLI
-   and SDKs with no delegation; this works with today's `create-asset-json`.
+4. **Self-published objects:** create a self-grant, then create, edit, delete and
+   query objects on its registry from the existing CLI and SDKs; this works with
+   today's asset commands.
 5. **Delegation:** wallet UI to create, list and revoke grants on a chain registry.
 6. **Indexer.**
 7. **Memepool client.**
