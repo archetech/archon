@@ -54,7 +54,7 @@ Two decisions shape everything else:
 |---|---|
 | **Memeplex** | The protocol: object schemas, grants, the attribution rules, and the query conventions. |
 | **Memepool** | The first client and indexer, run by the project. |
-| **object** | Any Memeplex asset DID: post, article, paper, reply, review, reaction, rating, tag. |
+| **object** | Any Memeplex asset DID: post, paper, reply, rating, tag. |
 | **author** | The user DID an object is attributed to. |
 | **publisher** | The agent DID that controls an object: the client its grant names, never the author itself. |
 
@@ -111,14 +111,11 @@ its operations, which resolution already reports.
 
 | Kind | Purpose | `target` | Notes |
 |---|---|---|---|
-| `post` | Short text, Twitter-like | optional | Usually inline `text`. With a `target` it is a boost or quote post (see Boosts and quote posts). |
-| `article` | Long-form essay, Substack-like | — | `title`, optional `subtitle` and `summary`; body as `content` on IPFS. |
+| `post` | Short text or long-form essay, Twitter- and Substack-like | optional | Usually inline `text`. With a `title` it is an **article** (see Articles); with a `target` it is a boost or quote post (see Boosts and quote posts). |
 | `paper` | Scholarly work, arXiv-like | — | `title`, optional `subtitle`, `summary` (the abstract), `authors` (DIDs; see Coauthors), `content` (the paper in Markdown), optional `pdf` and `source` (LaTeX) downloads. Revised by editing; see Revisions and citation. |
-| `reply` | Comment in a thread | required | Same fields as `post`. |
-| `review` | Written assessment | required | `verdict` (short free text), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
-| `reaction` | Like or other emoji response | required | `value`, one emoji (see Reactions). Withdrawn by deleting it. |
+| `reply` | Comment in a thread | required | Body as for `post`. With a `verdict` it is a **review** (see Reviews). |
 | `rating` | Score on the author's own scale | required | Integers `rating`, `min`, `max` (see Ratings). One per author per target; changed by editing, withdrawn by deleting. |
-| `tag` | Label applied to someone else's object | required | `tag`, a normalized string (see Tags). Withdrawn by deleting it. |
+| `tag` | Label or reaction applied to an object | required | `tag`: a normalized word, or one emoji, which makes it a **reaction** (see Tags and reactions). Withdrawn by deleting it. |
 
 `target` is the one link from a response to what it responds to; `kind` says how. This
 keeps every response, of whatever kind, reachable from its target with one query.
@@ -131,24 +128,23 @@ keeps every response, of whatever kind, reachable from its target with one query
 | `kind` | string | all; required |
 | `author` | DID | all; required |
 | `grant` | DID | all; required |
-| `text` | string, at most 10,000 code points | post, article, reply, review |
-| `content` | `{ cid, type, bytes }` | post, article, paper, reply, review |
-| `target`, `targetVersion` | DID, `versionId` | post, optional; reply, review, reaction, rating, tag, required |
-| `tags` | 1–20 normalized strings, each at most 64 code points | post, article, paper, reply, review |
-| `title` | string, at most 300 code points | article, paper; required |
-| `subtitle` | string, at most 300 code points: one line shown under the title | article, paper |
-| `summary` | string, at most 5,000 code points: an article's summary or a paper's abstract | article; paper, required |
+| `text` | string, at most 10,000 code points | post, reply |
+| `content` | `{ cid, type, bytes }` | post, paper, reply |
+| `target`, `targetVersion` | DID, `versionId` | post, optional; reply, rating, tag, required |
+| `tags` | 1–20 normalized words, each at most 64 code points | post, paper, reply |
+| `title` | string, at most 300 code points | post, optional; paper, required |
+| `subtitle` | string, at most 300 code points: one line shown under the title | post with a `title`; paper |
+| `summary` | string, at most 5,000 code points: an article's summary or a paper's abstract | post with a `title`; paper, required |
 | `authors` | 1–100 distinct DIDs, including `author` | paper; required |
 | `source` | `{ cid, type, bytes }` | paper |
 | `pdf` | `{ cid, type, bytes }` | paper |
-| `verdict` | string, at most 300 code points | review; required |
-| `value` | one emoji (see Reactions) | reaction; required |
+| `verdict` | string, at most 300 code points | reply |
 | `rating`, `min`, `max` | integers (see Ratings) | rating; required |
-| `tag` | normalized string, at most 64 code points (see Tags) | tag; required |
+| `tag` | normalized word, at most 64 code points, or one emoji (see Tags and reactions) | tag; required |
 
-- **Body.** `text` and `content` are mutually exclusive. An article, reply or review
-  has one of them; a paper has `content`; a post has `text` or `content`, or neither
-  when it has a `target` (a plain boost).
+- **Body.** `text` and `content` are mutually exclusive. A reply has one of them; a
+  paper has `content`; a post has `text` or `content`, or neither when it has a
+  `target` (a plain boost).
 - **References.** `cid` is an IPFS CID string, `bytes` a nonnegative integer, and
   `type` the media type Text formatting allows for that field. A `targetVersion` is a
   canonical operation CID.
@@ -176,8 +172,8 @@ Protocol's strong references do:
 A reference then always means the content the author responded to, quoted or showed,
 even after the target is edited. Clients may mark a response whose `targetVersion` is
 not the target's current revision. For reviews and ratings that mark is prominent
-("reviewed an earlier revision"); for replies and reactions it can be subtle or
-omitted. If a pinned version leaves the accepted history, see Revisions and citation.
+("reviewed an earlier revision"); for other replies and for reactions it can be subtle
+or omitted. If a pinned version leaves the accepted history, see Revisions and citation.
 
 ### Schemas
 
@@ -187,8 +183,7 @@ Memeplex specification lists the schema DID and pinned `versionId` for each core
 
 - **Validation.** Verifiers and indexers validate each object against its kind's
   schema. An object that fails is ignored: not displayed, counted or attributed.
-  Rules a schema cannot express (the reaction emoji rules, normalized tags, rating
-  bounds) are part of the kind's definition and are checked alongside.
+  Rules a schema cannot express (tag values, rating bounds) are part of the kind's definition and are checked alongside.
 - **Core kinds have bare names** (`post`, `reply`, `rating`, …).
 - **Extension kinds are named by their schema DID:** `"kind": "did:cid:…schema?versionId=…"`.
   That gives namespacing without a registry or DNS. A client that does not know an
@@ -199,7 +194,8 @@ Memeplex specification lists the schema DID and pinned `versionId` for each core
 
 ### Examples
 
-One object of each kind, showing each object's `didDocumentData`. Each names the grant
+One object of each kind and of each common variant, showing each object's
+`didDocumentData`. Each names the grant
 it was published under (see Delegation): the reply comes from Bob's Memepool client,
 and the paper from a client Alice runs herself. DIDs are shortened.
 
@@ -212,10 +208,10 @@ and the paper from a client Alice runs herself. DIDs are shortened.
                 "tags": ["archon", "memeplex"] } }
 ```
 
-**article**: the body lives on IPFS
+**post with a title (an article)**: the body lives on IPFS
 
 ```jsonc
-{ "memeplex": { "v": 1, "kind": "article", "author": "did:cid:…alice",
+{ "memeplex": { "v": 1, "kind": "post", "author": "did:cid:…alice",
                 "grant": "did:cid:…alice-memepool",
                 "title": "Why every post should be a DID",
                 "subtitle": "Objects as identifiers, not rows in someone's database",
@@ -256,23 +252,23 @@ and the paper from a client Alice runs herself. DIDs are shortened.
                 "text": "This is the clearest explanation of the idea so far." } }
 ```
 
-**review**: pins the revision it assessed
+**reply with a verdict (a review)**: pins the revision it assessed
 
 ```jsonc
-{ "memeplex": { "v": 1, "kind": "review", "author": "did:cid:…carol",
+{ "memeplex": { "v": 1, "kind": "reply", "author": "did:cid:…carol",
                 "grant": "did:cid:…carol-grant",
                 "target": "did:cid:…paper", "targetVersion": "bafyreirev2…",
                 "verdict": "minor revisions",
                 "text": "The convergence argument holds, but section 4 assumes …" } }
 ```
 
-**reaction**
+**tag with an emoji (a reaction)**
 
 ```jsonc
-{ "memeplex": { "v": 1, "kind": "reaction", "author": "did:cid:…dave",
+{ "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…dave",
                 "grant": "did:cid:…dave-grant",
                 "target": "did:cid:…alice-post", "targetVersion": "bafyreipost…",
-                "value": "❤️" } }
+                "tag": "❤️" } }
 ```
 
 **rating**: three stars out of five
@@ -293,23 +289,12 @@ and the paper from a client Alice runs herself. DIDs are shortened.
                 "tag": "spam" } }
 ```
 
-### Reactions
+### Articles
 
-A reaction's `value` is a single Unicode emoji, so every client can render it and no
-Memeplex-specific list has to be maintained:
-
-- **One emoji, in its canonical form.** `value` is exactly one emoji from Unicode's
-  recommended (RGI) set, in the fully-qualified form listed in Unicode's
-  `emoji-test.txt`. `❤️` is valid; the unqualified `❤` and arbitrary text are not.
-  Each emoji therefore has one encoding, and counts never split across encodings.
-- **Variants are allowed.** Skin-tone variants are valid RGI emoji. How to group
-  variants when counting or displaying reactions is up to each client and indexer
-  (see Memepool for its choice).
-- **Invalid values are ignored.** A reaction whose `value` breaks these rules is not
-  counted or displayed.
-- **Counted once per author.** An author can react to one object with several emoji,
-  but each emoji counts at most once per author, even if two clients each published
-  it.
+A post with a `title` is an article: clients give it a long-form layout, with the
+optional `subtitle` and `summary` on its card. Its body is usually `content` on IPFS.
+Articles need no separate kind because nothing about them differs except the fields
+they carry.
 
 ### Boosts and quote posts
 
@@ -320,7 +305,7 @@ A boost (repost) is a `post` whose `target` is the original:
 - A **quote post** has a body, shown above the original.
 
 `kind`, not `target`, decides thread membership: a thread shows `reply` objects, and
-counts posts, reactions, ratings and tags that target it without listing them in it.
+counts posts, ratings and tags that target it without listing them in it.
 So a boost shares the original with the booster's own audience, yet the "every
 response to an object" query still finds every boost and quote post through
 Gatekeeper alone. Boosting needs the `memeplex:post` action.
@@ -363,12 +348,18 @@ down, and ratings stay comparable:
 - Equal values are not equally precise: a 5-point scale and a 100-point scale cluster
   differently. Aggregators that care can group by `max − min`.
 
-A like stays a `reaction` ("I appreciate this"); a `rating` judges quality.
+A like is a reaction ("I appreciate this"); a `rating` judges quality.
 
-### Tags
+### Reviews
+
+A reply with a `verdict` is a review. It sits in the thread like any reply, so it can
+be answered there, and clients may also list a target's reviews separately. A
+reviewer who also wants to score publishes a separate `rating`.
+
+### Tags and reactions
 
 An object's author describes it with the `tags` field inside the object. Anyone else
-labels it with a `tag` object whose `target` is the labelled object:
+labels it, or reacts to it, with a `tag` object whose `target` is the object:
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…labeller",
@@ -377,12 +368,26 @@ labels it with a `tag` object whose `target` is the labelled object:
                 "tag": "cryptography" } }
 ```
 
-Tag values, in both places, are normalized before publishing: Unicode NFC, trimmed,
-lower-case, internal whitespace collapsed to a single hyphen. Otherwise one tag
-splinters across spellings. Like a reaction, a tag value counts at most once per
-labeller and object.
+A tag value is a **word** or an **emoji**:
 
-Third-party tags are signed, attributed judgments like any other object, so their
+- **Words** are normalized before publishing: Unicode NFC, trimmed, lower-case,
+  internal whitespace collapsed to a single hyphen. Otherwise one tag splinters across
+  spellings. The `tags` field takes words only.
+- **An emoji** makes the tag a **reaction**. A value containing any emoji must be
+  exactly one emoji from Unicode's recommended (RGI) set, in the fully-qualified form
+  listed in Unicode's `emoji-test.txt`: `❤️` is valid; the unqualified `❤` and
+  mixtures like `❤️ love` are not. Each emoji therefore has one encoding, and counts
+  never split across encodings. Skin-tone variants are valid RGI emoji; how to group
+  them when counting or displaying is up to each client and indexer (see Memepool for
+  its choice).
+- **Invalid values are ignored**: not counted or displayed.
+- **Counted once per author.** An author can apply several values to one object, but
+  each value counts at most once per author and object, even if two clients each
+  published it.
+
+Clients show emoji tags as reactions and word tags as labels.
+
+Word tags are signed, attributed judgments like any other object, so their
 weight depends on who applied them. Moderation labels are tags too (see Memepool:
 Moderation).
 
@@ -522,7 +527,7 @@ creates, so it is signed with the user's own key and controlled by the user:
 ```jsonc
 { "memeplexGrant": { "v": 1,
                      "client": "did:cid:…client",
-                     "actions": ["memeplex:post", "memeplex:reply", "memeplex:react"],
+                     "actions": ["memeplex:post", "memeplex:reply", "memeplex:tag"],
                      "nonce": "Qm9vdHN0cmFwIG5vbmNl" } }
 ```
 
@@ -557,12 +562,10 @@ mistake one for a publication.
 
 | Action | Lets the client create |
 |---|---|
-| `memeplex:post` | `post`, `article` and `paper` objects |
-| `memeplex:reply` | `reply` objects |
-| `memeplex:review` | `review` objects |
-| `memeplex:react` | `reaction` objects |
+| `memeplex:post` | `post` and `paper` objects |
+| `memeplex:reply` | `reply` objects, reviews included |
 | `memeplex:rate` | `rating` objects |
-| `memeplex:tag` | `tag` objects |
+| `memeplex:tag` | `tag` objects, reactions included |
 
 For an extension kind, the action is the kind itself, its schema DID URL; the wallet
 shows the schema's title.
@@ -578,7 +581,7 @@ subset.
    { "memeplexGrantRequest": { "v": 1,
                                "client": "did:cid:…client",
                                "name": "Memepool",
-                               "actions": ["memeplex:post", "memeplex:reply", "memeplex:react"],
+                               "actions": ["memeplex:post", "memeplex:reply", "memeplex:tag"],
                                "nonce": "Qm9vdHN0cmFwIG5vbmNl" } }
    ```
 
@@ -791,8 +794,8 @@ A whole thread is loaded by repeating the `target` query one level at a time, ke
 `reply` objects; an indexer builds thread trees directly. Objects carry no separate
 thread-root field to keep consistent.
 
-Only one condition and only `$in` are supported, so a client separates replies,
-boosts (posts), reviews, reactions, ratings and tags by `kind` after the query. Results are unsorted and unpaged, and
+Only one condition and only `$in` are supported, so a client separates boosts (posts), replies, ratings and tags by `kind` after the query,
+and reviews and reactions by their fields. Results are unsorted and unpaged, and
 they are not attributions: the matches still have to pass the attribution check,
 because anyone can write any `author` into an object they publish.
 
@@ -806,7 +809,7 @@ client and indexer. Other clients may choose differently.
 
 Memepool offers no skin-tone picker, and counts and renders every reaction as its base
 emoji: the fully-qualified RGI emoji that Unicode's `emoji-test.txt` lists as the
-untoned form of the reaction's `value`. Removing the modifier code points is not
+untoned form of the reaction's `tag`. Removing the modifier code points is not
 enough: ☝🏽 without its modifier is the unqualified `☝`, whose base is `☝️`, and a toned
 multi-person sequence can have a different base (👩🏽‍🤝‍👩🏻's base is 👭). The mapping is
 derived from `emoji-test.txt`, which lists each toned emoji with its base.
@@ -862,7 +865,7 @@ There is no central moderator. Viewers choose which judgments to apply:
   from the labellers its reader trusts and ignores the rest, so moderation needs no
   separate mechanism. Block lists of DIDs remain credentials issued by those
   communities (as in #937).
-- **Reviews** are objects, so a review's own reputation is visible: who wrote it, who
+- **Reviews** are replies, so a review's own reputation is visible: who wrote it, who
   replied, whether it was retracted.
 - **Unattributed objects** (failed delegation, revoked client) are hidden or marked by
   default.
