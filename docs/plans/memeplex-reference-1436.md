@@ -542,8 +542,8 @@ Hosted publishing can impose costs or limits, and indexers can rank by trust.
 
 Every object, of every kind, is a DID; no kind is batched or stored differently. Each
 object goes through Gatekeeper gossip, replay and the in-memory search index on every
-node. CPU, memory, startup time and durable storage all grow with the workload. Optimizations will come as volume requires them, as they have for
-startup replay.
+node. CPU, memory, startup time and durable storage all grow with the workload.
+Optimizations will come as volume requires them, as they have for startup replay.
 
 A sizing benchmark establishes the starting point, on an isolated node with production-like Redis
 persistence, in both Gatekeeper ports:

@@ -110,6 +110,20 @@ scope. The normal way to end a grant is `revokeDID`.
 
 ### Authority is an interval
 
+For user `U`, a **valid grant** is an asset whose accepted history establishes all
+of the following:
+
+1. Its creation data satisfies the grant schema.
+2. Its create operation names `U` as controller and is signed by `U`.
+3. It was created on a chain registry `R`, and its creation has an accepted chain
+   receipt on `R`.
+4. Its creation data names a client agent `A` different from `U`.
+
+Read the client and actions from that creation data. An unanchored creation leaves
+the grant's authority pending. The interval check below determines whether a valid
+grant still permits a particular operation; revocation does not invalidate the
+grant's earlier authority.
+
 Let `X ≺ Y` mean that two receipts on the grant's registry are ordered as follows:
 
 - In different blocks, `X` has the lower block height.
@@ -255,6 +269,26 @@ The wallet distinguishes requested, submitted and effective revocation. Authorit
 ends at the chain position, not at the button press. Pending transactions, funding,
 mediator availability and chain inclusion determine the delay; there is no fixed
 upper bound. A stalled signed deletion can be resubmitted to other suitable nodes.
+
+## Security considerations
+
+- **Spoofed authorship:** an object's `author` is a claim until its history passes
+  the [publication rule](#one-rule-for-publication).
+- **Forged grants:** require the user's signature and control at creation, not a
+  later transfer to the user; see [grant validity](#authority-is-an-interval).
+- **Backdating:** compare receipts on one chain, not publisher-selected clocks;
+  [revocation](#what-revocation-means) remains pending until anchored.
+- **Over-broad or forgotten grants:** the [wallet](memeplex-reference-1436.md#wallet)
+  defaults to narrow actions and lists grants for revocation.
+- **Transferred objects:** ownership cannot confer authorship; the
+  [attributed prefix](#one-rule-for-publication) ends at a transfer.
+- **Untrusted rendering:** enforce safe formats and resource budgets before
+  rendering; see [text formatting](memeplex-reference-1436.md#text-formatting).
+- **Spam:** batch anchoring alone is not a rate limit; services and indexers need
+  their own [controls](memeplex-reference-1436.md#design-choices).
+- **Unavailable content:** operation pinning does not preserve referenced bytes;
+  [content availability](memeplex-reference-1436.md#content-availability) needs
+  separate pinning.
 
 ## Scope and decisions still open
 
