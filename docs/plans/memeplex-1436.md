@@ -111,7 +111,7 @@ its operations, which resolution already reports.
 |---|---|---|---|
 | `post` | Short text, Twitter-like | — | Usually inline `text`. |
 | `article` | Long-form essay, Substack-like | — | `title`, `summary`; body as `content` on IPFS. |
-| `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs), `content` (the readable paper, usually PDF), optional `source` (LaTeX source). Revised by editing; see Revisions and citation. |
+| `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs; see Coauthors), `content` (the readable paper, usually PDF), optional `source` (LaTeX source). Revised by editing; see Revisions and citation. |
 | `reply` | Comment in a thread | required | Same fields as `post`. |
 | `review` | Written assessment | required | `verdict` (free text or schema-defined), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
 | `reaction` | Like or other emoji response | required | `value`, one emoji (see Reactions). Withdrawn by deleting it. |
@@ -289,6 +289,15 @@ larger, or any binary, goes to IPFS and is referenced from `content`. Updating t
 content of an article is a normal update that replaces the reference; the old
 reference stays in the previous version.
 
+### Coauthors
+
+Attribution covers only `author`, the DID that published the paper. The other DIDs in
+`authors` are the publisher's **claim**. A listed coauthor confirms it by publishing a
+`tag` with the value `coauthor` on the paper, with `parentVersion` set to the revision
+they stand behind. Clients show each listed coauthor as confirmed only when such an
+attributed tag exists for that revision or an earlier one, and as "listed by
+the publisher" otherwise. A coauthor withdraws by deleting the tag.
+
 ### Text formatting
 
 Every client renders the same text the same way:
@@ -402,11 +411,12 @@ creates, so it is signed with the user's own key and controlled by the user:
   vouches for it.
 - **Actions:** which kinds the client may create (table below). A client may always
   edit and delete the objects it published under the grant.
-- **Immutable.** A grant is never edited, and verifiers read it as created. Narrowing
-  one by editing it would have the same backdating gap as revocation: the client could
-  keep publishing with dates before the edit. To narrow a grant, the wallet revokes it
-  (with its snapshot) and creates a narrower one.
-- **Revocation:** the wallet deletes the grant with `revokeDID`.
+- **Immutable.** Verifiers read `client` and `actions` as created. Narrowing a grant by
+  editing it would have the same backdating gap as revocation: the client could keep
+  publishing with dates before the edit. To narrow a grant, the wallet revokes it and
+  creates a narrower one.
+- **Revocation:** the wallet adds the revocation snapshot to the grant in one final
+  update, then deletes the grant with `revokeDID` (see Revocation).
 - **No expiry and no chains.** A grant lasts until it is revoked, and a client cannot
   pass it on: only the user can create a grant. Wallets list active grants so unused
   ones can be revoked.
@@ -471,12 +481,11 @@ then transfer it to *U* without *U* signing anything.
    the grant. *G*'s `client` and `actions` are read from its creation; later updates are
    ignored.
 3. Its `client` is *A*.
-4. If *G* is deactivated in its latest state, *U*'s revocation snapshot for *G* admits
-   this version (see Revocation). Until that snapshot is visible, the version is
-   **unverified**: neither attributed nor rejected. This fails closed, because the
-   grant's deletion and the snapshot live in different DIDs and can reach a verifier in
-   either order. A grant revoked without any snapshot disowns everything published
-   under it.
+4. If *G* is deactivated in its latest state, the revocation snapshot recorded in its
+   version just before deactivation admits this version (see Revocation). A grant
+   revoked without a snapshot disowns everything published under it. If the snapshot's
+   IPFS content cannot be fetched, the version is **unverified**: neither attributed nor
+   rejected.
 
 ### Creation
 
@@ -525,14 +534,26 @@ before the revocation, and the grant check would accept them. Gatekeeper does no
 Hyperswarm times by receipt, and adding such a bound is a protocol decision outside
 this design.
 
-The fix is a **revocation snapshot**. Before revoking, the wallet records the snapshot
-in the user's DID; only then does it deactivate the grant. It queries the objects
-published under the grant (`memeplex.grant $in [grant]`; an object never changes its
-grant, so this finds every live one) and records, for each, the `versionId` (canonical
-operation CID) of its accepted version at that moment. The record goes into the user's
-DID data under `memeplex.revocations[grant]`, with the set on IPFS if it is large. Step
-4 of the grant check then admits a version only if its `versionId` is in the snapshot or
-is an ancestor of one, through signed `previd` links.
+The fix is a **revocation snapshot**, kept in the grant itself. The wallet queries the
+objects published under the grant (`memeplex.grant $in [grant]`; an object never
+changes its grant, so this finds every live one) and records, for each, the
+`versionId` (canonical operation CID) of its accepted version at that moment. It
+stores that set on IPFS and revokes in two operations on the grant:
+
+1. an update adding `"snapshot": "<CID of the set>"` to the grant's data;
+2. `revokeDID`.
+
+Deletion clears the grant's data, but the version before it stays resolvable, so
+verifiers read the snapshot there. Step 4 of the grant check admits a version only if
+its `versionId` is in the snapshot or is an ancestor of one, through signed `previd`
+links.
+
+Keeping the snapshot in the grant has two consequences:
+
+- **No growing record.** Nothing accumulates in the user's DID, however many grants are
+  revoked.
+- **No ordering gap.** The snapshot and the deletion are consecutive operations in one
+  signed history, so a verifier that sees the deletion also has the snapshot's version.
 
 - Objects the wallet's node had not yet seen are lost, which is the right failure
   direction.
@@ -639,7 +660,7 @@ Timelines, ranking, full-text search and counts need an indexer. The Memepool in
   Reconciliation re-resolves the indexed DIDs and re-reads the events feed over its
   whole range;
 - verifies attribution per version and records what each result depended on: the
-  grant, the author's DID (which holds revocation snapshots), and the controllers
+  grant (whose final version holds any revocation snapshot), and the controllers
   whose keys signed. When any of those change, the indexer re-verifies the affected
   versions, so a later revocation snapshot can disown objects it had already accepted;
 - builds timelines for the set of authors a reader supplies (see Follows), thread
@@ -733,8 +754,6 @@ stay as individual DIDs or are batched.
 - **Action vocabulary.** Is one action per creatable kind the right granularity, and
   should grants be able to narrow further (for example, replies only within one
   thread)?
-- **Revocation record.** Is `memeplex.revocations` in the user's DID data the right
-  place, given that every revocation then updates the user's DID?
 - **Expiry.** Should grants carry an optional expiry? On `hyperswarm` an expiry has the
   same backdating gap as revocation, so it would need a snapshot when it lapses.
 - **Change feed.** Should Gatekeeper offer an arrival-ordered change feed? It would
