@@ -735,7 +735,11 @@ and moderation labels alike, is its **last attributed version**:
 
 So a rating or coauthor confirmation that was attributed before revocation survives a
 compromised client deleting or corrupting it afterwards. A user who wants such an
-object gone deletes it before revoking, while the grant is live.
+object gone has the client delete it while the grant is live, and waits until that
+deletion is anchored, in an earlier block than the revocation or ordered before it in
+the same transaction, before submitting the revocation. When containing a compromised
+client matters more, the user revokes at once and accepts that pending withdrawals may
+fail.
 
 A shared verifier library should implement these rules once for clients and indexers
 alike.
@@ -813,7 +817,8 @@ The grant's client controls the objects published under it. Consequences:
   of its objects is attributed, even by the same client under a new grant. Rotating a
   grant therefore means papers can no longer be revised, ratings withdrawn or
   coauthor confirmations removed without republishing. Withdraw what should be
-  withdrawn before revoking.
+  withdrawn first, and revoke once those withdrawals are anchored (see Publication
+  state).
 
 Decision (from #1436): accept this for v1. If usage shows users need direct control of
 an application's objects, the alternative is a protocol change letting Gatekeeper
@@ -835,14 +840,22 @@ cover the controller, which is why objects carry `author` in their data.
 | Objects an author tagged | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
 | Tags others applied (their `target`s are the tagged objects) | `{ "where": { "memeplex.tag": { "$in": ["cryptography"] } } }` |
 
-A whole thread is loaded by repeating the `target` query one level at a time, keeping
-`reply` objects; an indexer builds thread trees directly. Objects carry no separate
+A thread is loaded by repeating the `target` query one level at a time, keeping
+`reply` objects (subject to the limit below); an indexer builds complete thread trees
+directly. Objects carry no separate
 thread-root field to keep consistent.
 
-Only one condition and only `$in` are supported, so a client separates boosts (posts), replies, ratings and tags by `kind` after the query,
-and reviews and reactions by their fields. Results are unsorted and unpaged, and
-they are not attributions: the matches still have to pass the attribution check,
-because anyone can write any `author` into an object they publish.
+Only one condition and only `$in` are supported, so a client separates boosts
+(posts), replies, ratings and tags by `kind` after the query, and reviews and
+reactions by their fields. Results are unsorted and unpaged, and they are not
+attributions: the matches still have to pass the attribution check, because anyone
+can write any `author` into an object they publish.
+
+These queries match **current** data, so they are incomplete. An object whose latest
+version is an unattributed deletion or edit (by a revoked client, for example) no
+longer matches, even though its publication state is its last attributed version. A
+thread or timeline built from queries can therefore miss such objects. Complete
+results need history-based discovery from the events feed, as the indexer does.
 
 ## Memepool
 
@@ -900,8 +913,10 @@ Timelines, ranking, full-text search and counts need an indexer. The Memepool in
   state;
 - serves them to clients over HTTP, behind Drawbridge like other public surfaces.
 
-The indexer is a cache of public data. Anyone can run one, and a client can always fall
-back to direct queries and its own verification.
+The indexer is a cache of public data. Anyone can run one. A client can fall back to
+direct queries and its own verification, which shows current publications but can miss
+objects whose latest version is unattributed; for complete results it reads the events
+feed itself, as the indexer does.
 
 ### Moderation
 
