@@ -724,11 +724,13 @@ and makes revoking a grant, snapshot included, a single action.
 
 ## Scale
 
-Objects as DIDs puts every object through Gatekeeper storage, gossip, replay and the
-in-memory search index on every node. The protocol has no fixed limit that rules this
-out, but cost per object should be measured, not assumed.
+Every object, of every kind, is a DID; no kind is batched or stored differently. Each
+object goes through Gatekeeper gossip, replay and the in-memory search index on every
+node, so the costs that grow with object count are CPU, memory and startup time rather
+than storage. Optimizations will come as volume requires them, as they have for
+startup replay.
 
-Benchmark before building the client, on an isolated node with production-like Redis
+A sizing benchmark establishes the starting point, on an isolated node with production-like Redis
 persistence, in both Gatekeeper ports:
 
 - create 1, 5 and 10 million Memeplex objects with a realistic mix (mostly short posts,
@@ -740,8 +742,7 @@ persistence, in both Gatekeeper ports:
 - compare startup against the current production dataset to separate per-object cost
   from fixed cost.
 
-The results decide whether reactions, ratings and tags, the most numerous kinds,
-stay as individual DIDs or are batched.
+The results size node hardware and show where optimization will be needed first.
 
 ## Security considerations
 
@@ -793,7 +794,6 @@ stay as individual DIDs or are batched.
 - **Change feed.** Should Gatekeeper offer an arrival-ordered change feed? It would
   let indexers follow new and displaced versions directly, instead of reconciling
   periodically against full state.
-- **Reactions, ratings and tags.** Individual DIDs or batched, pending the benchmark.
 - **Public follows.** Whether Memeplex should ever define a public follow list (see
   Memepool: Follows), and if so, where it lives.
 - **Content availability.** Who pins long-form content and papers, and for how long?
