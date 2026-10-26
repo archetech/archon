@@ -21,7 +21,9 @@ Two decisions shape everything else:
    identity and gives a separate client a scoped, revocable **grant**: an ordinary
    asset the user creates, naming the client and what it may do. The client publishes
    under its own agent DID, and verifiers attribute its objects to the user through the
-   grant. This needs no protocol change.
+   grant. A grant and the objects published under it are anchored on one chain
+   registry, so a revoked client cannot backdate its way past the revocation. This
+   needs no protocol change.
 
 ## Goals
 
@@ -438,7 +440,9 @@ while they remain in its accepted history. This is arXiv's model, with the DID a
   successor that Archon's sibling ordering prefers, displacing the cited revision from
   the accepted history; resolving its `versionId` then returns `notFound`. That is the
   honest answer to an equivocating author, not an error. Clients show the citation as
-  "revision no longer in the history" and never substitute another revision. A
+  "revision no longer in the history" and never substitute another revision. On a
+  chain registry, Gatekeeper prefers the sibling anchored first, so only a revision
+  still pending can be displaced this way. A
   reviewer who needs the assessed content to survive this keeps its `content` CID, and
   pins it (see Content availability under Security considerations).
 - **Responses pin what they assessed.** Every response names the revision it
@@ -457,10 +461,12 @@ to get one:
   registry. The migration itself is confirmed by the *old* registry, so it gives no
   chain timestamp; only operations after it are anchored. The chain timestamp bounds
   the update that was included, and therefore the content as of that version, not the
-  earlier `hyperswarm` versions.
+  earlier `hyperswarm` versions. This is for direct objects only: a delegated object
+  that changes registry loses attribution.
 
-Either way the time exists only after actual chain inclusion. Most objects never need
-this; a paper establishing priority might.
+Either way the time exists only after actual chain inclusion. Delegated objects are
+always created on their grant's chain registry (see Delegation), so they are anchored
+anyway. Direct objects rarely need this; a paper establishing priority might.
 
 ## Follows are not objects
 
@@ -490,15 +496,17 @@ creates, so it is signed with the user's own key and controlled by the user:
   edit and delete the objects it published under the grant.
 - **Nonce:** copied from the client's grant request so the client can find this grant
   (see Flow). It carries no authority.
-- **Immutable.** Verifiers read `client` and `actions` as created. Narrowing a grant by
-  editing it would have the same backdating gap as revocation: the client could keep
-  publishing with dates before the edit. To narrow a grant, the wallet revokes it and
-  creates a narrower one.
-- **Revocation:** the wallet adds the revocation snapshot to the grant in one final
-  update, then deletes the grant with `revokeDID` (see Revocation).
-- **No expiry and no chains.** A grant lasts until it is revoked, and a client cannot
-  pass it on: only the user can create a grant. Wallets list active grants so unused
-  ones can be revoked.
+- **On a chain.** The wallet creates the grant on a chain registry (BTC, ZEC, ETH or
+  SOL), and every object published under it is created on that same registry and
+  stays there. A grant on `hyperswarm`, `local` or `pin` is void. See Revocation for
+  why.
+- **Immutable.** A grant's history is its creation and at most a deletion; a grant
+  with any other update is void. To narrow a grant, the wallet revokes it and creates
+  a narrower one.
+- **Revocation:** the wallet deletes the grant with `revokeDID` (see Revocation).
+- **No expiry and no re-delegation.** A grant lasts until it is revoked, and a client
+  cannot pass it on: only the user can create a grant. Wallets list active grants so
+  unused ones can be revoked.
 
 Grants use their own `memeplexGrant` data member, not `memeplex`, so indexers never
 mistake one for a publication.
@@ -535,15 +543,17 @@ subset.
    `nonce` is at least 128 random bits, base64url-encoded. The client shows the request
    as base64url-encoded JSON, in a QR code or a link the wallet accepts.
 2. The wallet shows the client DID, the claimed `name` (labelled as the client's own
-   claim) and the requested actions. The user approves a subset, and the wallet creates
-   the grant with that subset and the request's `client` and `nonce`.
+   claim) and the requested actions. The user approves a subset and picks a chain
+   registry, and the wallet creates the grant there with that subset and the request's
+   `client` and `nonce`.
 3. The client finds the grant with a query for `memeplexGrant.client` (see Queries),
    keeps the one carrying its nonce, and checks *grant-ok* for itself. The grant's
    creator is the user. Anyone who saw the request could create a grant with the same
    nonce from a different DID, so the client shows the user's identity and asks for
    confirmation before publishing.
 4. The client names the grant's DID as `memeplex.grant` in every object it publishes
-   for that user.
+   for that user, and creates each object on the grant's registry. Its Gatekeeper
+   must support that registry.
 
 A client may hold grants from several users (a shared device, or a service publishing
 for many people); the `author` and `grant` fields keep them apart.
@@ -579,51 +589,52 @@ order. For each version it takes:
   Gatekeeper does not re-check signatures.
 - **Controller and data:** from the create operation for the creation, and from
   resolving the object at the version's `versionId` for later versions.
-- **Time *T*:** the event's `time`. Resolution compares this same value against
-  `versionTime`, so the grant check's step 2 compares like with like. On `hyperswarm`
-  it is the creation's `created` and an update's or deletion's `proof.created`.
+- **Position *P*:** where the version is anchored on a chain registry *R*: the
+  event's `ordinal` when the event's `registry` is *R*. Positions on one registry
+  compare lexicographically (block height, index within the block, then the
+  operation's index in its batch), so they order operations even within one block. A
+  version whose accepted event is not yet a receipt from *R* is **pending** on *R*.
+- **Time:** the event's `time`, as resolution reports it. Attribution does not use it;
+  it orders duplicate ratings (see Ratings) and is shown to readers.
 
 The grant's own history is read the same way.
 
 ### Grant check
 
-*grant-ok(G, U, A, T)* holds when grant *G* lets client *A* act for user *U* at time
-*T*:
+*grant-ok(G, U, A, P)* holds when grant *G* lets client *A* act for user *U* at
+position *P* on *G*'s registry:
 
 1. *G*'s create operation names *U* as its controller and is signed by *U*. (A grant
    someone else created and then transferred to *U* does not count, for the same reason
    as above.)
-2. *T* is not earlier than *G*'s creation time, and *G* resolved at *T* is not
-   deactivated and is still controlled by *U*. The creation-time comparison is explicit
-   because resolving a DID at a time before its creation returns the creation version
-   rather than failing; without it, a client could date an object before it received
-   the grant. *G*'s `client` and `actions` are read from its creation; later updates are
-   ignored.
-3. Its `client` is *A*.
-4. If *G* is deactivated in its latest state, the revocation snapshot recorded in its
-   version just before deactivation admits this version (see Revocation). A grant
-   revoked without a snapshot disowns everything published under it. If the snapshot's
-   IPFS content cannot be fetched, the version is **unverified**: neither attributed nor
-   rejected. Clients show it like an unattributed version but labelled unverified, and
-   verifiers retry the fetch; once it succeeds the version is decided either way.
+2. *G* was created on a chain registry *R*, and its history is its creation and at most
+   a deletion.
+3. *G*'s creation is anchored on *R* before *P*.
+4. *G* is not deleted, or its deletion is pending or anchored after *P*.
+5. *G*'s `client` is *A*.
+
+The check compares chain positions on one registry, never clocks (see Revocation).
 
 ### Creation
 
 The create operation decides whether an object is a publication by *U* at all. Let *A*
-be the controller the create operation names and signs with, and *T* its time.
+be the controller the create operation names and signs with.
 
-- **Direct:** `memeplex.grant` is absent, `memeplex.author` is *U*, and *A* is *U*.
-- **Delegated:** `memeplex.author` is *U*, *grant-ok(G, U, A, T)* holds for *G* =
-  `memeplex.grant`, and the grant's `actions` include the action for the object's kind
-  (see Actions).
+- **Direct:** `memeplex.grant` is absent, `memeplex.author` is *U*, and *A* is *U*. Any
+  registry may be used, `hyperswarm` included.
+- **Delegated:** `memeplex.author` is *U*; the object is created on *G*'s registry *R*,
+  for *G* = `memeplex.grant`; *grant-ok(G, U, A, P)* holds for the creation's position
+  *P* on *R*; and the grant's `actions` include the action for the object's kind (see
+  Actions).
 
-An object whose creation is not attributed is never attributed, whatever its later
-versions say.
+A delegated creation that is not yet anchored is **pending**: neither attributed nor
+rejected, and decided once it is anchored. An object whose creation is not attributed
+is never attributed, whatever its later versions say.
 
 ### Later versions
 
-An update or deletion, signed by its predecessor's controller *A* at time *T*, is
-attributed to *U* only if all of these hold:
+An update or deletion, signed by its predecessor's controller *A*, is attributed to *U*
+only if all of these hold:
 
 1. Its predecessor version is attributed to *U*, so attribution runs unbroken from the
    creation.
@@ -631,90 +642,72 @@ attributed to *U* only if all of these hold:
    the grant it was created under, and a response stays in its thread. `parentVersion`
    may change, so a review or rating can move to a newer revision of its parent. (A
    deletion clears the data; the check applies to the predecessor.)
-3. *A* is *U* (direct), or *grant-ok(G, U, A, T)* holds for that grant. Any client
-   holding the grant may edit or delete what it published under it.
-4. It does not change the controller. A transfer ends attribution for that version and
-   every later one.
+3. *A* is *U* (direct), or *grant-ok(G, U, A, P)* holds for that grant at the
+   version's position *P* on the grant's registry. Any client holding the grant may
+   edit or delete what it published under it.
+4. It changes neither the controller nor the registry. A transfer or a
+   `changeRegistry` ends attribution for that version and every later one.
 
 A version that fails is shown as unattributed and stops the lineage: later versions
-built on it are unattributed too. Earlier attributed versions stay attributed.
+built on it are unattributed too. Earlier attributed versions stay attributed. A
+pending version makes the versions after it pending too.
 
 A shared verifier library should implement these rules once for clients and indexers
 alike.
 
 ## Revocation
 
-The wallet revokes a grant with `revokeDID`. From then on step 2 of the grant check
-fails for any version whose time is after the revocation.
+The wallet revokes a grant with `revokeDID`. Revocation takes effect at the deletion's
+position on the grant's registry: versions anchored before it keep their attribution,
+and versions anchored after it, or never, have none.
 
-### The backdating gap
+### Why delegated objects are anchored
 
-On `hyperswarm`, *T* is the publisher-chosen `proof.created`. A client that keeps its
-key after revocation (a stolen device, a rogue app) can create objects or edits dated
-before the revocation, and the grant check would accept them. Gatekeeper does not bound
-Hyperswarm times by receipt, and adding such a bound is a protocol decision outside
-this design.
+On `hyperswarm`, a version's time is the `proof.created` its signer chooses. A client
+that keeps its key after revocation (a stolen device, a rogue app) could sign objects
+and edits dated before the revocation, and a check by time would accept them.
+Gatekeeper does not bound Hyperswarm times by receipt, and adding such a bound would be
+a protocol change.
 
-The fix is a **revocation snapshot**, kept in the grant itself. The wallet queries the
-objects published under the grant (`memeplex.grant $in [grant]`; an object never
-changes its grant, so this finds every live one) and records, for each, the
-`versionId` (canonical operation CID) of its accepted version at that moment. It
-stores that set on IPFS and revokes in two operations on the grant:
+A chain position cannot be chosen. An operation anchored after the grant's deletion
+comes after it, whatever its `proof.created` says, so the grant check compares
+positions instead of times. Requiring the grant and its objects to share one registry
+makes that comparison exact; positions on different chains could only be compared
+through block timestamps, which drift (Bitcoin allows about two hours).
 
-1. an update adding `"snapshot": "<CID of the set>"` to the grant's `memeplexGrant`
-   data;
-2. `revokeDID`.
+Consequences:
 
-The set is a JSON object stored through the Gatekeeper data API's JSON encoding
-(`addJSON`), mapping each object DID to one `versionId`:
+- **Pending until anchored.** A delegated object gossips on Hyperswarm at once, so
+  readers see it within seconds, but it is attributed only once its batch is anchored:
+  minutes on SOL or ETH, longer on BTC, depending on the mediator's batch interval.
+  Clients show it as pending until then.
+- **A window at revocation.** Revocation takes effect when the deletion is anchored.
+  Until then a compromised client can still get operations anchored ahead of it. The
+  wallet submits the deletion at once, so the window is about one batch interval.
+- **No inventory.** The wallet does not need to find what the client published.
+  Everything anchored before the deletion stays attributed, including objects the
+  wallet never saw and objects later deleted; nothing anchored after it is.
+- **No displaced versions.** Among siblings, Gatekeeper prefers the one anchored first
+  on the expected registry, so a revoked client cannot displace an anchored version.
+  Its sibling would be anchored later, and after the deletion.
+- **No disowning.** A user cannot disown objects anchored before the revocation, even
+  ones a compromised client published before the user noticed.
+- **Direct publishing is unaffected.** The user's own objects need no grant and no
+  time check, so they may stay on `hyperswarm`.
 
-```jsonc
-{ "memeplexSnapshot": { "v": 1,
-                        "grant": "did:cid:…grant",
-                        "versions": { "did:cid:…post": "bafyrei…",
-                                      "did:cid:…reply": "bafyrei…" } } }
-```
-
-A snapshot whose `grant` is not the grant being checked admits nothing.
-
-Deletion clears the grant's data, but the version before it stays resolvable, so
-verifiers read the snapshot there. Step 4 of the grant check admits a version only if
-its `versionId` is in the snapshot or is an ancestor of one, through signed `previd`
-links.
-
-Keeping the snapshot in the grant has two consequences:
-
-- **No growing record.** Nothing accumulates in the user's DID, however many grants are
-  revoked.
-- **No ordering gap.** The snapshot and the deletion are consecutive operations in one
-  signed history, so a verifier that sees the deletion also has the snapshot's version.
-
-- Objects the wallet's node had not yet seen are lost, which is the right failure
-  direction.
-- Deleted objects no longer match the query, because deletion clears their data. A
-  wallet that can find them, for example through an indexer (which remembers deleted
-  DIDs), includes each with the `versionId` of its deletion, which admits the whole
-  history before it. A deleted object the wallet does not find loses attribution for
-  its **entire** history, not just its tombstone: earlier versions stay resolvable but
-  show as unattributed.
-- The snapshot names operations, not sequence numbers. A sequence number does not
-  identify content: a revoked client could publish a backdated sibling at the same
-  sequence that Archon's sibling ordering prefers. That sibling is simply not in the
-  snapshot.
-- A user who suspects a compromise can take the snapshot from an earlier point to
-  disown recent objects.
-
-Two weaker alternatives were considered. Attributing only versions anchored on a chain
-before the revocation is sound but slow and costly for ordinary posts. Distrusting
-versions an indexer first saw after the revocation is a useful client-side heuristic,
-but other parties cannot verify it.
+Two alternatives were considered. A **revocation snapshot**, recorded in the grant
+just before deletion and listing the `versionId` of every object to keep, gives
+immediate attribution and no window, but needs the wallet to find every object
+(deleted ones included), depends on the snapshot staying available on IPFS, and adds
+an unverified state. Distrusting versions an indexer first saw after the revocation is
+a useful client-side heuristic, but other parties cannot verify it.
 
 ### Who controls published objects
 
 The client controls the objects it publishes. Consequences:
 
 - The user cannot edit or delete them directly. After revocation they no longer count
-  as the user's beyond the snapshot, but they remain on the network.
+  as the user's beyond what was anchored before it, but they remain on the network.
 - Transferring an object ends its attribution, so a client cannot hand objects over to
   the user. A user who wants an object under their own control republishes it directly.
 
@@ -795,9 +788,9 @@ Timelines, ranking, full-text search and counts need an indexer. The Memepool in
   Reconciliation re-resolves the indexed DIDs and re-reads the events feed over its
   whole range;
 - verifies attribution per version and records what each result depended on: the
-  grant (whose final version holds any revocation snapshot), and the controllers
-  whose keys signed. When any of those change, the indexer re-verifies the affected
-  versions, so a later revocation snapshot can disown objects it had already accepted;
+  grant and the chain positions compared. It re-verifies pending versions as they are
+  anchored, and versions anchored after a grant's deletion once that deletion is
+  anchored;
 - builds timelines for the set of authors a reader supplies (see Follows), thread
   trees, reply, reaction and boost counts, and per-tag feeds;
 - serves them to clients over HTTP, behind Drawbridge like other public surfaces.
@@ -822,7 +815,8 @@ There is no central moderator. Viewers choose which judgments to apply:
 ### Wallet
 
 The wallet lists active grants with the actions they allow, defaults to narrow actions,
-and makes revoking a grant, snapshot included, a single action.
+lets the user choose each grant's chain registry, and makes revoking a grant a single
+action that is submitted at once, so the deletion is anchored in the next batch.
 
 ## Scale
 
@@ -838,7 +832,8 @@ persistence, in both Gatekeeper ports:
 - create 1, 5 and 10 million Memeplex objects with a realistic mix (mostly short posts,
   reactions, ratings and tags, some replies, few articles), across a realistic number of
   authors;
-- measure creation throughput, Hyperswarm propagation to a second node, startup replay
+- measure creation throughput, Hyperswarm propagation to a second node, mediator
+  batch anchoring throughput on a chain registry, startup replay
   time, resolve latency, `query` latency for `author` and `parent`, the memory
   used by the search index, and storage;
 - compare startup against the current production dataset to separate per-object cost
@@ -853,7 +848,9 @@ The results size node hardware and show where optimization will be needed first.
   unverified `author` as fact.
 - **Forged grants.** A grant counts only if the user created it; one created by
   someone else and transferred to the user fails the grant check.
-- **Backdating after revocation.** Addressed by snapshots bound to operation CIDs.
+- **Backdating after revocation.** Addressed by anchoring grants and delegated objects
+  on one chain registry and comparing positions, not times. The remaining window is
+  the time until the deletion is anchored.
 - **Over-broad or forgotten grants.** Mitigated by wallet design (see Memepool:
   Wallet).
 - **Transferred objects.** Ownership is not authorship; attribution follows the
@@ -880,8 +877,7 @@ The results size node hardware and show where optimization will be needed first.
    transferred objects, and backdated siblings.
 4. **Direct publishing:** create, edit, delete and query objects from the existing CLI
    and SDKs with no delegation; this works with today's `create-asset-json`.
-5. **Delegation:** wallet UI to create, list and revoke grants, including the
-   revocation snapshot.
+5. **Delegation:** wallet UI to create, list and revoke grants on a chain registry.
 6. **Indexer.**
 7. **Memepool client.**
 8. **Moderation:** block lists and labels.
@@ -891,8 +887,8 @@ The results size node hardware and show where optimization will be needed first.
 - **Action vocabulary.** Is one action per creatable kind the right granularity, and
   should grants be able to narrow further (for example, replies only within one
   thread)?
-- **Expiry.** Should grants carry an optional expiry? On `hyperswarm` an expiry has the
-  same backdating gap as revocation, so it would need a snapshot when it lapses.
+- **Expiry.** Should grants carry an optional expiry? A block height on the grant's
+  registry would be checkable the same way as revocation.
 - **Change feed.** Should Gatekeeper offer an arrival-ordered change feed? It would
   let indexers follow new and displaced versions directly, instead of reconciling
   periodically against full state.
