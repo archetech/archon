@@ -545,9 +545,9 @@ creates, so it is signed with the user's own key and controlled by the user:
   SOL), and every object published under it is created on that same registry and
   stays there. A grant on `hyperswarm`, `local` or `pin` is void. See Revocation for
   why.
-- **Immutable.** A grant ends at its first operation after creation, whatever that
-  operation is: a deletion, an update or a transfer. Positions before that operation
-  keep their attribution; later ones get none. To narrow a grant, the wallet revokes
+- **Immutable.** Any operation after creation ends a grant, whatever it is: a
+  deletion, an update or a transfer. The grant ends at the earliest anchored one;
+  positions before it keep their attribution, and later ones get none. To narrow a grant, the wallet revokes
   it and creates a narrower one.
 - **Revocation:** the wallet deletes the grant with `revokeDID`, which is the normal way
   to end it (see Revocation).
@@ -639,13 +639,15 @@ order. For each version it takes:
   event's `ordinal` and `registration` when the event's `registry` is *R*. A version
   whose accepted event is not yet a receipt from *R* is **pending** on *R*.
 
-Positions compare by block height. Within one block they are ordered only when both
-are in the same batch transaction (the same `registration.txid`), by their index in
-the batch. Positions in one block but different transactions are **unordered**: chains
-do not all give a cross-transaction order (Solana's ordinal index is local to its
-transaction), and the grant check treats unordered as failing in both directions.
 - **Time:** the event's `time`, as resolution reports it. Attribution does not use it;
   it orders duplicate ratings (see Ratings) and is shown to readers.
+
+Positions compare by block height. Within one block they are ordered only when both
+are in the same transaction (the same `registration.txid`), by comparing their complete
+ordinals lexicographically; one transaction can carry several batches. Positions in one
+block but different transactions are **unordered**: chains do not all give a
+cross-transaction order (Solana's ordinal index is local to its transaction), and the
+grant check treats unordered as failing in both directions.
 
 The grant's own history is read the same way.
 
@@ -659,8 +661,9 @@ position *P* on *G*'s registry:
    as above.)
 2. *G* was created on a chain registry *R*.
 3. *G*'s creation is anchored on *R*, ordered before *P*.
-4. *G* has no operation after its creation, or that operation is pending or anchored
-   ordered after *P*.
+4. Every operation in *G*'s history after its creation is pending, or anchored and
+   ordered after *P*. Any anchored operation ends the grant, even if an earlier one is
+   still pending.
 5. *G*'s `client` is *A*, and *A* is not *U*.
 
 The check compares chain positions on one registry, never clocks (see Revocation). A
@@ -709,7 +712,7 @@ alike.
 ## Revocation
 
 The wallet revokes a grant with `revokeDID`. Revocation takes effect at the deletion's
-position on the grant's registry (or that of any other first operation after the
+position on the grant's registry (or that of any earlier anchored operation after the
 grant's creation): versions anchored before it keep their attribution, and versions
 anchored after it, in the same block in another transaction, or never, have none.
 
@@ -846,9 +849,9 @@ Timelines, ranking, full-text search and counts need an indexer. The Memepool in
   Reconciliation re-resolves the indexed DIDs and re-reads the events feed over its
   whole range;
 - verifies attribution per version and records what each result depended on: the
-  grant and the chain positions compared. It re-verifies pending versions as they are
-  anchored, and versions anchored after a grant's deletion once that deletion is
-  anchored;
+  grant's accepted history and the chain receipts compared. It re-verifies the
+  dependent versions whenever any of those change: a pending version is anchored, any
+  operation on the grant is accepted or anchored, or a compared receipt is replaced;
 - builds timelines for the set of authors a reader supplies (see Follows), thread
   trees, reply, reaction and boost counts, and per-tag feeds;
 - serves them to clients over HTTP, behind Drawbridge like other public surfaces.
