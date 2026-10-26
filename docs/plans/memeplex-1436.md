@@ -111,11 +111,10 @@ its operations, which resolution already reports.
 
 | Kind | Purpose | `target` | Notes |
 |---|---|---|---|
-| `post` | Short text, Twitter-like | — | Usually inline `text`. |
+| `post` | Short text, Twitter-like | optional | Usually inline `text`. With a `target` it is a boost or quote post (see Boosts and quote posts). |
 | `article` | Long-form essay, Substack-like | — | `title`, optional `subtitle` and `summary`; body as `content` on IPFS. |
 | `paper` | Scholarly work, arXiv-like | — | `title`, optional `subtitle`, `summary` (the abstract), `authors` (DIDs; see Coauthors), `content` (the paper in Markdown), optional `pdf` and `source` (LaTeX) downloads. Revised by editing; see Revisions and citation. |
 | `reply` | Comment in a thread | required | Same fields as `post`. |
-| `boost` | Reshare to the booster's own audience | required | Optional `text`, making it a quote post (see Boosts and quote posts). |
 | `review` | Written assessment | required | `verdict` (short free text), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
 | `reaction` | Like or other emoji response | required | `value`, one emoji (see Reactions). Withdrawn by deleting it. |
 | `rating` | Score on the author's own scale | required | Integers `rating`, `min`, `max` (see Ratings). One per author per target; changed by editing, withdrawn by deleting. |
@@ -132,9 +131,9 @@ keeps every response, of whatever kind, reachable from its target with one query
 | `kind` | string | all; required |
 | `author` | DID | all; required |
 | `grant` | DID | all; required |
-| `text` | string, at most 10,000 code points | post, article, reply, boost, review |
+| `text` | string, at most 10,000 code points | post, article, reply, review |
 | `content` | `{ cid, type, bytes }` | post, article, paper, reply, review |
-| `target`, `targetVersion` | DID, `versionId` | reply, boost, review, reaction, rating, tag; required |
+| `target`, `targetVersion` | DID, `versionId` | post, optional; reply, review, reaction, rating, tag, required |
 | `tags` | 1–20 normalized strings, each at most 64 code points | post, article, paper, reply, review |
 | `title` | string, at most 300 code points | article, paper; required |
 | `subtitle` | string, at most 300 code points: one line shown under the title | article, paper |
@@ -148,8 +147,8 @@ keeps every response, of whatever kind, reachable from its target with one query
 | `tag` | normalized string, at most 64 code points (see Tags) | tag; required |
 
 - **Body.** `text` and `content` are mutually exclusive. An article, reply or review
-  has one of them; a paper has `content`; a post has `text` or `content`; a boost
-  has `text` or nothing.
+  has one of them; a paper has `content`; a post has `text` or `content`, or neither
+  when it has a `target` (a plain boost).
 - **References.** `cid` is an IPFS CID string, `bytes` a nonnegative integer, and
   `type` the media type Text formatting allows for that field. A `targetVersion` is a
   canonical operation CID.
@@ -248,10 +247,10 @@ and the paper from a client Alice runs herself. DIDs are shortened.
                 "text": "Including the reactions? Carol measured them:\n\n![Carol's benchmark post](did:cid:…carol-post?versionId=bafyreicarol…)" } }
 ```
 
-**boost**: a quote post; without `text` it would be a plain boost
+**post with a target**: a quote post; without `text` it would be a plain boost
 
 ```jsonc
-{ "memeplex": { "v": 1, "kind": "boost", "author": "did:cid:…erin",
+{ "memeplex": { "v": 1, "kind": "post", "author": "did:cid:…erin",
                 "grant": "did:cid:…erin-grant",
                 "target": "did:cid:…alice-post", "targetVersion": "bafyreipost…",
                 "text": "This is the clearest explanation of the idea so far." } }
@@ -314,15 +313,17 @@ Memeplex-specific list has to be maintained:
 
 ### Boosts and quote posts
 
-A boost (repost) is a `boost` object whose `target` is the original:
+A boost (repost) is a `post` whose `target` is the original:
 
-- A **plain boost** has no `text`. Clients show the original as "Alice boosted".
-- A **quote post** adds `text`, shown above the original.
+- A **plain boost** has no `text` or `content`. Clients show the original as "Alice
+  boosted".
+- A **quote post** has a body, shown above the original.
 
 `kind`, not `target`, decides thread membership: a thread shows `reply` objects, and
-counts boosts, reactions, ratings and tags without listing them in it. So a boost
-shares the original with the booster's own audience, yet the "every response to an
-object" query still finds every boost and quote post through Gatekeeper alone.
+counts posts, reactions, ratings and tags that target it without listing them in it.
+So a boost shares the original with the booster's own audience, yet the "every
+response to an object" query still finds every boost and quote post through
+Gatekeeper alone. Boosting needs the `memeplex:post` action.
 
 Quoting inside other text is an embed (see Text formatting): an essay that discusses
 three posts embeds each where it discusses it. Embeds are not indexed by Gatekeeper, so
@@ -558,7 +559,6 @@ mistake one for a publication.
 |---|---|
 | `memeplex:post` | `post`, `article` and `paper` objects |
 | `memeplex:reply` | `reply` objects |
-| `memeplex:boost` | `boost` objects |
 | `memeplex:review` | `review` objects |
 | `memeplex:react` | `reaction` objects |
 | `memeplex:rate` | `rating` objects |
@@ -792,7 +792,7 @@ A whole thread is loaded by repeating the `target` query one level at a time, ke
 thread-root field to keep consistent.
 
 Only one condition and only `$in` are supported, so a client separates replies,
-boosts, reviews, reactions, ratings and tags by `kind` after the query. Results are unsorted and unpaged, and
+boosts (posts), reviews, reactions, ratings and tags by `kind` after the query. Results are unsorted and unpaged, and
 they are not attributions: the matches still have to pass the attribution check,
 because anyone can write any `author` into an object they publish.
 
