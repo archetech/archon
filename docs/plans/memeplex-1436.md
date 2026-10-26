@@ -97,8 +97,8 @@ prefix.
     "text": "…",
 
     // links
-    "parent": "did:cid:…",          // the object this one responds to
-    "parentVersion": "bafyrei…",    // the versionId responded to
+    "target": "did:cid:…",          // the object this one responds to
+    "targetVersion": "bafyrei…",    // the versionId responded to
     "tags": ["cryptography", "did"]
   }
 }
@@ -109,7 +109,7 @@ its operations, which resolution already reports.
 
 ### Kinds
 
-| Kind | Purpose | `parent` | Notes |
+| Kind | Purpose | `target` | Notes |
 |---|---|---|---|
 | `post` | Short text, Twitter-like | — | Usually inline `text`. |
 | `article` | Long-form essay, Substack-like | — | `title`, optional `subtitle` and `summary`; body as `content` on IPFS. |
@@ -118,11 +118,11 @@ its operations, which resolution already reports.
 | `boost` | Reshare to the booster's own audience | required | Optional `text`, making it a quote post (see Boosts and quote posts). |
 | `review` | Written assessment | required | `verdict` (short free text), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
 | `reaction` | Like or other emoji response | required | `value`, one emoji (see Reactions). Withdrawn by deleting it. |
-| `rating` | Score on the author's own scale | required | Integers `rating`, `min`, `max` (see Ratings). One per author per parent; changed by editing, withdrawn by deleting. |
+| `rating` | Score on the author's own scale | required | Integers `rating`, `min`, `max` (see Ratings). One per author per target; changed by editing, withdrawn by deleting. |
 | `tag` | Label applied to someone else's object | required | `tag`, a normalized string (see Tags). Withdrawn by deleting it. |
 
-`parent` is the one link from a response to what it responds to; `kind` says how. This
-keeps every response, of whatever kind, reachable from its parent with one query.
+`target` is the one link from a response to what it responds to; `kind` says how. This
+keeps every response, of whatever kind, reachable from its target with one query.
 
 ### Fields
 
@@ -134,7 +134,7 @@ keeps every response, of whatever kind, reachable from its parent with one query
 | `grant` | DID | all; required |
 | `text` | string, at most 10,000 code points | post, article, reply, boost, review |
 | `content` | `{ cid, type, bytes }` | post, article, paper, reply, review |
-| `parent`, `parentVersion` | DID, `versionId` | reply, boost, review, reaction, rating, tag; required |
+| `target`, `targetVersion` | DID, `versionId` | reply, boost, review, reaction, rating, tag; required |
 | `tags` | 1–20 normalized strings, each at most 64 code points | post, article, paper, reply, review |
 | `title` | string, at most 300 code points | article, paper; required |
 | `subtitle` | string, at most 300 code points: one line shown under the title | article, paper |
@@ -151,7 +151,7 @@ keeps every response, of whatever kind, reachable from its parent with one query
   has one of them; a paper has `content`; a post has `text` or `content`; a boost
   has `text` or nothing.
 - **References.** `cid` is an IPFS CID string, `bytes` a nonnegative integer, and
-  `type` the media type Text formatting allows for that field. A `parentVersion` is a
+  `type` the media type Text formatting allows for that field. A `targetVersion` is a
   canonical operation CID.
 - **Strictness.** A field from this table on a kind that does not list it makes the
   object invalid, as does a missing required field. A field not in the table is
@@ -168,15 +168,15 @@ revisions"). A venue that needs a fixed vocabulary defines an extension kind.
 Every reference to another object names the exact version it refers to, as AT
 Protocol's strong references do:
 
-- **`parent` with `parentVersion`.** A response always carries both: `parent` is the
+- **`target` with `targetVersion`.** A response always carries both: `target` is the
   bare DID, so the "every response to an object" query still finds it, and
-  `parentVersion` is the `versionId` of the revision the author saw.
+  `targetVersion` is the `versionId` of the revision the author saw.
 - **Embeds** (images and quoted objects in the text) pin the version in the DID URL:
   `![alt](did:cid:…?versionId=bafyrei…)`. See Text formatting.
 
 A reference then always means the content the author responded to, quoted or showed,
-even after the target is edited. Clients may mark a response whose `parentVersion` is
-not the parent's current revision. For reviews and ratings that mark is prominent
+even after the target is edited. Clients may mark a response whose `targetVersion` is
+not the target's current revision. For reviews and ratings that mark is prominent
 ("reviewed an earlier revision"); for replies and reactions it can be subtle or
 omitted. If a pinned version leaves the accepted history, see Revisions and citation.
 
@@ -244,7 +244,7 @@ and the paper from a client Alice runs herself. DIDs are shortened.
 ```jsonc
 { "memeplex": { "v": 1, "kind": "reply", "author": "did:cid:…bob",
                 "grant": "did:cid:…bobs-grant",
-                "parent": "did:cid:…alice-post", "parentVersion": "bafyreipost…",
+                "target": "did:cid:…alice-post", "targetVersion": "bafyreipost…",
                 "text": "Including the reactions? Carol measured them:\n\n![Carol's benchmark post](did:cid:…carol-post?versionId=bafyreicarol…)" } }
 ```
 
@@ -253,7 +253,7 @@ and the paper from a client Alice runs herself. DIDs are shortened.
 ```jsonc
 { "memeplex": { "v": 1, "kind": "boost", "author": "did:cid:…erin",
                 "grant": "did:cid:…erin-grant",
-                "parent": "did:cid:…alice-post", "parentVersion": "bafyreipost…",
+                "target": "did:cid:…alice-post", "targetVersion": "bafyreipost…",
                 "text": "This is the clearest explanation of the idea so far." } }
 ```
 
@@ -262,7 +262,7 @@ and the paper from a client Alice runs herself. DIDs are shortened.
 ```jsonc
 { "memeplex": { "v": 1, "kind": "review", "author": "did:cid:…carol",
                 "grant": "did:cid:…carol-grant",
-                "parent": "did:cid:…paper", "parentVersion": "bafyreirev2…",
+                "target": "did:cid:…paper", "targetVersion": "bafyreirev2…",
                 "verdict": "minor revisions",
                 "text": "The convergence argument holds, but section 4 assumes …" } }
 ```
@@ -272,7 +272,7 @@ and the paper from a client Alice runs herself. DIDs are shortened.
 ```jsonc
 { "memeplex": { "v": 1, "kind": "reaction", "author": "did:cid:…dave",
                 "grant": "did:cid:…dave-grant",
-                "parent": "did:cid:…alice-post", "parentVersion": "bafyreipost…",
+                "target": "did:cid:…alice-post", "targetVersion": "bafyreipost…",
                 "value": "❤️" } }
 ```
 
@@ -281,7 +281,7 @@ and the paper from a client Alice runs herself. DIDs are shortened.
 ```jsonc
 { "memeplex": { "v": 1, "kind": "rating", "author": "did:cid:…carol",
                 "grant": "did:cid:…carol-grant",
-                "parent": "did:cid:…paper", "parentVersion": "bafyreirev2…",
+                "target": "did:cid:…paper", "targetVersion": "bafyreirev2…",
                 "rating": 3, "min": 1, "max": 5 } }
 ```
 
@@ -290,7 +290,7 @@ and the paper from a client Alice runs herself. DIDs are shortened.
 ```jsonc
 { "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…spamwatch",
                 "grant": "did:cid:…spamwatch-grant",
-                "parent": "did:cid:…some-post", "parentVersion": "bafyreispam…",
+                "target": "did:cid:…some-post", "targetVersion": "bafyreispam…",
                 "tag": "spam" } }
 ```
 
@@ -314,12 +314,12 @@ Memeplex-specific list has to be maintained:
 
 ### Boosts and quote posts
 
-A boost (repost) is a `boost` object whose `parent` is the original:
+A boost (repost) is a `boost` object whose `target` is the original:
 
 - A **plain boost** has no `text`. Clients show the original as "Alice boosted".
 - A **quote post** adds `text`, shown above the original.
 
-`kind`, not `parent`, decides thread membership: a thread shows `reply` objects, and
+`kind`, not `target`, decides thread membership: a thread shows `reply` objects, and
 counts boosts, reactions, ratings and tags without listing them in it. So a boost
 shares the original with the booster's own audience, yet the "every response to an
 object" query still finds every boost and quote post through Gatekeeper alone.
@@ -336,7 +336,7 @@ down, and ratings stay comparable:
 ```jsonc
 { "memeplex": { "v": 1, "kind": "rating", "author": "did:cid:…user",
                 "grant": "did:cid:…grant",
-                "parent": "did:cid:…paper", "parentVersion": "bafyreirev2…",
+                "target": "did:cid:…paper", "targetVersion": "bafyreirev2…",
                 "rating": 3, "min": 1, "max": 5 } }
 ```
 
@@ -348,16 +348,16 @@ down, and ratings stay comparable:
 - Four stars out of five, `(4, 1, 5)`, is **0.75, not 0.8**: it is three steps up a
   four-step scale. Clients that display normalized values should not present them as
   "n out of max".
-- An author has one rating per parent. Changing it is an edit, so the history stays
+- An author has one rating per target. Changing it is an edit, so the history stays
   visible; aggregators count each author's current attributed version once. Two
-  clients can still each create a rating for the same author and parent. So that
+  clients can still each create a rating for the same author and target. So that
   independent indexers agree, the author's rating is the attributed, undeleted rating
   object whose current version was anchored latest, by its anchoring block's time, with
   ties broken by the smallest canonical `versionId`. Block times are set by the chain,
   not the signer, and stay comparable when the ratings were published under grants on
   different registries. Deleting that object makes the next one by the same
   rule current; with none left, the author has no rating. Rating a
-  new revision of the parent is also an edit, which updates `parentVersion`; the
+  new revision of the target is also an edit, which updates `targetVersion`; the
   earlier rating and the revision it rated remain in the history.
 - Equal values are not equally precise: a 5-point scale and a 100-point scale cluster
   differently. Aggregators that care can group by `max − min`.
@@ -367,12 +367,12 @@ A like stays a `reaction` ("I appreciate this"); a `rating` judges quality.
 ### Tags
 
 An object's author describes it with the `tags` field inside the object. Anyone else
-labels it with a `tag` object whose `parent` is the labelled object:
+labels it with a `tag` object whose `target` is the labelled object:
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…labeller",
                 "grant": "did:cid:…grant",
-                "parent": "did:cid:…post", "parentVersion": "bafyrei…",
+                "target": "did:cid:…post", "targetVersion": "bafyrei…",
                 "tag": "cryptography" } }
 ```
 
@@ -396,7 +396,7 @@ reference stays in the previous version.
 
 Attribution covers only `author`, the DID that published the paper. The other DIDs in
 `authors` are the publisher's **claim**. A listed coauthor confirms it by publishing a
-`tag` with the value `coauthor` on the paper, with `parentVersion` set to the revision
+`tag` with the value `coauthor` on the paper, with `targetVersion` set to the revision
 they stand behind. Clients show a listed coauthor as confirmed for a revision only
 when such an attributed tag pins that exact revision. A tag on an earlier revision is
 shown as such ("confirmed v2"), never as confirmation of a later one, because the
@@ -493,7 +493,7 @@ while they remain in its accepted history. This is arXiv's model, with the DID a
   reviewer who needs the assessed content itself to survive keeps its `content` CID,
   and pins it (see Content availability under Security considerations).
 - **Responses pin what they assessed.** Every response names the revision it
-  responded to in `parentVersion` (see Version pinning), so a review of v1 is never
+  responded to in `targetVersion` (see Version pinning), so a review of v1 is never
   presented as a review of v2.
 
 ### Timestamps and anchoring
@@ -687,9 +687,9 @@ only if all of these hold:
 
 1. Its predecessor version is attributed to *U*, so attribution runs unbroken from the
    creation.
-2. It leaves `author`, `kind`, `grant` and `parent` unchanged: an object stays under
-   the grant it was created under, and a response stays in its thread. `parentVersion`
-   may change, so a review or rating can move to a newer revision of its parent. (A
+2. It leaves `author`, `kind`, `grant` and `target` unchanged: an object stays under
+   the grant it was created under, and a response keeps its target. `targetVersion`
+   may change, so a review or rating can move to a newer revision of its target. (A
    deletion clears the data; the check applies to the predecessor.)
 3. *grant-ok(G, U, A, P)* holds for that grant at the version's position *P* on the
    grant's registry. The client may edit or delete what it published under the grant.
@@ -781,15 +781,15 @@ cover the controller, which is why objects carry `author` in their data.
 | Question | Query |
 |---|---|
 | Everything by a user | `{ "where": { "memeplex.author": { "$in": ["did:cid:…user"] } } }` |
-| Every response to an object | `{ "where": { "memeplex.parent": { "$in": ["did:cid:…"] } } }` |
+| Every response to an object | `{ "where": { "memeplex.target": { "$in": ["did:cid:…"] } } }` |
 | Objects under one grant | `{ "where": { "memeplex.grant": { "$in": ["did:cid:…grant"] } } }` |
 | Grants naming a client | `{ "where": { "memeplexGrant.client": { "$in": ["did:cid:…client"] } } }` |
 | Objects an author tagged | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
-| Tags others applied (their `parent`s are the tagged objects) | `{ "where": { "memeplex.tag": { "$in": ["cryptography"] } } }` |
+| Tags others applied (their `target`s are the tagged objects) | `{ "where": { "memeplex.tag": { "$in": ["cryptography"] } } }` |
 
-A whole thread is loaded by repeating the `parent` query one level at a time; an
-indexer builds thread trees directly. Objects carry no separate thread-root field to
-keep consistent.
+A whole thread is loaded by repeating the `target` query one level at a time, keeping
+`reply` objects; an indexer builds thread trees directly. Objects carry no separate
+thread-root field to keep consistent.
 
 Only one condition and only `$in` are supported, so a client separates replies,
 boosts, reviews, reactions, ratings and tags by `kind` after the query. Results are unsorted and unpaged, and
@@ -889,7 +889,7 @@ persistence, in both Gatekeeper ports:
   authors;
 - measure creation throughput, Hyperswarm propagation to a second node, mediator
   batch anchoring throughput on a chain registry, startup replay
-  time, resolve latency, `query` latency for `author` and `parent`, the memory
+  time, resolve latency, `query` latency for `author` and `target`, the memory
   used by the search index, and storage;
 - compare startup against the current production dataset to separate per-object cost
   from fixed cost.
