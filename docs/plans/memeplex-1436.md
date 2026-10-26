@@ -448,6 +448,18 @@ Every client renders the same text the same way:
     so clients use it only to reject early, count bytes while downloading, and abort
     past the limit before buffering or decoding the whole image.
   - **Alt text** is expected to be non-empty. Clients may flag images without it.
+- **Rendering budgets.** Every object is untrusted input, so clients bound the work
+  before fetching or rendering, and fall back to a link or a truncated view with a
+  "show more" link when a budget is exceeded:
+  - **Body:** a `content` body is fetched only if its declared `bytes` is at most
+    1 MB, counted while downloading and aborted past that.
+  - **Embeds:** at most 20 embeds per object are expanded; the rest show as links.
+    An embedded object's card shows its own text with its embeds as links, so
+    expansion is one level deep and cannot recurse.
+  - **Images:** besides the 10 MB download limit, the asset's declared width × height
+    is at most 40 megapixels and is checked against the decoded header before full
+    decoding; animated images are limited to 100 frames.
+  - **Aggregate:** at most 50 MB fetched to render one object and its embeds.
 - **Math renders untrusted.** Renderers disable trusted commands (KaTeX's `trust`
   option, which enables `\href`, `\url`, `\includegraphics` and HTML-class commands).
 - **Graceful fallback.** A client may show any `text` as plain text, and math as its
@@ -471,8 +483,9 @@ what the conversion loses (custom macros, complex tables, exact figure placement
 
 - **Edit:** an update to the object. Earlier versions remain resolvable while they are
   in the accepted history, so a client can show "edited" with the full history.
-- **Delete:** `revokeDID`. Clients show a tombstone: the object existed, was deleted,
-  and when.
+- **Delete:** `revokeDID`. An attributed deletion withdraws the object: clients show a
+  tombstone (it existed, was deleted, and when), and it stops counting. An
+  unattributed deletion does not withdraw anything (see Publication state).
 
 ### Revisions and citation
 
@@ -693,7 +706,8 @@ only if all of these hold:
 
 1. Its predecessor version is attributed to *U*, so attribution runs unbroken from the
    creation.
-2. It leaves `author`, `kind`, `grant` and `target` unchanged: an object stays under
+2. It is valid against its kind's schema (a deletion is exempt) and leaves `author`,
+   `kind`, `grant` and `target` unchanged: an object stays under
    the grant it was created under, and a response keeps its target. `targetVersion`
    may change, so a review or rating can move to a newer revision of its target. (A
    deletion clears the data; the check applies to the predecessor.)
@@ -705,6 +719,23 @@ only if all of these hold:
 A version that fails is shown as unattributed and stops the lineage: later versions
 built on it are unattributed too. Earlier attributed versions stay attributed. A
 pending version makes the versions after it pending too.
+
+### Publication state
+
+What an object currently says, for display, counts, ratings, coauthor confirmations
+and moderation labels alike, is its **last attributed version**:
+
+- If that version is a deletion, the object is withdrawn: a tombstone, not counted.
+- Otherwise the object shows and counts as that version. Later unattributed versions,
+  including edits, deletions, removal of the `memeplex` member or schema-invalid data
+  by a revoked client, change nothing. Clients may note "later changes not
+  attributed" and show them on request, never as the object.
+- If the creation is pending, the object is pending; if it is not attributed, the
+  object does not exist as a publication.
+
+So a rating or coauthor confirmation that was attributed before revocation survives a
+compromised client deleting or corrupting it afterwards. A user who wants such an
+object gone deletes it before revoking, while the grant is live.
 
 A shared verifier library should implement these rules once for clients and indexers
 alike.
@@ -737,8 +768,12 @@ Consequences:
   minutes on SOL or ETH, longer on BTC, depending on the mediator's batch interval.
   Clients show it as pending until then.
 - **A window at revocation.** Revocation takes effect when the deletion is anchored.
-  Until then a compromised client can still get operations anchored ahead of it. The
-  wallet submits the deletion at once, so the window is about one batch interval.
+  Until then a compromised client can still get operations anchored ahead of it.
+  Submitting the deletion does not guarantee when it is anchored: the batch can wait
+  for confirmation, need fee bumping, or stall if the mediator is unfunded or down,
+  while the client keeps anchoring through another node. The window is therefore
+  bounded only by the availability of a working mediator for the grant's registry; with
+  one, it is typically a batch interval.
 - **No inventory.** The wallet does not need to find what the client published.
   Everything anchored before the deletion stays attributed, including objects the
   wallet never saw and objects later deleted; nothing anchored after it is.
@@ -772,6 +807,13 @@ The grant's client controls the objects published under it. Consequences:
 - Transferring an object ends its attribution, so a client cannot hand objects over to
   the user. A user who wants an object under their own control republishes it through
   a client they run.
+
+- **Revocation freezes existing objects.** An object never changes its `grant`, and
+  every version must pass that grant, so once a grant ends no further edit or deletion
+  of its objects is attributed, even by the same client under a new grant. Rotating a
+  grant therefore means papers can no longer be revised, ratings withdrawn or
+  coauthor confirmations removed without republishing. Withdraw what should be
+  withdrawn before revoking.
 
 Decision (from #1436): accept this for v1. If usage shows users need direct control of
 an application's objects, the alternative is a protocol change letting Gatekeeper
@@ -837,23 +879,25 @@ Neither is part of v1.
 
 Timelines, ranking, full-text search and counts need an indexer. The Memepool indexer:
 
-- discovers new activity through `GET /api/v1/events` and resolves objects whose data
-  has a `memeplex` member;
-- remembers every DID it has indexed and processes every later event for those DIDs,
-  including deletions. A deleted object's data is cleared, so it no longer carries a
-  `memeplex` member, and filtering on that member would leave stale posts and
-  reactions in the index instead of tombstones;
+- discovers objects from history, not current state: it reads the operations in
+  `GET /api/v1/events` and treats a DID as a Memeplex object if any of its operations
+  carries a `memeplex` member. An object deleted, or stripped of its member, before the
+  indexer first saw it is still found, and its publication state is derived from its
+  attributed history like any other;
+- remembers every DID it has indexed and processes every later event for those DIDs;
 - reconciles periodically against full state, because the events feed is ordered by
   event time, not arrival. A late or backdated publication can land behind any
   polling watermark, and replay can displace a branch without emitting a new event.
   Reconciliation re-resolves the indexed DIDs and re-reads the events feed over its
-  whole range;
+  whole range. A freshly built index and one that has run continuously must agree on
+  the same evidence; the verifier library's tests include rebuilding from scratch;
 - verifies attribution per version and records what each result depended on: the
   grant's accepted history and the chain receipts compared. It re-verifies the
   dependent versions whenever any of those change: a pending version is anchored, any
   operation on the grant is accepted or anchored, or a compared receipt is replaced;
 - builds timelines for the set of authors a reader supplies (see Follows), thread
-  trees, reply, reaction and boost counts, and per-tag feeds;
+  trees, reply, reaction and boost counts, and per-tag feeds, all from publication
+  state;
 - serves them to clients over HTTP, behind Drawbridge like other public surfaces.
 
 The indexer is a cache of public data. Anyone can run one, and a client can always fall
@@ -877,7 +921,11 @@ There is no central moderator. Viewers choose which judgments to apply:
 
 The wallet lists active grants with the actions they allow, defaults to narrow actions,
 lets the user choose each grant's chain registry, and makes revoking a grant a single
-action that is submitted at once, so the deletion is anchored in the next batch.
+action. It shows a revocation in three states: **requested** (signed by the wallet),
+**submitted** (accepted by a node for anchoring) and **effective** (the deletion is
+anchored). While it is not yet effective, the wallet warns the user, and if it stalls,
+resubmits the signed deletion to other nodes that run a mediator for the registry.
+Because the deletion gossips on Hyperswarm, any such node can anchor it.
 
 ## Scale
 
@@ -898,9 +946,14 @@ persistence, in both Gatekeeper ports:
   time, resolve latency, `query` latency for `author` and `target`, the memory
   used by the search index, and storage;
 - compare startup against the current production dataset to separate per-object cost
-  from fixed cost.
+  from fixed cost;
+- run the application workload too: per-version attribution, re-verification after
+  grant changes, full reconciliation, rebuilding a fresh indexer from scratch, and
+  publication churn (edits, deletions and revocations at a realistic rate).
 
-The results size node hardware and show where optimization will be needed first.
+Acceptance targets for each measurement (latency, memory, rebuild time) are set before
+the benchmark runs. The results size node hardware and show where optimization will be
+needed first.
 
 ## Security considerations
 
@@ -936,7 +989,9 @@ The results size node hardware and show where optimization will be needed first.
    assets, with signed fixtures.
 3. **Verifier library:** the attribution rules, shared by clients and the indexer, with
    cross-checks against real signed objects, including revoked and forged grants,
-   transferred objects, and backdated siblings.
+   transferred objects, backdated siblings, and unattributed edits and deletions after
+   revocation (of ratings and coauthor confirmations in particular), and a fresh index
+   rebuild that must match a continuously running one.
 4. **CLI client:** create an agent DID as the client, grant it from the user's
    identity, then create, edit, delete and query objects on the grant's registry from
    the existing CLI and SDKs; this works with today's asset commands.
@@ -947,6 +1002,9 @@ The results size node hardware and show where optimization will be needed first.
 
 ## Open questions
 
+- **Grant handover.** Should an object be allowed to move to a newer grant from the
+  same user, naming the same client on the same registry, so rotating a grant does not
+  freeze existing objects (see Who controls published objects)?
 - **Action vocabulary.** Is one action per creatable kind the right granularity, and
   should grants be able to narrow further (for example, replies only within one
   thread)?
