@@ -96,7 +96,6 @@ prefix.
     // links
     "parent": "did:cid:…",          // the object or DID this one responds to
     "parentVersion": "bafyrei…",    // optional: the parent's versionId this one responds to
-    "root": "did:cid:…",            // the thread root, for one-query thread loading
     "quotes": ["did:cid:…"],
     "tags": ["cryptography", "did"]
   }
@@ -113,7 +112,7 @@ its operations, which resolution already reports.
 | `post` | Short text, Twitter-like | — | Usually inline `text`. |
 | `article` | Long-form essay, Substack-like | — | `title`, `summary`; body as `content` on IPFS. |
 | `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs), `content` (PDF or source). Revised by editing; see Revisions and citation. |
-| `reply` | Comment in a thread | required | Same fields as `post`; also carries `root`. |
+| `reply` | Comment in a thread | required | Same fields as `post`. |
 | `review` | Written assessment | required | `verdict` (free text or schema-defined), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
 | `reaction` | Like or other emoji response | required | `value`, one emoji (see Reactions). Withdrawn by deleting it. |
 | `rating` | Score on the author's own scale | required | Integers `rating`, `min`, `max` (see Ratings). One per author per parent; changed by editing, withdrawn by deleting. |
@@ -168,7 +167,7 @@ shortened.
 ```jsonc
 { "memeplex": { "v": 1, "kind": "reply", "author": "did:cid:…bob",
                 "grant": "did:cid:…bobs-grant",
-                "parent": "did:cid:…alice-post", "root": "did:cid:…alice-post",
+                "parent": "did:cid:…alice-post",
                 "text": "Including the reactions? See the scale section.",
                 "quotes": ["did:cid:…carol-post"] } }
 ```
@@ -465,9 +464,8 @@ attributed to *U* only if all of these hold:
    predecessor.)
 3. *A* is *U* (direct), or *grant-ok(G, U, A, T)* holds for that grant. Any client
    holding the grant may edit or delete what it published under it.
-4. If it changes the controller, the new controller is *U*: a client may hand an object
-   back to its author, after which later versions are direct. Any other transfer ends
-   attribution for every later version.
+4. It does not change the controller. A transfer ends attribution for that version and
+   every later one.
 
 A version that fails is shown as unattributed and stops the lineage: later versions
 built on it are unattributed too. Earlier attributed versions stay attributed.
@@ -523,12 +521,11 @@ The client controls the objects it publishes. Consequences:
 
 - The user cannot edit or delete them directly. After revocation they no longer count
   as the user's beyond the snapshot, but they remain on the network.
-- A cooperating client can hand objects over with `transferAsset` to the user's DID; a
-  rogue or abandoned one will not.
+- Transferring an object ends its attribution, so a client cannot hand objects over to
+  the user. A user who wants an object under their own control republishes it directly.
 
 Decision (from #1436): accept this for v1. If usage shows users need direct control,
-the alternatives are a grant term requiring transfer on request (unenforced), or a
-protocol change letting Gatekeeper accept operations on a user's assets signed by a key
+the alternative is a protocol change letting Gatekeeper accept operations on a user's assets signed by a key
 the user's grant names. The latter changes protocol authorization and needs its own
 decision.
 
@@ -541,12 +538,15 @@ cover the controller, which is why objects carry `author` in their data.
 | Question | Query |
 |---|---|
 | Everything by a user | `{ "where": { "memeplex.author": { "$in": ["did:cid:…user"] } } }` |
-| A whole thread | `{ "where": { "memeplex.root": { "$in": ["did:cid:…root"] } } }` |
 | Every response to an object | `{ "where": { "memeplex.parent": { "$in": ["did:cid:…"] } } }` |
 | Boosts and quote posts of an object | `{ "where": { "memeplex.quotes[*]": { "$in": ["did:cid:…"] } } }` |
 | Objects under one grant | `{ "where": { "memeplex.grant": { "$in": ["did:cid:…grant"] } } }` |
 | Objects an author tagged | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
 | Tags others applied (their `parent`s are the tagged objects) | `{ "where": { "memeplex.tag": { "$in": ["cryptography"] } } }` |
+
+A whole thread is loaded by repeating the `parent` query one level at a time; an
+indexer builds thread trees directly. Objects carry no separate thread-root field to
+keep consistent.
 
 Only one condition and only `$in` are supported, so a client separates replies,
 reviews, reactions, ratings and tags by `kind` after the query. Results are unsorted and unpaged, and
@@ -642,7 +642,7 @@ persistence, in both Gatekeeper ports:
   reactions, ratings and tags, some replies, few articles), across a realistic number of
   authors;
 - measure creation throughput, Hyperswarm propagation to a second node, startup replay
-  time, resolve latency, `query` latency for `author`, `root` and `parent`, the memory
+  time, resolve latency, `query` latency for `author` and `parent`, the memory
   used by the search index, and storage;
 - compare startup against the current production dataset to separate per-object cost
   from fixed cost.
