@@ -397,9 +397,12 @@ reference stays in the previous version.
 Attribution covers only `author`, the DID that published the paper. The other DIDs in
 `authors` are the publisher's **claim**. A listed coauthor confirms it by publishing a
 `tag` with the value `coauthor` on the paper, with `parentVersion` set to the revision
-they stand behind. Clients show each listed coauthor as confirmed only when such an
-attributed tag exists for that revision or an earlier one, and as "listed by
-the publisher" otherwise. A coauthor withdraws by deleting the tag.
+they stand behind. Clients show a listed coauthor as confirmed for a revision only
+when such an attributed tag pins that exact revision. A tag on an earlier revision is
+shown as such ("confirmed v2"), never as confirmation of a later one, because the
+publisher can change the paper while keeping the coauthor listed. Otherwise the
+coauthor is shown as "listed by the publisher". A coauthor withdraws by deleting the
+tag, and moves their confirmation to a new revision by editing it.
 
 ### Text formatting
 
@@ -435,8 +438,9 @@ Every client renders the same text the same way:
   the IPFS CID, type, size, width and height.
   - **Types:** `image/png`, `image/jpeg`, `image/webp` and `image/gif`. No SVG, which can
     carry script.
-  - **Size:** at most 10 MB per image; clients check the asset's `bytes` before
-    fetching.
+  - **Size:** at most 10 MB per image. The asset's `bytes` is the publisher's claim,
+    so clients use it only to reject early, count bytes while downloading, and abort
+    past the limit before buffering or decoding the whole image.
   - **Alt text** is expected to be non-empty. Clients may flag images without it.
 - **Math renders untrusted.** Renderers disable trusted commands (KaTeX's `trust`
   option, which enables `\href`, `\url`, `\includegraphics` and HTML-class commands).
@@ -478,15 +482,16 @@ while they remain in its accepted history. This is arXiv's model, with the DID a
   preferred sibling can take over, and a version's time is not known until it is
   anchored. Only `versionId` names fixed content, so an author cannot change what a
   citation points to after the fact.
-- **A pending revision can disappear.** Until a revision is anchored, the object's
+- **A cited revision can disappear.** Until a revision is anchored, the object's
   controller can publish a competing successor that Archon's sibling ordering prefers,
   displacing it from the accepted history; resolving its `versionId` then returns
   `notFound`. That is the honest answer to an equivocating author, not an error.
   Clients show the citation as "revision no longer in the history" and never
   substitute another revision. Once a revision is anchored, Gatekeeper prefers it over
-  any sibling anchored later, so citing anchored revisions avoids this. A reviewer who
-  needs the assessed content itself to survive keeps its `content` CID, and pins it
-  (see Content availability under Security considerations).
+  any sibling anchored later, so citing anchored revisions avoids this unless the
+  publisher anchored an earlier sibling and withheld its content (see Revocation). A
+  reviewer who needs the assessed content itself to survive keeps its `content` CID,
+  and pins it (see Content availability under Security considerations).
 - **Responses pin what they assessed.** Every response names the revision it
   responded to in `parentVersion` (see Version pinning), so a review of v1 is never
   presented as a review of v2.
@@ -534,10 +539,12 @@ creates, so it is signed with the user's own key and controlled by the user:
   SOL), and every object published under it is created on that same registry and
   stays there. A grant on `hyperswarm`, `local` or `pin` is void. See Revocation for
   why.
-- **Immutable.** A grant's history is its creation and at most a deletion; a grant
-  with any other update is void. To narrow a grant, the wallet revokes it and creates
-  a narrower one.
-- **Revocation:** the wallet deletes the grant with `revokeDID` (see Revocation).
+- **Immutable.** A grant ends at its first operation after creation, whatever that
+  operation is: a deletion, an update or a transfer. Positions before that operation
+  keep their attribution; later ones get none. To narrow a grant, the wallet revokes
+  it and creates a narrower one.
+- **Revocation:** the wallet deletes the grant with `revokeDID`, which is the normal way
+  to end it (see Revocation).
 - **No expiry and no re-delegation.** A grant lasts until it is revoked, and a client
   cannot pass it on: only the user can create a grant. Wallets list active grants so
   unused ones can be revoked.
@@ -582,10 +589,10 @@ subset.
    registry, and the wallet creates the grant there with that subset and the request's
    `client` and `nonce`.
 3. The client finds the grant with a query for `memeplexGrant.client` (see Queries),
-   keeps the one carrying its nonce, and checks *grant-ok* for itself. The grant's
-   creator is the user. Anyone who saw the request could create a grant with the same
-   nonce from a different DID, so the client shows the user's identity and asks for
-   confirmation before publishing.
+   keeps the one carrying its nonce, waits until it is anchored, and checks *grant-ok*
+   for itself. The grant's creator is the user. Anyone who saw the request could create
+   a grant with the same nonce from a different DID, so the client shows the user's
+   identity and asks for confirmation before publishing.
 4. The client names the grant's DID as `memeplex.grant` in every object it publishes
    for that user, and creates each object on the grant's registry. Its Gatekeeper
    must support that registry.
@@ -618,17 +625,22 @@ order. For each version it takes:
 
 - **versionId:** the canonical CID of the event's operation (the event's `opid`,
   computed as Gatekeeper computes it when absent). `previd` names the predecessor.
-- **Signer:** the DID in the operation's `proof.verificationMethod`. Gatekeeper
-  accepted the operation only if that DID controlled the predecessor, or for a
-  creation, is the controller the operation names. A verifier that trusts its
-  Gatekeeper does not re-check signatures.
+- **Signer:** for a creation, the controller the operation names; for a later
+  version, the predecessor's controller. Gatekeeper accepted the operation only if
+  that agent signed it. `proof.verificationMethod` identifies only which of its keys
+  signed, and may be relative (`#key-1`), so it is not used to find the signer. A
+  verifier that trusts its Gatekeeper does not re-check signatures.
 - **Controller and data:** from the create operation for the creation, and from
   resolving the object at the version's `versionId` for later versions.
 - **Position *P*:** where the version is anchored on a chain registry *R*: the
-  event's `ordinal` when the event's `registry` is *R*. Positions on one registry
-  compare lexicographically (block height, index within the block, then the
-  operation's index in its batch), so they order operations even within one block. A
-  version whose accepted event is not yet a receipt from *R* is **pending** on *R*.
+  event's `ordinal` and `registration` when the event's `registry` is *R*. A version
+  whose accepted event is not yet a receipt from *R* is **pending** on *R*.
+
+Positions compare by block height. Within one block they are ordered only when both
+are in the same batch transaction (the same `registration.txid`), by their index in
+the batch. Positions in one block but different transactions are **unordered**: chains
+do not all give a cross-transaction order (Solana's ordinal index is local to its
+transaction), and the grant check treats unordered as failing in both directions.
 - **Time:** the event's `time`, as resolution reports it. Attribution does not use it;
   it orders duplicate ratings (see Ratings) and is shown to readers.
 
@@ -642,13 +654,15 @@ position *P* on *G*'s registry:
 1. *G*'s create operation names *U* as its controller and is signed by *U*. (A grant
    someone else created and then transferred to *U* does not count, for the same reason
    as above.)
-2. *G* was created on a chain registry *R*, and its history is its creation and at most
-   a deletion.
-3. *G*'s creation is anchored on *R* before *P*.
-4. *G* is not deleted, or its deletion is pending or anchored after *P*.
+2. *G* was created on a chain registry *R*.
+3. *G*'s creation is anchored on *R*, ordered before *P*.
+4. *G* has no operation after its creation, or that operation is pending or anchored
+   ordered after *P*.
 5. *G*'s `client` is *A*, and *A* is not *U*.
 
-The check compares chain positions on one registry, never clocks (see Revocation).
+The check compares chain positions on one registry, never clocks (see Revocation). A
+version in the same block as the grant's creation or end, but another transaction,
+fails, so a client waits for its grant to be anchored before publishing.
 
 ### Creation
 
@@ -692,8 +706,9 @@ alike.
 ## Revocation
 
 The wallet revokes a grant with `revokeDID`. Revocation takes effect at the deletion's
-position on the grant's registry: versions anchored before it keep their attribution,
-and versions anchored after it, or never, have none.
+position on the grant's registry (or that of any other first operation after the
+grant's creation): versions anchored before it keep their attribution, and versions
+anchored after it, in the same block in another transaction, or never, have none.
 
 ### Why objects are anchored
 
@@ -721,9 +736,14 @@ Consequences:
 - **No inventory.** The wallet does not need to find what the client published.
   Everything anchored before the deletion stays attributed, including objects the
   wallet never saw and objects later deleted; nothing anchored after it is.
-- **No displaced versions.** Among siblings, Gatekeeper prefers the one anchored first
-  on the expected registry, so a revoked client cannot displace an anchored version.
-  Its sibling would be anchored later, and after the deletion.
+- **Displacement only by withheld evidence.** Among siblings, Gatekeeper prefers the
+  one anchored first on the expected registry, so a sibling anchored later cannot
+  displace an anchored version. A client can still anchor a sibling earlier while
+  withholding its content, and reveal it later: mediators retry unavailable
+  operations and keep their original positions. That sibling was anchored while the
+  grant was live, so it is attributed, and it displaces the version readers saw. This
+  is the publisher equivocating; clients show the displaced version as no longer in
+  the history.
 - **No disowning.** A user cannot disown objects anchored before the revocation, even
   ones a compromised client published before the user noticed.
 - **One rule for everyone.** A client the user runs follows the same rules as any
