@@ -1,1045 +1,274 @@
-# Memeplex: delegated publishing on Archon (#1436)
+# Memeplex: an open publishing graph (#1436)
 
-Status: design. Nothing described here is implemented. This document expands the
-design record in #1436 into something an implementer can work from, and records the
-decisions taken so far and the questions still open.
+Status: design; not implemented. This revision organizes the decisions in #1437
+at `79a957e1` around one publication rule. It preserves the existing wire fields,
+five kinds, grant scopes, chain requirements and client-controlled ownership.
 
-## Summary
+**Memeplex lets a person publish through an application without giving it their
+identity keys. Every publication has its own identity, history and place in a
+shared graph.** Memepool is the first client; any client can publish into the same
+graph or build a different view of it.
 
-**Memeplex** is an open publishing protocol on Archon that covers the ground of
-Twitter, Substack and arXiv: short posts, long essays and papers, and the replies,
-reviews, comments and reactions around them. **Memepool** is the first client built on
-it.
+A grant authorizes a client. A signed history records its work. The last
+attributed version is the publication.
 
-Two decisions shape everything else:
+## The model
 
-1. **Every published object is a DID.** A post, an essay, a paper, a reply, a review,
-   a reaction, a rating and a tag are each an Archon asset. Archon's existing machinery then
-   supplies permalinks, ownership, edit history, deletion, gossip and optional chain
-   timestamps.
-2. **Applications live outside the wallet.** The user's wallet holds the root
-   identity and gives a separate client a scoped, revocable **grant**: an ordinary
-   asset the user creates, naming the client and what it may do. The client publishes
-   under its own agent DID, and verifiers attribute its objects to the user through the
-   grant. Every object is published by a client under a grant; a user who wants to
-   publish without an application runs their own client. A grant and the objects published under it are
-   anchored on one chain registry, so a revoked client cannot backdate its way past
-   the revocation. This needs no protocol change.
+There are two asset shapes and one relationship:
 
-## Goals
-
-- Publishing of any length, from a one-line post to a paper, under one model.
-- Responses (replies, boosts, reviews, comments, reactions) are first-class objects
-  that link to what they respond to, so threads and review histories form a graph any
-  node can walk.
-- Authorship is verifiable by anyone, without trusting the client or an indexer.
-- A client never holds the user's root key, and the user can cut a client off with
-  one wallet action.
-- Several independent clients can implement Memeplex; Memepool is one of them.
-
-## Non-goals
-
-- **No protocol change.** Gatekeeper's single-controller rule and its authorization
-  model are unchanged. Delegation lives in grant assets and verifier logic.
-- **No private content in v1.** Objects are public plaintext. Private circles (for
-  example on group vaults, as in #1044) are later work.
-- **No central ranking or moderation.** Indexers and clients may rank and filter, but
-  the raw graph is public and anyone can aggregate it differently (as in #937).
-- **No payment rail.** Tipping can use the existing `#lightning` service entries
-  (`publish-lightning`, zaps) but is not part of the protocol.
-
-## Names
-
-| Name | What it is |
+| Element | Meaning |
 |---|---|
-| **Memeplex** | The protocol: object schemas, grants, the attribution rules, and the query conventions. |
-| **Memepool** | The first client and indexer, run by the project. |
-| **object** | Any Memeplex asset DID: post, paper, reply, rating, tag. |
-| **author** | The user DID an object is attributed to. |
-| **publisher** | The agent DID that controls an object: the client its grant names, never the author itself. |
+| **Grant** | A user authorizes one client to publish particular kinds of objects. |
+| **Object** | A client publishes a versioned work under that grant. |
+| **Target** | An object responds to a particular revision of another object. |
 
-The name puns on the memetic *meme pool* and Bitcoin's *mempool*: objects gossip on
-Hyperswarm first and are then anchored on a chain.
+```mermaid
+flowchart LR
+    U[User / wallet] -->|creates| G[Grant]
+    G -->|authorizes| A[Client / publisher]
+    A -->|creates and edits| O[Object]
+    O -->|names| G
+    O -->|target + targetVersion| T[Another object's revision]
+```
 
-## Archon primitives used
+The **author** is the user to whom a publication is attributed. The **publisher**
+is the separate agent that signs and controls it. Keeping those roles distinct is
+what lets the wallet authorize an application without becoming that application.
+A user who publishes through their own software creates a separate client agent
+and grants it authority in exactly the same way.
 
-Everything below exists today; the references are to `packages/keymaster/src/keymaster.ts`
-and the Gatekeeper documentation.
+Archon supplies asset identity, signatures, accepted histories, storage references
+and chain receipts. Memeplex interprets those histories as publications. It adds
+no Gatekeeper authorization rule. Indexers compute the graph; readers choose its
+presentation, ranking and moderation.
 
-| Need | Primitive |
-|---|---|
-| Create an object | `createAsset(data, { registry, controller })`. Assets must be controlled by an agent DID. Memeplex objects use their grant's chain registry. |
-| Edit an object | `updateDID` / `mergeData`. Each update is a new version; earlier versions in the accepted history stay resolvable (`versionId`, `versionTime`, `versionSequence`). |
-| Delete an object | `revokeDID`. Resolution reports `deactivated`, and deletion clears the document data while keeping registration metadata. |
-| Anchor an object | Create it on a chain registry (BTC, ZEC, ETH, SOL), or `changeRegistry` to one and then publish an update there; see Timestamps and anchoring. |
-| Move an object | `transferAsset` to another agent DID. |
-| Large content | IPFS via the Gatekeeper data API (`createFile` stores `{ cid, filename, type, bytes }`). Operations are limited to 64 Ki JSON code units in both Gatekeeper ports. |
-| Delegation | A grant: an asset the user creates and controls, naming the client and its actions. Revoked with `revokeDID`. |
-| Historical checks | Resolution at `versionTime`, as used by historical `verifyResponse` (#1299). |
-| Discovery | Gatekeeper `POST /api/v1/query` (`$in` match on a `didDocumentData` path) and `GET /api/v1/events` (paged event feed by time and registry). |
+## A small vocabulary
 
-## Object model
+Every object carries `didDocumentData.memeplex`, including `v: 1`, `kind`,
+`author` and `grant`. Five kinds describe what the author is doing:
 
-Every object is an asset whose `didDocumentData` carries one `memeplex` member. Keeping
-everything under one key avoids collisions with other data and gives queries a fixed
-prefix.
+| Kind | Meaning | Variations |
+|---|---|---|
+| `post` | Say or share something | A title makes an article; a target makes a boost or quote post. |
+| `paper` | Publish scholarly work | Markdown body, authors and abstract; optional PDF and source downloads. |
+| `reply` | Answer another object | A verdict makes a review. |
+| `rating` | Assess another object | A score on the author's declared scale. |
+| `tag` | Describe another object | A word makes a label; an emoji makes a reaction. |
+
+Replies, ratings and tags require `target` and `targetVersion`. Posts may carry
+both; papers carry neither. A plain boost is a post with a target and no body.
+`kind` determines thread membership, so boosts and reactions need no special
+thread mechanism. The graph has no independently maintained thread-root field.
+
+Text is inline or referenced by IPFS CID. The object carries no separate creation
+clock: its operation history already supplies one. Long essays and one-line posts
+share the same identity, revision and attribution rules.
+
+The [reference](memeplex-reference-1436.md#object-format) defines the complete
+fields, schemas, kind semantics and examples. Those definitions are part of the
+protocol; they do not create additional attribution paths.
+
+## One grant, one client, one chain
+
+A grant is an ordinary asset created and signed by its user. Its creation data is
+the authorization:
 
 ```jsonc
 {
-  "memeplex": {
+  "memeplexGrant": {
     "v": 1,
-    "kind": "reply",                // see Kinds; Fields lists what each kind allows
-    "author": "did:cid:…user",      // the attributed user, who created the grant
-    "grant": "did:cid:…",           // the grant it was published under
-
-    // body: inline text, or instead, for anything large,
-    // "content": { "cid": "…", "type": "text/markdown", "bytes": 48213 }
-    "text": "…",
-
-    // links
-    "target": "did:cid:…",          // the object this one responds to
-    "targetVersion": "bafyrei…",    // the versionId responded to
-    "tags": ["cryptography", "did"]
+    "client": "did:cid:…client",
+    "actions": ["memeplex:post", "memeplex:reply", "memeplex:tag"],
+    "nonce": "Qm9vdHN0cmFwIG5vbmNl"
   }
 }
 ```
 
-The object carries no timestamp of its own. Its creation and update times are those of
-its operations, which resolution already reports.
+The named client must differ from the user. A grant created by someone else and
+later transferred to the user confers no authority. The grant's schema applies;
+`nonce` correlates a request and carries no authority.
 
-### Kinds
+| Action | Kinds it permits |
+|---|---|
+| `memeplex:post` | `post`, `paper` |
+| `memeplex:reply` | `reply` |
+| `memeplex:rate` | `rating` |
+| `memeplex:tag` | `tag` |
+| An extension's pinned schema DID URL | That extension kind |
 
-| Kind | Purpose | `target` | Notes |
-|---|---|---|---|
-| `post` | Short text or long-form essay, Twitter- and Substack-like | optional | Usually inline `text`. With a `title` it is an **article** (see Articles); with a `target` it is a boost or quote post (see Boosts and quote posts). |
-| `paper` | Scholarly work, arXiv-like | — | `title`, optional `subtitle`, `summary` (the abstract), `authors` (DIDs; see Coauthors), `content` (the paper in Markdown), optional `pdf` and `source` (LaTeX) downloads. Revised by editing; see Revisions and citation. |
-| `reply` | Comment in a thread | required | Body as for `post`. With a `verdict` it is a **review** (see Reviews). |
-| `rating` | Score on the author's own scale | required | Integers `rating`, `min`, `max` (see Ratings). One per author per target; changed by editing, withdrawn by deleting. |
-| `tag` | Label or reaction applied to an object | required | `tag`: a normalized word, or one emoji, which makes it a **reaction** (see Tags and reactions). Withdrawn by deleting it. |
+A permitted creation includes permission to edit and delete that object while
+the grant is live. There is no separate edit scope, expiry or re-delegation in v1.
 
-`target` is the one link from a response to what it responds to; `kind` says how. This
-keeps every response, of whatever kind, reachable from its target with one query.
+The grant and its objects are created on the same chain registry and publications
+stay there. Grants on `local`, `hyperswarm` or `pin` are void. Objects gossip
+before anchoring, but attribution waits for chain evidence.
 
-### Fields
+The grant is immutable as an authorization. Any later operation in its accepted
+history ends its authority at that operation's chain position, whether it is a
+deletion, update or transfer. Later data never changes the original client or
+scope. The normal way to end a grant is `revokeDID`.
 
-| Field | Type | Kinds |
+### Authority is an interval
+
+Let `X ≺ Y` mean that two receipts on the grant's registry are ordered as follows:
+
+- In different blocks, `X` has the lower block height.
+- In the same transaction in one block, `X` has the lexicographically smaller
+  **complete ordinal**, including any batch or instruction components.
+- In different transactions in the same block, neither precedes the other.
+
+Equal positions do not precede each other. This conservative relation works across
+the supported chains, including Solana's transaction-local instruction indices.
+It is an attribution rule; it does not replace Gatekeeper's sibling ordering.
+
+A valid grant permits an operation at position `P` exactly when:
+
+```text
+grant creation ≺ P
+and
+P ≺ every anchored operation after the grant's creation
+```
+
+With no anchored successor, the second condition is vacuously true. An operation
+without a receipt from the grant's registry is pending there. Check **all** grant
+successors: a pending update must not hide an anchored deletion later in history.
+Same-block, different-transaction comparisons fail closed in both directions.
+
+This is why attribution uses a shared chain. A publisher chooses `proof.created`
+and can backdate a new signature; it cannot make a newly anchored operation precede
+a revocation in an earlier block. Clocks and cross-chain timestamp comparisons
+are unnecessary for delegation.
+
+## One rule for publication
+
+Read an object's accepted history in predecessor order. Attribute its longest
+prefix whose versions satisfy the following checks:
+
+| Check | Creation | Each later version |
 |---|---|---|
-| `v` | integer, `1` | all; required |
-| `kind` | string | all; required |
-| `author` | DID | all; required |
-| `grant` | DID | all; required |
-| `text` | string, at most 10,000 code points | post, reply |
-| `content` | `{ cid, type, bytes }` | post, paper, reply |
-| `target`, `targetVersion` | DID, `versionId` | post, optional; reply, rating, tag, required |
-| `tags` | 1–20 normalized words, each at most 64 code points | post, paper, reply |
-| `title` | string, at most 300 code points | post, optional; paper, required |
-| `subtitle` | string, at most 300 code points: one line shown under the title | post with a `title`; paper |
-| `summary` | string, at most 5,000 code points: an article's summary or a paper's abstract | post with a `title`; paper, required |
-| `authors` | 1–100 distinct DIDs, including `author` | paper; required |
-| `source` | `{ cid, type, bytes }` | paper |
-| `pdf` | `{ cid, type, bytes }` | paper |
-| `verdict` | string, at most 300 code points | reply |
-| `rating`, `min`, `max` | integers (see Ratings) | rating; required |
-| `tag` | normalized word, at most 64 code points, or one emoji (see Tags and reactions) | tag; required |
-
-- **Body.** `text` and `content` are mutually exclusive. A reply has one of them; a
-  paper has `content`; a post has `text` or `content`, or neither when it has a
-  `target` (a plain boost).
-- **References.** `cid` is an IPFS CID string, `bytes` a nonnegative integer, and
-  `type` the media type Text formatting allows for that field. A `targetVersion` is a
-  canonical operation CID.
-- **Strictness.** A field from this table on a kind that does not list it makes the
-  object invalid, as does a missing required field. A field not in the table is
-  ignored, so a later optional field (see Schemas) does not invalidate objects for
-  clients that predate it.
-- **Lengths** count Unicode code points. The whole operation must still fit
-  Gatekeeper's 64 Ki limit.
-
-A verdict is free text so that venues can use their own wording ("accept", "minor
-revisions"). A venue that needs a fixed vocabulary defines an extension kind.
-
-### Version pinning
-
-Every reference to another object names the exact version it refers to, as AT
-Protocol's strong references do:
-
-- **`target` with `targetVersion`.** A response always carries both: `target` is the
-  bare DID, so the "every response to an object" query still finds it, and
-  `targetVersion` is the `versionId` of the revision the author saw.
-- **Embeds** (images and quoted objects in the text) pin the version in the DID URL:
-  `![alt](did:cid:…?versionId=bafyrei…)`. See Text formatting.
-
-A reference then always means the content the author responded to, quoted or showed,
-even after the target is edited. Clients may mark a response whose `targetVersion` is
-not the target's current revision. For reviews and ratings that mark is prominent
-("reviewed an earlier revision"); for other replies and for reactions it can be subtle
-or omitted. If a pinned version leaves the accepted history, see Revisions and citation.
-
-### Schemas
-
-Every kind, and the grant, has a **schema**: a JSON Schema (draft 2020-12) published as
-an Archon schema asset (`createSchema`), in the spirit of AT Protocol's Lexicon. The
-Memeplex specification lists the schema DID and pinned `versionId` for each core kind.
-
-- **Validation.** Verifiers and indexers validate each object against its kind's
-  schema. An object that fails is ignored: not displayed, counted or attributed.
-  Rules a schema cannot express (tag values, rating bounds) are part of the kind's definition and are checked alongside.
-- **Core kinds have bare names** (`post`, `reply`, `rating`, …).
-- **Extension kinds are named by their schema DID:** `"kind": "did:cid:…schema?versionId=…"`.
-  That gives namespacing without a registry or DNS. A client that does not know an
-  extension kind can fetch its schema, and may show the object generically or ignore
-  it.
-- **Evolution.** Adding optional fields keeps `v`. A breaking change publishes a new
-  schema and increments `v`; clients ignore versions they do not support.
-
-### Examples
-
-One object of each kind and of each common variant, showing each object's
-`didDocumentData`. Each names the grant
-it was published under (see Delegation): the reply comes from Bob's Memepool client,
-and the paper from a client Alice runs herself. DIDs are shortened.
-
-**post**
-
-```jsonc
-{ "memeplex": { "v": 1, "kind": "post", "author": "did:cid:…alice",
-                "grant": "did:cid:…alice-memepool",
-                "text": "Every post on Memepool is a DID. So is this photo.\n\n![A canvas tent full of people facing a projector screen](did:cid:…photo?versionId=bafyreiimg…)",
-                "tags": ["archon", "memeplex"] } }
-```
-
-**post with a title (an article)**: the body lives on IPFS
-
-```jsonc
-{ "memeplex": { "v": 1, "kind": "post", "author": "did:cid:…alice",
-                "grant": "did:cid:…alice-memepool",
-                "title": "Why every post should be a DID",
-                "subtitle": "Objects as identifiers, not rows in someone's database",
-                "summary": "Permalinks, edit history and provable timestamps for free.",
-                "content": { "cid": "bafkrei…", "type": "text/markdown", "bytes": 48213 },
-                "tags": ["archon", "publishing"] } }
-```
-
-**paper**: revised in place; each revision is a version of the same DID
-
-```jsonc
-{ "memeplex": { "v": 1, "kind": "paper", "author": "did:cid:…alice",
-                "grant": "did:cid:…alice-own-client",
-                "title": "Convergent Replay of Signed DID Histories",
-                "summary": "We show that nodes receiving the same signed operations …",
-                "authors": ["did:cid:…alice", "did:cid:…bob"],
-                "content": { "cid": "bafkrei…", "type": "text/markdown", "bytes": 61207 },
-                "pdf": { "cid": "bafybei…", "type": "application/pdf", "bytes": 912340 },
-                "source": { "cid": "bafybei…", "type": "application/x-tex", "bytes": 84112 },
-                "tags": ["distributed-systems", "did"] } }
-```
-
-**reply**: published by Bob's client under his grant, quoting another post inline
-
-```jsonc
-{ "memeplex": { "v": 1, "kind": "reply", "author": "did:cid:…bob",
-                "grant": "did:cid:…bobs-grant",
-                "target": "did:cid:…alice-post", "targetVersion": "bafyreipost…",
-                "text": "Including the reactions? Carol measured them:\n\n![Carol's benchmark post](did:cid:…carol-post?versionId=bafyreicarol…)" } }
-```
-
-**post with a target**: a quote post; without `text` it would be a plain boost
-
-```jsonc
-{ "memeplex": { "v": 1, "kind": "post", "author": "did:cid:…erin",
-                "grant": "did:cid:…erin-grant",
-                "target": "did:cid:…alice-post", "targetVersion": "bafyreipost…",
-                "text": "This is the clearest explanation of the idea so far." } }
-```
-
-**reply with a verdict (a review)**: pins the revision it assessed
-
-```jsonc
-{ "memeplex": { "v": 1, "kind": "reply", "author": "did:cid:…carol",
-                "grant": "did:cid:…carol-grant",
-                "target": "did:cid:…paper", "targetVersion": "bafyreirev2…",
-                "verdict": "minor revisions",
-                "text": "The convergence argument holds, but section 4 assumes …" } }
-```
-
-**tag with an emoji (a reaction)**
-
-```jsonc
-{ "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…dave",
-                "grant": "did:cid:…dave-grant",
-                "target": "did:cid:…alice-post", "targetVersion": "bafyreipost…",
-                "tag": "❤️" } }
-```
-
-**rating**: three stars out of five
-
-```jsonc
-{ "memeplex": { "v": 1, "kind": "rating", "author": "did:cid:…carol",
-                "grant": "did:cid:…carol-grant",
-                "target": "did:cid:…paper", "targetVersion": "bafyreirev2…",
-                "rating": 3, "min": 1, "max": 5 } }
-```
-
-**tag**: a community labeller marking a post
-
-```jsonc
-{ "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…spamwatch",
-                "grant": "did:cid:…spamwatch-grant",
-                "target": "did:cid:…some-post", "targetVersion": "bafyreispam…",
-                "tag": "spam" } }
-```
-
-### Articles
-
-A post with a `title` is an article: clients give it a long-form layout, with the
-optional `subtitle` and `summary` on its card. Its body is usually `content` on IPFS.
-Articles need no separate kind because nothing about them differs except the fields
-they carry.
-
-### Boosts and quote posts
-
-A boost (repost) is a `post` whose `target` is the original:
-
-- A **plain boost** has no `text` or `content`. Clients show the original as "Alice
-  boosted".
-- A **quote post** has a body, shown above the original.
-
-`kind`, not `target`, decides thread membership: a thread shows `reply` objects, and
-counts posts, ratings and tags that target it without listing them in it.
-So a boost shares the original with the booster's own audience, yet the "every
-response to an object" query still finds every boost and quote post through
-Gatekeeper alone. Boosting needs the `memeplex:post` action.
-
-Quoting inside other text is an embed (see Text formatting): an essay that discusses
-three posts embeds each where it discusses it. Embeds are not indexed by Gatekeeper, so
-counting them needs an indexer.
-
-### Ratings
-
-A rating states its own scale, so clients can use 5 stars, 0–100 or thumbs up and
-down, and ratings stay comparable:
-
-```jsonc
-{ "memeplex": { "v": 1, "kind": "rating", "author": "did:cid:…user",
-                "grant": "did:cid:…grant",
-                "target": "did:cid:…paper", "targetVersion": "bafyreirev2…",
-                "rating": 3, "min": 1, "max": 5 } }
-```
-
-- `rating`, `min` and `max` are integers with `min < max` and
-  `min ≤ rating ≤ max`.
-- The comparable value is `(rating − min) / (max − min)`, from 0 (worst) to 1 (best).
-  Three stars on a 1–5 scale is 0.5; 80 on 0–100 is 0.8; a thumbs up `(1, 0, 1)` is 1.
-  Centred scales work too: `(0, −2, 2)` is 0.5.
-- Four stars out of five, `(4, 1, 5)`, is **0.75, not 0.8**: it is three steps up a
-  four-step scale. Clients that display normalized values should not present them as
-  "n out of max".
-- An author has one rating per target. Changing it is an edit, so the history stays
-  visible; aggregators count each author's current attributed version once. Two
-  clients can still each create a rating for the same author and target. So that
-  independent indexers agree, the author's rating is the attributed, undeleted rating
-  object whose current version was anchored latest, by its anchoring block's time, with
-  ties broken by the smallest canonical `versionId`. Block times are set by the chain,
-  not the signer, and stay comparable when the ratings were published under grants on
-  different registries. Deleting that object makes the next one by the same
-  rule current; with none left, the author has no rating. Rating a
-  new revision of the target is also an edit, which updates `targetVersion`; the
-  earlier rating and the revision it rated remain in the history.
-- Equal values are not equally precise: a 5-point scale and a 100-point scale cluster
-  differently. Aggregators that care can group by `max − min`.
-
-A like is a reaction ("I appreciate this"); a `rating` judges quality.
-
-### Reviews
-
-A reply with a `verdict` is a review. It sits in the thread like any reply, so it can
-be answered there, and clients may also list a target's reviews separately. A
-reviewer who also wants to score publishes a separate `rating`.
-
-### Tags and reactions
-
-An object's author describes it with the `tags` field inside the object. Anyone else
-labels it, or reacts to it, with a `tag` object whose `target` is the object:
-
-```jsonc
-{ "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…labeller",
-                "grant": "did:cid:…grant",
-                "target": "did:cid:…post", "targetVersion": "bafyrei…",
-                "tag": "cryptography" } }
-```
-
-A tag value is a **word** or an **emoji**:
-
-- **Words** are normalized before publishing: Unicode NFC, trimmed, lower-case,
-  internal whitespace collapsed to a single hyphen. Otherwise one tag splinters across
-  spellings. The `tags` field takes words only.
-- **An emoji** makes the tag a **reaction**. A value containing any emoji must be
-  exactly one emoji from Unicode's recommended (RGI) set, in the fully-qualified form
-  listed in Unicode's `emoji-test.txt`: `❤️` is valid; the unqualified `❤` and
-  mixtures like `❤️ love` are not. Each emoji therefore has one encoding, and counts
-  never split across encodings. Skin-tone variants are valid RGI emoji; how to group
-  them when counting or displaying is up to each client and indexer (see Memepool for
-  its choice).
-- **Invalid values are ignored**: not counted or displayed.
-- **Counted once per author.** An author can apply several values to one object, but
-  each value counts at most once per author and object, even if two clients each
-  published it.
-
-Clients show emoji tags as reactions and word tags as labels.
-
-Word tags are signed, attributed judgments like any other object, so their
-weight depends on who applied them. Moderation labels are tags too (see Memepool:
-Moderation).
-
-### Content and size
-
-Inline `text` is for content that fits comfortably inside one operation. Anything
-larger, or any binary, goes to IPFS and is referenced from `content`. Updating the
-content of an article is a normal update that replaces the reference; the old
-reference stays in the previous version.
-
-### Coauthors
-
-Attribution covers only `author`, the DID that published the paper. The other DIDs in
-`authors` are the publisher's **claim**. A listed coauthor confirms it by publishing a
-`tag` with the value `coauthor` on the paper, with `targetVersion` set to the revision
-they stand behind. Clients show a listed coauthor as confirmed for a revision only
-when such an attributed tag pins that exact revision. A tag on an earlier revision is
-shown as such ("confirmed v2"), never as confirmation of a later one, because the
-publisher can change the paper while keeping the coauthor listed. Otherwise the
-coauthor is shown as "listed by the publisher". A coauthor withdraws by deleting the
-tag, and moves their confirmation to a new revision by editing it.
-
-### Text formatting
-
-Every client renders the same text the same way:
-
-- **`text`, and `content` of type `text/markdown`,** are GitHub Flavored Markdown
-  (GFM): CommonMark plus tables, strikethrough, task lists and autolinked URLs, all
-  precisely specified.
-- **Math** uses the dollar convention shared by Pandoc, Jupyter and GitHub. Inline math
-  is `$…$`, display math is `$$…$$`, and longer equations go in a fenced ```` ```math ````
-  block. An opening `$` must be followed immediately by a non-space character, and a
-  closing `$` must be preceded immediately by a non-space character and not followed by
-  a digit, so "it costs $5 and $10" stays text. The math itself is LaTeX, rendered by
-  the client (for example with KaTeX or MathJax).
-- **No raw HTML.** HTML inside Markdown is displayed as text, never rendered.
-- **Safe links only.** Links use `https:` or `did:`. Other schemes, including
-  `javascript:` and `data:`, are not followed.
-- **Embeds use Markdown image syntax,** in any kind: `![alt text](did:cid:…?versionId=…)`.
-  There is no separate attachment or quote field. What a client shows depends on the
-  DID:
-  - an **image asset** is shown as the image (rules below); a client may lay out a
-    short post's images as a gallery;
-  - a **Memeplex object** is shown as a card with that version's content, marked if
-    it is unattributed or no longer in the history;
-  - anything else, or a DID URL without `versionId`, is shown as a link with the alt
-    text.
-
-  Only version-pinned `did:` URLs embed. Other sources are not loaded: an `https:`
-  image would be fetched by every reader's client, telling the host who is reading,
-  and could change after publication. A plain Markdown link, `[text](did:…)`, stays
-  a link.
-- **Images** are Archon image assets, created with `createImage`, whose data gives
-  the IPFS CID, type, size, width and height.
-  - **Types:** `image/png`, `image/jpeg`, `image/webp` and `image/gif`. No SVG, which can
-    carry script.
-  - **Size:** at most 10 MB per image. The asset's `bytes` is the publisher's claim,
-    so clients use it only to reject early, count bytes while downloading, and abort
-    past the limit before buffering or decoding the whole image.
-  - **Alt text** is expected to be non-empty. Clients may flag images without it.
-- **Rendering budgets.** Every object is untrusted input, so clients bound the work
-  before fetching or rendering, and fall back to a link or a truncated view with a
-  "show more" link when a budget is exceeded:
-  - **Body:** a `content` body is fetched only if its declared `bytes` is at most
-    1 MB, counted while downloading and aborted past that.
-  - **Embeds:** at most 20 embeds per object are expanded; the rest show as links.
-    An embedded object's card shows its own text with its embeds as links, so
-    expansion is one level deep and cannot recurse.
-  - **Images:** besides the 10 MB download limit, the asset's declared width × height
-    is at most 40 megapixels and is checked against the decoded header before full
-    decoding; animated images are limited to 100 frames.
-  - **Aggregate:** at most 50 MB fetched to render one object and its embeds.
-- **Math renders untrusted.** Renderers disable trusted commands (KaTeX's `trust`
-  option, which enables `\href`, `\url`, `\includegraphics` and HTML-class commands).
-- **Graceful fallback.** A client may show any `text` as plain text, and math as its
-  LaTeX source; both stay readable.
-
-`content.type` is always `text/markdown`, for every kind, papers included: one body
-format means one renderer, and every body reflows on small screens, works with screen
-readers, can be searched, and can embed figures and other objects. A paper may also
-carry two downloads, which clients offer but never render:
-
-- **`pdf`** (`application/pdf`): the typeset version of record, for readers who want
-  the author's exact layout and for printing. Clients do not embed a PDF viewer, which
-  would be a large attack surface for untrusted files.
-- **`source`**: LaTeX (`application/x-tex`) or a source archive (`application/gzip`),
-  as arXiv accepts.
-
-Pandoc converts most LaTeX papers to Markdown with math well enough; the PDF covers
-what the conversion loses (custom macros, complex tables, exact figure placement).
-
-### Edits, deletion and revisions
-
-- **Edit:** an update to the object. Earlier versions remain resolvable while they are
-  in the accepted history, so a client can show "edited" with the full history.
-- **Delete:** `revokeDID`. An attributed deletion withdraws the object: clients show a
-  tombstone (it existed, was deleted, and when), and it stops counting. An
-  unattributed deletion does not withdraw anything (see Publication state).
-
-### Revisions and citation
-
-A revision is an edit: the object keeps its DID, and earlier revisions stay resolvable
-while they remain in its accepted history. This is arXiv's model, with the DID as the identifier and its versions as
-`v1`, `v2` and so on.
-
-- **Citing the work** uses the bare DID, which always resolves to the latest revision.
-- **Citing one revision** uses a DID URL with the revision's `versionId`, the canonical
-  CID of the operation that produced it: `did:cid:…?versionId=bafyrei…`. Gatekeeper
-  resolves it in both ports (#1462, #1463).
-- **Not by sequence number or time.** `versionSequence` names a position, which a
-  preferred sibling can take over, and a version's time is not known until it is
-  anchored. Only `versionId` names fixed content, so an author cannot change what a
-  citation points to after the fact.
-- **A cited revision can disappear.** Until a revision is anchored, the object's
-  controller can publish a competing successor that Archon's sibling ordering prefers,
-  displacing it from the accepted history; resolving its `versionId` then returns
-  `notFound`. That is the honest answer to an equivocating author, not an error.
-  Clients show the citation as "revision no longer in the history" and never
-  substitute another revision. Once a revision is anchored, Gatekeeper prefers it over
-  any sibling anchored later, so citing anchored revisions avoids this unless the
-  publisher anchored an earlier sibling and withheld its content (see Revocation). A
-  reviewer who needs the assessed content itself to survive keeps its `content` CID,
-  and pins it (see Content availability under Security considerations).
-- **Responses pin what they assessed.** Every response names the revision it
-  responded to in `targetVersion` (see Version pinning), so a review of v1 is never
-  presented as a review of v2.
-
-### Timestamps and anchoring
-
-Every object is created on its grant's chain registry (see Delegation), so every
-version is anchored once the chain includes its batch. Its time is then the anchoring
-block's time, which the publisher cannot choose: a paper establishing priority needs
-nothing extra. Before anchoring, a version carries only its signed `proof.created`,
-which the publisher chooses; clients show such versions as pending.
-
-## Follows are not objects
-
-A follow is not a publication. It has no content anyone reads, quotes or cites, nobody
-responds to it, and it is current state the reader toggles rather than a work
-addressed to an audience. Memeplex therefore defines no follow kind: whom a reader
-follows is the reader's own preference, kept by their client (see Memepool).
-
-## Delegation
-
-### Grants
-
-A **grant** lets one client publish for one user. It is an asset the user's wallet
-creates, so it is signed with the user's own key and controlled by the user:
-
-```jsonc
-{ "memeplexGrant": { "v": 1,
-                     "client": "did:cid:…client",
-                     "actions": ["memeplex:post", "memeplex:reply", "memeplex:tag"],
-                     "nonce": "Qm9vdHN0cmFwIG5vbmNl" } }
-```
-
-- **Client:** the agent DID that publishes, holding its own key, and never the user's
-  own DID: the user's identity key does not sign publications. Agents are
-  self-controlled, so the user cannot own the client's DID; the grant is how the user
-  vouches for it. A user who wants to publish without an application, or to keep
-  control of their objects, runs their own client: an agent DID they create, hold the
-  key for, and grant like any other.
-- **Actions:** which kinds the client may create (table below). A client may always
-  edit and delete the objects it published under the grant.
-- **Nonce:** copied from the client's grant request so the client can find this grant
-  (see Flow). It carries no authority.
-- **On a chain.** The wallet creates the grant on a chain registry (BTC, ZEC, ETH or
-  SOL), and every object published under it is created on that same registry and
-  stays there. A grant on `hyperswarm`, `local` or `pin` is void. See Revocation for
-  why.
-- **Immutable.** Any operation after creation ends a grant, whatever it is: a
-  deletion, an update or a transfer. The grant ends at the earliest anchored one;
-  positions before it keep their attribution, and later ones get none. To narrow a grant, the wallet revokes
-  it and creates a narrower one.
-- **Revocation:** the wallet deletes the grant with `revokeDID`, which is the normal way
-  to end it (see Revocation).
-- **No expiry and no re-delegation.** A grant lasts until it is revoked, and a client
-  cannot pass it on: only the user can create a grant. Wallets list active grants so
-  unused ones can be revoked.
-
-Grants use their own `memeplexGrant` data member, not `memeplex`, so indexers never
-mistake one for a publication.
-
-### Actions
-
-| Action | Lets the client create |
+| Shape | Valid kind schema and semantic rules | Same validation; deletion uses its predecessor's identity and needs no data body |
+| Author and publisher | Grant creator is `author`; creation controller is the grant's client | Predecessor controller is that same client |
+| Scope | Grant permits `kind` | Creation's permission continues to cover edits and deletion |
+| Identity | Establish `author`, `kind`, `grant`, `target`, controller and registry | Updates preserve them; `targetVersion` may change. Deletion takes identity from its predecessor. |
+| Position | Receipt is on the grant's registry, inside its authority interval | Same condition |
+
+Grant fields always come from its creation, including after the grant is deleted.
+Object data comes from the version being checked, not the current document.
+An asset transfer cannot manufacture authorship: Archon requires the previous
+controller's signature, not the recipient's agreement.
+
+A missing anchor leaves that version and its successors pending. A failed check
+ends attribution for that version and its successors. Neither case erases the
+already-attributed prefix. A creation that fails cannot be repaired into a
+publication by a later edit. These decisions are relative to the current accepted
+histories and receipts; reconsider them when that evidence changes.
+
+**Publication state is the last version in that attributed prefix.**
+
+| Prefix result | Publication state |
 |---|---|
-| `memeplex:post` | `post` and `paper` objects |
-| `memeplex:reply` | `reply` objects, reviews included |
-| `memeplex:rate` | `rating` objects |
-| `memeplex:tag` | `tag` objects, reactions included |
-
-For an extension kind, the action is the kind itself, its schema DID URL; the wallet
-shows the schema's title.
-
-A client asks for the actions it needs; the wallet shows them and the user approves a
-subset.
-
-### Flow
-
-1. The client creates its agent DID and a **grant request**:
-
-   ```jsonc
-   { "memeplexGrantRequest": { "v": 1,
-                               "client": "did:cid:…client",
-                               "name": "Memepool",
-                               "actions": ["memeplex:post", "memeplex:reply", "memeplex:tag"],
-                               "nonce": "Qm9vdHN0cmFwIG5vbmNl" } }
-   ```
-
-   `nonce` is at least 128 random bits, base64url-encoded. The client shows the request
-   as base64url-encoded JSON, in a QR code or a link the wallet accepts.
-2. The wallet shows the client DID, the claimed `name` (labelled as the client's own
-   claim) and the requested actions. The user approves a subset and picks a chain
-   registry, and the wallet creates the grant there with that subset and the request's
-   `client` and `nonce`.
-3. The client finds the grant with a query for `memeplexGrant.client` (see Queries),
-   keeps the one carrying its nonce, waits until it is anchored, and checks *grant-ok*
-   for itself. The grant's creator is the user. Anyone who saw the request could create
-   a grant with the same nonce from a different DID, so the client shows the user's
-   identity and asks for confirmation before publishing.
-4. The client names the grant's DID as `memeplex.grant` in every object it publishes
-   for that user, and creates each object on the grant's registry. Its Gatekeeper
-   must support that registry.
-
-A client may hold grants from several users (a shared device, or a service publishing
-for many people); the `author` and `grant` fields keep them apart.
-
-### Standards considered
-
-ZCAP (W3C CCG Authorization Capabilities) and UCAN were considered. Both exist mainly
-for chained delegation and for verifying a capability without fetching anything.
-Memeplex needs neither: one level of delegation is enough, and Archon verification
-already resolves DIDs. A grant asset already has what those formats add: it is signed
-by the user, versioned, resolvable as of any past time, and revoked by deactivation.
-Adopting either standard would add a proof format and verification rules without
-adding protection.
-
-## Attribution
-
-Attribution is decided **per version**, along the object's accepted history. The
-current controller is not evidence of authorship: an asset transfer needs only the
-previous owner's signature, so anyone can create an object naming *U* as author and
-then transfer it to *U* without *U* signing anything.
-
-### Evidence
-
-A verifier reads an object's accepted history from Gatekeeper's export
-(`POST /api/v1/dids/export`, `exportDIDs` in the SDK): its events in predecessor
-order. For each version it takes:
-
-- **versionId:** the canonical CID of the event's operation (the event's `opid`,
-  computed as Gatekeeper computes it when absent). `previd` names the predecessor.
-- **Signer:** for a creation, the controller the operation names; for a later
-  version, the predecessor's controller. Gatekeeper accepted the operation only if
-  that agent signed it. `proof.verificationMethod` identifies only which of its keys
-  signed, and may be relative (`#key-1`), so it is not used to find the signer. A
-  verifier that trusts its Gatekeeper does not re-check signatures.
-- **Controller and data:** from the create operation for the creation, and from
-  resolving the object at the version's `versionId` for later versions.
-- **Position *P*:** where the version is anchored on a chain registry *R*: the
-  event's `ordinal` and `registration` when the event's `registry` is *R*. A version
-  whose accepted event is not yet a receipt from *R* is **pending** on *R*.
-
-- **Time:** the event's `time`, as resolution reports it. Attribution does not use it;
-  it orders duplicate ratings (see Ratings) and is shown to readers.
-
-Positions compare by block height. Within one block they are ordered only when both
-are in the same transaction (the same `registration.txid`), by comparing their complete
-ordinals lexicographically; one transaction can carry several batches. Positions in one
-block but different transactions are **unordered**: chains do not all give a
-cross-transaction order (Solana's ordinal index is local to its transaction), and the
-grant check treats unordered as failing in both directions.
-
-The grant's own history is read the same way.
-
-### Grant check
-
-*grant-ok(G, U, A, P)* holds when grant *G* lets client *A* act for user *U* at
-position *P* on *G*'s registry:
-
-1. *G*'s create operation names *U* as its controller and is signed by *U*. (A grant
-   someone else created and then transferred to *U* does not count, for the same reason
-   as above.)
-2. *G* was created on a chain registry *R*.
-3. *G*'s creation is anchored on *R*, ordered before *P*.
-4. Every operation in *G*'s history after its creation is pending, or anchored and
-   ordered after *P*. Any anchored operation ends the grant, even if an earlier one is
-   still pending.
-5. *G*'s `client` is *A*, and *A* is not *U*.
-
-The check compares chain positions on one registry, never clocks (see Revocation). A
-version in the same block as the grant's creation or end, but another transaction,
-fails, so a client waits for its grant to be anchored before publishing.
-
-### Creation
-
-The create operation decides whether an object is a publication by *U* at all. Let *A*
-be the controller the create operation names and signs with.
-
-It is attributed to *U* when all of these hold, for *G* = `memeplex.grant`:
-
-1. `memeplex.author` is *U*.
-2. The object is created on *G*'s registry *R*.
-3. *grant-ok(G, U, A, P)* holds for the creation's position *P* on *R*.
-4. *G*'s `actions` include the action for the object's kind (see Actions).
-
-A creation that is not yet anchored is **pending**: neither attributed nor rejected,
-and decided once it is anchored. An object whose creation is not attributed is never
-attributed, whatever its later versions say.
-
-### Later versions
-
-An update or deletion, signed by its predecessor's controller *A*, is attributed to *U*
-only if all of these hold:
-
-1. Its predecessor version is attributed to *U*, so attribution runs unbroken from the
-   creation.
-2. It is valid against its kind's schema (a deletion is exempt) and leaves `author`,
-   `kind`, `grant` and `target` unchanged: an object stays under
-   the grant it was created under, and a response keeps its target. `targetVersion`
-   may change, so a review or rating can move to a newer revision of its target. (A
-   deletion clears the data; the check applies to the predecessor.)
-3. *grant-ok(G, U, A, P)* holds for that grant at the version's position *P* on the
-   grant's registry. The client may edit or delete what it published under the grant.
-4. It changes neither the controller nor the registry. A transfer or a
-   `changeRegistry` ends attribution for that version and every later one.
-
-A version that fails is shown as unattributed and stops the lineage: later versions
-built on it are unattributed too. Earlier attributed versions stay attributed. A
-pending version makes the versions after it pending too.
-
-### Publication state
-
-What an object currently says, for display, counts, ratings, coauthor confirmations
-and moderation labels alike, is its **last attributed version**:
-
-- If that version is a deletion, the object is withdrawn: a tombstone, not counted.
-- Otherwise the object shows and counts as that version. Later unattributed versions,
-  including edits, deletions, removal of the `memeplex` member or schema-invalid data
-  by a revoked client, change nothing. Clients may note "later changes not
-  attributed" and show them on request, never as the object.
-- If the creation is pending, the object is pending; if it is not attributed, the
-  object does not exist as a publication.
-
-So a rating or coauthor confirmation that was attributed before revocation survives a
-compromised client deleting or corrupting it afterwards. A user who wants such an
-object gone has the client delete it while the grant is live, and waits until that
-deletion is anchored, in an earlier block than the revocation or ordered before it in
-the same transaction, before submitting the revocation. When containing a compromised
-client matters more, the user revokes at once and accepts that pending withdrawals may
-fail.
-
-A shared verifier library should implement these rules once for clients and indexers
-alike.
-
-## Revocation
-
-The wallet revokes a grant with `revokeDID`. Revocation takes effect at the deletion's
-position on the grant's registry (or that of any earlier anchored operation after the
-grant's creation): versions anchored before it keep their attribution, and versions
-anchored after it, in the same block in another transaction, or never, have none.
-
-### Why objects are anchored
-
-On `hyperswarm`, a version's time is the `proof.created` its signer chooses. A client
-that keeps its key after revocation (a stolen device, a rogue app) could sign objects
-and edits dated before the revocation, and a check by time would accept them.
-Gatekeeper does not bound Hyperswarm times by receipt, and adding such a bound would be
-a protocol change.
-
-A chain position cannot be chosen. An operation anchored after the grant's deletion
-comes after it, whatever its `proof.created` says, so the grant check compares
-positions instead of times. Requiring the grant and its objects to share one registry
-makes that comparison exact; positions on different chains could only be compared
-through block timestamps, which drift (Bitcoin allows about two hours).
-
-Consequences:
-
-- **Pending until anchored.** An object gossips on Hyperswarm at once, so
-  readers see it within seconds, but it is attributed only once its batch is anchored:
-  minutes on SOL or ETH, longer on BTC, depending on the mediator's batch interval.
-  Clients show it as pending until then.
-- **A window at revocation.** Revocation takes effect when the deletion is anchored.
-  Until then a compromised client can still get operations anchored ahead of it.
-  Submitting the deletion does not guarantee when it is anchored: the batch can wait
-  for confirmation, need fee bumping, or stall if the mediator is unfunded or down,
-  while the client keeps anchoring through another node. The window is therefore
-  bounded only by the availability of a working mediator for the grant's registry; with
-  one, it is typically a batch interval.
-- **No inventory.** The wallet does not need to find what the client published.
-  Everything anchored before the deletion stays attributed, including objects the
-  wallet never saw and objects later deleted; nothing anchored after it is.
-- **Displacement only by withheld evidence.** Among siblings, Gatekeeper prefers the
-  one anchored first on the expected registry, so a sibling anchored later cannot
-  displace an anchored version. A client can still anchor a sibling earlier while
-  withholding its content, and reveal it later: mediators retry unavailable
-  operations and keep their original positions. That sibling was anchored while the
-  grant was live, so it is attributed, and it displaces the version readers saw. This
-  is the publisher equivocating; clients show the displaced version as no longer in
-  the history.
-- **No disowning.** A user cannot disown objects anchored before the revocation, even
-  ones a compromised client published before the user noticed.
-- **One rule for everyone.** A client the user runs follows the same rules as any
-  application, so the verifier has a single path.
-
-Two alternatives were considered. A **revocation snapshot**, recorded in the grant
-just before deletion and listing the `versionId` of every object to keep, gives
-immediate attribution and no window, but needs the wallet to find every object
-(deleted ones included), depends on the snapshot staying available on IPFS, and adds
-an unverified state. Distrusting versions an indexer first saw after the revocation is
-a useful client-side heuristic, but other parties cannot verify it.
-
-### Who controls published objects
-
-The grant's client controls the objects published under it. Consequences:
-
-- The user cannot edit or delete an application's objects directly. After revocation
-  they no longer count as the user's beyond what was anchored before it, but they
-  remain on the network.
-- Transferring an object ends its attribution, so a client cannot hand objects over to
-  the user. A user who wants an object under their own control republishes it through
-  a client they run.
-
-- **Revocation freezes existing objects.** An object never changes its `grant`, and
-  every version must pass that grant, so once a grant ends no further edit or deletion
-  of its objects is attributed, even by the same client under a new grant. Rotating a
-  grant therefore means papers can no longer be revised, ratings withdrawn or
-  coauthor confirmations removed without republishing. Withdraw what should be
-  withdrawn first, and revoke once those withdrawals are anchored (see Publication
-  state).
-
-Decision (from #1436): accept this for v1. If usage shows users need direct control of
-an application's objects, the alternative is a protocol change letting Gatekeeper
-accept operations on a user's assets signed by a key the user's grant names. That
-changes protocol authorization and needs its own decision.
-
-## Queries
-
-Gatekeeper keeps an in-memory index of every DID's `didDocumentData`, and
-`POST /api/v1/query` matches a path against a list of values. That index does not
-cover the controller, which is why objects carry `author` in their data.
-
-| Question | Query |
-|---|---|
-| Everything by a user | `{ "where": { "memeplex.author": { "$in": ["did:cid:…user"] } } }` |
-| Every response to an object | `{ "where": { "memeplex.target": { "$in": ["did:cid:…"] } } }` |
-| Objects under one grant | `{ "where": { "memeplex.grant": { "$in": ["did:cid:…grant"] } } }` |
-| Grants naming a client | `{ "where": { "memeplexGrant.client": { "$in": ["did:cid:…client"] } } }` |
-| Objects an author tagged | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
-| Tags others applied (their `target`s are the tagged objects) | `{ "where": { "memeplex.tag": { "$in": ["cryptography"] } } }` |
-
-A thread is loaded by repeating the `target` query one level at a time, keeping
-`reply` objects (subject to the limit below); an indexer builds complete thread trees
-directly. Objects carry no separate
-thread-root field to keep consistent.
-
-Only one condition and only `$in` are supported, so a client separates boosts
-(posts), replies, ratings and tags by `kind` after the query, and reviews and
-reactions by their fields. Results are unsorted and unpaged, and they are not
-attributions: the matches still have to pass the attribution check, because anyone
-can write any `author` into an object they publish.
-
-These queries match **current** data, so they are incomplete. An object whose latest
-version is an unattributed deletion or edit (by a revoked client, for example) no
-longer matches, even though its publication state is its last attributed version. A
-thread or timeline built from queries can therefore miss such objects. Complete
-results need history-based discovery from the events feed, as the indexer does.
-
-## Memepool
-
-Everything above is the Memeplex protocol: what any client must publish and how any
-verifier attributes it. This section records choices specific to Memepool, the first
-client and indexer. Other clients may choose differently.
-
-### Reactions
-
-Memepool offers no skin-tone picker, and counts and renders every reaction as its base
-emoji: the fully-qualified RGI emoji that Unicode's `emoji-test.txt` lists as the
-untoned form of the reaction's `tag`. Removing the modifier code points is not
-enough: ☝🏽 without its modifier is the unqualified `☝`, whose base is `☝️`, and a toned
-multi-person sequence can have a different base (👩🏽‍🤝‍👩🏻's base is 👭). The mapping is
-derived from `emoji-test.txt`, which lists each toned emoji with its base.
-
-### Follows
-
-Memepool keeps follows **private**: on the device, or in a vault the user owns so that
-several clients share them. Follows are never published, so the network does not learn
-whom anyone follows. A hosted indexer that builds a reader's timeline does learn the set
-of authors it is asked about, and computing the timeline locally does not by itself
-avoid this: per-author queries go to a Gatekeeper over HTTP, so a remote Gatekeeper sees
-the same author set. Readers who want their follows private from every service query a
-Gatekeeper and indexer they run or trust. This is closer to Substack's reading privacy
-than to Twitter's public graph.
-
-A public social graph (follower counts, graph-based discovery) can be added later if
-something needs it. The candidates are a `follows` list in the user's own DID data,
-written by the wallet, or a single per-user state asset kept apart from publications.
-Neither is part of v1.
-
-### Indexer
-
-Timelines, ranking, full-text search and counts need an indexer. The Memepool indexer:
-
-- discovers objects from history, not current state: it reads the operations in
-  `GET /api/v1/events` and treats a DID as a Memeplex object if any of its operations
-  carries a `memeplex` member. An object deleted, or stripped of its member, before the
-  indexer first saw it is still found, and its publication state is derived from its
-  attributed history like any other;
-- remembers every DID it has indexed and processes every later event for those DIDs;
-- reconciles periodically against full state, because the events feed is ordered by
-  event time, not arrival. A late or backdated publication can land behind any
-  polling watermark, and replay can displace a branch without emitting a new event.
-  Reconciliation re-resolves the indexed DIDs and re-reads the events feed over its
-  whole range. A freshly built index and one that has run continuously must agree on
-  the same evidence; the verifier library's tests include rebuilding from scratch;
-- verifies attribution per version and records what each result depended on: the
-  grant's accepted history and the chain receipts compared. It re-verifies the
-  dependent versions whenever any of those change: a pending version is anchored, any
-  operation on the grant is accepted or anchored, or a compared receipt is replaced;
-- builds timelines for the set of authors a reader supplies (see Follows), thread
-  trees, reply, reaction and boost counts, and per-tag feeds, all from publication
-  state;
-- serves them to clients over HTTP, behind Drawbridge like other public surfaces.
-
-The indexer is a cache of public data. Anyone can run one. A client can fall back to
-direct queries and its own verification, which shows current publications but can miss
-objects whose latest version is unattributed; for complete results it reads the events
-feed itself, as the indexer does.
-
-### Moderation
-
-There is no central moderator. Viewers choose which judgments to apply:
-
-- **Labels are tags.** A community labels an object ("spam", "misleading",
-  "nsfw") by publishing a `tag` object from its own DID. A client applies the tags
-  from the labellers its reader trusts and ignores the rest, so moderation needs no
-  separate mechanism. Block lists of DIDs remain credentials issued by those
-  communities (as in #937).
-- **Reviews** are replies, so a review's own reputation is visible: who wrote it, who
-  replied, whether it was retracted.
-- **Unattributed objects** (failed delegation, revoked client) are hidden or marked by
-  default.
-
-### Wallet
-
-The wallet lists active grants with the actions they allow, defaults to narrow actions,
-lets the user choose each grant's chain registry, and makes revoking a grant a single
-action. It shows a revocation in three states: **requested** (signed by the wallet),
-**submitted** (accepted by a node for anchoring) and **effective** (the deletion is
-anchored). While it is not yet effective, the wallet warns the user, and if it stalls,
-resubmits the signed deletion to other nodes that run a mediator for the registry.
-Because the deletion gossips on Hyperswarm, any such node can anchor it.
-
-## Scale
-
-Every object, of every kind, is a DID; no kind is batched or stored differently. Each
-object goes through Gatekeeper gossip, replay and the in-memory search index on every
-node, so the costs that grow with object count are CPU, memory and startup time rather
-than storage. Optimizations will come as volume requires them, as they have for
-startup replay.
-
-A sizing benchmark establishes the starting point, on an isolated node with production-like Redis
-persistence, in both Gatekeeper ports:
-
-- create 1, 5 and 10 million Memeplex objects with a realistic mix (mostly short posts,
-  reactions, ratings and tags, some replies, few articles), across a realistic number of
-  authors;
-- measure creation throughput, Hyperswarm propagation to a second node, mediator
-  batch anchoring throughput on a chain registry, startup replay
-  time, resolve latency, `query` latency for `author` and `target`, the memory
-  used by the search index, and storage;
-- compare startup against the current production dataset to separate per-object cost
-  from fixed cost;
-- run the application workload too: per-version attribution, re-verification after
-  grant changes, full reconciliation, rebuilding a fresh indexer from scratch, and
-  publication churn (edits, deletions and revocations at a realistic rate).
-
-Acceptance targets for each measurement (latency, memory, rebuild time) are set before
-the benchmark runs. The results size node hardware and show where optimization will be
-needed first.
-
-## Security considerations
-
-- **Spoofed authorship.** Anyone can publish an object claiming any `author`.
-  Attribution, not the data, decides authorship. Clients must never display an
-  unverified `author` as fact.
-- **Forged grants.** A grant counts only if the user created it; one created by
-  someone else and transferred to the user fails the grant check.
-- **Backdating after revocation.** Addressed by anchoring grants and their objects
-  on one chain registry and comparing positions, not times. The remaining window is
-  the time until the deletion is anchored.
-- **Over-broad or forgotten grants.** Mitigated by wallet design (see Memepool:
-  Wallet).
-- **Transferred objects.** Ownership is not authorship; attribution follows the
-  creation and signed lineage, never the current controller.
-- **Rendering untrusted text.** Every object's text is attacker-controlled. The
-  formatting rules (no raw HTML, safe link schemes, untrusted math) are what keep a
-  post from becoming script in every client; renderers must follow them exactly.
-- **Spam.** Every object is anchored, so the anchoring node pays a share of a batch
-  transaction for it, but per object that is small. Indexers will need rate limits or
-  cost per author (for example L402 on publishing through a hosted node, or ranking by
-  trust graph). Not designed here.
-- **Content availability.** IPFS content is available only while someone pins it.
-  Registry pinning (`ARCHON_GATEKEEPER_REGISTRIES_PIN`) pins operation JSON only, not
-  the article, PDF or image bytes an object references. Those need explicit
-  pinning by the publisher, the indexer or a pinning service; long-term availability of
-  papers needs an explicit answer.
-
-## Milestones
-
-1. **Benchmark** objects-as-DIDs at the volumes above (Scale).
-2. **Schemas:** JSON Schemas for every core kind and the grant, published as schema
-   assets, with signed fixtures.
-3. **Verifier library:** the attribution rules, shared by clients and the indexer, with
-   cross-checks against real signed objects, including revoked and forged grants,
-   transferred objects, backdated siblings, and unattributed edits and deletions after
-   revocation (of ratings and coauthor confirmations in particular), and a fresh index
-   rebuild that must match a continuously running one.
-4. **CLI client:** create an agent DID as the client, grant it from the user's
-   identity, then create, edit, delete and query objects on the grant's registry from
-   the existing CLI and SDKs; this works with today's asset commands.
-5. **Delegation:** wallet UI to create, list and revoke grants on a chain registry.
-6. **Indexer.**
-7. **Memepool client.**
-8. **Moderation:** block lists and labels.
-
-## Open questions
-
-- **Grant handover.** Should an object be allowed to move to a newer grant from the
-  same user, naming the same client on the same registry, so rotating a grant does not
-  freeze existing objects (see Who controls published objects)?
-- **Action vocabulary.** Is one action per creatable kind the right granularity, and
-  should grants be able to narrow further (for example, replies only within one
-  thread)?
-- **Expiry.** Should grants carry an optional expiry? A block height on the grant's
-  registry would be checkable the same way as revocation.
-- **Change feed.** Should Gatekeeper offer an arrival-ordered change feed? It would
-  let indexers follow new and displaced versions directly, instead of reconciling
-  periodically against full state.
-- **Public follows.** Whether Memeplex should ever define a public follow list (see
-  Memepool: Follows), and if so, where it lives.
-- **Content availability.** Who pins long-form content and papers, and for how long?
-- **Custom emoji.** Should reactions also allow community emoji, as a shortcode plus
-  an image CID (in the style of Nostr's NIP-30), with clients that lack support
-  showing the shortcode?
-
-## References
-
-- ZCAP: [Authorization Capabilities v0.4.0](https://w3c-ccg.github.io/zcap-spec/) and
-  UCAN: [specification](https://github.com/ucan-wg/spec), considered and not adopted
-- #937: thin agent marketplace (attestations, opt-in block lists)
-- #1044: encrypted messageboard where each post is a DID owned by its author
-- #1299: historical verification of credential responses
-- #1462 / #1463: Gatekeeper resolution by `versionId`
+| No attributed creation; creation pending | Pending, never presented as verified authorship |
+| No attributed creation; creation fails | No publication |
+| Last attributed version is a creation or update | Show and count that version |
+| Last attributed version is a deletion | A tombstone; no longer counted |
+
+Apply this same state to timelines, threads, ratings, labels and coauthor
+confirmations. An unauthorized deletion, invalid edit or removed `memeplex`
+member changes none of them. Clients may expose the later history separately.
+
+For example, if a rating is created at block 20, edited at 30, its grant revoked
+at 40, and the client deletes the rating at 50, the publication remains the rating
+from block 30. If its deletion was instead attributed at 35, it is withdrawn.
+No special rule for ratings or revocation is needed.
+
+### Reading the evidence
+
+Use `exportDIDs` (`POST /api/v1/dids/export`) for accepted events and
+`resolveDID` with `versionId` for version-specific data. A version's identity is
+the canonical CID of its operation (`opid`, or computed as Gatekeeper computes
+it); `previd` links its predecessor. Keep all comparisons on the same accepted
+history, and recompute when that history changes.
+
+For creation, the signer is the controller named by the operation; thereafter it
+is the predecessor's controller. `proof.verificationMethod` selects a key and may
+be relative, so it is not a source of the signer DID. A verifier relying on its
+trusted Gatekeeper need not repeat signature verification.
+
+Chain position comes from the accepted event's `registry`, `registration` and
+`ordinal`. Display time comes from its `time`; time never decides grant validity.
+Implement this interpretation once in a library shared by clients and indexers.
+
+## References remember what was read
+
+An object DID names a work. A `versionId` names one revision in its accepted
+history. Responses carry the pair `target` and `targetVersion`; inline embeds use
+`did:cid:…?versionId=…`. A response continues to mean the revision it assessed
+when the target changes. Reviews and ratings prominently identify older revisions.
+
+Sequence numbers and times are not substitutes for content identity. If replay
+displaces the cited revision, resolution may return `notFound`; show "revision no
+longer in the history", never a different revision. Anchoring gives a version
+priority over later-position siblings, but previously withheld evidence of an
+earlier anchor can still displace it. Chain reorganizations and authorization
+replay also remain Archon's responsibility. Attribution is a view of accepted
+evidence, not a promise that evidence can never change.
+
+Content identity does not guarantee availability. A reviewer who needs the
+assessed bytes to survive keeps and pins their content CID. The [reference's
+content rules](memeplex-reference-1436.md#content-availability) cover this separately
+from attribution.
+
+## A graph anyone can reconstruct
+
+An indexer discovers objects from operations in `GET /api/v1/events`, including
+objects already deleted or edited out of their original shape. It then derives
+publication state from their histories. A fresh rebuild and a continuously
+running index must agree on the same evidence.
+
+The feed is ordered by event time, not arrival. Polling alone misses late evidence
+and displaced branches, so indexers also reconcile indexed histories and reread
+the feed over its full range. Recheck dependent publications when their histories,
+grant histories or compared receipts change. Indexer caches confer no authority.
+
+Gatekeeper's data queries are useful discovery shortcuts. They match current
+data, so they cannot find every publication preserved behind an unauthorized edit
+or deletion. Complete timelines and threads require historical discovery. Both
+paths use the same publication rule; neither trusts an object's claimed `author`.
+
+## What revocation means
+
+Revocation ends future authority and preserves the attributed past. It needs no
+inventory of a client's work and cannot disown a compromised client's publications
+that were anchored while its grant was live.
+
+It also **freezes existing objects**. Their grant cannot change, even to a renewed
+grant for the same client. A new grant permits new publications; republishing does
+not withdraw an old rating or coauthor confirmation. Direct user control and grant
+handover remain separate design questions, not exceptions to the attribution rule.
+
+To withdraw work first, have the client delete it and confirm that its anchor
+precedes revocation under `≺`. Submission order alone is insufficient. If immediate
+containment matters more, revoke at once and accept that pending withdrawals may
+fail. A user cannot force a compromised client to delete work it controls.
+
+The wallet distinguishes requested, submitted and effective revocation. Authority
+ends at the chain position, not at the button press. Pending transactions, funding,
+mediator availability and chain inclusion determine the delay; there is no fixed
+upper bound. A stalled signed deletion can be resubmitted to other suitable nodes.
+
+## Scope and decisions still open
+
+V1 publishes public plaintext. It defines no private circles, public follow graph,
+central ranking, mandatory moderation authority or payment rail. Memepool keeps
+follows as private reader state, and uses ordinary tags for opt-in moderation.
+Clients can differ in their views while agreeing about the underlying publications.
+
+The [companion reference](memeplex-reference-1436.md) contains field-level rules,
+examples, rendering requirements, the grant request flow, discovery queries,
+Memepool choices and the implementation/benchmark plan. Its rendering budgets
+limit automatic presentation; they do not decide authorship.
+
+Before implementation, settle concrete benchmark targets and publish the pinned
+schemas and signed verifier fixtures. Grant handover, narrower scopes, expiry,
+an arrival-ordered change feed, public follows, long-term content pinning and custom
+emoji remain [open questions](memeplex-reference-1436.md#open-questions).
