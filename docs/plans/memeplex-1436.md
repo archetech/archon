@@ -29,7 +29,7 @@ Two decisions shape everything else:
 ## Goals
 
 - Publishing of any length, from a one-line post to a paper, under one model.
-- Responses (replies, quotes, reviews, comments, reactions) are first-class objects
+- Responses (replies, boosts, reviews, comments, reactions) are first-class objects
   that link to what they respond to, so threads and review histories form a graph any
   node can walk.
 - Authorship is verifiable by anyone, without trusting the client or an indexer.
@@ -99,7 +99,6 @@ prefix.
     // links
     "parent": "did:cid:…",          // the object this one responds to
     "parentVersion": "bafyrei…",    // the versionId responded to
-    "quotes": [{ "did": "did:cid:…", "version": "bafyrei…" }],
     "tags": ["cryptography", "did"]
   }
 }
@@ -116,6 +115,7 @@ its operations, which resolution already reports.
 | `article` | Long-form essay, Substack-like | — | `title`, `summary`; body as `content` on IPFS. |
 | `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs; see Coauthors), `content` (the readable paper, usually PDF), optional `source` (LaTeX source). Revised by editing; see Revisions and citation. |
 | `reply` | Comment in a thread | required | Same fields as `post`. |
+| `boost` | Reshare to the booster's own audience | required | Optional `text`, making it a quote post (see Boosts and quote posts). |
 | `review` | Written assessment | required | `verdict` (short free text), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
 | `reaction` | Like or other emoji response | required | `value`, one emoji (see Reactions). Withdrawn by deleting it. |
 | `rating` | Score on the author's own scale | required | Integers `rating`, `min`, `max` (see Ratings). One per author per parent; changed by editing, withdrawn by deleting. |
@@ -132,10 +132,9 @@ keeps every response, of whatever kind, reachable from its parent with one query
 | `kind` | string | all; required |
 | `author` | DID | all; required |
 | `grant` | DID | all; required |
-| `text` | string, at most 10,000 code points | post, article, reply, review |
+| `text` | string, at most 10,000 code points | post, article, reply, boost, review |
 | `content` | `{ cid, type, bytes }` | post, article, paper, reply, review |
-| `parent`, `parentVersion` | DID, `versionId` | reply, review, reaction, rating, tag; required |
-| `quotes` | 1–10 `{ did, version }` pairs | post, article, paper, reply, review |
+| `parent`, `parentVersion` | DID, `versionId` | reply, boost, review, reaction, rating, tag; required |
 | `tags` | 1–20 normalized strings, each at most 64 code points | post, article, paper, reply, review |
 | `title` | string, at most 300 code points | article, paper; required |
 | `summary` | string, at most 1,000 code points | article |
@@ -148,11 +147,11 @@ keeps every response, of whatever kind, reachable from its parent with one query
 | `tag` | normalized string, at most 64 code points (see Tags) | tag; required |
 
 - **Body.** `text` and `content` are mutually exclusive. An article, reply or review
-  has one of them; a paper has `content`; a post has `text`, `content` or `quotes` (a
-  plain boost has only `quotes`).
+  has one of them; a paper has `content`; a post has `text` or `content`; a boost
+  has `text` or nothing.
 - **References.** `cid` is an IPFS CID string, `bytes` a nonnegative integer, and
-  `type` one of the media types under Text formatting. A `version` or `parentVersion`
-  is a canonical operation CID.
+  `type` one of the media types under Text formatting. A `parentVersion` is a
+  canonical operation CID.
 - **Strictness.** A field from this table on a kind that does not list it makes the
   object invalid, as does a missing required field. A field not in the table is
   ignored, so a later optional field (see Schemas) does not invalidate objects for
@@ -171,9 +170,8 @@ Protocol's strong references do:
 - **`parent` with `parentVersion`.** A response always carries both: `parent` is the
   bare DID, so the "every response to an object" query still finds it, and
   `parentVersion` is the `versionId` of the revision the author saw.
-- **`quotes` entries** are `{ "did", "version" }` pairs.
-- **Images** pin the image asset's version in the DID URL:
-  `![alt](did:cid:…?versionId=bafyrei…)`.
+- **Embeds** (images and quoted objects in the text) pin the version in the DID URL:
+  `![alt](did:cid:…?versionId=bafyrei…)`. See Text formatting.
 
 A reference then always means the content the author responded to, quoted or showed,
 even after the target is edited. Clients may mark a response whose `parentVersion` is
@@ -238,14 +236,22 @@ and the paper from a client Alice runs herself. DIDs are shortened.
                 "tags": ["distributed-systems", "did"] } }
 ```
 
-**reply**: published by Bob's client under his grant, quoting another post
+**reply**: published by Bob's client under his grant, quoting another post inline
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "reply", "author": "did:cid:…bob",
                 "grant": "did:cid:…bobs-grant",
                 "parent": "did:cid:…alice-post", "parentVersion": "bafyreipost…",
-                "text": "Including the reactions? See the scale section.",
-                "quotes": [{ "did": "did:cid:…carol-post", "version": "bafyreicarol…" }] } }
+                "text": "Including the reactions? Carol measured them:\n\n![Carol's benchmark post](did:cid:…carol-post?versionId=bafyreicarol…)" } }
+```
+
+**boost**: a quote post; without `text` it would be a plain boost
+
+```jsonc
+{ "memeplex": { "v": 1, "kind": "boost", "author": "did:cid:…erin",
+                "grant": "did:cid:…erin-grant",
+                "parent": "did:cid:…alice-post", "parentVersion": "bafyreipost…",
+                "text": "This is the clearest explanation of the idea so far." } }
 ```
 
 **review**: pins the revision it assessed
@@ -305,15 +311,19 @@ Memeplex-specific list has to be maintained:
 
 ### Boosts and quote posts
 
-A boost (repost) is a `post` that quotes the original:
+A boost (repost) is a `boost` object whose `parent` is the original:
 
-- A **plain boost** quotes the original (`quotes: [{ did, version }]`) and has no `text`. Clients show the original
-  as "Alice boosted".
+- A **plain boost** has no `text`. Clients show the original as "Alice boosted".
 - A **quote post** adds `text`, shown above the original.
 
-Neither sets `parent`: a boost shares the original with the booster's own audience
-instead of joining its thread. A reply that also quotes something is still a reply,
-because `parent` decides thread membership and `quotes` only embeds.
+`kind`, not `parent`, decides thread membership: a thread shows `reply` objects, and
+counts boosts, reactions, ratings and tags without listing them in it. So a boost
+shares the original with the booster's own audience, yet the "every response to an
+object" query still finds every boost and quote post through Gatekeeper alone.
+
+Quoting inside other text is an embed (see Text formatting): an essay that discusses
+three posts embeds each where it discusses it. Embeds are not indexed by Gatekeeper, so
+counting them needs an indexer.
 
 ### Ratings
 
@@ -404,13 +414,22 @@ Every client renders the same text the same way:
 - **No raw HTML.** HTML inside Markdown is displayed as text, never rendered.
 - **Safe links only.** Links use `https:` or `did:`. Other schemes, including
   `javascript:` and `data:`, are not followed.
-- **Images are Markdown images,** in any kind: `![alt text](did:cid:…)`. There is no
-  separate attachment field; a client may lay out a short post's images as a gallery.
-  - **Image assets only.** The source is a version-pinned `did:` URL naming an Archon
-    image asset, created with `createImage`, whose data gives the IPFS CID, type,
-    size, width and height (see Version pinning). Other sources are not loaded. An
-    `https:` image would be fetched by every reader's client, telling the host who is
-    reading, and could change after publication.
+- **Embeds use Markdown image syntax,** in any kind: `![alt text](did:cid:…?versionId=…)`.
+  There is no separate attachment or quote field. What a client shows depends on the
+  DID:
+  - an **image asset** is shown as the image (rules below); a client may lay out a
+    short post's images as a gallery;
+  - a **Memeplex object** is shown as a card with that version's content, marked if
+    it is unattributed or no longer in the history;
+  - anything else, or a DID URL without `versionId`, is shown as a link with the alt
+    text.
+
+  Only version-pinned `did:` URLs embed. Other sources are not loaded: an `https:`
+  image would be fetched by every reader's client, telling the host who is reading,
+  and could change after publication. A plain Markdown link, `[text](did:…)`, stays
+  a link.
+- **Images** are Archon image assets, created with `createImage`, whose data gives
+  the IPFS CID, type, size, width and height.
   - **Types:** `image/png`, `image/jpeg`, `image/webp` and `image/gif`. No SVG, which can
     carry script.
   - **Size:** at most 10 MB per image; clients check the asset's `bytes` before
@@ -520,6 +539,7 @@ mistake one for a publication.
 |---|---|
 | `memeplex:post` | `post`, `article` and `paper` objects |
 | `memeplex:reply` | `reply` objects |
+| `memeplex:boost` | `boost` objects |
 | `memeplex:review` | `review` objects |
 | `memeplex:react` | `reaction` objects |
 | `memeplex:rate` | `rating` objects |
@@ -730,7 +750,6 @@ cover the controller, which is why objects carry `author` in their data.
 |---|---|
 | Everything by a user | `{ "where": { "memeplex.author": { "$in": ["did:cid:…user"] } } }` |
 | Every response to an object | `{ "where": { "memeplex.parent": { "$in": ["did:cid:…"] } } }` |
-| Boosts and quote posts of an object | `{ "where": { "memeplex.quotes[*].did": { "$in": ["did:cid:…"] } } }` |
 | Objects under one grant | `{ "where": { "memeplex.grant": { "$in": ["did:cid:…grant"] } } }` |
 | Grants naming a client | `{ "where": { "memeplexGrant.client": { "$in": ["did:cid:…client"] } } }` |
 | Objects an author tagged | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
@@ -741,7 +760,7 @@ indexer builds thread trees directly. Objects carry no separate thread-root fiel
 keep consistent.
 
 Only one condition and only `$in` are supported, so a client separates replies,
-reviews, reactions, ratings and tags by `kind` after the query. Results are unsorted and unpaged, and
+boosts, reviews, reactions, ratings and tags by `kind` after the query. Results are unsorted and unpaged, and
 they are not attributions: the matches still have to pass the attribution check,
 because anyone can write any `author` into an object they publish.
 
