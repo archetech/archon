@@ -94,9 +94,9 @@ prefix.
     "content": { "cid": "…", "type": "text/markdown", "bytes": 48213 },
 
     // links
-    "parent": "did:cid:…",          // the object or DID this one responds to
-    "parentVersion": "bafyrei…",    // optional: the parent's versionId this one responds to
-    "quotes": ["did:cid:…"],
+    "parent": "did:cid:…",          // the object this one responds to
+    "parentVersion": "bafyrei…",    // required with parent: the versionId responded to
+    "quotes": [{ "did": "did:cid:…", "version": "bafyrei…" }],
     "tags": ["cryptography", "did"]
   }
 }
@@ -119,12 +119,43 @@ its operations, which resolution already reports.
 | `tag` | Label applied to someone else's object | required | `tag`, a normalized string (see Tags). Withdrawn by deleting it. |
 
 `parent` is the one link from a response to what it responds to; `kind` says how. This
-keeps every response, of whatever kind, reachable from its parent with one query. A
-response that assessed one particular revision also names it in `parentVersion` (see
-Revisions and citation). `parent` itself stays the bare DID, so the query still finds it.
+keeps every response, of whatever kind, reachable from its parent with one query.
 
-Kinds are an open set: a client ignores kinds it does not understand. New kinds are
-added by agreement, not by registry.
+### Version pinning
+
+Every reference to another object names the exact version it refers to, as AT
+Protocol's strong references do:
+
+- **`parent` with `parentVersion`.** A response always carries both: `parent` is the
+  bare DID, so the "every response to an object" query still finds it, and
+  `parentVersion` is the `versionId` of the revision the author saw.
+- **`quotes` entries** are `{ "did", "version" }` pairs.
+- **Images** referenced by `did:` pin the image asset's version in the DID URL:
+  `![alt](did:cid:…?versionId=bafyrei…)`. An `ipfs:` image is a fixed CID already.
+
+A reference then always means the content the author responded to, quoted or showed,
+even after the target is edited. Clients may mark a response whose `parentVersion` is
+not the parent's current revision. For reviews and ratings that mark is prominent
+("reviewed an earlier revision"); for replies and reactions it can be subtle or
+omitted. If a pinned version leaves the accepted history, see Revisions and citation.
+
+### Schemas
+
+Every kind, and the grant, has a **schema**: a JSON Schema (draft 2020-12) published as
+an Archon schema asset (`createSchema`), in the spirit of AT Protocol's Lexicon. The
+Memeplex specification lists the schema DID and pinned `versionId` for each core kind.
+
+- **Validation.** Verifiers and indexers validate each object against its kind's
+  schema. An object that fails is ignored: not displayed, counted or attributed.
+  Rules a schema cannot express (the reaction emoji rules, normalized tags, rating
+  bounds) are part of the kind's definition and are checked alongside.
+- **Core kinds have bare names** (`post`, `reply`, `rating`, …).
+- **Extension kinds are named by their schema DID:** `"kind": "did:cid:…schema?versionId=…"`.
+  That gives namespacing without a registry or DNS. A client that does not know an
+  extension kind can fetch its schema, and may show the object generically or ignore
+  it.
+- **Evolution.** Adding optional fields keeps `v`. A breaking change publishes a new
+  schema and increments `v`; clients ignore versions they do not support.
 
 ### Examples
 
@@ -137,7 +168,7 @@ shortened.
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "post", "author": "did:cid:…alice",
-                "text": "Every post on Memepool is a DID. So is this photo.\n\n![A canvas tent full of people facing a projector screen](did:cid:…photo)",
+                "text": "Every post on Memepool is a DID. So is this photo.\n\n![A canvas tent full of people facing a projector screen](did:cid:…photo?versionId=bafyreiimg…)",
                 "tags": ["archon", "memeplex"] } }
 ```
 
@@ -168,9 +199,9 @@ shortened.
 ```jsonc
 { "memeplex": { "v": 1, "kind": "reply", "author": "did:cid:…bob",
                 "grant": "did:cid:…bobs-grant",
-                "parent": "did:cid:…alice-post",
+                "parent": "did:cid:…alice-post", "parentVersion": "bafyreipost…",
                 "text": "Including the reactions? See the scale section.",
-                "quotes": ["did:cid:…carol-post"] } }
+                "quotes": [{ "did": "did:cid:…carol-post", "version": "bafyreicarol…" }] } }
 ```
 
 **review**: pins the revision it assessed
@@ -186,7 +217,8 @@ shortened.
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "reaction", "author": "did:cid:…dave",
-                "parent": "did:cid:…alice-post", "value": "❤️" } }
+                "parent": "did:cid:…alice-post", "parentVersion": "bafyreipost…",
+                "value": "❤️" } }
 ```
 
 **rating**: three stars out of five
@@ -201,7 +233,8 @@ shortened.
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…spamwatch",
-                "parent": "did:cid:…some-post", "tag": "spam" } }
+                "parent": "did:cid:…some-post", "parentVersion": "bafyreispam…",
+                "tag": "spam" } }
 ```
 
 ### Reactions
@@ -223,7 +256,7 @@ Memeplex-specific list has to be maintained:
 
 A boost (repost) is a `post` that quotes the original:
 
-- A **plain boost** has `quotes: [original]` and no `text`. Clients show the original
+- A **plain boost** quotes the original (`quotes: [{ did, version }]`) and has no `text`. Clients show the original
   as "Alice boosted".
 - A **quote post** adds `text`, shown above the original.
 
@@ -271,7 +304,8 @@ labels it with a `tag` object whose `parent` is the labelled object:
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…labeller",
-                "parent": "did:cid:…post", "tag": "cryptography" } }
+                "parent": "did:cid:…post", "parentVersion": "bafyrei…",
+                "tag": "cryptography" } }
 ```
 
 Tag values, in both places, are normalized before publishing: Unicode NFC, trimmed,
@@ -316,9 +350,9 @@ Every client renders the same text the same way:
   `javascript:` and `data:`, are not followed.
 - **Images are Markdown images,** in any kind: `![alt text](did:cid:…)`. There is no
   separate attachment field; a client may lay out a short post's images as a gallery.
-  - **Content-addressed only.** The source is `did:` (an Archon image asset, created
-    with `createImage`, whose data gives the IPFS CID, type, width and height) or
-    `ipfs:` (a raw CID). `https:` images are not loaded: every reader's client would
+  - **Content-addressed only.** The source is a version-pinned `did:` URL (an Archon
+    image asset, created with `createImage`, whose data gives the IPFS CID, type, width
+    and height; see Version pinning) or `ipfs:` (a raw CID). `https:` images are not loaded: every reader's client would
     fetch them, telling the host who is reading, and the image could change after
     publication.
   - **Types:** `image/png`, `image/jpeg`, `image/webp` and `image/gif`. No SVG, which can
@@ -364,10 +398,9 @@ while they remain in its accepted history. This is arXiv's model, with the DID a
   "revision no longer in the history" and never substitute another revision. A
   reviewer who needs the assessed content to survive this keeps its `content` CID, and
   pins it (see Content availability under Security considerations).
-- **Responses pin what they assessed.** A `review` or `rating` of an article or paper
-  sets `parentVersion` to the `versionId` it assessed. Clients show "reviewed an
-  earlier revision" when that is not the current version, so a review of v1 is never
-  presented as a review of v2. Replies, reactions and tags usually omit it.
+- **Responses pin what they assessed.** Every response names the revision it
+  responded to in `parentVersion` (see Version pinning), so a review of v1 is never
+  presented as a review of v2.
 
 ### Timestamps and anchoring
 
@@ -599,7 +632,7 @@ cover the controller, which is why objects carry `author` in their data.
 |---|---|
 | Everything by a user | `{ "where": { "memeplex.author": { "$in": ["did:cid:…user"] } } }` |
 | Every response to an object | `{ "where": { "memeplex.parent": { "$in": ["did:cid:…"] } } }` |
-| Boosts and quote posts of an object | `{ "where": { "memeplex.quotes[*]": { "$in": ["did:cid:…"] } } }` |
+| Boosts and quote posts of an object | `{ "where": { "memeplex.quotes[*].did": { "$in": ["did:cid:…"] } } }` |
 | Objects under one grant | `{ "where": { "memeplex.grant": { "$in": ["did:cid:…grant"] } } }` |
 | Objects an author tagged | `{ "where": { "memeplex.tags[*]": { "$in": ["cryptography"] } } }` |
 | Tags others applied (their `parent`s are the tagged objects) | `{ "where": { "memeplex.tag": { "$in": ["cryptography"] } } }` |
@@ -737,7 +770,8 @@ stay as individual DIDs or are batched.
 ## Milestones
 
 1. **Benchmark** objects-as-DIDs at the volumes above (Scale).
-2. **Schemas:** the object schema and the grant schema, with signed fixtures.
+2. **Schemas:** JSON Schemas for every core kind and the grant, published as schema
+   assets, with signed fixtures.
 3. **Verifier library:** the attribution rules, shared by clients and the indexer, with
    cross-checks against real signed objects, including revoked and forged grants,
    transferred objects, and backdated siblings.
