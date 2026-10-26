@@ -111,7 +111,7 @@ its operations, which resolution already reports.
 |---|---|---|---|
 | `post` | Short text, Twitter-like | — | Usually inline `text`. |
 | `article` | Long-form essay, Substack-like | — | `title`, `summary`; body as `content` on IPFS. |
-| `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs), `content` (PDF or source). Revised by editing; see Revisions and citation. |
+| `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs), `content` (the readable paper, usually PDF), optional `source` (LaTeX source). Revised by editing; see Revisions and citation. |
 | `reply` | Comment in a thread | required | Same fields as `post`. |
 | `review` | Written assessment | required | `verdict` (free text or schema-defined), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
 | `reaction` | Like or other emoji response | required | `value`, one emoji (see Reactions). Withdrawn by deleting it. |
@@ -159,6 +159,7 @@ shortened.
                 "abstract": "We show that nodes receiving the same signed operations …",
                 "authors": ["did:cid:…alice", "did:cid:…bob"],
                 "content": { "cid": "bafybei…", "type": "application/pdf", "bytes": 912340 },
+                "source": { "cid": "bafybei…", "type": "application/x-tex", "bytes": 84112 },
                 "tags": ["distributed-systems", "did"] } }
 ```
 
@@ -287,6 +288,32 @@ Inline `text` is for content that fits comfortably inside one operation. Anythin
 larger, or any binary, goes to IPFS and is referenced from `content`. Updating the
 content of an article is a normal update that replaces the reference; the old
 reference stays in the previous version.
+
+### Text formatting
+
+Every client renders the same text the same way:
+
+- **`text`, and `content` of type `text/markdown`,** are GitHub Flavored Markdown
+  (GFM): CommonMark plus tables, strikethrough, task lists and autolinked URLs, all
+  precisely specified.
+- **Math** uses the dollar convention shared by Pandoc, Jupyter and GitHub. Inline math
+  is `$…$`, display math is `$$…$$`, and longer equations go in a fenced ```` ```math ````
+  block. An opening `$` must be followed immediately by a non-space character, and a
+  closing `$` must be preceded immediately by a non-space character and not followed by
+  a digit, so "it costs $5 and $10" stays text. The math itself is LaTeX, rendered by
+  the client (for example with KaTeX or MathJax).
+- **No raw HTML.** HTML inside Markdown is displayed as text, never rendered.
+- **Safe links only.** Links use `https:` or `did:`; images use `https:`, `did:` or
+  `ipfs:`. Other schemes, including `javascript:` and `data:`, are not followed.
+- **Math renders untrusted.** Renderers disable trusted commands (KaTeX's `trust`
+  option, which enables `\href`, `\url`, `\includegraphics` and HTML-class commands).
+- **Graceful fallback.** A client may show any `text` as plain text, and math as its
+  LaTeX source; both stay readable.
+
+`content.type` is one of `text/markdown`, `text/plain` or `application/pdf`. A paper's
+`source` may also be `application/x-tex` or a source archive (`application/gzip`), as
+arXiv accepts. Clients offer source for download rather than rendering it. Clients may
+support other types, and others may ignore them.
 
 ### Edits, deletion and revisions
 
@@ -662,6 +689,9 @@ stay as individual DIDs or are batched.
   Wallet).
 - **Transferred objects.** Ownership is not authorship; attribution follows the
   creation and signed lineage, never the current controller.
+- **Rendering untrusted text.** Every object's text is attacker-controlled. The
+  formatting rules (no raw HTML, safe link schemes, untrusted math) are what keep a
+  post from becoming script in every client; renderers must follow them exactly.
 - **Spam.** Object creation on `hyperswarm` is free. Indexers will need rate limits or
   cost per author (for example L402 on publishing through a hosted node, or ranking by
   trust graph). Not designed here.
