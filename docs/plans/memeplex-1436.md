@@ -88,17 +88,17 @@ prefix.
 {
   "memeplex": {
     "v": 1,
-    "kind": "post",                 // see kinds below
-    "author": "did:cid:…user",      // the attributed user
+    "kind": "reply",                // see Kinds; Fields lists what each kind allows
+    "author": "did:cid:…user",      // the attributed user, who created the grant
     "grant": "did:cid:…",           // the grant it was published under
 
-    // content: inline text, or a reference for anything large
+    // body: inline text, or instead, for anything large,
+    // "content": { "cid": "…", "type": "text/markdown", "bytes": 48213 }
     "text": "…",
-    "content": { "cid": "…", "type": "text/markdown", "bytes": 48213 },
 
     // links
     "parent": "did:cid:…",          // the object this one responds to
-    "parentVersion": "bafyrei…",    // required with parent: the versionId responded to
+    "parentVersion": "bafyrei…",    // the versionId responded to
     "quotes": [{ "did": "did:cid:…", "version": "bafyrei…" }],
     "tags": ["cryptography", "did"]
   }
