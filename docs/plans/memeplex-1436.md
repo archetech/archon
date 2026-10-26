@@ -112,8 +112,8 @@ its operations, which resolution already reports.
 | Kind | Purpose | `parent` | Notes |
 |---|---|---|---|
 | `post` | Short text, Twitter-like | — | Usually inline `text`. |
-| `article` | Long-form essay, Substack-like | — | `title`, `summary`; body as `content` on IPFS. |
-| `paper` | Scholarly work, arXiv-like | — | `title`, `abstract`, `authors` (DIDs; see Coauthors), `content` (the paper in Markdown), optional `pdf` and `source` (LaTeX) downloads. Revised by editing; see Revisions and citation. |
+| `article` | Long-form essay, Substack-like | — | `title`, optional `summary`; body as `content` on IPFS. |
+| `paper` | Scholarly work, arXiv-like | — | `title`, `summary` (the abstract), `authors` (DIDs; see Coauthors), `content` (the paper in Markdown), optional `pdf` and `source` (LaTeX) downloads. Revised by editing; see Revisions and citation. |
 | `reply` | Comment in a thread | required | Same fields as `post`. |
 | `boost` | Reshare to the booster's own audience | required | Optional `text`, making it a quote post (see Boosts and quote posts). |
 | `review` | Written assessment | required | `verdict` (short free text), body. A review can itself be replied to. A reviewer who also wants to score publishes a separate `rating`. |
@@ -137,8 +137,7 @@ keeps every response, of whatever kind, reachable from its parent with one query
 | `parent`, `parentVersion` | DID, `versionId` | reply, boost, review, reaction, rating, tag; required |
 | `tags` | 1–20 normalized strings, each at most 64 code points | post, article, paper, reply, review |
 | `title` | string, at most 300 code points | article, paper; required |
-| `summary` | string, at most 1,000 code points | article |
-| `abstract` | string, at most 5,000 code points | paper; required |
+| `summary` | string, at most 5,000 code points: an article's summary or a paper's abstract | article; paper, required |
 | `authors` | 1–100 distinct DIDs, including `author` | paper; required |
 | `source` | `{ cid, type, bytes }` | paper |
 | `pdf` | `{ cid, type, bytes }` | paper |
@@ -230,7 +229,7 @@ and the paper from a client Alice runs herself. DIDs are shortened.
 { "memeplex": { "v": 1, "kind": "paper", "author": "did:cid:…alice",
                 "grant": "did:cid:…alice-own-client",
                 "title": "Convergent Replay of Signed DID Histories",
-                "abstract": "We show that nodes receiving the same signed operations …",
+                "summary": "We show that nodes receiving the same signed operations …",
                 "authors": ["did:cid:…alice", "did:cid:…bob"],
                 "content": { "cid": "bafkrei…", "type": "text/markdown", "bytes": 61207 },
                 "pdf": { "cid": "bafybei…", "type": "application/pdf", "bytes": 912340 },
