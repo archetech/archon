@@ -137,7 +137,7 @@ shortened.
 
 ```jsonc
 { "memeplex": { "v": 1, "kind": "post", "author": "did:cid:…alice",
-                "text": "Every post on Memepool is a DID. This one too.",
+                "text": "Every post on Memepool is a DID. So is this photo.\n\n![A canvas tent full of people facing a projector screen](did:cid:…photo)",
                 "tags": ["archon", "memeplex"] } }
 ```
 
@@ -303,8 +303,20 @@ Every client renders the same text the same way:
   a digit, so "it costs $5 and $10" stays text. The math itself is LaTeX, rendered by
   the client (for example with KaTeX or MathJax).
 - **No raw HTML.** HTML inside Markdown is displayed as text, never rendered.
-- **Safe links only.** Links use `https:` or `did:`; images use `https:`, `did:` or
-  `ipfs:`. Other schemes, including `javascript:` and `data:`, are not followed.
+- **Safe links only.** Links use `https:` or `did:`. Other schemes, including
+  `javascript:` and `data:`, are not followed.
+- **Images are Markdown images,** in any kind: `![alt text](did:cid:…)`. There is no
+  separate attachment field; a client may lay out a short post's images as a gallery.
+  - **Content-addressed only.** The source is `did:` (an Archon image asset, created
+    with `createImage`, whose data gives the IPFS CID, type, width and height) or
+    `ipfs:` (a raw CID). `https:` images are not loaded: every reader's client would
+    fetch them, telling the host who is reading, and the image could change after
+    publication.
+  - **Types:** `image/png`, `image/jpeg`, `image/webp` and `image/gif`. No SVG, which can
+    carry script.
+  - **Size:** at most 10 MB per image; clients check the asset's `bytes` before
+    fetching.
+  - **Alt text** is expected to be non-empty. Clients may flag images without it.
 - **Math renders untrusted.** Renderers disable trusted commands (KaTeX's `trust`
   option, which enables `\href`, `\url`, `\includegraphics` and HTML-class commands).
 - **Graceful fallback.** A client may show any `text` as plain text, and math as its
@@ -697,7 +709,7 @@ stay as individual DIDs or are batched.
   trust graph). Not designed here.
 - **Content availability.** IPFS content is available only while someone pins it.
   Registry pinning (`ARCHON_GATEKEEPER_REGISTRIES_PIN`) pins operation JSON only, not
-  the article or PDF bytes an object's `content.cid` references. Those need explicit
+  the article, PDF or image bytes an object references. Those need explicit
   pinning by the publisher, the indexer or a pinning service; long-term availability of
   papers needs an explicit answer.
 
