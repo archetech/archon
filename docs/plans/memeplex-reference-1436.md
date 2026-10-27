@@ -24,7 +24,7 @@ defined in the core. Examples below show asset data with abbreviated identifiers
 | `text` | string, at most 10,000 code points | post, reply |
 | `content` | `{ cid, type, bytes }` | post, paper, reply |
 | `target`, `targetVersion` | DID, `versionId` | post, optional; reply, rating, tag, required |
-| `tags` | 1–20 normalized words, each at most 64 code points | post, paper, reply |
+| `tags` | 1–20 strings, each 1–64 code points (see Tags and reactions) | post, paper, reply |
 | `title` | string, at most 300 code points | post, optional; paper, required |
 | `subtitle` | string, at most 300 code points: one line shown under the title | post with a `title`; paper |
 | `summary` | string, at most 5,000 code points: an article's summary or a paper's abstract | post with a `title`; paper, required |
@@ -33,7 +33,7 @@ defined in the core. Examples below show asset data with abbreviated identifiers
 | `pdf` | `{ cid, type, bytes }` | paper |
 | `verdict` | string, at most 300 code points | reply |
 | `rating`, `min`, `max` | integers (see Ratings) | rating; required |
-| `tag` | normalized word, at most 64 code points, or one emoji (see Tags and reactions) | tag; required |
+| `tag` | string, 1–64 code points (see Tags and reactions) | tag; required |
 
 - **Body.** `text` and `content` are mutually exclusive. A reply has one of them; a
   paper has `content`; a post has `text` or `content`, or neither when it has a
@@ -68,10 +68,11 @@ common `$defs` inlined so it stands alone, and the protocol pins its DID and
   That gives namespacing without a registry or DNS. A client that does not know an
   extension kind can fetch its schema, and may show the object generically or ignore
   it.
-- **Evolution.** The schemas, the checks beyond them and the Unicode baseline for a
-  given `v` never change. Any change to what is valid, including a new optional
-  field (an unknown field that was ignored would now be checked) or a newer Unicode
-  release (new emoji would become valid), publishes new schemas under a new `v`.
+- **Evolution.** The schemas and the checks beyond them for a given `v` never
+  change. Any change to what is valid, including a new optional field (an unknown
+  field that was ignored would now be checked), publishes new schemas under a new
+  `v`. Validity never depends on Unicode data, so a new Unicode release needs no new
+  `v`.
   Each object is validated by the rules of its own `v`, so a verifier that supports
   `v: 2` still validates `v: 1` objects by `v: 1` rules, and every verifier that
   supports a `v` reaches the same result for it. A verifier that does not support an
@@ -121,8 +122,8 @@ common `$defs` inlined so it stands alone, and the protocol pins its DID and
       "bytes": {"$ref": "#/$defs/bytes"}
     }
   },
-  "word": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^\\S+$"},
-  "tags": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"$ref": "#/$defs/word"}},
+  "tagValue": {"type": "string", "minLength": 1, "maxLength": 64},
+  "tags": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"$ref": "#/$defs/tagValue"}},
   "text": {"type": "string", "maxLength": 10000},
   "action": {
     "anyOf": [
@@ -335,19 +336,11 @@ JSON Schema counts string length in code points, matching the field table.
 These rules cannot be expressed in JSON Schema. Validators apply them alongside the
 schema, and a version that fails one is invalid in the same way.
 
-`v: 1` pins **Unicode 17.0**: its normalization data (NFC), default case mapping,
-`White_Space` property, and its emoji data, including `emoji-test.txt` for Emoji
-17.0. Validators use that release's data whatever their platform provides, so the
-same signed value gets the same result everywhere.
-
 1. **Rating bounds:** `min < max` and `min ≤ rating ≤ max`.
 2. **Paper authors:** `authors` includes `author`.
-3. **Words:** each entry of `tags`, and a `tag` value without emoji, is a normalized
-   word: NFC, unchanged by default lower-casing, and containing no `White_Space`
-   character and no emoji, all by the pinned release.
-4. **Emoji tags:** a `tag` value containing any emoji is exactly one emoji from the RGI
-   set, in the fully-qualified form listed in the pinned `emoji-test.txt`. An emoji
-   added in a later Unicode release is invalid under `v: 1`.
+
+No check depends on Unicode data: tag values are validated structurally, and how
+they are normalized and classified is up to readers (see Tags and reactions).
 
 ### Examples
 
@@ -526,25 +519,26 @@ labels it, or reacts to it, with a `tag` object whose `target` is the object:
                 "tag": "cryptography" } }
 ```
 
-A tag value is a **word** or an **emoji**:
+A tag value is any string of 1–64 code points. Validity stops there: whether a value
+is well formed is a matter of presentation, not authorship, so it never depends on a
+verifier's Unicode data.
 
-- **Words** are normalized before publishing: Unicode NFC, trimmed, lower-case,
-  internal whitespace collapsed to a single hyphen. Otherwise one tag splinters across
-  spellings. The `tags` field takes words only.
-- **An emoji** makes the tag a **reaction**. A value containing any emoji must be
-  exactly one emoji from Unicode's recommended (RGI) set, in the fully-qualified form
-  listed in Unicode's `emoji-test.txt`: `❤️` is valid; the unqualified `❤` and
-  mixtures like `❤️ love` are not. Each emoji therefore has one encoding, and counts
-  never split across encodings. Skin-tone variants are valid RGI emoji; how to group
-  them when counting or displaying is up to each client and indexer (see Memepool for
-  its choice).
-- **Invalid values are ignored**: that version is not attributed. Counts still use
-  the object's last attributed version, if any.
+- **Publishers normalize.** Clients publish a **word** as lower-case NFC with internal
+  whitespace collapsed to a single hyphen, so one tag does not splinter across
+  spellings, and a **reaction** as exactly one fully-qualified emoji from Unicode's
+  recommended (RGI) set, as listed in `emoji-test.txt` (`❤️`, not `❤`). The `tags`
+  field takes words.
+- **Readers classify and group.** An indexer or client decides whether a value is a
+  reaction (one emoji) or a label (anything else), and normalizes values when
+  counting, using the Unicode data it has. A value it cannot classify, such as an
+  emoji newer than its data, shows as text. How to group skin-tone variants is also
+  the reader's choice (see Memepool for its choice).
 - **Counted once per author.** An author can apply several values to one object, but
-  each value counts at most once per author and object, even if two clients each
-  published it.
+  each value, as the reader normalizes it, counts at most once per author and object,
+  even if two clients each published it.
 
-Clients show emoji tags as reactions and word tags as labels.
+Indexers on different Unicode releases may count a brand-new emoji differently;
+authorship is the same everywhere.
 
 Word tags are signed, attributed judgments like any other object, so their
 weight depends on who applied them. Moderation labels are tags too (see Memepool:
