@@ -137,8 +137,8 @@ of the following:
 
 1. Its creation data satisfies the grant schema.
 2. Its create operation names `U` as controller and is signed by `U`.
-3. It was created on a permitted registry `R`, and its creation has an accepted chain
-   receipt on `R`.
+3. It was created on a permitted registry `R`, without `validUntil`, and its creation
+   has an accepted chain receipt on `R`.
 4. Its creation data names a client agent `A` different from `U`.
 
 Read the client and actions from that creation data. An unanchored creation leaves
@@ -185,7 +185,7 @@ prefix whose versions satisfy the following checks:
 | Shape | Valid kind schema and semantic rules | Same validation; deletion uses its predecessor's identity and needs no data body |
 | Author and publisher | Grant creator is `author`; creation controller is the grant's client | Predecessor controller is that same client |
 | Scope | Grant permits `kind` | Creation's permission continues to cover edits and deletion |
-| Identity | Establish `author`, `kind`, `grant`, `target`, controller and registry | Updates preserve them; `targetVersion` may change. Deletion takes identity from its predecessor. |
+| Identity | Establish `author`, `kind`, `grant`, `target`, controller and registry; no `validUntil` | Updates preserve them and add no `validUntil`; `targetVersion` may change. Deletion takes identity from its predecessor. |
 | Position | Receipt is on the grant's registry, inside its authority interval | Same condition |
 
 Grant fields always come from its creation, including after the grant is deleted.
@@ -265,6 +265,16 @@ The feed is ordered by event time, not arrival. Polling alone misses late eviden
 and displaced branches, so indexers also reconcile indexed histories and reread
 the feed over its full range. Recheck dependent publications when their histories,
 grant histories or compared receipts change. Indexer caches confer no authority.
+
+Reconstruction needs the evidence to still exist. Archon lets an asset's controller
+set `validUntil` in an update, and nodes then remove the asset's history once it
+passes. A publication can never be ephemeral (an attributed version has no
+`validUntil`), but a revoked client can still expire the objects it controls, and a
+node that removes them can no longer serve their histories. Indexers therefore keep
+the exported histories of the objects and grants they index, and keep using them
+after nodes drop those DIDs; a publication remains attributed on that retained,
+signed evidence. A fresh indexer can rebuild only what some node or archive still
+holds.
 
 Gatekeeper's data queries are useful discovery shortcuts. They match current
 data, so they cannot find every publication preserved behind an unauthorized edit
