@@ -108,10 +108,11 @@ verifiers that predate that `v` could not read restricted grants at all.
 A permitted creation includes permission to edit and delete that object while
 the grant is live. There is no separate edit scope or re-delegation in v1.
 
-A grant may carry `expiresAt`, an RFC 3339 UTC date-time. It works as an automatic
-revocation: authority ends for operations anchored in a block whose time is at or
-after `expiresAt`, and the grant and its history stay, so everything anchored
-before then stays attributed. This is unlike Archon's `validUntil`, which makes a
+A grant may carry `expiresAt`, an RFC 3339 UTC date-time. Authority ends for
+operations anchored in a block whose time is at or after `expiresAt`. Expiry is a
+rule verifiers apply, not an event on the network: the grant DID is not revoked or
+changed, and nothing needs to be published. Its history stays, so everything
+anchored before then stays attributed. The user can still revoke it earlier. This is unlike Archon's `validUntil`, which makes a
 DID ephemeral and lets nodes delete its history; a grant must not use that.
 
 The grant and its objects are created on the same chain registry and publications
@@ -298,8 +299,9 @@ paths use the same publication rule; neither trusts an object's claimed `author`
 
 ## What revocation means
 
-Revocation ends future authority and preserves the attributed past. An expired
-grant behaves the same way, without the wallet having to act. It needs no
+Revocation ends future authority and preserves the attributed past. Expiry has the
+same effect on attribution without any operation: the grant stays active on Archon,
+and verifiers stop admitting operations anchored at or after its `expiresAt`. It needs no
 inventory of a client's work and cannot disown a compromised client's publications
 that were anchored while its grant was live.
 
