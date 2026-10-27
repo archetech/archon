@@ -133,7 +133,11 @@ common `$defs` inlined so it stands alone, and the protocol pins its DID and
     ]
   },
   "actions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/action"}},
-  "nonce": {"type": "string", "minLength": 22, "pattern": "^[A-Za-z0-9_-]+$"}
+  "nonce": {"type": "string", "minLength": 22, "pattern": "^[A-Za-z0-9_-]+$"},
+  "expiresAt": {
+    "type": "string",
+    "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+  }
 }
 ```
 
@@ -309,7 +313,8 @@ ignored, as the strictness rule requires.
     "v": {"const": 1},
     "client": {"$ref": "#/$defs/did"},
     "actions": {"$ref": "#/$defs/actions"},
-    "nonce": {"$ref": "#/$defs/nonce"}
+    "nonce": {"$ref": "#/$defs/nonce"},
+    "expiresAt": {"$ref": "#/$defs/expiresAt"}
   }
 }
 ```
@@ -326,7 +331,8 @@ ignored, as the strictness rule requires.
     "client": {"$ref": "#/$defs/did"},
     "name": {"type": "string", "minLength": 1, "maxLength": 100},
     "actions": {"$ref": "#/$defs/actions"},
-    "nonce": {"$ref": "#/$defs/nonce"}
+    "nonce": {"$ref": "#/$defs/nonce"},
+    "expiresAt": {"$ref": "#/$defs/expiresAt"}
   }
 }
 ```
@@ -820,9 +826,10 @@ There is no central moderator. Viewers choose which judgments to apply:
 ### Wallet
 
 The wallet lists active grants with their scope ("all core kinds" or the listed
-actions), grants what a client requests unless the user narrows it, lets the user
-choose each grant's registry from the permitted mainnets, and makes revoking a grant a
-single action. It shows a revocation in three states: **requested** (signed by the wallet),
+actions) and expiry. It grants what a client requests, including any requested
+`expiresAt`, unless the user narrows the scope or changes the expiry; lets the user
+choose each grant's registry from the permitted mainnets; and makes revoking a grant
+a single action. It shows a revocation in three states: **requested** (signed by the wallet),
 **submitted** (accepted by a node for anchoring) and **effective** (the deletion is
 anchored). Until it is effective, the wallet warns the user that the client can
 still publish.
@@ -914,8 +921,6 @@ needed first.
 - **Action vocabulary.** Is one action per creatable kind the right granularity, and
   should grants be able to narrow further (for example, replies only within one
   thread)?
-- **Expiry.** Should grants carry an optional expiry? A block height on the grant's
-  registry would be checkable the same way as revocation.
 - **Change feed.** Should Gatekeeper offer an arrival-ordered change feed? It would
   let indexers follow new and displaced versions directly, instead of reconciling
   periodically against full state.

@@ -106,7 +106,13 @@ adding it later would need a new `v` (see the reference's Evolution rule), and
 verifiers that predate that `v` could not read restricted grants at all.
 
 A permitted creation includes permission to edit and delete that object while
-the grant is live. There is no separate edit scope, expiry or re-delegation in v1.
+the grant is live. There is no separate edit scope or re-delegation in v1.
+
+A grant may carry `expiresAt`, an RFC 3339 UTC date-time. It works as an automatic
+revocation: authority ends for operations anchored in a block whose time is at or
+after `expiresAt`, and the grant and its history stay, so everything anchored
+before then stays attributed. This is unlike Archon's `validUntil`, which makes a
+DID ephemeral and lets nodes delete its history; a grant must not use that.
 
 The grant and its objects are created on the same chain registry and publications
 stay there. Only mainnet chain registries are permitted:
@@ -163,7 +169,16 @@ A valid grant permits an operation at position `P` exactly when:
 grant creation ≺ P
 and
 P ≺ every anchored operation after the grant's creation
+and
+time(P) < expiresAt, if the grant has one
 ```
+
+`time(P)` is the time of the block that anchors `P`, which is the accepted event's
+`time` for a chain receipt. It comes from the block header, so the publisher cannot
+choose it, and every copy of the receipt carries the same value. Block times can be
+slightly out of order (Bitcoin allows about two hours of drift), so near the expiry
+an operation in a later block may pass while one in an earlier block fails; the rule
+is still deterministic, and expiry is coarse by nature.
 
 With no anchored successor, the second condition is vacuously true. An operation
 without a receipt from the grant's registry is pending there. Check **all** grant
@@ -283,7 +298,8 @@ paths use the same publication rule; neither trusts an object's claimed `author`
 
 ## What revocation means
 
-Revocation ends future authority and preserves the attributed past. It needs no
+Revocation ends future authority and preserves the attributed past. An expired
+grant behaves the same way, without the wallet having to act. It needs no
 inventory of a client's work and cannot disown a compromised client's publications
 that were anchored while its grant was live.
 
@@ -338,6 +354,6 @@ Memepool choices and the implementation/benchmark plan. Its rendering budgets
 limit automatic presentation; they do not decide authorship.
 
 Before implementation, settle concrete benchmark targets and publish the pinned
-schemas and signed verifier fixtures. Grant handover, narrower scopes, expiry,
+schemas and signed verifier fixtures. Grant handover, narrower scopes,
 an arrival-ordered change feed, public follows and long-term content pinning
 remain [open questions](memeplex-reference-1436.md#open-questions).
