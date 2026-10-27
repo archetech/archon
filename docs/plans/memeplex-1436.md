@@ -70,8 +70,8 @@ protocol; they do not create additional attribution paths.
 
 ## One grant, one client, one chain
 
-A grant is an ordinary asset created and signed by its user. Its creation data is
-the authorization:
+A grant is an ordinary asset created and signed by its user. Its data is the
+authorization:
 
 ```jsonc
 {
@@ -106,14 +106,17 @@ adding it later would need a new `v` (see the reference's Evolution rule), and
 verifiers that predate that `v` could not read restricted grants at all.
 
 A permitted creation includes permission to edit and delete that object while
-the grant is live. There is no separate edit scope or re-delegation in v1.
+the grant is live, even if the grant's actions later narrow. There is no separate
+edit scope or re-delegation in v1.
 
 A grant may carry `expiresAt`, an RFC 3339 UTC date-time. Authority ends for
 operations anchored in a block whose time is at or after `expiresAt`. Expiry is a
 rule verifiers apply, not an event on the network: the grant DID is not revoked or
 changed, and nothing needs to be published. Its history stays, so everything
-anchored before then stays attributed. The user can still revoke it earlier. This is unlike Archon's `validUntil`, which makes a
-DID ephemeral and lets nodes delete its history; a grant must not use that.
+anchored before then stays attributed. The user can extend, shorten or remove the
+expiry with an update, or revoke the grant earlier. This is unlike Archon's
+`validUntil`, which makes a DID ephemeral and lets nodes delete its history; a grant
+must not use that.
 
 The grant and its objects are created on the same chain registry and publications
 stay there. Only mainnet chain registries are permitted:
@@ -132,10 +135,21 @@ registry to this list is a protocol revision; until a verifier adopts it, that
 verifier treats grants on the new registry as void. Objects gossip
 before anchoring, but attribution waits for chain evidence.
 
-The grant is immutable as an authorization. Any later operation in its accepted
-history ends its authority at that operation's chain position, whether it is a
-deletion, update or transfer. Later data never changes the original client or
-scope. The normal way to end a grant is `revokeDID`.
+A grant is the user's current instructions to one client, read as of each
+operation. The user changes its scope or expiry with an ordinary update, and each
+operation is checked against the grant version in force before it, so a change
+takes effect from its anchor forward and never reaches back. Only these changes
+keep the grant:
+
+- A **scope update** changes nothing but `memeplexGrant.actions` and
+  `memeplexGrant.expiresAt`, adding, changing or removing either, and its data still
+  satisfies the grant schema.
+
+Every other operation **ends** the grant at its chain position: a deletion (the
+normal way, with `revokeDID`), a change of `client` or of any other data, a transfer
+or other controller change, a registry change, or a `validUntil`. The client cannot
+change in place, because the objects it published are controlled by it and no other
+client could continue them.
 
 ### Authority is an interval
 
@@ -148,8 +162,10 @@ of the following:
    has an accepted chain receipt on `R`.
 4. Its creation data names a client agent `A` different from `U`.
 
-Read the client and actions from that creation data. An unanchored creation leaves
-the grant's authority pending. The interval check below determines whether a valid
+Read the client from the creation. Read `actions` and `expiresAt` from the
+**version in force** at a position `P`: the latest of the creation and the anchored
+scope updates whose receipts precede `P`. An unanchored creation leaves the grant's
+authority pending. The interval check below determines whether a valid
 grant still permits a particular operation; revocation does not invalidate the
 grant's earlier authority.
 
@@ -169,10 +185,16 @@ A valid grant permits an operation at position `P` exactly when:
 ```text
 grant creation ≺ P
 and
-P ≺ every anchored operation after the grant's creation
+P ≺ every anchored operation that ends the grant
 and
-time(P) < expiresAt, if the grant has one
+every anchored scope update ≺ P or P ≺ it
+and
+time(P) < expiresAt of the version in force at P, if it has one
 ```
+
+The third condition makes a scope update in the same block as `P` fail closed, as
+every same-block comparison does. A pending scope update has no effect until it is
+anchored; until then the previous version stays in force.
 
 `time(P)` is the time of the block that anchors `P`, which is the accepted event's
 `time` for a chain receipt. It comes from the block header, so the publisher cannot
@@ -181,9 +203,10 @@ slightly out of order (Bitcoin allows about two hours of drift), so near the exp
 an operation in a later block may pass while one in an earlier block fails; the rule
 is still deterministic, and expiry is coarse by nature.
 
-With no anchored successor, the second condition is vacuously true. An operation
-without a receipt from the grant's registry is pending there. Check **all** grant
-successors: a pending update must not hide an anchored deletion later in history.
+With no anchored ending operation, the second condition is vacuously true. An
+operation without a receipt from the grant's registry is pending there. Check
+**all** grant successors: a pending update must not hide an anchored deletion later
+in history.
 Same-block comparisons fail closed in both directions.
 
 This is why attribution uses a shared chain. A publisher chooses `proof.created`
@@ -200,11 +223,12 @@ prefix whose versions satisfy the following checks:
 |---|---|---|
 | Shape | Valid kind schema and semantic rules | Same validation; deletion uses its predecessor's identity and needs no data body |
 | Author and publisher | Grant creator is `author`; creation controller is the grant's client | Predecessor controller is that same client |
-| Scope | Grant permits `kind` | Creation's permission continues to cover edits and deletion |
+| Scope | The version in force at the creation permits `kind` | Creation's permission continues to cover edits and deletion |
 | Identity | Establish `author`, `kind`, `grant`, `target`, controller and registry; no `validUntil` | Updates preserve them and add no `validUntil`; `targetVersion` may change. Deletion takes identity from its predecessor. |
 | Position | Receipt is on the grant's registry, inside its authority interval | Same condition |
 
-Grant fields always come from its creation, including after the grant is deleted.
+The grant's client always comes from its creation, and its scope and expiry from the
+version in force at each position, including after the grant is deleted.
 Object data comes from the version being checked, not the current document.
 An asset transfer cannot manufacture authorship: Archon requires the previous
 controller's signature, not the recipient's agreement.
@@ -305,10 +329,13 @@ and verifiers stop admitting operations anchored at or after its `expiresAt`. It
 inventory of a client's work and cannot disown a compromised client's publications
 that were anchored while its grant was live.
 
-It also **freezes existing objects**. Their grant cannot change, even to a renewed
-grant for the same client. A new grant permits new publications; republishing does
-not withdraw an old rating or coauthor confirmation. Direct user control and grant
-handover remain separate design questions, not exceptions to the attribution rule.
+When a grant ends, it **freezes existing objects**: no later edit or deletion of
+them is attributed. Renewing, extending or rescoping a grant for the same client is a
+scope update, not an ending, so its objects stay editable. Only ending the grant
+(revoking it, or changing its client) freezes them. A new grant permits new
+publications; republishing does not withdraw an old rating or coauthor confirmation.
+Direct user control remains a separate design question, not an exception to the
+attribution rule.
 
 To withdraw work first, have the client delete it and confirm that its anchor
 precedes revocation under `≺`. Submission order alone is insufficient. If immediate
@@ -356,6 +383,6 @@ Memepool choices and the implementation/benchmark plan. Its rendering budgets
 limit automatic presentation; they do not decide authorship.
 
 Before implementation, settle concrete benchmark targets and publish the pinned
-schemas and signed verifier fixtures. Grant handover, narrower scopes,
-an arrival-ordered change feed, public follows and long-term content pinning
+schemas and signed verifier fixtures. Narrower scopes, an arrival-ordered change
+feed, public follows and long-term content pinning
 remain [open questions](memeplex-reference-1436.md#open-questions).

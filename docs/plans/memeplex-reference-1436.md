@@ -828,8 +828,8 @@ There is no central moderator. Viewers choose which judgments to apply:
 The wallet lists active grants with their scope ("all core kinds" or the listed
 actions) and expiry. It grants what a client requests, including any requested
 `expiresAt`, unless the user narrows the scope or changes the expiry; lets the user
-choose each grant's registry from the permitted mainnets; and makes revoking a grant
-a single action. It shows a revocation in three states: **requested** (signed by the wallet),
+choose each grant's registry from the permitted mainnets; changes a grant's scope or
+expiry in place with a scope update; and makes revoking a grant a single action. It shows a revocation in three states: **requested** (signed by the wallet),
 **submitted** (accepted by a node for anchoring) and **effective** (the deletion is
 anchored). Until it is effective, the wallet warns the user that the client can
 still publish.
@@ -915,9 +915,6 @@ needed first.
 
 ## Open questions
 
-- **Grant handover.** Should an object be allowed to move to a newer grant from the
-  same user, naming the same client on the same registry, so rotating a grant does not
-  freeze existing objects (see [What revocation means](memeplex-1436.md#what-revocation-means))?
 - **Action vocabulary.** Is one action per creatable kind the right granularity, and
   should grants be able to narrow further (for example, replies only within one
   thread)?
