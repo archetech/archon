@@ -43,8 +43,7 @@ defined in the core. Examples below show asset data with abbreviated identifiers
   canonical operation CID.
 - **Strictness.** A field from this table on a kind that does not list it makes the
   object invalid, as does a missing required field. A field not in the table is
-  ignored, so a later optional field (see Schemas) does not invalidate objects for
-  clients that predate it.
+  ignored. New fields arrive only with a new `v` (see Schemas: Evolution).
 - **Lengths** count Unicode code points. The whole operation must still fit
   Gatekeeper's 64 Ki limit.
 
@@ -69,8 +68,14 @@ common `$defs` inlined so it stands alone, and the protocol pins its DID and
   That gives namespacing without a registry or DNS. A client that does not know an
   extension kind can fetch its schema, and may show the object generically or ignore
   it.
-- **Evolution.** Adding optional fields keeps `v`. A breaking change publishes a new
-  schema and increments `v`; clients ignore versions they do not support.
+- **Evolution.** The schemas, the checks beyond them and the Unicode baseline for a
+  given `v` never change. Any change to what is valid, including a new optional
+  field (an unknown field that was ignored would now be checked) or a newer Unicode
+  release (new emoji would become valid), publishes new schemas under a new `v`.
+  Each object is validated by the rules of its own `v`, so a verifier that supports
+  `v: 2` still validates `v: 1` objects by `v: 1` rules, and every verifier that
+  supports a `v` reaches the same result for it. A verifier that does not support an
+  object's `v` neither attributes nor rejects it: the object is unsupported there.
 
 ### Schema text
 
@@ -328,15 +333,21 @@ JSON Schema counts string length in code points, matching the field table.
 ### Checks beyond the schemas
 
 These rules cannot be expressed in JSON Schema. Validators apply them alongside the
-schema, and a version that fails one is invalid in the same way:
+schema, and a version that fails one is invalid in the same way.
+
+`v: 1` pins **Unicode 17.0**: its normalization data (NFC), default case mapping,
+`White_Space` property, and its emoji data, including `emoji-test.txt` for Emoji
+17.0. Validators use that release's data whatever their platform provides, so the
+same signed value gets the same result everywhere.
 
 1. **Rating bounds:** `min < max` and `min ≤ rating ≤ max`.
 2. **Paper authors:** `authors` includes `author`.
 3. **Words:** each entry of `tags`, and a `tag` value without emoji, is a normalized
-   word: Unicode NFC, no leading or trailing whitespace, unchanged by Unicode default
-   lower-casing, and no internal whitespace. A word contains no emoji.
+   word: NFC, unchanged by default lower-casing, and containing no `White_Space`
+   character and no emoji, all by the pinned release.
 4. **Emoji tags:** a `tag` value containing any emoji is exactly one emoji from the RGI
-   set, in the fully-qualified form listed in Unicode's `emoji-test.txt`.
+   set, in the fully-qualified form listed in the pinned `emoji-test.txt`. An emoji
+   added in a later Unicode release is invalid under `v: 1`.
 
 ### Examples
 
