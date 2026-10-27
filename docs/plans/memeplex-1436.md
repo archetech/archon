@@ -142,8 +142,12 @@ takes effect from its anchor forward and never reaches back. Only these changes
 keep the grant:
 
 - A **scope update** changes nothing but `memeplexGrant.actions` and
-  `memeplexGrant.expiresAt`, adding, changing or removing either, and its data still
-  satisfies the grant schema.
+  `memeplexGrant.expiresAt`, adding, changing or removing either; its data still
+  satisfies the grant schema; it is signed by `U`; and no operation that ends the
+  grant comes before it in the grant's history, whether anchored or pending. Once
+  the history contains an ending operation, such as a transfer to the client, no
+  later update is a scope update, so a new controller cannot widen the grant while
+  that transfer waits to be anchored.
 
 Every other operation **ends** the grant at its chain position: a deletion (the
 normal way, with `revokeDID`), a change of `client` or of any other data, a transfer
@@ -271,7 +275,10 @@ be relative, so it is not a source of the signer DID. A verifier relying on its
 trusted Gatekeeper need not repeat signature verification.
 
 Chain position is the block height of the accepted event's receipt
-(`registration.height`) when the event's `registry` is the grant's registry. Display time comes from its `time`; time never decides grant validity.
+(`registration.height`) when the event's `registry` is the grant's registry. The
+event's `time` is the anchoring block's time; it is the only clock attribution uses,
+for `expiresAt`, and is also shown to readers. Publisher-chosen `proof.created` and
+Archon's historical resolution by `versionTime` never decide grant validity.
 Implement this interpretation once in a library shared by clients and indexers.
 
 ## References remember what was read

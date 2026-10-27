@@ -346,6 +346,10 @@ schema, and a version that fails one is invalid in the same way.
 
 1. **Rating bounds:** `min < max` and `min ≤ rating ≤ max`.
 2. **Paper authors:** `authors` includes `author`.
+3. **Expiry instant:** a grant's or grant request's `expiresAt` is a real RFC 3339
+   date-time: the month is 01–12, the day exists in that month and year (with
+   Gregorian leap years), the hour is 00–23, and minutes and seconds are 00–59. Leap
+   seconds (`:60`) are not accepted. The schema's pattern checks only the shape.
 
 No check depends on Unicode data: tag values are validated structurally, and how
 they are normalized and classified is up to readers (see Tags and reactions).
