@@ -34,6 +34,7 @@ defined in the core. Examples below show asset data with abbreviated identifiers
 | `verdict` | string, at most 300 code points | reply |
 | `rating`, `min`, `max` | integers (see Ratings) | rating; required |
 | `tag` | string, 1–64 code points (see Tags and reactions) | tag; required |
+| `image` | version-pinned DID URL of an image asset (see Custom emoji) | tag |
 
 - **Body.** `text` and `content` are mutually exclusive. A reply has one of them; a
   paper has `content`; a post has `text` or `content`, or neither when it has a
@@ -90,7 +91,7 @@ common `$defs` inlined so it stands alone, and the protocol pins its DID and
     "type": "string",
     "pattern": "^(b[a-z2-7]{20,}|Qm[1-9A-HJ-NP-Za-km-z]{44})$"
   },
-  "pinnedSchema": {
+  "pinnedDidUrl": {
     "type": "string",
     "pattern": "^did:[a-z0-9]+:[A-Za-z0-9._:%-]+\\?versionId=b[a-z2-7]{20,}$"
   },
@@ -128,7 +129,7 @@ common `$defs` inlined so it stands alone, and the protocol pins its DID and
   "action": {
     "anyOf": [
       {"enum": ["memeplex:post", "memeplex:reply", "memeplex:rate", "memeplex:tag"]},
-      {"$ref": "#/$defs/pinnedSchema"}
+      {"$ref": "#/$defs/pinnedDidUrl"}
     ]
   },
   "actions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/action"}},
@@ -162,7 +163,7 @@ ignored, as the strictness rule requires.
     "subtitle": {"type": "string", "maxLength": 300},
     "summary": {"type": "string", "maxLength": 5000},
     "authors": false, "source": false, "pdf": false, "verdict": false,
-    "rating": false, "min": false, "max": false, "tag": false
+    "rating": false, "min": false, "max": false, "tag": false, "image": false
   },
   "required": ["v", "kind", "author", "grant"],
   "dependentRequired": {
@@ -210,7 +211,7 @@ ignored, as the strictness rule requires.
     "source": {"$ref": "#/$defs/source"},
     "pdf": {"$ref": "#/$defs/pdf"},
     "text": false, "target": false, "targetVersion": false, "verdict": false,
-    "rating": false, "min": false, "max": false, "tag": false
+    "rating": false, "min": false, "max": false, "tag": false, "image": false
   },
   "required": ["v", "kind", "author", "grant", "title", "summary", "authors", "content"]
 }
@@ -235,7 +236,7 @@ ignored, as the strictness rule requires.
     "verdict": {"type": "string", "maxLength": 300},
     "title": false, "subtitle": false, "summary": false, "authors": false,
     "source": false, "pdf": false, "rating": false, "min": false, "max": false,
-    "tag": false
+    "tag": false, "image": false
   },
   "required": ["v", "kind", "author", "grant", "target", "targetVersion"],
   "allOf": [
@@ -268,7 +269,7 @@ ignored, as the strictness rule requires.
     "max": {"type": "integer"},
     "text": false, "content": false, "tags": false, "title": false,
     "subtitle": false, "summary": false, "authors": false, "source": false,
-    "pdf": false, "verdict": false, "tag": false
+    "pdf": false, "verdict": false, "tag": false, "image": false
   },
   "required": ["v", "kind", "author", "grant", "target", "targetVersion", "rating", "min", "max"]
 }
@@ -288,6 +289,7 @@ ignored, as the strictness rule requires.
     "target": {"$ref": "#/$defs/did"},
     "targetVersion": {"$ref": "#/$defs/versionId"},
     "tag": {"type": "string", "minLength": 1, "maxLength": 64},
+    "image": {"$ref": "#/$defs/pinnedDidUrl"},
     "text": false, "content": false, "tags": false, "title": false,
     "subtitle": false, "summary": false, "authors": false, "source": false,
     "pdf": false, "verdict": false, "rating": false, "min": false, "max": false
@@ -540,6 +542,32 @@ verifier's Unicode data.
 Indexers on different Unicode releases may count a brand-new emoji differently;
 authorship is the same everywhere.
 
+#### Custom emoji
+
+A tag with an `image` is a **custom emoji** reaction, like Slack's `:catjam:` or
+Nostr's NIP-30 emoji:
+
+```jsonc
+{ "memeplex": { "v": 1, "kind": "tag", "author": "did:cid:…dave",
+                "grant": "did:cid:…dave-grant",
+                "target": "did:cid:…post", "targetVersion": "bafyrei…",
+                "tag": ":catjam:",
+                "image": "did:cid:…catjam?versionId=bafyrei…" } }
+```
+
+- **`tag` carries the shortcode,** by convention `:name:`. A client without custom
+  emoji support shows it as text, which still reads.
+- **`image` is a version-pinned image asset,** so the picture cannot change after
+  the fact and is fetched from IPFS, not from a host that would learn who is reading.
+- **Readers group custom emoji by image, not shortcode.** There is no global
+  namespace: two communities' `:catjam:` can be different pictures, and one picture
+  can have two names.
+- **Custom emoji have tighter rendering limits** than other images (see Text
+  formatting: Rendering budgets).
+
+Shared emoji packs, which map a community's shortcodes to images so users can pick
+from a set, are a client feature built on `image`; they need no protocol change.
+
 Word tags are signed, attributed judgments like any other object, so their
 weight depends on who applied them. Moderation labels are tags too (see Memepool:
 Moderation).
@@ -615,6 +643,8 @@ Every client renders the same text the same way:
   - **Images:** besides the 10 MB download limit, the asset's declared width × height
     is at most 40 megapixels and is checked against the decoded header before full
     decoding; animated images are limited to 100 frames.
+  - **Custom emoji:** an `image` on a tag is at most 256 KB and 128 × 128 pixels,
+    checked the same way; animation is allowed within the frame limit.
   - **Aggregate:** at most 50 MB fetched to render one object and its embeds.
 - **Math renders untrusted.** Renderers disable trusted commands (KaTeX's `trust`
   option, which enables `\href`, `\url`, `\includegraphics` and HTML-class commands).
@@ -892,9 +922,6 @@ needed first.
 - **Public follows.** Whether Memeplex should ever define a public follow list (see
   Memepool: Follows), and if so, where it lives.
 - **Content availability.** Who pins long-form content and papers, and for how long?
-- **Custom emoji.** Should reactions also allow community emoji, as a shortcode plus
-  an image CID (in the style of Nostr's NIP-30), with clients that lack support
-  showing the shortcode?
 
 ## References
 

@@ -329,5 +329,5 @@ limit automatic presentation; they do not decide authorship.
 
 Before implementation, settle concrete benchmark targets and publish the pinned
 schemas and signed verifier fixtures. Grant handover, narrower scopes, expiry,
-an arrival-ordered change feed, public follows, long-term content pinning and custom
-emoji remain [open questions](memeplex-reference-1436.md#open-questions).
+an arrival-ordered change feed, public follows and long-term content pinning
+remain [open questions](memeplex-reference-1436.md#open-questions).
