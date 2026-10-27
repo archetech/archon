@@ -1,8 +1,8 @@
 # Memeplex reference: formats and implementation (#1436)
 
 Status: design; not implemented. Read the [protocol core](memeplex-1436.md) first.
-This companion retains the field definitions, examples and operational detail
-from #1437 at `79a957e1`. Object formats and rendering requirements apply to
+This companion holds the field definitions, schemas, examples and operational
+detail. Object formats and rendering requirements apply to
 Memeplex implementations; the Memepool section records choices of one client.
 The core is the single definition of attribution and publication state.
 

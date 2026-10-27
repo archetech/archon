@@ -1,8 +1,8 @@
 # Memeplex: an open publishing graph (#1436)
 
-Status: design; not implemented. This revision organizes the decisions in #1437
-at `79a957e1` around one publication rule. It preserves the existing wire fields,
-five kinds, grant scopes, chain requirements and client-controlled ownership.
+Status: design; not implemented. This core defines grants, attribution and
+publication state; the [reference](memeplex-reference-1436.md) defines formats and
+implementation detail.
 
 **Memeplex lets a person publish through an application without giving it their
 identity keys. Every publication has its own identity, history and place in a
@@ -101,9 +101,9 @@ full client such as Memepool asks for; single-purpose clients (a reaction widget
 posting bot, a labelling service) ask for less, so that a compromised client can do
 less under the user's name. Extension kinds are never implied: a grant permits one
 only by listing its schema DID URL, because a user cannot have reviewed a kind defined
-after the grant. The field exists in v1 even though most grants omit it: verifiers
-ignore unknown fields, so a restriction added later would be invisible to older
-verifiers, and they would attribute objects that newer ones reject.
+after the grant. The field exists in v1 even though most grants omit it, because
+adding it later would need a new `v` (see the reference's Evolution rule), and
+verifiers that predate that `v` could not read restricted grants at all.
 
 A permitted creation includes permission to edit and delete that object while
 the grant is live. There is no separate edit scope, expiry or re-delegation in v1.
@@ -230,8 +230,8 @@ is the predecessor's controller. `proof.verificationMethod` selects a key and ma
 be relative, so it is not a source of the signer DID. A verifier relying on its
 trusted Gatekeeper need not repeat signature verification.
 
-Chain position comes from the accepted event's `registry`, `registration` and
-`ordinal`. Display time comes from its `time`; time never decides grant validity.
+Chain position is the block height of the accepted event's receipt
+(`registration.height`) when the event's `registry` is the grant's registry. Display time comes from its `time`; time never decides grant validity.
 Implement this interpretation once in a library shared by clients and indexers.
 
 ## References remember what was read
