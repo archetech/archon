@@ -146,16 +146,16 @@ the grant's authority pending. The interval check below determines whether a val
 grant still permits a particular operation; revocation does not invalidate the
 grant's earlier authority.
 
-Let `X ≺ Y` mean that two receipts on the grant's registry are ordered as follows:
+Let `X ≺ Y` mean that receipt `X` on the grant's registry is in a block of lower
+height than receipt `Y`. Receipts in the same block are unordered: neither precedes
+the other.
 
-- In different blocks, `X` has the lower block height.
-- In the same transaction in one block, `X` has the lexicographically smaller
-  **complete ordinal**, including any batch or instruction components.
-- In different transactions in the same block, neither precedes the other.
-
-Equal positions do not precede each other. This conservative relation works across
-the supported chains, including Solana's transaction-local instruction indices.
-It is an attribution rule; it does not replace Gatekeeper's sibling ordering.
+Comparing within a block would depend on details that are not stable evidence.
+Solana's instruction index is local to its transaction, and Gatekeeper keeps one
+receipt per operation, registry and ordinal, without the transaction ID, so which of
+two same-ordinal copies in different transactions survives depends on delivery
+order. Block height is the same in every copy. This conservative relation is an
+attribution rule; it does not replace Gatekeeper's sibling ordering.
 
 A valid grant permits an operation at position `P` exactly when:
 
@@ -168,7 +168,7 @@ P ≺ every anchored operation after the grant's creation
 With no anchored successor, the second condition is vacuously true. An operation
 without a receipt from the grant's registry is pending there. Check **all** grant
 successors: a pending update must not hide an anchored deletion later in history.
-Same-block, different-transaction comparisons fail closed in both directions.
+Same-block comparisons fail closed in both directions.
 
 This is why attribution uses a shared chain. A publisher chooses `proof.created`
 and can backdate a new signature; it cannot make a newly anchored operation precede
@@ -290,7 +290,12 @@ fail. A user cannot force a compromised client to delete work it controls.
 The wallet distinguishes requested, submitted and effective revocation. Authority
 ends at the chain position, not at the button press. Pending transactions, funding,
 mediator availability and chain inclusion determine the delay; there is no fixed
-upper bound. A stalled signed deletion can be resubmitted to other suitable nodes.
+upper bound. Only the node the deletion was submitted to queues it for anchoring;
+nodes that receive it by gossip accept it without queueing it. Resubmitting a
+stalled deletion elsewhere therefore needs a Gatekeeper path that queues an
+already accepted operation for anchoring, idempotently; today such a node rejects
+the resubmission, because its predecessor is no longer the current version. That
+path is an implementation prerequisite for stalled-revocation recovery.
 
 ## Security considerations
 

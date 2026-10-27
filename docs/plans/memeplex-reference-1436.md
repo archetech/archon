@@ -593,7 +593,8 @@ Every client renders the same text the same way:
 - **Images** are Archon image assets, created with `createImage`, whose data gives
   the IPFS CID, type, size, width and height.
   - **Types:** `image/png`, `image/jpeg`, `image/webp` and `image/gif`. No SVG, which can
-    carry script.
+    carry script. `createImage` records JPEG files as `image/jpg`; renderers read that
+    as `image/jpeg` before applying this list, without changing the signed asset.
   - **Size:** at most 10 MB per image. The asset's `bytes` is the publisher's claim,
     so clients use it only to reject early, count bytes while downloading, and abort
     past the limit before buffering or decoding the whole image.
@@ -789,8 +790,10 @@ choose each grant's registry from the permitted mainnets, and makes revoking a g
 single action. It shows a revocation in three states: **requested** (signed by the wallet),
 **submitted** (accepted by a node for anchoring) and **effective** (the deletion is
 anchored). While it is not yet effective, the wallet warns the user, and if it stalls,
-resubmits the signed deletion to other nodes that run a mediator for the registry.
-Because the deletion gossips on Hyperswarm, any such node can anchor it.
+resubmits the signed deletion to another node that runs a mediator for the registry.
+Gossip alone does not get it anchored, because nodes queue only operations submitted
+to them, and a node that already accepted the deletion by gossip needs the idempotent
+requeue path described under [What revocation means](memeplex-1436.md#what-revocation-means).
 
 ## Content availability
 
