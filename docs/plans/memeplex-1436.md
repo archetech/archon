@@ -109,7 +109,20 @@ A permitted creation includes permission to edit and delete that object while
 the grant is live. There is no separate edit scope, expiry or re-delegation in v1.
 
 The grant and its objects are created on the same chain registry and publications
-stay there. Grants on `local`, `hyperswarm` or `pin` are void. Objects gossip
+stay there. Only mainnet chain registries are permitted:
+
+| Registry | Chain |
+|---|---|
+| `BTC:mainnet` | Bitcoin |
+| `ZEC:mainnet` | Zcash |
+| `ETH:mainnet` | Ethereum |
+| `SOL:mainnet-beta` | Solana |
+
+A grant on any other registry is void: testnets (`BTC:signet`, `BTC:testnet4`,
+`ZEC:testnet`, `ETH:sepolia`, `SOL:devnet`), whose coins are free and whose chains can
+be reset, and `local`, `hyperswarm` and `pin`, which have no chain order. Adding a
+registry to this list is a protocol revision; until a verifier adopts it, that
+verifier treats grants on the new registry as void. Objects gossip
 before anchoring, but attribution waits for chain evidence.
 
 The grant is immutable as an authorization. Any later operation in its accepted
@@ -124,7 +137,7 @@ of the following:
 
 1. Its creation data satisfies the grant schema.
 2. Its create operation names `U` as controller and is signed by `U`.
-3. It was created on a chain registry `R`, and its creation has an accepted chain
+3. It was created on a permitted registry `R`, and its creation has an accepted chain
    receipt on `R`.
 4. Its creation data names a client agent `A` different from `U`.
 

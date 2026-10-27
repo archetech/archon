@@ -685,7 +685,7 @@ cutoff, even though Archon supports historical resolution by time.
 2. The wallet shows the client DID, the claimed `name` (labelled as the client's own
    claim) and the requested scope: the listed actions, or every core kind when the
    request has no `actions`. The user approves it or a narrower subset and picks a
-   chain registry, and the wallet creates the grant there with that scope and the
+   permitted registry, and the wallet creates the grant there with that scope and the
    request's `client` and `nonce`.
 3. The client finds the grant with a query for `memeplexGrant.client` (see
    Discovery queries), keeps the one carrying its nonce, waits until it is anchored,
@@ -784,8 +784,9 @@ There is no central moderator. Viewers choose which judgments to apply:
 ### Wallet
 
 The wallet lists active grants with their scope ("all core kinds" or the listed
-actions), grants what a client requests unless the user narrows it, lets the user choose each grant's chain registry, and makes revoking a grant a single
-action. It shows a revocation in three states: **requested** (signed by the wallet),
+actions), grants what a client requests unless the user narrows it, lets the user
+choose each grant's registry from the permitted mainnets, and makes revoking a grant a
+single action. It shows a revocation in three states: **requested** (signed by the wallet),
 **submitted** (accepted by a node for anchoring) and **effective** (the deletion is
 anchored). While it is not yet effective, the wallet warns the user, and if it stalls,
 resubmits the signed deletion to other nodes that run a mediator for the registry.
@@ -865,7 +866,7 @@ needed first.
 4. **CLI client:** create an agent DID as the client, grant it from the user's
    identity, then create, edit, delete and query objects on the grant's registry from
    the existing CLI and SDKs; this works with today's asset commands.
-5. **Delegation:** wallet UI to create, list and revoke grants on a chain registry.
+5. **Delegation:** wallet UI to create, list and revoke grants on a permitted registry.
 6. **Indexer.**
 7. **Memepool client.**
 8. **Moderation:** block lists and labels.
