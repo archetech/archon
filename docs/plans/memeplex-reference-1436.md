@@ -663,8 +663,25 @@ cutoff, even though Archon supports historical resolution by time.
                                "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz" } }
    ```
 
-   `nonce` is at least 128 random bits, base64url-encoded. The client shows the request
-   as base64url-encoded JSON, in a QR code or a link the wallet accepts.
+   `nonce` is at least 128 random bits, base64url-encoded. The client presents the
+   request as a **grant link**, following the `archon://` deep links Archon wallets
+   already handle (`archon://auth?challenge=…`, `archon://accept?credential=…`):
+
+   ```text
+   archon://grant?request=<base64url(request JSON)>
+   ```
+
+   - `request` is the UTF-8 JSON above, base64url-encoded without padding. The whole
+     link is at most 2,048 characters, which keeps it scannable as a QR code; a
+     typical request is about 330.
+   - The client shows the link as a QR code for a wallet on another device, as a
+     clickable link for a wallet on the same device (the browser extension or the
+     mobile app), and as copyable text that the wallet accepts when pasted.
+   - The request travels inline, so presenting it needs no network call and creates
+     no DID. The wallet sends nothing back: the client finds the grant by query (step
+     3).
+   - A wallet rejects a link whose `request` does not decode, does not match the grant
+     request schema, or is longer than the limit, and creates no grant.
 2. The wallet shows the client DID, the claimed `name` (labelled as the client's own
    claim) and the requested scope: the listed actions, or every core kind when the
    request has no `actions`. The user approves it or a narrower subset and picks a
