@@ -290,12 +290,9 @@ fail. A user cannot force a compromised client to delete work it controls.
 The wallet distinguishes requested, submitted and effective revocation. Authority
 ends at the chain position, not at the button press. Pending transactions, funding,
 mediator availability and chain inclusion determine the delay; there is no fixed
-upper bound. Only the node the deletion was submitted to queues it for anchoring;
-nodes that receive it by gossip accept it without queueing it. Resubmitting a
-stalled deletion elsewhere therefore needs a Gatekeeper path that queues an
-already accepted operation for anchoring, idempotently; today such a node rejects
-the resubmission, because its predecessor is no longer the current version. That
-path is an implementation prerequisite for stalled-revocation recovery.
+upper bound. This is the same for every operation on a chain registry: anchoring
+is the responsibility of the node the deletion is submitted to and its mediator, and
+Memeplex adds no recovery mechanism of its own.
 
 ## Security considerations
 

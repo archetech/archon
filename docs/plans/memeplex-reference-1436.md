@@ -789,11 +789,8 @@ actions), grants what a client requests unless the user narrows it, lets the use
 choose each grant's registry from the permitted mainnets, and makes revoking a grant a
 single action. It shows a revocation in three states: **requested** (signed by the wallet),
 **submitted** (accepted by a node for anchoring) and **effective** (the deletion is
-anchored). While it is not yet effective, the wallet warns the user, and if it stalls,
-resubmits the signed deletion to another node that runs a mediator for the registry.
-Gossip alone does not get it anchored, because nodes queue only operations submitted
-to them, and a node that already accepted the deletion by gossip needs the idempotent
-requeue path described under [What revocation means](memeplex-1436.md#what-revocation-means).
+anchored). Until it is effective, the wallet warns the user that the client can
+still publish.
 
 ## Content availability
 
