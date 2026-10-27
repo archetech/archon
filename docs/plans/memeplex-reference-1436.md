@@ -296,7 +296,7 @@ ignored, as the strictness rule requires.
 {
   "title": "Memeplex grant",
   "type": "object",
-  "required": ["v", "client", "actions"],
+  "required": ["v", "client"],
   "properties": {
     "v": {"const": 1},
     "client": {"$ref": "#/$defs/did"},
@@ -312,7 +312,7 @@ ignored, as the strictness rule requires.
 {
   "title": "Memeplex grant request",
   "type": "object",
-  "required": ["v", "client", "name", "actions", "nonce"],
+  "required": ["v", "client", "name", "nonce"],
   "properties": {
     "v": {"const": 1},
     "client": {"$ref": "#/$defs/did"},
@@ -666,9 +666,10 @@ cutoff, even though Archon supports historical resolution by time.
    `nonce` is at least 128 random bits, base64url-encoded. The client shows the request
    as base64url-encoded JSON, in a QR code or a link the wallet accepts.
 2. The wallet shows the client DID, the claimed `name` (labelled as the client's own
-   claim) and the requested actions. The user approves a subset and picks a chain
-   registry, and the wallet creates the grant there with that subset and the request's
-   `client` and `nonce`.
+   claim) and the requested scope: the listed actions, or every core kind when the
+   request has no `actions`. The user approves it or a narrower subset and picks a
+   chain registry, and the wallet creates the grant there with that scope and the
+   request's `client` and `nonce`.
 3. The client finds the grant with a query for `memeplexGrant.client` (see
    Discovery queries), keeps the one carrying its nonce, waits until it is anchored,
    and checks the grant against the core authorization rules. The grant's creator
@@ -765,8 +766,8 @@ There is no central moderator. Viewers choose which judgments to apply:
 
 ### Wallet
 
-The wallet lists active grants with the actions they allow, defaults to narrow actions,
-lets the user choose each grant's chain registry, and makes revoking a grant a single
+The wallet lists active grants with their scope ("all core kinds" or the listed
+actions), grants what a client requests unless the user narrows it, lets the user choose each grant's chain registry, and makes revoking a grant a single
 action. It shows a revocation in three states: **requested** (signed by the wallet),
 **submitted** (accepted by a node for anchoring) and **effective** (the deletion is
 anchored). While it is not yet effective, the wallet warns the user, and if it stalls,

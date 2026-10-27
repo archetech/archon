@@ -96,6 +96,15 @@ later transferred to the user confers no authority. The grant's schema applies;
 | `memeplex:tag` | `tag` |
 | An extension's pinned schema DID URL | That extension kind |
 
+`actions` is optional. A grant without it permits every core kind, which is what a
+full client such as Memepool asks for; single-purpose clients (a reaction widget, a
+posting bot, a labelling service) ask for less, so that a compromised client can do
+less under the user's name. Extension kinds are never implied: a grant permits one
+only by listing its schema DID URL, because a user cannot have reviewed a kind defined
+after the grant. The field exists in v1 even though most grants omit it: verifiers
+ignore unknown fields, so a restriction added later would be invisible to older
+verifiers, and they would attribute objects that newer ones reject.
+
 A permitted creation includes permission to edit and delete that object while
 the grant is live. There is no separate edit scope, expiry or re-delegation in v1.
 
@@ -278,8 +287,9 @@ upper bound. A stalled signed deletion can be resubmitted to other suitable node
   later transfer to the user; see [grant validity](#authority-is-an-interval).
 - **Backdating:** compare receipts on one chain, not publisher-selected clocks;
   [revocation](#what-revocation-means) remains pending until anchored.
-- **Over-broad or forgotten grants:** the [wallet](memeplex-reference-1436.md#wallet)
-  defaults to narrow actions and lists grants for revocation.
+- **Over-broad or forgotten grants:** single-purpose clients request listed
+  actions, and the [wallet](memeplex-reference-1436.md#wallet) shows each grant's
+  scope and lists grants for revocation.
 - **Transferred objects:** ownership cannot confer authorship; the
   [attributed prefix](#one-rule-for-publication) ends at a transfer.
 - **Untrusted rendering:** enforce safe formats and resource budgets before
