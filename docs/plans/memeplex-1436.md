@@ -79,7 +79,7 @@ the authorization:
     "v": 1,
     "client": "did:cid:…client",
     "actions": ["memeplex:post", "memeplex:reply", "memeplex:tag"],
-    "nonce": "Qm9vdHN0cmFwIG5vbmNl"
+    "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz"
   }
 }
 ```

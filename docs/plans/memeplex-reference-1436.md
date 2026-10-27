@@ -53,14 +53,17 @@ revisions"). A venue that needs a fixed vocabulary defines an extension kind.
 
 ### Schemas
 
-Every kind, and the grant, has a **schema**: a JSON Schema (draft 2020-12) published as
-an Archon schema asset (`createSchema`), in the spirit of AT Protocol's Lexicon. The
-Memeplex specification lists the schema DID and pinned `versionId` for each core kind.
+Every kind, the grant and the grant request has a **schema**: a JSON Schema (draft
+2020-12), in the spirit of AT Protocol's Lexicon. The schema text below is normative.
+Each schema is also published as an Archon schema asset (`createSchema`), with the
+common `$defs` inlined so it stands alone, and the protocol pins its DID and
+`versionId`. A schema validates the `memeplex` member (or `memeplexGrant`,
+`memeplexGrantRequest`), not the whole `didDocumentData`.
 
 - **Validation.** Verifiers and indexers validate each object against its kind's
   schema. A version that fails is not attributed; earlier attributed versions still
-  determine publication state. Rules a schema cannot express (tag values, rating
-  bounds) are part of the kind's definition and are checked alongside.
+  determine publication state. Rules a schema cannot express are part of the kind's definition
+  and are checked alongside (see Checks beyond the schemas).
 - **Core kinds have bare names** (`post`, `reply`, `rating`, …).
 - **Extension kinds are named by their schema DID:** `"kind": "did:cid:…schema?versionId=…"`.
   That gives namespacing without a registry or DNS. A client that does not know an
@@ -68,6 +71,272 @@ Memeplex specification lists the schema DID and pinned `versionId` for each core
   it.
 - **Evolution.** Adding optional fields keeps `v`. A breaking change publishes a new
   schema and increments `v`; clients ignore versions they do not support.
+
+### Schema text
+
+**Common definitions**, shared as `$defs` by every schema:
+
+```json
+{
+  "did": {"type": "string", "pattern": "^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$"},
+  "versionId": {"type": "string", "pattern": "^b[a-z2-7]{20,}$"},
+  "cid": {
+    "type": "string",
+    "pattern": "^(b[a-z2-7]{20,}|Qm[1-9A-HJ-NP-Za-km-z]{44})$"
+  },
+  "pinnedSchema": {
+    "type": "string",
+    "pattern": "^did:[a-z0-9]+:[A-Za-z0-9._:%-]+\\?versionId=b[a-z2-7]{20,}$"
+  },
+  "bytes": {"type": "integer", "minimum": 0},
+  "markdown": {
+    "type": "object",
+    "required": ["cid", "type", "bytes"],
+    "properties": {
+      "cid": {"$ref": "#/$defs/cid"},
+      "type": {"const": "text/markdown"},
+      "bytes": {"$ref": "#/$defs/bytes"}
+    }
+  },
+  "pdf": {
+    "type": "object",
+    "required": ["cid", "type", "bytes"],
+    "properties": {
+      "cid": {"$ref": "#/$defs/cid"},
+      "type": {"const": "application/pdf"},
+      "bytes": {"$ref": "#/$defs/bytes"}
+    }
+  },
+  "source": {
+    "type": "object",
+    "required": ["cid", "type", "bytes"],
+    "properties": {
+      "cid": {"$ref": "#/$defs/cid"},
+      "type": {"enum": ["application/x-tex", "application/gzip"]},
+      "bytes": {"$ref": "#/$defs/bytes"}
+    }
+  },
+  "word": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^\\S+$"},
+  "tags": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"$ref": "#/$defs/word"}},
+  "text": {"type": "string", "maxLength": 10000},
+  "action": {
+    "anyOf": [
+      {"enum": ["memeplex:post", "memeplex:reply", "memeplex:rate", "memeplex:tag"]},
+      {"$ref": "#/$defs/pinnedSchema"}
+    ]
+  },
+  "actions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/action"}},
+  "nonce": {"type": "string", "minLength": 22, "pattern": "^[A-Za-z0-9_-]+$"}
+}
+```
+
+Every schema sets `"$schema": "https://json-schema.org/draft/2020-12/schema"`, omitted
+below. Each kind's schema lists every field the field table defines: the fields the
+kind allows with their types, and the rest as `false`, so a field from another kind
+makes the object invalid. Other properties are unconstrained, so unknown fields are
+ignored, as the strictness rule requires.
+
+**post**
+
+```json
+{
+  "title": "Memeplex post",
+  "type": "object",
+  "properties": {
+    "v": {"const": 1},
+    "author": {"$ref": "#/$defs/did"},
+    "grant": {"$ref": "#/$defs/did"},
+    "kind": {"const": "post"},
+    "text": {"$ref": "#/$defs/text"},
+    "content": {"$ref": "#/$defs/markdown"},
+    "target": {"$ref": "#/$defs/did"},
+    "targetVersion": {"$ref": "#/$defs/versionId"},
+    "tags": {"$ref": "#/$defs/tags"},
+    "title": {"type": "string", "maxLength": 300},
+    "subtitle": {"type": "string", "maxLength": 300},
+    "summary": {"type": "string", "maxLength": 5000},
+    "authors": false, "source": false, "pdf": false, "verdict": false,
+    "rating": false, "min": false, "max": false, "tag": false
+  },
+  "required": ["v", "kind", "author", "grant"],
+  "dependentRequired": {
+    "target": ["targetVersion"],
+    "targetVersion": ["target"],
+    "subtitle": ["title"],
+    "summary": ["title"]
+  },
+  "allOf": [
+    {"not": {"required": ["text", "content"]}},
+    {
+      "anyOf": [
+        {"required": ["text"]},
+        {"required": ["content"]},
+        {"required": ["target"]}
+      ]
+    }
+  ]
+}
+```
+
+**paper**
+
+```json
+{
+  "title": "Memeplex paper",
+  "type": "object",
+  "properties": {
+    "v": {"const": 1},
+    "author": {"$ref": "#/$defs/did"},
+    "grant": {"$ref": "#/$defs/did"},
+    "kind": {"const": "paper"},
+    "content": {"$ref": "#/$defs/markdown"},
+    "tags": {"$ref": "#/$defs/tags"},
+    "title": {"type": "string", "maxLength": 300},
+    "subtitle": {"type": "string", "maxLength": 300},
+    "summary": {"type": "string", "maxLength": 5000},
+    "authors": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/did"}
+    },
+    "source": {"$ref": "#/$defs/source"},
+    "pdf": {"$ref": "#/$defs/pdf"},
+    "text": false, "target": false, "targetVersion": false, "verdict": false,
+    "rating": false, "min": false, "max": false, "tag": false
+  },
+  "required": ["v", "kind", "author", "grant", "title", "summary", "authors", "content"]
+}
+```
+
+**reply**
+
+```json
+{
+  "title": "Memeplex reply",
+  "type": "object",
+  "properties": {
+    "v": {"const": 1},
+    "author": {"$ref": "#/$defs/did"},
+    "grant": {"$ref": "#/$defs/did"},
+    "kind": {"const": "reply"},
+    "text": {"$ref": "#/$defs/text"},
+    "content": {"$ref": "#/$defs/markdown"},
+    "target": {"$ref": "#/$defs/did"},
+    "targetVersion": {"$ref": "#/$defs/versionId"},
+    "tags": {"$ref": "#/$defs/tags"},
+    "verdict": {"type": "string", "maxLength": 300},
+    "title": false, "subtitle": false, "summary": false, "authors": false,
+    "source": false, "pdf": false, "rating": false, "min": false, "max": false,
+    "tag": false
+  },
+  "required": ["v", "kind", "author", "grant", "target", "targetVersion"],
+  "allOf": [
+    {"not": {"required": ["text", "content"]}},
+    {
+      "anyOf": [
+        {"required": ["text"]},
+        {"required": ["content"]}
+      ]
+    }
+  ]
+}
+```
+
+**rating**
+
+```json
+{
+  "title": "Memeplex rating",
+  "type": "object",
+  "properties": {
+    "v": {"const": 1},
+    "author": {"$ref": "#/$defs/did"},
+    "grant": {"$ref": "#/$defs/did"},
+    "kind": {"const": "rating"},
+    "target": {"$ref": "#/$defs/did"},
+    "targetVersion": {"$ref": "#/$defs/versionId"},
+    "rating": {"type": "integer"},
+    "min": {"type": "integer"},
+    "max": {"type": "integer"},
+    "text": false, "content": false, "tags": false, "title": false,
+    "subtitle": false, "summary": false, "authors": false, "source": false,
+    "pdf": false, "verdict": false, "tag": false
+  },
+  "required": ["v", "kind", "author", "grant", "target", "targetVersion", "rating", "min", "max"]
+}
+```
+
+**tag**
+
+```json
+{
+  "title": "Memeplex tag",
+  "type": "object",
+  "properties": {
+    "v": {"const": 1},
+    "author": {"$ref": "#/$defs/did"},
+    "grant": {"$ref": "#/$defs/did"},
+    "kind": {"const": "tag"},
+    "target": {"$ref": "#/$defs/did"},
+    "targetVersion": {"$ref": "#/$defs/versionId"},
+    "tag": {"type": "string", "minLength": 1, "maxLength": 64},
+    "text": false, "content": false, "tags": false, "title": false,
+    "subtitle": false, "summary": false, "authors": false, "source": false,
+    "pdf": false, "verdict": false, "rating": false, "min": false, "max": false
+  },
+  "required": ["v", "kind", "author", "grant", "target", "targetVersion", "tag"]
+}
+```
+
+**grant** (`memeplexGrant`)
+
+```json
+{
+  "title": "Memeplex grant",
+  "type": "object",
+  "required": ["v", "client", "actions"],
+  "properties": {
+    "v": {"const": 1},
+    "client": {"$ref": "#/$defs/did"},
+    "actions": {"$ref": "#/$defs/actions"},
+    "nonce": {"$ref": "#/$defs/nonce"}
+  }
+}
+```
+
+**grant request** (`memeplexGrantRequest`)
+
+```json
+{
+  "title": "Memeplex grant request",
+  "type": "object",
+  "required": ["v", "client", "name", "actions", "nonce"],
+  "properties": {
+    "v": {"const": 1},
+    "client": {"$ref": "#/$defs/did"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 100},
+    "actions": {"$ref": "#/$defs/actions"},
+    "nonce": {"$ref": "#/$defs/nonce"}
+  }
+}
+```
+
+JSON Schema counts string length in code points, matching the field table.
+
+### Checks beyond the schemas
+
+These rules cannot be expressed in JSON Schema. Validators apply them alongside the
+schema, and a version that fails one is invalid in the same way:
+
+1. **Rating bounds:** `min < max` and `min ≤ rating ≤ max`.
+2. **Paper authors:** `authors` includes `author`.
+3. **Words:** each entry of `tags`, and a `tag` value without emoji, is a normalized
+   word: Unicode NFC, no leading or trailing whitespace, unchanged by Unicode default
+   lower-casing, and no internal whitespace. A word contains no emoji.
+4. **Emoji tags:** a `tag` value containing any emoji is exactly one emoji from the RGI
+   set, in the fully-qualified form listed in Unicode's `emoji-test.txt`.
 
 ### Examples
 
@@ -391,7 +660,7 @@ cutoff, even though Archon supports historical resolution by time.
                                "client": "did:cid:…client",
                                "name": "Memepool",
                                "actions": ["memeplex:post", "memeplex:reply", "memeplex:tag"],
-                               "nonce": "Qm9vdHN0cmFwIG5vbmNl" } }
+                               "nonce": "Qm9vdHN0cmFwIG5vbmNlMTIz" } }
    ```
 
    `nonce` is at least 128 random bits, base64url-encoded. The client shows the request
