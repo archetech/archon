@@ -109,7 +109,7 @@ A permitted creation includes permission to edit and delete that object while
 the grant is live, even if the grant's actions later narrow. There is no separate
 edit scope or re-delegation in v1.
 
-A grant may carry `expiresAt`, an RFC 3339 UTC date-time. Authority ends for
+A grant may carry `expiresAt`, an ISO 8601 UTC date-time. Authority ends for
 operations anchored in a block whose time is at or after `expiresAt`. Expiry is a
 rule verifiers apply, not an event on the network: the grant DID is not revoked or
 changed, and nothing needs to be published. Its history stays, so everything
