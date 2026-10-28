@@ -115,7 +115,12 @@ async fn creation_type(state: &AppState, did: &str) -> Option<String> {
 }
 
 // Registration replaces the whole component; omission is handled by the caller.
-pub(crate) fn valid_registration(value: &Value, genesis: Option<&Value>) -> bool {
+// A replacement cannot add expiry to a DID whose predecessor registration has none.
+pub(crate) fn valid_registration(
+    value: &Value,
+    genesis: Option<&Value>,
+    previous: Option<&Value>,
+) -> bool {
     let Some(registration) = value.as_object() else {
         return false;
     };
@@ -133,6 +138,9 @@ pub(crate) fn valid_registration(value: &Value, genesis: Option<&Value>) -> bool
     }
     if let Some(expiry) = registration.get("validUntil") {
         if !verify_date_format(expiry.as_str()) {
+            return false;
+        }
+        if previous.is_some_and(|previous| previous.get("validUntil").is_none()) {
             return false;
         }
     }
@@ -212,7 +220,7 @@ pub(crate) async fn authorize_operation(
             }
             Ok(
                 verify_create_operation_impl(operation, controller.as_ref())?
-                    && valid_registration(&operation["registration"], None),
+                    && valid_registration(&operation["registration"], None, None),
             )
         }
         Some("update" | "delete") => {
@@ -239,7 +247,11 @@ pub(crate) async fn authorize_operation(
                 return Ok(false);
             }
             if let Some(registration) = operation.pointer("/doc/didDocumentRegistration") {
-                if !valid_registration(registration, genesis.as_ref()) {
+                if !valid_registration(
+                    registration,
+                    genesis.as_ref(),
+                    current.get("didDocumentRegistration"),
+                ) {
                     return Ok(false);
                 }
             }

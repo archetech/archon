@@ -128,7 +128,9 @@ are separate. Likewise, the version-1 size rule remains the existing limit of
 UTF-8 byte limit (#1159).
 
 `validUntil`, when supplied, must have the accepted RFC 3339 string form. A valid
-registration replacement can change or omit it. Current Gatekeepers use expiry
+registration replacement can change or omit it, but cannot add it when the
+predecessor registration has none: a permanent DID stays permanent (#1466).
+Current Gatekeepers use expiry
 for node garbage collection; they do not add a wall-clock expiry check to each
 operation's authorization or resolution. GC removal is local retention behavior,
 not a signed deletion or a consensus transition. Successful GC also clears the
@@ -716,7 +718,7 @@ fields. Null, array, scalar, and partial replacements are invalid.
 Every replacement preserves genesis version, kind, and prefix presence/value.
 A valid registry may change under existing migration rules. Optional `validUntil`
 must use the shared RFC 3339 string grammar; a complete replacement may change or
-omit expiry. Unknown extension fields remain allowed. These checks introduce no
+omit expiry, but cannot add it when the predecessor registration has none. Unknown extension fields remain allowed. These checks introduce no
 new expiry enforcement or creation-prefix grammar. Imports validate registry name
 shape independently of the node's locally supported registries.
 

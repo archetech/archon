@@ -1079,6 +1079,172 @@
           "proofValue": "fdIwXv2R6V5dXRr0OKnwF7mVrXy3IZ2XrqqFZDmu0ANQJBbDcQTkpc4Ah4BidT82ueToKAU6UBI4Cl7fJpmDdA"
         }
       }
+    },
+    {
+      "name": "add_expiry_to_permanent",
+      "agent": {
+        "type": "create",
+        "created": "2026-09-17T11:00:00.000Z",
+        "registration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "hyperswarm"
+        },
+        "publicJwk": {
+          "kty": "EC",
+          "crv": "secp256k1",
+          "x": "I9o4OLoCF-Dz7WvC313IGyADEWkrVirgD2M0GHvCYR8",
+          "y": "TnYS-S8LdarWUSViruA6l73z_mI_VbbLjwe3L10-KOQ"
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "QUMqYTs0nXt4srpeBMbIQwAAe4H5CEYaNzxsfmPXRC5R4JAS77k54oWEnW2dvysVy5WfP8_IMi_gPasW91mbMw"
+        }
+      },
+      "did": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+      "accepted": false,
+      "expectedRegistration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm"
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+        "previd": "bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+        "doc": {
+          "didDocumentRegistration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "hyperswarm",
+            "validUntil": "2099-12-31T00:00:00Z"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "J9JTaUg-GMkGXaMDblSYfQLOoRnFJ9ykjZ7LoQ3wYP9k8mCQTcUO9jgQUMY_ZA3XDfzEesSaBSecFbo5lJDfNw"
+        }
+      }
+    },
+    {
+      "name": "replace_permanent",
+      "agent": {
+        "type": "create",
+        "created": "2026-09-17T11:00:00.000Z",
+        "registration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "hyperswarm"
+        },
+        "publicJwk": {
+          "kty": "EC",
+          "crv": "secp256k1",
+          "x": "I9o4OLoCF-Dz7WvC313IGyADEWkrVirgD2M0GHvCYR8",
+          "y": "TnYS-S8LdarWUSViruA6l73z_mI_VbbLjwe3L10-KOQ"
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "QUMqYTs0nXt4srpeBMbIQwAAe4H5CEYaNzxsfmPXRC5R4JAS77k54oWEnW2dvysVy5WfP8_IMi_gPasW91mbMw"
+        }
+      },
+      "did": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+      "accepted": true,
+      "expectedRegistration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm",
+        "extension": {
+          "foo": "bar"
+        }
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+        "previd": "bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a",
+        "doc": {
+          "didDocumentRegistration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "hyperswarm",
+            "extension": {
+              "foo": "bar"
+            }
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaiera5ubhz3ljzekxmz6yppw4ueyzldpmp34jeqx7n63wbhwv7mfnma5a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "2_Qs0FPYjaaIkV_t3-hNSFAeEvjRKC1t7omWMY1gEn1f280zSYuviOvCraM6XMZggG_yOobQTq53deZ3Gc09hw"
+        }
+      }
+    },
+    {
+      "name": "readd_expiry_after_removal",
+      "prior": {
+        "type": "update",
+        "did": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "previd": "bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "doc": {
+          "didDocumentData": {
+            "case": "remove_expiry"
+          },
+          "didDocumentRegistration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "hyperswarm"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "pIrRe84xDHlTSyfxJU4YM96CuTNsKIy6-ZvvmWpl2nB1bHeuAnRvvAGuOzKQrzoARFlYjOxp2wJC_5-I-wLMzA"
+        }
+      },
+      "accepted": false,
+      "expectedRegistration": {
+        "version": 1,
+        "type": "agent",
+        "registry": "hyperswarm"
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a",
+        "previd": "bagaaiera74g5uvgs6aloqtijdbihi47gqnk4l52isgppp2lczoqa2a5dwo4q",
+        "doc": {
+          "didDocumentRegistration": {
+            "version": 1,
+            "type": "agent",
+            "registry": "hyperswarm",
+            "validUntil": "2099-12-31T00:00:00Z"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-09-17T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaierarx4f3n2bfkpnil2ofwdag3omt5avfoswopbzjee6i6lavbjh6p5a#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "w04QsgZZHOKyx2GKP-9VDud-hwemltNkjR3z2uE7kZUsr_xHQtxqr06j0ccZgjW1sxYTe5Uhr4Palk8oHsx_rA"
+        }
+      }
     }
   ]
 }

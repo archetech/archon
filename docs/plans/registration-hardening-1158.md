@@ -31,7 +31,7 @@ to tighten key permissions or byte limits without their own compatibility policy
 | `type` | Required `agent` or `asset`, matching immutable genesis. Existing self-control and agent-owner rules continue to apply. |
 | `registry` | Required string of 1–128 characters matching `[A-Za-z0-9][A-Za-z0-9:_-]*`. May change under existing registry-migration rules. This is not a chain allowlist. |
 | `prefix` | Optional at creation. Replacements preserve its genesis presence and value. No additional creation-prefix grammar is introduced. |
-| `validUntil` | Optional string using the shared RFC 3339 timestamp grammar. Null, numbers, empty strings, and malformed timestamps are invalid. Omission in a complete replacement removes expiry; a valid value may change. |
+| `validUntil` | Optional string using the shared RFC 3339 timestamp grammar. Null, numbers, empty strings, and malformed timestamps are invalid. Omission in a complete replacement removes expiry; a valid value may change. A replacement cannot add it when the predecessor registration has none (#1466). |
 | Extension members | Allowed; this change adds no restriction on unknown members. |
 
 JavaScript optional members set to `undefined` serialize as omission. Local SDK
@@ -54,8 +54,8 @@ Import and startup recovery keep candidate evidence and use the same validation;
 missing predecessor recovery and competing-branch selection remain intact.
 Cryptographic proof verification gains no history lookup responsibilities.
 
-Shared signed fixtures cover omission, complete replacement, expiry removal and
-syntax, invalid field types, version/kind/prefix changes, extension members, and
+Shared signed fixtures cover omission, complete replacement, expiry removal,
+addition, and syntax, invalid field types, version/kind/prefix changes, extension members, and
 registry migration. Both ports exercise direct submission, import, verified and
 ordinary resolution, restart, and repair of pre-existing malformed projections.
 Rejected direct submissions are checked for database side effects. Older migration
