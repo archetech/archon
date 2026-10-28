@@ -291,6 +291,10 @@ These rules apply to coding agents working in this repository.
 
 - Wallet and demo-client DID repair must use the shared `@didcid/wallet-ui/did-repair` dialog with injected Keymaster callbacks. Keep repair decisions in Keymaster, discard stale inspection results when the target changes, and require an explicit repair action after displaying proposed changes. Alias inspection must retain the resolved canonical DID separately from document names and editable inputs; post-repair refreshes on every consuming surface must use the repaired DID rather than another tab’s selection. Identity views refresh only for their own DID; generic viewers follow the repaired canonical DID.
 
+- Before merging or enabling auto-merge, verify the squash/merge commit headline uses a conventional commit prefix, as required by CONTRIBUTING.md. Set the merge headline explicitly when the PR title is not conventional; do not rely on GitHub defaults.
+
+- Before adding deferred-event retirement machinery, trace successful GC queue cleanup, the lifetime of batch-ingress deduplication, mediator completion checks, and durable candidate replay together. Do not describe retries as indefinite without checking those existing bounds.
+
 - Run resource-intensive Docker builds, dependency installs, and native frontend builds sequentially on this shared host. Check load before starting; when load rises sharply, stop task-owned jobs before further diagnosis, and do not restart Docker without authorization.
 
 - For internal L402 exemptions, trace both the Drawbridge validator and the upstream credentials sent by each Keymaster service runtime. Use an explicit upstream credential rather than automatically forwarding the local admin secret to a configurable remote URL. Match the configured admin key, never a source address; wrong keys must retain the normal paid path, and exemption metrics must not include secrets.
