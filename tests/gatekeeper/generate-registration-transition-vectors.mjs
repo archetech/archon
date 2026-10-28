@@ -47,6 +47,21 @@ for (const [name, next, accepted] of [
     cases.push({name,agent:genesis,did:target,accepted,expectedRegistration:accepted?replacement:registrationWithPrefix,
         operation:sign({type:'update',did:target,previd:canonical(genesis),doc:{didDocumentRegistration:replacement}},target+'#key-1')});
 }
+// Expiry cannot be added to a DID whose predecessor registration has none (#1466).
+const permanent={version:1,type:'agent',registry:'hyperswarm'};
+const permanentGenesis=sign({...createOp,registration:permanent},'#key-1');
+const permanentDid='did:cid:'+canonical(permanentGenesis);
+for (const [name, next, accepted] of [
+    ['add_expiry_to_permanent', {...permanent,validUntil:'2099-12-31T00:00:00Z'}, false],
+    ['replace_permanent', {...permanent,extension:{foo:'bar'}}, true],
+]) {
+    cases.push({name,agent:permanentGenesis,did:permanentDid,accepted,expectedRegistration:accepted?next:permanent,
+        operation:sign({type:'update',did:permanentDid,previd:canonical(permanentGenesis),doc:{didDocumentRegistration:next}},permanentDid+'#key-1')});
+}
+// The predecessor decides, not genesis: an ephemeral DID made permanent stays permanent.
+const removal=cases.find(item=>item.name==='remove_expiry').operation;
+cases.push({name:'readd_expiry_after_removal',prior:removal,accepted:false,expectedRegistration:permanent,
+    operation:sign({type:'update',did,previd:canonical(removal),doc:{didDocumentRegistration:registration}},did+'#key-1')});
 const invalidGenesis=[null,123,'', '2026-02-30T00:00:00Z'].map(validUntil=>sign({...createOp,registration:{...registration,validUntil}},'#key-1'));
 const unsupportedGenesis=sign({...createOp,registration:{...registration,version:2}},'#key-1');
 writeFileSync('tests/gatekeeper/registration-transition-v1-vectors.json',JSON.stringify({agent,did,unsupportedGenesis,invalidGenesis,cases},null,2)+'\n');

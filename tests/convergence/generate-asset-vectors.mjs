@@ -32,13 +32,13 @@ for (const legacy of [false, true]) for (const mode of ['hyperswarm', 'pin', 'ch
     const ar = await rotate(a, aid, 0, 1, 20), br = await rotate(b, bid, 2, 3, 45);
     const ad = sign({ type: 'delete', did: aid, previd: await cid(ar) }, 1, 25, aid + '#key-1');
     const create = sign({ type: 'create', created: date(12),
-        registration: { version: 1, type: 'asset', registry: assetRegistry }, controller: aid,
+        registration: { version: 1, type: 'asset', registry: assetRegistry, validUntil: '2029-01-01T00:00:00Z' }, controller: aid,
         data: { phase: 'created', kept: 'only until replacement' } }, 0, 12, aid + '#key-1');
     const did = 'did:cid:' + await cid(create);
     const transferPayload = { type: 'update', did, previd: await cid(create), doc: {
         didDocument: { id: did, controller: bid, service: [{ id: '#svc', type: 'Test', serviceEndpoint: 'https://example.test' }] },
         didDocumentData: { phase: 'transferred' },
-        didDocumentRegistration: { version: 1, type: 'asset', registry: nextRegistry, validUntil: '2029-01-01T00:00:00Z' },
+        didDocumentRegistration: { version: 1, type: 'asset', registry: nextRegistry },
     } };
     const oldTransfer = sign(transferPayload, 0, 30, aid + '#key-1');
     const freshTransfer = sign(transferPayload, 1, 30, aid + '#key-1');

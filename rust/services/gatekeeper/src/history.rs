@@ -1546,6 +1546,8 @@ mod tests {
             let agent = case.get("agent").unwrap_or(&v["agent"]);
             let did = case.get("did").unwrap_or(&v["did"]).as_str().unwrap();
             let accepted = case["accepted"].as_bool().unwrap();
+            let prior = case.get("prior");
+            let base = if prior.is_some() { 2 } else { 1 };
             for mode in ["direct", "import", "replay"] {
                 let (state, _dir) = crate::tests::make_state(JsonDb {
                     backend: DbBackend::Memory,
@@ -1565,6 +1567,11 @@ mod tests {
                     crate::events::handle_did_operation(&state, agent)
                         .await
                         .unwrap();
+                    if let Some(prior) = prior {
+                        crate::events::handle_did_operation(&state, prior)
+                            .await
+                            .unwrap();
+                    }
                     let before = serde_json::to_value(&state.store.lock().await.data).unwrap();
                     assert_eq!(
                         crate::events::handle_did_operation(&state, &case["operation"])
@@ -1582,6 +1589,12 @@ mod tests {
                     }
                 } else if mode == "import" {
                     crate::events::import_event_impl(&state, wrap(agent)).await;
+                    if let Some(prior) = prior {
+                        assert!(matches!(
+                            crate::events::import_event_impl(&state, wrap(prior)).await,
+                            crate::events::ImportStatus::Added
+                        ));
+                    }
                     let status =
                         crate::events::import_event_impl(&state, wrap(&case["operation"])).await;
                     assert!(
@@ -1595,8 +1608,9 @@ mod tests {
                     );
                 }
                 if mode == "replay" {
-                    let events: Vec<_> = [agent, &case["operation"]]
-                        .into_iter()
+                    let events: Vec<_> = std::iter::once(agent)
+                        .chain(prior)
+                        .chain(std::iter::once(&case["operation"]))
                         .map(|op| {
                             let mut event = wrap(op);
                             event.opid = Some(generate_json_cid(op).unwrap());
@@ -1646,7 +1660,7 @@ mod tests {
                         );
                         assert_eq!(
                             doc["didDocumentMetadata"]["versionSequence"],
-                            if accepted { "2" } else { "1" }
+                            (if accepted { base + 1 } else { base }).to_string()
                         );
                     }
                 }

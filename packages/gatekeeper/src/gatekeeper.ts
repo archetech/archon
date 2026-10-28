@@ -588,7 +588,8 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     // Registration is a whole component replacement; omitted fields are not merged.
-    private validRegistration(value: unknown, genesis?: Operation['registration']): boolean {
+    // A replacement cannot add expiry to a DID whose predecessor registration has none.
+    private validRegistration(value: unknown, genesis?: Operation['registration'], previous?: Record<string, unknown>): boolean {
         if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
         const registration = value as Record<string, unknown>;
         if (registration.version !== 1 ||
@@ -597,6 +598,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         // Undefined optional members disappear on the JSON wire (including in local SDK calls).
         if (registration.validUntil !== undefined &&
             (typeof registration.validUntil !== 'string' || !this.verifyDateFormat(registration.validUntil))) return false;
+        if (registration.validUntil !== undefined && previous && previous.validUntil === undefined) return false;
         return !genesis || (registration.version === genesis.version && registration.type === genesis.type &&
             registration.prefix === genesis.prefix);
     }
@@ -632,7 +634,8 @@ export default class Gatekeeper implements GatekeeperInterface {
             if (!this.verifyProofFormat(operation.proof)) throw new InvalidOperationError('proof');
             if (!type || current.didDocumentMetadata?.deactivated) return this.verifyUpdateOperation(operation, current);
             if (operation.doc?.didDocumentRegistration !== undefined &&
-                !this.validRegistration(operation.doc.didDocumentRegistration, genesis)) return false;
+                !this.validRegistration(operation.doc.didDocumentRegistration, genesis,
+                    current.didDocumentRegistration as Record<string, unknown> | undefined)) return false;
             const next = operation.doc?.didDocument ?? current.didDocument;
             if (!next || next.id !== operation.did) return false;
             const methods = next.verificationMethod;

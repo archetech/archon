@@ -1967,7 +1967,7 @@ pub(crate) async fn get_genesis(
         let event = json!({ "registry": "local", "ordinal": [0],
             "time": operation["created"], "operation": operation });
         operation["type"] == "create"
-            && crate::authorization::valid_registration(&operation["registration"], None)
+            && crate::authorization::valid_registration(&operation["registration"], None, None)
             && (operation["registration"]["type"] != "agent"
                 || (crate::proofs::public_jwk_to_sec1_bytes(&operation["publicJwk"]).is_ok()
                     && operation["proof"]["verificationMethod"] == "#key-1"))

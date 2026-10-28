@@ -12,26 +12,29 @@ class Db extends DbMemory {
 // Shared signed vectors exercise the registration contract in both ports.
 const vector = JSON.parse(readFileSync('tests/gatekeeper/registration-transition-v1-vectors.json', 'utf8')) as {
     agent: Operation; did: string; unsupportedGenesis: Operation; invalidGenesis: Operation[];
-    cases: { agent?: Operation; did?: string; name: string; operation: Operation; accepted: boolean; expectedRegistration: Record<string, unknown> }[];
+    cases: { agent?: Operation; did?: string; prior?: Operation; name: string; operation: Operation; accepted: boolean; expectedRegistration: Record<string, unknown> }[];
 };
 const event = (operation: Operation): GatekeeperEvent => ({ operation, registry: 'hyperswarm', time: operation.proof!.created });
 
-it.each(vector.cases)('enforces v1 $name across submission, import, and restart', async ({ agent = vector.agent, did = vector.did, operation, accepted, expectedRegistration }) => {
+it.each(vector.cases)('enforces v1 $name across submission, import, and restart', async ({ agent = vector.agent, did = vector.did, prior, operation, accepted, expectedRegistration }) => {
+    const base = prior ? 2 : 1;
     for (const mode of ['direct', 'import', 'replay']) {
         const db = new Db('registration-v1');
         const ipfs = new MemoryClient();
         let g = new Gatekeeper({ db, ipfs, registries: mode === 'direct' ? ['hyperswarm', 'BTC:signet'] : ['hyperswarm'] });
         if (mode === 'direct') {
             await g.createDID(agent);
+            if (prior) expect(await g.updateDID(prior)).toBe(true);
             const before = JSON.stringify(db.snapshot());
             expect(await g.updateDID(operation)).toBe(accepted);
             if (!accepted) expect(JSON.stringify(db.snapshot())).toBe(before);
         } else if (mode === 'import') {
             await g.importEvent(event(agent));
+            if (prior) expect(await g.importEvent(event(prior))).toBe('added');
             expect(await g.importEvent(event(operation))).toBe(accepted ? 'added' : 'rejected');
         } else {
             // Simulate an old projection that bypassed registration validation.
-            const events = await Promise.all([agent, operation].map(async op => ({ ...event(op), opid: await generateCID(op) })));
+            const events = await Promise.all([agent, ...(prior ? [prior] : []), operation].map(async op => ({ ...event(op), opid: await generateCID(op) })));
             await db.setEvents(did, events);
             await db.setCandidates(did, events);
         }
@@ -41,7 +44,7 @@ it.each(vector.cases)('enforces v1 $name across submission, import, and restart'
                 const doc = await g.resolveDID(did, { verify });
                 expect(doc.didDocument?.id).toBe(did);
                 expect(doc.didDocumentRegistration).toEqual(expectedRegistration);
-                expect(doc.didDocumentMetadata?.versionSequence).toBe(accepted ? '2' : '1');
+                expect(doc.didDocumentMetadata?.versionSequence).toBe(String(accepted ? base + 1 : base));
             }
         }
     }
