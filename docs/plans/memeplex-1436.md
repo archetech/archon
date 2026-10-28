@@ -166,7 +166,9 @@ The **version in force** at `P` is the latest of the creation and the anchored s
 updates before `P`; the client always comes from the creation. A pending operation
 has no effect until it is anchored, and a pending creation leaves the grant's
 authority pending. `time(P)` is the time of the block that anchors `P`, set by the
-chain rather than the publisher.
+chain rather than the publisher. Block times are not strictly increasing, so expiry
+is approximate: a block shortly after the deadline can still pass (up to about an
+hour on Bitcoin). Revocation is the exact cutoff.
 
 Publishers choose `proof.created`, so they can backdate a signature, but they cannot
 anchor an operation in an earlier block. That is why attribution compares positions
