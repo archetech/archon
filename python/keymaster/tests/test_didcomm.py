@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 import sys
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
@@ -280,18 +282,21 @@ def _peer_2_mediator(seed_byte: int) -> dict[str, Any]:
     return {"did": did, "kid": f"{did}#key-1", "kp": kp}
 
 
-def _peer_4_agent(seed_byte: int, service_uri: str) -> dict[str, Any]:
+def _peer_4_agent(seed_byte: int, service_uri: str, shape: str = "referenced") -> dict[str, Any]:
     # A did:peer:4 agent (as the DIF demo identifies itself) whose service uri is
     # its mediator's routing DID, encoded per the peer DID method specification.
+    # Its key-agreement method is referenced from verificationMethod, or embedded.
     import hashlib
     import json as jsonlib
 
     kp = dc.generate_x25519_jwk(bytes([seed_byte] * 32))
+    method = {"id": "#key-1", "type": "Multikey",
+              "publicKeyMultibase": dc.x25519_jwk_to_did_key(kp["publicJwk"])[len("did:key:"):]}
+    keys = ({"keyAgreement": [method]} if shape == "embedded"
+            else {"verificationMethod": [method], "keyAgreement": ["#key-1"]})
     doc = {
         "@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/multikey/v1"],
-        "verificationMethod": [{"id": "#key-1", "type": "Multikey",
-                                "publicKeyMultibase": dc.x25519_jwk_to_did_key(kp["publicJwk"])[len("did:key:"):]}],
-        "keyAgreement": ["#key-1"],
+        **keys,
         "service": [{"id": "#didcomm", "type": "DIDCommMessaging", "serviceEndpoint": {"uri": service_uri, "accept": ["didcomm/v2"]}}],
     }
     encoded = dc.bytes_to_multibase(bytes([0x80, 0x04]) + jsonlib.dumps(doc, separators=(",", ":")).encode())
@@ -300,7 +305,8 @@ def _peer_4_agent(seed_byte: int, service_uri: str) -> dict[str, Any]:
     return {"did": did, "kid": f"{did}#key-1", "kp": kp}
 
 
-def test_unpack_didcomm_from_did_peer_4_without_the_gatekeeper(testbed, monkeypatch):
+@pytest.mark.parametrize("shape", ["referenced", "embedded"])
+def test_unpack_didcomm_from_did_peer_4_without_the_gatekeeper(testbed, monkeypatch, shape):
     import json as jsonlib
     from keymaster.core import KeymasterError
     from .helpers import run
@@ -312,7 +318,7 @@ def test_unpack_didcomm_from_did_peer_4_without_the_gatekeeper(testbed, monkeypa
     alice_ka_id = alice_doc["keyAgreement"][0]
     alice_ka = next(vm for vm in alice_doc["verificationMethod"] if vm["id"] == alice_ka_id)
 
-    peer = _peer_4_agent(0x61, _peer_2_mediator(0x62)["did"])
+    peer = _peer_4_agent(0x61, _peer_2_mediator(0x62)["did"], shape)
     message = {"id": "p4", "typ": "application/didcomm-plain+json", "type": "https://x/1/msg",
                "from": peer["did"], "to": [alice_did], "body": {"text": "peer4 hello"}}
     packed = dc.pack_encrypted(
@@ -613,14 +619,15 @@ def test_send_didcomm_uses_the_service_for_a_mailbox_elsewhere(monkeypatch):
     assert not any(url.endswith("/api/v1/messages") for url in urls)
 
 
-def test_send_didcomm_forwards_to_the_mediator_named_by_a_did_service_uri(monkeypatch):
+@pytest.mark.parametrize("shape", ["referenced", "embedded"])
+def test_send_didcomm_forwards_to_the_mediator_named_by_a_did_service_uri(monkeypatch, shape):
     # The DIF demo's did:peer:4 service uri is its mediator's routing DID. The
     # gatekeeper is never asked: both peer DIDs resolve locally. Mirrors the JS keymaster.
     import asyncio
     import json as jsonlib
 
     mediator = _peer_2_mediator(0x63)
-    peer = _peer_4_agent(0x64, mediator["did"])
+    peer = _peer_4_agent(0x64, mediator["did"], shape)
     calls: list = []
 
     def responses(url, kw):
@@ -629,18 +636,19 @@ def test_send_didcomm_forwards_to_the_mediator_named_by_a_did_service_uri(monkey
         return _FakeResponse({"ids": ["forwarded"]})
 
     km = _mailbox_keymaster(monkeypatch, calls, responses)
-    monkeypatch.setattr(km, "pack_didcomm", _async_return('{"inner":"envelope"}'))
     monkeypatch.setattr(km, "_node_didcomm_endpoint_uri", _async_return(None))
     monkeypatch.setattr("keymaster.core.sign_hash", lambda *args, **kwargs: "sig")
 
-    assert asyncio.run(km.send_didcomm({"type": "t", "body": {}}, peer["did"])) == ["forwarded"]
+    body = {"text": "peer4 reply"}
+    assert asyncio.run(km.send_didcomm({"type": "t", "body": body}, peer["did"], {"anoncrypt": True})) == ["forwarded"]
 
     delivery = next(kw["json"] for _method, url, kw in calls if url.endswith("/deliver"))
     assert delivery["endpoint"] == MEDIATOR_ENDPOINT
     plaintext, _ = dc.unpack_encrypted(delivery["message"], {"kid": mediator["kid"], "privateJwk": mediator["kp"]["privateJwk"]})
     forward = dc.parse_forward(plaintext.decode("utf-8"))
     assert forward["next"] == peer["did"]
-    assert jsonlib.loads(forward["forwardedMessage"]) == {"inner": "envelope"}
+    inner, _ = dc.unpack_encrypted(forward["forwardedMessage"], {"kid": peer["kid"], "privateJwk": peer["kp"]["privateJwk"]})
+    assert jsonlib.loads(inner)["body"] == body
 
 
 def test_send_didcomm_refuses_a_mediator_without_a_direct_endpoint(monkeypatch):

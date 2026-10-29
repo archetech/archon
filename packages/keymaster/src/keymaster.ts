@@ -3138,16 +3138,34 @@ export default class Keymaster implements KeymasterInterface {
             vm => vm.id && this.absoluteKeyId(vm.id, did) === target);
     }
 
+    // A key-agreement method may be listed in verificationMethod or, as DID Core
+    // and did:peer:4 allow, embedded in keyAgreement itself.
+    private findKeyAgreementMethod(doc: DidCidDocument, kid: string) {
+        const did = doc.didDocument?.id;
+        const vm = this.findVerificationMethod(doc, kid);
+        if (vm || !did) {
+            return vm;
+        }
+        const target = this.absoluteKeyId(kid, did);
+        return ((doc.didDocument?.keyAgreement || []) as unknown[]).find(
+            (method): method is NonNullable<typeof vm> => typeof (method as { id?: unknown })?.id === 'string'
+                && this.absoluteKeyId((method as { id: string }).id, did) === target);
+    }
+
     private resolveKeyAgreement(doc: DidCidDocument): { kid: string; publicJwk: OkpJwkPublic } {
-        const refs = doc.didDocument?.keyAgreement || [];
+        const refs = (doc.didDocument?.keyAgreement || []) as unknown[];
         if (refs.length === 0) {
             throw new KeymasterError('DID has no published keyAgreement key; call publishDidComm first');
         }
         // A JWE recipient kid must be a whole DID URL; did:peer:2 references
         // its methods relatively.
+        const ref = typeof refs[0] === 'string' ? refs[0] : (refs[0] as { id?: unknown })?.id;
+        if (typeof ref !== 'string') {
+            throw new KeymasterError('keyAgreement verification method not found');
+        }
         const did = doc.didDocument?.id;
-        const kid = did ? this.absoluteKeyId(refs[0], did) : refs[0];
-        const vm = this.findVerificationMethod(doc, kid);
+        const kid = did ? this.absoluteKeyId(ref, did) : ref;
+        const vm = this.findKeyAgreementMethod(doc, kid);
         if (!vm) {
             throw new KeymasterError('keyAgreement verification method not found');
         }
@@ -3293,7 +3311,7 @@ export default class Keymaster implements KeymasterInterface {
         let senderKey: OkpJwkPublic | undefined;
         if (info.skid) {
             const senderDoc = await this.resolveDidForDidComm(info.skid.split('#')[0]);
-            const senderVm = this.findVerificationMethod(senderDoc, info.skid);
+            const senderVm = this.findKeyAgreementMethod(senderDoc, info.skid);
             if (!senderVm) {
                 throw new KeymasterError('Sender keyAgreement key not found');
             }
@@ -3395,7 +3413,7 @@ export default class Keymaster implements KeymasterInterface {
 
     private async resolveX25519Key(kid: string): Promise<OkpJwkPublic> {
         const doc = await this.resolveDidForDidComm(kid.split('#')[0]);
-        const vm = this.findVerificationMethod(doc, kid);
+        const vm = this.findKeyAgreementMethod(doc, kid);
         if (!vm) {
             throw new KeymasterError(`key ${kid} not found`);
         }

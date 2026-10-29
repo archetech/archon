@@ -4263,15 +4263,31 @@ class Keymaster:
                 return vm
         return None
 
+    def _find_key_agreement_method(self, doc: dict[str, Any], kid: str) -> dict[str, Any] | None:
+        # A key-agreement method may be listed in verificationMethod or, as DID
+        # Core and did:peer:4 allow, embedded in keyAgreement itself.
+        vm = self._find_verification_method(doc, kid)
+        did = doc.get("didDocument", {}).get("id")
+        if vm or not did:
+            return vm
+        target = _absolute_key_id(kid, did)
+        for method in doc.get("didDocument", {}).get("keyAgreement") or []:
+            if isinstance(method, dict) and _absolute_key_id(method.get("id"), did) == target:
+                return method
+        return None
+
     def _resolve_key_agreement(self, doc: dict[str, Any]) -> dict[str, Any]:
         refs = doc.get("didDocument", {}).get("keyAgreement") or []
         if not refs:
             raise KeymasterError("DID has no published keyAgreement key; call publish_didcomm first")
         # A JWE recipient kid must be a whole DID URL; did:peer:2 references
         # its methods relatively.
+        ref = refs[0].get("id") if isinstance(refs[0], dict) else refs[0]
+        if not isinstance(ref, str):
+            raise KeymasterError("keyAgreement verification method not found")
         did = doc.get("didDocument", {}).get("id")
-        kid = (_absolute_key_id(refs[0], did) if did else None) or refs[0]
-        vm = self._find_verification_method(doc, kid)
+        kid = (_absolute_key_id(ref, did) if did else None) or ref
+        vm = self._find_key_agreement_method(doc, kid)
         if not vm:
             raise KeymasterError("keyAgreement verification method not found")
         try:
@@ -4344,7 +4360,7 @@ class Keymaster:
 
     async def _resolve_x25519_key(self, kid: str) -> dict[str, str]:
         doc = await self._resolve_did_for_didcomm(kid.split("#")[0])
-        vm = self._find_verification_method(doc, kid)
+        vm = self._find_key_agreement_method(doc, kid)
         if not vm:
             raise KeymasterError(f"key {kid} not found")
         try:
@@ -4633,7 +4649,7 @@ class Keymaster:
         sender_key = None
         if info.get("skid"):
             sender_doc = await self._resolve_did_for_didcomm(info["skid"].split("#")[0])
-            sender_vm = self._find_verification_method(sender_doc, info["skid"])
+            sender_vm = self._find_key_agreement_method(sender_doc, info["skid"])
             if not sender_vm:
                 raise KeymasterError("Sender keyAgreement key not found")
             try:

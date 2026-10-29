@@ -470,12 +470,16 @@ describe('cross-method: Archon did:cid <-> long-form did:peer:4 behind a did:pee
 
     // A did:peer:4 agent (as the DIF demo identifies itself) whose service uri is
     // its mediator's routing DID, encoded per the peer DID method specification.
-    function peer4Agent(seedByte: number, serviceUri: string) {
+    // Its key-agreement method is referenced from verificationMethod, or embedded.
+    function peer4Agent(seedByte: number, serviceUri: string, shape: 'referenced' | 'embedded' = 'referenced') {
         const { kp, multibase } = x25519Agent(seedByte);
+        const method = { id: '#key-1', type: 'Multikey', publicKeyMultibase: multibase };
+        const keys = shape === 'embedded'
+            ? { keyAgreement: [method] }
+            : { verificationMethod: [method], keyAgreement: ['#key-1'] };
         const doc = {
             '@context': ['https://www.w3.org/ns/did/v1', 'https://w3id.org/security/multikey/v1'],
-            verificationMethod: [{ id: '#key-1', type: 'Multikey', publicKeyMultibase: multibase }],
-            keyAgreement: ['#key-1'],
+            ...keys,
             service: [{ id: '#didcomm', type: 'DIDCommMessaging', serviceEndpoint: { uri: serviceUri, accept: ['didcomm/v2'] } }],
         };
         const encoded = base58btc.encode(new Uint8Array([0x80, 0x04, ...Buffer.from(JSON.stringify(doc))]));
@@ -495,7 +499,7 @@ describe('cross-method: Archon did:cid <-> long-form did:peer:4 behind a did:pee
         });
     }
 
-    it('did:peer:4 -> Archon (authcrypt): decrypts without asking the gatekeeper', async () => {
+    test.each(['referenced', 'embedded'] as const)('did:peer:4 (%s key) -> Archon (authcrypt): decrypts without asking the gatekeeper', async shape => {
         await keymaster.createId('Alice');
         await keymaster.publishDidComm(undefined, 'Alice');
 
@@ -503,7 +507,7 @@ describe('cross-method: Archon did:cid <-> long-form did:peer:4 behind a did:pee
         const aliceKaId = aliceDoc.didDocument!.keyAgreement![0];
         const aliceKaVm = aliceDoc.didDocument!.verificationMethod!.find(v => v.id === aliceKaId)!;
 
-        const peer = peer4Agent(0x61, peer2Mediator(0x62).did);
+        const peer = peer4Agent(0x61, peer2Mediator(0x62).did, shape);
         const message = { id: 'p4', typ: 'application/didcomm-plain+json', type: 'https://x/1/msg', from: peer.did, to: [aliceDoc.didDocument!.id], body };
         const packed = packEncrypted(
             new TextEncoder().encode(JSON.stringify(message)),
@@ -520,12 +524,12 @@ describe('cross-method: Archon did:cid <-> long-form did:peer:4 behind a did:pee
         expect(spy.mock.calls.some(([did]) => did?.startsWith('did:peer:'))).toBe(false);
     });
 
-    it('Archon -> did:peer:4: delivers a Forward to the mediator named by the service uri', async () => {
+    test.each(['referenced', 'embedded'] as const)('Archon -> did:peer:4 (%s key): delivers a Forward to the mediator named by the service uri', async shape => {
         const base = useDidCommGateway();
         await keymaster.createId('Alice');
         await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
         const mediator = peer2Mediator(0x63);
-        const peer = peer4Agent(0x64, mediator.did);
+        const peer = peer4Agent(0x64, mediator.did, shape);
 
         const deliveries: any[] = [];
         jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
