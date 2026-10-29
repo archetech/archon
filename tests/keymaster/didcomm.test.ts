@@ -11,7 +11,10 @@ import {
     unpackEncrypted,
     didKeyToX25519,
     x25519JwkToDidKey,
+    parseForward,
 } from '@didcid/cipher/didcomm';
+import { base58btc } from 'multiformats/bases/base58';
+import { createHash } from 'crypto';
 
 let ipfs: MemoryClient;
 let gatekeeper: Gatekeeper;
@@ -444,6 +447,128 @@ describe('packDidComm / unpackDidComm (cross-method: Archon did:cid <-> did:peer
         expect(JSON.parse(packed).recipients.map((r: any) => r.header.kid)).toEqual([peer.kid]);
         const { plaintext } = unpackEncrypted(packed, { kid: peer.kid, privateJwk: peer.kp.privateJwk });
         expect(JSON.parse(new TextDecoder().decode(plaintext)).body).toEqual(body);
+    });
+});
+
+describe('cross-method: Archon did:cid <-> long-form did:peer:4 behind a did:peer:2 mediator', () => {
+    const body = { text: 'peer4 hello' };
+    const MEDIATOR_ENDPOINT = 'https://mediator.example/didcomm';
+
+    function x25519Agent(seedByte: number) {
+        const kp = cipher.generateX25519Jwk(new Uint8Array(32).fill(seedByte));
+        return { kp, multibase: x25519JwkToDidKey(kp.publicJwk).slice('did:key:'.length) };
+    }
+
+    // A mediator as coordinate-mediation grants it: a did:peer:2 routing DID
+    // with its own HTTP endpoint.
+    function peer2Mediator(seedByte: number) {
+        const { kp, multibase } = x25519Agent(seedByte);
+        const service = Buffer.from(JSON.stringify({ t: 'dm', s: { uri: MEDIATOR_ENDPOINT, a: ['didcomm/v2'] } })).toString('base64url');
+        const did = `did:peer:2.E${multibase}.S${service}`;
+        return { did, kid: `${did}#key-1`, kp };
+    }
+
+    // A did:peer:4 agent (as the DIF demo identifies itself) whose service uri is
+    // its mediator's routing DID, encoded per the peer DID method specification.
+    function peer4Agent(seedByte: number, serviceUri: string) {
+        const { kp, multibase } = x25519Agent(seedByte);
+        const doc = {
+            '@context': ['https://www.w3.org/ns/did/v1', 'https://w3id.org/security/multikey/v1'],
+            verificationMethod: [{ id: '#key-1', type: 'Multikey', publicKeyMultibase: multibase }],
+            keyAgreement: ['#key-1'],
+            service: [{ id: '#didcomm', type: 'DIDCommMessaging', serviceEndpoint: { uri: serviceUri, accept: ['didcomm/v2'] } }],
+        };
+        const encoded = base58btc.encode(new Uint8Array([0x80, 0x04, ...Buffer.from(JSON.stringify(doc))]));
+        const hash = base58btc.encode(new Uint8Array([0x12, 0x20, ...createHash('sha256').update(encoded).digest()]));
+        const did = `did:peer:4${hash}:${encoded}`;
+        return { did, kid: `${did}#key-1`, kp };
+    }
+
+    // A gatekeeper (or its universal resolver) without a did:peer driver.
+    function withoutDidPeerDriver() {
+        const resolveDID = gatekeeper.resolveDID.bind(gatekeeper);
+        return jest.spyOn(gatekeeper, 'resolveDID').mockImplementation(async (did, options) => {
+            if (did?.startsWith('did:peer:')) {
+                throw new Error('unsupported DID method');
+            }
+            return resolveDID(did, options);
+        });
+    }
+
+    it('did:peer:4 -> Archon (authcrypt): decrypts without asking the gatekeeper', async () => {
+        await keymaster.createId('Alice');
+        await keymaster.publishDidComm(undefined, 'Alice');
+
+        const aliceDoc = await keymaster.resolveDID('Alice');
+        const aliceKaId = aliceDoc.didDocument!.keyAgreement![0];
+        const aliceKaVm = aliceDoc.didDocument!.verificationMethod!.find(v => v.id === aliceKaId)!;
+
+        const peer = peer4Agent(0x61, peer2Mediator(0x62).did);
+        const message = { id: 'p4', typ: 'application/didcomm-plain+json', type: 'https://x/1/msg', from: peer.did, to: [aliceDoc.didDocument!.id], body };
+        const packed = packEncrypted(
+            new TextEncoder().encode(JSON.stringify(message)),
+            [{ kid: aliceKaId, publicJwk: aliceKaVm.publicKeyJwk as any }],
+            { kid: peer.kid, privateJwk: peer.kp.privateJwk },
+            'A256CBC-HS512',
+        );
+
+        const spy = withoutDidPeerDriver();
+        const { message: out, metadata } = await keymaster.unpackDidComm(packed, { name: 'Alice' });
+        expect(out.body).toEqual(body);
+        expect(metadata.authenticated).toBe(true);
+        expect(metadata.sender).toBe(peer.kid);
+        expect(spy.mock.calls.some(([did]) => did?.startsWith('did:peer:'))).toBe(false);
+    });
+
+    it('Archon -> did:peer:4: delivers a Forward to the mediator named by the service uri', async () => {
+        const base = useDidCommGateway();
+        await keymaster.createId('Alice');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        const mediator = peer2Mediator(0x63);
+        const peer = peer4Agent(0x64, mediator.did);
+
+        const deliveries: any[] = [];
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+            const url = String(input);
+            if (url === `${base}/api/v1/challenge`) {
+                return jsonResponse({ challenge: 'peer4-challenge' });
+            }
+            if (url === `${base}/api/v1/deliver`) {
+                deliveries.push(JSON.parse(String(init?.body)));
+                return jsonResponse({ ids: ['forwarded'] });
+            }
+            throw new Error(`unexpected fetch ${url}`);
+        });
+        withoutDidPeerDriver();
+
+        const ids = await keymaster.sendDidComm({ type: 'https://x/1/msg', body }, peer.did, { name: 'Alice' });
+
+        expect(ids).toEqual(['forwarded']);
+        expect(deliveries).toHaveLength(1);
+        expect(deliveries[0].endpoint).toBe(MEDIATOR_ENDPOINT);
+
+        const { plaintext } = unpackEncrypted(deliveries[0].message, { kid: mediator.kid, privateJwk: mediator.kp.privateJwk });
+        const { next, forwardedMessage } = parseForward(new TextDecoder().decode(plaintext));
+        expect(next).toBe(peer.did);
+        const alice = await keymaster.fetchDidCommKeyPair('Alice');
+        const inner = unpackEncrypted(forwardedMessage, { kid: peer.kid, privateJwk: peer.kp.privateJwk }, alice.publicJwk);
+        expect(JSON.parse(new TextDecoder().decode(inner.plaintext)).body).toEqual(body);
+    });
+
+    it('refuses a mediator DID that has no direct endpoint of its own', async () => {
+        useDidCommGateway();
+        await keymaster.createId('Alice');
+        await keymaster.publishDidComm('https://alice.example/didcomm', 'Alice');
+        const innerMediator = peer2Mediator(0x65);
+        const outerMediator = peer4Agent(0x66, innerMediator.did);
+        const peer = peer4Agent(0x67, outerMediator.did);
+        const fetcher = jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+            throw new Error(`unexpected fetch ${input}`);
+        });
+
+        await expect(keymaster.sendDidComm({ type: 'https://x/1/msg', body }, peer.did, { name: 'Alice' }))
+            .rejects.toThrow(/no direct DIDCommMessaging endpoint/);
+        expect(fetcher).not.toHaveBeenCalled();
     });
 });
 

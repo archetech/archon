@@ -12,6 +12,7 @@ import {
     getEnvelopeInfo,
     didKeyToX25519,
     resolveDidPeer2,
+    resolveDidPeer4,
     normalizeX25519PublicKey,
     wrapForward,
     parseForward,
@@ -278,6 +279,56 @@ describe('did:peer:2 resolution', () => {
         expect(() => resolveDidPeer2('did:peer:2.E6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR')).toThrow(/Invalid/);
         expect(() => resolveDidPeer2('did:peer:2.Ez0OIl')).toThrow();
         expect(() => resolveDidPeer2(`did:peer:2.S${Buffer.from('[1]').toString('base64url')}`)).toThrow(/not an object/);
+    });
+});
+
+describe('did:peer:4 resolution', () => {
+    // The long-form example in the peer DID method specification, Method 4.
+    const SPEC_DID = 'did:peer:4zQmd8CpeFPci817KDsbSAKWcXAE2mjvCQSasRewvbSF54Bd:z2M1k7h4psgp4CmJcnQn2Ljp7Pz7ktsd7oBhMU3dWY5s4fhFNj17qcRTQ427C7QHNT6cQ7T3XfRh35Q2GhaNFZmWHVFq4vL7F8nm36PA9Y96DvdrUiRUaiCuXnBFrn1o7mxFZAx14JL4t8vUWpuDPwQuddVo1T8myRiVH7wdxuoYbsva5x6idEpCQydJdFjiHGCpNc2UtjzPQ8awSXkctGCnBmgkhrj5gto3D4i3EREXYq4Z8r2cWGBr2UzbSmnxW2BuYddFo9Yfm6mKjtJyLpF74ytqrF5xtf84MnGFg1hMBmh1xVx1JwjZ2BeMJs7mNS8DTZhKC7KH38EgqDtUZzfjhpjmmUfkXg2KFEA3EGbbVm1DPqQXayPYKAsYPS9AyKkcQ3fzWafLPP93UfNhtUPL8JW5pMcSV3P8v6j3vPXqnnGknNyBprD6YGUVtgLiAqDBDUF3LSxFQJCVYYtghMTv8WuSw9h1a1SRFrDQLGHE4UrkgoRvwaGWr64aM87T1eVGkP5Dt4L1AbboeK2ceLArPScrdYGTpi3BpTkLwZCdjdiFSfTy9okL1YNRARqUf2wm8DvkVGUU7u5nQA3ZMaXWJAewk6k1YUxKd7LvofGUK4YEDtoxN5vb6r1Q2godrGqaPkjfL3RoYPpDYymf9XhcgG8Kx3DZaA6cyTs24t45KxYAfeCw4wqUpCH9HbpD78TbEUr9PPAsJgXBvBj2VVsxnr7FKbK4KykGcg1W8M1JPz21Z4Y72LWgGQCmixovrkHktcTX1uNHjAvKBqVD5C7XmVfHgXCHj7djCh3vzLNuVLtEED8J1hhqsB1oCBGiuh3xXr7fZ9wUjJCQ1HYHqxLJKdYKtoCiPmgKM7etVftXkmTFETZmpM19aRyih3bao76LdpQtbw636r7a3qt8v4WfxsXJetSL8c7t24SqQBcAY89FBsbEnFNrQCMK3JEseKHVaU388ctvRD45uQfe5GndFxthj4iSDomk4uRFd1uRbywoP1tRuabHTDX42UxPjz';
+    const SHORT_FORM = 'did:peer:4zQmd8CpeFPci817KDsbSAKWcXAE2mjvCQSasRewvbSF54Bd';
+
+    it('resolves the specification example', () => {
+        expect(resolveDidPeer4(SPEC_DID)).toEqual({
+            '@context': [
+                'https://www.w3.org/ns/did/v1',
+                'https://w3id.org/security/suites/x25519-2020/v1',
+                'https://w3id.org/security/suites/ed25519-2020/v1',
+            ],
+            verificationMethod: [
+                { id: '#6LSqPZfn', type: 'X25519KeyAgreementKey2020', publicKeyMultibase: 'z6LSqPZfn9krvgXma2icTMKf2uVcYhKXsudCmPoUzqGYW24U', controller: SPEC_DID },
+                { id: '#6MkrCD1c', type: 'Ed25519VerificationKey2020', publicKeyMultibase: 'z6MkrCD1csqtgdj8sjrsu8jxcbeyP6m7LiK87NzhfWqio5yr', controller: SPEC_DID },
+            ],
+            service: [
+                {
+                    id: '#didcommmessaging-0',
+                    type: 'DIDCommMessaging',
+                    serviceEndpoint: { uri: 'didcomm:transport/queue', accept: ['didcomm/v2'], routingKeys: [] },
+                },
+            ],
+            authentication: ['#6MkrCD1c'],
+            keyAgreement: ['#6LSqPZfn'],
+            assertionMethod: ['#6MkrCD1c'],
+            capabilityDelegation: ['#6MkrCD1c'],
+            capabilityInvocation: ['#6MkrCD1c'],
+            alsoKnownAs: [SHORT_FORM],
+            id: SPEC_DID,
+        });
+    });
+
+    it('ignores a fragment or query on the DID', () => {
+        expect(resolveDidPeer4(`${SPEC_DID}#6LSqPZfn`).id).toBe(SPEC_DID);
+    });
+
+    it('rejects a document that does not match its hash', () => {
+        const tampered = SPEC_DID.replace('SF54Bd:', 'SF54Be:');
+        expect(() => resolveDidPeer4(tampered)).toThrow(/hash/);
+        const [prefix, encoded] = SPEC_DID.split(':z2M1');
+        expect(() => resolveDidPeer4(`${prefix}:z2M2${encoded}`)).toThrow(/hash/);
+    });
+
+    it('rejects the short form and other DIDs', () => {
+        expect(() => resolveDidPeer4(SHORT_FORM)).toThrow(/long-form/);
+        expect(() => resolveDidPeer4('did:peer:2.Ez6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR')).toThrow(/did:peer:4/);
     });
 });
 

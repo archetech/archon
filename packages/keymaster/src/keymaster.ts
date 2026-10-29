@@ -105,6 +105,7 @@ import {
     getEnvelopeInfo,
     didKeyToX25519,
     resolveDidPeer2,
+    resolveDidPeer4,
     normalizeX25519PublicKey,
     wrapForward,
     parseForward,
@@ -3178,6 +3179,10 @@ export default class Keymaster implements KeymasterInterface {
         if (did.startsWith('did:peer:2.')) {
             return { didDocument: resolveDidPeer2(did) } as DidCidDocument;
         }
+        // So is long-form did:peer:4, whose document is embedded after its hash.
+        if (did.startsWith('did:peer:4')) {
+            return { didDocument: resolveDidPeer4(did) } as DidCidDocument;
+        }
         return this.resolveDID(did);
     }
 
@@ -3520,6 +3525,8 @@ export default class Keymaster implements KeymasterInterface {
             }
 
             let envelope = packed;
+            let deliveryUri = endpoint.uri;
+            let mediated = false;
             // If the recipient is behind a mediator, wrap the packed message in a
             // Forward addressed to the mediator's routing key (crypto, so it stays here).
             if (endpoint.routingKeys.length > 0) {
@@ -3527,6 +3534,22 @@ export default class Keymaster implements KeymasterInterface {
                 const recipientKa = this.resolveKeyAgreement(recipientDoc);
                 const routing = await this.resolveRoutingKey(endpoint.routingKeys[0]);
                 envelope = wrapForward(packed, recipientKa.kid, { kid: routing.kid, publicJwk: routing.publicJwk });
+                mediated = true;
+            }
+            // A service uri that is a DID names the recipient's mediator (the
+            // coordinate-mediation routing_did): deliver to the mediator's own
+            // endpoint, in a Forward for its key-agreement key whose `next` is
+            // the recipient DID the mediator registered.
+            else if (endpoint.uri.startsWith('did:')) {
+                const mediatorDid = endpoint.uri;
+                const mediatorEndpoint = await this.resolveDidCommEndpoint(mediatorDid);
+                if (!mediatorEndpoint || mediatorEndpoint.routingKeys.length > 0 || mediatorEndpoint.uri.startsWith('did:')) {
+                    throw new KeymasterError(`mediator ${mediatorDid} for ${recipientDid} has no direct DIDCommMessaging endpoint`);
+                }
+                const routing = await this.resolveRoutingKey(mediatorDid);
+                envelope = wrapForward(packed, recipientDid, { kid: routing.kid, publicJwk: routing.publicJwk });
+                deliveryUri = mediatorEndpoint.uri;
+                mediated = true;
             }
 
             // A recipient whose mailbox is on this node needs no egress: deposit
@@ -3538,8 +3561,7 @@ export default class Keymaster implements KeymasterInterface {
             // published endpoint. Skipped when a mediator is in the path, whose
             // Forward envelope is addressed elsewhere by design.
             const nodeEndpoint = await this.nodeDidCommEndpoint();
-            if (endpoint.routingKeys.length === 0 && nodeEndpoint
-                && Keymaster.sameDidCommEndpoint(endpoint.uri, nodeEndpoint)) {
+            if (!mediated && nodeEndpoint && Keymaster.sameDidCommEndpoint(deliveryUri, nodeEndpoint)) {
                 const localResponse = await fetch(`${serviceBase}/api/v1/messages`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/didcomm-encrypted+json' },
@@ -3564,7 +3586,7 @@ export default class Keymaster implements KeymasterInterface {
             const response = await fetch(`${serviceBase}/api/v1/deliver`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ did: senderDid, challenge, signature, endpoint: endpoint.uri, message: envelope }),
+                body: JSON.stringify({ did: senderDid, challenge, signature, endpoint: deliveryUri, message: envelope }),
             });
             if (!response.ok) {
                 // The status alone cannot tell a missing Tor proxy from a recipient

@@ -207,8 +207,9 @@ already spec-standard, so only resolution and transport are method-specific.
   `didKeyToX25519` (resolves `did:key` — `z6LS…` X25519 and `z6Mk…` Ed25519 with the
   spec-correct Ed25519→X25519 derivation, verified against the W3C vector) and
   `normalizeX25519PublicKey` (accepts `publicKeyJwk` **or** `publicKeyMultibase`).
-  `keymaster.resolveDidForDidComm` resolves `did:key` and `did:peer:2` (`resolveDidPeer2`,
-  per the peer DID method specification) locally and routes everything else
+  `keymaster.resolveDidForDidComm` resolves `did:key`, `did:peer:2` (`resolveDidPeer2`)
+  and long-form `did:peer:4` (`resolveDidPeer4`, hash checked), per the peer DID method
+  specification, locally and routes everything else
   through the gatekeeper (which has a universal-resolver fallback for `did:web` etc.);
   `pack`/`unpack` use it for recipient and sender keys. *Validated:* Archon `did:cid` ↔
   `did:key` both directions (keymaster e2e), and our pack to a `did:key` is unpacked by the
@@ -239,7 +240,9 @@ already spec-standard, so only resolution and transport are method-specific.
   (`wrap_in_forward`/Forward parsing) in each direction. Integration: the DID-doc
   `serviceEndpoint` object form carries `routingKeys` (`publishDidComm(endpoint, name,
   routingKeys)`); `sendDidComm` wraps in a Forward to the mediator when the recipient
-  advertises one; `mediateDidComm` lets an Archon identity act as a mediator — fetch Forwards
+  advertises one, or when the service `uri` is itself a DID (a mediator's `routing_did`):
+  then the Forward, with `next` set to the recipient DID, goes to that DID's own endpoint
+  for its key-agreement key; `mediateDidComm` lets an Archon identity act as a mediator — fetch Forwards
   from its mailbox, unpack, and relay the inner envelope to `next`. *Validated:* an e2e where
   Alice → mediator → Bob is delivered via the Forward protocol through the live relay.
 
@@ -380,7 +383,7 @@ against the `didcomm-node` reference library.
 | 0 — Spike & decisions | ✅ | Validated decisions against `didcomm-node`; interop now locked in by committed cross-language test vectors (the throwaway spike has been removed) |
 | 1 — Standard-curve keys | ✅ | deterministic X25519 `keyAgreement` keys in `did:cid` docs; `publishDidComm`/`unpublishDidComm` |
 | 2 — Envelope crypto + API | ✅ | pure-JS anoncrypt/authcrypt/signed in `cipher`; keymaster `packDidComm`/`unpackDidComm` over real `did:cid` resolution |
-| 3a — Cross-method resolution | ✅ | `did:key` (Ed25519/X25519), `did:peer:2` + universal-resolver fallback; multibase key normalization |
+| 3a — Cross-method resolution | ✅ | `did:key` (Ed25519/X25519), `did:peer:2`, long-form `did:peer:4` + universal-resolver fallback; multibase key normalization |
 | 3b — Transport (mailbox) | ✅ | `services/didcomm/server` relay (signed-challenge auth; in-memory/redis; Docker + `didcomm` compose profile, port 4236); keymaster `sendDidComm`/`receiveDidComm`; Drawbridge `/didcomm` reverse proxy |
 | 3c — Forward/routing | ✅ | `wrapForward`/`parseForward`; DID-doc `routingKeys`; `sendDidComm` mediator wrapping; `mediateDidComm` (Archon-as-mediator) |
 | 4 — Application protocols | ✅ | message builders (`didcomm-protocols.ts`) for Trust Ping, Basic Message, Discover Features, Out-of-Band (+ `_oob` URL encode/decode) — compose with `sendDidComm`/`receiveDidComm`; e2e: basic message + trust-ping request/response (thid-correlated) over the relay |

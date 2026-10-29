@@ -20,6 +20,7 @@ import hashlib
 import hmac as hmaclib
 import json
 import os
+import re
 import struct
 from typing import Any
 
@@ -657,6 +658,49 @@ def resolve_did_peer_2(did: str) -> dict[str, Any]:
             unnamed += 1
     if services:
         doc["service"] = services
+
+    return doc
+
+
+_MULTICODEC_JSON = bytes([0x80, 0x04])  # varint 0x0200
+_MULTIHASH_SHA2_256 = bytes([0x12, 0x20])
+_DID_PEER_4_LONG_FORM = re.compile(r"^did:peer:4(z[1-9A-HJ-NP-Za-km-z]+):(z[1-9A-HJ-NP-Za-km-z]+)")
+_DID_PEER_4_RELATIONSHIPS = ("authentication", "assertionMethod", "keyAgreement", "capabilityInvocation", "capabilityDelegation")
+
+
+def resolve_did_peer_4(did: str) -> dict[str, Any]:
+    """Resolve a long-form did:peer:4<hash>:<encoded document> to its DID
+    document, as the peer DID method specification defines it: the hash is
+    checked against the encoded document, which is then decoded and
+    contextualized (id set to the DID, the short form appended to alsoKnownAs,
+    and controller set on verification methods that lack one). The short form
+    cannot be resolved without a stored long form. Mirrors resolveDidPeer4 in
+    the TypeScript cipher."""
+    base = did.split("?")[0].split("#")[0]
+    match = _DID_PEER_4_LONG_FORM.fullmatch(base)
+    if not match:
+        raise ValueError("Only long-form did:peer:4 can be resolved" if base.startswith("did:peer:4") else "Not a did:peer:4")
+    hash_value, encoded = match.groups()
+
+    expected_hash = bytes_to_multibase(_MULTIHASH_SHA2_256 + hashlib.sha256(encoded.encode("utf-8")).digest())
+    if hash_value != expected_hash:
+        raise ValueError("did:peer:4 hash does not match its document")
+
+    data = multibase_to_bytes(encoded)
+    if data[:2] != _MULTICODEC_JSON:
+        raise ValueError("did:peer:4 document is not multicodec JSON")
+    doc = json.loads(data[2:].decode("utf-8"))
+    if not isinstance(doc, dict):
+        raise ValueError("did:peer:4 document is not an object")
+
+    doc["id"] = base
+    also_known_as = doc.get("alsoKnownAs")
+    doc["alsoKnownAs"] = [*(also_known_as if isinstance(also_known_as, list) else []), f"did:peer:4{hash_value}"]
+    for name in ("verificationMethod", *_DID_PEER_4_RELATIONSHIPS):
+        methods = doc.get(name)
+        for vm in methods if isinstance(methods, list) else []:
+            if isinstance(vm, dict) and "controller" not in vm:
+                vm["controller"] = base
 
     return doc
 

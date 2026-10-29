@@ -205,6 +205,139 @@ def test_did_peer_2_rejects_malformed_dids():
         dc.resolve_did_peer_2("did:peer:2.S" + base64.urlsafe_b64encode(b"[1]").decode().rstrip("="))
 
 
+PEER4_SPEC_DID = (
+    "did:peer:4zQmd8CpeFPci817KDsbSAKWcXAE2mjvCQSasRewvbSF54Bd:z2M1k7h4psgp4CmJcnQn2Ljp7Pz7ktsd7oBhMU3dWY5s4fhFNj17qcRTQ427C7"
+    "QHNT6cQ7T3XfRh35Q2GhaNFZmWHVFq4vL7F8nm36PA9Y96DvdrUiRUaiCuXnBFrn1o7mxFZAx14JL4t8vUWpuDPwQuddVo1T8myRiVH7wdxuoYbsva5x6idE"
+    "pCQydJdFjiHGCpNc2UtjzPQ8awSXkctGCnBmgkhrj5gto3D4i3EREXYq4Z8r2cWGBr2UzbSmnxW2BuYddFo9Yfm6mKjtJyLpF74ytqrF5xtf84MnGFg1hMBm"
+    "h1xVx1JwjZ2BeMJs7mNS8DTZhKC7KH38EgqDtUZzfjhpjmmUfkXg2KFEA3EGbbVm1DPqQXayPYKAsYPS9AyKkcQ3fzWafLPP93UfNhtUPL8JW5pMcSV3P8v6"
+    "j3vPXqnnGknNyBprD6YGUVtgLiAqDBDUF3LSxFQJCVYYtghMTv8WuSw9h1a1SRFrDQLGHE4UrkgoRvwaGWr64aM87T1eVGkP5Dt4L1AbboeK2ceLArPScrdY"
+    "GTpi3BpTkLwZCdjdiFSfTy9okL1YNRARqUf2wm8DvkVGUU7u5nQA3ZMaXWJAewk6k1YUxKd7LvofGUK4YEDtoxN5vb6r1Q2godrGqaPkjfL3RoYPpDYymf9X"
+    "hcgG8Kx3DZaA6cyTs24t45KxYAfeCw4wqUpCH9HbpD78TbEUr9PPAsJgXBvBj2VVsxnr7FKbK4KykGcg1W8M1JPz21Z4Y72LWgGQCmixovrkHktcTX1uNHjA"
+    "vKBqVD5C7XmVfHgXCHj7djCh3vzLNuVLtEED8J1hhqsB1oCBGiuh3xXr7fZ9wUjJCQ1HYHqxLJKdYKtoCiPmgKM7etVftXkmTFETZmpM19aRyih3bao76Ldp"
+    "Qtbw636r7a3qt8v4WfxsXJetSL8c7t24SqQBcAY89FBsbEnFNrQCMK3JEseKHVaU388ctvRD45uQfe5GndFxthj4iSDomk4uRFd1uRbywoP1tRuabHTDX42U"
+    "xPjz"
+)
+PEER4_SPEC_SHORT_FORM = "did:peer:4zQmd8CpeFPci817KDsbSAKWcXAE2mjvCQSasRewvbSF54Bd"
+
+
+def test_did_peer_4_spec_example():
+    # The long-form example in the peer DID method specification, Method 4.
+    assert dc.resolve_did_peer_4(PEER4_SPEC_DID) == {
+        "@context": [
+            "https://www.w3.org/ns/did/v1",
+            "https://w3id.org/security/suites/x25519-2020/v1",
+            "https://w3id.org/security/suites/ed25519-2020/v1",
+        ],
+        "verificationMethod": [
+            {"id": "#6LSqPZfn", "type": "X25519KeyAgreementKey2020", "publicKeyMultibase": "z6LSqPZfn9krvgXma2icTMKf2uVcYhKXsudCmPoUzqGYW24U", "controller": PEER4_SPEC_DID},
+            {"id": "#6MkrCD1c", "type": "Ed25519VerificationKey2020", "publicKeyMultibase": "z6MkrCD1csqtgdj8sjrsu8jxcbeyP6m7LiK87NzhfWqio5yr", "controller": PEER4_SPEC_DID},
+        ],
+        "service": [
+            {
+                "id": "#didcommmessaging-0",
+                "type": "DIDCommMessaging",
+                "serviceEndpoint": {"uri": "didcomm:transport/queue", "accept": ["didcomm/v2"], "routingKeys": []},
+            }
+        ],
+        "authentication": ["#6MkrCD1c"],
+        "keyAgreement": ["#6LSqPZfn"],
+        "assertionMethod": ["#6MkrCD1c"],
+        "capabilityDelegation": ["#6MkrCD1c"],
+        "capabilityInvocation": ["#6MkrCD1c"],
+        "alsoKnownAs": [PEER4_SPEC_SHORT_FORM],
+        "id": PEER4_SPEC_DID,
+    }
+    assert dc.resolve_did_peer_4(f"{PEER4_SPEC_DID}#6LSqPZfn")["id"] == PEER4_SPEC_DID
+
+
+def test_did_peer_4_rejects_bad_hashes_and_other_forms():
+    import pytest
+
+    with pytest.raises(ValueError, match="hash"):
+        dc.resolve_did_peer_4(PEER4_SPEC_DID.replace("SF54Bd:", "SF54Be:"))
+    prefix, encoded = PEER4_SPEC_DID.split(":z2M1")
+    with pytest.raises(ValueError, match="hash"):
+        dc.resolve_did_peer_4(f"{prefix}:z2M2{encoded}")
+    with pytest.raises(ValueError, match="long-form"):
+        dc.resolve_did_peer_4(PEER4_SPEC_SHORT_FORM)
+    with pytest.raises(ValueError, match="did:peer:4"):
+        dc.resolve_did_peer_4("did:peer:2.Ez6LSg8zQom395jKLrGiBNruB9MM6V8PWuf2FpEy4uRFiqQBR")
+
+
+MEDIATOR_ENDPOINT = "https://mediator.example/didcomm"
+
+
+def _peer_2_mediator(seed_byte: int) -> dict[str, Any]:
+    # A mediator as coordinate-mediation grants it: a did:peer:2 routing DID
+    # with its own HTTP endpoint.
+    import base64
+    import json as jsonlib
+
+    kp = dc.generate_x25519_jwk(bytes([seed_byte] * 32))
+    service = jsonlib.dumps({"t": "dm", "s": {"uri": MEDIATOR_ENDPOINT, "a": ["didcomm/v2"]}}).encode()
+    did = ("did:peer:2.E" + dc.x25519_jwk_to_did_key(kp["publicJwk"])[len("did:key:"):]
+           + ".S" + base64.urlsafe_b64encode(service).decode().rstrip("="))
+    return {"did": did, "kid": f"{did}#key-1", "kp": kp}
+
+
+def _peer_4_agent(seed_byte: int, service_uri: str) -> dict[str, Any]:
+    # A did:peer:4 agent (as the DIF demo identifies itself) whose service uri is
+    # its mediator's routing DID, encoded per the peer DID method specification.
+    import hashlib
+    import json as jsonlib
+
+    kp = dc.generate_x25519_jwk(bytes([seed_byte] * 32))
+    doc = {
+        "@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/multikey/v1"],
+        "verificationMethod": [{"id": "#key-1", "type": "Multikey",
+                                "publicKeyMultibase": dc.x25519_jwk_to_did_key(kp["publicJwk"])[len("did:key:"):]}],
+        "keyAgreement": ["#key-1"],
+        "service": [{"id": "#didcomm", "type": "DIDCommMessaging", "serviceEndpoint": {"uri": service_uri, "accept": ["didcomm/v2"]}}],
+    }
+    encoded = dc.bytes_to_multibase(bytes([0x80, 0x04]) + jsonlib.dumps(doc, separators=(",", ":")).encode())
+    hash_value = dc.bytes_to_multibase(bytes([0x12, 0x20]) + hashlib.sha256(encoded.encode()).digest())
+    did = f"did:peer:4{hash_value}:{encoded}"
+    return {"did": did, "kid": f"{did}#key-1", "kp": kp}
+
+
+def test_unpack_didcomm_from_did_peer_4_without_the_gatekeeper(testbed, monkeypatch):
+    import json as jsonlib
+    from keymaster.core import KeymasterError
+    from .helpers import run
+
+    km = testbed.keymaster
+    alice_did = run(km.create_id("Alice", {"registry": "local"}))
+    run(km.publish_didcomm("https://relay.example/didcomm", "Alice"))
+    alice_doc = run(km.resolve_did(alice_did))["didDocument"]
+    alice_ka_id = alice_doc["keyAgreement"][0]
+    alice_ka = next(vm for vm in alice_doc["verificationMethod"] if vm["id"] == alice_ka_id)
+
+    peer = _peer_4_agent(0x61, _peer_2_mediator(0x62)["did"])
+    message = {"id": "p4", "typ": "application/didcomm-plain+json", "type": "https://x/1/msg",
+               "from": peer["did"], "to": [alice_did], "body": {"text": "peer4 hello"}}
+    packed = dc.pack_encrypted(
+        jsonlib.dumps(message).encode(),
+        [{"kid": alice_ka_id, "publicJwk": alice_ka["publicKeyJwk"]}],
+        {"kid": peer["kid"], "privateJwk": peer["kp"]["privateJwk"]},
+        "A256CBC-HS512",
+    )
+
+    # A gatekeeper (or its universal resolver) without a did:peer driver.
+    resolve_did = km.resolve_did
+
+    async def no_peer_driver(did, *args, **kwargs):
+        if did.startswith("did:peer:"):
+            raise KeymasterError("unsupported DID method")
+        return await resolve_did(did, *args, **kwargs)
+
+    monkeypatch.setattr(km, "resolve_did", no_peer_driver)
+
+    result = run(km.unpack_didcomm(packed, {"name": "Alice"}))
+    assert result["message"]["body"] == {"text": "peer4 hello"}
+    assert result["metadata"]["authenticated"] is True
+    assert result["metadata"]["sender"] == peer["kid"]
+
+
 def _foreign_did_peer_2(seed_byte: int) -> dict[str, Any]:
     # A did:peer:2 agent (as the DIF demo, Credo and Aries mediators use), whose
     # X25519 keypair we hold. Its key-agreement key is #key-1, the only key.
@@ -478,6 +611,53 @@ def test_send_didcomm_uses_the_service_for_a_mailbox_elsewhere(monkeypatch):
     urls = [url for _method, url, _kw in calls]
     assert any("/deliver" in url for url in urls)
     assert not any(url.endswith("/api/v1/messages") for url in urls)
+
+
+def test_send_didcomm_forwards_to_the_mediator_named_by_a_did_service_uri(monkeypatch):
+    # The DIF demo's did:peer:4 service uri is its mediator's routing DID. The
+    # gatekeeper is never asked: both peer DIDs resolve locally. Mirrors the JS keymaster.
+    import asyncio
+    import json as jsonlib
+
+    mediator = _peer_2_mediator(0x63)
+    peer = _peer_4_agent(0x64, mediator["did"])
+    calls: list = []
+
+    def responses(url, kw):
+        if url.endswith("/challenge"):
+            return _FakeResponse({"challenge": "c"})
+        return _FakeResponse({"ids": ["forwarded"]})
+
+    km = _mailbox_keymaster(monkeypatch, calls, responses)
+    monkeypatch.setattr(km, "pack_didcomm", _async_return('{"inner":"envelope"}'))
+    monkeypatch.setattr(km, "_node_didcomm_endpoint_uri", _async_return(None))
+    monkeypatch.setattr("keymaster.core.sign_hash", lambda *args, **kwargs: "sig")
+
+    assert asyncio.run(km.send_didcomm({"type": "t", "body": {}}, peer["did"])) == ["forwarded"]
+
+    delivery = next(kw["json"] for _method, url, kw in calls if url.endswith("/deliver"))
+    assert delivery["endpoint"] == MEDIATOR_ENDPOINT
+    plaintext, _ = dc.unpack_encrypted(delivery["message"], {"kid": mediator["kid"], "privateJwk": mediator["kp"]["privateJwk"]})
+    forward = dc.parse_forward(plaintext.decode("utf-8"))
+    assert forward["next"] == peer["did"]
+    assert jsonlib.loads(forward["forwardedMessage"]) == {"inner": "envelope"}
+
+
+def test_send_didcomm_refuses_a_mediator_without_a_direct_endpoint(monkeypatch):
+    import asyncio
+    import pytest
+    from keymaster.core import KeymasterError
+
+    outer_mediator = _peer_4_agent(0x66, _peer_2_mediator(0x65)["did"])
+    peer = _peer_4_agent(0x67, outer_mediator["did"])
+    calls: list = []
+
+    km = _mailbox_keymaster(monkeypatch, calls, lambda url, kw: _FakeResponse({}))
+    monkeypatch.setattr(km, "pack_didcomm", _async_return('{"inner":"envelope"}'))
+
+    with pytest.raises(KeymasterError, match="no direct DIDCommMessaging endpoint"):
+        asyncio.run(km.send_didcomm({"type": "t", "body": {}}, peer["did"]))
+    assert calls == []
 
 
 def test_same_didcomm_endpoint_ignores_case_and_trailing_slash():

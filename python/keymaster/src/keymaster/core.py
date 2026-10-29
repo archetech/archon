@@ -4297,6 +4297,9 @@ class Keymaster:
         # the driver for it.
         if did.startswith("did:peer:2."):
             return {"didDocument": dc.resolve_did_peer_2(did)}
+        # So is long-form did:peer:4, whose document is embedded after its hash.
+        if did.startswith("did:peer:4"):
+            return {"didDocument": dc.resolve_did_peer_4(did)}
         return await self.resolve_did(did)
 
     async def _node_didcomm_endpoint_uri(self) -> str | None:
@@ -4745,12 +4748,28 @@ class Keymaster:
                     raise KeymasterError(f"recipient {recipient_did} has no DIDCommMessaging endpoint")
 
                 envelope = packed
+                delivery_uri = endpoint["uri"]
+                mediated = False
                 # If the recipient is behind a mediator, wrap in a Forward to the routing key.
                 if endpoint["routingKeys"]:
                     recipient_doc = await self._resolve_did_for_didcomm(recipient_did)
                     recipient_ka = self._resolve_key_agreement(recipient_doc)
                     routing = await self._resolve_routing_key(endpoint["routingKeys"][0])
                     envelope = dc.wrap_forward(packed, recipient_ka["kid"], {"kid": routing["kid"], "publicJwk": routing["publicJwk"]})
+                    mediated = True
+                # A service uri that is a DID names the recipient's mediator (the
+                # coordinate-mediation routing_did): deliver to the mediator's own
+                # endpoint, in a Forward for its key-agreement key whose next is
+                # the recipient DID the mediator registered.
+                elif endpoint["uri"].startswith("did:"):
+                    mediator_did = endpoint["uri"]
+                    mediator_endpoint = await self._resolve_didcomm_endpoint(mediator_did)
+                    if not mediator_endpoint or mediator_endpoint["routingKeys"] or mediator_endpoint["uri"].startswith("did:"):
+                        raise KeymasterError(f"mediator {mediator_did} for {recipient_did} has no direct DIDCommMessaging endpoint")
+                    routing = await self._resolve_routing_key(mediator_did)
+                    envelope = dc.wrap_forward(packed, recipient_did, {"kid": routing["kid"], "publicJwk": routing["publicJwk"]})
+                    delivery_uri = mediator_endpoint["uri"]
+                    mediated = True
 
                 # A recipient whose mailbox is on this node needs no egress: deposit
                 # straight into the local relay. Without this, sending to your own
@@ -4761,7 +4780,7 @@ class Keymaster:
                 # published endpoint. Skipped when a mediator is in the path, whose
                 # Forward envelope is addressed elsewhere by design.
                 node_endpoint = await self._node_didcomm_endpoint_uri()
-                if not endpoint["routingKeys"] and node_endpoint and self._same_didcomm_endpoint(endpoint["uri"], node_endpoint):
+                if not mediated and node_endpoint and self._same_didcomm_endpoint(delivery_uri, node_endpoint):
                     local_response = await client.post(
                         f"{service_base}/api/v1/messages",
                         content=envelope,
@@ -4792,7 +4811,7 @@ class Keymaster:
                 signature = sign_hash(hash_message(challenge), keypair["privateJwk"])
                 response = await client.post(
                     f"{service_base}/api/v1/deliver",
-                    json={"did": sender_did, "challenge": challenge, "signature": signature, "endpoint": endpoint["uri"], "message": envelope},
+                    json={"did": sender_did, "challenge": challenge, "signature": signature, "endpoint": delivery_uri, "message": envelope},
                 )
                 if response.status_code >= 400:
                     # The status alone cannot tell a missing Tor proxy from a recipient

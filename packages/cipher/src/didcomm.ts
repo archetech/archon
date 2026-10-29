@@ -602,6 +602,54 @@ export function resolveDidPeer2(did: string): DidPeer2Document {
     return doc;
 }
 
+const MULTICODEC_JSON = [0x80, 0x04]; // varint 0x0200
+const MULTIHASH_SHA2_256 = [0x12, 0x20];
+
+/**
+ * Resolve a long-form `did:peer:4<hash>:<encoded document>` to its DID
+ * document, as the peer DID method specification defines it: the hash is
+ * checked against the encoded document, which is then decoded and
+ * contextualized (`id` set to the DID, the short form appended to
+ * `alsoKnownAs`, and `controller` set on verification methods that lack one).
+ * The short form cannot be resolved without a stored long form.
+ */
+export function resolveDidPeer4(did: string): Record<string, any> {
+    const base = did.split(/[?#]/)[0];
+    const match = /^did:peer:4(z[1-9A-HJ-NP-Za-km-z]+):(z[1-9A-HJ-NP-Za-km-z]+)$/.exec(base);
+    if (!match) {
+        throw new Error(base.startsWith('did:peer:4') ? 'Only long-form did:peer:4 can be resolved' : 'Not a did:peer:4');
+    }
+    const [, hash, encoded] = match;
+
+    const expectedHash = base58btc.encode(new Uint8Array([...MULTIHASH_SHA2_256, ...sha256(new TextEncoder().encode(encoded))]));
+    if (hash !== expectedHash) {
+        throw new Error('did:peer:4 hash does not match its document');
+    }
+
+    const bytes = base58btc.decode(encoded);
+    if (bytes[0] !== MULTICODEC_JSON[0] || bytes[1] !== MULTICODEC_JSON[1]) {
+        throw new Error('did:peer:4 document is not multicodec JSON');
+    }
+    const doc = JSON.parse(new TextDecoder().decode(bytes.slice(MULTICODEC_JSON.length)));
+    if (!doc || typeof doc !== 'object' || Array.isArray(doc)) {
+        throw new Error('did:peer:4 document is not an object');
+    }
+
+    doc.id = base;
+    doc.alsoKnownAs = [...(Array.isArray(doc.alsoKnownAs) ? doc.alsoKnownAs : []), `did:peer:4${hash}`];
+    const relationships = ['authentication', 'assertionMethod', 'keyAgreement', 'capabilityInvocation', 'capabilityDelegation'];
+    const methods = [doc.verificationMethod, ...relationships.map(name => doc[name])]
+        .flatMap(list => (Array.isArray(list) ? list : []))
+        .filter(vm => vm && typeof vm === 'object');
+    for (const vm of methods) {
+        if (vm.controller === undefined) {
+            vm.controller = base;
+        }
+    }
+
+    return doc;
+}
+
 /**
  * Normalize a DID-document verification method's key material to an X25519 JWK,
  * accepting `publicKeyJwk` (OKP/X25519) or `publicKeyMultibase` (X25519 or
