@@ -602,11 +602,14 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
         setDidcommBusy(true);
         try {
-            // Resolve first: an alias must not travel in the envelope, which
+            // Resolve an alias first: it must not travel in the envelope, which
             // addresses recipients by DID. This also turns an unknown name into a
-            // clear error before any crypto happens.
-            const docs = await keymaster.resolveDID(recipient);
-            const recipientDid = docs.didDocument?.id;
+            // clear error before any crypto happens. A DID is passed through:
+            // sendDidComm resolves did:key and did:peer locally, which the
+            // gatekeeper may have no driver for.
+            const recipientDid = recipient.startsWith('did:')
+                ? recipient
+                : (await keymaster.resolveDID(recipient)).didDocument?.id;
 
             if (!recipientDid) {
                 showError(`Could not resolve ${recipient}`);
