@@ -348,7 +348,7 @@ export function createV1Router(options: CreateV1RouterOptions): express.Router {
             return;
         }
         try {
-            await proxyLightningMediatorRequest(req, res, req.originalUrl);
+            await proxyLightningMediatorRequest(req, res, req.originalUrl, '/api/v1/lightning');
         } catch (error: any) {
             logger.error({ err: error, path: req.originalUrl }, 'Lightning mediator proxy error');
             res.status(502).json({ error: 'Upstream lightning mediator error' });

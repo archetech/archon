@@ -1,4 +1,5 @@
 import type express from 'express';
+import { resolveUpstreamUrl } from './upstream-url.js';
 
 // Forwarding to Herald, kept apart from the app so the proxy itself can be
 // exercised end to end against a running Herald in tests.
@@ -35,11 +36,12 @@ export function buildProxyBody(req: express.Request): BodyInit | undefined {
     return undefined;
 }
 
-export async function proxyHeraldRequest(req: express.Request, res: express.Response, heraldURL: string, prefixToStrip = '/names') {
-    const upstreamPath = prefixToStrip
-        ? (req.originalUrl.replace(new RegExp(`^${prefixToStrip}`), '') || '/')
-        : req.originalUrl;
-    const upstreamUrl = new URL(upstreamPath, heraldURL);
+export async function proxyHeraldRequest(req: express.Request, res: express.Response, heraldURL: string, prefixToStrip = '/names', confineTo?: string) {
+    const upstreamUrl = resolveUpstreamUrl(req.originalUrl, prefixToStrip, heraldURL, confineTo);
+    if (!upstreamUrl) {
+        res.status(400).json({ error: 'Invalid path' });
+        return;
+    }
 
     const headers = new Headers();
     for (const [name, value] of Object.entries(req.headers)) {

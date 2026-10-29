@@ -1,12 +1,14 @@
 import type express from 'express';
 import { buildProxyBody } from './herald-proxy.js';
+import { resolveUpstreamUrl } from './upstream-url.js';
 
 // Generic reverse proxy to an internal service, stripping a path prefix.
-export async function proxyRequest(req: express.Request, res: express.Response, baseURL: string, prefixToStrip: string) {
-    const upstreamPath = prefixToStrip
-        ? (req.originalUrl.replace(new RegExp(`^${prefixToStrip}`), '') || '/')
-        : req.originalUrl;
-    const upstreamUrl = new URL(upstreamPath, baseURL);
+export async function proxyRequest(req: express.Request, res: express.Response, baseURL: string, prefixToStrip: string, confineTo?: string) {
+    const upstreamUrl = resolveUpstreamUrl(req.originalUrl, prefixToStrip, baseURL, confineTo);
+    if (!upstreamUrl) {
+        res.status(400).json({ error: 'Invalid path' });
+        return;
+    }
 
     const headers = new Headers();
     for (const [name, value] of Object.entries(req.headers)) {

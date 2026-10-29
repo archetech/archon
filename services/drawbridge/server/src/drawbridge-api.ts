@@ -14,6 +14,7 @@ import { normalizePath } from './metrics-path.js';
 import { REDACTED_LOG_PATHS } from './log-redaction.js';
 import { buildProxyBody, proxyHeraldRequest } from './herald-proxy.js';
 import { proxyRequest } from './proxy.js';
+import { resolveUpstreamUrl } from './upstream-url.js';
 import { createAuthMiddleware } from './middleware/auth.js';
 import { loadPricingFromEnv } from './pricing.js';
 import { createV1Router } from './v1-router.js';
@@ -107,9 +108,14 @@ async function resolveDidCommEndpoint(): Promise<string | null> {
 async function proxyLightningMediatorRequest(
     req: express.Request,
     res: express.Response,
-    upstreamPath: string
+    upstreamPath: string,
+    confineTo: string
 ) {
-    const upstreamUrl = new URL(upstreamPath, config.lightningMediatorURL);
+    const upstreamUrl = resolveUpstreamUrl(upstreamPath, '', config.lightningMediatorURL, confineTo);
+    if (!upstreamUrl) {
+        res.status(400).json({ error: 'Invalid path' });
+        return;
+    }
 
     const headers = new Headers();
     const contentType = req.headers['content-type'];
@@ -328,7 +334,7 @@ async function main() {
             return;
         }
         try {
-            await proxyLightningMediatorRequest(req, res, req.originalUrl);
+            await proxyLightningMediatorRequest(req, res, req.originalUrl, '/invoice');
         } catch (error: any) {
             logger.error({ err: error, path: req.originalUrl }, 'Lightning mediator public invoice proxy error');
             res.status(502).json({ error: 'Upstream lightning mediator error' });
@@ -337,7 +343,7 @@ async function main() {
 
     app.use('/.well-known', heraldRateLimit, async (req, res) => {
         try {
-            await proxyHeraldRequest(req, res, config.heraldURL, '');
+            await proxyHeraldRequest(req, res, config.heraldURL, '', '/.well-known');
         } catch (error: any) {
             logger.error({ err: error, path: req.originalUrl }, 'Herald proxy error');
             res.status(502).json({ error: 'Upstream herald error' });
@@ -371,7 +377,7 @@ async function main() {
             return;
         }
         try {
-            await proxyRequest(req, res, config.explorerURL, '');
+            await proxyRequest(req, res, config.explorerURL, '', '/explorer');
         } catch (error: any) {
             logger.error({ err: error, path: req.originalUrl }, 'Explorer proxy error');
             res.status(502).json({ error: 'Upstream explorer error' });
@@ -416,7 +422,7 @@ async function main() {
     // with universal resolvers, which do not speak L402.
     app.use('/1.0/identifiers', publicReadRateLimit, async (req, res) => {
         try {
-            await proxyRequest(req, res, config.gatekeeperURL, '');
+            await proxyRequest(req, res, config.gatekeeperURL, '', '/1.0/identifiers');
         } catch (error: any) {
             logger.error({ err: error, path: req.originalUrl }, 'Gatekeeper conformant proxy error');
             res.status(502).json({ error: 'Upstream gatekeeper error' });

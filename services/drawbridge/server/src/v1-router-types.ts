@@ -18,6 +18,7 @@ export interface CreateV1RouterOptions {
     proxyLightningMediatorRequest: (
         req: express.Request,
         res: express.Response,
-        prefixToStrip: string,
+        upstreamPath: string,
+        confineTo: string,
     ) => Promise<void>;
 }
