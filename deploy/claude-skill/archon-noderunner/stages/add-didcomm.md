@@ -15,19 +15,28 @@ No human checkpoint required — this is the smoothest add-stage. Free to run wi
    ```
    Append `didcomm` to `COMPOSE_PROFILES`.
 
-2. **Caddy** — append handler inside the `{{DOMAIN}}` block. Target depends on whether `add-lightning` has already run:
-   - **If drawbridge is enabled** (post-add-lightning): `reverse_proxy localhost:4222`
-   - **If not** (stage 0 only, no lightning yet): `reverse_proxy localhost:4236` (the didcomm container's direct port)
-   ```
-   handle /didcomm/* {
-       reverse_proxy localhost:4222   # or :4236 if pre-lightning
-   }
-   ```
+2. **Caddy** — append handler inside the `{{DOMAIN}}` block. The published endpoint is the bare `https://<domain>/didcomm`, and senders POST to it exactly as published, so the matcher must cover `/didcomm` itself as well as the paths under it. `handle /didcomm/*` does not match `/didcomm`, and every delivery to the node then fails with 404.
+
+   - **If drawbridge is enabled** (post-add-lightning): drawbridge strips the `/didcomm` prefix itself.
+     ```
+     @didcomm path /didcomm /didcomm/*
+     handle @didcomm {
+         reverse_proxy localhost:4222
+     }
+     ```
+   - **If not** (stage 0 only, no lightning yet): the didcomm container serves `/`, `/health` and `/api/v1/*` on its direct port, so Caddy strips the prefix.
+     ```
+     @didcomm path /didcomm /didcomm/*
+     handle @didcomm {
+         uri strip_prefix /didcomm
+         reverse_proxy localhost:4236
+     }
+     ```
    Back up the Caddyfile as `Caddyfile.bak-pre-didcomm-<timestamp>`. Reload with `sudo systemctl reload caddy`.
 
-   If the operator later runs `add-lightning`, the didcomm route target must be flipped from `:4236` to `:4222` as part of add-lightning's Caddy transition — track this in the add-lightning procedure.
+   If the operator later runs `add-lightning`, that stage switches this route to the drawbridge form above.
 
-3. **Bring up** the didcomm container. Wait for `GET /didcomm/health` → 200.
+3. **Bring up** the didcomm container. Wait for `GET /didcomm/health` → 200, and confirm the published endpoint itself reaches the relay: `curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/didcomm-encrypted+json' --data '{}' https://$DOMAIN/didcomm` must print `400` (the relay rejecting an empty message), not `404`.
 
 4. **Verify** — service endpoint should appear in DID resolution:
    ```
