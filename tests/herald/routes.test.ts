@@ -87,6 +87,8 @@ describe('herald public endpoints', () => {
         expect((await request(app).get('/.well-known/poppy.json')).status).toBe(404);
         expect((await request(app).post('/poppy/token')).status).toBe(404);
         expect((await request(app).get('/api/poppy/connections')).status).toBe(404);
+        expect((await request(app).delete('/api/poppy/connections/agt_1')).body)
+            .toEqual({ error: 'Personal Agent Protocol is not enabled' });
     });
 
     it('reports service configuration', async () => {
@@ -1982,5 +1984,235 @@ describe('inbound email fallbacks', () => {
             }),
             { registry: 'hyperswarm' },
         );
+    });
+});
+
+describe('herald cross-device login', () => {
+    // The browser mints the challenge and keeps it in its session; the wallet
+    // answers it from another device, in a session of its own. The browser is
+    // signed in once the answer arrives.
+    function mountBrowser() {
+        const db = createDb();
+        const keymaster = {
+            verifyResponse: jest.fn<any>().mockResolvedValue({
+                match: true,
+                challenge: 'did:cid:challenge',
+                responder: 'did:cid:alice',
+            }),
+        };
+        return mount({ db, keymaster, session: { challenge: 'did:cid:challenge' } });
+    }
+
+    it('signs the browser in once the wallet answers its challenge', async () => {
+        const { app } = mountBrowser();
+
+        const before = await request(app).get('/api/check-auth');
+        expect(before.body).toMatchObject({ isAuthenticated: false, userDID: null });
+
+        await request(app).get('/api/login?response=wallet-response').expect(200);
+
+        const after = await request(app).get('/api/check-auth');
+        expect(after.body).toMatchObject({ isAuthenticated: true, userDID: 'did:cid:alice', profile: { logins: 1 } });
+    });
+
+    it('admits the browser to authenticated routes on the strength of the answered challenge', async () => {
+        const { app } = mountBrowser();
+
+        expect((await request(app).get('/api/users')).status).toBe(401);
+
+        await request(app).get('/api/login?response=wallet-response').expect(200);
+
+        const users = await request(app).get('/api/users');
+        expect(users.status).toBe(200);
+        expect(users.body).toEqual(['did:cid:alice']);
+    });
+});
+
+describe('herald session login failures', () => {
+    it('reports a POST login failure as 500', async () => {
+        const keymaster = { verifyResponse: jest.fn<any>().mockRejectedValue(new Error('gatekeeper down')) };
+        const { app } = mount({ keymaster });
+
+        const response = await request(app).post('/api/login').send({ response: 'abc' });
+
+        expect(response.status).toBe(500);
+        expect(response.text).toBe('Error: gatekeeper down');
+    });
+
+    it('still reports logout when the session store fails to destroy the session', async () => {
+        const app = express();
+        app.use((req: any, _res, next) => {
+            req.session = { user: { did: 'did:cid:alice' }, destroy: (cb: any) => cb(new Error('store down')) };
+            next();
+        });
+        app.use(createHeraldRoutes({ keymaster: {}, db: createDb(), emailBridge: null, serviceDID: 'did:cid:service' }).router);
+
+        const response = await request(app).post('/api/logout');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ ok: true });
+        expect(logSpy).toHaveBeenCalledWith(expect.objectContaining({ message: 'store down' }));
+    });
+});
+
+describe('herald version', () => {
+    it('reports API version 1', async () => {
+        const { app } = mount();
+
+        const response = await request(app).get('/api/version');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toBe(1);
+    });
+});
+
+describe('herald backing store failures', () => {
+    // Every database method rejects, as when Redis or Mongo is unreachable.
+    function failingDb() {
+        const down = () => Promise.reject(new Error('db down'));
+        return {
+            ...createDb(),
+            getUser: jest.fn<any>(down),
+            setUser: jest.fn<any>(down),
+            deleteUser: jest.fn<any>(down),
+            listUsers: jest.fn<any>(down),
+            findDidByName: jest.fn<any>(down),
+        };
+    }
+
+    const ALICE = 'did:cid:alice';
+    const cases: Array<[string, 'get' | 'put' | 'delete', string, any]> = [
+        ['check-auth', 'get', '/api/check-auth', { user: { did: ALICE } }],
+        ['the user list', 'get', '/api/users', { user: { did: ALICE } }],
+        ['the admin view', 'get', '/api/admin', { user: { did: 'did:cid:owner' } }],
+        ['a profile', 'get', `/api/profile/${ALICE}`, { user: { did: ALICE } }],
+        ['a profile name', 'get', `/api/profile/${ALICE}/name`, { user: { did: ALICE } }],
+        ['setting a profile name', 'put', `/api/profile/${ALICE}/name`, { user: { did: ALICE } }],
+        ['deleting a profile name', 'delete', `/api/profile/${ALICE}/name`, { user: { did: ALICE } }],
+        ['the registry', 'get', '/api/registry', {}],
+        ['a name lookup', 'get', '/api/name/alice', {}],
+        ['the directory document', 'get', '/directory.json', {}],
+        ['the well-known names list', 'get', '/.well-known/names', {}],
+        ['a well-known name lookup', 'get', '/.well-known/names/alice', {}],
+        ['a webfinger lookup', 'get', '/.well-known/webfinger?resource=acct:alice@archon.test', {}],
+    ];
+
+    it.each(cases)('reports a store failure in %s as 500', async (_label, method, url, session) => {
+        const { app } = mount({ db: failingDb(), session });
+
+        const response = await request(app)[method](url).send({ name: 'alice' });
+
+        expect(response.status).toBe(500);
+        expect(response.text).toBe('Error: db down');
+    });
+
+    it('reports a failure during a bearer-token name delete as 500', async () => {
+        const keymaster = { verifyResponse: jest.fn<any>().mockResolvedValue({ match: true, responder: ALICE }) };
+        const { app } = mount({ db: failingDb(), keymaster });
+
+        const response = await request(app).delete('/api/name').set('Authorization', 'Bearer valid');
+
+        expect(response.status).toBe(500);
+        expect(response.text).toBe('Error: db down');
+    });
+
+    it('404s setting a profile name for a signed-in DID with no record', async () => {
+        const { app } = mount({ session: { user: { did: 'did:cid:ghost' } } });
+
+        const response = await request(app).put('/api/profile/did:cid:ghost/name').send({ name: 'ghost' });
+
+        expect(response.status).toBe(404);
+    });
+});
+
+describe('herald avatar failures', () => {
+    it('reports an image fetch failure as 500 with its message', async () => {
+        const db = createDb({ 'did:cid:alice': { name: 'alice' } });
+        const keymaster = {
+            resolveDID: jest.fn<any>().mockResolvedValue({ didDocumentData: { avatar: 'did:cid:avatar' } }),
+            getImage: jest.fn<any>().mockRejectedValue(new Error('ipfs unavailable')),
+        };
+        const { app } = mount({ db, keymaster });
+
+        const response = await request(app).get('/api/name/alice/avatar');
+
+        expect(response.status).toBe(500);
+        expect(response.body).toEqual({ error: 'ipfs unavailable' });
+    });
+});
+
+describe('herald LNURLp for an unknown name', () => {
+    it('reports that no Lightning service exists without resolving anything', async () => {
+        const keymaster = { resolveDID: jest.fn<any>() };
+        const { app } = mount({ keymaster });
+
+        const response = await request(app).get('/.well-known/lnurlp/nobody');
+
+        expect(response.body).toEqual({ status: 'ERROR', reason: 'No Lightning service found for this name' });
+        expect(keymaster.resolveDID).not.toHaveBeenCalled();
+    });
+});
+
+describe('herald name deletion when revocation fails', () => {
+    it('still deletes the name and reports success', async () => {
+        const db = createDb({ 'did:cid:alice': { name: 'alice', credentialDid: 'did:cid:cred' } });
+        const keymaster = {
+            verifyResponse: jest.fn<any>().mockResolvedValue({ match: true, responder: 'did:cid:alice' }),
+            setCurrentId: jest.fn<any>().mockResolvedValue(undefined),
+            revokeCredential: jest.fn<any>().mockRejectedValue(new Error('gatekeeper down')),
+        };
+        const { app } = mount({ db, keymaster });
+
+        const response = await request(app).delete('/api/name').set('Authorization', 'Bearer valid');
+
+        expect(response.status).toBe(200);
+        expect(keymaster.revokeCredential).toHaveBeenCalledWith('did:cid:cred');
+        expect((await db.getUser('did:cid:alice')).name).toBeUndefined();
+        expect((await request(app).get('/api/name/alice')).status).toBe(404);
+    });
+});
+
+describe('herald member lookup timeouts', () => {
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+
+    // A resolution that never returns would otherwise hold the whole response open.
+    it('reports a credential whose check never finishes as timed out', async () => {
+        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+        const ALICE = 'did:cid:alice';
+        let checking!: () => void;
+        const checkStarted = new Promise<void>(resolve => { checking = resolve; });
+        const db = createDb({ [ALICE]: { name: 'alice' } });
+        const keymaster = {
+            resolveDID: jest.fn<any>().mockResolvedValue({
+                didDocument: { id: ALICE },
+                didDocumentData: {
+                    manifest: {
+                        'did:cid:vc': {
+                            issuer: 'did:cid:issuer',
+                            credentialSubject: { id: ALICE, member: true },
+                            proof: { verificationMethod: 'did:cid:issuer#key-1' },
+                        },
+                    },
+                },
+            }),
+            verifyProof: jest.fn<any>(() => {
+                checking();
+                return new Promise(() => {});
+            }),
+        };
+        const { app } = mount({ db, keymaster });
+
+        const pending = request(app).get('/api/member/alice').then(response => response);
+        await checkStarted;
+        await jest.advanceTimersByTimeAsync(5000);
+        const response = await pending;
+
+        expect(response.status).toBe(200);
+        expect(response.body.credentialStatus['did:cid:vc']).toStrictEqual({
+            status: 'unverified',
+            reason: 'verification timed out',
+        });
     });
 });

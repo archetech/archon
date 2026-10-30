@@ -80,6 +80,21 @@ if (redisUrl) {
 }
 
 describe('MemoryKV expiry', () => {
+    it('forgets a value after its lifetime, so it can be claimed again', async () => {
+        let now = 1_000_000;
+        const kv = new MemoryKV(() => now);
+        await kv.set('v', 'first', 60);
+        await kv.set('forever', 'kept');
+        now += 59_000;
+        expect(await kv.get('v')).toBe('first');
+        now += 1_000;
+        expect(await kv.get('v')).toBeNull();
+        expect(await kv.setIfPresent('v', 'revived', 60)).toBe(false);
+        expect(await kv.setIfAbsent('v', 'second', 60)).toBe(true);
+        expect(await kv.get('v')).toBe('second');
+        expect(await kv.get('forever')).toBe('kept');
+    });
+
     it('expires a set with its lifetime, extended by later adds', async () => {
         let now = 1_000_000;
         const kv = new MemoryKV(() => now);
