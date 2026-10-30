@@ -29,7 +29,7 @@ Add a chain-writer mediator. Values: `BTC:mainnet`, `ZEC:mainnet`, `ETH:mainnet`
 Enable CLN + LNbits + lightning-mediator + drawbridge L402. Human checkpoint: channel opens.
 
 ### `add-didcomm`
-Enable DIDComm v2 messaging + Caddy `/didcomm/*` route. No human checkpoint (fully automatable).
+Enable DIDComm v2 messaging + Caddy route for `/didcomm` and `/didcomm/*`. No human checkpoint (fully automatable).
 
 ### `add-email`
 Enable Herald email-challenge flow. Human checkpoint: SMTP relay credentials (Postmark/SES/etc).

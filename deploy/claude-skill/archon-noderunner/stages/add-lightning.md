@@ -9,6 +9,7 @@ Because Drawbridge derives its capabilities from the `ARCHON_*_URL` values rathe
 Once this stage completes:
 - Caddy's `/api/*` and `/1.0/*` handlers switch from `localhost:4224` (gatekeeper direct) to `localhost:4222` (drawbridge → gatekeeper). Public API calls now go through drawbridge's L402 auth layer.
 - `/invoice/*` is added at `localhost:4222` for Lightning invoice endpoints.
+- If `add-didcomm` already ran, its `@didcomm` handler switches from the relay's direct port to drawbridge: drop `uri strip_prefix /didcomm` and change `reverse_proxy localhost:4236` to `localhost:4222`, since drawbridge strips the prefix itself. Keep the `@didcomm path /didcomm /didcomm/*` matcher.
 
 **Not** part of this stage any more, since it no longer enables the `tor` profile: there is no Tor SOCKS listener on `127.0.0.1:9050` and no onion hostname at `data/tor-drawbridge/drawbridge/hostname`. Do not probe for either when verifying stage health. An operator who wants them adds `tor` to `COMPOSE_PROFILES` and sets the `*_TOR_PROXY` variables to `tor:9050`.
 
