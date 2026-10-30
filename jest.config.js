@@ -77,6 +77,11 @@ const config = {
         '!**/*-types.ts',
         '!**/interfaces.ts',
         '!packages/*/src/index.ts',
+        // The shared wallet UI renders only under the wallets' vitest render
+        // tests, which report its coverage themselves (unit-test workflow,
+        // wallet-ui-coverage). Measuring it here too would merge two different
+        // instrumentations of the same files.
+        '!packages/wallet-ui/**',
         // Platform variants not exercised by the node test environment.
         '!**/cipher-web.ts',
         '!**/node.ts',
