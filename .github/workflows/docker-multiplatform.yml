@@ -77,6 +77,8 @@ jobs:
             image: gatekeeper-rs
           - dockerfile: docker/Dockerfile.pinning
             image: pinning-mediator
+          - dockerfile: docker/Dockerfile.tor
+            image: tor
           - dockerfile: docker/Dockerfile.ethereum
             image: ethereum-mediator
           - dockerfile: docker/Dockerfile.ethereum-wallet
