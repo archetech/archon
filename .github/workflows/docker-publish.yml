@@ -133,6 +133,8 @@ jobs:
             image: gatekeeper-rs
           - dockerfile: docker/Dockerfile.pinning
             image: pinning-mediator
+          - dockerfile: docker/Dockerfile.tor
+            image: tor
           # Chain mediators and their wallet sidecars. Named for the chain
           # rather than the network, the way satoshi/satoshi-wallet already are:
           # compose picks the network (eth-sepolia, sol-devnet, zcash-mainnet),
