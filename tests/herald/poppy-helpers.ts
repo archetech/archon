@@ -69,6 +69,12 @@ export class TestAgent {
             .sign(this.key);
     }
 
+    // Signs exactly the given claims with the agent key, for tests that need
+    // a claim assertion() always sets (iss, iat, exp) to be wrong.
+    async jwt(payload: Record<string, unknown>, header: Record<string, unknown> = {}): Promise<string> {
+        return new SignJWT(payload).setProtectedHeader({ alg: 'ES256', kid: this.kid, ...header }).sign(this.key);
+    }
+
     async clientAuth(): Promise<Record<string, string>> {
         return {
             client_id: this.clientId,

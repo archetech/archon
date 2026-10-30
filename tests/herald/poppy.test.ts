@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
 import { SignJWT, exportJWK, generateKeyPair } from 'jose';
@@ -7,7 +8,8 @@ import { AgentDirectory } from '../../services/herald/server/src/poppy/agents.ts
 import { createPoppyConfig } from '../../services/herald/server/src/poppy/config.ts';
 import { MemoryKV } from '../../services/herald/server/src/poppy/kv.ts';
 import { createPoppy, type Poppy } from '../../services/herald/server/src/poppy/router.ts';
-import { PoppyStore } from '../../services/herald/server/src/poppy/store.ts';
+import { PoppyStore, hashSecret } from '../../services/herald/server/src/poppy/store.ts';
+import type { PoppyAccounts } from '../../services/herald/server/src/poppy/api.ts';
 import {
     AGENT_ID, ALICE, API, BOB, ISSUER, ORIGIN, REDIRECT, TOKEN,
     TestAgent, fakeAccounts, fetcherFor, fetches, type Docs,
@@ -23,6 +25,7 @@ let poppy: Poppy;
 let app: express.Express;
 let kv: MemoryKV;
 let descriptions: string[];
+let accounts: PoppyAccounts;
 
 beforeEach(async () => {
     fetches.length = 0;
@@ -31,12 +34,13 @@ beforeEach(async () => {
     kv = new MemoryKV();
     const fake = fakeAccounts();
     descriptions = fake.descriptions;
+    accounts = fake.accounts;
     const config = createPoppyConfig(ORIGIN, 'archon.test', 'https://wallet.archon.test');
     poppy = createPoppy({
         config,
         store: new PoppyStore(kv),
         agents: new AgentDirectory(fetcherFor(() => docs)),
-        accounts: fake.accounts,
+        accounts,
     });
     app = express();
     app.use(express.json());
@@ -116,6 +120,17 @@ async function signedIn(did = ALICE, scope = 'poppy:read poppy:write') {
     }, await agent.proof('POST', TOKEN));
     expect(response.status).toBe(200);
     return { session: session.body, signIn: response.body };
+}
+
+async function exchange(redirect: URL, verifier: string, sessionId: string) {
+    return token({
+        grant_type: 'authorization_code',
+        code: redirect.searchParams.get('code')!,
+        redirect_uri: REDIRECT,
+        code_verifier: verifier,
+        session_id: sessionId,
+        ...await agent.clientAuth(),
+    }, await agent.proof('POST', TOKEN));
 }
 
 describe('discovery', () => {
@@ -620,17 +635,6 @@ describe('Device Sign-In', () => {
 });
 
 describe('concurrent and repeated requests', () => {
-    async function exchange(redirect: URL, verifier: string, sessionId: string) {
-        return token({
-            grant_type: 'authorization_code',
-            code: redirect.searchParams.get('code')!,
-            redirect_uri: REDIRECT,
-            code_verifier: verifier,
-            session_id: sessionId,
-            ...await agent.clientAuth(),
-        }, await agent.proof('POST', TOKEN));
-    }
-
     it('rejects scopes inherited from Object.prototype', async () => {
         const response = await request(app).post('/poppy/device_authorization').type('form')
             .send({ scope: 'constructor', ...await agent.clientAuth() });
@@ -975,5 +979,348 @@ describe('independent review', () => {
             });
             expect(poll.body.error).toBe('expired_token');
         }
+    });
+});
+
+describe('token endpoint refusals', () => {
+    const jwtBearer = async (claims: Record<string, unknown> = {}, extra: Record<string, string> = {}) => token({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: await agent.assertion({ sub: 'usr_1', ...claims }),
+        ...await agent.clientAuth(),
+        ...extra,
+    }, await agent.proof('POST', TOKEN));
+
+    it('requires private_key_jwt client authentication', async () => {
+        const response = await jwtBearer({}, { client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:saml2-bearer' });
+        expect(response.status).toBe(401);
+        expect(response.body).toMatchObject({ error: 'invalid_client', error_description: 'private_key_jwt client authentication is required' });
+    });
+
+    it('rejects a client assertion whose sub is not the client_id', async () => {
+        const response = await jwtBearer({}, { client_assertion: await agent.assertion({ sub: 'usr_1' }) });
+        expect(response.status).toBe(401);
+        expect(response.body).toMatchObject({ error: 'invalid_client', error_description: 'client assertion sub must be the client_id' });
+    });
+
+    it('rejects a User ID longer than 255 characters', async () => {
+        const response = await jwtBearer({ sub: 'u'.repeat(256) });
+        expect(response.status).toBe(400);
+        expect(response.body).toMatchObject({ error: 'invalid_grant', error_description: 'sub must be the User ID' });
+        expect((await jwtBearer({ sub: 'u'.repeat(255) })).status).toBe(200);
+    });
+
+    it('rejects a grant type it does not support', async () => {
+        const response = await token({ grant_type: 'password', ...await agent.clientAuth() }, await agent.proof('POST', TOKEN));
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('unsupported_grant_type');
+    });
+
+    it('accepts only its own API as the resource', async () => {
+        const other = await jwtBearer({}, { resource: 'https://other.example/api' });
+        expect(other.status).toBe(400);
+        expect(other.body.error).toBe('invalid_target');
+        expect((await jwtBearer({}, { resource: API })).status).toBe(200);
+    });
+
+    it('refuses a refresh without an Account Token', async () => {
+        const response = await token({ grant_type: 'refresh_token', ...await agent.clientAuth() }, await agent.proof('POST', TOKEN));
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('invalid_grant');
+    });
+
+    it('rejects a code_verifier that does not match, and the code cannot be retried', async () => {
+        const session = await startSession();
+        const { redirect, verifier } = await directSignIn(ALICE, 'poppy:read');
+        const wrong = await exchange(redirect, crypto.randomBytes(32).toString('base64url'), session.body.session_id);
+        expect(wrong.status).toBe(400);
+        expect(wrong.body).toMatchObject({ error: 'invalid_grant', error_description: 'code_verifier does not match' });
+
+        const retry = await exchange(redirect, verifier, session.body.session_id);
+        expect(retry.body.error).toBe('invalid_grant');
+        expect(await poppy.listConnections(ALICE)).toEqual([]);
+    });
+
+    it('rejects a code_verifier too short to be a PKCE verifier', async () => {
+        const session = await startSession();
+        const { redirect } = await directSignIn(ALICE, 'poppy:read');
+        const response = await exchange(redirect, 'short', session.body.session_id);
+        expect(response.body).toMatchObject({ error: 'invalid_grant', error_description: 'code_verifier does not match' });
+    });
+
+    it('will not sign a Session in to another account with an Account Token', async () => {
+        const alice = await signedIn(ALICE);
+        const bob = await signedIn(BOB);
+        const response = await token({
+            grant_type: 'refresh_token',
+            refresh_token: bob.signIn.refresh_token,
+            session_id: alice.session.session_id,
+            ...await agent.clientAuth(),
+        }, await agent.proof('POST', TOKEN));
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe('account_mismatch');
+    });
+
+    it('limits token requests per client to 300 a minute, naming when to retry', async () => {
+        const revoke = async () => request(app).post('/poppy/revoke').type('form')
+            .send({ token: 'pat_unknown', ...await agent.clientAuth() });
+        for (let i = 0; i < 300; i++) {
+            expect((await revoke()).status).toBe(200);
+        }
+        const limited = await revoke();
+        expect(limited.status).toBe(429);
+        expect(limited.body.error).toBe('rate_limited');
+        expect(Number(limited.headers['retry-after'])).toBeGreaterThan(0);
+    });
+
+    it('requires at least one scope for device authorization', async () => {
+        for (const scope of [undefined, ' ']) {
+            const form: Record<string, string> = { ...await agent.clientAuth() };
+            if (scope !== undefined) {
+                form.scope = scope;
+            }
+            const response = await request(app).post('/poppy/device_authorization').type('form').send(form);
+            expect(response.status).toBe(400);
+            expect(response.body).toMatchObject({ error: 'invalid_scope', error_description: 'scope is required' });
+        }
+    });
+
+    it('answers server_error, not success, when a revocation cannot reach the store', async () => {
+        const { signIn } = await signedIn();
+        const get = jest.spyOn(kv, 'get').mockRejectedValue(new Error('store unavailable'));
+        const response = await request(app).post('/poppy/revoke').type('form')
+            .send({ token: signIn.refresh_token, ...await agent.clientAuth() });
+        get.mockRestore();
+        expect(response.status).toBe(500);
+        expect(response.body.error).toBe('server_error');
+        expect(await poppy.listConnections(ALICE)).toHaveLength(1);
+    });
+});
+
+describe('authorization request refusals', () => {
+    const query = {
+        response_type: 'code', client_id: AGENT_ID, redirect_uri: REDIRECT, scope: 'poppy:read', state: 'st-2',
+        code_challenge: 'x'.repeat(43), code_challenge_method: 'S256',
+    };
+
+    it('shows an error page, without redirecting, when client_id is missing', async () => {
+        const { client_id: _omitted, ...rest } = query;
+        const response = await request(app).get('/poppy/authorize').query(rest);
+        expect(response.status).toBe(400);
+        expect(response.text).toContain('client_id is missing');
+        expect(response.headers.location).toBeUndefined();
+    });
+
+    it('redirects unsupported_response_type with state and iss for anything but code', async () => {
+        const response = await request(app).get('/poppy/authorize').query({ ...query, response_type: 'token' });
+        expect(response.status).toBe(303);
+        const location = new URL(response.headers.location);
+        expect(location.searchParams.get('error')).toBe('unsupported_response_type');
+        expect(location.searchParams.get('state')).toBe('st-2');
+        expect(location.searchParams.get('iss')).toBe(ISSUER);
+    });
+
+    it('redirects server_error when the wallet challenge cannot be created', async () => {
+        jest.spyOn(accounts, 'createChallenge').mockRejectedValue(new Error('keymaster unavailable'));
+        const response = await request(app).get('/poppy/authorize').query(query);
+        expect(response.status).toBe(303);
+        expect(new URL(response.headers.location).searchParams.get('error')).toBe('server_error');
+    });
+});
+
+describe('sign-in page and wallet response refusals', () => {
+    async function openPage() {
+        const page = await request(app).get('/poppy/authorize').query({
+            response_type: 'code', client_id: AGENT_ID, redirect_uri: REDIRECT, scope: 'poppy:read',
+            code_challenge: 'x'.repeat(43), code_challenge_method: 'S256',
+        });
+        expect(page.status).toBe(200);
+        return {
+            cookie: page.headers['set-cookie'][0].split(';')[0],
+            csrf: /"csrf":"([^"]+)"/.exec(page.text)![1],
+            statusUrl: /"statusUrl":"([^"]+)"/.exec(page.text)![1].replace(ISSUER, '/poppy'),
+            decideUrl: /"decideUrl":"([^"]+)"/.exec(page.text)![1].replace(ISSUER, '/poppy'),
+            walletChallenge: decodeURIComponent(/challenge=([^"&]+)/.exec(page.text)![1]),
+        };
+    }
+
+    it('reports sign-in status only to the browser that opened the page', async () => {
+        const { cookie, statusUrl } = await openPage();
+        expect((await request(app).get(statusUrl).set('Cookie', cookie)).body).toEqual({ status: 'pending' });
+
+        expect((await request(app).get('/poppy/signin/sgn_unknown/status').set('Cookie', cookie)).status).toBe(404);
+        const noCookie = await request(app).get(statusUrl);
+        expect(noCookie.status).toBe(404);
+        expect(noCookie.body.error).toBe('sign_in_not_found');
+        const [name] = cookie.split('=');
+        expect((await request(app).get(statusUrl).set('Cookie', `${name}=wrong-secret`)).status).toBe(404);
+        expect((await request(app).get(statusUrl).set('Cookie', `other=1; ${name}=`)).status).toBe(404);
+    });
+
+    it('refuses a decision before the wallet has answered', async () => {
+        const { cookie, csrf, decideUrl } = await openPage();
+        const response = await request(app).post(decideUrl).set('Cookie', cookie).set('X-Poppy-CSRF', csrf)
+            .send({ decision: 'approve', scope: ['poppy:read'] });
+        expect(response.status).toBe(409);
+        expect(response.body.error_description).toBe('Sign in with your wallet first.');
+    });
+
+    it('refuses wallet responses that are missing, unverified, unknown or unreadable', async () => {
+        const { walletChallenge, cookie, statusUrl } = await openPage();
+        const respond = (body: object) => request(app).post('/poppy/signin/response').send(body);
+
+        expect((await respond({})).status).toBe(400);
+        expect((await respond({})).body.error).toBe('missing_response');
+
+        const unverified = await respond({ response: JSON.stringify({ challenge: walletChallenge }) });
+        expect(unverified.status).toBe(401);
+        expect(unverified.body.error).toBe('invalid_response');
+
+        const unknown = await respond({ response: JSON.stringify({ challenge: 'did:cid:other-challenge', responder: ALICE }) });
+        expect(unknown.status).toBe(400);
+        expect(unknown.body.error).toBe('unknown_challenge');
+
+        const unreadable = await respond({ response: 'not json' });
+        expect(unreadable.status).toBe(500);
+        expect(unreadable.body.error).toBe('server_error');
+
+        // None of them signed the page in.
+        expect((await request(app).get(statusUrl).set('Cookie', cookie)).body).toEqual({ status: 'pending' });
+    });
+});
+
+describe('device page limits', () => {
+    async function authorizeDevice() {
+        return (await request(app).post('/poppy/device_authorization').type('form')
+            .send({ scope: 'poppy:read', ...await agent.clientAuth() })).body;
+    }
+
+    it('limits device sign-in pages per agent', async () => {
+        const device = await authorizeDevice();
+        for (let i = 0; i < 60; i++) {
+            expect((await request(app).post('/poppy/device').type('form').send({ user_code: device.user_code })).status).toBe(200);
+        }
+        const limited = await request(app).post('/poppy/device').type('form').send({ user_code: device.user_code });
+        expect(limited.status).toBe(429);
+        expect(Number(limited.headers['retry-after'])).toBeGreaterThan(0);
+        expect(limited.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('stops accepting user codes after 1200 failed entries a minute', async () => {
+        const device = await authorizeDevice();
+        for (let i = 0; i < 1200; i++) {
+            await request(app).post('/poppy/device').type('form').send({ user_code: 'BBBB-BBBB' });
+        }
+        const blocked = await request(app).post('/poppy/device').type('form').send({ user_code: device.user_code });
+        expect(blocked.status).toBe(429);
+        expect(blocked.text).toContain('Too many attempts');
+        expect(blocked.headers['set-cookie']).toBeUndefined();
+    });
+
+    it('shows an error when the agent’s metadata can no longer be loaded', async () => {
+        let clock = Date.now();
+        const local = createPoppy({
+            config: createPoppyConfig(ORIGIN, 'archon.test', 'https://wallet.archon.test'),
+            store: new PoppyStore(new MemoryKV(() => clock), () => clock),
+            agents: new AgentDirectory(fetcherFor(() => docs), () => clock),
+            accounts,
+            now: () => clock,
+        });
+        const localApp = express();
+        localApp.use('/poppy', local.router);
+        const device = (await request(localApp).post('/poppy/device_authorization').type('form')
+            .send({ scope: 'poppy:read', ...await agent.clientAuth() })).body;
+
+        // The agent withdraws its metadata and Herald's cached copy expires.
+        delete docs[AGENT_ID];
+        clock += 301_000;
+        const response = await request(localApp).post('/poppy/device').type('form').send({ user_code: device.user_code });
+        expect(response.status).toBe(400);
+        expect(response.text).toContain('could not be loaded');
+        expect(response.headers['set-cookie']).toBeUndefined();
+    });
+});
+
+describe('OpenAPI interface refusals', () => {
+    it('rejects a Session Token it did not issue', async () => {
+        const forged = 'pst_forged';
+        const response = await request(app).get('/poppy/api/directory')
+            .set('Authorization', `DPoP ${forged}`)
+            .set('DPoP', await agent.proof('GET', `${API}/directory`, forged));
+        expect(response.status).toBe(401);
+        expect(response.headers['www-authenticate']).toContain('error="invalid_token"');
+    });
+
+    it('rejects a proof that is not bound to the Session Token', async () => {
+        const session = await startSession();
+        const response = await request(app).get('/poppy/api/directory')
+            .set('Authorization', `DPoP ${session.body.access_token}`)
+            .set('DPoP', await agent.proof('GET', `${API}/directory`));
+        expect(response.status).toBe(401);
+        expect(response.headers['www-authenticate']).toContain('error="invalid_dpop_proof"');
+    });
+
+    it('limits each Session to 120 requests a minute', async () => {
+        const session = await startSession();
+        for (let i = 0; i < 120; i++) {
+            expect((await api('get', '/directory', session.body.access_token)).status).toBe(200);
+        }
+        const limited = await api('get', '/directory', session.body.access_token);
+        expect(limited.status).toBe(429);
+        expect(limited.body.error).toBe('rate_limited');
+        expect(Number(limited.headers['retry-after'])).toBeGreaterThan(0);
+    });
+
+    it('fails closed when the store cannot be read', async () => {
+        const session = await startSession();
+        const proof = await agent.proof('GET', `${API}/directory`, session.body.access_token);
+        jest.spyOn(kv, 'get').mockRejectedValue(new Error('store unavailable'));
+        const response = await request(app).get('/poppy/api/directory')
+            .set('Authorization', `DPoP ${session.body.access_token}`).set('DPoP', proof);
+        expect(response.status).toBe(500);
+        expect(response.body).not.toHaveProperty('names');
+    });
+
+    it('answers server_error when Herald cannot answer', async () => {
+        const session = await startSession();
+        jest.spyOn(accounts, 'directory').mockRejectedValue(new Error('db unavailable'));
+        const response = await api('get', '/directory', session.body.access_token);
+        expect(response.status).toBe(500);
+        expect(response.body).toEqual({ error: 'server_error' });
+        expect(response.headers['cache-control']).toBe('no-store');
+    });
+});
+
+describe('the OpenAPI account and member operations', () => {
+    it('resolves a member by name, and 404s an unknown one', async () => {
+        const session = await startSession();
+        const found = await api('get', '/members/alice', session.body.access_token);
+        expect(found.status).toBe(200);
+        expect(found.body).toEqual({ didDocument: { id: 'alice' } });
+        const missing = await api('get', '/members/nobody', session.body.access_token);
+        expect(missing.status).toBe(404);
+        expect(missing.body.error).toBe('name_not_found');
+    });
+
+    it('returns the signed-in User’s membership credential', async () => {
+        const { signIn } = await signedIn(ALICE, 'poppy:read');
+        const response = await api('get', '/account/credential', signIn.access_token);
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({ credentialDid: 'did:cid:alice-credential' });
+    });
+
+    it('releases the signed-in User’s name', async () => {
+        const { signIn } = await signedIn(ALICE);
+        const released = await api('delete', '/account/name', signIn.access_token);
+        expect(released.status).toBe(200);
+        const account = await api('get', '/account', signIn.access_token);
+        expect(account.body.name).toBeUndefined();
+    });
+
+    it('lists connected agents most recently used first', async () => {
+        const store = new PoppyStore(kv);
+        const base = { userId: 'usr_1', did: ALICE, scope: ['poppy:read'], createdAt: Date.now(), expiresAt: Date.now() + 60_000 };
+        await store.putGrant({ ...base, id: 'grt_old', tokenHash: hashSecret('pat_old'), clientId: AGENT_ID, clientName: 'Example Agent', domain: 'agent.example', lastUsedAt: Date.now() - 5000 });
+        await store.putGrant({ ...base, id: 'grt_new', tokenHash: hashSecret('pat_new'), clientId: 'https://other.example/agent.json', clientName: 'Other Agent', domain: 'other.example', lastUsedAt: Date.now() });
+        expect((await poppy.listConnections(ALICE)).map(connection => connection.name)).toEqual(['Other Agent', 'Example Agent']);
     });
 });
