@@ -75,7 +75,7 @@
   "license": "MIT",
   "dependencies": {
     "@didcid/common": "^0.5.0",
-    "axios": "^1.20.0",
+    "axios": "^1.21.0",
     "canonicalize": "^2.0.0",
     "ip": "^2.0.1",
     "kubo-rpc-client": "^5.1.0",
