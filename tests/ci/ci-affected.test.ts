@@ -51,6 +51,30 @@ function copySources(): string[] {
     return [...sources].sort();
 }
 
+// Paths written as literals in these sources, relative to the repo root.
+function literalPaths(files: string[], pattern: RegExp): string[] {
+    const paths = new Set<string>();
+    for (const file of files) {
+        for (const match of readFileSync(file, 'utf-8').matchAll(pattern)) {
+            paths.add(match[1].replace(/^(\.\.?\/)+/, ''));
+        }
+    }
+    return [...paths].sort();
+}
+
+// Documents the tests read: these are suite inputs, not prose.
+function documentInputs(): string[] {
+    const tests = execSync('git ls-files tests', { encoding: 'utf-8' })
+        .split('\n')
+        .filter(file => /\.[cm]?[jt]s$/.test(file) && file !== 'tests/ci/ci-affected.test.ts');
+    return literalPaths(tests, /['"`]((?:\.\.?\/)*(?:docs\/[^'"`\s]+|[\w./-]+\.md))['"`]/g);
+}
+
+// Fixtures the parity runner replays against both gatekeepers.
+function parityInputs(): string[] {
+    return literalPaths(['scripts/gatekeeper-parity.mjs'], /['"`]((?:\.\.\/)+tests\/[^'"`\s]+)['"`]/g);
+}
+
 describe('ci-affected', () => {
     it('finds image inputs to check', () => {
         expect(copySources().length).toBeGreaterThan(20);
@@ -58,6 +82,19 @@ describe('ci-affected', () => {
 
     it.each(copySources())('builds images when %s changes', (path) => {
         expect(affected([path])).toStrictEqual({ unit: 'true', images: 'true', e2e: 'true' });
+    });
+
+    it('finds document and parity inputs to check', () => {
+        expect(documentInputs()).toEqual(expect.arrayContaining(['docs/scheme.md', 'docs/gatekeeper-api.json']));
+        expect(parityInputs()).toEqual(expect.arrayContaining(['tests/convergence/vectors.json']));
+    });
+
+    it.each(documentInputs())('runs the suites when %s, which a test reads, changes', (path) => {
+        expect(affected([path]).unit).toBe('true');
+    });
+
+    it.each(parityInputs())('runs the end-to-end jobs when parity input %s changes', (path) => {
+        expect(affected([path]).e2e).toBe('true');
     });
 
     it('skips everything for documentation', () => {

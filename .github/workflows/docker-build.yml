@@ -48,7 +48,9 @@ jobs:
   build_test_images:
     runs-on: ubuntu-latest
     needs: [generate, changes]
-    if: needs.changes.outputs.images == 'true'
+    # Runs unless detection succeeded and found no image inputs: a failed
+    # detection must not skip the required builds.
+    if: ${{ !cancelled() && needs.generate.result == 'success' && (needs.changes.result != 'success' || needs.changes.outputs.images != 'false') }}
     permissions:
       contents: read
       packages: write

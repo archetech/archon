@@ -15,8 +15,9 @@ concurrency:
 
 jobs:
   # Documentation-only changes skip the suites below; each required job then
-  # reports as skipped, which branch protection accepts. See
-  # scripts/ci-affected.sh.
+  # reports as skipped, which branch protection accepts. They run unless
+  # detection succeeded and said otherwise, so a failed detection cannot skip
+  # them. See scripts/ci-affected.sh.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -33,7 +34,7 @@ jobs:
 
   build-and-test:
     needs: changes
-    if: needs.changes.outputs.unit == 'true'
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.unit != 'false') }}
     runs-on: ubuntu-latest
     # npm test runs jest --runInBand without --forceExit, so a leaked handle
     # keeps the job alive rather than failing it. Without a bound that runs to
@@ -86,7 +87,7 @@ jobs:
 
   convergence-tests:
     needs: changes
-    if: needs.changes.outputs.unit == 'true'
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.unit != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -123,7 +124,7 @@ jobs:
   # merged below with the Jest reports.
   wallet-ui-coverage:
     needs: changes
-    if: needs.changes.outputs.unit == 'true'
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.unit != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -161,8 +162,8 @@ jobs:
           if-no-files-found: error
 
   coverage:
-    needs: [changes, build-and-test, convergence-tests, wallet-ui-coverage]
-    if: needs.changes.outputs.unit == 'true'
+    needs: [build-and-test, convergence-tests, wallet-ui-coverage]
+    if: ${{ !cancelled() && needs.build-and-test.result == 'success' && needs.convergence-tests.result == 'success' && needs.wallet-ui-coverage.result == 'success' }}
     runs-on: ubuntu-latest
 
     steps:

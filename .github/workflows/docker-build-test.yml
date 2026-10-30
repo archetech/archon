@@ -23,7 +23,8 @@ concurrency:
 jobs:
   # Decides whether this change can affect the images or the tests that run
   # against them; documentation and other test-only changes skip both jobs.
-  # See scripts/ci-affected.sh.
+  # They run unless detection succeeded and said otherwise, so a failed
+  # detection cannot skip required checks. See scripts/ci-affected.sh.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -41,7 +42,7 @@ jobs:
   build_test_images:
     name: build_test_images (${{ matrix.gatekeeper }} gatekeeper, ${{ matrix.keymaster }} keymaster)
     needs: changes
-    if: needs.changes.outputs.e2e == 'true'
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.e2e != 'false') }}
     runs-on: ubuntu-latest
     strategy:
       # Always run both legs even if one fails, so a Rust regression doesn't
@@ -118,7 +119,7 @@ jobs:
   gatekeeper_parity:
     name: gatekeeper parity
     needs: changes
-    if: needs.changes.outputs.e2e == 'true'
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.e2e != 'false') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

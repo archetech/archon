@@ -2,10 +2,15 @@
 # Decides which expensive CI jobs a change can affect, as key=value lines for
 # $GITHUB_OUTPUT:
 #
-#   unit    the Jest suites and coverage: anything but documentation
+#   unit    the Jest suites and coverage: anything but Markdown and deploy/,
+#           except Markdown a test reads
 #   images  the Docker image builds: the paths the Dockerfiles copy from
 #   e2e     the CLI and parity tests against those images: images, plus the
-#           tests that drive them
+#           tests and fixtures that drive them
+#
+# tests/ci/ci-affected.test.ts derives these inputs from the Dockerfiles, the
+# tests and the parity runner, so a new input fails CI rather than being
+# skipped.
 #
 # Main, tags and an empty diff run everything. A branch is compared with its
 # merge base on main, so a later documentation-only commit still runs what the
@@ -31,7 +36,7 @@ classify() {
         everything
         return
     fi
-    code=$(grep -vE '(\.md$|^docs/|^deploy/)' <<<"$paths" || true)
+    code=$( { grep -vE '(\.md$|^deploy/)' <<<"$paths"; grep -E '^docs/scheme\.md$' <<<"$paths"; } || true)
     local unit=false images=false e2e=false
     [ -n "$code" ] && unit=true
     # Root-level files (package.json, lockfiles, tsconfig, compose files,
@@ -39,7 +44,7 @@ classify() {
     if grep -qE '^(docker/|packages/|services/|apps/|scripts/|rust/|python/|prebuilds/|[^/]+$)' <<<"$code"; then
         images=true
         e2e=true
-    elif grep -qE '^tests/(cli|cli-tests|gatekeeper|fixtures)/' <<<"$code"; then
+    elif grep -qE '^(tests/(cli|cli-tests|gatekeeper|fixtures)/|tests/convergence/vectors\.json$)' <<<"$code"; then
         e2e=true
     fi
     printf 'unit=%s\nimages=%s\ne2e=%s\n' "$unit" "$images" "$e2e"
