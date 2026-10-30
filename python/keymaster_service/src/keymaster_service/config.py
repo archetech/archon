@@ -9,7 +9,7 @@ def _package_version() -> str:
     try:
         return metadata.version("keymaster-service")
     except metadata.PackageNotFoundError:
-        return "0.14.0"
+        return "0.15.0"
 
 
 @dataclass(slots=True)
