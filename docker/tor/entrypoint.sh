@@ -17,56 +17,61 @@ resolve() {
     getent hosts "$TARGET_HOST" | awk '{ print $1; exit }'
 }
 
+# The SOCKS proxy never depends on Drawbridge: the profile also serves
+# stacks without it. The onion service is added once its target resolves.
 write_torrc() {
-    cat > "$TORRC" <<EOF
-DataDirectory $DATA_DIR
-SocksPort 0.0.0.0:9050
-HiddenServiceDir $HS_DIR
-HiddenServicePort $TARGET_PORT $1:$TARGET_PORT
-EOF
+    {
+        echo "DataDirectory $DATA_DIR"
+        echo "SocksPort 0.0.0.0:9050"
+        if [ -n "$1" ]; then
+            echo "HiddenServiceDir $HS_DIR"
+            echo "HiddenServicePort $TARGET_PORT $1:$TARGET_PORT"
+        fi
+    } > "$TORRC"
 }
-
-address=$(resolve || true)
-while [ -z "$address" ]; do
-    echo "[tor] waiting for $TARGET_HOST to resolve"
-    sleep 2
-    address=$(resolve || true)
-done
 
 mkdir -p "$HS_DIR" "$DATA_DIR"
 chown -R tor:tor /var/lib/tor
 chmod 700 "$HS_ROOT" "$HS_DIR" "$DATA_DIR"
+
+address=$(resolve || true)
 write_torrc "$address"
 
 su-exec tor tor -f "$TORRC" &
 pid=$!
-trap 'kill -TERM "$pid" 2>/dev/null' TERM INT
-
-until [ -f "$HS_DIR/hostname" ]; do
-    kill -0 "$pid" 2>/dev/null || break
-    sleep 1
-done
-
-if [ -f "$HS_DIR/hostname" ]; then
-    cp "$HS_DIR/hostname" /tor-hostname/hostname
-    chmod 644 /tor-hostname/hostname
-    echo '[tor] Published onion hostname'
-fi
 
 (
-    while sleep 30; do
+    published=
+    while :; do
         current=$(resolve || true)
         if [ -n "$current" ] && [ "$current" != "$address" ]; then
             address=$current
             write_torrc "$address"
             kill -HUP "$pid" 2>/dev/null || true
-            echo "[tor] $TARGET_HOST is now $address; reloaded"
+            echo "[tor] serving $TARGET_HOST at $address"
         fi
+        # The directory keeps its hostname file between runs, so it is only
+        # current once this Tor is serving the onion.
+        if [ -n "$address" ] && [ -f "$HS_DIR/hostname" ] && [ "$(cat "$HS_DIR/hostname")" != "$published" ]; then
+            published=$(cat "$HS_DIR/hostname")
+            cp "$HS_DIR/hostname" /tor-hostname/hostname
+            chmod 644 /tor-hostname/hostname
+            echo '[tor] Published onion hostname'
+        fi
+        # Poll quickly until the onion is published, then settle.
+        if [ -n "$published" ]; then sleep 30; else sleep 2; fi
     done
 ) &
 watcher=$!
 
-status=0
-wait "$pid" || status=$?
-kill "$watcher" 2>/dev/null || true
-exit "$status"
+finish() {
+    status=0
+    wait "$pid" || status=$?
+    kill "$watcher" 2>/dev/null || true
+    exit "$status"
+}
+
+# Forward the stop signal, then let Tor finish shutting down before exiting.
+trap 'kill -TERM "$pid" 2>/dev/null || true; finish' TERM INT
+
+finish
