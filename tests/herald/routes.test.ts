@@ -1134,6 +1134,18 @@ describe('herald member lookup', () => {
             expect(await statusOf(mountWith(issued()).app)).toStrictEqual({ status: 'verified' });
         });
 
+        // Each check races a timeout; one left running after the check settles
+        // keeps the process alive for its full length.
+        it('leaves no timer running once a credential is checked', async () => {
+            jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+            try {
+                expect(await statusOf(mountWith(issued()).app)).toStrictEqual({ status: 'verified' });
+                expect(jest.getTimerCount()).toBe(0);
+            } finally {
+                jest.useRealTimers();
+            }
+        });
+
         // A credential carries a set once its issuer publishes a key whose
         // cryptosuite an outside verifier reads. Reading `proof` as one object
         // yields undefined for the set, so every published credential in a
