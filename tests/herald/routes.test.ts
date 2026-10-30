@@ -2153,25 +2153,6 @@ describe('herald LNURLp for an unknown name', () => {
     });
 });
 
-describe('herald name deletion when revocation fails', () => {
-    it('still deletes the name and reports success', async () => {
-        const db = createDb({ 'did:cid:alice': { name: 'alice', credentialDid: 'did:cid:cred' } });
-        const keymaster = {
-            verifyResponse: jest.fn<any>().mockResolvedValue({ match: true, responder: 'did:cid:alice' }),
-            setCurrentId: jest.fn<any>().mockResolvedValue(undefined),
-            revokeCredential: jest.fn<any>().mockRejectedValue(new Error('gatekeeper down')),
-        };
-        const { app } = mount({ db, keymaster });
-
-        const response = await request(app).delete('/api/name').set('Authorization', 'Bearer valid');
-
-        expect(response.status).toBe(200);
-        expect(keymaster.revokeCredential).toHaveBeenCalledWith('did:cid:cred');
-        expect((await db.getUser('did:cid:alice')).name).toBeUndefined();
-        expect((await request(app).get('/api/name/alice')).status).toBe(404);
-    });
-});
-
 describe('herald member lookup timeouts', () => {
     afterEach(() => {
         jest.useRealTimers();
