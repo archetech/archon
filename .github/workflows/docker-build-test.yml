@@ -21,8 +21,27 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # Decides whether this change can affect the images or the tests that run
+  # against them; documentation and other test-only changes skip both jobs.
+  # See scripts/ci-affected.sh.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      e2e: ${{ steps.affected.outputs.e2e }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 2
+
+      - name: Detect affected jobs
+        id: affected
+        run: scripts/ci-affected.sh >> "$GITHUB_OUTPUT"
+
   build_test_images:
     name: build_test_images (${{ matrix.gatekeeper }} gatekeeper, ${{ matrix.keymaster }} keymaster)
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     strategy:
       # Always run both legs even if one fails, so a Rust regression doesn't
@@ -98,6 +117,8 @@ jobs:
   # string, leaving `timeISO` null in anchoring metadata.
   gatekeeper_parity:
     name: gatekeeper parity
+    needs: changes
+    if: needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -165,11 +186,15 @@ jobs:
   build_test_images_result:
     name: build_test_images result
     if: always()
-    needs: build_test_images
+    needs: [changes, build_test_images]
     runs-on: ubuntu-latest
     steps:
       - name: Verify all matrix legs passed
         run: |
+          if [ "${{ needs.changes.result }}" = success ] && [ "${{ needs.changes.outputs.e2e }}" = false ]; then
+            echo "No image or end-to-end test inputs changed; legs skipped"
+            exit 0
+          fi
           result="${{ needs.build_test_images.result }}"
           if [ "$result" != "success" ]; then
             echo "build_test_images did not succeed (result: $result)"
