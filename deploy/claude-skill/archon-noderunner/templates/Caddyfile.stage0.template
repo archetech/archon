@@ -30,6 +30,9 @@ wallet.{{DOMAIN}} {
 #                 (add-lightning also flips /api/* and /1.0/* to localhost:4222
 #                  so L402-guarded routes are handled by drawbridge instead of
 #                  hitting gatekeeper directly)
-# add-didcomm:    handle /didcomm/*  { reverse_proxy localhost:4222 } (post-lightning)
-#                 or                  { reverse_proxy localhost:4236 } (pre-lightning)
+# add-didcomm:    @didcomm path /didcomm /didcomm/*
+#                 handle @didcomm { reverse_proxy localhost:4222 } (post-lightning)
+#                 or handle @didcomm { uri strip_prefix /didcomm
+#                                      reverse_proxy localhost:4236 } (pre-lightning)
+#                 (the bare /didcomm must match: it is the published endpoint)
 # add-email:      names.{{DOMAIN}} { reverse_proxy localhost:4231 }
