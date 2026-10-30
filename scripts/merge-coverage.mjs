@@ -7,8 +7,8 @@ const { createContext } = require('istanbul-lib-report');
 const reports = require('istanbul-reports');
 
 const inputs = process.argv.slice(2);
-if (inputs.length !== 2) {
-    throw new Error('Expected unit and convergence coverage-final.json paths');
+if (inputs.length === 0) {
+    throw new Error('Expected one or more coverage-final.json paths');
 }
 
 const coverage = createCoverageMap({});

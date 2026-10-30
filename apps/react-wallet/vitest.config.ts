@@ -29,5 +29,17 @@ export default mergeConfig(viteConfig, defineConfig({
         setupFiles: ['./src/test/setup.ts'],
         // These mount real provider trees; a hang should fail rather than sit.
         testTimeout: 15000,
+        // The render tests are the only ones that load the shared wallet UI,
+        // so its coverage comes from here and is merged into the repo report
+        // by the unit-test workflow. Every wallet-ui source file is listed, so
+        // one no render reaches counts as 0% rather than going unseen.
+        coverage: {
+            provider: 'istanbul',
+            include: ['../../packages/wallet-ui/src/**/*.{ts,tsx}'],
+            exclude: ['../../packages/wallet-ui/src/index.ts'],
+            allowExternal: true,
+            reporter: ['json', 'text-summary'],
+            reportsDirectory: './coverage',
+        },
     },
 }));

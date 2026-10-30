@@ -8,7 +8,8 @@
     "preview": "vite preview",
     "android:run": "vite build --mode android && npx cap sync android && npx cap run android",
     "android:build": "vite build --mode production && npx cap sync android && cd android && ./gradlew assembleDebug",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts",
+    "test:coverage": "vitest run --config vitest.config.ts --coverage"
   },
   "author": "Peter Bushnell",
   "license": "MIT",
@@ -43,6 +44,7 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/coverage-istanbul": "^5.0.5",
     "esbuild": "^0.28.2",
     "jsdom": "^26.1.0",
     "typescript": "^5.9.3",
