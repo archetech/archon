@@ -29,6 +29,10 @@ it('returns only the validated answers to the socket, without resolving again', 
     await expect(resolve(answers, false, 6)).resolves.toEqual({ address: answers[1].address, family: 6 });
 });
 
+it('rejects a lookup for an address family the answers do not include', async () => {
+    await expect(resolve([{ address: '8.8.8.8', family: 4 }], false, 6)).rejects.toThrow('no matching address');
+});
+
 it('rejects empty DNS results and propagates DNS errors', async () => {
     await expect(resolve([])).rejects.toThrow('private address');
     lookup.mockImplementation((_host: string, _options: unknown, cb: any) => cb(new Error('DNS unavailable')));

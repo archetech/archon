@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { EventEmitter } from 'events';
 import { installProcessGuards } from '@didcid/common/process-guards';
 
@@ -56,6 +57,26 @@ describe('installProcessGuards', () => {
 
         expect(exits).toStrictEqual([]);
         expect(messages).toStrictEqual(['Service: unhandled rejection', 'Service: uncaught exception']);
+    });
+
+    it('logs to stderr and exits the real process by default', () => {
+        const target = new EventEmitter();
+        const error = jest.spyOn(console, 'error').mockImplementation(() => { });
+        const exit = jest.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+
+        try {
+            installProcessGuards('Service', { target });
+            const failure = new Error('gatekeeper unreachable');
+            target.emit('unhandledRejection', failure);
+
+            expect(error).toHaveBeenCalledWith('Service: unhandled rejection', failure);
+            expect(error).toHaveBeenCalledWith('Service: startup did not finish, exiting');
+            expect(exit).toHaveBeenCalledWith(1);
+        }
+        finally {
+            error.mockRestore();
+            exit.mockRestore();
+        }
     });
 
     it('installs on the real process by default', () => {

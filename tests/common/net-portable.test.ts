@@ -16,6 +16,27 @@ describe('portable public HTTPS guard', () => {
     test.each(['8.8.8.8', '2606:4700:4700::1111', 'public.example'])(
         'allows public host %s', host => expect(isPrivateHostname(host)).toBe(false));
 
+    // Text shaped like an address but not a valid one is not read as some
+    // other address; it falls through to the name checks. URL parsing rejects
+    // every one of these hosts, so none can reach a request either.
+    test.each([
+        ['five IPv4 parts', '1.2.3.4.5', '1.2.3.4.5'],
+        ['an empty IPv4 part', '127..1', '127..1'],
+        ['an IPv4 part too long to be a number', '1'.repeat(400), '1'.repeat(400)],
+        ['a final IPv4 part wider than the bytes it covers', '127.16777216', '127.16777216'],
+        ['a leading IPv4 part over 255', '256.0.0.1', '256.0.0.1'],
+        ['two :: in IPv6', '1::2::3', '[1::2::3]'],
+        ['an invalid embedded IPv4', '::ffff:999.0.0.1', '[::ffff:999.0.0.1]'],
+        ['a non-hex IPv6 group', '::gggg', '[::gggg]'],
+        ['nine IPv6 groups around ::', '1:2:3:4:5:6:7:8::9', '[1:2:3:4:5:6:7:8::9]'],
+        ['too few IPv6 groups without ::', '1:2:3', '[1:2:3]'],
+    ])('does not read %s as an address', async (_, host, urlHost) => {
+        expect(isPrivateHostname(host)).toBe(false);
+        const fetcher = jest.fn<typeof fetch>();
+        await expect(fetchPublicHttps(`https://${urlHost}/`, {}, fetcher)).rejects.toThrow('Invalid URL');
+        expect(fetcher).not.toHaveBeenCalled();
+    });
+
     test.each(['http://public.example/next', 'https://169.254.169.254/latest/meta-data'])(
         'rechecks redirect destination %s and releases the previous body', async location => {
             const response = new Response('redirect body', { status: 302, headers: { location } });
