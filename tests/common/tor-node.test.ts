@@ -25,3 +25,8 @@ it('rejects malformed hostnames and missing proxies before connecting', async ()
     await expect(probeOnion(onion, 4222, '')).rejects.toThrow('not configured');
     expect(createConnection).not.toHaveBeenCalled();
 });
+
+it.each(['tor', 'tor:0'])('rejects proxy address %s without a usable port before connecting', async proxy => {
+    await expect(probeOnion(onion, 4222, proxy)).rejects.toThrow('invalid Tor SOCKS proxy address');
+    expect(createConnection).not.toHaveBeenCalled();
+});
