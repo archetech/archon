@@ -221,13 +221,19 @@ async function checkManifest(
         await Promise.all(batch.map(async ([credentialDid, vc]) => {
             // A resolution that never returns would otherwise hold the whole
             // response open.
-            const timeout = new Promise<CredentialCheck>(resolve =>
-                setTimeout(() => resolve({ status: 'unverified', reason: 'verification timed out' }), CREDENTIAL_CHECK_TIMEOUT_MS));
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const timeout = new Promise<CredentialCheck>(resolve => {
+                timer = setTimeout(() => resolve({ status: 'unverified', reason: 'verification timed out' }), CREDENTIAL_CHECK_TIMEOUT_MS);
+            });
 
-            results[credentialDid] = await Promise.race([
-                checkManifestCredential(keymaster, memberDid, credentialDid, vc),
-                timeout,
-            ]);
+            try {
+                results[credentialDid] = await Promise.race([
+                    checkManifestCredential(keymaster, memberDid, credentialDid, vc),
+                    timeout,
+                ]);
+            } finally {
+                clearTimeout(timer);
+            }
         }));
     }
 
