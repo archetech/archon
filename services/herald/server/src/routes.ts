@@ -297,13 +297,11 @@ export function createHeraldRoutes(ctx: HeraldContext): {
 
     async function revokeCredential(user: any, name: string): Promise<void> {
         if (user.credentialDid) {
-            try {
-                await ctx.keymaster.setCurrentId(SERVICE_NAME);
-                await ctx.keymaster.revokeCredential(user.credentialDid);
-                console.log(`Revoked credential ${user.credentialDid} for ${name}`);
-            } catch (err) {
-                console.log(`Failed to revoke credential: ${err}`);
-            }
+            // A failure propagates so the caller keeps the name and this
+            // record of the credential, and the delete can be retried.
+            await ctx.keymaster.setCurrentId(SERVICE_NAME);
+            await ctx.keymaster.revokeCredential(user.credentialDid);
+            console.log(`Revoked credential ${user.credentialDid} for ${name}`);
             delete user.credentialDid;
             delete user.credentialIssuedAt;
         }
