@@ -312,3 +312,5 @@ These rules apply to coding agents working in this repository.
 
 - When simplifying Memeplex, keep attribution and publication-state rules in one protocol core; derive kind-specific counts and withdrawals from that state. Preserve agreed wire fields and grant policy, keep Memepool choices separate, and distinguish protocol changes from editorial restructuring.
 - Validate the whole proposal when asked for a protocol review, not only its latest fix commit.
+
+- Pushing a release tag runs the Android workflow, whose `softprops/action-gh-release` step uploads the APK to that tag's release and publishes any draft it finds (`draft` defaults to false). Draft GitHub release notes only after that run has finished, or the maintainer loses the chance to review them before they go public.
