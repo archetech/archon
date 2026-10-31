@@ -24,7 +24,29 @@ jobs:
           - gatekeeper: typescript
             keymaster: python
     steps:
-      - uses: dorny/test-reporter@0f7d1ed661203449e0ee89fa7a0a7f9c9a7d9911
+      # The legs upload their results even when they fail, so a successful run
+      # with no results is one whose change could not affect them and skipped
+      # them (scripts/ci-affected.sh). A failed run without results still goes
+      # to the reporter, which fails.
+      - name: Check for results
+        id: results
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          ARTIFACT: E2E Artifacts (${{ matrix.gatekeeper }}, ${{ matrix.keymaster }})
+        run: |
+          count=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts?per_page=100" \
+            --jq '[.artifacts[] | select(.name == env.ARTIFACT)] | length')
+          if [ "$count" = 0 ] && [ "$CONCLUSION" = success ]; then
+            echo "No results: the end-to-end legs were skipped for this change"
+            echo "report=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "report=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.results.outputs.report == 'true'
+        uses: dorny/test-reporter@0f7d1ed661203449e0ee89fa7a0a7f9c9a7d9911
         with:
           artifact: E2E Artifacts (${{ matrix.gatekeeper }}, ${{ matrix.keymaster }})
           name: CLI E2E Tests (${{ matrix.gatekeeper }} gatekeeper, ${{ matrix.keymaster }} keymaster)

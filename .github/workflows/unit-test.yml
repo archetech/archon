@@ -14,7 +14,27 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # Documentation-only changes skip the suites below; each required job then
+  # reports as skipped, which branch protection accepts. They run unless
+  # detection succeeded and said otherwise, so a failed detection cannot skip
+  # them. See scripts/ci-affected.sh.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      unit: ${{ steps.affected.outputs.unit }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Detect affected jobs
+        id: affected
+        run: scripts/ci-affected.sh >> "$GITHUB_OUTPUT"
+
   build-and-test:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.unit != 'false') }}
     runs-on: ubuntu-latest
     # npm test runs jest --runInBand without --forceExit, so a leaked handle
     # keeps the job alive rather than failing it. Without a bound that runs to
@@ -66,6 +86,8 @@ jobs:
           if-no-files-found: error
 
   convergence-tests:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.unit != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -101,6 +123,8 @@ jobs:
   # react-wallet vitest render tests, so its coverage is collected there and
   # merged below with the Jest reports.
   wallet-ui-coverage:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.unit != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -139,6 +163,7 @@ jobs:
 
   coverage:
     needs: [build-and-test, convergence-tests, wallet-ui-coverage]
+    if: ${{ !cancelled() && needs.build-and-test.result == 'success' && needs.convergence-tests.result == 'success' && needs.wallet-ui-coverage.result == 'success' }}
     runs-on: ubuntu-latest
 
     steps:

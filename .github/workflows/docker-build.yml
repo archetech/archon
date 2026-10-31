@@ -29,9 +29,28 @@ jobs:
           calver=$(date +'%Y.%m.%d')
           echo "calver=$calver" >> $GITHUB_OUTPUT
 
+  # Decides whether this change can affect an image at all; documentation and
+  # test-only changes skip the matrix. See scripts/ci-affected.sh.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.affected.outputs.images }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Detect affected jobs
+        id: affected
+        run: scripts/ci-affected.sh >> "$GITHUB_OUTPUT"
+
   build_test_images:
     runs-on: ubuntu-latest
-    needs: generate
+    needs: [generate, changes]
+    # Runs unless detection succeeded and found no image inputs: a failed
+    # detection must not skip the required builds.
+    if: ${{ !cancelled() && needs.generate.result == 'success' && (needs.changes.result != 'success' || needs.changes.outputs.images != 'false') }}
     permissions:
       contents: read
       packages: write
@@ -177,11 +196,15 @@ jobs:
   image_build_result:
     name: image build result
     if: always()
-    needs: build_test_images
+    needs: [changes, build_test_images]
     runs-on: ubuntu-latest
     steps:
       - name: Verify every image built
         run: |
+          if [ "${{ needs.changes.result }}" = success ] && [ "${{ needs.changes.outputs.images }}" = false ]; then
+            echo "No image inputs changed; builds skipped"
+            exit 0
+          fi
           result="${{ needs.build_test_images.result }}"
           if [ "$result" != "success" ]; then
             echo "build_test_images did not succeed (result: $result)"
