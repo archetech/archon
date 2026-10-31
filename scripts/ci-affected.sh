@@ -68,4 +68,6 @@ else
     base=$(git merge-base FETCH_HEAD HEAD)
 fi
 
-git diff --name-only "$base" HEAD | classify
+# Without --no-renames a move lists only its destination, and the source a
+# Dockerfile may still copy from would go unclassified.
+git diff --name-only --no-renames "$base" HEAD | classify
