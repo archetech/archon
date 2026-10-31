@@ -1008,6 +1008,36 @@ describe('herald session-based profile name', () => {
         expect(keymaster.revokeCredential).toHaveBeenCalledWith('did:cid:cred');
     });
 
+    // A credential left live on the ledger must stay on record, or Herald can
+    // never revoke it.
+    describe('when revocation fails', () => {
+        const failingKeymaster = () => ({
+            ...keymasterFull(),
+            verifyResponse: jest.fn<any>().mockResolvedValue({ match: true, responder: 'did:cid:alice' }),
+            revokeCredential: jest.fn<any>().mockRejectedValue(new Error('gatekeeper down')),
+        });
+
+        it('keeps the name and credential of a session delete', async () => {
+            const db = createDb({ 'did:cid:alice': { name: 'alice', credentialDid: 'did:cid:cred' } });
+            const { app } = mount({ db, keymaster: failingKeymaster(), session: { user: { did: 'did:cid:alice' } } });
+
+            const response = await request(app).delete('/api/profile/did:cid:alice/name');
+
+            expect(response.status).toBe(500);
+            expect(await db.getUser('did:cid:alice')).toMatchObject({ name: 'alice', credentialDid: 'did:cid:cred' });
+        });
+
+        it('keeps the name and credential of a bearer-token delete', async () => {
+            const db = createDb({ 'did:cid:alice': { name: 'alice', credentialDid: 'did:cid:cred' } });
+            const { app } = mount({ db, keymaster: failingKeymaster() });
+
+            const response = await request(app).delete('/api/name').set('Authorization', 'Bearer valid');
+
+            expect(response.status).toBe(500);
+            expect(await db.getUser('did:cid:alice')).toMatchObject({ name: 'alice', credentialDid: 'did:cid:cred' });
+        });
+    });
+
     it('404s a delete for a user with no record', async () => {
         const { app } = mount({ session: { user: { did: 'did:cid:ghost' } } });
 
@@ -1100,6 +1130,18 @@ describe('herald member lookup', () => {
 
         it('marks a properly signed credential verified', async () => {
             expect(await statusOf(mountWith(issued()).app)).toStrictEqual({ status: 'verified' });
+        });
+
+        // Each check races a timeout; one left running after the check settles
+        // keeps the process alive for its full length.
+        it('leaves no timer running once a credential is checked', async () => {
+            jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
+            try {
+                expect(await statusOf(mountWith(issued()).app)).toStrictEqual({ status: 'verified' });
+                expect(jest.getTimerCount()).toBe(0);
+            } finally {
+                jest.useRealTimers();
+            }
         });
 
         // A credential carries a set once its issuer publishes a key whose

@@ -254,26 +254,17 @@ services:
 
   tor:
     profiles: ["tor"]
-    image: goldy/tor-hidden-service:latest
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.tor
+    image: ghcr.io/archetech/tor
     ports:
       - "${ARCHON_TOR_SOCKS_PORT:-127.0.0.1:9050}:9050"
-    environment:
-      DRAWBRIDGE_TOR_SERVICE_HOSTS: '4222:drawbridge:4222'
-      DRAWBRIDGE_TOR_SERVICE_VERSION: '3'
-      TOR_SOCKS_PORT: '0.0.0.0:9050'
     volumes:
+      # Holds the onion service's key, so the published address survives
+      # image changes and restarts.
       - ../../data/tor-drawbridge:/var/lib/tor/hidden_service
       - tor-hostname:/tor-hostname
-    entrypoint:
-      - /bin/sh
-      - -c
-      - |
-        pyentrypoint tor &
-        while [ ! -f /var/lib/tor/hidden_service/drawbridge/hostname ]; do sleep 1; done
-        cp /var/lib/tor/hidden_service/drawbridge/hostname /tor-hostname/hostname
-        chmod 644 /tor-hostname/hostname
-        echo '[tor] Published onion hostname'
-        wait
     depends_on:
       # Optional so the `tor` profile can be selected without `drawbridge`.
       # A required dependency on a service in another profile makes the whole

@@ -221,13 +221,19 @@ async function checkManifest(
         await Promise.all(batch.map(async ([credentialDid, vc]) => {
             // A resolution that never returns would otherwise hold the whole
             // response open.
-            const timeout = new Promise<CredentialCheck>(resolve =>
-                setTimeout(() => resolve({ status: 'unverified', reason: 'verification timed out' }), CREDENTIAL_CHECK_TIMEOUT_MS));
+            let timer: ReturnType<typeof setTimeout> | undefined;
+            const timeout = new Promise<CredentialCheck>(resolve => {
+                timer = setTimeout(() => resolve({ status: 'unverified', reason: 'verification timed out' }), CREDENTIAL_CHECK_TIMEOUT_MS);
+            });
 
-            results[credentialDid] = await Promise.race([
-                checkManifestCredential(keymaster, memberDid, credentialDid, vc),
-                timeout,
-            ]);
+            try {
+                results[credentialDid] = await Promise.race([
+                    checkManifestCredential(keymaster, memberDid, credentialDid, vc),
+                    timeout,
+                ]);
+            } finally {
+                clearTimeout(timer);
+            }
         }));
     }
 
@@ -297,13 +303,11 @@ export function createHeraldRoutes(ctx: HeraldContext): {
 
     async function revokeCredential(user: any, name: string): Promise<void> {
         if (user.credentialDid) {
-            try {
-                await ctx.keymaster.setCurrentId(SERVICE_NAME);
-                await ctx.keymaster.revokeCredential(user.credentialDid);
-                console.log(`Revoked credential ${user.credentialDid} for ${name}`);
-            } catch (err) {
-                console.log(`Failed to revoke credential: ${err}`);
-            }
+            // A failure propagates so the caller keeps the name and this
+            // record of the credential, and the delete can be retried.
+            await ctx.keymaster.setCurrentId(SERVICE_NAME);
+            await ctx.keymaster.revokeCredential(user.credentialDid);
+            console.log(`Revoked credential ${user.credentialDid} for ${name}`);
             delete user.credentialDid;
             delete user.credentialIssuedAt;
         }

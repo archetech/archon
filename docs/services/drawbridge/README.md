@@ -39,7 +39,7 @@ has three jobs:
    are forwarded to the local Gatekeeper. Lightning routes are
    forwarded to the local Lightning mediator. Herald routes
    (`/.well-known/*`, `/names/*`) are forwarded to the local Herald. The
-   DIDComm relay is fronted at `/didcomm/*` (not paywalled — DIDComm has
+   DIDComm relay is fronted at `/didcomm` and `/didcomm/*` (not paywalled — DIDComm has
    its own signed-challenge auth).
 3. **Public surface for the Lightning + name layers.** A few unprotected
    endpoints exist for clients that need to learn about the node before

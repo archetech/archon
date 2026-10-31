@@ -1,0 +1,15 @@
+FROM alpine:3.22
+
+# The distribution package tracks Tor's current stable series. A client older
+# than the protocol versions the network's consensus requires refuses to run.
+RUN apk add --no-cache tor su-exec
+
+COPY docker/tor/entrypoint.sh /usr/local/bin/tor-entrypoint
+RUN chmod 755 /usr/local/bin/tor-entrypoint
+
+EXPOSE 9050
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD nc -z 127.0.0.1 9050 || exit 1
+
+ENTRYPOINT ["/usr/local/bin/tor-entrypoint"]
