@@ -110,6 +110,7 @@ Accepting a mint's tokens means trusting the mint with that value.
 | `receiveCashu(token, name?)` | Swap the token's proofs for new ones at its mint |
 | `checkCashu(mint?, name?)` | NUT-07: settle pending proofs; settle open quotes and reservations |
 | `restoreCashu(mint, name?)` | NUT-09: recover proofs from the seed |
+| `listCashuQuotes(mint?, name?)` | Open mint and melt quotes with their state |
 
 A wallet with Lightning funds the quote with `payLightningInvoice`; the CLI and UI
 offer that in one step. `receiveCashu` always swaps at the mint, since a token is
@@ -134,11 +135,43 @@ not received until the mint confirms its proofs are unspent.
   `swaggerConf.js` and `docs/keymaster-api.json`, served identically by the Python
   service.
 - `KeymasterClient` and the Python SDK.
-- CLI: `cashu-add-mint`, `cashu-remove-mint`, `cashu-list-mints`,
-  `cashu-balance`, `cashu-mint`, `cashu-melt`, `cashu-send`, `cashu-receive`,
-  `cashu-check`, `cashu-restore` in `scripts/archon-cli.js`,
+- The CLI commands below, in `scripts/archon-cli.js`,
   `packages/keymaster/src/cli.ts` and `python/keymaster/src/keymaster/cli.py`.
-- MCP tools in `packages/mcp-server/src/tools.ts`, writes marked mutating.
+- An MCP tool for each command in `packages/mcp-server/src/tools.ts`, writes
+  marked mutating.
+
+### CLI
+
+All Cashu commands, including those Phases 2 and 3 add. Mint management follows the
+`add-lightning`/`remove-lightning` pattern; operations take a `cashu-` prefix as
+the Lightning ones take `lightning-`. `-m, --mint <url>` selects the mint and
+defaults to the identity's only mint, failing when it holds proofs at several.
+`-n, --name <name>` selects the identity and defaults to the current one.
+
+| Command | Method | Phase | Writes |
+|---|---|---|---|
+| `add-cashu-mint [url]` | `addCashuMint` | 1; no URL needs 3 | yes |
+| `remove-cashu-mint <url> [--force]` | `removeCashuMint` | 1 | yes |
+| `list-cashu-mints` | `listCashuMints` | 1 | no |
+| `cashu-balance [-m] [-n]` | `getCashuBalance` | 1 | no |
+| `cashu-mint <amount> [--pay] [-m] [-n]` | `createCashuMintQuote`, then `payLightningInvoice` and `claimCashuMintQuote` with `--pay` | 1 | yes |
+| `cashu-claim <quoteId> [-m] [-n]` | `claimCashuMintQuote` | 1 | yes |
+| `cashu-quotes [-m] [-n]` | `listCashuQuotes` | 1 | no |
+| `cashu-melt <bolt11> [-m] [-n]` | `meltCashu` | 1 | yes |
+| `cashu-send <amount> [-m] [-n]` | `sendCashu`; prints the token | 1 | yes |
+| `cashu-receive <token> [-n]` | `receiveCashu` | 1 | yes |
+| `cashu-check [-m] [-n]` | `checkCashu` | 1 | yes |
+| `cashu-restore <url> [-n]` | `restoreCashu` | 1 | yes |
+| `cashu-send-to <recipient> <amount> [memo] [--locktime <duration>] [-m] [-n]` | `sendCashuTo`; recipient is a DID or alias | 2 | yes |
+| `cashu-accept [-n]` | `receiveCashuMessages` | 2 | yes |
+| `cashu-reclaim [-m] [-n]` | `reclaimCashu`: refunds expired locked sends | 2 | yes |
+
+Without `--pay`, `cashu-mint` prints the quote id and invoice and the user runs
+`cashu-claim` after paying it. Commands that change ecash state print the
+resulting balance.
+
+The node mint (Phase 3) adds no Keymaster command beyond `add-cashu-mint` with no
+URL. Operators manage it with cdk-mintd's own tooling inside its container.
 
 ### Tests
 
