@@ -12,7 +12,27 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # Documentation-only changes skip the tests below; the required job then
+  # reports as skipped, which branch protection accepts. It runs unless
+  # detection succeeded and said otherwise, so a failed detection cannot skip
+  # it. See scripts/ci-affected.sh.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      unit: ${{ steps.affected.outputs.unit }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          fetch-depth: 0
+
+      - name: Detect affected jobs
+        id: affected
+        run: scripts/ci-affected.sh >> "$GITHUB_OUTPUT"
+
   test_python_sdk:
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.unit != 'false') }}
     runs-on: ubuntu-latest
 
     steps:

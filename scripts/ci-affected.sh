@@ -2,8 +2,8 @@
 # Decides which expensive CI jobs a change can affect, as key=value lines for
 # $GITHUB_OUTPUT:
 #
-#   unit    the Jest suites and coverage: anything but Markdown and deploy/,
-#           except Markdown a test reads
+#   unit    the Jest suites, coverage and the Python tests: anything but
+#           Markdown and deploy/, except Markdown a test reads
 #   images  the Docker image builds: the paths the Dockerfiles copy from
 #   e2e     the CLI and parity tests against those images: images, plus the
 #           tests and fixtures that drive them
