@@ -2,6 +2,11 @@ name: Build Explorer
 
 on:
   push:
+    # Not required checks, so a workflow-level filter is safe; see
+    # scripts/ci-affected.sh for what documentation-only means.
+    paths-ignore:
+      - '**.md'
+      - 'deploy/**'
 
 # Superseding pushes make earlier runs irrelevant: only the head commit's checks
 # gate a merge. Cancelling them on branches keeps a rapidly-iterated PR from
