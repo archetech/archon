@@ -143,13 +143,17 @@ after the locktime through `reclaimCashu`.
 
 ```json
 {
-  "type": "<archon namespace>/cashu/1.0/token",
+  "type": "https://archetech.com/didcomm/cashu/1.0/token",
   "body": { "token": "cashuB...", "memo": "optional" }
 }
 ```
 
-The type URI needs an Archon-controlled namespace; none of the existing DIDComm
-protocols use one yet.
+Archon's own DIDComm protocols live under `https://archetech.com/didcomm/`,
+published from a new `archetech/didcomm` repository through GitHub Pages, as
+`archetech.com/schemas/` is. The protocol URI `https://archetech.com/didcomm/cashu/1.0`
+resolves to the protocol's specification. Versions follow DIDComm v2: a minor
+version only adds, and receivers accept higher minor versions. Keymaster lists the
+protocol in its discover-features disclosures so a sender can check support first.
 
 ### Receiving
 
@@ -159,8 +163,10 @@ may be an earlier derivation if the recipient has rotated keys; Keymaster alread
 searches retained derivations. Processed messages are recorded so a token message
 is not redeemed twice.
 
-A specification for DID-locked ecash goes in `docs/`: the key selection rule,
-the locking tags, the message type and the refund path.
+The specification for DID-locked ecash is `cashu/1.0/README.md` in
+`archetech/didcomm`, with a JSON Schema for the message body: the key selection
+rule, the locking tags, the message type and the refund path. Archon's `docs/`
+links to it.
 
 ## Phase 3: Optional node mint
 
@@ -223,7 +229,7 @@ without allowlist entries.
 | 2 | Mint component with `fakewallet` and `cln` backends; Drawbridge proxy, capability and discovery |
 | 3 | Keymaster wallet core and REST, TypeScript and Python, with vectors |
 | 4 | SDKs, CLIs, MCP |
-| 5 | DID-locked sends over DIDComm, both ports, plus the specification |
+| 5 | DID-locked sends over DIDComm, both ports; the protocol specification in `archetech/didcomm` |
 | 6 | Wallet and client UI |
 
 The mint component lands before the wallet so the wallet's integration tests have
