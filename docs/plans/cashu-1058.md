@@ -71,10 +71,14 @@ interface CashuQuote {
 
 Counters are reserved and saved before the blinded outputs they cover are sent to
 the mint, so a crash can never reuse a counter the mint has signed. A reservation
-is released for reuse only once the mint is known not to have signed it: an error
-response, or a NUT-09 restore of the range after an interrupted request. Unsigned
-gaps therefore do not accumulate, and the counter sequence stays within the
-NUT-13 recovery scan, which stops after three empty batches of 100.
+is released for reuse only when the mint rejects the request that used it, since
+a rejected request can no longer sign. An interrupted swap is retried with the
+same inputs and outputs until the mint answers; if the first attempt succeeded,
+the retry is rejected and NUT-09 recovers the signatures. A melt's change outputs
+stay reserved by its quote record until the quote is paid or unpaid, because a
+pending melt can still sign them. Unsigned gaps come only from rejected requests,
+which reuse their range, so the sequence stays within the NUT-13 recovery scan,
+which stops after three empty batches of 100.
 
 A quote record is saved before its invoice is paid or its melt is submitted, and
 removed only after it settles. A paid mint quote is claimable by its id alone, so
