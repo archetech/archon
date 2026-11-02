@@ -181,13 +181,17 @@ the locking tags, the message type and the refund path.
 
 ### Exposure
 
-- Drawbridge proxies the mint under a public path such as `/cashu`, outside L402,
-  so external Cashu wallets reach it through the node's public host or onion
-  address.
+- The mint publishes no host port. Drawbridge is the only route to it, for
+  Keymaster as well as external wallets.
+- Drawbridge proxies the mint's `/v1/*` API under `/cashu`, stripping the prefix,
+  outside L402. Cashu mint URLs may carry a path, so the mint's public URL is
+  `<public host>/cashu` and cdk-mintd needs no prefix support.
 - Drawbridge `/capabilities` reports `cashu` when a mint URL is configured, and a
   discovery route returns the public mint URL, as `/didcomm-endpoint` does for
   DIDComm.
-- `addCashuMint()` with no argument trusts that URL.
+- `addCashuMint()` with no argument trusts that public URL. Tokens name the mint
+  by URL, so Keymaster records the public one and sends its requests to its own
+  node's `/cashu` path; tokens it issues are then redeemable by external wallets.
 
 ### Operator documentation
 
