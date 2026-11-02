@@ -37,6 +37,10 @@ reputation credentials (Sigil). Both are recorded in #1058 as later work.
   application.
 - **The mint is optional.** It is a Compose profile like Lightning, and a node
   without it is an ordinary Cashu client of other mints.
+- **Cashu is enabled like Lightning.** `add-cashu [id]` enables Cashu for an
+  identity on its node's mint, as `add-lightning [id]` creates its Lightning
+  wallet on the node, and `publish-cashu [id]` advertises it in the DID document
+  as `publish-lightning` does. Outside mints are added per identity.
 
 ## Phase 1: Keymaster wallet
 
@@ -48,12 +52,12 @@ live there like the Nostr `nsec`.
 ```ts
 // WalletFile
 cashu?: {
-    mints: Record<string, { added: string; unit: 'sat' }>;   // trusted mints, by normalized URL
-    counters: Record<string, number>;                        // keyset id -> next NUT-13 counter
+    counters: Record<string, number>;   // keyset id -> next NUT-13 counter
 };
 
-// IDInfo
-cashu?: Record<string, {           // mint URL
+// IDInfo: one entry per mint the identity uses, by normalized public URL
+cashu?: Record<string, {
+    added: string;
     proofs: Proof[];               // unspent
     pending?: Proof[];             // sent or melting, not yet confirmed spent
     quotes?: CashuQuote[];         // open mint and melt quotes
@@ -89,19 +93,37 @@ for the reserved change outputs.
 Proof changes and counter changes go through `updateWallet`, so concurrent
 operations in one Keymaster cannot spend or derive from the same state.
 
-### Mint trust
+### Enabling and mint trust
 
-Keymaster talks only to mints in `cashu.mints`. Receiving a token from any other
-mint fails with an error that names the mint, and the user adds it explicitly.
-Accepting a mint's tokens means trusting the mint with that value.
+An identity uses only the mints in its own `cashu` entry, as its Lightning
+configuration is its own. `addCashu` adds the node's mint, the way `addLightning`
+creates a wallet on the node: it is idempotent, and on a node without the `cashu`
+capability it fails with an error that points to `addCashuMint`. `addCashuMint`
+adds any other mint by URL.
+
+Receiving a token from a mint the identity has not added fails with an error that
+names the mint. Accepting a mint's tokens means trusting the mint with that
+value, so the user adds it explicitly.
+
+Removing a mint discards any proofs held there, which are the funds themselves,
+so `removeCashu` and `removeCashuMint` refuse while the identity holds proofs at
+the mint unless forced.
+
+`publishCashu` adds a `#cashu` service to the identity's DID document, of type
+`Cashu`, whose `serviceEndpoint` lists its mint URLs. `unpublishCashu` removes it.
+Senders use it to pick a mint the recipient accepts (Phase 2).
 
 ### Methods
 
 | Method | Behaviour |
 |---|---|
-| `addCashuMint(url?)` | Trust a mint; with no URL, the node's mint (Phase 3) |
-| `removeCashuMint(url)` | Refuses while any identity holds proofs there unless forced |
-| `listCashuMints()` | Trusted mints with NUT-06 info |
+| `addCashu(name?)` | Enable Cashu on the node's mint (Phase 3) |
+| `removeCashu(force?, name?)` | Remove every mint from the identity |
+| `addCashuMint(url, name?)` | Add an outside mint |
+| `removeCashuMint(url, force?, name?)` | Remove one mint |
+| `listCashuMints(name?)` | The identity's mints with NUT-06 info |
+| `publishCashu(name?)` | Add the `#cashu` service listing the identity's mints |
+| `unpublishCashu(name?)` | Remove the `#cashu` service |
 | `getCashuBalance(mint?, name?)` | Unspent and pending totals for an identity |
 | `createCashuMintQuote(amount, mint?)` | NUT-04 quote: a BOLT11 invoice to pay |
 | `claimCashuMintQuote(quoteId, mint?, name?)` | Mint proofs once the quote is paid |
@@ -109,7 +131,7 @@ Accepting a mint's tokens means trusting the mint with that value.
 | `sendCashu(amount, mint?, name?)` | Swap to exact proofs and return a `cashuB` token |
 | `receiveCashu(token, name?)` | Swap the token's proofs for new ones at its mint |
 | `checkCashu(mint?, name?)` | NUT-07: settle pending proofs; settle open quotes and reservations |
-| `restoreCashu(mint, name?)` | NUT-09: recover proofs from the seed |
+| `restoreCashu(mint?, name?)` | NUT-09: recover proofs from the seed |
 | `listCashuQuotes(mint?, name?)` | Open mint and melt quotes with their state |
 
 A wallet with Lightning funds the quote with `payLightningInvoice`; the CLI and UI
@@ -126,7 +148,7 @@ not received until the mint confirms its proofs are unspent.
   token format, plus a mint HTTP client.
 - Both ports are checked against the NUT specification test vectors and against
   committed TypeScript-generated vectors, as the DIDComm port was.
-- New error types for a mint not trusted, insufficient balance, a quote not paid
+- New error types for a mint the identity has not added, insufficient balance, a quote not paid
   and a token already spent.
 
 ### Surfaces
@@ -142,36 +164,49 @@ not received until the mint confirms its proofs are unspent.
 
 ### CLI
 
-All Cashu commands, including those Phases 2 and 3 add. Mint management follows the
-`add-lightning`/`remove-lightning` pattern; operations take a `cashu-` prefix as
-the Lightning ones take `lightning-`. `-m, --mint <url>` selects the mint and
-defaults to the identity's only mint, failing when it holds proofs at several.
-`-n, --name <name>` selects the identity and defaults to the current one.
+All Cashu commands, including those Phases 2 and 3 add. They mirror the
+Lightning commands: `add-cashu`, `remove-cashu`, `publish-cashu` and
+`unpublish-cashu` correspond to their `-lightning` counterparts, operations take
+a `cashu-` prefix as the Lightning ones take `lightning-`, and the identity is
+the optional trailing `[id]`, defaulting to the current one. `-m, --mint <url>`
+selects the mint; it defaults to the node's mint when the identity has it, else
+to the identity's only mint, and is required otherwise.
+
+Enabling Cashu for an identity is the same two steps as Lightning:
+
+```
+archon add-cashu          # archon add-lightning
+archon publish-cashu      # archon publish-lightning
+```
 
 | Command | Method | Phase | Writes |
 |---|---|---|---|
-| `add-cashu-mint [url]` | `addCashuMint` | 1; no URL needs 3 | yes |
-| `remove-cashu-mint <url> [--force]` | `removeCashuMint` | 1 | yes |
-| `list-cashu-mints` | `listCashuMints` | 1 | no |
-| `cashu-balance [-m] [-n]` | `getCashuBalance` | 1 | no |
-| `cashu-mint <amount> [--pay] [-m] [-n]` | `createCashuMintQuote`, then `payLightningInvoice` and `claimCashuMintQuote` with `--pay` | 1 | yes |
-| `cashu-claim <quoteId> [-m] [-n]` | `claimCashuMintQuote` | 1 | yes |
-| `cashu-quotes [-m] [-n]` | `listCashuQuotes` | 1 | no |
-| `cashu-melt <bolt11> [-m] [-n]` | `meltCashu` | 1 | yes |
-| `cashu-send <amount> [-m] [-n]` | `sendCashu`; prints the token | 1 | yes |
-| `cashu-receive <token> [-n]` | `receiveCashu` | 1 | yes |
-| `cashu-check [-m] [-n]` | `checkCashu` | 1 | yes |
-| `cashu-restore <url> [-n]` | `restoreCashu` | 1 | yes |
-| `cashu-send-to <recipient> <amount> [memo] [--locktime <duration>] [-m] [-n]` | `sendCashuTo`; recipient is a DID or alias | 2 | yes |
-| `cashu-accept [-n]` | `receiveCashuMessages` | 2 | yes |
-| `cashu-reclaim [-m] [-n]` | `reclaimCashu`: refunds expired locked sends | 2 | yes |
+| `add-cashu [id]` | `addCashu` | 1; needs the node mint (3) | yes |
+| `remove-cashu [id] [--force]` | `removeCashu` | 1 | yes |
+| `add-cashu-mint <url> [id]` | `addCashuMint` | 1 | yes |
+| `remove-cashu-mint <url> [id] [--force]` | `removeCashuMint` | 1 | yes |
+| `list-cashu-mints [id]` | `listCashuMints` | 1 | no |
+| `publish-cashu [id]` | `publishCashu` | 1 | yes |
+| `unpublish-cashu [id]` | `unpublishCashu` | 1 | yes |
+| `cashu-balance [id] [-m]` | `getCashuBalance` | 1 | no |
+| `cashu-mint <amount> [id] [--pay] [-m]` | `createCashuMintQuote`, then `payLightningInvoice` and `claimCashuMintQuote` with `--pay` | 1 | yes |
+| `cashu-claim <quoteId> [id] [-m]` | `claimCashuMintQuote` | 1 | yes |
+| `cashu-quotes [id] [-m]` | `listCashuQuotes` | 1 | no |
+| `cashu-melt <bolt11> [id] [-m]` | `meltCashu` | 1 | yes |
+| `cashu-send <amount> [id] [-m]` | `sendCashu`; prints the token | 1 | yes |
+| `cashu-receive <token> [id]` | `receiveCashu` | 1 | yes |
+| `cashu-check [id] [-m]` | `checkCashu` | 1 | yes |
+| `cashu-restore [id] [-m]` | `restoreCashu` | 1 | yes |
+| `cashu-send-to <recipient> <amount> [memo] [--locktime <duration>] [-m]` | `sendCashuTo`; recipient is a DID or alias | 2 | yes |
+| `cashu-accept [id]` | `receiveCashuMessages` | 2 | yes |
+| `cashu-reclaim [id] [-m]` | `reclaimCashu`: refunds expired locked sends | 2 | yes |
 
 Without `--pay`, `cashu-mint` prints the quote id and invoice and the user runs
 `cashu-claim` after paying it. Commands that change ecash state print the
 resulting balance.
 
-The node mint (Phase 3) adds no Keymaster command beyond `add-cashu-mint` with no
-URL. Operators manage it with cdk-mintd's own tooling inside its container.
+Operators manage the node mint (Phase 3) with cdk-mintd's own tooling inside its
+container; Archon adds no mint administration command.
 
 ### Tests
 
@@ -185,17 +220,21 @@ they need no public test mint.
 
 `sendCashuTo(did, amount, options?)`:
 
-1. Require the mint to advertise NUT-11 in its NUT-06 info. A mint without it may
+1. Choose the mint: the one given, else a mint listed in the recipient's `#cashu`
+   service that the sender also uses, preferring the sender's node mint. With
+   neither, the send fails and names the recipient's mints, or reports that the
+   recipient publishes none.
+2. Require the mint to advertise NUT-11 in its NUT-06 info. A mint without it may
    treat locked proofs as bearer tokens, so the send is refused rather than
    falling back to an unlocked token.
-2. Resolve the recipient and take the public key of its current verification
+3. Resolve the recipient and take the public key of its current verification
    method. DID keys are secp256k1, the curve NUT-11 uses; the JWK becomes a
    compressed 33-byte public key.
-3. Swap for proofs whose NUT-11 secret locks them to that key, with
+4. Swap for proofs whose NUT-11 secret locks them to that key, with
    `SIG_INPUTS`, a `locktime` (default seven days), and the sender's current key
    as the `refund` key. The locked proofs stay in the sender's `pending` list,
    since their random secrets exist nowhere else and the refund needs them.
-4. Encode the token, pack it for the recipient, and send it through the DIDComm
+5. Encode the token, pack it for the recipient, and send it through the DIDComm
    service.
 
 An intercepted token is unspendable, and an unclaimed one returns to the sender
@@ -257,7 +296,7 @@ links to it.
 - Drawbridge `/capabilities` reports `cashu` when a mint URL is configured, and a
   discovery route returns the public mint URL, as `/didcomm-endpoint` does for
   DIDComm.
-- `addCashuMint()` with no argument trusts that public URL. Tokens name the mint
+- `addCashu()` adds that public URL to the identity. Tokens name the mint
   by URL, so Keymaster records the public one and sends its requests to its own
   node's `/cashu` path; tokens it issues are then redeemable by external wallets.
 
@@ -273,7 +312,8 @@ Both `packages/wallet-ui` and `packages/keymaster-ui` get a Cashu view, always
 available so a wallet on a node without a mint can add an outside one. The `cashu`
 capability only offers the node's own mint as a one-step choice. The view has:
 
-- trusted mints, with add and remove
+- enable and remove Cashu, and publish or unpublish it, as the Lightning view does
+- the identity's mints, with add and remove
 - balance per mint for the current identity
 - mint: show the quote invoice, or pay it from Lightning
 - melt: pay an invoice
