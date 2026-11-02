@@ -46,7 +46,7 @@ jobs:
           fi
 
       - if: steps.results.outputs.report == 'true'
-        uses: dorny/test-reporter@0f7d1ed661203449e0ee89fa7a0a7f9c9a7d9911
+        uses: dorny/test-reporter@df6247429542221bc30d46a036ee47af1102c451
         with:
           artifact: E2E Artifacts (${{ matrix.gatekeeper }}, ${{ matrix.keymaster }})
           name: CLI E2E Tests (${{ matrix.gatekeeper }} gatekeeper, ${{ matrix.keymaster }} keymaster)
