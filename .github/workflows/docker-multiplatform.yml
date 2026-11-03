@@ -79,6 +79,8 @@ jobs:
             image: pinning-mediator
           - dockerfile: docker/Dockerfile.tor
             image: tor
+          - dockerfile: docker/Dockerfile.cln
+            image: cln
           - dockerfile: docker/Dockerfile.ethereum
             image: ethereum-mediator
           - dockerfile: docker/Dockerfile.ethereum-wallet
