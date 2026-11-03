@@ -71,11 +71,14 @@ interface CashuOperation {
     kind: 'mint' | 'melt' | 'swap' | 'receive' | 'send' | 'locked-send';
     quote?: string;                // mint or melt quote id
     inputs: Proof[];               // proofs the operation spends
-    outputs: {
-        keyset: string;
-        counters?: [number, number];              // NUT-13 outputs or change
-        random?: { secret: string; r: string }[]; // non-derived secrets, e.g. P2PK
-    };
+    keyset: string;                // keyset of the outputs
+    outputs: {                     // in request order
+        amount: number;            // 0 for a blank NUT-08 change output
+        role: 'keep' | 'send';     // credited to proofs, or handed out as the token
+        counter?: number;          // NUT-13 derivation
+        secret?: string;           // non-derived secret, e.g. P2PK,
+        r?: string;                // with its blinding factor
+    }[];
     sent?: Proof[];                // proofs handed out as a token, until redeemed
     created: string;
 }
@@ -84,8 +87,10 @@ interface CashuOperation {
 Every operation that talks to the mint is journaled first. Its record, with its
 inputs, its quote and everything needed to rebuild its outputs, is saved before
 the request is sent, so an interrupted operation can be finished after a restart
-rather than lost. Outputs with seed-derived secrets need only their counter
-range; outputs with random secrets, such as the P2PK outputs of a locked send,
+rather than lost. Each output keeps its amount and role, so a resubmission
+reproduces the same request and recovered signatures go to the balance or the
+token as intended. Outputs with seed-derived secrets need only their counter;
+outputs with random secrets, such as the P2PK outputs of a locked send,
 store the secrets and blinding factors themselves, since neither the mnemonic
 nor the response can supply them. A record is retired only after its result is
 saved.
@@ -97,8 +102,14 @@ After a restart, `checkCashu` settles each record by kind:
 |---|---|---|
 | `mint` | the quote is paid, or expires unpaid | claim the proofs, or drop the record |
 | `melt` | the quote is paid or unpaid | keep the change, or return the inputs to `proofs` |
-| `swap`, `receive` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09, or return the inputs |
+| `swap` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09, or return the inputs once NUT-07 shows them unspent |
+| `receive` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09, or drop the record and report the token as already spent |
 | `send`, `locked-send` | the swap settles as above, then every `sent` proof is spent | the token was redeemed; until then it is outstanding, not balance |
+
+Inputs return to `proofs` only when the identity owned them and NUT-07 shows them
+unspent. A received token's proofs were never the identity's, so its value is
+credited only from the swap's outputs: if someone else spent the token first, the
+receive yields nothing.
 
 A sent token is never returned to the balance because its proofs are unspent: the
 recipient may not have redeemed it yet. `reclaimCashu` takes back an unredeemed
