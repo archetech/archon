@@ -30,8 +30,9 @@ reputation credentials (Sigil). Both are recorded in #1058 as later work.
   Outstanding DID-locked sends are the exception: their secrets are not derived
   from the seed, so reclaiming them needs the wallet file or a wallet backup.
 - **Balances are per identity.** Proofs are stored under the identity that holds
-  them. A restore recovers the funds but not that attribution; restored proofs go
-  to the current identity.
+  them. A restore recovers the funds but not that attribution. It checks recovered
+  proofs against every identity's proofs and journal, keeps existing ownership,
+  and assigns only proofs no identity holds or has sent to the requested identity.
 - **Python stays in parity.** The Python Keymaster implements the Cashu
   cryptography itself rather than depending on Nutshell, which is a full wallet
   application.
@@ -61,20 +62,48 @@ cashu?: {
 // IDInfo: one entry per mint the identity uses, by normalized public URL
 cashu?: Record<string, {
     added: string;
-    proofs: Proof[];               // unspent
-    pending?: Proof[];             // sent or melting, not yet confirmed spent
-    quotes?: CashuQuote[];         // open mint and melt quotes
+    proofs: Proof[];               // unspent, spendable by this identity
+    operations?: CashuOperation[]; // journal of unsettled operations
 }>;
 
-interface CashuQuote {
-    kind: 'mint' | 'melt';
-    id: string;                    // mint's quote id
-    amount: number;
-    keyset: string;                // keyset of the outputs
-    counters: [number, number];    // reserved NUT-13 counter range for outputs or change
+interface CashuOperation {
+    id: string;
+    kind: 'mint' | 'melt' | 'swap' | 'receive' | 'send' | 'locked-send';
+    quote?: string;                // mint or melt quote id
+    inputs: Proof[];               // proofs the operation spends
+    outputs: {
+        keyset: string;
+        counters?: [number, number];              // NUT-13 outputs or change
+        random?: { secret: string; r: string }[]; // non-derived secrets, e.g. P2PK
+    };
+    sent?: Proof[];                // proofs handed out as a token, until redeemed
     created: string;
 }
 ```
+
+Every operation that talks to the mint is journaled first. Its record, with its
+inputs, its quote and everything needed to rebuild its outputs, is saved before
+the request is sent, so an interrupted operation can be finished after a restart
+rather than lost. Outputs with seed-derived secrets need only their counter
+range; outputs with random secrets, such as the P2PK outputs of a locked send,
+store the secrets and blinding factors themselves, since neither the mnemonic
+nor the response can supply them. A record is retired only after its result is
+saved.
+
+The journal also says what each unspent proof is for, which NUT-07 alone cannot.
+After a restart, `checkCashu` settles each record by kind:
+
+| Kind | Settled when | Outcome |
+|---|---|---|
+| `mint` | the quote is paid, or expires unpaid | claim the proofs, or drop the record |
+| `melt` | the quote is paid or unpaid | keep the change, or return the inputs to `proofs` |
+| `swap`, `receive` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09, or return the inputs |
+| `send`, `locked-send` | the swap settles as above, then every `sent` proof is spent | the token was redeemed; until then it is outstanding, not balance |
+
+A sent token is never returned to the balance because its proofs are unspent: the
+recipient may not have redeemed it yet. `reclaimCashu` takes back an unredeemed
+token explicitly, by swapping it, or for a locked send by the refund key once the
+locktime has passed.
 
 Counters are reserved and saved before the blinded outputs they cover are sent to
 the mint, so a crash can never reuse a counter the mint has signed. A reservation
@@ -82,20 +111,12 @@ is released for reuse only once the request that used it is settled and can no
 longer sign: all of it when the mint rejects the request, and the unsigned tail
 of a melt's change outputs once the melt is paid, since NUT-08 lets the mint sign
 fewer change outputs than were sent, or none. Released ranges go to the keyset's
-`free` list and are allocated before `next`. An interrupted swap is retried with the
-same inputs and outputs until the mint answers; if the first attempt succeeded,
-the retry is rejected and NUT-09 recovers the signatures. A melt's change outputs
-stay reserved by its quote record until the quote is paid or unpaid, because a
-pending melt can still sign them. Every unsigned counter of a settled request is
-reused, so gaps in the signed sequence are bounded by the outputs of requests
-still in flight, and stay within the NUT-13 recovery scan, which stops after
-three empty batches of 100.
-
-A quote record is saved before its invoice is paid or its melt is submitted, and
-removed only after it settles. A paid mint quote is claimable by its id alone, so
-losing the id strands the payment at the mint; `checkCashu` claims paid mint
-quotes and collects melt change through the quote state, falling back to NUT-09
-for the reserved change outputs.
+`free` list and are allocated before `next`. An interrupted request is retried
+with the same inputs and outputs until the mint answers; if the first attempt
+succeeded, the retry is rejected and NUT-09 recovers the signatures. Every unsigned
+counter of a settled request is reused, so gaps in the signed sequence are bounded
+by the outputs of requests still in flight, and stay within the NUT-13 recovery
+scan, which stops after three empty batches of 100.
 
 Proof changes and counter changes go through `updateWallet`, so concurrent
 operations in one Keymaster cannot spend or derive from the same state.
@@ -108,13 +129,23 @@ creates a wallet on the node: it is idempotent, and on a node without the `cashu
 capability it fails with an error that points to `addCashuMint`. `addCashuMint`
 adds any other mint by URL.
 
+Both refuse a mint whose NUT-06 info does not advertise NUT-07 and NUT-09. Without
+NUT-07 the journal cannot be settled, and without NUT-09 ecash minted there could
+not be recovered from the mnemonic.
+
 Receiving a token from a mint the identity has not added fails with an error that
 names the mint. Accepting a mint's tokens means trusting the mint with that
 value, so the user adds it explicitly.
 
-Removing a mint discards any proofs held there, which are the funds themselves,
-so `removeCashu` and `removeCashuMint` refuse while the identity holds proofs at
-the mint unless forced.
+Removing a mint discards the identity's proofs and journal there, which are the
+funds themselves and the only record of paid quotes, outstanding tokens and
+random output secrets. `removeCashu` and `removeCashuMint` refuse while either is
+non-empty unless forced.
+
+The same state makes the existing identity removals dangerous, since both ports
+delete the whole `IDInfo`. `removeId` refuses to remove an identity holding Cashu
+proofs or journal records. `fixWallet`, which removes identities whose DIDs are
+deactivated or fail to resolve, keeps such identities and reports them instead.
 
 `publishCashu` adds a `#cashu` service to the identity's DID document, of type
 `Cashu`, whose `serviceEndpoint` lists its mint URLs. `unpublishCashu` removes it.
@@ -131,15 +162,15 @@ Senders use it to pick a mint the recipient accepts (Phase 2).
 | `listCashuMints(name?)` | The identity's mints with NUT-06 info |
 | `publishCashu(name?)` | Add the `#cashu` service listing the identity's mints |
 | `unpublishCashu(name?)` | Remove the `#cashu` service |
-| `getCashuBalance(mint?, name?)` | Unspent and pending totals for an identity |
+| `getCashuBalance(mint?, name?)` | Spendable, in-flight and outstanding-sent totals for an identity |
 | `createCashuMintQuote(amount, mint?, name?)` | NUT-04 quote: a BOLT11 invoice to pay |
 | `claimCashuMintQuote(quoteId, mint?, name?)` | Mint proofs once the quote is paid |
 | `meltCashu(bolt11, mint?, name?)` | NUT-05: pay an invoice from proofs, keep change |
 | `sendCashu(amount, mint?, name?)` | Swap to exact proofs and return a `cashuB` token |
 | `receiveCashu(token, name?)` | Swap the token's proofs for new ones at its mint |
-| `checkCashu(mint?, name?)` | NUT-07: settle pending proofs; settle open quotes and reservations |
+| `checkCashu(mint?, name?)` | Settle the journal: NUT-07 states, quote states, retries and NUT-09 |
 | `restoreCashu(mint?, name?)` | NUT-09: recover proofs from the seed |
-| `listCashuQuotes(mint?, name?)` | Open mint and melt quotes with their state |
+| `listCashuQuotes(mint?, name?)` | Open mint and melt quotes from the journal, with their state |
 
 A wallet with Lightning funds the quote with `payLightningInvoice`; the CLI and UI
 offer that in one step. `receiveCashu` always swaps at the mint, since a token is
@@ -239,8 +270,9 @@ they need no public test mint.
    compressed 33-byte public key.
 4. Swap for proofs whose NUT-11 secret locks them to that key, with
    `SIG_INPUTS`, a `locktime` (default seven days), and the sender's current key
-   as the `refund` key. The locked proofs stay in the sender's `pending` list,
-   since their random secrets exist nowhere else and the refund needs them.
+   as the `refund` key. The swap is journaled as a `locked-send` with its random
+   secrets and blinding factors before it is submitted, and the record keeps the
+   locked proofs, since they exist nowhere else and the refund needs them.
 5. Encode the token, pack it for the recipient, and send it through the DIDComm
    service.
 
