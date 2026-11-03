@@ -250,6 +250,16 @@ retry 120 bash -c "[[ \$(docker inspect -f '{{.RestartCount}}' $P-tor-1) -ge 1 &
 retry 600 docker exec "$node" cln-healthcheck || fail "CLN did not recover after Tor restarted"
 log "compose: tor restarted and the onion answers again"
 
+# A separate Tor client, to check the onion from outside. It must reach the
+# onion before the switch, so a failure afterwards means the onion is gone
+# rather than that the probe never worked.
+docker run -d --name "$P-probe" --network "$NET" "$TOR_IMAGE" >/dev/null
+probe() {
+    docker run --rm --network "container:$P-probe" --entrypoint socat "$CLN_IMAGE" -T 30 /dev/null \
+        "SOCKS4A:127.0.0.1:$compose_onion:9736,socksport=9050" >/dev/null 2>&1
+}
+retry 600 probe || fail "the probe could not reach $compose_onion before the switch"
+
 log "compose: switching to clearnet without the tor profile"
 "${COMPOSE[@]}" rm -sf tor >/dev/null
 COMPOSE_PROFILES=lightning ARCHON_CLN_NETWORK_MODE=clearnet \
@@ -257,14 +267,17 @@ COMPOSE_PROFILES=lightning ARCHON_CLN_NETWORK_MODE=clearnet \
 retry 300 docker exec "$node" cln-healthcheck || fail "the clearnet node is not healthy"
 docker exec "$node" lightning-cli --rpc-file=/data/lightning/regtest/regtest/lightning-rpc getinfo |
     jq -e '.address | length == 0' >/dev/null || fail "the clearnet node still announces an address"
-# A separate Tor client must no longer reach the old onion.
-docker run -d --name "$P-probe" --network "$NET" "$TOR_IMAGE" >/dev/null
-retry 120 docker exec "$P-probe" nc -z 127.0.0.1 9050 || fail "probe Tor did not start"
-sleep 60
-if docker run --rm --network "container:$P-probe" --entrypoint socat "$CLN_IMAGE" -T 30 /dev/null \
-    "SOCKS4A:127.0.0.1:$compose_onion:9736,socksport=9050" >/dev/null 2>&1; then
-    fail "$compose_onion still answers after the switch to clearnet"
-fi
+# The probe must now fail as a connection, three times over a few minutes so a
+# cached descriptor cannot pass for a live service. socat reports a refused
+# or unreachable SOCKS target with status 1; docker's own failures are 125+.
+for attempt in 1 2 3; do
+    status=0
+    probe || status=$?
+    [[ $status -ne 0 ]] || fail "$compose_onion still answers after the switch to clearnet"
+    [[ $status -eq 1 ]] || fail "the probe failed to run (status $status), so it shows nothing"
+    sleep 60
+done
+docker exec "$P-probe" nc -z 127.0.0.1 9050 || fail "the probe's Tor stopped, so its failures show nothing"
 log "compose: clearnet, and the old onion no longer answers"
 
 log "PASS"
