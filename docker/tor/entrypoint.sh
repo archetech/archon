@@ -1,41 +1,29 @@
 #!/bin/sh
-# Runs Tor as the SOCKS proxy for the other services and publishes Drawbridge
-# as a v3 onion service. The container lives exactly as long as Tor does.
+# Runs Tor as the SOCKS proxy for the other services and publishes the onion
+# services listed in TOR_SERVICES (see services.sh). The container lives
+# exactly as long as Tor does.
 set -eu
 
-HS_ROOT=/var/lib/tor/hidden_service
-HS_DIR=$HS_ROOT/drawbridge
-DATA_DIR=/var/lib/tor/data
+. /usr/local/lib/archon/tor-services.sh
+
 TORRC=/etc/tor/torrc
-TARGET_HOST=${TOR_SERVICE_HOST:-drawbridge}
-TARGET_PORT=${TOR_SERVICE_PORT:-4222}
 
-# HiddenServicePort takes an address, not a hostname, so the target is
-# resolved here and again below: a restarted Drawbridge can come back on a
-# different address.
-resolve() {
-    getent hosts "$TARGET_HOST" | awk '{ print $1; exit }'
-}
+services=$(tor_services)
 
-# The SOCKS proxy never depends on Drawbridge: the profile also serves
-# stacks without it. The onion service is added once its target resolves.
-write_torrc() {
-    {
-        echo "DataDirectory $DATA_DIR"
-        echo "SocksPort 0.0.0.0:9050"
-        if [ -n "$1" ]; then
-            echo "HiddenServiceDir $HS_DIR"
-            echo "HiddenServicePort $TARGET_PORT $1:$TARGET_PORT"
-        fi
-    } > "$TORRC"
-}
-
-mkdir -p "$HS_DIR" "$DATA_DIR"
+mkdir -p "$HS_ROOT" "$DATA_DIR"
+for name in $(echo "$services" | cut -d' ' -f1); do
+    mkdir -p "$HS_ROOT/$name"
+done
 chown -R tor:tor /var/lib/tor
-chmod 700 "$HS_ROOT" "$HS_DIR" "$DATA_DIR"
+chmod 700 "$HS_ROOT" "$DATA_DIR"
+for name in $(echo "$services" | cut -d' ' -f1); do
+    chmod 700 "$HS_ROOT/$name"
+done
 
-address=$(resolve || true)
-write_torrc "$address"
+# Each target is resolved here and again below: a restarted service can come
+# back on a different address.
+resolved=$(echo "$services" | resolve_services)
+echo "$resolved" | write_torrc > "$TORRC"
 
 su-exec tor tor -f "$TORRC" &
 pid=$!
@@ -43,23 +31,25 @@ pid=$!
 (
     published=
     while :; do
-        current=$(resolve || true)
-        if [ -n "$current" ] && [ "$current" != "$address" ]; then
-            address=$current
-            write_torrc "$address"
+        current=$(echo "$services" | resolve_services)
+        if [ "$current" != "$resolved" ]; then
+            resolved=$current
+            echo "$resolved" | write_torrc > "$TORRC"
             kill -HUP "$pid" 2>/dev/null || true
-            echo "[tor] serving $TARGET_HOST at $address"
+            echo "$resolved" | sed -n 's/^\([^ ]*\) [^ ]* \(.*\)$/[tor] serving \1 at \2/p'
         fi
-        # The directory keeps its hostname file between runs, so it is only
-        # current once this Tor is serving the onion.
-        if [ -n "$address" ] && [ -f "$HS_DIR/hostname" ] && [ "$(cat "$HS_DIR/hostname")" != "$published" ]; then
-            published=$(cat "$HS_DIR/hostname")
-            cp "$HS_DIR/hostname" /tor-hostname/hostname
+        # Drawbridge reads its onion hostname from this volume. The directory
+        # keeps its hostname file between runs, so it is only current once this
+        # Tor is serving the onion.
+        hostname=$HS_ROOT/drawbridge/hostname
+        if echo "$resolved" | grep -q '^drawbridge ' && [ -f "$hostname" ] && [ "$(cat "$hostname")" != "$published" ]; then
+            published=$(cat "$hostname")
+            cp "$hostname" /tor-hostname/hostname
             chmod 644 /tor-hostname/hostname
             echo '[tor] Published onion hostname'
         fi
-        # Poll quickly until the onion is published, then settle.
-        if [ -n "$published" ]; then sleep 30; else sleep 2; fi
+        # Poll quickly until Drawbridge's onion is published, then settle.
+        if [ -n "$published" ] || ! echo "$services" | grep -q '^drawbridge '; then sleep 30; else sleep 2; fi
     done
 ) &
 watcher=$!
