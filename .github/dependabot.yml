@@ -81,3 +81,20 @@ updates:
       - dependency-name: "@solana/web3.js"
         update-types:
           - "version-update:semver-major"
+
+  # Core Lightning releases, for the ghcr.io/archetech/cln base image. Only
+  # this image is allowed: the other Dockerfiles' bases are not managed here.
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "America/Toronto"
+    open-pull-requests-limit: 1
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "deps"
+    allow:
+      - dependency-name: "elementsproject/lightningd"

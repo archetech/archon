@@ -109,6 +109,26 @@ jobs:
           name: E2E Artifacts (${{ matrix.gatekeeper }}, ${{ matrix.keymaster }})
           path: e2e-results.xml
 
+  # Runs the Core Lightning image on regtest: clnrest with a rune, the on-disk
+  # layout existing nodes depend on, startup failure handling and a Tor-mode
+  # start through the shared Tor image. See tests/cln/smoke.sh.
+  cln_image:
+    name: cln image smoke test
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.e2e != 'false') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Build images
+        run: |
+          docker build -t archon-cln-test -f docker/Dockerfile.cln .
+          docker build -t archon-tor-test -f docker/Dockerfile.tor .
+
+      - name: Smoke test
+        run: tests/cln/smoke.sh
+
   # Replays the shared request flows in tests/gatekeeper/api-parity-flows.json
   # against BOTH gatekeeper implementations and diffs the responses. The runner
   # (scripts/gatekeeper-parity.mjs) already existed but nothing invoked it, so

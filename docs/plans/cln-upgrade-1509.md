@@ -150,8 +150,10 @@ The entrypoint reads every CLN-core variable the cl-hive entrypoint reads,
 under the same names and with the same defaults, so a Compose override that
 sets one keeps working. The unit tests set each one.
 
+`grpc-port=9937` is kept although nothing uses gRPC: `cln-grpc` otherwise
+listens on 9736, the P2P port, and `connectd` then fails to bind it.
+
 Not carried over:
-- `grpc-port` (not published and unused).
 - Every `hive-*`, `revenue-ops-*`, Boltz and vitality option.
 - WireGuard (`WIREGUARD_ENABLED`, `WG_*`), which our compose never enabled.
 - `EXPERIMENTAL_SPLICING`. cl-hive left splicing off unless it was set, but
