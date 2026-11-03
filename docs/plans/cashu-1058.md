@@ -64,7 +64,7 @@ cashu?: {
 // IDInfo: one entry per mint the identity uses, by normalized URL
 cashu?: Record<string, {
     added: string;
-    node?: boolean;                // the node's own mint, reached through Drawbridge
+    node?: string;                 // node URL whose Drawbridge reaches this mint
     proofs: Proof[];               // unspent, spendable by this identity
     operations?: CashuOperation[]; // journal of unsettled operations
 }>;
@@ -112,9 +112,12 @@ nor the response can supply them. A record is retired only after its result is
 saved.
 
 The journal also says what each unspent proof is for, which NUT-07 alone cannot.
-`checkCashu` settles each record by kind. Every Cashu operation on a mint first
-settles that mint's open records for the identity, so a restart needs no separate
-step; `cashu-check` runs the same settlement on demand.
+`checkCashu` settles each record by kind. Every mutating Cashu operation on a
+mint first settles that mint's open records for the identity, so a restart needs
+no separate step; `cashu-check` runs the same settlement on demand. Read methods
+(`getCashuBalance`, `listCashuMints`, `listCashuQuotes`, `listCashuSends`,
+`listCashuMessages`) never settle or send anything: they report open records as
+in flight, so they stay safe to expose as read-only MCP tools.
 
 | Kind | Settled when | Outcome |
 |---|---|---|
@@ -171,9 +174,12 @@ each keyset's `next` past the highest signed counter it finds, and a request the
 mint rejects because its outputs are already signed triggers a NUT-09 scan of
 that keyset and a retry with fresh counters, so stale counters repair themselves
 instead of failing every operation. Mints report already-signed outputs with
-error codes 11003 and 11008 on a swap and 20006 on a mint or melt; the
-`customRequest` wrapper and the Python client keep the mint's error code in the
-errors they raise so this path can recognize them.
+error code 11003 on a swap, mint or melt, and only that code triggers this path;
+11004 (outputs pending) leaves the record open, and other errors, such as 11008
+(duplicate outputs in one request) or 20006 (invoice already paid), fail the
+operation without touching counters. The `customRequest` wrapper and the Python
+client keep the mint's error code in the errors they raise so these cases can be
+told apart.
 
 `proofs` is a set keyed by each proof's `Y` (the hash-to-curve point of its
 secret). No path adds a proof whose `Y` is already in any identity's `proofs` or
@@ -222,9 +228,10 @@ Senders use it to pick a mint the recipient accepts (Phase 2).
 
 Keymaster reaches mints in two ways.
 
-- **The node's mint**, an entry marked `node`, goes through the node's
-  Drawbridge at `<node URL>/cashu`, whatever public URL the entry stores
-  (Phase 3).
+- **The node's mint**, an entry whose `node` equals Keymaster's current node
+  URL, goes through that Drawbridge at `<node URL>/cashu`, whatever public URL
+  the entry stores (Phase 3). An entry whose `node` names a different node, as
+  after recovering the wallet elsewhere, is an outside mint at its public URL.
 - **Any other mint** is a URL a caller chose, which on a server-side Keymaster
   makes it a request-forgery vector. TypeScript passes cashu-ts's `Mint` a
   `customRequest` built on `fetchPublicHttps` from `@didcid/common/net`; Python
@@ -558,12 +565,14 @@ links to it.
   host is https, and `addCashu` then fails with an error saying so.
 - `DrawbridgeClient` in `@didcid/clients` gains `getCashuMint()`, and the Python
   Keymaster's Gatekeeper client gains `get_cashu_mint()`.
-- `addCashu()` adds that public URL to the identity with `node: true`. Tokens
-  name the mint by URL, so Keymaster records the public one, and routes requests
-  for an entry marked `node` to its own node's `/cashu` path; tokens it issues are
-  then redeemable by external wallets. The flag, not URL comparison, decides the
-  route, so a later change of public host does not turn the entry into an outside
-  mint; `addCashu` run again updates the entry's URL.
+- `addCashu()` adds that public URL to the identity with `node` set to
+  Keymaster's node URL. Tokens name the mint by URL, so Keymaster records the
+  public one and routes requests for the entry to its own node's `/cashu` path;
+  tokens it issues are then redeemable by external wallets. Running `addCashu`
+  again after the public host changes updates the entry's URL only if the entry
+  has the same `node` and every keyset id among its proofs and journal records is
+  one the node's mint lists, so a different mint is never relabelled; otherwise
+  it adds a separate entry and leaves the old one as it was.
 
 ### Operator documentation
 
