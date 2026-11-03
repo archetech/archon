@@ -198,7 +198,9 @@ Compose changes to the `tor` service:
 
 A hostname shows the onion service is configured, not that peers can reach
 it (see AGENTS.md on Tor hostname files). The node's healthcheck runs
-`lightning-cli getinfo` in every mode. In `tor` and `hybrid` modes it also
+`lightning-cli --rpc-file=<dir>/<network>/lightning-rpc getinfo` in every mode;
+without `--rpc-file` the CLI looks in its default directory and never finds the
+socket. In `tor` and `hybrid` modes it also
 makes a bounded SOCKS connection through `tor` to `<onion>:<port>` and reports
 failure as unhealthy. In `clearnet` mode there is no onion to probe. That keeps
 reachability separate from whether the node started.
@@ -229,10 +231,17 @@ connections on the host's address. `clearnet` and `hybrid` operators set
   Docker's 10-second default; `restart: unless-stopped`, so an exit from the
   entrypoint's supervision restarts it; the onion healthcheck above; the P2P
   publication above.
-- No `depends_on: tor`. `tor` already waits for `drawbridge`, which waits for
-  `lightning-mediator`, `drawbridge-init` and so for the CLN node, so a
-  dependency from the node back to `tor` would be a cycle that Compose
-  refuses. The entrypoint's bounded wait for `tor` orders them instead.
+- No `depends_on: tor`; the entrypoint's bounded wait for `tor` orders them.
+- Remove `tor`'s `depends_on: drawbridge` (`service_healthy`). Today `tor`
+  waits for `drawbridge`, which waits for `lightning-mediator`, which waits for
+  `drawbridge-init`, which waits for a running CLN. A Tor-mode CLN waits for
+  `tor` before it starts `lightningd`, so on a fresh full-profile start every
+  service would wait out its timeout. A compose dependency from the node to
+  `tor` would be the same cycle, which `docker compose config` rejects; the
+  entrypoint's wait only hides it until runtime. The `tor` dependency predates
+  #1491. That PR's entrypoint keeps the SOCKS proxy independent of Drawbridge
+  and adds an onion service once its target resolves, so nothing needs the
+  ordering.
 - Init containers: replace the `python3 -c "…['rune']"` pipelines with
   `set -euo pipefail` and `jq -er '.rune | select(type == "string" and length > 0)'`,
   so a failed `createrune` or a missing field stops the container instead of
@@ -258,7 +267,15 @@ connections on the host's address. `clearnet` and `hybrid` operators set
      start.
   4. Check `getinfo` (same `id`, same onion in `address`), `listpeerchannels`
      (same channels, `CHANNELD_NORMAL`), and an invoice through Drawbridge.
-  5. **Rollback** is restoring the copy and the old image, and is safe only
+  5. **Switching an existing node to `clearnet`** later: `docker compose up`
+     does not stop a container whose profile has been removed, so an old `tor`
+     container would keep serving the onion to a CLN that now listens on the
+     container network. If `tor` stays enabled for Drawbridge, `docker compose
+     up -d` recreates it with the new `TOR_SERVICES` value. If the `tor`
+     profile is removed, run `docker compose rm -sf tor` first. The key stays
+     in `data/cln-mainnet/tor/cln-service`; deleting it retires the address
+     permanently.
+  6. **Rollback** is restoring the copy and the old image, and is safe only
      if no channel state has changed since the upgrade. An older database
      broadcast after a channel update is a revoked state, and the peer can
      claim the whole channel. Once a payment or forward has gone through on
@@ -298,7 +315,8 @@ connections on the host's address. `clearnet` and `hybrid` operators set
   - the healthcheck in all three modes
 - **Compose check**: `docker compose config` with
   `COMPOSE_PROFILES=drawbridge,lightning,tor` (and each subset) must succeed.
-  It rejects dependency cycles.
+  It rejects dependency cycles, though not runtime waits, so the rehearsal
+  also does a fresh start.
 - **Migration rehearsal**, `scripts/cln-migration-rehearsal.sh`, run by hand
   and recorded in the PR (it pulls the old image and takes minutes):
   1. On regtest, start two nodes on `cl-hive-node:3.4.0`.
@@ -308,12 +326,17 @@ connections on the host's address. `clearnet` and `hybrid` operators set
      wallet path unchanged.
   5. Pay in both directions.
   6. Also run it in `tor` mode to confirm the onion address survives.
+  7. Start `drawbridge,lightning,tor` from an empty data directory with no
+     rune files, through a compose override that points CLN at the regtest
+     `bitcoind`. Every service must become healthy without hitting a timeout.
+  8. Switch that node to `clearnet` and remove the `tor` profile, following
+     the documented procedure. The old onion must stop answering.
 
 ## Delivery
 
 | PR | Content |
 |---|---|
-| 1 | `TOR_SERVICES` support in the Tor image only; compose keeps the single Drawbridge service (no behaviour change) |
+| 1 | `TOR_SERVICES` support in the Tor image, and removal of `tor`'s wait on `drawbridge`; compose keeps the single Drawbridge service |
 | 2 | `Dockerfile.cln`, entrypoint, unit tests, smoke test, CI matrices, Dependabot entry |
 | 3 | Compose switch, including the `cln` entry in `TOR_SERVICES` and the key mount; init containers, docs, upgrade notes; the rehearsal script and its recorded run |
 
