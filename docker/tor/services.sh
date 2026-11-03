@@ -15,6 +15,7 @@ DATA_DIR=${DATA_DIR:-/var/lib/tor/data}
 # Prints "name host port" for each entry that is to be served.
 tor_services() (
     set -f
+    seen=' '
     for entry in ${TOR_SERVICES:-drawbridge:drawbridge:4222}; do
         IFS=: read -r name host port mode <<EOF
 $entry
@@ -26,9 +27,21 @@ EOF
         case "$name" in
             ''|*[!a-z0-9-]*) echo "[tor] invalid service name in '$entry'" >&2; return 1 ;;
         esac
-        case "$port" in
-            ''|*[!0-9]*) echo "[tor] invalid port in '$entry'" >&2; return 1 ;;
+        # Each name is a hidden-service directory, which Tor accepts once.
+        case "$seen" in
+            *" $name "*) echo "[tor] duplicate service name in '$entry'" >&2; return 1 ;;
         esac
+        seen="$seen$name "
+        # Tor rejects a virtual port outside 1-65535, and a rejected torrc takes
+        # the SOCKS proxy down with it. The length check keeps the comparison
+        # below within shell arithmetic.
+        case "$port" in
+            ''|*[!0-9]*|??????*) echo "[tor] invalid port in '$entry'" >&2; return 1 ;;
+        esac
+        if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
+            echo "[tor] invalid port in '$entry'" >&2
+            return 1
+        fi
         if [ -z "$host" ]; then
             echo "[tor] missing host in '$entry'" >&2
             return 1

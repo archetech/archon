@@ -34,6 +34,11 @@ describe('tor_services', () => {
         expect(services()).toBe('drawbridge drawbridge 4222\n');
     });
 
+    it('accepts the port range limits', () => {
+        expect(services({ TOR_SERVICES: 'a:drawbridge:1 b:drawbridge:65535' }))
+            .toBe('a drawbridge 1\nb drawbridge 65535\n');
+    });
+
     it('serves every listed entry', () => {
         expect(services({ TOR_SERVICES: 'drawbridge:drawbridge:4222 cln:cln-mainnet-node:9736:tor' }))
             .toBe('drawbridge drawbridge 4222\ncln cln-mainnet-node 9736\n');
@@ -65,6 +70,11 @@ describe('tor_services', () => {
         ['a name with invalid characters', 'Draw_bridge:drawbridge:4222'],
         ['a missing host', 'drawbridge::4222'],
         ['a non-numeric port', 'drawbridge:drawbridge:http'],
+        ['port 0', 'drawbridge:drawbridge:0'],
+        ['port 65536', 'drawbridge:drawbridge:65536'],
+        ['an over-long port', 'drawbridge:drawbridge:000004222'],
+        ['a repeated name', 'cln:cln-mainnet-node:9736 cln:cln-mainnet-node:9737'],
+        ['a repeated name in clearnet mode', 'cln:cln-mainnet-node:9736 cln:cln-mainnet-node:9737:clearnet'],
         ['an unknown mode', 'cln:cln-mainnet-node:9736:onion'],
     ])('rejects %s', (_case, entry) => {
         expect(() => services({ TOR_SERVICES: entry })).toThrow();
