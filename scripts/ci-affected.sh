@@ -5,8 +5,8 @@
 #   unit    the Jest suites, coverage and the Python tests: anything but
 #           Markdown and deploy/, except Markdown a test reads
 #   images  the Docker image builds: the paths the Dockerfiles copy from
-#   e2e     the CLI and parity tests against those images: images, plus the
-#           tests and fixtures that drive them
+#   e2e     the CLI, parity and CLN smoke tests against those images: images,
+#           plus the tests and fixtures that drive them
 #
 # tests/ci/ci-affected.test.ts derives these inputs from the Dockerfiles, the
 # tests and the parity runner, so a new input fails CI rather than being
@@ -44,7 +44,7 @@ classify() {
     if grep -qE '^(docker/|packages/|services/|apps/|scripts/|rust/|python/|prebuilds/|[^/]+$)' <<<"$code"; then
         images=true
         e2e=true
-    elif grep -qE '^(tests/(cli|cli-tests|gatekeeper|fixtures)/|tests/convergence/vectors\.json$)' <<<"$code"; then
+    elif grep -qE '^(tests/(cli|cli-tests|cln|gatekeeper|fixtures)/|tests/convergence/vectors\.json$)' <<<"$code"; then
         e2e=true
     fi
     printf 'unit=%s\nimages=%s\ne2e=%s\n' "$unit" "$images" "$e2e"

@@ -107,7 +107,7 @@ describe('ci-affected', () => {
             .toStrictEqual({ unit: 'true', images: 'false', e2e: 'false' });
     });
 
-    it.each(['tests/cli/didcomm.test.ts', 'tests/cli-tests/generate_test_env.sh', 'tests/gatekeeper/api-parity-flows.json'])(
+    it.each(['tests/cli/didcomm.test.ts', 'tests/cli-tests/generate_test_env.sh', 'tests/cln/smoke.sh', 'tests/gatekeeper/api-parity-flows.json'])(
         'runs the end-to-end jobs for %s', (path) => {
             expect(affected([path])).toStrictEqual({ unit: 'true', images: 'false', e2e: 'true' });
         });
