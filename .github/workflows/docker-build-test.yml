@@ -121,6 +121,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
+      # Neither image installs npm packages, but every image-building job
+      # seeds prebuilds first (tests/ci/prebuild-seeding.test.ts).
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "22.23.4"
+
+      - name: Prefetch native prebuilds
+        run: node scripts/prefetch-prebuilds.mjs
+
       - name: Build images
         run: |
           docker build -t archon-cln-test -f docker/Dockerfile.cln .
