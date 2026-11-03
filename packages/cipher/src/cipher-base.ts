@@ -1,10 +1,12 @@
-import * as bip39 from 'bip39';
+import { generateMnemonic } from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { HDKey } from '@scure/bip32';
 import * as secp from '@noble/secp256k1';
 import { schnorr } from '@noble/curves/secp256k1.js';
 import { ed25519, x25519 } from '@noble/curves/ed25519.js';
-import { hmac } from '@noble/hashes/hmac';
-import { sha256 } from '@noble/hashes/sha256';
+import { hmac } from '@noble/hashes/hmac.js';
+import { pbkdf2 } from '@noble/hashes/pbkdf2.js';
+import { sha256, sha512 } from '@noble/hashes/sha2.js';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha';
 import { managedNonce } from '@noble/ciphers/webcrypto/utils'
 import { bytesToUtf8, utf8ToBytes } from '@noble/ciphers/utils';
@@ -19,21 +21,28 @@ const canonicalize = canonicalizeModule as unknown as (input: unknown) => string
 // Polyfill for synchronous signatures
 secp.etc.hmacSha256Sync = (k: Uint8Array, ...m: Uint8Array[]): Uint8Array => hmac(sha256, k, secp.etc.concatBytes(...m));
 
+// The BIP39 seed: PBKDF2-HMAC-SHA512 over the NFKD mnemonic, salted with
+// "mnemonic", 2048 rounds. @scure/bip39's mnemonicToSeedSync computes the same
+// bytes but rejects strings that are not 12-24 single-spaced words, and
+// newWallet has always accepted any string, so a stored mnemonic may be one.
+function bip39Seed(mnemonic: string): Uint8Array {
+    return pbkdf2(sha512, utf8ToBytes(mnemonic.normalize('NFKD')), utf8ToBytes('mnemonic'), { c: 2048, dkLen: 64 });
+}
+
 export default abstract class CipherBase implements Cipher {
     // Only the source of randomness differs between environments; @scure/bip32
     // is pure JS, so derivation is shared rather than implemented per platform.
     abstract generateRandomSalt(): string;
 
     generateHDKey(mnemonic: string): HDKey {
-        const seed = bip39.mnemonicToSeedSync(mnemonic);
-        return HDKey.fromMasterSeed(seed);
+        return HDKey.fromMasterSeed(bip39Seed(mnemonic));
     }
 
     // The BIP39 seed both curves derive from. BIP32 and SLIP-0010 build
     // different master nodes out of it, so one mnemonic backs every key without
     // any curve sharing material with another.
     mnemonicToSeed(mnemonic: string): Uint8Array {
-        return new Uint8Array(bip39.mnemonicToSeedSync(mnemonic));
+        return bip39Seed(mnemonic);
     }
 
     // Ed25519 signing keys, on SLIP-0010's hardened-only ladder.
@@ -54,7 +63,7 @@ export default abstract class CipherBase implements Cipher {
     }
 
     generateMnemonic(): string {
-        return bip39.generateMnemonic();
+        return generateMnemonic(wordlist, 128);
     }
 
     generateJwk(privateKeyBytes: Uint8Array): EcdsaJwkPair {
@@ -175,7 +184,7 @@ export default abstract class CipherBase implements Cipher {
     }
 
     hashMessage(msg: string | Uint8Array): string {
-        const hash = sha256(msg);
+        const hash = sha256(typeof msg === 'string' ? utf8ToBytes(msg) : msg);
         return Buffer.from(hash).toString('hex');
     }
 

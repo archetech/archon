@@ -1,4 +1,4 @@
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2.js';
 
 /**
  * Concat KDF (Single Step KDF) per NIST SP 800-56A and RFC 7518 §4.6.2.

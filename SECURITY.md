@@ -19,14 +19,14 @@ Every claim below was verified against the code and by executing the relevant pa
 ### Wallet keys derive from a single 128-bit seed
 
 ```
-bip39.generateMnemonic()          128 bits of entropy (12 words)
-  ↓ mnemonicToSeedSync — PBKDF2-HMAC-SHA512, 2048 iterations
+generateMnemonic(wordlist, 128)   128 bits of entropy (12 words)
+  ↓ BIP39 seed — PBKDF2-HMAC-SHA512, 2048 iterations
 512-bit seed                      still 128 bits of entropy
   ↓ HDKey.fromMasterSeed → derive("m/44'/0'/{account}'/0/{index}")
 32-byte secp256k1 private key     256-bit value, 128 bits of entropy
 ```
 
-`packages/cipher/src/cipher-base.ts` calls `bip39.generateMnemonic()` with **no strength argument**; bip39 v3.1.0 defaults to `strength = 128`. The Python port states it explicitly — `python/keymaster/src/keymaster/crypto.py` uses `Mnemonic("english").generate(strength=128)` — so both implementations agree.
+`packages/cipher/src/cipher-base.ts` calls `@scure/bip39`'s `generateMnemonic(wordlist, 128)`. The Python port states the same strength — `python/keymaster/src/keymaster/crypto.py` uses `Mnemonic("english").generate(strength=128)` — so both implementations agree.
 
 The PBKDF2 stretch to a 512-bit seed **adds no entropy**. Stretching increases the cost of a brute-force attempt per guess; it does not increase the number of guesses required.
 
@@ -100,18 +100,20 @@ Every path reaches `crypto.getRandomValues`, but **through two independent imple
 
 | generator | RNG | reached via |
 | --- | --- | --- |
-| Mnemonic, salts, passphrase IV | `@noble/hashes` `randomBytes` | `bip39.generateMnemonic()`, `generateRandomSalt()` |
+| Mnemonic, salts, passphrase IV | `@noble/hashes` `randomBytes` | `@scure/bip39` `generateMnemonic()`, `generateRandomSalt()` |
 | Vault keypair | `@noble/secp256k1`'s own `randomBytes` | `secp.utils.randomPrivateKey()` |
 
-`@noble/secp256k1` does not use `@noble/hashes` for this — it ships its own. The two are separate packages on separate version lines, so **a dependency bump can change one and leave the other untouched**. (A single install can also contain more than one resolved copy of `@noble/hashes`; `@noble/curves` nests its own.) Anything asserting a property of "the RNG" has to assert it of both.
+`@noble/secp256k1` does not use `@noble/hashes` for this — it ships its own. The two are separate packages on separate version lines, so **a dependency bump can change one and leave the other untouched**. (`@noble/curves`, `@scure/bip32` and `@scure/bip39` each pin an exact `@noble/hashes` version, so a bump can also leave nested copies behind.) Anything asserting a property of "the RNG" has to assert it of both.
 
-Both refuse to degrade, by different mechanisms:
+Both refuse to degrade, reading `globalThis.crypto` at call time:
 
 ```js
-// @noble/hashes — captures globalThis.crypto at module load
-throw new Error('crypto.getRandomValues must be defined');
+// @noble/hashes
+const cr = typeof globalThis === 'object' ? globalThis.crypto : null;
+if (typeof cr?.getRandomValues !== 'function')
+    throw new Error('crypto.getRandomValues must be defined');
 
-// @noble/secp256k1 — reads globalThis.crypto at call time, then dereferences it
+// @noble/secp256k1 — dereferences it, so an absent crypto throws
 const cr = () => globalThis?.crypto;
 ```
 
@@ -124,7 +126,7 @@ Note what those tests deliberately do **not** do. A degraded RNG still produces 
 `crypto.getRandomValues` is where Archon's responsibility ends, but it is not where the randomness originates. Below it, both implementations above converge on one chain — on a Linux node:
 
 ```
-bip39.generateMnemonic() · randomPrivateKey() · generateRandomSalt()
+generateMnemonic() · randomPrivateKey() · generateRandomSalt()
   ↓ @noble/hashes randomBytes
 crypto.getRandomValues                       Web Crypto
   ↓ Node routes this to OpenSSL RAND_bytes
@@ -139,7 +141,7 @@ interrupt timing jitter · RDSEED/RDRAND · bootloader/EFI seed · seed file acr
 thermal noise in silicon · timing variance between physically independent clocks
 ```
 
-Note which branch actually runs: `@noble/hashes` tries `crypto.getRandomValues` first and only falls back to Node's `crypto.randomBytes` if it is absent. Since Node 19 exposes `globalThis.crypto`, **the first branch is the one taken** on every supported Node version and in browsers; the fallback is legacy compatibility that current deployments never reach.
+`@noble/hashes` has no other branch: it calls `crypto.getRandomValues` or throws. Node 19 and later expose `globalThis.crypto`, as browsers do, so every supported runtime takes that path.
 
 #### The bottom of the chain is physics
 

@@ -1,7 +1,7 @@
-import { pbkdf2Async } from '@noble/hashes/pbkdf2';
-import { sha512 } from '@noble/hashes/sha512';
+import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
+import { sha512 } from '@noble/hashes/sha2.js';
 import { gcm } from '@noble/ciphers/aes';
-import { randomBytes } from '@noble/hashes/utils';
+import { randomBytes } from '@noble/hashes/utils.js';
 
 const ENC_ITER_DEFAULT = 100_000;
 const IV_LEN = 12;
