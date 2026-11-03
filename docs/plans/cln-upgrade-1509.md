@@ -266,7 +266,8 @@ connections on the host's address. `clearnet` and `hybrid` operators set
   1. Stop the stack and copy `data/cln-mainnet` (including `tor/`).
   2. In `tor` or `hybrid` mode, add `tor` to `COMPOSE_PROFILES`. In
      `clearnet` or `hybrid` mode, set `ARCHON_CLN_P2P_BIND=0.0.0.0`.
-  3. Pull and start. CLN migrates the database to the v26.06 schema on first
+  3. Start with `./start-node` (from `main`) or pull and start (from a
+     release). CLN migrates the database to the v26.06 schema on first
      start.
   4. Check `getinfo` (same `id`, same onion in `address`), `listpeerchannels`
      (same channels, `CHANNELD_NORMAL`), and an invoice through Drawbridge.
@@ -347,13 +348,14 @@ connections on the host's address. `clearnet` and `hybrid` operators set
 PR 3 carries the release note, because it is the one that changes running
 nodes.
 
-The three PRs are split for review only, and all three merge before the next
-release. No node runs from `main` until the third has landed. The split
-introduces no deployment ordering:
+The three PRs are split for review only. Nodes that run from `main` deploy
+with `./start-node`, which runs `docker compose build` before `up`, so every
+buildable image, Tor and CLN included, comes from the same checkout. The
+split introduces no deployment ordering:
 
-- Every intermediate `main` is sound. After PR 1, Drawbridge's onion service
-  is unchanged. After PR 2, the CLN image is built and tested but nothing
-  uses it.
+- Every intermediate `main` is deployable. After PR 1, Drawbridge's onion
+  service is unchanged. After PR 2, the CLN image exists but compose does not
+  reference it yet.
 - The `v*` tag publishes the Tor and CLN images as `latest` together with the
   compose switch.
 - The `cln` Tor entry and key mount ship in the same release as the switch,
@@ -366,9 +368,10 @@ still find the `hostname` cl-hive's Tor left in the key directory and announce
 it, so the mismatch shows as the node's onion healthcheck failing, not as a
 startup error. Two rules prevent it:
 
-- A node running from `main` upgrades with `docker compose up -d --build`, as
-  for any change on `main`. The upgrade notes say so, because `--build` is
-  what rebuilds an existing `tor` image rather than only the missing CLN one.
+- A node running from `main` upgrades with `./start-node`, which rebuilds
+  both images from the checkout. The upgrade notes say so, and warn that a
+  bare `docker compose up` would build only the missing CLN image and keep an
+  existing `tor` image.
 - Release images are published by separate jobs. The release note for this
   change is published only after the tag's `docker-publish.yml` run has
   succeeded for every image.
