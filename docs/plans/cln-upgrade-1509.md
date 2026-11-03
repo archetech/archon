@@ -360,6 +360,19 @@ introduces no deployment ordering:
   so no deployment has the cl-hive Tor and the shared Tor serving the same key
   at once.
 
+The Tor and CLN images must come from the same revision. A Tor image older
+than PR 1 ignores `TOR_SERVICES` and never serves the CLN onion. CLN would
+still find the `hostname` cl-hive's Tor left in the key directory and announce
+it, so the mismatch shows as the node's onion healthcheck failing, not as a
+startup error. Two rules prevent it:
+
+- A node running from `main` upgrades with `docker compose up -d --build`, as
+  for any change on `main`. The upgrade notes say so, because `--build` is
+  what rebuilds an existing `tor` image rather than only the missing CLN one.
+- Release images are published by separate jobs. The release note for this
+  change is published only after the tag's `docker-publish.yml` run has
+  succeeded for every image.
+
 ## Risks
 
 - **Database migration is one-way.** Covered by the backup step and the
