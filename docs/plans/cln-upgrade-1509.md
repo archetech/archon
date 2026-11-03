@@ -222,8 +222,11 @@ connections on the host's address. `clearnet` and `hybrid` operators set
 
 ### Compose (`docker/compose/lightning.yml`)
 
-- `x-cln-image: &cln-image ghcr.io/archetech/cln`, still shared by the node and
-  the three init containers.
+- The node and the three init containers share one image through an anchor
+  that carries both `image: ghcr.io/archetech/cln` and
+  `build: { context: ../.., dockerfile: docker/Dockerfile.cln }`, as `tor`
+  does. A release pulls the published image; a node running from `main`
+  builds it when it is missing instead of failing to pull it.
 - Node: remove the four `HIVE_*` variables; mount `data/cln-mainnet` at
   `/data/lightning` (unchanged); add
   `data/cln-mainnet/tor/cln-service:/tor/cln-service:ro`;
@@ -318,7 +321,8 @@ connections on the host's address. `clearnet` and `hybrid` operators set
   It rejects dependency cycles, though not runtime waits, so the rehearsal
   also does a fresh start.
 - **Migration rehearsal**, `scripts/cln-migration-rehearsal.sh`, run by hand
-  and recorded in the PR (it pulls the old image and takes minutes):
+  against images built from `main` with PRs 1 and 2 merged, and recorded in
+  PR 3 (it pulls the old image and takes minutes):
   1. On regtest, start two nodes on `cl-hive-node:3.4.0`.
   2. Open a channel and pay an invoice.
   3. Switch node A to the new image with the same data directory.
@@ -343,24 +347,18 @@ connections on the host's address. `clearnet` and `hybrid` operators set
 PR 3 carries the release note, because it is the one that changes running
 nodes.
 
-The `cln` Tor entry and key mount land in PR 3, not PR 1. While the cl-hive
-node is still running, its own Tor serves the same key, and in `tor` mode its
-`lightningd` listens only on that container's loopback. A second Tor
-publishing descriptors for the key would send some peers to a target that
-cannot answer.
+The three PRs are split for review only, and all three merge before the next
+release. No node runs from `main` until the third has landed. The split
+introduces no deployment ordering:
 
-Compose refers to the untagged images, which resolve to `latest`, and
-`latest` is published only from `v*` tags; a `workflow_dispatch` on the
-`pre-release` channel publishes `<version>` and `pre-release`, not `latest`.
-So PRs 1 and 2 ship in one release and PR 3 in a later one. Before PR 3
-merges:
-
-- `docker manifest inspect` confirms that `ghcr.io/archetech/cln:latest` and
-  `ghcr.io/archetech/tor:latest` are the images from that earlier release.
-- The rehearsal runs against those published images, not local builds.
-
-That way a node running from `main` after PR 3 pulls images that already
-support it.
+- Every intermediate `main` is sound. After PR 1, Drawbridge's onion service
+  is unchanged. After PR 2, the CLN image is built and tested but nothing
+  uses it.
+- The `v*` tag publishes the Tor and CLN images as `latest` together with the
+  compose switch.
+- The `cln` Tor entry and key mount ship in the same release as the switch,
+  so no deployment has the cl-hive Tor and the shared Tor serving the same key
+  at once.
 
 ## Risks
 
