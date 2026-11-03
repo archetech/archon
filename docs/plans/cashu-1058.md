@@ -283,9 +283,9 @@ not received until the mint confirms its proofs are unspent.
 
 ### Implementation
 
-- TypeScript uses `@cashu/cashu-ts` 4.x. It requires `@noble/curves` 2 while
-  `packages/cipher` uses 1.9; upgrading cipher first avoids shipping both copies
-  in the browser wallets.
+- TypeScript uses `@cashu/cashu-ts` 4.x. Its `@noble/curves` 2 and
+  `@noble/hashes` 2 dependencies are already in `packages/cipher`'s tree, so it
+  adds no second copy to the browser wallets.
 - Python implements NUT-00 hash-to-curve, blinding and unblinding, NUT-12 DLEQ
   verification, NUT-13 derivation, NUT-11 signing and the V4 (`cashuB`, CBOR)
   token format, plus a mint HTTP client. Elliptic-curve operations and BIP-340
@@ -602,12 +602,11 @@ without allowlist entries.
 
 | PR | Content |
 |---|---|
-| 1 | `packages/cipher` on `@noble/curves` 2, with tests that existing keys, signatures and encryption are byte-identical before and after |
-| 2 | Mint component with `fakewallet` and `cln` backends; Drawbridge proxy, capability and discovery |
-| 3 | Keymaster wallet core and REST, TypeScript and Python, with vectors |
-| 4 | SDKs, CLIs, MCP |
-| 5 | DID-locked sends over DIDComm, both ports; the protocol specification in `archetech/didcomm` |
-| 6 | Wallet and client UI |
+| 1 | Mint component with `fakewallet` and `cln` backends; Drawbridge proxy, capability and discovery |
+| 2 | Keymaster wallet core and REST, TypeScript and Python, with vectors |
+| 3 | SDKs, CLIs, MCP |
+| 4 | DID-locked sends over DIDComm, both ports; the protocol specification in `archetech/didcomm` |
+| 5 | Wallet and client UI |
 
 The mint component lands before the wallet so the wallet's integration tests have
 a mint to run against.
