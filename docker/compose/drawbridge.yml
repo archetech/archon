@@ -265,15 +265,8 @@ services:
       # image changes and restarts.
       - ../../data/tor-drawbridge:/var/lib/tor/hidden_service
       - tor-hostname:/tor-hostname
-    depends_on:
-      # Optional so the `tor` profile can be selected without `drawbridge`.
-      # A required dependency on a service in another profile makes the whole
-      # merged project invalid ("depends on undefined service"), which is a
-      # parse error for every profile, not just this one. When `drawbridge` IS
-      # enabled the condition still applies and tor waits for it to be healthy.
-      drawbridge:
-        condition: service_healthy
-        required: false
+    # No depends_on: the entrypoint adds each onion service once its target
+    # resolves, so nothing has to start before tor.
 
 volumes:
   tor-hostname:
