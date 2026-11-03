@@ -29,7 +29,10 @@ is at v26.06.9; the releases since v25.12.1 include fixes for unauthenticated
 ## Facts the design depends on
 
 Read from cl-hive v3.4.0 (`docker/docker-entrypoint.sh`, `supervisord.conf`)
-and the official image `elementsproject/lightningd:v26.06.9`.
+and the official image `elementsproject/lightningd:v26.06.9`. cl-hive v3.1.0,
+which `sample.env` pins, has the same lightning dir, wallet path,
+hidden-service directory and CLN-core variables; it differs from v3.4.0 only
+in plugin variables.
 
 | | cl-hive v3.4.0 | official v26.06.9 |
 |---|---|---|
@@ -176,7 +179,10 @@ Changes to `docker/tor/entrypoint.sh`:
 - It serves a list of onion services, `TOR_SERVICES`, each given as
   `name:host:port[:mode]`. The default is `drawbridge:drawbridge:4222`,
   matching what the existing `TOR_SERVICE_HOST`/`TOR_SERVICE_PORT` defaults
-  produce, and those two variables keep working for a single service.
+  produce. Those two variables keep working: when either is set, it replaces
+  the host or port of the `drawbridge` entry, so a Compose override that
+  points Drawbridge's onion elsewhere is not lost when compose starts setting
+  `TOR_SERVICES`.
 - An entry whose `mode` is `clearnet` is not served. Without that, a
   `clearnet` node would still get a reachable onion service, under the old
   address if a key exists. Switching a node to `clearnet` therefore removes the
@@ -304,6 +310,12 @@ interface; `always-use-proxy` covers only outbound connections.
      broadcast after a channel update is a revoked state, and the peer can
      claim the whole channel. Once a payment or forward has gone through on
      the new node, there is no going back.
+- `deploy/claude-skill/archon-noderunner`: the `add-lightning` stage appends
+  `drawbridge,lightning` only. It must also append `tor`, or set
+  `ARCHON_CLN_NETWORK_MODE=clearnet` with a public bind for operators who
+  choose clearnet. Otherwise the default `tor` mode makes CLN refuse to start.
+  `SKILL.md`'s note that Tor's hidden service targets `drawbridge:4222` gains
+  the CLN service.
 - `docs/plans/cashu-1058.md`'s mint uses this CLN's RPC socket; no change
   needed there.
 
@@ -329,7 +341,8 @@ interface; `always-use-proxy` covers only outbound connections.
 - **Tor entrypoint tests** (new, `tests/tor/entrypoint.test.ts`, running the
   script's torrc generation with a stubbed resolver). Cover: the default
   single Drawbridge service, two services with one unresolvable, a `clearnet`
-  entry (not served), a switch from `tor` to `clearnet`, and Drawbridge's
+  entry (not served), a switch from `tor` to `clearnet`, `TOR_SERVICE_HOST`
+  and `TOR_SERVICE_PORT` overriding the `drawbridge` entry, and Drawbridge's
   hostname still published at its existing path.
 - **Image smoke test** in `docker-build-test.yml`: build `Dockerfile.cln`,
   start it on regtest against a `bitcoind -regtest` container, and check:
@@ -347,7 +360,8 @@ interface; `always-use-proxy` covers only outbound connections.
 - **Migration rehearsal**, `scripts/cln-migration-rehearsal.sh`, run by hand
   against images built from `main` with PRs 1 and 2 merged, and recorded in
   PR 3 (it pulls the old image and takes minutes):
-  1. On regtest, start two nodes on `cl-hive-node:3.4.0`.
+  1. On regtest, start two nodes on `cl-hive-node:3.4.0`, and repeat the run
+     from `3.1.0`.
   2. Open a channel and pay an invoice.
   3. Switch node A to the new image with the same data directory.
   4. Assert the same node id, the channel still `CHANNELD_NORMAL`, and the
