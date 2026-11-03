@@ -52,7 +52,10 @@ live there like the Nostr `nsec`.
 ```ts
 // WalletFile
 cashu?: {
-    counters: Record<string, number>;   // keyset id -> next NUT-13 counter
+    counters: Record<string, {          // by keyset id
+        next: number;                   // next never-used NUT-13 counter
+        free: [number, number][];       // released ranges, reused before next
+    }>;
 };
 
 // IDInfo: one entry per mint the identity uses, by normalized public URL
@@ -75,14 +78,18 @@ interface CashuQuote {
 
 Counters are reserved and saved before the blinded outputs they cover are sent to
 the mint, so a crash can never reuse a counter the mint has signed. A reservation
-is released for reuse only when the mint rejects the request that used it, since
-a rejected request can no longer sign. An interrupted swap is retried with the
+is released for reuse only once the request that used it is settled and can no
+longer sign: all of it when the mint rejects the request, and the unsigned tail
+of a melt's change outputs once the melt is paid, since NUT-08 lets the mint sign
+fewer change outputs than were sent, or none. Released ranges go to the keyset's
+`free` list and are allocated before `next`. An interrupted swap is retried with the
 same inputs and outputs until the mint answers; if the first attempt succeeded,
 the retry is rejected and NUT-09 recovers the signatures. A melt's change outputs
 stay reserved by its quote record until the quote is paid or unpaid, because a
-pending melt can still sign them. Unsigned gaps come only from rejected requests,
-which reuse their range, so the sequence stays within the NUT-13 recovery scan,
-which stops after three empty batches of 100.
+pending melt can still sign them. Every unsigned counter of a settled request is
+reused, so gaps in the signed sequence are bounded by the outputs of requests
+still in flight, and stay within the NUT-13 recovery scan, which stops after
+three empty batches of 100.
 
 A quote record is saved before its invoice is paid or its melt is submitted, and
 removed only after it settles. A paid mint quote is claimable by its id alone, so
@@ -125,7 +132,7 @@ Senders use it to pick a mint the recipient accepts (Phase 2).
 | `publishCashu(name?)` | Add the `#cashu` service listing the identity's mints |
 | `unpublishCashu(name?)` | Remove the `#cashu` service |
 | `getCashuBalance(mint?, name?)` | Unspent and pending totals for an identity |
-| `createCashuMintQuote(amount, mint?)` | NUT-04 quote: a BOLT11 invoice to pay |
+| `createCashuMintQuote(amount, mint?, name?)` | NUT-04 quote: a BOLT11 invoice to pay |
 | `claimCashuMintQuote(quoteId, mint?, name?)` | Mint proofs once the quote is paid |
 | `meltCashu(bolt11, mint?, name?)` | NUT-05: pay an invoice from proofs, keep change |
 | `sendCashu(amount, mint?, name?)` | Swap to exact proofs and return a `cashuB` token |
