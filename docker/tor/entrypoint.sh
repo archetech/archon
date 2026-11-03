@@ -28,11 +28,20 @@ echo "$resolved" | write_torrc > "$TORRC"
 su-exec tor tor -f "$TORRC" &
 pid=$!
 
+# Tor installs its SIGHUP handler a moment after starting, even after its SOCKS
+# port opens, and until then SIGHUP kills it. The kernel lists the signals a
+# process catches in SigCgt, where SIGHUP is the lowest bit.
+catches_hup() {
+    last=$(awk '/^SigCgt/ { print substr($2, length($2)) }' "/proc/$pid/status" 2>/dev/null)
+    [ -n "$last" ] && [ $((0x$last & 1)) -eq 1 ]
+}
+
 (
     published=
     while :; do
         current=$(echo "$services" | resolve_services)
-        if [ "$current" != "$resolved" ]; then
+        # A change found before Tor can take the reload waits for the next pass.
+        if [ "$current" != "$resolved" ] && catches_hup; then
             resolved=$current
             echo "$resolved" | write_torrc > "$TORRC"
             kill -HUP "$pid" 2>/dev/null || true
@@ -48,8 +57,15 @@ pid=$!
             chmod 644 /tor-hostname/hostname
             echo '[tor] Published onion hostname'
         fi
-        # Poll quickly until Drawbridge's onion is published, then settle.
-        if [ -n "$published" ] || ! echo "$services" | grep -q '^drawbridge '; then sleep 30; else sleep 2; fi
+        # Poll quickly while a listed service has not resolved, a change waits
+        # for Tor, or Drawbridge's onion is unpublished; then settle.
+        if [ "$(echo "$current" | grep -c .)" -lt "$(echo "$services" | grep -c .)" ] ||
+            [ "$current" != "$resolved" ] ||
+            { [ -z "$published" ] && echo "$services" | grep -q '^drawbridge '; }; then
+            sleep 2
+        else
+            sleep 30
+        fi
     done
 ) &
 watcher=$!
