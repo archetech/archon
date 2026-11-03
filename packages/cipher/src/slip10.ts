@@ -1,5 +1,5 @@
-import { hmac } from '@noble/hashes/hmac';
-import { sha512 } from '@noble/hashes/sha512';
+import { hmac } from '@noble/hashes/hmac.js';
+import { sha512 } from '@noble/hashes/sha2.js';
 
 // SLIP-0010 hierarchical derivation for the Ed25519 curve.
 //

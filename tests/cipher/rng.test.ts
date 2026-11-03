@@ -14,8 +14,9 @@ import { jest } from '@jest/globals';
 // to fall into.
 //
 // Note there are TWO independent RNG implementations behind these calls:
-// mnemonics and salts go through `@noble/hashes` `randomBytes`, while vault
-// keypairs go through `@noble/secp256k1`, which ships its own. They are
+// mnemonics (via `@scure/bip39`) and passphrase salts go through
+// `@noble/hashes` `randomBytes`, while vault keypairs go through
+// `@noble/secp256k1`, which ships its own. They are
 // separate packages on separate version lines, so a bump can change one and not
 // the other — hence a test for each.
 
@@ -74,20 +75,20 @@ describe('there is no weak RNG to fall back to', () => {
         }
     });
 
-    // Kept last and nested: the module mock replaces the crypto module for any
-    // subsequent import in this file's registry.
-    describe('hashes RNG', () => {
-        afterAll(() => {
-            jest.resetModules();
-        });
+    it('mnemonic generation throws when no platform CSPRNG is available', async () => {
+        const { default: CipherNode } = await import('@didcid/cipher/node');
+        const cipher = new CipherNode();
+        // @noble/hashes, which @scure/bip39 draws entropy through, also reads
+        // globalThis.crypto at call time.
+        const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto')!;
 
-        it('throws instead of degrading when no platform CSPRNG is available', async () => {
-            jest.unstable_mockModule('@noble/hashes/crypto', () => ({ crypto: undefined }));
-            jest.resetModules();
+        delete (globalThis as any).crypto;
 
-            const { randomBytes } = await import('@noble/hashes/utils');
-
-            expect(() => randomBytes(32)).toThrow(/getRandomValues must be defined/);
-        });
+        try {
+            expect(() => cipher.generateMnemonic()).toThrow(/getRandomValues must be defined/);
+        }
+        finally {
+            Object.defineProperty(globalThis, 'crypto', descriptor);
+        }
     });
 });
