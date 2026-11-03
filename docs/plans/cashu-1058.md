@@ -80,6 +80,7 @@ interface CashuOperation {
         r?: string;                // with its blinding factor
     }[];
     sent?: Proof[];                // proofs handed out as a token, until redeemed
+    message?: { id: string; packed: string; delivered: boolean }; // locked-send DIDComm delivery
     created: string;
 }
 ```
@@ -129,6 +130,14 @@ counter of a settled request is reused, so gaps in the signed sequence are bound
 by the outputs of requests still in flight, and stay within the NUT-13 recovery
 scan, which stops after three empty batches of 100.
 
+Counters are only as current as the wallet file. A wallet recovered from its
+mnemonic, from a backup (`recoverWallet`) or an identity recovered with
+`recoverId` may hold counters the mint has already signed. `restoreCashu` sets
+each keyset's `next` past the highest signed counter it finds, and a request the
+mint rejects because its outputs are already signed triggers a NUT-09 scan of
+that keyset and a retry with fresh counters, so stale counters repair themselves
+instead of failing every operation.
+
 Proof changes and counter changes go through `updateWallet`, so concurrent
 operations in one Keymaster cannot spend or derive from the same state.
 
@@ -140,9 +149,10 @@ creates a wallet on the node: it is idempotent, and on a node without the `cashu
 capability it fails with an error that points to `addCashuMint`. `addCashuMint`
 adds any other mint by URL.
 
-Both refuse a mint whose NUT-06 info does not advertise NUT-07 and NUT-09. Without
-NUT-07 the journal cannot be settled, and without NUT-09 ecash minted there could
-not be recovered from the mnemonic.
+Both refuse a mint whose NUT-06 info does not advertise NUT-07, NUT-08 and NUT-09.
+Without NUT-07 the journal cannot be settled; without NUT-08 the unused part of a
+melt's fee reserve is never returned as change; and without NUT-09 ecash minted
+there could not be recovered from the mnemonic.
 
 Receiving a token from a mint the identity has not added fails with an error that
 names the mint. Accepting a mint's tokens means trusting the mint with that
@@ -197,6 +207,8 @@ not received until the mint confirms its proofs are unspent.
   token format, plus a mint HTTP client.
 - Both ports are checked against the NUT specification test vectors and against
   committed TypeScript-generated vectors, as the DIDComm port was.
+- Amounts account for NUT-02 input fees: a send or melt selects enough proofs to
+  cover the keyset's `input_fee_ppk` as well as the amount.
 - New error types for a mint the identity has not added, insufficient balance, a quote not paid
   and a token already spent.
 
@@ -285,7 +297,9 @@ they need no public test mint.
    secrets and blinding factors before it is submitted, and the record keeps the
    locked proofs, since they exist nowhere else and the refund needs them.
 5. Encode the token, pack it for the recipient, and send it through the DIDComm
-   service.
+   service. The journal record keeps the packed message and is marked delivered
+   only when the DIDComm service accepts it; `checkCashu` resends an undelivered
+   message with the same message id, which the recipient deduplicates.
 
 An intercepted token is unspendable, and an unclaimed one returns to the sender
 after the locktime through `reclaimCashu`.
@@ -311,7 +325,7 @@ protocol in its discover-features disclosures so a sender can check support firs
 `receiveCashuMessages(name?)` takes token messages from the DIDComm inbox, signs
 each locked proof with the matching private key and swaps it. The matching key
 may be an earlier derivation if the recipient has rotated keys; Keymaster already
-searches retained derivations. Processed messages are recorded so a token message
+searches retained derivations. Processed messages are recorded by message id so a token message
 is not redeemed twice.
 
 The specification for DID-locked ecash is `cashu/1.0/README.md` in
