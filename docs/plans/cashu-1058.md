@@ -64,6 +64,7 @@ cashu?: {
 // IDInfo: one entry per mint the identity uses, by normalized URL
 cashu?: Record<string, {
     added: string;
+    node?: boolean;                // the node's own mint, reached through Drawbridge
     proofs: Proof[];               // unspent, spendable by this identity
     operations?: CashuOperation[]; // journal of unsettled operations
 }>;
@@ -72,6 +73,7 @@ interface CashuOperation {
     id: string;
     kind: 'mint' | 'melt' | 'swap' | 'receive' | 'send' | 'locked-send';
     quote?: string;                // mint or melt quote id
+    quoteKey?: string;             // NUT-20 private key for a mint quote
     inputs: Proof[];               // proofs the operation spends
     keyset: string;                // keyset of the outputs
     outputs: {                     // in request order
@@ -89,8 +91,9 @@ interface CashuOperation {
 
 A mint URL is normalized before it is stored or compared: lowercase scheme and
 host, default port removed, no trailing slash, no query or fragment. A token
-names its mint by the same normalized form, so a token's mint matches an
-identity's entry exactly.
+from another wallet may not use that form (NUT-00 only strips trailing slashes),
+so Keymaster normalizes a decoded token's mint URL the same way before comparing
+it with the identity's entries.
 
 Every operation that talks to the mint is journaled first. Its record, with its
 inputs, its quote and everything needed to rebuild its outputs, is saved before
@@ -104,15 +107,28 @@ nor the response can supply them. A record is retired only after its result is
 saved.
 
 The journal also says what each unspent proof is for, which NUT-07 alone cannot.
-After a restart, `checkCashu` settles each record by kind:
+`checkCashu` settles each record by kind. Every Cashu operation on a mint first
+settles that mint's open records for the identity, so a restart needs no separate
+step; `cashu-check` runs the same settlement on demand.
 
 | Kind | Settled when | Outcome |
 |---|---|---|
 | `mint` | the quote is paid, or expires unpaid | claim the proofs, or drop the record |
-| `melt` | the quote is paid or unpaid | keep the change, or return the inputs to `proofs` |
+| `melt` | the quote is paid or unpaid; while it is `PENDING` the record stays open | keep the change, from the quote state if the response was lost, or return the inputs to `proofs` |
 | `swap` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09, or return the inputs once NUT-07 shows them unspent |
 | `receive` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09, or drop the record and report the token as already spent |
 | `send`, `locked-send` | the swap settles as above, then every `sent` proof is spent | the token was redeemed; until then it is outstanding, not balance |
+
+Mint quotes are created with a NUT-20 public key whenever the mint advertises
+NUT-20, and claimed with the matching signature. The key is random per quote and
+kept in the quote's journal record, so the mint cannot link quotes to an
+identity. NUT-04 warns that anyone who learns a quote id can otherwise claim its
+tokens, and quote ids appear in request URLs that proxies, including Drawbridge,
+log.
+
+Melt requests use no client timeout, as NUT-05 advises, since a melt can take as
+long as the Lightning payment; a request that does time out leaves its record
+open and the quote is polled instead.
 
 Inputs return to `proofs` only when the identity owned them and NUT-07 shows them
 unspent. A received token's proofs were never the identity's, so its value is
@@ -120,20 +136,23 @@ credited only from the swap's outputs: if someone else spent the token first, th
 receive yields nothing.
 
 A sent token is never returned to the balance because its proofs are unspent: the
-recipient may not have redeemed it yet. `reclaimCashu` takes back an unredeemed
-token explicitly, by swapping it, or for a locked send by the refund key once the
-locktime has passed.
+recipient may not have redeemed it yet. `reclaimCashu` takes back one unredeemed
+send, named by its operation id from `listCashuSends`: an unlocked token by
+swapping it, a locked one with the refund key once its locktime has passed.
+Reclaiming is per send because taking back every outstanding token would cancel
+payments still in transit.
 
 Counters are reserved and saved before the blinded outputs they cover are sent to
 the mint, so a crash can never reuse a counter the mint has signed. A reservation
-is released for reuse only once the request that used it is settled and can no
-longer sign: all of it when the mint rejects the request, and the unsigned tail
-of a melt's change outputs once the melt is paid, since NUT-08 lets the mint sign
-fewer change outputs than were sent, or none. Released ranges go to the keyset's
-`free` list and are allocated before `next`. An interrupted request is retried
-with the same inputs and outputs until the mint answers; if the first attempt
-succeeded, the retry is rejected and NUT-09 recovers the signatures. Every unsigned
-counter of a settled request is reused, so gaps in the signed sequence are bounded
+is released for reuse only when its request is settled and can no longer sign,
+and a NUT-09 query for its outputs returns no signature: after a rejection, since
+a rejected retry may mean an earlier attempt was signed, and for the unsigned
+tail of a melt's change outputs once the melt is paid, since NUT-08 lets the mint
+sign fewer change outputs than were sent, or none. Released ranges go to the
+keyset's `free` list and are allocated before `next`. An interrupted request is
+retried with the same inputs and outputs until the mint answers; if the first
+attempt succeeded, the retry is rejected and NUT-09 recovers the signatures. Every
+unsigned counter of a settled request is reused, so gaps in the signed sequence are bounded
 by the outputs of requests still in flight, and stay within the NUT-13 recovery
 scan, which stops after three empty batches of 100.
 
@@ -146,7 +165,14 @@ mnemonic, from a backup (`recoverWallet`) or an identity recovered with
 each keyset's `next` past the highest signed counter it finds, and a request the
 mint rejects because its outputs are already signed triggers a NUT-09 scan of
 that keyset and a retry with fresh counters, so stale counters repair themselves
-instead of failing every operation.
+instead of failing every operation. Mints report already-signed outputs with
+error codes 11003 and 11008 on a swap and 20006 on a mint or melt; the
+`customRequest` wrapper and the Python client keep the mint's error code in the
+errors they raise so this path can recognize them.
+
+`proofs` is a set keyed by each proof's `Y` (the hash-to-curve point of its
+secret). No path adds a proof whose `Y` is already in any identity's `proofs` or
+journal records, so restores, retries and recoveries cannot count value twice.
 
 Proof, journal and counter changes go through `mutateWallet`, so concurrent
 operations in one Keymaster cannot spend or derive from the same state. The lock
@@ -191,16 +217,19 @@ Senders use it to pick a mint the recipient accepts (Phase 2).
 
 Keymaster reaches mints in two ways.
 
-- **The node's mint** goes through the node's Drawbridge at `<node URL>/cashu`,
-  whatever public URL the identity stores for it (Phase 3).
+- **The node's mint**, an entry marked `node`, goes through the node's
+  Drawbridge at `<node URL>/cashu`, whatever public URL the entry stores
+  (Phase 3).
 - **Any other mint** is a URL a caller chose, which on a server-side Keymaster
   makes it a request-forgery vector. TypeScript passes cashu-ts's `Mint` a
   `customRequest` built on `fetchPublicHttps` from `@didcid/common/net`; Python
   uses `fetch_public_https` from `keymaster.net`. Both require https, reject
   private addresses at connection time and revalidate redirects, as the existing
   Lightning Address and Herald fetches do. In a browser the same import resolves
-  to plain `fetch`, and the mint must allow cross-origin requests, which public
-  mints commonly do; a mint that does not fails with an error that says so.
+  to the browser build, which still requires https and rejects private host
+  names but cannot check resolved addresses; the mint must also allow
+  cross-origin requests, which public mints commonly do, and one that does not
+  fails with an error that says so.
 
 A token received from an unadded mint is rejected before any request is made,
 so a token cannot point Keymaster at an arbitrary host.
@@ -227,7 +256,9 @@ so a token cannot point Keymaster at an arbitrary host.
 | `listCashuQuotes(mint?, name?)` | Open mint and melt quotes from the journal, with their state |
 | `sendCashuTo(recipient, amount, options?)` | Phase 2: locked send over DIDComm; options `{ memo?, locktime?, mint?, name? }` |
 | `receiveCashuMessages(name?)` | Phase 2: redeem token messages from the DIDComm inbox |
-| `reclaimCashu(mint?, name?)` | Phase 2: take back unredeemed sends, locked ones once their locktime passes |
+| `reclaimCashu(operationId, name?)` | Take back one unredeemed send: an unlocked token at once, a locked one once its locktime passes |
+| `listCashuSends(mint?, name?)` | Outstanding sends from the journal, with operation id, amount, recipient and locktime |
+| `listCashuMessages(name?)` | Phase 2: token messages waiting in the DIDComm inbox, with sender, amount, mint and whether it can be redeemed |
 
 Every method that omits `mint` uses the same default as the CLI: the node's mint
 when the identity has it, else the identity's only mint, else an error.
@@ -255,7 +286,16 @@ not received until the mint confirms its proofs are unspent.
 - Both ports are checked against the NUT specification test vectors and against
   committed TypeScript-generated vectors, as the DIDComm port was.
 - Amounts account for NUT-02 input fees: a send or melt selects enough proofs to
-  cover the keyset's `input_fee_ppk` as well as the amount.
+  cover the keyset's `input_fee_ppk` as well as the amount. A send's `amount` is
+  what the recipient nets: the sender adds the fee the recipient's redemption
+  swap will pay on the sent proofs, and the result reports that fee.
+- Tokens are decoded in both formats, V4 `cashuB` and V3 `cashuA`, and issued as
+  V4. A V4 token may carry a short keyset id, which is resolved against the
+  mint's keysets, and an ambiguous id rejects the token, as NUT-00 requires. In
+  TypeScript that means reading the token's mint with `getTokenMetadata` before
+  `getDecodedToken(token, keysetIds)`.
+- cashu-ts is ESM-only. Keymaster's CommonJS build reaches it through
+  `require(esm)`, which the pinned Node 22.13+ supports.
 - New error types in `packages/common/src/errors.ts` and the Python equivalents,
   following `LightningNotConfiguredError`:
 
@@ -291,13 +331,15 @@ not received until the mint confirms its proofs are unspent.
   | `POST /cashu/quote`, `POST /cashu/claim`, `POST /cashu/quotes` | `createCashuMintQuote`, `claimCashuMintQuote`, `listCashuQuotes` |
   | `POST /cashu/melt`, `POST /cashu/send`, `POST /cashu/receive` | `meltCashu`, `sendCashu`, `receiveCashu` |
   | `POST /cashu/check`, `POST /cashu/restore` | `checkCashu`, `restoreCashu` |
-  | `POST /cashu/send-to`, `POST /cashu/accept`, `POST /cashu/reclaim` | `sendCashuTo`, `receiveCashuMessages`, `reclaimCashu` (Phase 2) |
+  | `POST /cashu/sends`, `POST /cashu/reclaim` | `listCashuSends`, `reclaimCashu` |
+  | `POST /cashu/send-to`, `POST /cashu/messages`, `POST /cashu/accept` | `sendCashuTo`, `listCashuMessages`, `receiveCashuMessages` (Phase 2) |
 
 - Result types in `packages/clients/src/keymaster-types.ts`, mirrored in Python:
   `CashuMintInfo` (`url`, `name`, `nuts`, `keysets`, `isNodeMint`),
   `CashuBalance` (`spendable`, `inFlight`, `outstanding`, and `mints` when
   totalled across several), `CashuMintQuote` (`quote`, `request`, `amount`,
-  `state`, `expiry`), `CashuMeltResult` (`paid`, `preimage`, `fee`, `change`),
+  `state`, `expiry`), `CashuMeltResult` (`paid`, `preimage`, `fee`, `change` as an amount, never
+  the proofs),
   `CashuSendResult` (`token`, `amount`, `fee`), `CashuReceiveResult` (`amount`,
   `mint`), `CashuCheckResult` (counts of records settled and still open), and
   `CashuSendToResult` (`token`, `messageId`, `delivered`).
@@ -344,7 +386,9 @@ archon publish-cashu      # archon publish-lightning
 | `cashu-restore [id] [-m]` | `restoreCashu` | 1 | yes |
 | `cashu-send-to <recipient> <amount> [memo] [id] [--locktime <duration>] [-m]` | `sendCashuTo`; recipient is a DID or alias | 2 | yes |
 | `cashu-accept [id]` | `receiveCashuMessages` | 2 | yes |
-| `cashu-reclaim [id] [-m]` | `reclaimCashu`: refunds expired locked sends | 2 | yes |
+| `cashu-sends [id] [-m]` | `listCashuSends` | 1 | no |
+| `cashu-reclaim <operationId> [id]` | `reclaimCashu`: takes back one unredeemed send | 1; locked sends 2 | yes |
+| `cashu-messages [id]` | `listCashuMessages` | 2 | no |
 
 Without `--pay`, `cashu-mint` prints the quote id and invoice and the user runs
 `cashu-claim` after paying it. Commands that change ecash state print the
@@ -357,11 +401,16 @@ container; Archon adds no mint administration command.
 
 Unit tests mock the mint HTTP API. Integration tests run against the Phase 3
 mint with its `fakewallet` backend, which settles quotes without Lightning, so
-they need no public test mint. They join the CLI tests in `tests/cli-tests`, run
-by `docker-build-test.yml` against both Keymaster flavors, which enable the
-`cashu` profile with `ARCHON_CASHU_MINT_BACKEND=fakewallet`. The fixtures that
-drive them must be inputs of `scripts/ci-affected.sh` so a change to them runs
-those tests.
+they need no public test mint. They are Jest tests in `tests/cli`, run by
+`npm run test:cli` (`jest.config.cli.js`) in `docker-build-test.yml` against both
+Keymaster flavors. The node mint is reached through Drawbridge, which the CLI
+test stack does not start today, so `start-node-ci` changes too: it builds and
+starts `drawbridge` and `cashu-mint` with the `drawbridge` and `cashu` profiles,
+`ARCHON_CASHU_MINT_BACKEND=fakewallet`, an https `ARCHON_DRAWBRIDGE_PUBLIC_HOST`
+placeholder for the advertised URL, and
+`ARCHON_KEYMASTER_GATEKEEPER_URL=http://drawbridge:4222` so Keymaster's node URL
+is Drawbridge. L402 stays off, its default. The new tests and that script are
+inputs of `scripts/ci-affected.sh`.
 
 ## Phase 2: DID-locked ecash over DIDComm
 
@@ -369,7 +418,9 @@ those tests.
 
 `sendCashuTo(recipient, amount, { memo?, locktime?, mint?, name? })`, where
 `recipient` is a DID or alias and `locktime` is a duration in seconds (the CLI
-also accepts `30m`, `12h` or `7d`), default seven days:
+also accepts `30m`, `12h` or `7d`), default three days, and never more than the
+DIDComm mailbox keeps an unacknowledged message (seven days), so the sender can
+reclaim the value before the message could expire unread:
 
 1. Choose the mint: the one given, else a mint listed in the recipient's `#cashu`
    service that the sender also uses, preferring the sender's node mint. With
@@ -385,7 +436,7 @@ also accepts `30m`, `12h` or `7d`), default seven days:
    Keymaster signs DID operations with, made with the same private key:
    cashu-ts's `signP2PKProofs` in TypeScript and `coincurve` in Python.
 4. Swap for proofs whose NUT-11 secret locks them to that key, with
-   `SIG_INPUTS`, a `locktime` (default seven days), and the sender's current key
+   `SIG_INPUTS`, the requested `locktime`, and the sender's current key
    as the `refund` key. The swap is journaled as a `locked-send` with its random
    secrets and blinding factors before it is submitted, and the record keeps the
    locked proofs, since they exist nowhere else and the refund needs them.
@@ -425,7 +476,10 @@ each locked proof with the matching private key and swaps it. The matching key
 may be an earlier derivation if the recipient has rotated keys; Keymaster already
 searches retained derivations. It journals each redemption as a `receive` and
 acknowledges the message only after the record is saved, so a crash cannot lose
-a token between the mailbox and the wallet. Processed message ids are recorded so
+a token between the mailbox and the wallet. A message it cannot redeem — a mint
+the identity has not added, a token already spent, a mint unreachable — stays
+unacknowledged and is reported with the reason, so the user can add the mint and
+accept it again; a spent token's message is acknowledged once reported. Processed message ids are recorded so
 a resent message is not redeemed twice.
 
 The specification for DID-locked ecash is `cashu/1.0/README.md` in
@@ -439,18 +493,38 @@ links to it.
 
 - `docker/compose/cashu-mint.yml`, included from `docker-compose.yml` and enabled
   by the `cashu` profile in `COMPOSE_PROFILES`.
-- The `cashubtc/mintd` image at a pinned version.
-- An entrypoint generates the mint configuration from environment variables and,
-  on first start, the mint mnemonic, persisted like the Lightning macaroon
-  secrets.
-- SQLite under `./data/cashu-mint`, bind-mounted and running as
-  `${ARCHON_UID}:${ARCHON_GID}`.
+- `cashubtc/mintd:0.18.3`, pinned.
+- cdk-mintd 0.18 keeps its configuration in its database. A TOML file is imported
+  once with `cdk-mintd config init --new-mint --file <toml>`; later starts ignore
+  the file and `CDK_MINTD_*` variables, apart from bootstrap values such as the
+  work directory. The entrypoint therefore runs once per data directory: on
+  first start it generates the mint mnemonic into `/data/mnemonic` (mode 0600),
+  writes the TOML from the `ARCHON_CASHU_MINT_*` variables, and runs
+  `config init`; on every start it then runs `cdk-mintd`. Changing those
+  variables after the first start has no effect, and `sample.env` says so.
+- The TOML sets `listen_host = "0.0.0.0"` so Drawbridge can reach the mint on the
+  Compose network, and refers to the mnemonic as `file:/data/mnemonic`; cdk-mintd
+  accepts secrets only as `env:` or `file:` references.
+- `CDK_MINTD_WORK_DIR=/data`, a bind mount of `./data/cashu-mint`, with the
+  container running as `${ARCHON_UID}:${ARCHON_GID}`; the image's own default is
+  root with `~/.cdk-mintd`.
 - `ARCHON_CASHU_MINT_BACKEND`: `cln` uses the bundled CLN's RPC socket and needs
   the `lightning` profile; `fakewallet` is for development and CI. The bundled
   CLN is mainnet, so a `cln` mint holds real bitcoin. Operators should run it
   first with `fakewallet`, and the operator documentation says so.
-- Conservative defaults for mint and melt limits and fees, with all values set in
-  environment variables documented in `sample.env`.
+- The RPC socket grants full control of the CLN node; unlike the other bundled
+  services, which use CLN REST with a restricted rune, a mint bug or compromise
+  could spend the node's whole balance. The CLN service sets `rpc-file-mode` so
+  the socket is group-readable by `${ARCHON_GID}`, and the mint mounts only the
+  socket's directory. The operator documentation states the exposure.
+- Initial mint and melt limits and fees from `ARCHON_CASHU_MINT_*` variables,
+  with conservative defaults in `sample.env`.
+- Live changes after initialization, including keyset rotation
+  (`rotate-next-keyset`), go through cdk's management RPC with `cdk-mint-cli`.
+  The mintd image does not include that binary. The component enables the
+  management RPC on the Compose network only, with its TLS material under
+  `/data`, and the operator documentation gives the `cdk-mint-cli` commands from
+  the matching cdk release.
 
 ### Exposure
 
@@ -460,18 +534,28 @@ links to it.
   (`http://cashu-mint:<port>` in Compose, empty to disable), following
   `ARCHON_DIDCOMM_URL`.
 - Drawbridge proxies the mint's `/v1/*` API under `/cashu`, stripping the prefix,
-  outside L402 but behind per-source and global rate limits configured like the
-  DIDComm ones (`ARCHON_DRAWBRIDGE_CASHU_PER_SOURCE`,
-  `ARCHON_DRAWBRIDGE_CASHU_GLOBAL`). Cashu mint URLs may carry a path, so the mint's public URL is
+  outside L402 but behind per-source and global request limits in the pattern of
+  the DIDComm ones (`ARCHON_DRAWBRIDGE_CASHU_PER_SOURCE`,
+  `ARCHON_DRAWBRIDGE_CASHU_GLOBAL`, `ARCHON_DRAWBRIDGE_CASHU_RATE_LIMIT_WINDOW`).
+  A server-side Keymaster's requests all count against one source, so its own
+  traffic needs a per-source limit sized for every identity it serves; requests
+  carrying the configured admin key are exempt. Cashu mint URLs may carry a path, so the mint's public URL is
   `<public host>/cashu` and cdk-mintd needs no prefix support.
 - Drawbridge `/capabilities` reports `cashu` when the mint URL is configured, and
-  `GET /cashu-mint` returns `{ url }`, the public mint URL (`<public host>/cashu`,
-  or the onion address), as `/didcomm-endpoint` does for DIDComm.
+  `GET /cashu-mint` returns `{ url }`, the public mint URL
+  `<ARCHON_DRAWBRIDGE_PUBLIC_HOST>/cashu`, as `/didcomm-endpoint` does for
+  DIDComm. Unlike DIDComm it does not fall back to the onion address: that is an
+  `http://` URL, which the https-only mint fetch refuses and which outside wallets
+  could not redeem tokens against. It returns `{ url: null }` unless the public
+  host is https, and `addCashu` then fails with an error saying so.
 - `DrawbridgeClient` in `@didcid/clients` gains `getCashuMint()`, and the Python
   Keymaster's Gatekeeper client gains `get_cashu_mint()`.
-- `addCashu()` adds that public URL to the identity. Tokens name the mint
-  by URL, so Keymaster records the public one and sends its requests to its own
-  node's `/cashu` path; tokens it issues are then redeemable by external wallets.
+- `addCashu()` adds that public URL to the identity with `node: true`. Tokens
+  name the mint by URL, so Keymaster records the public one, and routes requests
+  for an entry marked `node` to its own node's `/cashu` path; tokens it issues are
+  then redeemable by external wallets. The flag, not URL comparison, decides the
+  route, so a later change of public host does not turn the entry into an outside
+  mint; `addCashu` run again updates the entry's URL.
 
 ### Operator documentation
 
@@ -491,8 +575,8 @@ capability only offers the node's own mint as a one-step choice. The view has:
 - mint: show the quote invoice, or pay it from Lightning
 - melt: pay an invoice
 - send a token (copy and QR), receive a token (paste)
-- send to a DID, list incoming token messages and claim them, reclaim expired
-  sends
+- outstanding sends, each with a reclaim action once it can be reclaimed
+- send to a DID, list incoming token messages and claim them
 
 `tests/wallet/ui-capability-parity.test.ts` covers the new Keymaster methods
 without allowlist entries.
@@ -520,3 +604,8 @@ a mint to run against.
 - Two copies of one wallet in use at once derive the same counters and hold the
   same proofs. The mint rejects the second use, so operations fail and each copy
   shows proofs the other has spent until `checkCashu` reconciles them.
+- `mutateWallet` serializes writes within one Keymaster process only. Two
+  processes sharing one wallet store overwrite each other's writes, and a lost
+  journal record with random P2PK secrets cannot be recovered. Cashu therefore
+  requires one Keymaster process per wallet store; the operator documentation
+  says so.
