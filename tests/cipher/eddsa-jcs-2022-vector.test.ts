@@ -1,7 +1,8 @@
 import CipherNode from '@didcid/cipher/node';
 import { multikeyToEd25519PublicKey, multibaseToBytes } from '@didcid/cipher/multikey';
 import canonicalizeModule from 'canonicalize';
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { utf8ToBytes } from '@noble/hashes/utils.js';
 
 const canonicalize = canonicalizeModule as unknown as (input: unknown) => string;
 const cipher = new CipherNode();
@@ -49,7 +50,7 @@ const PROOF_VALUE = 'z2HnFSSPPBzR36zdDgK8PbEHeXbR56YF24jwMpt3R1eHXQzJDMWS93FCzpv
 
 // sha256 of the canonical proof config, then of the canonical document.
 const payload = (config: unknown, document: unknown) =>
-    new Uint8Array([...sha256(canonicalize(config)), ...sha256(canonicalize(document))]);
+    new Uint8Array([...sha256(utf8ToBytes(canonicalize(config))), ...sha256(utf8ToBytes(canonicalize(document)))]);
 
 describe('the W3C eddsa-jcs-2022 test vector', () => {
     const publicJwk = {
@@ -75,7 +76,7 @@ describe('the W3C eddsa-jcs-2022 test vector', () => {
     });
 
     it('fails if the proof config is dropped from the payload', () => {
-        const documentOnly = new Uint8Array([...sha256(canonicalize(UNSIGNED))]);
+        const documentOnly = new Uint8Array([...sha256(utf8ToBytes(canonicalize(UNSIGNED)))]);
 
         expect(cipher.verifyEd25519(documentOnly, multibaseToBytes(PROOF_VALUE), publicJwk)).toBe(false);
     });

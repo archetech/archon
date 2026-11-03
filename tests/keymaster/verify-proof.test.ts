@@ -6,7 +6,8 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import { bytesToMultibase } from '@didcid/cipher/multikey';
 import canonicalizeModule from 'canonicalize';
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { utf8ToBytes } from '@noble/hashes/utils.js';
 
 const canonicalize = canonicalizeModule as unknown as (input: unknown) => string;
 
@@ -51,8 +52,8 @@ async function signEddsaJcs2022(document: any, did: string, name?: string, proof
     };
 
     const payload = new Uint8Array([
-        ...sha256(canonicalize(config)),
-        ...sha256(canonicalize(unsecured)),
+        ...sha256(utf8ToBytes(canonicalize(config))),
+        ...sha256(utf8ToBytes(canonicalize(unsecured))),
     ]);
 
     return { ...config, proofValue: bytesToMultibase(cipher.signEd25519(payload, keypair.privateJwk)) };
@@ -105,8 +106,8 @@ describe('eddsa-jcs-2022', () => {
             proofPurpose: 'assertionMethod',
         };
         const payload = new Uint8Array([
-            ...sha256(canonicalize(config)),
-            ...sha256(canonicalize(document)),
+            ...sha256(utf8ToBytes(canonicalize(config))),
+            ...sha256(utf8ToBytes(canonicalize(document))),
         ]);
         const proof = { ...config, proofValue: bytesToMultibase(cipher.signEd25519(payload, keypair.privateJwk)) };
 
@@ -323,7 +324,7 @@ describe('archon-ecdsa-secp256k1-jcs-2026 binds its proof configuration', () => 
             verificationMethod: `${did}#key-1`,
             proofPurpose: 'assertionMethod',
         };
-        const payload = new Uint8Array([...sha256(canonicalize(config)), ...sha256(canonicalize(document))]);
+        const payload = new Uint8Array([...sha256(utf8ToBytes(canonicalize(config))), ...sha256(utf8ToBytes(canonicalize(document)))]);
         const proofValue = Buffer.from(
             cipher.signHash(cipher.hashMessage(payload), keypair!.privateJwk), 'hex').toString('base64url');
 
