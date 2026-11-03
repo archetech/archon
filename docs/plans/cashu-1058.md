@@ -84,7 +84,12 @@ interface CashuOperation {
         r?: string;                // with its blinding factor
     }[];
     sent?: Proof[];                // proofs handed out as a token, until redeemed
-    message?: { id: string; packed: string; delivered: boolean }; // locked-send DIDComm delivery
+    delivery?: {                   // locked-send DIDComm delivery, saved before the swap
+        recipient: string;         // recipient DID
+        memo?: string;
+        messageId: string;         // stable across resends
+        delivered: boolean;
+    };
     created: string;
 }
 ```
@@ -441,9 +446,12 @@ reclaim the value before the message could expire unread:
    secrets and blinding factors before it is submitted, and the record keeps the
    locked proofs, since they exist nowhere else and the refund needs them.
 5. Encode the token, pack it for the recipient, and send it through the DIDComm
-   service. The journal record keeps the packed message and is marked delivered
-   only when the DIDComm service accepts it; `checkCashu` resends an undelivered
-   message with the same message id, which the recipient deduplicates.
+   service. The record's `delivery` (recipient DID, memo and a message id) is
+   saved with the rest of the record before the swap in step 4, so a restart at
+   any point can still deliver. It is marked delivered only when the DIDComm
+   service accepts the message; until then `checkCashu` builds the token from the
+   record's proofs, recovering them through NUT-09 first if the swap response was
+   lost, and sends it with the same message id, which the recipient deduplicates.
 
 An intercepted token is unspendable, and an unclaimed one returns to the sender
 after the locktime through `reclaimCashu`.
