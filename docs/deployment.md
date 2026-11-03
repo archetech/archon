@@ -676,13 +676,17 @@ Optional UIs when Drawbridge is enabled:
 
 If you don't have an existing CLN node, the bundled Lightning stack provides a complete setup with CLN, RTL, and LNbits.
 
+The node runs `ghcr.io/archetech/cln`: Core Lightning's official image (`docker/Dockerfile.cln` names the version) with only CLN's built-in plugins. Nothing adjusts channel fees or rebalances automatically: new channels get a 0 msat base fee and 100 ppm, and fee policy beyond that is the operator's.
+
 ### Enable Lightning
 
-Add the Lightning profile to `COMPOSE_PROFILES`:
+Add the Lightning profile to `COMPOSE_PROFILES`, together with `tor` for the default `tor` network mode:
 
 ```env
-COMPOSE_PROFILES=lightning
+COMPOSE_PROFILES=lightning,tor
 ```
+
+A `clearnet` node needs only `lightning`. In `tor` and `hybrid` modes CLN uses the node's shared `tor` service for its outbound proxy and its onion service, and refuses to start, naming the profile, if `tor` is not running.
 
 ### Bitcoin RPC
 
@@ -703,8 +707,9 @@ ARCHON_BTC_PASS=bitcoin
 | `ARCHON_CLN_RGB` | `e33502` | Node color (hex) |
 | `ARCHON_CLN_PORT` | `9736` | Lightning P2P port |
 | `ARCHON_CLN_NETWORK_MODE` | `tor` | Network mode: `tor`, `hybrid`, or `clearnet` |
-| `ARCHON_CLN_ANNOUNCE_ADDR` | *(empty)* | Announce address (for `clearnet`/`hybrid` modes) |
-| `ARCHON_CLN_GOVERNANCE_MODE` | `advisor` | cl-hive governance mode |
+| `ARCHON_CLN_ANNOUNCE_ADDR` | *(empty)* | Public address to announce (for `clearnet`/`hybrid` modes) |
+| `ARCHON_CLN_P2P_BIND` | `127.0.0.1` | Interface the P2P port publishes on. Set `0.0.0.0` in `clearnet` and `hybrid` modes; `tor` mode refuses anything but loopback |
+| `ARCHON_CLN_MIN_CAPACITY_SAT` | `50000` | Smallest channel the node accepts |
 | `ARCHON_CLN_LOG_LEVEL` | `info` | CLN log level |
 | `ARCHON_RTL_PASSWORD` | `changeme` | **Change this.** RTL web UI password |
 | `ARCHON_RTL_PORT` | `3002` | RTL web UI port |
@@ -715,9 +720,13 @@ ARCHON_BTC_PASS=bitcoin
 
 | Mode | Description |
 |------|-------------|
-| `tor` | Node is only reachable via Tor. Address is not publicly announced. |
-| `hybrid` | Reachable via both Tor and clearnet. Set `ARCHON_CLN_ANNOUNCE_ADDR` to your public IP/domain. |
-| `clearnet` | Clearnet only. Set `ARCHON_CLN_ANNOUNCE_ADDR` to your public IP/domain. |
+| `tor` | Reachable only through its onion, which it announces. All outbound connections go through Tor. Needs the `tor` profile; leave `ARCHON_CLN_P2P_BIND` unset. |
+| `hybrid` | Reachable through its onion and on clearnet. Needs the `tor` profile and `ARCHON_CLN_P2P_BIND=0.0.0.0`; set `ARCHON_CLN_ANNOUNCE_ADDR` to your public IP/domain. |
+| `clearnet` | Clearnet only. Set `ARCHON_CLN_P2P_BIND=0.0.0.0` and `ARCHON_CLN_ANNOUNCE_ADDR` to your public IP/domain. |
+
+The node's onion key lives in `./data/cln-mainnet/tor/cln-service`, served by the `tor` service. Back it up with the rest of `./data/cln-mainnet/`.
+
+**Switching an existing node to `clearnet`:** `docker compose up` does not stop a container whose profile has been removed, so an old `tor` container would keep serving the onion to a CLN that now listens on the container network. If `tor` stays enabled for Drawbridge, `docker compose up -d` recreates it without the CLN service. If you remove the `tor` profile, run `docker compose rm -sf tor` first. The key stays on disk; delete `./data/cln-mainnet/tor/cln-service` to retire the address for good.
 
 ### Init Containers
 
@@ -729,11 +738,24 @@ Three one-shot init containers automatically create CLN runes:
 | `rtl-init` | Creates unrestricted rune for RTL | `./data/cln-mainnet/rtl/rune.txt` |
 | `lnbits-init` | Creates three runes (readonly, invoice, pay) + copies TLS certs | `./data/cln-mainnet/lnbits/runes.env` |
 
-These run once and exit. If a rune file already exists, they skip creation. The bundled LNbits service now runs from the published image `ghcr.io/archetech/lnbits:1.5.3-archetech.1`.
+These run once and exit. If a rune file already exists, they skip creation; a failed rune request stops the container rather than leaving a partial file. The bundled LNbits service now runs from the published image `ghcr.io/archetech/lnbits:1.5.3-archetech.1`.
 
 ### Important: Back Up Lightning Data
 
 The `./data/cln-mainnet/` directory contains your Lightning wallet, channels, and keys. **Back this up regularly.** Losing this data means losing funds.
+
+### Upgrading from the cl-hive image
+
+Earlier releases ran CLN v25.12 in `ghcr.io/lightning-goats/cl-hive-node`, which is no longer maintained. That image also ran cl-hive, cl-revenue-ops (automatic fees and rebalancing), Boltz and vitality; none of them run now. The upgrade keeps the node's identity, channels, wallet location and onion address, and every CLN setting cl-hive applied. Per-channel fees already set stay as they are; nothing adjusts them any more.
+
+1. Stop the stack and copy `./data/cln-mainnet/`, including `tor/`.
+2. In `tor` or `hybrid` mode, add `tor` to `COMPOSE_PROFILES`. In `clearnet` or `hybrid` mode, set `ARCHON_CLN_P2P_BIND=0.0.0.0`; in `tor` mode leave it unset. Remove `ARCHON_CLN_VERSION`, `ARCHON_CLN_GOVERNANCE_MODE` and `ARCHON_CLN_ARCHON_VERSION` from `.env`; nothing reads them.
+3. Start with `./start-node` from a checkout, which builds both the CLN and Tor images (a bare `docker compose up` would build only the missing CLN image and keep an older Tor image that cannot serve CLN's onion), or pull and start from a release. CLN migrates its database to the new schema on first start. The previous config is kept as `./data/cln-mainnet/bitcoin/config.cl-hive.bak`.
+4. Check that `lightning-cli --lightning-dir=/data/lightning/bitcoin --network=bitcoin getinfo` (in `cln-mainnet-node`) shows the same `id` and, in `tor` or `hybrid` mode, the same onion under `address`; that `listpeerchannels` shows the same channels in `CHANNELD_NORMAL`; and that Drawbridge can issue an invoice.
+
+Splicing is now on: CLN enables it by default since v26.04, where cl-hive left it off.
+
+**Rollback** is restoring the copy with the old image, and is safe only if no channel state has changed since the upgrade. An older database broadcast after a channel update is a revoked state, and the peer can claim the whole channel. Once a payment or forward has gone through on the new node, there is no going back.
 
 ### Verify
 
@@ -816,7 +838,7 @@ GRAFANA_ADMIN_PASSWORD=your-secure-password
 | 4231 | Herald Client | 4231 | `ARCHON_HERALD_CLIENT_PORT` | configurable |
 | 4235 | Lightning Mediator | 4235 | `ARCHON_LIGHTNING_MEDIATOR_PORT` | configurable |
 | 4000 | Explorer | 4000 | -- | public |
-| 9736 | CLN P2P | 9736 | `ARCHON_CLN_PORT` | public |
+| 9736 | CLN P2P | 127.0.0.1:9736 | `ARCHON_CLN_P2P_BIND` / `ARCHON_CLN_PORT` | localhost in `tor` mode; set `ARCHON_CLN_P2P_BIND=0.0.0.0` for `clearnet`/`hybrid` |
 | 3001 | CLN REST | 3001 | -- | localhost |
 | 3002 | RTL | 127.0.0.1:3002 | `ARCHON_RTL_BIND` / `ARCHON_RTL_PORT` | localhost (admin UI; set `ARCHON_RTL_BIND=0.0.0.0` to expose) |
 | 5000 | LNbits | 127.0.0.1:5000 | `ARCHON_LNBITS_BIND` / `ARCHON_LNBITS_PORT` | localhost (custodial wallet admin UI; set `ARCHON_LNBITS_BIND=0.0.0.0` to expose) |
@@ -876,7 +898,15 @@ Verify your `ARCHON_BTC_HOST`, `ARCHON_BTC_USER`, and `ARCHON_BTC_PASS` are corr
 
 ### Empty Node Address
 
-This is expected when running in `tor` network mode — the node is hidden and doesn't announce a public address. If you need a visible address, switch to `hybrid` or `clearnet` mode and set `ARCHON_CLN_ANNOUNCE_ADDR`.
+In `tor` mode the node announces only its onion; in `clearnet` mode it announces nothing unless `ARCHON_CLN_ANNOUNCE_ADDR` is set. If `getinfo` shows no onion in `tor` or `hybrid` mode, check that the `tor` service is running and serving `cln` (`docker compose logs tor`).
+
+### CLN Refuses to Start
+
+The entrypoint stops with a message rather than start a node in a state that could lose funds or leak its address:
+
+- **`hsm_secret exists but … lightningd.sqlite3 does not`**: the wallet is missing from where the node keeps it. Restore it from backup; starting anyway would create a node with the right identity and none of its channels.
+- **`tor did not resolve`**: `tor` or `hybrid` mode without the `tor` profile.
+- **`the P2P port is published on …`**: `tor` mode with `ARCHON_CLN_P2P_BIND` set beyond loopback.
 
 ### Init Containers Failing
 

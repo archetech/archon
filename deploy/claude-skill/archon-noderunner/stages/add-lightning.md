@@ -2,7 +2,7 @@
 
 Enable CLN + LNbits + lightning-mediator + drawbridge L402 authentication.
 
-**Note on profiles:** upstream has split these into independent profiles, so `drawbridge` no longer implies the Lightning stack. This stage enables `drawbridge,lightning`, which brings up drawbridge, drawbridge-client, `lightning-mediator`, and the Lightning rail. It does **not** bring up Herald or Tor any more — add the `herald` / `tor` profiles explicitly if the node needs them (`add-email` owns Herald). Stage 0 deliberately does not enable drawbridge, so this stage is still the first place the front-door proxy comes online.
+**Note on profiles:** upstream has split these into independent profiles, so `drawbridge` no longer implies the Lightning stack. This stage enables `drawbridge,lightning`, which brings up drawbridge, drawbridge-client, `lightning-mediator`, and the Lightning rail. It does **not** bring up Herald (`add-email` owns it). It brings up Tor only when the operator keeps CLN in its default `tor` network mode, which needs the shared `tor` service (step 3). Stage 0 deliberately does not enable drawbridge, so this stage is still the first place the front-door proxy comes online.
 
 Because Drawbridge derives its capabilities from the `ARCHON_*_URL` values rather than the profiles, `ARCHON_LIGHTNING_MEDIATOR_URL` must be set in the same step as the profile — enabling one without the other yields connection errors instead of a clean 501.
 
@@ -11,7 +11,7 @@ Once this stage completes:
 - `/invoice/*` is added at `localhost:4222` for Lightning invoice endpoints.
 - If `add-didcomm` already ran, its `@didcomm` handler switches from the relay's direct port to drawbridge: drop `uri strip_prefix /didcomm` and change `reverse_proxy localhost:4236` to `localhost:4222`, since drawbridge strips the prefix itself. Keep the `@didcomm path /didcomm /didcomm/*` matcher.
 
-**Not** part of this stage any more, since it no longer enables the `tor` profile: there is no Tor SOCKS listener on `127.0.0.1:9050` and no onion hostname at `data/tor-drawbridge/drawbridge/hostname`. Do not probe for either when verifying stage health. An operator who wants them adds `tor` to `COMPOSE_PROFILES` and sets the `*_TOR_PROXY` variables to `tor:9050`.
+In `clearnet` mode the stage does not enable the `tor` profile: there is no Tor SOCKS listener on `127.0.0.1:9050` and no onion hostname at `data/tor-drawbridge/drawbridge/hostname`, so do not probe for either. In `tor` mode both exist, and CLN's onion key is in `data/cln-mainnet/tor/cln-service`.
 
 ## Prereqs
 
@@ -25,7 +25,9 @@ Once this stage completes:
 
 3. **Prompt** the operator:
    - CLN alias (defaults to `ARCHON_NODE_NAME`)
-   - Whether to enable public inbound connections (default: yes, opens port 9735)
+   - CLN network mode:
+     - `tor` (default): reachable only through its onion, all outbound through Tor. Needs the `tor` profile; without it CLN refuses to start.
+     - `clearnet`: public inbound on port 9736. Needs the operator's public IP or domain, and the port opened in the host firewall.
    - LNbits admin credentials (auto-generate a strong random password, offer to store in `.env`)
 
 4. **Splice** config into `.env`:
@@ -34,13 +36,22 @@ Once this stage completes:
    ARCHON_LIGHTNING_MEDIATOR_CLN_REST_URL=https://cln:3001
    ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL=http://lnbits:5000
    ARCHON_LIGHTNING_MEDIATOR_LNBITS_ADMIN_KEY={{generated}}
-   # Explicitly empty: this stage does not enable the `tor` profile. The compose
-   # default is `${ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY-tor:9050}` (single dash),
-   # so leaving the key UNSET still resolves to tor:9050 and the mediator would
-   # dial a container that isn't running. Only an explicit empty value disables it.
-   ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY=
    ```
-   Append `drawbridge,lightning` to `COMPOSE_PROFILES` (idempotently — `drawbridge` may already be present).
+   Then, by network mode:
+   - `tor`: append `drawbridge,lightning,tor` to `COMPOSE_PROFILES`. Leave `ARCHON_CLN_P2P_BIND` unset; CLN refuses to start in `tor` mode with the P2P port published beyond loopback.
+   - `clearnet`: append `drawbridge,lightning`, and splice
+     ```
+     ARCHON_CLN_NETWORK_MODE=clearnet
+     ARCHON_CLN_P2P_BIND=0.0.0.0
+     ARCHON_CLN_ANNOUNCE_ADDR={{public ip or domain}}:9736
+     # Explicitly empty: the tor profile is off. The compose default is
+     # `${ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY-tor:9050}` (single dash), so leaving
+     # the key UNSET still resolves to tor:9050 and the mediator would dial a
+     # container that isn't running. Only an explicit empty value disables it.
+     ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY=
+     ```
+
+   Append idempotently: `drawbridge` or `tor` may already be present.
 
 5. **Build & bring up** — CLN takes 5-15 minutes on first start (chain sync from bitcoind). Show live progress. Wait for CLN `getinfo` to return warmly.
 

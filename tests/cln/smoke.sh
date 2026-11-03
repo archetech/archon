@@ -23,6 +23,13 @@ cleanup
 
 fail() {
     echo "FAIL: $*" >&2
+    # The containers are removed on exit, so their logs are the only record.
+    for container in "$P-cln" "$P-cln-tor" "$P-tor"; do
+        if docker inspect "$container" >/dev/null 2>&1; then
+            echo "--- logs: $container" >&2
+            docker logs --tail 80 "$container" >&2 2>&1 || true
+        fi
+    done
     exit 1
 }
 

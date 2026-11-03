@@ -1,12 +1,18 @@
 # Shared CLN image. The node and its one-shot rune-init containers (drawbridge-init,
 # rtl-init, lnbits-init) MUST run the same image so the init `lightning-cli` always
-# matches the running lightningd. Bump ARCHON_CLN_VERSION to move all of them together.
-x-cln-image: &cln-image ghcr.io/lightning-goats/cl-hive-node:${ARCHON_CLN_VERSION:-3.4.0}
+# matches the running lightningd. The CLN version is the base image in
+# docker/Dockerfile.cln; each service can build it, so a node running from a
+# checkout builds the image rather than failing to pull an unpublished one.
+x-cln: &cln
+  image: ghcr.io/archetech/cln
+  build:
+    context: ../..
+    dockerfile: docker/Dockerfile.cln
 
 services:
   cln-mainnet-node:
     profiles: ["lightning"]
-    image: *cln-image
+    <<: *cln
     environment:
       - NETWORK=bitcoin
       - ALIAS=${ARCHON_CLN_ALIAS:-archon}
@@ -18,26 +24,38 @@ services:
       - LIGHTNING_PORT=${ARCHON_CLN_PORT:-9736}
       - NETWORK_MODE=${ARCHON_CLN_NETWORK_MODE:-tor}
       - ANNOUNCE_ADDR=${ARCHON_CLN_ANNOUNCE_ADDR:-}
-      - HIVE_GOVERNANCE_MODE=${ARCHON_CLN_GOVERNANCE_MODE:-advisor}
-      - HIVE_COMMS_ENABLED=true
-      - HIVE_ARCHON_ENABLED=true
-      - HIVE_ARCHON_VERSION=${ARCHON_CLN_ARCHON_VERSION:-v0.1.0}
+      # Checked against NETWORK_MODE: a tor-mode node refuses to start when its
+      # P2P port is published beyond loopback.
+      - P2P_BIND=${ARCHON_CLN_P2P_BIND:-}
       - MIN_CAPACITY_SAT=${ARCHON_CLN_MIN_CAPACITY_SAT:-50000}
       - LOG_LEVEL=${ARCHON_CLN_LOG_LEVEL:-info}
     volumes:
       - ../../data/cln-mainnet:/data/lightning
-      - ../../data/cln-mainnet/tor:/var/lib/tor
+      # The onion key directory the tor service serves CLN from (TOR_SERVICES
+      # in drawbridge.yml). Tor writes its hostname from the key there, which
+      # the entrypoint announces in tor and hybrid modes.
+      - ../../data/cln-mainnet/tor/cln-service:/tor/cln-service:ro
     networks:
       default:
         aliases:
           - cln
     ports:
-      - "${ARCHON_CLN_PORT:-9736}:${ARCHON_CLN_PORT:-9736}"
+      # Loopback by default: in tor mode lightningd listens on the container
+      # network for Tor, and a public publication would also accept clearnet
+      # peers on the host's address. Set ARCHON_CLN_P2P_BIND=0.0.0.0 for
+      # clearnet and hybrid modes.
+      - "${ARCHON_CLN_P2P_BIND:-127.0.0.1}:${ARCHON_CLN_PORT:-9736}:${ARCHON_CLN_PORT:-9736}"
       - "127.0.0.1:3001:3001"
+    # No depends_on: tor. The entrypoint waits for tor itself; a compose
+    # dependency would close a cycle, because drawbridge waits for this node
+    # through lightning-mediator and drawbridge-init.
+    restart: unless-stopped
+    # Time for lightningd to finish HTLCs and flush its database on stop.
+    stop_grace_period: 120s
 
   drawbridge-init:
     profiles: ["lightning"]
-    image: *cln-image
+    <<: *cln
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -60,18 +78,15 @@ services:
         done
 
         echo "[drawbridge-init] Creating rune..."
-        set -e
+        set -euo pipefail
         mkdir -p /data/lightning/drawbridge
         RUNE=$$(lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" createrune \
             restrictions='[["method^invoice","method^listinvoices"]]' \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['rune'])")
+            | jq -er '.rune | select(type == "string" and length > 0)')
 
-        if [ -z "$$RUNE" ]; then
-            echo "[drawbridge-init] ERROR: Failed to create rune"
-            exit 1
-        fi
-
-        echo "LIGHTNING_RUNE=\"$$RUNE\"" > "$$RUNE_FILE"
+        # Written whole or not at all: the check above skips any file present.
+        echo "LIGHTNING_RUNE=\"$$RUNE\"" > "$$RUNE_FILE.tmp"
+        mv "$$RUNE_FILE.tmp" "$$RUNE_FILE"
         echo "[drawbridge-init] Rune created successfully (restricted to invoice methods)"
     volumes:
       - ../../data/cln-mainnet:/data/lightning
@@ -81,7 +96,7 @@ services:
 
   rtl-init:
     profiles: ["lightning"]
-    image: *cln-image
+    <<: *cln
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -104,17 +119,14 @@ services:
         done
 
         echo "[rtl-init] Creating rune..."
-        set -e
+        set -euo pipefail
         mkdir -p /data/lightning/rtl
         RUNE=$$(lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" createrune \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['rune'])")
+            | jq -er '.rune | select(type == "string" and length > 0)')
 
-        if [ -z "$$RUNE" ]; then
-            echo "[rtl-init] ERROR: Failed to create rune"
-            exit 1
-        fi
-
-        echo "LIGHTNING_RUNE=\"$$RUNE\"" > "$$RUNE_FILE"
+        # Written whole or not at all: the check above skips any file present.
+        echo "LIGHTNING_RUNE=\"$$RUNE\"" > "$$RUNE_FILE.tmp"
+        mv "$$RUNE_FILE.tmp" "$$RUNE_FILE"
         echo "[rtl-init] Rune created successfully"
     volumes:
       - ../../data/cln-mainnet:/data/lightning
@@ -148,7 +160,7 @@ services:
 
   lnbits-init:
     profiles: ["lightning"]
-    image: *cln-image
+    <<: *cln
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -173,24 +185,26 @@ services:
         done
 
         echo "[lnbits-init] Creating runes..."
-        set -e
+        set -euo pipefail
         mkdir -p "$$RUNE_DIR"
 
         READONLY=$$(lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" createrune \
             restrictions='[["method=listfunds","method=listpays","method=listinvoices","method=getinfo","method=summary","method=waitanyinvoice"]]' \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['rune'])")
+            | jq -er '.rune | select(type == "string" and length > 0)')
 
         INVOICE=$$(lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" createrune \
             restrictions='[["method=invoice"],["rate=120"]]' \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['rune'])")
+            | jq -er '.rune | select(type == "string" and length > 0)')
 
         PAY=$$(lightning-cli --conf=/dev/null --rpc-file="$$RPC_SOCKET" createrune \
             restrictions='[["method=pay"],["rate=30"]]' \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['rune'])")
+            | jq -er '.rune | select(type == "string" and length > 0)')
 
-        echo "CLNREST_READONLY_RUNE=\"$$READONLY\"" > "$$RUNE_FILE"
-        echo "CLNREST_INVOICE_RUNE=\"$$INVOICE\"" >> "$$RUNE_FILE"
-        echo "CLNREST_PAY_RUNE=\"$$PAY\"" >> "$$RUNE_FILE"
+        {
+            echo "CLNREST_READONLY_RUNE=\"$$READONLY\""
+            echo "CLNREST_INVOICE_RUNE=\"$$INVOICE\""
+            echo "CLNREST_PAY_RUNE=\"$$PAY\""
+        } > "$$RUNE_FILE.tmp"
 
         # Copy TLS certs so LNbits can read them
         if [ -f "$$CERT_DIR/ca.pem" ]; then
@@ -201,6 +215,9 @@ services:
             echo "[lnbits-init] WARNING: TLS certs not found at $$CERT_DIR"
         fi
 
+        # Written last and whole: the check above skips any file present, and
+        # the certs have to be in place before it is.
+        mv "$$RUNE_FILE.tmp" "$$RUNE_FILE"
         echo "[lnbits-init] Runes created successfully"
     volumes:
       - ../../data/cln-mainnet:/data/lightning

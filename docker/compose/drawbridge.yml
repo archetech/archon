@@ -258,13 +258,23 @@ services:
       context: ../..
       dockerfile: docker/Dockerfile.tor
     image: ghcr.io/archetech/tor
+    environment:
+      # Each entry is served once its host resolves, so the CLN entry is inert
+      # without the lightning profile. A clearnet-mode node's entry is not
+      # served at all.
+      - TOR_SERVICES=drawbridge:drawbridge:4222 cln:cln-mainnet-node:${ARCHON_CLN_PORT:-9736}:${ARCHON_CLN_NETWORK_MODE:-tor}
     ports:
       - "${ARCHON_TOR_SOCKS_PORT:-127.0.0.1:9050}:9050"
     volumes:
-      # Holds the onion service's key, so the published address survives
-      # image changes and restarts.
+      # Hold the onion services' keys, so the published addresses survive
+      # image changes and restarts. CLN's is where the cl-hive image's own Tor
+      # kept it, so its onion address carries over.
       - ../../data/tor-drawbridge:/var/lib/tor/hidden_service
+      - ../../data/cln-mainnet/tor/cln-service:/var/lib/tor/hidden_service/cln
       - tor-hostname:/tor-hostname
+    # The container lives exactly as long as Tor does; without this a Tor
+    # crash leaves the onion services and the SOCKS proxy down.
+    restart: unless-stopped
     # No depends_on: the entrypoint adds each onion service once its target
     # resolves, so nothing has to start before tor.
 
