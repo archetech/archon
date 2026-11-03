@@ -38,6 +38,8 @@ reputation credentials (Sigil). Both are recorded in #1058 as later work.
   application.
 - **The mint is optional.** It is a Compose profile like Lightning, and a node
   without it is an ordinary Cashu client of other mints.
+- **Satoshis only.** The wallet uses each mint's `sat` keysets and ignores keysets
+  in other units.
 - **Cashu is enabled like Lightning.** `add-cashu [id]` enables Cashu for an
   identity on its node's mint, as `add-lightning [id]` creates its Lightning
   wallet on the node, and `publish-cashu [id]` advertises it in the DID document
@@ -59,7 +61,7 @@ cashu?: {
     }>;
 };
 
-// IDInfo: one entry per mint the identity uses, by normalized public URL
+// IDInfo: one entry per mint the identity uses, by normalized URL
 cashu?: Record<string, {
     added: string;
     proofs: Proof[];               // unspent, spendable by this identity
@@ -84,6 +86,11 @@ interface CashuOperation {
     created: string;
 }
 ```
+
+A mint URL is normalized before it is stored or compared: lowercase scheme and
+host, default port removed, no trailing slash, no query or fragment. A token
+names its mint by the same normalized form, so a token's mint matches an
+identity's entry exactly.
 
 Every operation that talks to the mint is journaled first. Its record, with its
 inputs, its quote and everything needed to rebuild its outputs, is saved before
@@ -130,6 +137,9 @@ counter of a settled request is reused, so gaps in the signed sequence are bound
 by the outputs of requests still in flight, and stay within the NUT-13 recovery
 scan, which stops after three empty batches of 100.
 
+`restoreCashu` scans every `sat` keyset the mint lists, active and inactive,
+since proofs minted under a since-rotated keyset are still redeemable.
+
 Counters are only as current as the wallet file. A wallet recovered from its
 mnemonic, from a backup (`recoverWallet`) or an identity recovered with
 `recoverId` may hold counters the mint has already signed. `restoreCashu` sets
@@ -138,8 +148,13 @@ mint rejects because its outputs are already signed triggers a NUT-09 scan of
 that keyset and a retry with fresh counters, so stale counters repair themselves
 instead of failing every operation.
 
-Proof changes and counter changes go through `updateWallet`, so concurrent
-operations in one Keymaster cannot spend or derive from the same state.
+Proof, journal and counter changes go through `mutateWallet`, so concurrent
+operations in one Keymaster cannot spend or derive from the same state. The lock
+is not held across mint requests. An operation takes it to select inputs, reserve
+counters and write its journal record, moving the inputs out of `proofs` into
+the record; it sends the request unlocked; and it takes the lock again to save
+the result and retire the record. Inputs in a journal record are unavailable to
+other operations, so nothing else can spend them meanwhile.
 
 ### Enabling and mint trust
 
@@ -172,6 +187,24 @@ deactivated or fail to resolve, keeps such identities and reports them instead.
 `Cashu`, whose `serviceEndpoint` lists its mint URLs. `unpublishCashu` removes it.
 Senders use it to pick a mint the recipient accepts (Phase 2).
 
+### Network access
+
+Keymaster reaches mints in two ways.
+
+- **The node's mint** goes through the node's Drawbridge at `<node URL>/cashu`,
+  whatever public URL the identity stores for it (Phase 3).
+- **Any other mint** is a URL a caller chose, which on a server-side Keymaster
+  makes it a request-forgery vector. TypeScript passes cashu-ts's `Mint` a
+  `customRequest` built on `fetchPublicHttps` from `@didcid/common/net`; Python
+  uses `fetch_public_https` from `keymaster.net`. Both require https, reject
+  private addresses at connection time and revalidate redirects, as the existing
+  Lightning Address and Herald fetches do. In a browser the same import resolves
+  to plain `fetch`, and the mint must allow cross-origin requests, which public
+  mints commonly do; a mint that does not fails with an error that says so.
+
+A token received from an unadded mint is rejected before any request is made,
+so a token cannot point Keymaster at an arbitrary host.
+
 ### Methods
 
 | Method | Behaviour |
@@ -192,6 +225,14 @@ Senders use it to pick a mint the recipient accepts (Phase 2).
 | `checkCashu(mint?, name?)` | Settle the journal: NUT-07 states, quote states, retries and NUT-09 |
 | `restoreCashu(mint?, name?)` | NUT-09: recover proofs from the seed |
 | `listCashuQuotes(mint?, name?)` | Open mint and melt quotes from the journal, with their state |
+| `sendCashuTo(recipient, amount, options?)` | Phase 2: locked send over DIDComm; options `{ memo?, locktime?, mint?, name? }` |
+| `receiveCashuMessages(name?)` | Phase 2: redeem token messages from the DIDComm inbox |
+| `reclaimCashu(mint?, name?)` | Phase 2: take back unredeemed sends, locked ones once their locktime passes |
+
+Every method that omits `mint` uses the same default as the CLI: the node's mint
+when the identity has it, else the identity's only mint, else an error.
+`getCashuBalance` with no mint and an identity using several returns a total and
+a per-mint breakdown instead of failing.
 
 A wallet with Lightning funds the quote with `payLightningInvoice`; the CLI and UI
 offer that in one step. `receiveCashu` always swaps at the mint, since a token is
@@ -204,19 +245,62 @@ not received until the mint confirms its proofs are unspent.
   in the browser wallets.
 - Python implements NUT-00 hash-to-curve, blinding and unblinding, NUT-12 DLEQ
   verification, NUT-13 derivation, NUT-11 signing and the V4 (`cashuB`, CBOR)
-  token format, plus a mint HTTP client.
+  token format, plus a mint HTTP client. Elliptic-curve operations and BIP-340
+  Schnorr signatures use `coincurve`, already a dependency; CBOR adds `cbor2`,
+  pinned like the other dependencies.
+- NUT-13 derivation depends on the keyset ID version: keysets whose IDs start
+  with `01` use the HMAC-SHA256 derivation, and deprecated `00` keysets use the
+  BIP32 path `m/129372'/0'/<keyset>'/<counter>'/{0,1}`. Both ports implement
+  both, checked against the NUT-13 vectors for each.
 - Both ports are checked against the NUT specification test vectors and against
   committed TypeScript-generated vectors, as the DIDComm port was.
 - Amounts account for NUT-02 input fees: a send or melt selects enough proofs to
   cover the keyset's `input_fee_ppk` as well as the amount.
-- New error types for a mint the identity has not added, insufficient balance, a quote not paid
-  and a token already spent.
+- New error types in `packages/common/src/errors.ts` and the Python equivalents,
+  following `LightningNotConfiguredError`:
+
+  | Error | `type` |
+  |---|---|
+  | `CashuNotConfiguredError` | `Cashu not configured` (the identity has no mints) |
+  | `CashuUnavailableError` | `Cashu mint unavailable` (no node mint, or a mint unreachable) |
+  | `CashuMintNotAddedError` | `Cashu mint not added` |
+  | `CashuMintUnsupportedError` | `Cashu mint unsupported` (a required NUT missing) |
+  | `CashuInsufficientFundsError` | `Insufficient ecash` |
+  | `CashuQuoteUnpaidError` | `Cashu quote not paid` |
+  | `CashuTokenSpentError` | `Cashu token already spent` |
+  | `CashuStateError` | `Cashu state present` (a removal refused without force) |
+
+  The Keymaster service maps them to HTTP statuses in `keymaster-error-status.ts`
+  and its Python counterpart.
 
 ### Surfaces
 
-- Keymaster REST: a `cashu` route family in its own router, listed in
-  `swaggerConf.js` and `docs/keymaster-api.json`, served identically by the Python
-  service.
+- Keymaster REST: `keymaster-cashu-router.ts`, listed in `swaggerConf.js` in
+  mount order and in `docs/keymaster-api.json`, served identically by the Python
+  service. As the Lightning routes do, every route is a `POST` (or `DELETE` to
+  remove) whose JSON body carries the method's arguments, with the identity as
+  `id`:
+
+  | Route | Method |
+  |---|---|
+  | `POST /cashu`, `DELETE /cashu` | `addCashu`, `removeCashu` (`force`) |
+  | `POST /cashu/mints`, `DELETE /cashu/mints` | `addCashuMint`, `removeCashuMint` (`url`, `force`) |
+  | `POST /cashu/mints/list` | `listCashuMints` |
+  | `POST /cashu/publish`, `POST /cashu/unpublish` | `publishCashu`, `unpublishCashu` |
+  | `POST /cashu/balance` | `getCashuBalance` |
+  | `POST /cashu/quote`, `POST /cashu/claim`, `POST /cashu/quotes` | `createCashuMintQuote`, `claimCashuMintQuote`, `listCashuQuotes` |
+  | `POST /cashu/melt`, `POST /cashu/send`, `POST /cashu/receive` | `meltCashu`, `sendCashu`, `receiveCashu` |
+  | `POST /cashu/check`, `POST /cashu/restore` | `checkCashu`, `restoreCashu` |
+  | `POST /cashu/send-to`, `POST /cashu/accept`, `POST /cashu/reclaim` | `sendCashuTo`, `receiveCashuMessages`, `reclaimCashu` (Phase 2) |
+
+- Result types in `packages/clients/src/keymaster-types.ts`, mirrored in Python:
+  `CashuMintInfo` (`url`, `name`, `nuts`, `keysets`, `isNodeMint`),
+  `CashuBalance` (`spendable`, `inFlight`, `outstanding`, and `mints` when
+  totalled across several), `CashuMintQuote` (`quote`, `request`, `amount`,
+  `state`, `expiry`), `CashuMeltResult` (`paid`, `preimage`, `fee`, `change`),
+  `CashuSendResult` (`token`, `amount`, `fee`), `CashuReceiveResult` (`amount`,
+  `mint`), `CashuCheckResult` (counts of records settled and still open), and
+  `CashuSendToResult` (`token`, `messageId`, `delivered`).
 - `KeymasterClient` and the Python SDK.
 - The CLI commands below, in `scripts/archon-cli.js`,
   `packages/keymaster/src/cli.ts` and `python/keymaster/src/keymaster/cli.py`.
@@ -258,7 +342,7 @@ archon publish-cashu      # archon publish-lightning
 | `cashu-receive <token> [id]` | `receiveCashu` | 1 | yes |
 | `cashu-check [id] [-m]` | `checkCashu` | 1 | yes |
 | `cashu-restore [id] [-m]` | `restoreCashu` | 1 | yes |
-| `cashu-send-to <recipient> <amount> [memo] [--locktime <duration>] [-m]` | `sendCashuTo`; recipient is a DID or alias | 2 | yes |
+| `cashu-send-to <recipient> <amount> [memo] [id] [--locktime <duration>] [-m]` | `sendCashuTo`; recipient is a DID or alias | 2 | yes |
 | `cashu-accept [id]` | `receiveCashuMessages` | 2 | yes |
 | `cashu-reclaim [id] [-m]` | `reclaimCashu`: refunds expired locked sends | 2 | yes |
 
@@ -273,13 +357,19 @@ container; Archon adds no mint administration command.
 
 Unit tests mock the mint HTTP API. Integration tests run against the Phase 3
 mint with its `fakewallet` backend, which settles quotes without Lightning, so
-they need no public test mint.
+they need no public test mint. They join the CLI tests in `tests/cli-tests`, run
+by `docker-build-test.yml` against both Keymaster flavors, which enable the
+`cashu` profile with `ARCHON_CASHU_MINT_BACKEND=fakewallet`. The fixtures that
+drive them must be inputs of `scripts/ci-affected.sh` so a change to them runs
+those tests.
 
 ## Phase 2: DID-locked ecash over DIDComm
 
 ### Locking
 
-`sendCashuTo(did, amount, options?)`:
+`sendCashuTo(recipient, amount, { memo?, locktime?, mint?, name? })`, where
+`recipient` is a DID or alias and `locktime` is a duration in seconds (the CLI
+also accepts `30m`, `12h` or `7d`), default seven days:
 
 1. Choose the mint: the one given, else a mint listed in the recipient's `#cashu`
    service that the sender also uses, preferring the sender's node mint. With
@@ -288,9 +378,12 @@ they need no public test mint.
 2. Require the mint to advertise NUT-11 in its NUT-06 info. A mint without it may
    treat locked proofs as bearer tokens, so the send is refused rather than
    falling back to an unlocked token.
-3. Resolve the recipient and take the public key of its current verification
-   method. DID keys are secp256k1, the curve NUT-11 uses; the JWK becomes a
-   compressed 33-byte public key.
+3. Resolve the recipient and take the public key of its first verification
+   method, the same key Keymaster already uses to encrypt to a DID. DID keys are
+   secp256k1, the curve NUT-11 uses; the JWK becomes a compressed 33-byte public
+   key. NUT-11 witnesses are BIP-340 Schnorr signatures rather than the ECDSA
+   Keymaster signs DID operations with, made with the same private key:
+   cashu-ts's `signP2PKProofs` in TypeScript and `coincurve` in Python.
 4. Swap for proofs whose NUT-11 secret locks them to that key, with
    `SIG_INPUTS`, a `locktime` (default seven days), and the sender's current key
    as the `refund` key. The swap is journaled as a `locked-send` with its random
@@ -322,11 +415,18 @@ protocol in its discover-features disclosures so a sender can check support firs
 
 ### Receiving
 
+The general DIDComm inbox must not consume token messages. `receiveDidComm`
+returns them like any other message but leaves them out of the messages it
+acknowledges, so `receive-didcomm` and `ack-didcomm` cannot delete a token before
+it is redeemed; an explicit `ack-didcomm` of a token message's id still removes it.
+
 `receiveCashuMessages(name?)` takes token messages from the DIDComm inbox, signs
 each locked proof with the matching private key and swaps it. The matching key
 may be an earlier derivation if the recipient has rotated keys; Keymaster already
-searches retained derivations. Processed messages are recorded by message id so a token message
-is not redeemed twice.
+searches retained derivations. It journals each redemption as a `receive` and
+acknowledges the message only after the record is saved, so a crash cannot lose
+a token between the mailbox and the wallet. Processed message ids are recorded so
+a resent message is not redeemed twice.
 
 The specification for DID-locked ecash is `cashu/1.0/README.md` in
 `archetech/didcomm`, with a JSON Schema for the message body: the key selection
@@ -346,7 +446,9 @@ links to it.
 - SQLite under `./data/cashu-mint`, bind-mounted and running as
   `${ARCHON_UID}:${ARCHON_GID}`.
 - `ARCHON_CASHU_MINT_BACKEND`: `cln` uses the bundled CLN's RPC socket and needs
-  the `lightning` profile; `fakewallet` is for development and CI.
+  the `lightning` profile; `fakewallet` is for development and CI. The bundled
+  CLN is mainnet, so a `cln` mint holds real bitcoin. Operators should run it
+  first with `fakewallet`, and the operator documentation says so.
 - Conservative defaults for mint and melt limits and fees, with all values set in
   environment variables documented in `sample.env`.
 
@@ -354,12 +456,19 @@ links to it.
 
 - The mint publishes no host port. Drawbridge is the only route to it, for
   Keymaster as well as external wallets.
+- Drawbridge reads the mint's internal URL from `ARCHON_CASHU_MINT_URL`
+  (`http://cashu-mint:<port>` in Compose, empty to disable), following
+  `ARCHON_DIDCOMM_URL`.
 - Drawbridge proxies the mint's `/v1/*` API under `/cashu`, stripping the prefix,
-  outside L402. Cashu mint URLs may carry a path, so the mint's public URL is
+  outside L402 but behind per-source and global rate limits configured like the
+  DIDComm ones (`ARCHON_DRAWBRIDGE_CASHU_PER_SOURCE`,
+  `ARCHON_DRAWBRIDGE_CASHU_GLOBAL`). Cashu mint URLs may carry a path, so the mint's public URL is
   `<public host>/cashu` and cdk-mintd needs no prefix support.
-- Drawbridge `/capabilities` reports `cashu` when a mint URL is configured, and a
-  discovery route returns the public mint URL, as `/didcomm-endpoint` does for
-  DIDComm.
+- Drawbridge `/capabilities` reports `cashu` when the mint URL is configured, and
+  `GET /cashu-mint` returns `{ url }`, the public mint URL (`<public host>/cashu`,
+  or the onion address), as `/didcomm-endpoint` does for DIDComm.
+- `DrawbridgeClient` in `@didcid/clients` gains `getCashuMint()`, and the Python
+  Keymaster's Gatekeeper client gains `get_cashu_mint()`.
 - `addCashu()` adds that public URL to the identity. Tokens name the mint
   by URL, so Keymaster records the public one and sends its requests to its own
   node's `/cashu` path; tokens it issues are then redeemable by external wallets.
@@ -392,7 +501,7 @@ without allowlist entries.
 
 | PR | Content |
 |---|---|
-| 1 | `packages/cipher` on `@noble/curves` 2 |
+| 1 | `packages/cipher` on `@noble/curves` 2, with tests that existing keys, signatures and encryption are byte-identical before and after |
 | 2 | Mint component with `fakewallet` and `cln` backends; Drawbridge proxy, capability and discovery |
 | 3 | Keymaster wallet core and REST, TypeScript and Python, with vectors |
 | 4 | SDKs, CLIs, MCP |
