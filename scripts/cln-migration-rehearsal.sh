@@ -13,8 +13,9 @@
 #      onion; a Tor crash recovers by itself.
 #
 # Everything is named cln-rehearsal-*, publishes no host ports and is removed
-# on exit (KEEP=1 leaves it for inspection). The compose part uses this
-# checkout's data/cln-mainnet, which must be empty.
+# on exit (KEEP=1 leaves it for inspection). The compose part runs a copy of
+# the compose files in a temporary directory, so its data/ is that
+# directory's and never this checkout's, which may hold a live node.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -25,7 +26,49 @@ TOR_IMAGE=${TOR_IMAGE:-ghcr.io/archetech/tor}
 BITCOIN_IMAGE=ghcr.io/archetech/bitcoin-core:v28.0-multiarch
 P=cln-rehearsal
 NET=$P
-COMPOSE=(compose -p "$P" -f docker-compose.yml -f "$PWD/scripts/cln-rehearsal.compose.yml")
+work=$(mktemp -d)
+cp docker-compose.yml "$work/"
+mkdir -p "$work/docker"
+cp -r docker/compose "$work/docker/"
+# Runs the Lightning services on regtest against the rehearsal's bitcoind,
+# with no host ports. The rune containers read the mainnet socket and
+# certificate paths, so the regtest network directory is mounted there.
+cat > "$work/rehearsal.yml" <<YAML
+x-regtest-socket: &regtest-socket
+  volumes:
+    - $work/data/cln-mainnet/regtest/regtest:/data/lightning/bitcoin/bitcoin
+
+services:
+  cln-mainnet-node:
+    image: $CLN_IMAGE
+    environment:
+      - NETWORK=regtest
+      - BITCOIN_RPCHOST=$P-bitcoind
+      - BITCOIN_RPCPORT=18443
+      - BITCOIN_RPCUSER=u
+      - BITCOIN_RPCPASSWORD=p
+    ports: !reset []
+    networks:
+      - rehearsal
+  drawbridge-init:
+    image: $CLN_IMAGE
+    <<: *regtest-socket
+  rtl-init:
+    image: $CLN_IMAGE
+    <<: *regtest-socket
+  lnbits-init:
+    image: $CLN_IMAGE
+    <<: *regtest-socket
+  tor:
+    image: $TOR_IMAGE
+    ports: !reset []
+
+networks:
+  rehearsal:
+    name: $NET
+    external: true
+YAML
+COMPOSE=(compose -p "$P" --project-directory "$work" -f "$work/docker-compose.yml" -f "$work/rehearsal.yml")
 
 # docker compose, without its warnings about the many unrelated variables a
 # checkout without .env leaves unset.
@@ -44,10 +87,14 @@ cleanup() {
     docker ps -aq --filter "name=^$P-" | xargs -r docker rm -f >/dev/null 2>&1 || true
     docker volume ls -q --filter "name=^$P-" | xargs -r docker volume rm >/dev/null 2>&1 || true
     docker network rm "$NET" >/dev/null 2>&1 || true
-    # The compose part writes root-owned files; remove them as root.
-    docker run --rm -v "$PWD/data:/data" alpine:3.22 rm -rf /data/cln-mainnet /data/lnbits >/dev/null 2>&1 || true
+    # The compose part writes root-owned files into the temporary directory.
+    docker run --rm -v "$work:/work" alpine:3.22 rm -rf /work/data >/dev/null 2>&1 || true
 }
-[[ -n "${KEEP:-}" ]] || trap cleanup EXIT
+if [[ -n "${KEEP:-}" ]]; then
+    echo "Keeping everything; the compose copy is in $work"
+else
+    trap 'cleanup; rm -rf "$work"' EXIT
+fi
 
 # Retries a command once a second for up to $1 seconds.
 retry() {
@@ -60,7 +107,6 @@ retry() {
     "$@"
 }
 
-[[ -z "$(ls -A data/cln-mainnet 2>/dev/null)" ]] || fail "data/cln-mainnet in this checkout is not empty"
 cleanup
 docker network create "$NET" >/dev/null
 
@@ -182,15 +228,14 @@ log "tor: kept $onion, and it answers"
 docker rm -f "$P-c" "$P-tor" >/dev/null
 
 log "compose: lightning,tor from empty data"
-mkdir -p data
-COMPOSE_PROFILES=lightning,tor CLN_IMAGE="$CLN_IMAGE" TOR_IMAGE="$TOR_IMAGE" REHEARSAL_BITCOIND="$P-bitcoind" \
+COMPOSE_PROFILES=lightning,tor \
     "${COMPOSE[@]}" up -d --no-build tor cln-mainnet-node drawbridge-init rtl-init lnbits-init >/dev/null
 for init in drawbridge-init rtl-init lnbits-init; do
     retry 600 bash -c "[[ \$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' $P-$init-1) == 'exited 0' ]]" ||
         fail "$init did not complete"
 done
 for file in drawbridge/rune.txt rtl/rune.txt lnbits/runes.env; do
-    docker run --rm -v "$PWD/data:/data:ro" alpine:3.22 grep -q '="[^"]\+"' "/data/cln-mainnet/$file" ||
+    docker run --rm -v "$work/data:/data:ro" alpine:3.22 grep -q '="[^"]\+"' "/data/cln-mainnet/$file" ||
         fail "$file has no rune"
 done
 node=$P-cln-mainnet-node-1
@@ -207,7 +252,7 @@ log "compose: tor restarted and the onion answers again"
 
 log "compose: switching to clearnet without the tor profile"
 "${COMPOSE[@]}" rm -sf tor >/dev/null
-COMPOSE_PROFILES=lightning ARCHON_CLN_NETWORK_MODE=clearnet CLN_IMAGE="$CLN_IMAGE" REHEARSAL_BITCOIND="$P-bitcoind" \
+COMPOSE_PROFILES=lightning ARCHON_CLN_NETWORK_MODE=clearnet \
     "${COMPOSE[@]}" up -d --no-build cln-mainnet-node >/dev/null
 retry 300 docker exec "$node" cln-healthcheck || fail "the clearnet node is not healthy"
 docker exec "$node" lightning-cli --rpc-file=/data/lightning/regtest/regtest/lightning-rpc getinfo |
