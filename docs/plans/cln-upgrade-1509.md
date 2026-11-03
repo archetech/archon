@@ -140,12 +140,20 @@ On every start:
 | `clnrest-port`, `clnrest-protocol`, `clnrest-host` | `3001`, `https`, `0.0.0.0` | same |
 | `min-capacity-sat` | `MIN_CAPACITY_SAT`, default 50000 (compose) | same |
 | `fee-base`, `fee-per-satoshi`, `htlc-minimum-msat` | `0`, `100`, `1000` unless overridden by `FEE_BASE`, `FEE_PER_SATOSHI`, `HTLC_MINIMUM_MSAT` | same defaults |
-| `experimental-dual-fund`, `funder-policy`, `funder-policy-mod`, `funder-lease-requests-only` | on, `match`, `100`, `false`, unless `DUAL_FUND_ENABLED=false` | same defaults |
+| `experimental-dual-fund`, `funder-policy`, `funder-policy-mod`, `funder-lease-requests-only`, `funder-per-channel-max` | on, `match`, `100`, `false`, unset; overridden by `DUAL_FUND_ENABLED=false`, `FUNDER_POLICY`, `FUNDER_POLICY_MOD` and `FUNDER_PER_CHANNEL_MAX` | same defaults and overrides |
 | Network mode | see Tor below | same modes |
 
-Not carried over: `grpc-port` (not published and unused), every `hive-*`,
-`revenue-ops-*` and vitality option, and `experimental-splicing` (deprecated in
-26.04; splicing is on by default).
+The entrypoint reads every CLN-core variable the cl-hive entrypoint reads,
+under the same names and with the same defaults, so a Compose override that
+sets one keeps working. The unit tests set each one.
+
+Not carried over:
+- `grpc-port` (not published and unused).
+- Every `hive-*`, `revenue-ops-*`, Boltz and vitality option.
+- WireGuard (`WIREGUARD_ENABLED`, `WG_*`), which our compose never enabled.
+- `EXPERIMENTAL_SPLICING`. cl-hive left splicing off unless it was set, but
+  CLN deprecated `experimental-splicing` in 26.04 and turned splicing on by
+  default. That is a behaviour change, and the upgrade notes state it.
 
 Existing per-channel fees live in the database (`setchannel`, including the
 values cl-revenue-ops set), so they are unchanged. They stay fixed from then
@@ -207,7 +215,7 @@ reachability separate from whether the node started.
 
 | Mode | `lightningd` options |
 |---|---|
-| `tor` | `proxy=127.0.0.1:9050` (the `socat` relay), `always-use-proxy=true`, `bind-addr=0.0.0.0:<port>`, `announce-addr=<onion>:<port>` |
+| `tor` | `proxy=127.0.0.1:9050` (the `socat` relay), `always-use-proxy=true`, `bind-addr=0.0.0.0:<port>`, `announce-addr=<onion>:<port>`, and `announce-addr=<ANNOUNCE_ADDR>` if set, as cl-hive does |
 | `hybrid` | `proxy=127.0.0.1:9050` (the `socat` relay), `bind-addr=0.0.0.0:<port>`, `announce-addr=<ANNOUNCE_ADDR>` only if set (CLN rejects an empty value as a wildcard), and `announce-addr=<onion>:<port>` |
 | `clearnet` | `bind-addr=0.0.0.0:<port>`, `announce-addr=<ANNOUNCE_ADDR>` only if set; the `tor` profile is not needed |
 
@@ -219,6 +227,12 @@ container interface for `tor` to reach it, the host publication becomes
 `ARCHON_RTL_BIND`. Without it, a `tor`-mode node would accept clearnet
 connections on the host's address. `clearnet` and `hybrid` operators set
 `ARCHON_CLN_P2P_BIND=0.0.0.0`. This is a required step in the upgrade notes.
+
+Compose also passes `ARCHON_CLN_P2P_BIND` to the node, and in `tor` mode the
+entrypoint refuses to start unless it is `127.0.0.1` (or unset). Otherwise a
+node switched back to `tor` from `hybrid` or `clearnet`, with the old bind
+still in `.env`, would keep accepting clearnet connections on every host
+interface; `always-use-proxy` covers only outbound connections.
 
 ### Compose (`docker/compose/lightning.yml`)
 
@@ -235,6 +249,11 @@ connections on the host's address. `clearnet` and `hybrid` operators set
   entrypoint's supervision restarts it; the onion healthcheck above; the P2P
   publication above.
 - No `depends_on: tor`; the entrypoint's bounded wait for `tor` orders them.
+- `tor` gets `restart: unless-stopped`. Its container lives exactly as long
+  as the Tor process, and it has no restart policy today, so a Tor crash
+  would leave Tor-mode CLN, and Drawbridge's onion, down until someone
+  intervened. `socat` connects per connection, so CLN reconnects as soon as
+  `tor` is back, with no restart of its own.
 - Remove `tor`'s `depends_on: drawbridge` (`service_healthy`). Today `tor`
   waits for `drawbridge`, which waits for `lightning-mediator`, which waits for
   `drawbridge-init`, which waits for a running CLN. A Tor-mode CLN waits for
@@ -265,7 +284,8 @@ connections on the host's address. `clearnet` and `hybrid` operators set
   cl-hive image** section:
   1. Stop the stack and copy `data/cln-mainnet` (including `tor/`).
   2. In `tor` or `hybrid` mode, add `tor` to `COMPOSE_PROFILES`. In
-     `clearnet` or `hybrid` mode, set `ARCHON_CLN_P2P_BIND=0.0.0.0`.
+     `clearnet` or `hybrid` mode, set `ARCHON_CLN_P2P_BIND=0.0.0.0`; in `tor`
+     mode leave it unset. Splicing is now on (CLN's default since 26.04).
   3. Start with `./start-node` (from `main`) or pull and start (from a
      release). CLN migrates the database to the v26.06 schema on first
      start.
@@ -300,6 +320,9 @@ connections on the host's address. `clearnet` and `hybrid` operators set
   - preservation of the cl-hive defaults in the table, and no `announce-addr`
     line when `ANNOUNCE_ADDR` is empty in `hybrid` and `clearnet`
   - the onion-wait and `tor`-resolution timeouts
+  - refusal to start in `tor` mode with a non-loopback `ARCHON_CLN_P2P_BIND`
+  - each cl-hive override variable (`FUNDER_*`, `FEE_*`, `HTLC_MINIMUM_MSAT`,
+    `MIN_CAPACITY_SAT`, `DUAL_FUND_ENABLED`, `ANNOUNCE_ADDR` in every mode)
   - supervision: a `lightningd` stub that exits before creating its socket
     makes the entrypoint exit with its status; a `socat` exit stops
     `lightningd` and exits non-zero
@@ -336,6 +359,8 @@ connections on the host's address. `clearnet` and `hybrid` operators set
      `bitcoind`. Every service must become healthy without hitting a timeout.
   8. Switch that node to `clearnet` and remove the `tor` profile, following
      the documented procedure. The old onion must stop answering.
+  9. Back in `tor` mode, kill the Tor process. `tor` must restart and CLN
+     regain peers without intervention.
 
 ## Delivery
 
@@ -372,9 +397,9 @@ startup error. Two rules prevent it:
   both images from the checkout. The upgrade notes say so, and warn that a
   bare `docker compose up` would build only the missing CLN image and keep an
   existing `tor` image.
-- Release images are published by separate jobs. The release note for this
-  change is published only after the tag's `docker-publish.yml` run has
-  succeeded for every image.
+- A node deploying a release pulls once the tag's `docker-publish.yml` run has
+  finished, as with any release that changes images. Until then `latest` can
+  mix revisions, and the onion healthcheck reports it.
 
 ## Risks
 
