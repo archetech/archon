@@ -112,15 +112,17 @@ On every start:
 5. Write `config` from the environment (table below), with the header, to a
    temporary file renamed into place.
 6. In `tor` and `hybrid` modes:
-   - Fail immediately if `tor` does not resolve, with a message saying to add
-     `tor` to `COMPOSE_PROFILES`.
+   - Wait (bounded, default 300 s) for `tor` to resolve, then fail with a
+     message saying to add `tor` to `COMPOSE_PROFILES`. The node has no
+     `depends_on: tor` (see Compose), so this wait is what orders them.
    - Start `socat TCP-LISTEN:9050,bind=127.0.0.1,fork,reuseaddr TCP:tor:9050`
      and give `lightningd` `proxy=127.0.0.1:9050`. With `always-use-proxy`,
      v26.06.9 rejects a proxy hostname ("Needed DNS, but lookups suppressed"),
      and a numeric address taken at startup would break when `tor` is
      recreated on another address. `socat` (in the base image) resolves `tor`
      per connection.
-   - Wait (bounded, default 300 s) for `/tor-hostname/cln/hostname` and add
+   - Wait (bounded, default 300 s) for `/tor/cln-service/hostname`, the
+     hidden-service directory mounted read-only, and add
      `announce-addr=<onion>:<port>`. Fail with a clear message on timeout
      rather than start unannounced.
 7. Run `lightningd --lightning-dir=<dir> --network=<network>` as a child,
@@ -176,27 +178,30 @@ Changes to `docker/tor/entrypoint.sh`:
   so the `cln` entry is harmless on nodes without the `lightning` profile.
 - Hidden-service directories are `/var/lib/tor/hidden_service/<name>`.
   Drawbridge's is unchanged (`data/tor-drawbridge/drawbridge`).
-- Each hostname is published to `/tor-hostname/<name>/hostname` once this Tor
-  is serving it. On start, the entrypoint first removes the files it
-  publishes, so a file left by an earlier run cannot satisfy CLN's wait.
-  Drawbridge's existing `/tor-hostname/hostname` is still written, because
-  Drawbridge reads that path.
+- Drawbridge's hostname is still published to `/tor-hostname/hostname`,
+  unchanged. Nothing is published for `cln`. CLN reads `hostname` from the
+  hidden-service directory itself, which Tor writes from the key in that
+  directory. A hostname there therefore always names the key Tor will serve;
+  a file in a separate volume could be left over from an earlier run.
 
 Compose changes to the `tor` service:
 
 - `TOR_SERVICES=drawbridge:drawbridge:4222 cln:cln-mainnet-node:${ARCHON_CLN_PORT:-9736}:${ARCHON_CLN_NETWORK_MODE:-tor}`
 - An added bind mount of `data/cln-mainnet/tor/cln-service` at
-  `/var/lib/tor/hidden_service/cln`. That is where the cl-hive Tor kept its
+  `/var/lib/tor/hidden_service/cln`. The CLN node mounts the same directory
+  read-only at `/tor/cln-service`; it already holds `hsm_secret`, so the onion
+  key adds nothing to what that container can reach. That is where the cl-hive Tor kept its
   key, so the onion address does not change. The entrypoint already `chown`s
   the directory to its `tor` user. On nodes without Lightning the mount creates
   an empty directory, and no key is generated, because the target never
   resolves.
 
-A published hostname shows the onion service is configured, not that peers
-can reach it (see AGENTS.md on Tor hostname files). The node's healthcheck
-therefore makes a bounded SOCKS connection through `tor` to
-`<onion>:<port>` once `lightningd` is listening, and reports unreachability
-as unhealthy. That keeps reachability separate from whether the node started.
+A hostname shows the onion service is configured, not that peers can reach
+it (see AGENTS.md on Tor hostname files). The node's healthcheck runs
+`lightning-cli getinfo` in every mode. In `tor` and `hybrid` modes it also
+makes a bounded SOCKS connection through `tor` to `<onion>:<port>` and reports
+failure as unhealthy. In `clearnet` mode there is no onion to probe. That keeps
+reachability separate from whether the node started.
 
 | Mode | `lightningd` options |
 |---|---|
@@ -218,14 +223,16 @@ connections on the host's address. `clearnet` and `hybrid` operators set
 - `x-cln-image: &cln-image ghcr.io/archetech/cln`, still shared by the node and
   the three init containers.
 - Node: remove the four `HIVE_*` variables; mount `data/cln-mainnet` at
-  `/data/lightning` (unchanged); add `tor-hostname:/tor-hostname:ro`;
+  `/data/lightning` (unchanged); add
+  `data/cln-mainnet/tor/cln-service:/tor/cln-service:ro`;
   `stop_grace_period: 120s`, the time cl-hive's supervisord allowed, instead of
   Docker's 10-second default; `restart: unless-stopped`, so an exit from the
   entrypoint's supervision restarts it; the onion healthcheck above; the P2P
   publication above.
-- Node `depends_on: tor` with `required: false`, the pattern Drawbridge uses,
-  because `tor` is a separate profile. When Drawbridge is also enabled, `tor`
-  waits for it to be healthy, so a Tor-mode CLN starts after Drawbridge.
+- No `depends_on: tor`. `tor` already waits for `drawbridge`, which waits for
+  `lightning-mediator`, `drawbridge-init` and so for the CLN node, so a
+  dependency from the node back to `tor` would be a cycle that Compose
+  refuses. The entrypoint's bounded wait for `tor` orders them instead.
 - Init containers: replace the `python3 -c "…['rune']"` pipelines with
   `set -euo pipefail` and `jq -er '.rune | select(type == "string" and length > 0)'`,
   so a failed `createrune` or a missing field stops the container instead of
@@ -240,7 +247,10 @@ connections on the host's address. `clearnet` and `hybrid` operators set
 - `sample.env`: remove `ARCHON_CLN_VERSION`, `ARCHON_CLN_GOVERNANCE_MODE` and
   `ARCHON_CLN_ARCHON_VERSION`; add `ARCHON_CLN_P2P_BIND`.
 - `docs/deployment.md` §9: same table changes; describe the node as plain CLN;
-  add an **Upgrading from the cl-hive image** section:
+  change the enablement example from `COMPOSE_PROFILES=lightning` to
+  `COMPOSE_PROFILES=lightning,tor`, because `tor` is the default network mode,
+  and note that `clearnet` needs only `lightning`; add an **Upgrading from the
+  cl-hive image** section:
   1. Stop the stack and copy `data/cln-mainnet` (including `tor/`).
   2. In `tor` or `hybrid` mode, add `tor` to `COMPOSE_PROFILES`. In
      `clearnet` or `hybrid` mode, set `ARCHON_CLN_P2P_BIND=0.0.0.0`.
@@ -268,16 +278,15 @@ connections on the host's address. `clearnet` and `hybrid` operators set
   - owner-only permissions on the config and backup in a fresh data directory
   - preservation of the cl-hive defaults in the table, and no `announce-addr`
     line when `ANNOUNCE_ADDR` is empty in `hybrid` and `clearnet`
-  - the onion-wait timeout
+  - the onion-wait and `tor`-resolution timeouts
   - supervision: a `lightningd` stub that exits before creating its socket
     makes the entrypoint exit with its status; a `socat` exit stops
     `lightningd` and exits non-zero
 - **Tor entrypoint tests** (new, `tests/tor/entrypoint.test.ts`, running the
   script's torrc generation with a stubbed resolver). Cover: the default
   single Drawbridge service, two services with one unresolvable, a `clearnet`
-  entry (not served) and a switch from `tor` to `clearnet`, stale hostname
-  files removed on start, and the hostname published at Drawbridge's old path
-  as well as the new one.
+  entry (not served), a switch from `tor` to `clearnet`, and Drawbridge's
+  hostname still published at its existing path.
 - **Image smoke test** in `docker-build-test.yml`: build `Dockerfile.cln`,
   start it on regtest against a `bitcoind -regtest` container, and check:
   - `getinfo` and an `invoice` over `clnrest` with a rune
@@ -286,6 +295,10 @@ connections on the host's address. `clearnet` and `hybrid` operators set
     proxy
   - a startup failure (an invalid option) against an existing network
     directory, where the container must exit rather than hang
+  - the healthcheck in all three modes
+- **Compose check**: `docker compose config` with
+  `COMPOSE_PROFILES=drawbridge,lightning,tor` (and each subset) must succeed.
+  It rejects dependency cycles.
 - **Migration rehearsal**, `scripts/cln-migration-rehearsal.sh`, run by hand
   and recorded in the PR (it pulls the old image and takes minutes):
   1. On regtest, start two nodes on `cl-hive-node:3.4.0`.
@@ -300,21 +313,31 @@ connections on the host's address. `clearnet` and `hybrid` operators set
 
 | PR | Content |
 |---|---|
-| 1 | `TOR_SERVICES` in the Tor image and compose, including the CLN key mount (no behaviour change for Drawbridge) |
+| 1 | `TOR_SERVICES` support in the Tor image only; compose keeps the single Drawbridge service (no behaviour change) |
 | 2 | `Dockerfile.cln`, entrypoint, unit tests, smoke test, CI matrices, Dependabot entry |
-| 3 | Compose switch, init containers, docs, upgrade notes; the rehearsal script and its recorded run |
+| 3 | Compose switch, including the `cln` entry in `TOR_SERVICES` and the key mount; init containers, docs, upgrade notes; the rehearsal script and its recorded run |
 
 PR 3 carries the release note, because it is the one that changes running
 nodes.
 
+The `cln` Tor entry and key mount land in PR 3, not PR 1. While the cl-hive
+node is still running, its own Tor serves the same key, and in `tor` mode its
+`lightningd` listens only on that container's loopback. A second Tor
+publishing descriptors for the key would send some peers to a target that
+cannot answer.
+
 Compose refers to the untagged images, which resolve to `latest`, and
-`latest` is published only from `v*` tags. A release therefore delivers the
-images and the compose change together. Nodes that run from `main` in
-between would pull a Tor image without `TOR_SERVICES` and find no
-`ghcr.io/archetech/cln` at all. So PR 3 merges only after PRs 1 and 2 are
-published through `docker-publish.yml`'s `workflow_dispatch` on the
-`pre-release` channel, and after the rehearsal has run against those
-published images rather than local builds.
+`latest` is published only from `v*` tags; a `workflow_dispatch` on the
+`pre-release` channel publishes `<version>` and `pre-release`, not `latest`.
+So PRs 1 and 2 ship in one release and PR 3 in a later one. Before PR 3
+merges:
+
+- `docker manifest inspect` confirms that `ghcr.io/archetech/cln:latest` and
+  `ghcr.io/archetech/tor:latest` are the images from that earlier release.
+- The rehearsal runs against those published images, not local builds.
+
+That way a node running from `main` after PR 3 pulls images that already
+support it.
 
 ## Risks
 
