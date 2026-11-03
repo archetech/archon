@@ -6,21 +6,17 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import { UnknownIDError } from '@didcid/common/errors';
 import MemoryClient from '@didcid/ipfs/memory';
 import { bech32 } from 'bech32';
-// Deliberately a DIFFERENT copy of @noble/curves than the one that signed:
-// packages/cipher pins 1.9.7, and this resolves the root's 2.x. Nostr
-// signatures have to be verifiable by other people's software, so checking
-// them with an independent implementation is the point rather than an
-// accident -- it is what makes this an interop test instead of a round trip
-// through one library.
+// Deliberately a DIFFERENT implementation from the one that signed: cipher
+// signs with @noble/curves, and @noble/secp256k1 is a separate codebase with
+// its own BIP-340 code. Nostr signatures have to be verifiable by other
+// people's software, so checking them with an independent implementation is
+// the point rather than an accident -- it is what makes this an interop test
+// instead of a round trip through one library.
 //
-// The root dependency is declared for that reason (#925). It used to arrive
-// only because @libp2p/crypto happened to hoist it, so a dependency change
-// could have quietly collapsed both sides onto one copy and this would have
-// kept passing while proving nothing.
-//
-// The explicit '.js' is required: 2.x exports './secp256k1.js' only, where
-// 1.x still resolved the extensionless specifier.
-import { schnorr } from '@noble/curves/secp256k1.js';
+// The root dependency is declared for that reason (#925), so a dependency
+// change cannot quietly collapse both sides onto one library while this keeps
+// passing and proves nothing.
+import { schnorr } from '@noble/secp256k1';
 
 let ipfs: MemoryClient;
 let gatekeeper: Gatekeeper;
@@ -299,7 +295,7 @@ describe('signSchnorr', () => {
         expect(sig).toMatch(/^[0-9a-f]{128}$/);
     });
 
-    it('should produce a signature verifiable with @noble/curves', () => {
+    it('should produce a signature verifiable with @noble/secp256k1', async () => {
         const keypair = cipher.generateRandomJwk();
         const nostr = cipher.jwkToNostr(keypair.publicJwk);
         const msgHash = cipher.hashMessage('test message');
@@ -309,7 +305,7 @@ describe('signSchnorr', () => {
         const sigBytes = Uint8Array.from(Buffer.from(sig, 'hex'));
         const msgBytes = Uint8Array.from(Buffer.from(msgHash, 'hex'));
         const pubBytes = Uint8Array.from(Buffer.from(nostr.pubkey, 'hex'));
-        const valid = schnorr.verify(sigBytes, msgBytes, pubBytes);
+        const valid = await schnorr.verifyAsync(sigBytes, msgBytes, pubBytes);
         expect(valid).toBe(true);
     });
 
@@ -535,7 +531,7 @@ describe('signNostrEvent', () => {
         const sigBytes = Uint8Array.from(Buffer.from(signed.sig!, 'hex'));
         const idBytes = Uint8Array.from(Buffer.from(signed.id!, 'hex'));
         const pubBytes = Uint8Array.from(Buffer.from(signed.pubkey!, 'hex'));
-        const valid = schnorr.verify(sigBytes, idBytes, pubBytes);
+        const valid = await schnorr.verifyAsync(sigBytes, idBytes, pubBytes);
         expect(valid).toBe(true);
     });
 

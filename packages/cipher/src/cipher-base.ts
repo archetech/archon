@@ -1,8 +1,8 @@
 import * as bip39 from 'bip39';
 import { HDKey } from '@scure/bip32';
 import * as secp from '@noble/secp256k1';
-import { schnorr } from '@noble/curves/secp256k1';
-import { ed25519, edwardsToMontgomeryPriv, x25519 } from '@noble/curves/ed25519';
+import { schnorr } from '@noble/curves/secp256k1.js';
+import { ed25519, x25519 } from '@noble/curves/ed25519.js';
 import { hmac } from '@noble/hashes/hmac';
 import { sha256 } from '@noble/hashes/sha256';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha';
@@ -46,7 +46,7 @@ export default abstract class CipherBase implements Cipher {
     // the key agreement key it resolves to -- so the pair stays inspectable
     // against that method rather than being a scheme of our own.
     deriveX25519Jwk(seed: Uint8Array, path: string): OkpJwkPair {
-        return this.generateX25519Jwk(edwardsToMontgomeryPriv(slip10DerivePath(seed, path)));
+        return this.generateX25519Jwk(ed25519.utils.toMontgomerySecret(slip10DerivePath(seed, path)));
     }
 
     generateHDKeyJSON(json: HDKeyJSON): HDKey {

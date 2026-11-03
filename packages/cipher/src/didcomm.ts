@@ -10,7 +10,7 @@
 // These are pure functions over raw JWKs — no DID resolution or wallet access.
 // Keymaster resolves DIDs to keys and calls these.
 import * as secp from '@noble/secp256k1';
-import { x25519, edwardsToMontgomeryPub } from '@noble/curves/ed25519';
+import { ed25519, x25519 } from '@noble/curves/ed25519.js';
 import { ecb, cbc, gcm } from '@noble/ciphers/aes';
 import { xchacha20poly1305 } from '@noble/ciphers/chacha';
 import { sha256 } from '@noble/hashes/sha256';
@@ -233,7 +233,7 @@ export function packEncrypted(
     const apvStr = computeApv(recipients.map(r => r.kid));
 
     // Ephemeral key shared across recipients
-    const ephSeed = x25519.utils.randomPrivateKey();
+    const ephSeed = x25519.utils.randomSecretKey();
     const ephPub = x25519Public(ephSeed);
 
     const header: JweProtected = {
@@ -480,7 +480,7 @@ function x25519MultibaseToBytes(multibase: string): Uint8Array {
         return key;
     }
     if (decoded[0] === MULTICODEC_ED25519_PUB) {
-        return edwardsToMontgomeryPub(key); // Ed25519 verification key -> X25519 key agreement
+        return ed25519.utils.toMontgomery(key); // Ed25519 verification key -> X25519 key agreement
     }
     throw new Error(`Unsupported multicodec 0x${decoded[0].toString(16)} (need X25519 or Ed25519)`);
 }
