@@ -1,3 +1,11 @@
+// The route label for a finished request. It reads originalUrl, not path: a
+// handler mounted with app.use() sees req.path without its mount prefix, and
+// still does when the response finishes, so `/cashu/v1/keys/<id>` would be
+// labelled `/v1/keys/<id>` and miss the replacements below.
+export function routeLabel(req: { originalUrl: string }): string {
+    return normalizePath(req.originalUrl.split('?')[0]);
+}
+
 // Route labels for Drawbridge's request metrics. Dynamic segments (DIDs, CIDs,
 // registries, identifiers) are replaced with placeholders so dashboards do not
 // get one time series per identifier.
@@ -19,5 +27,11 @@ export function normalizePath(path: string): string {
         .replace(/\/poppy\/signin\/(?!response$)[^/]+/, '/poppy/signin/:id')
         .replace(/\/poppy\/api\/(names|members)\/[^/]+/, '/poppy/api/$1/:name')
         .replace(/\/poppy\/api\/dids\/[^/]+/, '/poppy/api/dids/:did')
-        .replace(/\/api\/poppy\/connections\/[^/]+/, '/api/poppy/connections/:id');
+        .replace(/\/api\/poppy\/connections\/[^/]+/, '/api/poppy/connections/:id')
+        // Cashu mint routes carry keyset and quote IDs, and a payment method
+        // the caller chooses.
+        .replace(/\/cashu\/v1\/keys\/[^/]+/, '/cashu/v1/keys/:keyset')
+        .replace(/\/cashu\/v1\/(mint|melt)\/quote\/[^/]+\/[^/]+/, '/cashu/v1/$1/quote/:method/:quote')
+        .replace(/\/cashu\/v1\/(mint|melt)\/quote\/[^/]+$/, '/cashu/v1/$1/quote/:method')
+        .replace(/\/cashu\/v1\/(mint|melt)\/(?!quote$)[^/]+$/, '/cashu/v1/$1/:method');
 }

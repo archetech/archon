@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Smoke test for ghcr.io/archetech/cln against a regtest bitcoind: clnrest with
-# a rune, the planned on-disk layout, a startup failure that must exit rather
-# than hang, and a Tor-mode start through the shared Tor image.
+# a rune, the planned on-disk layout, the Cashu mint's cln backend through the
+# shared RPC socket, a startup failure that must exit rather than hang, and a
+# Tor-mode start through the shared Tor image.
 #
 # Expects the images built as CLN_IMAGE and TOR_IMAGE (see
 # .github/workflows/docker-build-test.yml).
@@ -11,20 +12,29 @@ set -euo pipefail
 CLN_IMAGE=${CLN_IMAGE:-archon-cln-test}
 TOR_IMAGE=${TOR_IMAGE:-archon-tor-test}
 BITCOIN_IMAGE=ghcr.io/archetech/bitcoin-core:v28.0-multiarch
+MINT_IMAGE=cashubtc/mintd:0.18.3
 P=cln-smoke
+# The mint runs as this user, as it does under Compose, so it reaches the
+# socket only through the share group, not as root.
+uid=$(id -u)
+gid=$(id -g)
+mint_data=
 
 cleanup() {
-    docker rm -f "$P-bitcoind" "$P-cln" "$P-cln-tor" "$P-tor" >/dev/null 2>&1 || true
+    docker rm -f "$P-bitcoind" "$P-cln" "$P-cln-tor" "$P-tor" "$P-mint" >/dev/null 2>&1 || true
     docker volume rm "$P-data" "$P-data-tor" "$P-hs" >/dev/null 2>&1 || true
     docker network rm "$P" >/dev/null 2>&1 || true
+    [[ -z "$mint_data" ]] || rm -rf "$mint_data"
 }
 [[ -n "${KEEP:-}" ]] || trap cleanup EXIT
 cleanup
+# Created after the cleanup above, and owned by the user the mint runs as.
+mint_data=$(mktemp -d)
 
 fail() {
     echo "FAIL: $*" >&2
     # The containers are removed on exit, so their logs are the only record.
-    for container in "$P-cln" "$P-cln-tor" "$P-tor"; do
+    for container in "$P-cln" "$P-mint" "$P-cln-tor" "$P-tor"; do
         if docker inspect "$container" >/dev/null 2>&1; then
             echo "--- logs: $container" >&2
             docker logs --tail 80 "$container" >&2 2>&1 || true
@@ -61,7 +71,7 @@ rpc=/data/lightning/regtest/regtest/lightning-rpc
 
 echo "== clearnet"
 docker run -d --name "$P-cln" --network "$P" -v "$P-data:/data/lightning" -p 127.0.0.1::3001 \
-    "${cln_env[@]}" -e NETWORK_MODE=clearnet "$CLN_IMAGE" >/dev/null
+    "${cln_env[@]}" -e NETWORK_MODE=clearnet -e RPC_SHARE=true -e RPC_SHARE_GID="$gid" "$CLN_IMAGE" >/dev/null
 retry 120 docker exec "$P-cln" cln-healthcheck || fail "healthcheck did not pass in clearnet mode"
 
 docker exec "$P-cln" test -S "$rpc" || fail "RPC socket is not at $rpc"
@@ -76,6 +86,23 @@ rest() { curl -skf -X POST "https://127.0.0.1:$port/v1/$1" -H "Rune: $rune" -H '
 rest getinfo | jq -e '.id | length == 66' >/dev/null || fail "getinfo over clnrest"
 rest invoice '{"amount_msat":1000,"label":"smoke","description":"smoke"}' |
     jq -e '.bolt11 | startswith("lnbcrt")' >/dev/null || fail "invoice over clnrest"
+
+echo "== cashu mint, cln backend"
+# The share directory is the only part of CLN's data the mint sees.
+docker run -d --name "$P-mint" --network "$P" --user "$uid:$gid" \
+    -e CDK_MINTD_WORK_DIR=/data -e MINT_URL=https://mint.example/cashu -e BACKEND=cln \
+    -v "$PWD/scripts/cashu-mint-entrypoint.sh:/scripts/cashu-mint-entrypoint.sh:ro" -v "$mint_data:/data" \
+    --mount "type=volume,src=$P-data,dst=/cln,volume-subpath=rpc-share,readonly" \
+    --entrypoint /bin/sh "$MINT_IMAGE" /scripts/cashu-mint-entrypoint.sh >/dev/null
+mint() { docker run --rm --network "$P" alpine:3.22 wget -qO- "$@"; }
+retry 60 mint "http://$P-mint:8085/v1/info" || fail "the cln-backed mint did not start"
+quote=$(mint --header 'Content-Type: application/json' --post-data '{"amount":100,"unit":"sat"}' \
+    "http://$P-mint:8085/v1/mint/quote/bolt11") || fail "mint quote"
+request=$(jq -er '.request' <<<"$quote")
+docker exec "$P-cln" lightning-cli --rpc-file="$rpc" listinvoices |
+    jq -e --arg request "$request" 'any(.invoices[]; .bolt11 == $request)' >/dev/null ||
+    fail "the mint quote's invoice was not created by CLN"
+docker rm -f "$P-mint" >/dev/null
 
 echo "== startup failure"
 docker rm -f "$P-cln" >/dev/null

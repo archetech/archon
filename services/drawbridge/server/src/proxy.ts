@@ -1,6 +1,7 @@
 import type express from 'express';
 import { buildProxyBody } from './herald-proxy.js';
 import { resolveUpstreamUrl } from './upstream-url.js';
+import { isForwardedResponseHeader } from './response-headers.js';
 
 // Generic reverse proxy to an internal service, stripping a path prefix.
 export async function proxyRequest(req: express.Request, res: express.Response, baseURL: string, prefixToStrip: string, confineTo?: string) {
@@ -36,7 +37,7 @@ export async function proxyRequest(req: express.Request, res: express.Response, 
 
     res.status(upstream.status);
     upstream.headers.forEach((value, key) => {
-        if (key === 'content-length' || key === 'transfer-encoding' || key === 'connection') {
+        if (!isForwardedResponseHeader(key)) {
             return;
         }
         res.setHeader(key, value);

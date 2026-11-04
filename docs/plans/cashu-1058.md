@@ -512,13 +512,19 @@ links to it.
 - cdk-mintd 0.18 keeps its configuration in its database. A TOML file is imported
   once with `cdk-mintd config init --new-mint --file <toml>`; later starts ignore
   the file and `CDK_MINTD_*` variables, apart from bootstrap values such as the
-  work directory. The entrypoint therefore runs once per data directory: on
-  first start it generates the mint mnemonic into `/data/mnemonic` (mode 0600),
-  writes the TOML from the `ARCHON_CASHU_MINT_*` variables, and runs
-  `config init`; on every start it then runs `cdk-mintd`. Changing those
-  variables after the first start has no effect, and `sample.env` says so.
+  work directory. The entrypoint (`scripts/cashu-mint-entrypoint.sh`) therefore
+  initializes once per data directory: when `config show` reports the database
+  unconfigured, it generates the signing seed into `/data/seed`, writes the
+  TOML from the `ARCHON_CASHU_MINT_*` variables, and runs `config init`; any
+  other failure to read the configuration stops it. On every start it then runs
+  `cdk-mintd`. Changing those variables after the first start has no effect,
+  and `sample.env` says so; `config apply` on a stopped mint changes it.
+- The seed is 32 random bytes, hex-encoded, used by cdk-mintd as the BIP32
+  master seed (`[info].seed`). It replaces a BIP-39 mnemonic because the mintd
+  image has no way to generate one. The seed file and the database are the
+  mint's backup.
 - The TOML sets `listen_host = "0.0.0.0"` so Drawbridge can reach the mint on the
-  Compose network, and refers to the mnemonic as `file:/data/mnemonic`; cdk-mintd
+  Compose network, and refers to the seed as `file:/data/seed`; cdk-mintd
   accepts secrets only as `env:` or `file:` references.
 - `CDK_MINTD_WORK_DIR=/data`, a bind mount of `./data/cashu-mint`, with the
   container running as `${ARCHON_UID}:${ARCHON_GID}`; the image's own default is
@@ -529,32 +535,40 @@ links to it.
   first with `fakewallet`, and the operator documentation says so.
 - The RPC socket grants full control of the CLN node; unlike the other bundled
   services, which use CLN REST with a restricted rune, a mint bug or compromise
-  could spend the node's whole balance. The CLN service sets `rpc-file-mode` so
-  the socket is group-readable by `${ARCHON_GID}`, and the mint mounts only the
-  socket's directory. The operator documentation states the exposure.
+  could spend the node's whole balance. `lightningd` runs as root and keeps the
+  socket root-only in a root-only directory beside `hsm_secret`, so
+  `rpc-file-mode` alone cannot reach `${ARCHON_GID}`. With
+  `ARCHON_CLN_RPC_SHARE=true` the CLN entrypoint instead runs a `socat` relay:
+  a second socket, mode 0660 and group `${ARCHON_GID}`, in
+  `data/cln-mainnet/rpc-share/` (0750), which is all the mint mounts. The
+  operator documentation states the exposure.
 - Initial mint and melt limits and fees from `ARCHON_CASHU_MINT_*` variables,
   with conservative defaults in `sample.env`.
-- Live changes after initialization, including keyset rotation
-  (`rotate-next-keyset`), go through cdk's management RPC with `cdk-mint-cli`.
-  The mintd image does not include that binary. The component enables the
-  management RPC on the Compose network only, with its TLS material under
-  `/data`, and the operator documentation gives the `cdk-mint-cli` commands from
-  the matching cdk release.
+- Configuration changes after initialization go through `cdk-mintd config
+  apply` on the stopped mint. Live operations, including keyset rotation
+  (`rotate-next-keyset`), need cdk's management RPC and `cdk-mint-cli`. That
+  RPC requires operator-supplied TLS material (`server.pem`, `server.key`,
+  `ca.pem`), and the mintd image has neither OpenSSL nor `cdk-mint-cli`, so
+  the first delivery leaves it disabled; enabling it is a follow-up.
 
 ### Exposure
 
 - The mint publishes no host port. Drawbridge is the only route to it, for
   Keymaster as well as external wallets.
 - Drawbridge reads the mint's internal URL from `ARCHON_CASHU_MINT_URL`
-  (`http://cashu-mint:<port>` in Compose, empty to disable), following
-  `ARCHON_DIDCOMM_URL`.
+  (`http://cashu-mint:8085` once set; empty, the default, disables it),
+  following `ARCHON_DIDCOMM_URL`.
 - Drawbridge proxies the mint's `/v1/*` API under `/cashu`, stripping the prefix,
   outside L402 but behind per-source and global request limits in the pattern of
   the DIDComm ones (`ARCHON_DRAWBRIDGE_CASHU_PER_SOURCE`,
   `ARCHON_DRAWBRIDGE_CASHU_GLOBAL`, `ARCHON_DRAWBRIDGE_CASHU_RATE_LIMIT_WINDOW`).
   A server-side Keymaster's requests all count against one source, so its own
   traffic needs a per-source limit sized for every identity it serves; requests
-  carrying the configured admin key are exempt. Cashu mint URLs may carry a path, so the mint's public URL is
+  carrying the configured admin key are exempt, and Drawbridge removes that
+  header before forwarding. Only the mint API (`/v1/...`) is forwarded, and
+  not its WebSocket subscriptions (NUT-17): Drawbridge removes NUT-17 from the
+  `/v1/info` it serves, so wallets poll instead.
+  Cashu mint URLs may carry a path, so the mint's public URL is
   `<public host>/cashu` and cdk-mintd needs no prefix support.
 - Drawbridge `/capabilities` reports `cashu` when the mint URL is configured, and
   `GET /cashu-mint` returns `{ url }`, the public mint URL

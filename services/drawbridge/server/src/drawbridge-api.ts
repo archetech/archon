@@ -10,11 +10,13 @@ import GatekeeperClient from '@didcid/clients/gatekeeper';
 import config from './config.js';
 import { RedisStore } from './store.js';
 import { byHeraldRoute, publicRateLimit } from './middleware/public-rate-limit.js';
-import { normalizePath } from './metrics-path.js';
+import { routeLabel } from './metrics-path.js';
 import { REDACTED_LOG_PATHS } from './log-redaction.js';
 import { buildProxyBody, proxyHeraldRequest } from './herald-proxy.js';
 import { proxyRequest } from './proxy.js';
+import { cashuProxyHandlers } from './cashu-proxy.js';
 import { resolveUpstreamUrl } from './upstream-url.js';
+import { isForwardedResponseHeader } from './response-headers.js';
 import { createAuthMiddleware } from './middleware/auth.js';
 import { loadPricingFromEnv } from './pricing.js';
 import { createV1Router } from './v1-router.js';
@@ -146,7 +148,7 @@ async function proxyLightningMediatorRequest(
     res.status(upstream.status);
 
     upstream.headers.forEach((value, key) => {
-        if (key === 'content-length' || key === 'transfer-encoding' || key === 'connection') {
+        if (!isForwardedResponseHeader(key)) {
             return;
         }
         res.setHeader(key, value);
@@ -205,7 +207,7 @@ async function main() {
         const start = process.hrtime.bigint();
         res.on('finish', () => {
             const duration = Number(process.hrtime.bigint() - start) / 1e9;
-            const route = normalizePath(req.path);
+            const route = routeLabel(req);
             httpRequestsTotal.inc({ method: req.method, route, status: res.statusCode });
             httpRequestDuration.observe({ method: req.method, route }, duration);
         });
@@ -414,6 +416,10 @@ async function main() {
             res.status(502).json({ error: 'Upstream didcomm error' });
         }
     });
+
+    // Public face for the optional Cashu mint (the `cashu` profile).
+    const { rateLimit: cashuRateLimit, proxy: cashuProxy } = cashuProxyHandlers({ store, config, logger });
+    app.use('/cashu', cashuRateLimit, cashuProxy);
 
     // Standards-conformant DID resolution / dereferencing surface (Universal Resolver
     // driver convention). Proxied verbatim to the gatekeeper so its conformant output —

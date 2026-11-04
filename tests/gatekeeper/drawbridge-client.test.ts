@@ -18,6 +18,7 @@ const Endpoints = {
         zap: '/api/v1/lightning/zap',
     },
     didcommEndpoint: '/api/v1/didcomm-endpoint',
+    cashuMint: '/api/v1/cashu-mint',
 };
 
 describe('DrawbridgeClient', () => {
@@ -129,6 +130,22 @@ describe('DrawbridgeClient', () => {
         expect(await client.getDidCommEndpoint()).toBe('https://example.com/didcomm');
         expect(await client.getDidCommEndpoint()).toBeUndefined();
         expect(await client.getDidCommEndpoint()).toBeUndefined();
+    });
+
+    it('returns the node mint URL when available and undefined otherwise', async () => {
+        nock(DrawbridgeURL)
+            .get(Endpoints.cashuMint)
+            .reply(200, { url: 'https://example.com/cashu' })
+            .get(Endpoints.cashuMint)
+            .reply(200, { url: null })
+            .get(Endpoints.cashuMint)
+            .reply(404, ServerError);
+
+        const client = await DrawbridgeClient.create({ url: DrawbridgeURL });
+
+        expect(await client.getCashuMint()).toBe('https://example.com/cashu');
+        expect(await client.getCashuMint()).toBeUndefined();
+        expect(await client.getCashuMint()).toBeUndefined();
     });
 
     it('throws response data for lightning API errors', async () => {

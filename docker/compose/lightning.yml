@@ -27,6 +27,11 @@ services:
       # Checked against NETWORK_MODE: a tor-mode node refuses to start when its
       # P2P port is published beyond loopback.
       - P2P_BIND=${ARCHON_CLN_P2P_BIND:-}
+      # Opt-in RPC socket for the Cashu mint's cln backend, in
+      # data/cln-mainnet/rpc-share for ARCHON_GID. It gives full control of
+      # the node's Lightning funds.
+      - RPC_SHARE=${ARCHON_CLN_RPC_SHARE:-false}
+      - RPC_SHARE_GID=${ARCHON_GID:-}
       - MIN_CAPACITY_SAT=${ARCHON_CLN_MIN_CAPACITY_SAT:-50000}
       - LOG_LEVEL=${ARCHON_CLN_LOG_LEVEL:-info}
     volumes:

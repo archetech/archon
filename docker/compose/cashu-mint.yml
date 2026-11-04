@@ -1,0 +1,37 @@
+# The node's Cashu mint (cdk-mintd), enabled by the `cashu` profile. It
+# publishes no host port: Drawbridge proxies its API at `/cashu` once
+# ARCHON_CASHU_MINT_URL=http://cashu-mint:8085 is set. A mint holds other
+# people's funds on the node's Lightning balance; see docs/deployment.md.
+services:
+  cashu-mint:
+    profiles: ["cashu"]
+    image: cashubtc/mintd:0.18.3
+    entrypoint: ["/bin/sh", "/scripts/cashu-mint-entrypoint.sh"]
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    environment:
+      - CDK_MINTD_WORK_DIR=/data
+      # Read on the first start only, when the mint is initialized.
+      - BACKEND=${ARCHON_CASHU_MINT_BACKEND:-fakewallet}
+      - MINT_URL=${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-http://localhost:4222}/cashu
+      - MINT_NAME=${ARCHON_CASHU_MINT_NAME:-Archon mint}
+      - MINT_DESCRIPTION=${ARCHON_CASHU_MINT_DESCRIPTION:-}
+      - MIN_MINT=${ARCHON_CASHU_MINT_MIN_MINT:-1}
+      - MAX_MINT=${ARCHON_CASHU_MINT_MAX_MINT:-10000}
+      - MIN_MELT=${ARCHON_CASHU_MINT_MIN_MELT:-1}
+      - MAX_MELT=${ARCHON_CASHU_MINT_MAX_MELT:-10000}
+      - INPUT_FEE_PPK=${ARCHON_CASHU_MINT_INPUT_FEE_PPK:-0}
+      - LN_FEE_PERCENT=${ARCHON_CASHU_MINT_LN_FEE_PERCENT:-0.02}
+      - LN_RESERVE_FEE_MIN=${ARCHON_CASHU_MINT_LN_RESERVE_FEE_MIN:-2}
+    volumes:
+      - ../../scripts/cashu-mint-entrypoint.sh:/scripts/cashu-mint-entrypoint.sh:ro
+      - ../../data/cashu-mint:/data
+      # The CLN RPC relay, for the cln backend (ARCHON_CLN_RPC_SHARE=true).
+      # It gives full control of the node's Lightning funds.
+      - ../../data/cln-mainnet/rpc-share:/cln:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:8085/v1/info"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped

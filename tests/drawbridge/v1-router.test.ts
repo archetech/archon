@@ -108,18 +108,35 @@ describe('drawbridge v1 unprotected routes', () => {
                 lightningMediatorURL: 'http://ln',
                 heraldURL: 'http://herald',
                 explorerURL: 'http://explorer',
+                cashuMintURL: 'http://cashu-mint:8085',
             },
         });
         await expect(request(all.app).get('/api/v1/capabilities')).resolves.toMatchObject({
-            body: { didcomm: true, lightning: true, names: true, explorer: true },
+            body: { didcomm: true, lightning: true, names: true, explorer: true, cashu: true },
         });
 
         const none = mount({
-            config: { didcommURL: '', lightningMediatorURL: '', heraldURL: '', explorerURL: '' },
+            config: { didcommURL: '', lightningMediatorURL: '', heraldURL: '', explorerURL: '', cashuMintURL: '' },
         });
         await expect(request(none.app).get('/api/v1/capabilities')).resolves.toMatchObject({
-            body: { didcomm: false, lightning: false, names: false, explorer: false },
+            body: { didcomm: false, lightning: false, names: false, explorer: false, cashu: false },
         });
+    });
+
+    it('advertises the public mint URL only for a configured mint behind an https public host', async () => {
+        const mintUrl = async (config: Record<string, string>) =>
+            (await request(mount({ config }).app).get('/api/v1/cashu-mint')).body;
+
+        await expect(mintUrl({ cashuMintURL: 'http://cashu-mint:8085', publicHost: 'https://node.example/' }))
+            .resolves.toEqual({ url: 'https://node.example/cashu' });
+        // An http:// mint URL is refused by the wallet's https-only fetch, so
+        // an http public host or the onion fallback is no mint at all.
+        await expect(mintUrl({ cashuMintURL: 'http://cashu-mint:8085', publicHost: 'http://node.example' }))
+            .resolves.toEqual({ url: null });
+        await expect(mintUrl({ cashuMintURL: 'http://cashu-mint:8085', publicHost: '' }))
+            .resolves.toEqual({ url: null });
+        await expect(mintUrl({ cashuMintURL: '', publicHost: 'https://node.example' }))
+            .resolves.toEqual({ url: null });
     });
 
     it('advertises the resolved DIDComm endpoint, or null when unresolvable', async () => {
