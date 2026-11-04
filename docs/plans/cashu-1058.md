@@ -86,6 +86,7 @@ interface CashuOperation {
         secret?: string;           // non-derived secret, e.g. P2PK,
         r?: string;                // with its blinding factor
     }[];
+    token?: boolean;               // a swap whose inputs are a sent token
     sent?: Proof[];                // proofs handed out as a token, until redeemed
     delivery?: {                   // locked-send DIDComm delivery, saved before the swap
         recipient: string;         // recipient DID
@@ -119,7 +120,9 @@ The journal also says what each unspent proof is for, which NUT-07 alone cannot.
 mint first settles that mint's open records for the identity, so a restart needs
 no separate step; `cashu-check` runs the same settlement on demand, and also
 drops spendable proofs the mint reports spent, which only happens when something
-else spent them, reporting their value. Read methods
+else spent them, and swaps proofs from inactive keysets to the active one, paying
+the input fee out of the value and leaving any worth no more than that fee. It
+reports the value of both. Read methods
 (`getCashuBalance`, `listCashuMints`, `listCashuQuotes`, `listCashuSends`,
 `listCashuMessages`) never settle or send anything: they report open records as
 in flight, so they stay safe to expose as read-only MCP tools.
@@ -128,7 +131,7 @@ in flight, so they stay safe to expose as read-only MCP tools.
 |---|---|---|
 | `mint` | the quote is paid, or expires unpaid | claim the proofs, or drop the record |
 | `melt` | the quote is paid or unpaid; while it or an input is `PENDING` the record stays open | keep the change, from the quote state if the response was lost, or return the inputs to `proofs`; if an input is spent and a fresh read still says `UNPAID`, something else spent it, so swap the rest to new proofs and keep the change counters used |
-| `swap` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09 if every input is spent and the amounts match; on a refusal with unspent inputs, keep them as an outstanding send, since they may be a token someone else holds |
+| `swap` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09 if every input is spent and the amounts match; on a refusal with unspent inputs, return them to `proofs`, or keep them as an outstanding send if `token` says the recipient may still hold them |
 | `receive` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09, or drop the record and report the token as already spent |
 | `send`, `locked-send` | the swap settles as above, then every `sent` proof is spent | the token was redeemed; until then it is outstanding, not balance |
 
@@ -366,8 +369,9 @@ not received until the mint confirms its proofs are unspent.
   `state`, `expiry`), `CashuMeltResult` (`paid`, `preimage`, `fee`, `change` as an amount, never
   the proofs),
   `CashuSendResult` (`token`, `amount`, `fee`, `operationId`), `CashuReceiveResult` (`amount`,
-  `mint`), `CashuCheckResult` (counts of records settled and still open, and `dropped`, the
-  value of spent proofs removed, when there was any), and
+  `mint`), `CashuCheckResult` (counts of records settled and still open, and `dropped` and
+  `rotated`, the value of spent proofs removed and of proofs moved off inactive
+  keysets, when there was any), and
   `CashuSendToResult` (`token`, `messageId`, `delivered`).
 - `KeymasterClient` and the Python SDK.
 - The CLI commands below, in `scripts/archon-cli.js`,

@@ -350,6 +350,8 @@ export interface CashuOperation {
         secret?: string;
         r?: string;
     }[];
+    // A swap whose inputs are a sent token, which the recipient may still hold.
+    token?: boolean;
     sent?: CashuProof[];
     created: string;
 }
@@ -426,6 +428,8 @@ export interface CashuCheckResult {
     open: number;
     // Value of spendable proofs dropped because the mint reports them spent.
     dropped?: number;
+    // Value moved from inactive keysets to the active one, after input fees.
+    rotated?: number;
 }
 
 export interface CashuRestoreResult {

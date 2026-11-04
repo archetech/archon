@@ -30,11 +30,9 @@ class FakeMint:
     def __init__(self, input_fee_ppk: int = 0, nuts: list[int] | None = None) -> None:
         self.input_fee_ppk = input_fee_ppk
         self.nuts = nuts if nuts is not None else [4, 5, 7, 8, 9, 12, 20]
-        self.private_keys = {
-            2**bit: hashlib.sha256(f"fake-mint-{bit}".encode()).digest() for bit in range(16)
-        }
-        self.public_keys = {str(amount): public_key_hex(key) for amount, key in self.private_keys.items()}
-        self.keyset_id = "01" + hashlib.sha256("".join(self.public_keys.values()).encode()).hexdigest()
+        # Every keyset the mint has had, by id: its private keys by amount.
+        self.keysets: dict[str, dict[int, bytes]] = {}
+        self.rotate()
         self.spent: set[str] = set()
         self.signed: dict[str, dict[str, Any]] = {}
         self.mint_quotes: dict[str, dict[str, Any]] = {}
@@ -52,6 +50,14 @@ class FakeMint:
         self._refuse: dict[str, MintRefusal] = {}
         self._next = 0
 
+    def rotate(self) -> None:
+        """Retires the active keyset. Its proofs stay redeemable; nothing new is signed."""
+        generation = len(self.keysets)
+        keys = {2**bit: hashlib.sha256(f"fake-mint-{generation}-{bit}".encode()).digest() for bit in range(16)}
+        public = "".join(public_key_hex(key) for key in keys.values())
+        self.keyset_id = "01" + hashlib.sha256(public.encode()).hexdigest()
+        self.keysets[self.keyset_id] = keys
+
     def pay_mint_quote(self, quote: str) -> None:
         self.mint_quotes[quote]["state"] = "PAID"
 
@@ -64,7 +70,9 @@ class FakeMint:
     def _sign(self, outputs: list[dict[str, Any]]) -> list[dict[str, Any]]:
         signatures = []
         for output in outputs:
-            key = self.private_keys[output["amount"]]
+            if output["id"] != self.keyset_id:
+                raise MintRefusal(12002, "keyset inactive")
+            key = self.keysets[self.keyset_id][output["amount"]]
             nonce = hashlib.sha256(key + output["B_"].encode()).digest()
             signature = {
                 "id": self.keyset_id,
@@ -84,7 +92,7 @@ class FakeMint:
         if len({proof["secret"] for proof in inputs}) != len(inputs):
             raise MintRefusal(11007, "duplicate inputs")
         for proof in inputs:
-            expected = hash_to_curve(proof["secret"].encode()).multiply(self.private_keys[proof["amount"]])
+            expected = hash_to_curve(proof["secret"].encode()).multiply(self.keysets[proof["id"]][proof["amount"]])
             if expected.format().hex() != proof["C"]:
                 raise MintRefusal(10003, "invalid proof")
             if proof_y(proof["secret"]) in self.spent:
@@ -98,9 +106,16 @@ class FakeMint:
         if method == "GET" and path == "/v1/info":
             return {"name": "Fake mint", "version": "fake/1", "nuts": {str(nut): {"supported": True} for nut in self.nuts}}
         if method == "GET" and path == "/v1/keysets":
-            return {"keysets": [{"id": self.keyset_id, "unit": "sat", "active": True, "input_fee_ppk": self.input_fee_ppk}]}
+            return {
+                "keysets": [
+                    {"id": keyset, "unit": "sat", "active": keyset == self.keyset_id, "input_fee_ppk": self.input_fee_ppk}
+                    for keyset in self.keysets
+                ]
+            }
         if method == "GET" and path.startswith("/v1/keys/"):
-            return {"keysets": [{"id": self.keyset_id, "unit": "sat", "keys": self.public_keys}]}
+            keyset = path.rsplit("/", 1)[1]
+            keys = {str(amount): public_key_hex(key) for amount, key in self.keysets[keyset].items()}
+            return {"keysets": [{"id": keyset, "unit": "sat", "keys": keys}]}
         if method == "POST" and path == "/v1/mint/quote/bolt11":
             self._next += 1
             quote = f"mq{self._next}"

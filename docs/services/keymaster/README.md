@@ -1231,7 +1231,7 @@ See `docs/plans/cashu-1058.md`.
 | `POST /api/v1/cashu/melt` | `{ "bolt11": string, "mint"?: string, "id"?: string }` → `CashuMeltResult`. |
 | `POST /api/v1/cashu/send` | `{ "amount": number, "mint"?: string, "id"?: string }` → `CashuSendResult`, a `cashuB` token. |
 | `POST /api/v1/cashu/receive` | `{ "token": string, "id"?: string }` → `CashuReceiveResult`. The token's mint must already be added. |
-| `POST /api/v1/cashu/check` | `{ "mint"?: string, "id"?: string }` → `CashuCheckResult`, after settling open operations and dropping proofs the mint reports spent. |
+| `POST /api/v1/cashu/check` | `{ "mint"?: string, "id"?: string }` → `CashuCheckResult`, after settling open operations, dropping proofs the mint reports spent, and moving proofs off inactive keysets. |
 | `POST /api/v1/cashu/restore` | `{ "mint"?: string, "id"?: string }` → `CashuRestoreResult`, recovering proofs from the mnemonic. |
 | `POST /api/v1/cashu/sends` | `{ "sends": CashuSendRecord[] }`. Contacts no mint. |
 | `POST /api/v1/cashu/reclaim` | `{ "operationId": string, "id"?: string }` → `CashuReclaimResult`, taking back one unredeemed send: `{ amount, mint }`, plus `redeemed` and `pending` if the recipient redeemed part of it. A refused reclaim leaves the send outstanding. |

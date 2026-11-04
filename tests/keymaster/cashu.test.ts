@@ -889,6 +889,130 @@ describe('recovery', () => {
     });
 });
 
+describe('keyset rotation', () => {
+    const keysetsHeld = async () => new Set((await entry()).proofs.map((proof: { id: string }) => proof.id));
+
+    describe('without fees', () => {
+        beforeEach(async () => {
+            await setup();
+            await keymaster.addCashu();
+            await fund(100);
+        });
+
+        it('moves proofs from an inactive keyset to the active one when checking', async () => {
+            mint.rotate();
+
+            await expect(keymaster.checkCashu()).resolves.toEqual({ settled: 0, open: 0, rotated: 100 });
+
+            expect(await keysetsHeld()).toEqual(new Set([mint.keysetId]));
+            expect(await keymaster.getCashuBalance()).toEqual({ spendable: 100, inFlight: 0, outstanding: 0 });
+            await expect(keymaster.checkCashu()).resolves.toEqual({ settled: 0, open: 0 });
+        });
+
+        it('leaves proofs alone while their keyset is active', async () => {
+            mint.requests = [];
+
+            await keymaster.checkCashu();
+
+            expect(mint.requests).not.toContain('POST /v1/swap');
+        });
+
+        it('moves proofs only when checking', async () => {
+            const before = (await entry()).proofs.find((proof: { amount: number }) => proof.amount === 4);
+            mint.rotate();
+
+            await keymaster.sendCashu(40);
+
+            const after = (await entry()).proofs.find((proof: { secret: string }) => proof.secret === before.secret);
+            expect(after.id).toBe(before.id);
+            expect(after.id).not.toBe(mint.keysetId);
+        });
+
+        it('keeps the proofs spendable when the mint refuses the move', async () => {
+            const before = await keysetsHeld();
+            mint.rotate();
+            mint.refuseNext('/v1/swap', 11002, 'transaction unbalanced');
+
+            await expect(keymaster.checkCashu()).resolves.toEqual({ settled: 0, open: 0 });
+
+            expect(await keysetsHeld()).toEqual(before);
+            expect(await keymaster.getCashuBalance()).toEqual({ spendable: 100, inFlight: 0, outstanding: 0 });
+            await expect(keymaster.checkCashu()).resolves.toMatchObject({ rotated: 100 });
+        });
+
+        it('finishes the move on the next check when the response was lost', async () => {
+            mint.rotate();
+            mint.loseResponse('/v1/swap');
+
+            await expect(keymaster.checkCashu()).resolves.toEqual({ settled: 0, open: 0 });
+            expect((await keymaster.getCashuBalance()).inFlight).toBe(100);
+
+            await expect(keymaster.checkCashu()).resolves.toMatchObject({ settled: 1, open: 0 });
+            expect(await keymaster.getCashuBalance()).toEqual({ spendable: 100, inFlight: 0, outstanding: 0 });
+            expect(await keysetsHeld()).toEqual(new Set([mint.keysetId]));
+        });
+
+        it('does not move a sent token', async () => {
+            await keymaster.sendCashu(6);
+            mint.rotate();
+
+            await keymaster.checkCashu();
+
+            expect((await keymaster.getCashuBalance()).outstanding).toBe(6);
+        });
+
+        it('accepts a token from an inactive keyset', async () => {
+            const { token } = await keymaster.sendCashu(6);
+            await keymaster.createId('Bob');
+            await keymaster.addCashu('Bob');
+            mint.rotate();
+
+            await expect(keymaster.receiveCashu(token, 'Bob')).resolves.toMatchObject({ amount: 6 });
+
+            expect((await entry(keymaster, 'Bob')).proofs.every((proof: { id: string }) => proof.id === mint.keysetId)).toBe(true);
+        });
+
+        it('restores proofs from an inactive keyset', async () => {
+            const mnemonic = await keymaster.decryptMnemonic();
+            mint.rotate();
+            const other = newKeymaster(new WalletJsonMemory());
+            await other.newWallet(mnemonic);
+            await other.createId('Alice');
+            await other.addCashu();
+
+            await expect(other.restoreCashu()).resolves.toMatchObject({ amount: 100 });
+        });
+    });
+
+    describe('with input fees', () => {
+        beforeEach(async () => {
+            await setup({ inputFeePpk: 1000 });
+            await keymaster.addCashu();
+        });
+
+        it('pays the fee out of the value it moves', async () => {
+            await fund(100);
+            mint.rotate();
+
+            // Three proofs at one sat each.
+            await expect(keymaster.checkCashu()).resolves.toEqual({ settled: 0, open: 0, rotated: 97 });
+
+            expect((await keymaster.getCashuBalance()).spendable).toBe(97);
+        });
+
+        it('leaves proofs worth no more than the fee to move them', async () => {
+            await fund(1);
+            mint.rotate();
+            mint.requests = [];
+
+            await expect(keymaster.checkCashu()).resolves.toEqual({ settled: 0, open: 0 });
+
+            expect(mint.requests).not.toContain('POST /v1/swap');
+            expect((await keymaster.getCashuBalance()).spendable).toBe(1);
+        });
+    });
+});
+
 describe('removal guards', () => {
     beforeEach(async () => {
         await setup();

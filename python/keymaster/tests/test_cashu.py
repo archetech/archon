@@ -814,6 +814,111 @@ class TestRecovery:
         assert bed.mint.requests.count("POST /v1/restore") == 3
 
 
+class TestKeysetRotation:
+    @pytest.fixture(autouse=True)
+    def enabled(self, bed):
+        run(bed.keymaster.add_cashu())
+        bed.fund(100)
+
+    @staticmethod
+    def keysets_held(bed, name="Alice"):
+        return {proof["id"] for proof in bed.entry(name)["proofs"]}
+
+    def test_moves_proofs_from_an_inactive_keyset_when_checking(self, bed):
+        bed.mint.rotate()
+
+        assert run(bed.keymaster.check_cashu()) == {"settled": 0, "open": 0, "rotated": 100}
+
+        assert self.keysets_held(bed) == {bed.mint.keyset_id}
+        assert bed.balance() == {"spendable": 100, "inFlight": 0, "outstanding": 0}
+        assert run(bed.keymaster.check_cashu()) == {"settled": 0, "open": 0}
+
+    def test_leaves_proofs_alone_while_their_keyset_is_active(self, bed):
+        bed.mint.requests.clear()
+
+        run(bed.keymaster.check_cashu())
+
+        assert "POST /v1/swap" not in bed.mint.requests
+
+    def test_keeps_the_proofs_spendable_when_the_mint_refuses_the_move(self, bed):
+        before = self.keysets_held(bed)
+        bed.mint.rotate()
+        bed.mint.refuse_next("/v1/swap", 11002, "transaction unbalanced")
+
+        assert run(bed.keymaster.check_cashu()) == {"settled": 0, "open": 0}
+
+        assert self.keysets_held(bed) == before
+        assert bed.balance() == {"spendable": 100, "inFlight": 0, "outstanding": 0}
+        assert run(bed.keymaster.check_cashu())["rotated"] == 100
+
+    def test_finishes_the_move_on_the_next_check_when_the_response_was_lost(self, bed):
+        bed.mint.rotate()
+        bed.mint.lose_response("/v1/swap")
+
+        assert run(bed.keymaster.check_cashu()) == {"settled": 0, "open": 0}
+        assert bed.balance()["inFlight"] == 100
+
+        result = run(bed.keymaster.check_cashu())
+        assert result["settled"] == 1 and result["open"] == 0
+        assert bed.balance() == {"spendable": 100, "inFlight": 0, "outstanding": 0}
+        assert self.keysets_held(bed) == {bed.mint.keyset_id}
+
+    def test_does_not_move_a_sent_token(self, bed):
+        run(bed.keymaster.send_cashu(6))
+        bed.mint.rotate()
+
+        run(bed.keymaster.check_cashu())
+
+        assert bed.balance()["outstanding"] == 6
+
+    def test_accepts_a_token_from_an_inactive_keyset(self, bed):
+        token = run(bed.keymaster.send_cashu(6))["token"]
+        run(bed.keymaster.create_id("Bob"))
+        run(bed.keymaster.add_cashu("Bob"))
+        bed.mint.rotate()
+
+        assert run(bed.keymaster.receive_cashu(token, "Bob"))["amount"] == 6
+        assert self.keysets_held(bed, "Bob") == {bed.mint.keyset_id}
+
+    def test_restores_proofs_from_an_inactive_keyset(self, bed):
+        mnemonic = run(bed.keymaster.decrypt_mnemonic())
+        bed.mint.rotate()
+        other = Keymaster(gatekeeper=bed.gatekeeper, wallet_store=FakeWalletStore(), passphrase="passphrase")
+        run(other.new_wallet(mnemonic))
+        other._node_capabilities = None
+        bed.wire(other)
+        run(other.create_id("Alice"))
+        run(other.add_cashu())
+
+        assert run(other.restore_cashu())["amount"] == 100
+
+
+class TestKeysetRotationFees:
+    @pytest.fixture
+    def charged(self, monkeypatch):
+        monkeypatch.setenv("PBKDF2_ITERATIONS", "1")
+        bed = Bed(input_fee_ppk=1000)
+        run(bed.keymaster.add_cashu())
+        return bed
+
+    def test_pays_the_fee_out_of_the_value_it_moves(self, charged):
+        charged.fund(100)
+        charged.mint.rotate()
+
+        # Three proofs at one sat each.
+        assert run(charged.keymaster.check_cashu()) == {"settled": 0, "open": 0, "rotated": 97}
+        assert charged.balance()["spendable"] == 97
+
+    def test_leaves_proofs_worth_no_more_than_the_fee_to_move_them(self, charged):
+        charged.fund(1)
+        charged.mint.rotate()
+        charged.mint.requests.clear()
+
+        assert run(charged.keymaster.check_cashu()) == {"settled": 0, "open": 0}
+        assert "POST /v1/swap" not in charged.mint.requests
+        assert charged.balance()["spendable"] == 1
+
+
 class TestRemovalGuards:
     @pytest.fixture(autouse=True)
     def enabled(self, bed):

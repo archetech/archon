@@ -49,6 +49,9 @@ class MintRefusal extends Error {
 export class FakeMint {
     server!: http.Server;
     keyset;
+    // Every keyset the mint has had, by id. `keyset` is the active one.
+    keysets = new Map<string, ReturnType<typeof createNewMintKeys>>();
+    private generation = 7;
     inputFeePpk: number;
     readonly nuts: number[];
     readonly nut20: boolean;
@@ -75,7 +78,18 @@ export class FakeMint {
         this.inputFeePpk = options.inputFeePpk ?? 0;
         this.nuts = options.nuts ?? [4, 5, 7, 8, 9, 12];
         this.nut20 = options.nut20 ?? true;
-        this.keyset = createNewMintKeys(16, new Uint8Array(32).fill(7), { input_fee_ppk: this.inputFeePpk, unit: 'sat' });
+        this.keyset = this.newKeyset();
+    }
+
+    private newKeyset() {
+        const keyset = createNewMintKeys(16, new Uint8Array(32).fill(this.generation++), { input_fee_ppk: this.inputFeePpk, unit: 'sat' });
+        this.keysets.set(keyset.keysetId, keyset);
+        return keyset;
+    }
+
+    // Retires the active keyset. Its proofs stay redeemable; nothing new is signed.
+    rotate(): void {
+        this.keyset = this.newKeyset();
     }
 
     get keysetId(): string {
@@ -113,6 +127,9 @@ export class FakeMint {
 
     private sign(outputs: { amount: number; id: string; B_: string }[]) {
         return outputs.map((output) => {
+            if (output.id !== this.keysetId) {
+                throw new MintRefusal(12002, 'keyset inactive');
+            }
             const privateKey = this.keyset.privKeys[output.amount];
             const B_ = pointFromHex(output.B_);
             const { C_ } = createBlindSignature(B_, privateKey, this.keysetId);
@@ -134,7 +151,7 @@ export class FakeMint {
         }
     }
 
-    private spend(inputs: { amount: number; secret: string; C: string }[]): void {
+    private spend(inputs: { id: string; amount: number; secret: string; C: string }[]): void {
         const encoder = new TextEncoder();
         const seen = new Set<string>();
         for (const input of inputs) {
@@ -145,8 +162,8 @@ export class FakeMint {
             const valid = verifyUnblindedSignature({
                 C: pointFromHex(input.C),
                 secret: encoder.encode(input.secret),
-                id: this.keysetId,
-            }, this.keyset.privKeys[input.amount]);
+                id: input.id,
+            }, this.keysets.get(input.id)!.privKeys[input.amount]);
             if (!valid) {
                 throw new MintRefusal(10003, 'invalid proof');
             }
@@ -175,10 +192,18 @@ export class FakeMint {
             return { name: 'Fake mint', version: 'fake/1', nuts };
         }
         if (method === 'GET' && path === '/v1/keysets') {
-            return { keysets: [{ id: this.keysetId, unit: 'sat', active: true, input_fee_ppk: this.inputFeePpk }] };
+            return {
+                keysets: [...this.keysets.keys()].map(id => ({
+                    id,
+                    unit: 'sat',
+                    active: id === this.keysetId,
+                    input_fee_ppk: this.inputFeePpk,
+                })),
+            };
         }
         if (method === 'GET' && path.startsWith('/v1/keys/')) {
-            return { keysets: [{ id: this.keysetId, unit: 'sat', keys: serializeMintKeys(this.keyset.pubKeys) }] };
+            const id = path.split('/').pop()!;
+            return { keysets: [{ id, unit: 'sat', keys: serializeMintKeys(this.keysets.get(id)!.pubKeys) }] };
         }
         if (method === 'POST' && path === '/v1/mint/quote/bolt11') {
             const quote = `mq${++this.next}`;

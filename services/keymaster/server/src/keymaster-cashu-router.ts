@@ -547,7 +547,7 @@ export function createCashuRouter(options: CreateKeymasterRouterOptions): expres
      *                 description: Optional identity name or DID.
      *     responses:
      *       200:
-     *         description: Counts of records settled and still open, and the value of any spent proofs dropped.
+     *         description: Counts of records settled and still open, and the value of any spent proofs dropped or proofs moved off inactive keysets.
      *       400:
      *         description: Invalid request, or the mint refused it.
      *       503:

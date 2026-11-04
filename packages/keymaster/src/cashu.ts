@@ -649,13 +649,14 @@ export class CashuWallet {
         const retire = async (wallet: WalletFile) => {
             const entry = await this.entryOf(wallet, ctx);
             this.release(wallet, op.keyset, unsigned);
-            // A swap's inputs may be a token someone else holds, so a refusal leaves
-            // it outstanding rather than making it balance.
-            if (!spent && op.kind === 'swap') {
+            // The recipient may still hold a token's proofs, so a refusal leaves it
+            // outstanding rather than making it balance.
+            if (!spent && op.token) {
                 const stored = entry.operations!.find(item => item.id === id)!;
                 stored.sent = stored.inputs;
                 stored.inputs = [];
                 stored.outputs = [];
+                delete stored.token;
                 return entry;
             }
             this.retire(entry, id);
@@ -674,7 +675,7 @@ export class CashuWallet {
             ? op.inputs.filter((_, i) => inputStates[i] === 'UNSPENT')
             : [];
         if (remainder.length > 0) {
-            await this.swapRemainder(ctx, remainder, retire, report);
+            await this.swapRemainder(ctx, remainder, retire, report, op.token);
         }
         else {
             await this.host.mutateWallet(async (wallet) => { await retire(wallet); });
@@ -694,6 +695,7 @@ export class CashuWallet {
         inputs: CashuProof[],
         retire: (wallet: WalletFile) => Promise<CashuMintEntry>,
         report?: SwapReport,
+        token?: boolean,
     ): Promise<void> {
         const { keyset, keysets } = await this.activeKeyset(ctx);
         const value = sumProofs(inputs) - feeFor(inputs, keysets);
@@ -707,7 +709,7 @@ export class CashuWallet {
         try {
             outcome = await this.journaled(swapId, async (wallet) => {
                 const entry = await retire(wallet);
-                this.journalSwap(wallet, entry, swapId, 'swap', inputs, keyset.id, value);
+                this.journalSwap(wallet, entry, swapId, 'swap', inputs, keyset.id, value, token);
             }, () => this.runSwap(ctx, swapId, false, report));
         }
         catch (error) {
@@ -731,12 +733,14 @@ export class CashuWallet {
         inputs: CashuProof[],
         keyset: string,
         value: number,
+        token?: boolean,
     ): void {
         const parts = splitAmount(value);
         const counters = this.reserve(wallet, keyset, parts.length);
         (entry.operations ??= []).push({
             id,
             kind,
+            ...(token && { token }),
             inputs,
             keyset,
             outputs: parts.map((part, i) => ({ amount: part, role: 'keep' as const, counter: counters[i] })),
@@ -1484,14 +1488,50 @@ export class CashuWallet {
         const entries = await this.scopedEntries(mint, identity);
         const total: CashuCheckResult = { settled: 0, open: 0 };
         let dropped = 0;
+        let rotated = 0;
         for (const [url] of entries) {
             const ctx = await this.context(url, identity);
             const result = await this.settle(ctx);
             total.settled += result.settled;
             total.open += result.open;
             dropped += await this.dropSpent(ctx);
+            rotated += await this.rotateKeysets(ctx);
         }
-        return dropped > 0 ? { ...total, dropped } : total;
+        return {
+            ...total,
+            ...(dropped > 0 && { dropped }),
+            ...(rotated > 0 && { rotated }),
+        };
+    }
+
+    // Mints retire keysets, and may eventually stop honouring them, so proofs under
+    // an inactive one move to the active one while they still can. A failure leaves
+    // them spendable, or a record for settlement, and the next check tries again.
+    private async rotateKeysets(ctx: MintContext): Promise<number> {
+        try {
+            const { keyset, keysets } = await this.activeKeyset(ctx);
+            const inactive = new Set(keysets.filter(item => !item.active).map(item => item.id));
+            const { proofs } = await this.entryOf(await this.host.loadWallet(), ctx);
+            const inputs = proofs.filter(proof => inactive.has(proof.id));
+            const value = sumProofs(inputs) - feeFor(inputs, keysets);
+            // Worth no more than the fee to move them, they stay where they are.
+            if (value <= 0) {
+                return 0;
+            }
+            const id = newId();
+            const outcome = await this.journaled(id, async (wallet) => {
+                const entry = await this.entryOf(wallet, ctx);
+                this.removeFromEntry(entry, inputs);
+                this.journalSwap(wallet, entry, id, 'swap', inputs, keyset.id, value);
+            }, () => this.runSwap(ctx, id));
+            return outcome === 'done' ? value : 0;
+        }
+        catch (error) {
+            if (error instanceof CashuMintError || error instanceof CashuUnavailableError) {
+                return 0;
+            }
+            throw error;
+        }
     }
 
     // Proofs spent elsewhere, as by another copy of the wallet, otherwise stay in the
@@ -1577,7 +1617,7 @@ export class CashuWallet {
             const inputs = op.sent!;
             amount = sumProofs(inputs) - feeFor(inputs, keysets);
             this.retire(entry, operationId);
-            this.journalSwap(wallet, entry, swapId, 'swap', inputs, keyset.id, amount);
+            this.journalSwap(wallet, entry, swapId, 'swap', inputs, keyset.id, amount, true);
         }, () => this.runSwap(ctx, swapId, false, report));
         if (outcome === 'spent') {
             if (report.recovered === 0 && report.pending === 0) {

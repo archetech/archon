@@ -585,13 +585,14 @@ class CashuWallet:
         async def retire(wallet: dict[str, Any]) -> dict[str, Any]:
             entry = await self._entry_of(wallet, ctx)
             self._release(wallet, op["keyset"], unsigned)
-            # A swap's inputs may be a token someone else holds, so a refusal leaves
-            # it outstanding rather than making it balance.
-            if not spent and op["kind"] == "swap":
+            # The recipient may still hold a token's proofs, so a refusal leaves it
+            # outstanding rather than making it balance.
+            if not spent and op.get("token"):
                 stored = self._find_op(entry, op_id)
                 stored["sent"] = stored["inputs"]
                 stored["inputs"] = []
                 stored["outputs"] = []
+                del stored["token"]
                 return entry
             self._retire(entry, op_id)
             # Only what the identity owned goes back; a received token's proofs
@@ -606,7 +607,7 @@ class CashuWallet:
         if spent and op["kind"] != "receive":
             remainder = [proof for proof, state in zip(op["inputs"], input_states) if state == "UNSPENT"]
         if remainder:
-            await self._swap_remainder(ctx, remainder, retire, report)
+            await self._swap_remainder(ctx, remainder, retire, report, bool(op.get("token")))
         else:
             await self._mutate(retire)
         if not spent:
@@ -619,6 +620,7 @@ class CashuWallet:
         inputs: list[dict[str, Any]],
         retire: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]],
         report: dict[str, int] | None = None,
+        token: bool = False,
     ) -> None:
         """What is left of a partly spent operation. It is swapped rather than
         credited: when reclaiming a token, the recipient still holds these proofs. If
@@ -635,7 +637,7 @@ class CashuWallet:
 
         async def mutator(wallet: dict[str, Any]) -> None:
             entry = await retire(wallet)
-            self._journal_swap(wallet, entry, swap_id, "swap", inputs, keyset["id"], value)
+            self._journal_swap(wallet, entry, swap_id, "swap", inputs, keyset["id"], value, token)
 
         async def work(_: Any) -> str:
             return await self._run_swap(ctx, swap_id, False, report)
@@ -659,12 +661,14 @@ class CashuWallet:
         inputs: list[dict[str, Any]],
         keyset: str,
         value: int,
+        token: bool = False,
     ) -> None:
         parts = split_amount(value)
         counters = self._reserve(wallet, keyset, len(parts))
         entry.setdefault("operations", []).append({
             "id": op_id,
             "kind": kind,
+            **({"token": True} if token else {}),
             "inputs": inputs,
             "keyset": keyset,
             "outputs": [{"amount": part, "role": "keep", "counter": counters[i]} for i, part in enumerate(parts)],
@@ -1316,13 +1320,48 @@ class CashuWallet:
         total = {"settled": 0, "open": 0}
         identity = await self._bound_identity(name)
         dropped = 0
+        rotated = 0
         for url, _ in await self._scoped_entries(mint, identity):
             ctx = await self._context(url, identity)
             result = await self._settle(ctx)
             total["settled"] += result["settled"]
             total["open"] += result["open"]
             dropped += await self._drop_spent(ctx)
-        return {**total, "dropped": dropped} if dropped else total
+            rotated += await self._rotate_keysets(ctx)
+        if dropped:
+            total["dropped"] = dropped
+        if rotated:
+            total["rotated"] = rotated
+        return total
+
+    async def _rotate_keysets(self, ctx: _MintContext) -> int:
+        """Mints retire keysets, and may eventually stop honouring them, so proofs
+        under an inactive one move to the active one while they still can. A failure
+        leaves them spendable, or a record for settlement, and the next check tries
+        again."""
+        try:
+            keyset, keysets = await self._active_keyset(ctx)
+            inactive = {item["id"] for item in keysets if not item.get("active")}
+            proofs = (await self._entry_of(await self.host.load_wallet(), ctx))["proofs"]
+            inputs = [proof for proof in proofs if proof["id"] in inactive]
+            value = _sum_proofs(inputs) - _fee_for(inputs, keysets)
+            # Worth no more than the fee to move them, they stay where they are.
+            if value <= 0:
+                return 0
+            op_id = secrets.token_hex(16)
+
+            async def mutator(wallet: dict[str, Any]) -> None:
+                entry = await self._entry_of(wallet, ctx)
+                self._remove_from_entry(entry, inputs)
+                self._journal_swap(wallet, entry, op_id, "swap", inputs, keyset["id"], value)
+
+            async def run(_: Any) -> str:
+                return await self._run_swap(ctx, op_id)
+
+            outcome = await self._journaled(op_id, mutator, run)
+            return value if outcome == "done" else 0
+        except (CashuMintError, CashuUnavailableError):
+            return 0
 
     async def _drop_spent(self, ctx: _MintContext) -> int:
         """Proofs spent elsewhere, as by another copy of the wallet, otherwise stay in
@@ -1391,7 +1430,7 @@ class CashuWallet:
             inputs = op["sent"]
             value = _sum_proofs(inputs) - _fee_for(inputs, keysets)
             self._retire(entry, operation_id)
-            self._journal_swap(wallet, entry, swap_id, "swap", inputs, keyset["id"], value)
+            self._journal_swap(wallet, entry, swap_id, "swap", inputs, keyset["id"], value, True)
             return value
 
         report = {"redeemed": 0, "recovered": 0, "pending": 0}
