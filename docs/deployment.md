@@ -770,6 +770,47 @@ open http://localhost:5000
 curl http://localhost:4235/ready
 ```
 
+### Cashu Mint (Optional, Experimental)
+
+The `cashu` profile runs a Cashu ecash mint ([cdk-mintd](https://github.com/cashubtc/cdk) 0.18.3). Ecash issued by a mint is a claim on the mint's Lightning balance: **running a mint with real sats means holding other people's funds**. Cashu implementations are still under security audit; keep the limits low.
+
+The mint publishes no port. Drawbridge serves its API at `/cashu`, so its public URL is `<ARCHON_DRAWBRIDGE_PUBLIC_HOST>/cashu`, outside L402 and behind its own rate limits. `GET /api/v1/cashu-mint` returns that URL to wallets on the node, and only for an `https` public host: wallets refuse `http` mints, and outside wallets could not redeem against an onion.
+
+```env
+COMPOSE_PROFILES=...,drawbridge,cashu
+ARCHON_CASHU_MINT_URL=http://cashu-mint:8085
+```
+
+`ARCHON_CASHU_MINT_URL` is what tells Drawbridge to offer the mint (the `cashu` capability); with it empty, `/cashu` answers 501.
+
+**Backends.** `ARCHON_CASHU_MINT_BACKEND` defaults to `fakewallet`, which marks every quote paid without moving sats: use it to try the mint out. `cln` pays and receives through the bundled CLN node and needs the `lightning` profile and `ARCHON_CLN_RPC_SHARE=true`. That makes the CLN container open a second RPC socket in `./data/cln-mainnet/rpc-share/` for `ARCHON_GID`, which the mint mounts. **The RPC socket gives full control of the node**: a bug in or compromise of the mint could spend the node's whole Lightning balance, not only what the mint has issued. The other bundled services use CLN REST with restricted runes instead.
+
+**Settings** are read once, when the mint first starts and initializes its database:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ARCHON_CASHU_MINT_BACKEND` | `fakewallet` | `fakewallet` or `cln` |
+| `ARCHON_CASHU_MINT_NAME` / `_DESCRIPTION` | `Archon mint` / empty | Shown to wallets (NUT-06) |
+| `ARCHON_CASHU_MINT_MIN_MINT` / `_MAX_MINT` | `1` / `10000` | Sats per mint quote |
+| `ARCHON_CASHU_MINT_MIN_MELT` / `_MAX_MELT` | `1` / `10000` | Sats per melt quote |
+| `ARCHON_CASHU_MINT_INPUT_FEE_PPK` | `0` | Fee per input, in thousandths of a sat (NUT-02) |
+| `ARCHON_CASHU_MINT_LN_FEE_PERCENT` / `_LN_RESERVE_FEE_MIN` | `0.02` / `2` | Lightning fee reserve on melts |
+| `ARCHON_DRAWBRIDGE_CASHU_PER_SOURCE` / `_GLOBAL` / `_RATE_LIMIT_WINDOW` | `120` / `1200` / `60` | Drawbridge's limits on `/cashu`; requests with the admin key are not limited |
+
+After that, the configuration lives in the mint's database and changing these variables has no effect. To change a running mint, edit `./data/cashu-mint/mint.toml` (written on the first start) and apply it while the mint is stopped:
+
+```bash
+docker compose stop cashu-mint
+docker compose run --rm --entrypoint cdk-mintd cashu-mint --work-dir /data config apply --file /data/mint.toml
+docker compose start cashu-mint
+```
+
+**Never switch a `fakewallet` mint to `cln`.** Its ecash was issued without payment, and would become redeemable for the node's real sats. Start a new mint instead: stop it, move `./data/cashu-mint/` aside (keeping its `.gitkeep`), set the backend and start again.
+
+**Back up `./data/cashu-mint/`.** `seed` derives the mint's keys and `cdk-mintd.sqlite` records which ecash has been spent; restoring a mint needs both. Losing them leaves the mint unable to honour ecash it issued.
+
+Not provided yet: cdk's management RPC, and with it live keyset rotation (`rotate-next-keyset`), which needs TLS material and the separate `cdk-mint-cli`. The mint's WebSocket subscriptions (NUT-17) are not proxied; wallets poll instead.
+
 ---
 
 ## 10. Production Hardening
@@ -801,6 +842,7 @@ Back up the entire `./data/` directory regularly. Critical data:
 | Path | Contents | Priority |
 |------|----------|----------|
 | `./data/cln-mainnet/` | Lightning wallet, channels, keys | **Critical** — loss means lost funds |
+| `./data/cashu-mint/` | Cashu mint seed and database (`cashu` profile) | **Critical** — loss means the mint cannot honour its ecash |
 | `./data/tor-drawbridge/` | Tor hidden service keys | High — loss means new `.onion` address |
 | `./data/mongodb/` | Registry and wallet-side service state used by bundled Bitcoin mediators | High |
 | `./data/ZEC:mainnet-mediator.json` or `./data/ZEC:mainnet-mediator.db` | Zcash mediator scan/export state when using local JSON or SQLite storage | High |

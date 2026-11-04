@@ -37,6 +37,7 @@ include:
   - docker/compose/drawbridge.yml
   # DIDComm relay (mailbox). Optional — enable with COMPOSE_PROFILES=didcomm.
   - docker/compose/didcomm.yml
+  - docker/compose/cashu-mint.yml
   - docker/compose/btc-testnet4.yml
   - docker/compose/btc-testnet4-hosted.yml
   - docker/compose/zcash-mainnet.yml

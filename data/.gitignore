@@ -10,3 +10,5 @@ cln-mainnet/
 lnbits/
 drawbridge/*
 !drawbridge/.gitkeep
+cashu-mint/*
+!cashu-mint/.gitkeep

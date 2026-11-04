@@ -34,6 +34,7 @@ beforeEach(() => {
         const control = `STUB_${name.toUpperCase()}`;
         stub(name, `
 printf '%s\\n' "$@" > "${log}/${name}.args"
+echo "$*" >> "${log}/${name}.calls"
 case "\${${control}:-run}" in
     exit:*) exit "\${${control}#exit:}" ;;
     after:*) sleep 0.5; exit "\${${control}#after:}" ;;
@@ -274,6 +275,58 @@ describe('wallet guard', () => {
         writeFileSync(join(lightningDir(), 'lightningd.sqlite3'), 'x');
 
         expect(run().status).toBe(0);
+    });
+});
+
+describe('RPC share', () => {
+    const gid = String(process.getgid!());
+    const shareDir = () => join(root, 'data', 'rpc-share');
+    const calls = () => existsSync(join(log, 'socat.calls'))
+        ? readFileSync(join(log, 'socat.calls'), 'utf-8').trim().split('\n')
+        : [];
+
+    it('relays the RPC socket into a directory of its own for the group', () => {
+        expect(run({ RPC_SHARE: 'true', RPC_SHARE_GID: gid }).status).toBe(0);
+
+        expect(calls()).toEqual([
+            `UNIX-LISTEN:${shareDir()}/lightning-rpc,fork,unlink-early,mode=0660,group=${gid} ` +
+            `UNIX-CONNECT:${lightningDir()}/regtest/lightning-rpc`,
+        ]);
+        const stat = statSync(shareDir());
+        expect(stat.mode & 0o777).toBe(0o750);
+        expect(String(stat.gid)).toBe(gid);
+    });
+
+    it('runs alongside the Tor relay', () => {
+        expect(run(tor({ RPC_SHARE: 'true', RPC_SHARE_GID: gid })).status).toBe(0);
+        expect(calls()).toHaveLength(2);
+    });
+
+    it('is off by default, and removes a socket left from an earlier start', () => {
+        mkdirSync(shareDir(), { recursive: true });
+        writeFileSync(join(shareDir(), 'lightning-rpc'), '');
+
+        expect(run().status).toBe(0);
+        expect(calls()).toEqual([]);
+        expect(existsSync(join(shareDir(), 'lightning-rpc'))).toBe(false);
+    });
+
+    it.each([
+        ['a missing group', { RPC_SHARE: 'true' }],
+        ['a group name instead of an id', { RPC_SHARE: 'true', RPC_SHARE_GID: 'archon' }],
+        ['an unknown RPC_SHARE value', { RPC_SHARE: 'yes', RPC_SHARE_GID: '1000' }],
+    ])('refuses to start with %s', (_case, extra) => {
+        const result = run(extra);
+
+        expect(result.status).not.toBe(0);
+        expect(existsSync(join(log, 'lightningd.args'))).toBe(false);
+    });
+
+    it('stops lightningd and exits non-zero when the share relay exits', () => {
+        const result = run({ RPC_SHARE: 'true', RPC_SHARE_GID: gid, STUB_LIGHTNINGD: 'run', STUB_SOCAT: 'after:0' });
+
+        expect(result.status).toBe(1);
+        expect(existsSync(join(log, 'lightningd.stopped'))).toBe(true);
     });
 });
 

@@ -35,6 +35,9 @@ const config = {
     // to something that is not running.
     explorerURL: process.env.ARCHON_EXPLORER_URL ?? 'http://localhost:4000',
     didcommURL: process.env.ARCHON_DIDCOMM_URL ?? 'http://localhost:4236',
+    // The optional Cashu mint (the `cashu` profile). Unlike the services above
+    // it defaults to off: a node without a mint must not advertise one.
+    cashuMintURL: process.env.ARCHON_CASHU_MINT_URL ?? '',
     // Public base URL this node is reachable at (clearnet host or Tor onion).
     // Used to advertise the DIDComm relay endpoint (`<publicHost>/didcomm`).
     publicHost: process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || '',
@@ -99,6 +102,16 @@ const config = {
         process.env.ARCHON_DRAWBRIDGE_POPPY_AUTH_GLOBAL, 1200),
     publicRateLimitWindow: positiveInt('ARCHON_DRAWBRIDGE_PUBLIC_RATE_LIMIT_WINDOW',
         process.env.ARCHON_DRAWBRIDGE_PUBLIC_RATE_LIMIT_WINDOW, 60),
+    // The Cashu mint's API is public too, for outside wallets as well as this
+    // node's Keymaster. A server-side Keymaster reaches it over the Compose
+    // network, so its traffic falls in the global bucket; requests carrying
+    // the admin key are not limited.
+    cashuPerSource: positiveInt('ARCHON_DRAWBRIDGE_CASHU_PER_SOURCE',
+        process.env.ARCHON_DRAWBRIDGE_CASHU_PER_SOURCE, 120),
+    cashuGlobal: positiveInt('ARCHON_DRAWBRIDGE_CASHU_GLOBAL',
+        process.env.ARCHON_DRAWBRIDGE_CASHU_GLOBAL, 1200),
+    cashuRateLimitWindow: positiveInt('ARCHON_DRAWBRIDGE_CASHU_RATE_LIMIT_WINDOW',
+        process.env.ARCHON_DRAWBRIDGE_CASHU_RATE_LIMIT_WINDOW, 60),
     rateLimitWindow: positiveInt('ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW', process.env.ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW, 60),
 
     // Redis

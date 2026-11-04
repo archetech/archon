@@ -311,6 +311,7 @@ describe('public route mounts', () => {
         '/names': 'heraldRateLimit',
         '/explorer': 'explorerRateLimit',
         '/didcomm': 'didcommRateLimit',
+        '/cashu': 'cashuRateLimit',
         '/1.0/identifiers': 'publicReadRateLimit',
     };
 

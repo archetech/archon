@@ -19,5 +19,11 @@ export function normalizePath(path: string): string {
         .replace(/\/poppy\/signin\/(?!response$)[^/]+/, '/poppy/signin/:id')
         .replace(/\/poppy\/api\/(names|members)\/[^/]+/, '/poppy/api/$1/:name')
         .replace(/\/poppy\/api\/dids\/[^/]+/, '/poppy/api/dids/:did')
-        .replace(/\/api\/poppy\/connections\/[^/]+/, '/api/poppy/connections/:id');
+        .replace(/\/api\/poppy\/connections\/[^/]+/, '/api/poppy/connections/:id')
+        // Cashu mint routes carry keyset and quote IDs, and a payment method
+        // the caller chooses.
+        .replace(/\/cashu\/v1\/keys\/[^/]+/, '/cashu/v1/keys/:keyset')
+        .replace(/\/cashu\/v1\/(mint|melt)\/quote\/[^/]+\/[^/]+/, '/cashu/v1/$1/quote/:method/:quote')
+        .replace(/\/cashu\/v1\/(mint|melt)\/quote\/[^/]+$/, '/cashu/v1/$1/quote/:method')
+        .replace(/\/cashu\/v1\/(mint|melt)\/(?!quote$)[^/]+$/, '/cashu/v1/$1/:method');
 }

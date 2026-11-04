@@ -41,6 +41,8 @@ LIGHTNING_ROOT=${LIGHTNING_ROOT:-/data/lightning}
 TOR_HOST=${TOR_HOST:-tor}
 TOR_HS_DIR=${TOR_HS_DIR:-/tor/cln-service}
 TOR_WAIT_SECONDS=${TOR_WAIT_SECONDS:-300}
+RPC_SHARE=${RPC_SHARE:-false}
+RPC_SHARE_GID=${RPC_SHARE_GID:-}
 
 load_secret BITCOIN_RPCPASSWORD
 
@@ -51,6 +53,13 @@ esac
 case "$NETWORK_MODE" in
     tor|hybrid|clearnet) ;;
     *) die "NETWORK_MODE must be tor, hybrid or clearnet, not '$NETWORK_MODE'" ;;
+esac
+case "$RPC_SHARE" in
+    true)
+        [[ "$RPC_SHARE_GID" =~ ^[0-9]+$ ]] || die "RPC_SHARE is true but RPC_SHARE_GID is not a numeric group id: '$RPC_SHARE_GID'"
+        ;;
+    false) ;;
+    *) die "RPC_SHARE must be true or false, not '$RPC_SHARE'" ;;
 esac
 [[ -n "$BITCOIN_RPCUSER" ]] || die "BITCOIN_RPCUSER is required"
 [[ -n "$BITCOIN_RPCPASSWORD" ]] || die "BITCOIN_RPCPASSWORD is required"
@@ -97,7 +106,9 @@ wait_for() {
 
 announce=()
 proxy_lines=()
-socat_pid=
+# socat relays started below, supervised with lightningd.
+relays=()
+trap 'kill "${relays[@]}" 2>/dev/null || true' EXIT
 if [[ "$NETWORK_MODE" != clearnet ]]; then
     echo "[cln] Waiting for $TOR_HOST..."
     wait_for getent hosts "$TOR_HOST" >/dev/null ||
@@ -107,8 +118,7 @@ if [[ "$NETWORK_MODE" != clearnet ]]; then
     # an address resolved now would go stale if tor is recreated. socat
     # resolves the host on each connection.
     socat TCP-LISTEN:9050,bind=127.0.0.1,fork,reuseaddr "TCP:$TOR_HOST:9050" &
-    socat_pid=$!
-    trap 'kill "$socat_pid" 2>/dev/null || true' EXIT
+    relays+=("$!")
     proxy_lines+=("proxy=127.0.0.1:9050")
     [[ "$NETWORK_MODE" == tor ]] && proxy_lines+=("always-use-proxy=true")
 
@@ -121,6 +131,24 @@ if [[ "$NETWORK_MODE" != clearnet ]]; then
 fi
 # An empty announce-addr is a wildcard, which lightningd rejects.
 [[ -n "$ANNOUNCE_ADDR" ]] && announce+=("announce-addr=$ANNOUNCE_ADDR")
+
+# Opt-in access to the RPC socket for another container, the Cashu mint's
+# `cln` backend. The socket gives full control of the node, and lightningd
+# keeps it root-only in a root-only directory, alongside hsm_secret. Rather
+# than loosen those, a relay serves a second socket for RPC_SHARE_GID alone,
+# in a directory of its own that the other container mounts.
+if [[ "$RPC_SHARE" == true ]]; then
+    share=$LIGHTNING_ROOT/rpc-share
+    mkdir -p "$share"
+    chgrp "$RPC_SHARE_GID" "$share"
+    chmod 0750 "$share"
+    socat "UNIX-LISTEN:$share/lightning-rpc,fork,unlink-early,mode=0660,group=$RPC_SHARE_GID" \
+        "UNIX-CONNECT:$dir/$NETWORK/lightning-rpc" &
+    relays+=("$!")
+else
+    # A socket left from an earlier start must not stay reachable.
+    rm -f "$LIGHTNING_ROOT/rpc-share/lightning-rpc"
+fi
 
 {
     echo "$header"
@@ -162,11 +190,10 @@ lightningd --lightning-dir="$dir" --network="$NETWORK" "$@" &
 lightningd_pid=$!
 trap 'kill -TERM "$lightningd_pid" 2>/dev/null || true' TERM INT
 
-pids=("$lightningd_pid")
-[[ -n "$socat_pid" ]] && pids+=("$socat_pid")
+pids=("$lightningd_pid" "${relays[@]}")
 
-# Exit when lightningd does, with its status. If the proxy relay dies first,
-# stop lightningd and exit non-zero so the restart policy brings both back.
+# Exit when lightningd does, with its status. If a relay dies first, stop
+# lightningd and exit non-zero so the restart policy brings them all back.
 while :; do
     exited=
     status=0
@@ -180,7 +207,7 @@ if [[ "$exited" == "$lightningd_pid" ]]; then
     exit "$status"
 fi
 
-echo "[cln] The Tor proxy relay exited; stopping lightningd" >&2
+echo "[cln] A socat relay exited; stopping lightningd" >&2
 kill -TERM "$lightningd_pid" 2>/dev/null || true
 wait "$lightningd_pid" || true
 exit 1

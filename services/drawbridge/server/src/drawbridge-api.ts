@@ -14,6 +14,7 @@ import { normalizePath } from './metrics-path.js';
 import { REDACTED_LOG_PATHS } from './log-redaction.js';
 import { buildProxyBody, proxyHeraldRequest } from './herald-proxy.js';
 import { proxyRequest } from './proxy.js';
+import { cashuProxyHandlers } from './cashu-proxy.js';
 import { resolveUpstreamUrl } from './upstream-url.js';
 import { createAuthMiddleware } from './middleware/auth.js';
 import { loadPricingFromEnv } from './pricing.js';
@@ -414,6 +415,10 @@ async function main() {
             res.status(502).json({ error: 'Upstream didcomm error' });
         }
     });
+
+    // Public face for the optional Cashu mint (the `cashu` profile).
+    const { rateLimit: cashuRateLimit, proxy: cashuProxy } = cashuProxyHandlers({ store, config, logger });
+    app.use('/cashu', cashuRateLimit, cashuProxy);
 
     // Standards-conformant DID resolution / dereferencing surface (Universal Resolver
     // driver convention). Proxied verbatim to the gatekeeper so its conformant output —

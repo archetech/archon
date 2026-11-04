@@ -7,6 +7,7 @@ import {
     handleRevokeMacaroon,
 } from './middleware/l402-auth.js';
 import { createRequireAdminKey } from './v1-admin.js';
+import { publicCashuMintUrl } from './cashu-proxy.js';
 import type { CreateV1RouterOptions } from './v1-router-types.js';
 
 export function createV1Router(options: CreateV1RouterOptions): express.Router {
@@ -52,7 +53,14 @@ export function createV1Router(options: CreateV1RouterOptions): express.Router {
             lightning: config.lightningMediatorURL !== '',
             names: config.heraldURL !== '',
             explorer: config.explorerURL !== '',
+            cashu: config.cashuMintURL !== '',
         });
+    });
+
+    // The node mint's public URL, for addCashu. Null unless the mint is
+    // configured and the public host is https (see publicCashuMintUrl).
+    v1router.get('/cashu-mint', (_req, res) => {
+        res.json({ url: publicCashuMintUrl(config) });
     });
 
     // Public DIDComm relay endpoint, so `publishDidComm` can auto-discover it

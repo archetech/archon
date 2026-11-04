@@ -95,6 +95,19 @@ export default class DrawbridgeClient extends GatekeeperClient implements Drawbr
         }
     }
 
+    // The node mint's public URL (`<publicHost>/cashu`), or undefined if the
+    // node runs no mint, its public host is not https, or the gateway doesn't
+    // expose it (e.g. a plain Gatekeeper). Used by addCashu to find the node's
+    // own mint.
+    async getCashuMint(): Promise<string | undefined> {
+        try {
+            const response = await this.axios.get(`${this.API}/cashu-mint`);
+            return response.data?.url || undefined;
+        } catch {
+            return undefined;
+        }
+    }
+
     async unpublishLightning(did: string): Promise<boolean> {
         try {
             const response = await this.axios.delete(`${this.API}/lightning/publish/${encodeURIComponent(did)}`);

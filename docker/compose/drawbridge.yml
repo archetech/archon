@@ -117,6 +117,9 @@ services:
       # ARCHON_DIDCOMM_URL=http://didcomm:4236.
       - ARCHON_LIGHTNING_MEDIATOR_URL=${ARCHON_LIGHTNING_MEDIATOR_URL-http://lightning-mediator:4235}
       - ARCHON_DIDCOMM_URL=${ARCHON_DIDCOMM_URL-}
+      # The Cashu mint is opt-in the same way: add `cashu` to COMPOSE_PROFILES
+      # AND set ARCHON_CASHU_MINT_URL=http://cashu-mint:8085.
+      - ARCHON_CASHU_MINT_URL=${ARCHON_CASHU_MINT_URL-}
       # Public base URL advertised by GET /api/v1/didcomm-endpoint (used by
       # publish-didcomm). Without this the endpoint falls back to the Tor onion.
       - ARCHON_DRAWBRIDGE_PUBLIC_HOST=${ARCHON_DRAWBRIDGE_PUBLIC_HOST:-}
@@ -143,6 +146,11 @@ services:
       - ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_PER_SOURCE_BYTES=${ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_PER_SOURCE_BYTES:-16777216}
       - ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_GLOBAL_BYTES=${ARCHON_DRAWBRIDGE_DIDCOMM_DEPOSIT_GLOBAL_BYTES:-67108864}
       - ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW=${ARCHON_DRAWBRIDGE_DIDCOMM_RATE_LIMIT_WINDOW:-60}
+      # The Cashu mint's API. Requests carrying the admin key, such as this
+      # node's Keymaster's, are not limited.
+      - ARCHON_DRAWBRIDGE_CASHU_PER_SOURCE=${ARCHON_DRAWBRIDGE_CASHU_PER_SOURCE:-120}
+      - ARCHON_DRAWBRIDGE_CASHU_GLOBAL=${ARCHON_DRAWBRIDGE_CASHU_GLOBAL:-1200}
+      - ARCHON_DRAWBRIDGE_CASHU_RATE_LIMIT_WINDOW=${ARCHON_DRAWBRIDGE_CASHU_RATE_LIMIT_WINDOW:-60}
       # The remaining public passthroughs. Reads of Herald, the resolver and
       # the invoice endpoint share one budget; the explorer gets its own
       # because a page load is dozens of asset requests; Herald's writes get a
