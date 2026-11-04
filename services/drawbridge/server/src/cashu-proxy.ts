@@ -2,6 +2,7 @@ import type express from 'express';
 
 import { publicRateLimit } from './middleware/public-rate-limit.js';
 import { proxyRequest } from './proxy.js';
+import { resolveUpstreamUrl } from './upstream-url.js';
 import { ARCHON_ADMIN_HEADER, matchesAdminKey } from './v1-admin.js';
 import type { DrawbridgeStore } from './types.js';
 
@@ -55,6 +56,10 @@ export function cashuProxyHandlers(options: CashuProxyOptions): { rateLimit: exp
         // admin secret.
         delete req.headers[ARCHON_ADMIN_HEADER];
         try {
+            if (req.method === 'GET' && resolveUpstreamUrl(req.originalUrl, '/cashu', config.cashuMintURL)?.pathname === '/v1/info') {
+                await sendMintInfo(config.cashuMintURL, res);
+                return;
+            }
             await proxyRequest(req, res, config.cashuMintURL, '/cashu', '/v1');
         } catch (error: any) {
             logger.error({ err: error, path: req.originalUrl }, 'Cashu mint proxy error');
@@ -63,6 +68,27 @@ export function cashuProxyHandlers(options: CashuProxyOptions): { rateLimit: exp
     };
 
     return { rateLimit, proxy };
+}
+
+// The mint's info (NUT-06), less NUT-17. cdk-mintd offers WebSocket
+// subscriptions at /v1/ws, but this proxy forwards plain HTTP only, so a
+// wallet that subscribed on the strength of the advertisement would get no
+// notifications rather than falling back to polling.
+async function sendMintInfo(mintURL: string, res: express.Response): Promise<void> {
+    const upstream = await fetch(new URL('/v1/info', mintURL));
+    const body = Buffer.from(await upstream.arrayBuffer());
+    let info: any;
+    try {
+        info = JSON.parse(body.toString('utf-8'));
+    } catch {
+        info = undefined;
+    }
+    if (!upstream.ok || typeof info?.nuts !== 'object' || info.nuts === null) {
+        res.status(upstream.status).type(upstream.headers.get('content-type') ?? 'application/octet-stream').send(body);
+        return;
+    }
+    delete info.nuts['17'];
+    res.status(upstream.status).json(info);
 }
 
 // The public mint URL `GET /cashu-mint` returns. Unlike the DIDComm endpoint

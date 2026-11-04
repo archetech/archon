@@ -566,7 +566,8 @@ links to it.
   traffic needs a per-source limit sized for every identity it serves; requests
   carrying the configured admin key are exempt, and Drawbridge removes that
   header before forwarding. Only the mint API (`/v1/...`) is forwarded, and
-  not its WebSocket subscriptions (NUT-17), which wallets replace by polling.
+  not its WebSocket subscriptions (NUT-17): Drawbridge removes NUT-17 from the
+  `/v1/info` it serves, so wallets poll instead.
   Cashu mint URLs may carry a path, so the mint's public URL is
   `<public host>/cashu` and cdk-mintd needs no prefix support.
 - Drawbridge `/capabilities` reports `cashu` when the mint URL is configured, and

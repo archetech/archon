@@ -809,7 +809,7 @@ docker compose start cashu-mint
 
 **Back up `./data/cashu-mint/`.** `seed` derives the mint's keys and `cdk-mintd.sqlite` records which ecash has been spent; restoring a mint needs both. Losing them leaves the mint unable to honour ecash it issued.
 
-Not provided yet: cdk's management RPC, and with it live keyset rotation (`rotate-next-keyset`), which needs TLS material and the separate `cdk-mint-cli`. The mint's WebSocket subscriptions (NUT-17) are not proxied; wallets poll instead.
+Not provided yet: cdk's management RPC, and with it live keyset rotation (`rotate-next-keyset`), which needs TLS material and the separate `cdk-mint-cli`. The mint's WebSocket subscriptions (NUT-17) are not proxied, so Drawbridge removes NUT-17 from the mint info it serves and wallets poll instead.
 
 ---
 

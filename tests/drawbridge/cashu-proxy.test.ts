@@ -14,6 +14,16 @@ import type { DrawbridgeStore, RateLimitResult } from '../../services/drawbridge
 
 const ADMIN_KEY = 'test-admin-key';
 
+const INFO = {
+    name: 'Archon mint',
+    version: 'cdk-mintd/0.18.3',
+    nuts: {
+        4: { methods: [{ method: 'bolt11', unit: 'sat' }], disabled: false },
+        7: { supported: true },
+        17: { supported: [{ method: 'bolt11', unit: 'sat', commands: ['bolt11_mint_quote'] }] },
+    },
+};
+
 let mint: Server;
 let mintURL: string;
 let received: { method: string; url: string; headers: http.IncomingHttpHeaders; body: string }[];
@@ -56,6 +66,10 @@ beforeAll(async () => {
         req.on('end', () => {
             received.push({ method: req.method!, url: req.url!, headers: req.headers, body });
             res.setHeader('Content-Type', 'application/json');
+            if (req.url === '/v1/info') {
+                res.end(JSON.stringify(INFO));
+                return;
+            }
             if (req.url === '/v1/compressed' && /gzip/.test(String(req.headers['accept-encoding']))) {
                 res.setHeader('Content-Encoding', 'gzip');
                 res.end(gzipSync(JSON.stringify({ ok: true })));
@@ -139,6 +153,15 @@ describe('the /cashu mint proxy', () => {
         expect(response.headers['content-encoding']).toBeUndefined();
         expect(response.body).toEqual({ ok: true });
     });
+
+    it.each(['/cashu/v1/info', '/cashu/v1/info?x=1', '/cashu/v1/./info'])(
+        'serves the mint info from %s without NUT-17, which it cannot carry', async path => {
+            const response = await request(drawbridge()).get(path);
+
+            expect(response.status).toBe(200);
+            const { 17: _ws, ...nuts } = INFO.nuts;
+            expect(response.body).toEqual({ ...INFO, nuts });
+        });
 
     it('answers 501 when the node runs no mint', async () => {
         const response = await request(drawbridge('')).get('/cashu/v1/info');
