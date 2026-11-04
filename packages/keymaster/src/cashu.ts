@@ -37,6 +37,7 @@ import type {
     CashuProof,
     CashuQuoteRecord,
     CashuReceiveResult,
+    CashuReclaimResult,
     CashuRestoreResult,
     CashuSendRecord,
     CashuSendResult,
@@ -68,6 +69,13 @@ const REQUIRED_NUTS = ['7', '8', '9'];
 type MintFetch = (url: string, init?: RequestInit) => Promise<Response>;
 
 type OperationOutcome = 'done' | 'open' | 'spent' | 'rejected';
+
+// What became of a reclaim's proofs when some were already spent.
+interface SwapReport {
+    redeemed: number;
+    recovered: number;
+    pending: number;
+}
 
 interface MintKeyset {
     id: string;
@@ -554,6 +562,19 @@ export class CashuWallet {
         return proofs.filter(proof => !reserved.has(proof.secret));
     }
 
+    // Each input's state, in order. A mint that leaves one out says nothing about
+    // it, which must not read as unspent.
+    private async inputStates(ctx: MintContext, inputs: CashuProof[]): Promise<string[]> {
+        const states = await ctx.client.states(inputs.map(proof => proofY(proof.secret)));
+        return inputs.map((proof) => {
+            const state = states.get(proofY(proof.secret));
+            if (!state) {
+                throw new CashuUnavailableError(`${ctx.url} did not report the state of every proof`);
+            }
+            return state;
+        });
+    }
+
     private async unspent(ctx: MintContext, proofs: CashuProof[]): Promise<CashuProof[]> {
         const states = await ctx.client.states(proofs.map(proof => proofY(proof.secret)));
         return proofs.filter(proof => states.get(proofY(proof.secret)) === 'UNSPENT');
@@ -588,29 +609,37 @@ export class CashuWallet {
     }
 
     // The outcome of a swap-shaped request the mint would not accept as sent.
-    private async resolveRejected(ctx: MintContext, id: string, error: CashuMintError, retried: boolean): Promise<OperationOutcome> {
+    private async resolveRejected(
+        ctx: MintContext,
+        id: string,
+        error: CashuMintError,
+        retried: boolean,
+        report?: SwapReport,
+    ): Promise<OperationOutcome> {
         const op = (await this.readOp(ctx, id))!;
         if (error.code === OUTPUTS_PENDING) {
             return 'open';
         }
         const { data, blinded } = await this.outputData(op);
         const recovered = await ctx.client.restore(blinded);
-        const states = await ctx.client.states(op.inputs.map(proof => proofY(proof.secret)));
-        const inputStates = [...states.values()];
+        const inputStates = await this.inputStates(ctx, op.inputs);
         if (inputStates.includes('PENDING')) {
             return 'open';
         }
         const spent = inputStates.includes('SPENT');
 
-        // An earlier attempt was signed and its response lost.
-        if (spent && blinded.length > 0 && blinded.every(output => recovered.has(output.B_))) {
+        // An earlier attempt was signed and its response lost, which spends every
+        // input and signs these outputs for these amounts. Anything less is someone
+        // else's use of the proofs or counters, as with a stale copy of the wallet.
+        if (inputStates.every(state => state === 'SPENT') && blinded.length > 0
+            && blinded.every((output, i) => Number(recovered.get(output.B_)?.amount) === op.outputs[i].amount)) {
             const signatures = blinded.map(output => recovered.get(output.B_)!);
             await this.applySwap(ctx, id, signatures, data);
             return 'done';
         }
         if (!spent && recovered.size > 0 && !retried) {
             await this.repairAndRenumber(ctx, id, op.keyset);
-            return this.runSwap(ctx, id, true);
+            return this.runSwap(ctx, id, true, report);
         }
 
         // Settled and unable to sign: its unsigned counters are free again.
@@ -619,8 +648,17 @@ export class CashuWallet {
             .map(output => output.counter!);
         const retire = async (wallet: WalletFile) => {
             const entry = await this.entryOf(wallet, ctx);
-            this.retire(entry, id);
             this.release(wallet, op.keyset, unsigned);
+            // A swap's inputs may be a token someone else holds, so a refusal leaves
+            // it outstanding rather than making it balance.
+            if (!spent && op.kind === 'swap') {
+                const stored = entry.operations!.find(item => item.id === id)!;
+                stored.sent = stored.inputs;
+                stored.inputs = [];
+                stored.outputs = [];
+                return entry;
+            }
+            this.retire(entry, id);
             // Only what the identity owned goes back; a received token's proofs
             // were never its own.
             if (!spent && op.kind !== 'receive') {
@@ -629,11 +667,14 @@ export class CashuWallet {
             return entry;
         };
 
+        if (report) {
+            report.redeemed += sumProofs(op.inputs.filter((_, i) => inputStates[i] === 'SPENT'));
+        }
         const remainder = spent && op.kind !== 'receive'
-            ? op.inputs.filter(proof => states.get(proofY(proof.secret)) === 'UNSPENT')
+            ? op.inputs.filter((_, i) => inputStates[i] === 'UNSPENT')
             : [];
         if (remainder.length > 0) {
-            await this.swapRemainder(ctx, remainder, retire);
+            await this.swapRemainder(ctx, remainder, retire, report);
         }
         else {
             await this.host.mutateWallet(async (wallet) => { await retire(wallet); });
@@ -645,29 +686,40 @@ export class CashuWallet {
     }
 
     // What is left of a partly spent operation. It is swapped rather than credited:
-    // when reclaiming a token, the recipient still holds these proofs. A failure
-    // here leaves the new record for settlement to finish.
+    // when reclaiming a token, the recipient still holds these proofs. If the mint
+    // cannot be reached the new record is left for settlement; if it refuses, the
+    // proofs stay outstanding.
     private async swapRemainder(
         ctx: MintContext,
         inputs: CashuProof[],
         retire: (wallet: WalletFile) => Promise<CashuMintEntry>,
+        report?: SwapReport,
     ): Promise<void> {
         const { keyset, keysets } = await this.activeKeyset(ctx);
         const value = sumProofs(inputs) - feeFor(inputs, keysets);
         const swapId = newId();
+        // Worth less than the fee to redeem it, it is not worth a record.
+        if (value <= 0) {
+            await this.host.mutateWallet(async (wallet) => { await retire(wallet); });
+            return;
+        }
+        let outcome: OperationOutcome = 'open';
         try {
-            await this.journaled(swapId, async (wallet) => {
+            outcome = await this.journaled(swapId, async (wallet) => {
                 const entry = await retire(wallet);
-                // Worth less than the fee to redeem it, it is not worth a record.
-                if (value > 0) {
-                    this.journalSwap(wallet, entry, swapId, 'swap', inputs, keyset.id, value);
-                }
-            }, async () => value > 0 ? this.runSwap(ctx, swapId) : 'done');
+                this.journalSwap(wallet, entry, swapId, 'swap', inputs, keyset.id, value);
+            }, () => this.runSwap(ctx, swapId, false, report));
         }
         catch (error) {
             if (!(error instanceof CashuMintError || error instanceof CashuUnavailableError)) {
                 throw error;
             }
+        }
+        if (report && outcome === 'done') {
+            report.recovered += value;
+        }
+        else if (report && outcome === 'open') {
+            report.pending += sumProofs(inputs);
         }
     }
 
@@ -718,7 +770,7 @@ export class CashuWallet {
         });
     }
 
-    private async runSwap(ctx: MintContext, id: string, retried = false): Promise<OperationOutcome> {
+    private async runSwap(ctx: MintContext, id: string, retried = false, report?: SwapReport): Promise<OperationOutcome> {
         const op = (await this.readOp(ctx, id))!;
         const { data, blinded } = await this.outputData(op);
         try {
@@ -728,7 +780,7 @@ export class CashuWallet {
         }
         catch (error) {
             if (error instanceof CashuMintError) {
-                return this.resolveRejected(ctx, id, error, retried);
+                return this.resolveRejected(ctx, id, error, retried, report);
             }
             throw error;
         }
@@ -741,8 +793,8 @@ export class CashuWallet {
     }
 
     private async settleSent(ctx: MintContext, op: CashuOperation): Promise<OperationOutcome> {
-        const states = await ctx.client.states(op.sent!.map(proof => proofY(proof.secret)));
-        if ([...states.values()].length > 0 && [...states.values()].every(state => state === 'SPENT')) {
+        const states = await this.inputStates(ctx, op.sent!);
+        if (states.every(state => state === 'SPENT')) {
             await this.dropOp(ctx, op.id);
             return 'done';
         }
@@ -887,9 +939,36 @@ export class CashuWallet {
         }
 
         // Unpaid: the inputs come back once the mint shows them unspent.
-        const states = await ctx.client.states(op.inputs.map(proof => proofY(proof.secret)));
-        if ([...states.values()].some(state => state !== 'UNSPENT')) {
+        const states = await this.inputStates(ctx, op.inputs);
+        if (states.includes('PENDING')) {
             return { outcome: 'open', quote, change: 0 };
+        }
+        if (states.includes('SPENT')) {
+            // A mint marks a melt's inputs spent no earlier than it marks the quote
+            // paid, so an input spent under a quote still unpaid when read again was
+            // spent by something else, such as another copy of the wallet. This melt
+            // cannot complete. Its change counters stay used, in case this is wrong
+            // for some mint: a restore can still find the change.
+            const again = await ctx.client.checkMeltQuote(op.quote!);
+            if (again.state === 'PAID') {
+                return this.settleMelt(ctx, id, again);
+            }
+            if (again.state !== 'UNPAID') {
+                return { outcome: 'open', quote: again, change: 0 };
+            }
+            const retire = async (wallet: WalletFile) => {
+                const entry = await this.entryOf(wallet, ctx);
+                this.retire(entry, id);
+                return entry;
+            };
+            const remainder = op.inputs.filter((_, i) => states[i] === 'UNSPENT');
+            if (remainder.length > 0) {
+                await this.swapRemainder(ctx, remainder, retire);
+            }
+            else {
+                await this.host.mutateWallet(async (wallet) => { await retire(wallet); });
+            }
+            return { outcome: 'rejected', quote: again, change: 0 };
         }
         const recovered = await ctx.client.restore(blinded);
         const unsigned = op.outputs.filter((_, i) => !recovered.has(blinded[i].B_)).map(output => output.counter!);
@@ -1333,7 +1412,7 @@ export class CashuWallet {
             });
         }, () => this.runSwap(ctx, id));
         if (outcome === 'spent') {
-            throw new CashuTokenSpentError('the selected proofs were already spent; run cashu-check');
+            throw new CashuTokenSpentError('some selected proofs were already spent; the rest were kept, so try again');
         }
         if (outcome !== 'done') {
             throw new CashuUnavailableError(`${ctx.url} has the send pending; run cashu-check`);
@@ -1404,12 +1483,38 @@ export class CashuWallet {
         const identity = await this.boundIdentity(name);
         const entries = await this.scopedEntries(mint, identity);
         const total: CashuCheckResult = { settled: 0, open: 0 };
+        let dropped = 0;
         for (const [url] of entries) {
-            const result = await this.settle(await this.context(url, identity));
+            const ctx = await this.context(url, identity);
+            const result = await this.settle(ctx);
             total.settled += result.settled;
             total.open += result.open;
+            dropped += await this.dropSpent(ctx);
         }
-        return total;
+        return dropped > 0 ? { ...total, dropped } : total;
+    }
+
+    // Proofs spent elsewhere, as by another copy of the wallet, otherwise stay in the
+    // balance until an operation selects them and fails.
+    private async dropSpent(ctx: MintContext): Promise<number> {
+        const { proofs } = await this.entryOf(await this.host.loadWallet(), ctx);
+        let states: Map<string, string>;
+        try {
+            states = await ctx.client.states(proofs.map(proof => proofY(proof.secret)));
+        }
+        catch (error) {
+            if (error instanceof CashuMintError || error instanceof CashuUnavailableError) {
+                return 0;
+            }
+            throw error;
+        }
+        const spent = proofs.filter(proof => states.get(proofY(proof.secret)) === 'SPENT');
+        if (spent.length > 0) {
+            await this.host.mutateWallet(async (wallet) => {
+                this.removeFromEntry(await this.entryOf(wallet, ctx), spent);
+            });
+        }
+        return sumProofs(spent);
     }
 
     async restoreCashu(mint?: string, name?: string): Promise<CashuRestoreResult> {
@@ -1443,7 +1548,7 @@ export class CashuWallet {
         return found;
     }
 
-    async reclaimCashu(operationId: string, name?: string): Promise<CashuReceiveResult> {
+    async reclaimCashu(operationId: string, name?: string): Promise<CashuReclaimResult> {
         const identity = await this.boundIdentity(name);
         const entries = await this.scopedEntries(undefined, identity);
         const found = entries.find(([, entry]) => entry.operations?.some(op => op.id === operationId && op.sent));
@@ -1453,10 +1558,16 @@ export class CashuWallet {
         const ctx = await this.context(found[0], identity);
         const { keyset, keysets } = await this.activeKeyset(ctx);
 
+        if (this.active.has(operationId)) {
+            throw new CashuUnavailableError(`send ${operationId} is being settled; try again`);
+        }
+
         // The token becomes an ordinary swap's inputs, in one write, so the record
-        // can be finished after a crash and the value never appears twice.
-        const swapId = newId();
+        // can be finished after a crash and the value never appears twice. It keeps
+        // its id: a refusal puts the token back, to be reclaimed again.
+        const swapId = operationId;
         let amount = 0;
+        const report: SwapReport = { redeemed: 0, recovered: 0, pending: 0 };
         const outcome = await this.journaled(swapId, async (wallet) => {
             const entry = await this.entryOf(wallet, ctx);
             const op = entry.operations?.find(item => item.id === operationId && item.sent);
@@ -1467,9 +1578,17 @@ export class CashuWallet {
             amount = sumProofs(inputs) - feeFor(inputs, keysets);
             this.retire(entry, operationId);
             this.journalSwap(wallet, entry, swapId, 'swap', inputs, keyset.id, amount);
-        }, () => this.runSwap(ctx, swapId));
+        }, () => this.runSwap(ctx, swapId, false, report));
         if (outcome === 'spent') {
-            throw new CashuTokenSpentError('the recipient redeemed this token; any part they did not was reclaimed');
+            if (report.recovered === 0 && report.pending === 0) {
+                throw new CashuTokenSpentError('the recipient already redeemed this token');
+            }
+            return {
+                amount: report.recovered,
+                mint: ctx.url,
+                redeemed: report.redeemed,
+                ...(report.pending > 0 && { pending: report.pending }),
+            };
         }
         if (outcome !== 'done') {
             throw new CashuUnavailableError(`${ctx.url} has the reclaim pending; run cashu-check`);

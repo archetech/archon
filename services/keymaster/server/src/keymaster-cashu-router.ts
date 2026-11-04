@@ -547,7 +547,7 @@ export function createCashuRouter(options: CreateKeymasterRouterOptions): expres
      *                 description: Optional identity name or DID.
      *     responses:
      *       200:
-     *         description: Counts of records settled and still open.
+     *         description: Counts of records settled and still open, and the value of any spent proofs dropped.
      *       400:
      *         description: Invalid request, or the mint refused it.
      *       503:
@@ -656,7 +656,7 @@ export function createCashuRouter(options: CreateKeymasterRouterOptions): expres
      *                 description: Optional identity name or DID.
      *     responses:
      *       200:
-     *         description: The amount reclaimed.
+     *         description: The amount reclaimed, and what the recipient had redeemed if that was only part of the token.
      *       400:
      *         description: Invalid request, or the mint refused it.
      *       503:

@@ -313,20 +313,96 @@ class TestSendingAndReceiving:
         assert funded.balance() == {"spendable": 70, "inFlight": 0, "outstanding": 30}
         assert funded.balance("Bob")["spendable"] == 0
 
-    def test_re_swaps_the_unspent_part_of_a_partly_redeemed_reclaim(self, funded):
+    def partly_redeemed(self, funded):
         sent = run(funded.keymaster.send_cashu(6))
         record = next(op for op in funded.entry()["operations"] if op["id"] == sent["operationId"])
         two = next(proof for proof in record["sent"] if proof["amount"] == 2)
-        four = next(proof for proof in record["sent"] if proof["amount"] == 4)
         funded.mint.spent.add(proof_y(two["secret"]))
+        return sent["operationId"], next(proof for proof in record["sent"] if proof["amount"] == 4)
 
-        with pytest.raises(CashuTokenSpentError):
-            run(funded.keymaster.reclaim_cashu(sent["operationId"]))
+    def test_re_swaps_the_unspent_part_of_a_partly_redeemed_reclaim_and_says_what_happened(self, funded):
+        operation_id, four = self.partly_redeemed(funded)
+
+        assert run(funded.keymaster.reclaim_cashu(operation_id)) == {"amount": 4, "mint": PUBLIC_URL, "redeemed": 2}
 
         assert funded.balance() == {"spendable": 98, "inFlight": 0, "outstanding": 0}
         # The recipient still holds the original, so it must not come back as is.
         assert four["secret"] not in [proof["secret"] for proof in funded.entry()["proofs"]]
         assert proof_y(four["secret"]) in funded.mint.spent
+
+    def test_reports_what_is_still_in_flight_when_the_remainder_swap_does_not_finish(self, funded):
+        operation_id, _ = self.partly_redeemed(funded)
+        funded.mint.lose_response("/v1/swap")
+
+        result = run(funded.keymaster.reclaim_cashu(operation_id))
+
+        assert result == {"amount": 0, "mint": PUBLIC_URL, "redeemed": 2, "pending": 4}
+        assert funded.balance() == {"spendable": 94, "inFlight": 4, "outstanding": 0}
+        run(funded.keymaster.check_cashu())
+        assert funded.balance() == {"spendable": 98, "inFlight": 0, "outstanding": 0}
+
+    def backup_of(self, funded) -> Keymaster:
+        store = FakeWalletStore()
+        store.wallet = funded.testbed.wallet_store.load_wallet()
+        backup = Keymaster(gatekeeper=funded.gatekeeper, wallet_store=store, passphrase="passphrase")
+        backup._node_capabilities = None
+        funded.wire(backup)
+        return backup
+
+    def test_does_not_take_a_backups_stale_counters_as_its_own_lost_response(self, funded):
+        backup = self.backup_of(funded)
+        run(funded.keymaster.send_cashu(30))
+
+        # The 64 it selects is spent, and the original signed the same counters.
+        with pytest.raises(CashuTokenSpentError):
+            run(backup.send_cashu(60))
+
+        assert run(backup.get_cashu_balance()) == {"spendable": 36, "inFlight": 0, "outstanding": 0}
+        assert run(backup.list_cashu_sends()) == []
+
+    def test_keeps_what_a_backup_had_not_spent_when_a_send_selects_both(self, funded):
+        backup = self.backup_of(funded)
+        run(funded.keymaster.send_cashu(30))
+
+        with pytest.raises(CashuTokenSpentError):
+            run(backup.send_cashu(90))
+
+        assert run(backup.get_cashu_balance()) == {"spendable": 36, "inFlight": 0, "outstanding": 0}
+
+    def test_drops_proofs_the_mint_reports_spent_when_checking(self, funded):
+        four = next(proof for proof in funded.entry()["proofs"] if proof["amount"] == 4)
+        funded.mint.spent.add(proof_y(four["secret"]))
+
+        assert run(funded.keymaster.check_cashu()) == {"settled": 0, "open": 0, "dropped": 4}
+        assert funded.balance()["spendable"] == 96
+
+    def test_keeps_checking_through_a_mint_that_cannot_report_proof_states(self, funded):
+        funded.mint.refuse_next("/v1/checkstate", 20000, "try later")
+
+        assert run(funded.keymaster.check_cashu()) == {"settled": 0, "open": 0}
+        assert funded.balance()["spendable"] == 100
+
+    def test_does_not_read_a_proof_the_mint_left_out_as_unspent(self, funded):
+        funded.mint.refuse_next("/v1/swap", 11002, "transaction unbalanced")
+        funded.mint.states_limit = 0
+
+        with pytest.raises(CashuUnavailableError):
+            run(funded.keymaster.send_cashu(30))
+        assert funded.balance()["inFlight"] == 64
+
+        funded.mint.states_limit = None
+        run(funded.keymaster.check_cashu())
+        assert funded.balance() == {"spendable": 70, "inFlight": 0, "outstanding": 30}
+
+    def test_does_not_retire_an_outstanding_send_on_a_partial_state_answer(self, funded):
+        sent = run(funded.keymaster.send_cashu(30))
+        record = next(op for op in funded.entry()["operations"] if op["id"] == sent["operationId"])
+        funded.mint.spent.add(proof_y(record["sent"][0]["secret"]))
+        funded.mint.states_limit = 1
+
+        run(funded.keymaster.check_cashu())
+
+        assert len(run(funded.keymaster.list_cashu_sends())) == 1
 
     def test_keeps_nothing_of_a_partly_spent_token_it_was_receiving(self, funded):
         sent = run(funded.keymaster.send_cashu(6))
@@ -362,6 +438,76 @@ class TestSendingAndReceiving:
 
         assert funded.mint.requests.count("POST /v1/swap") == 1
         assert funded.balance() == {"spendable": 70, "inFlight": 0, "outstanding": 30}
+
+    def test_keeps_a_token_outstanding_when_the_mint_refuses_to_reclaim_it(self, funded):
+        sent = run(funded.keymaster.send_cashu(30))
+        funded.mint.refuse_next("/v1/swap", 11002, "transaction unbalanced")
+
+        with pytest.raises(KeymasterError, match="transaction unbalanced"):
+            run(funded.keymaster.reclaim_cashu(sent["operationId"]))
+
+        # The recipient still holds these proofs, so they cannot become balance.
+        assert funded.balance() == {"spendable": 70, "inFlight": 0, "outstanding": 30}
+        assert run(funded.keymaster.list_cashu_sends())[0]["operationId"] == sent["operationId"]
+
+        run(funded.keymaster.receive_cashu(sent["token"], "Bob"))
+        run(funded.keymaster.check_cashu())
+        assert funded.balance() == {"spendable": 70, "inFlight": 0, "outstanding": 0}
+
+    def test_refuses_to_reclaim_a_send_while_settlement_is_working_on_it(self, funded):
+        sent = run(funded.keymaster.send_cashu(30))
+        errors = []
+
+        async def reclaim(path):
+            if path == "/v1/checkstate" and not errors:
+                try:
+                    await funded.keymaster.reclaim_cashu(sent["operationId"])
+                except CashuUnavailableError as error:
+                    errors.append(error)
+
+        funded.mint.on_request = reclaim
+
+        run(funded.keymaster.check_cashu())
+
+        assert errors
+        assert len(run(funded.keymaster.list_cashu_sends())) == 1
+
+    def test_can_retry_a_reclaim_the_mint_refused(self, funded):
+        sent = run(funded.keymaster.send_cashu(30))
+        funded.mint.refuse_next("/v1/swap", 11002, "transaction unbalanced")
+        with pytest.raises(KeymasterError):
+            run(funded.keymaster.reclaim_cashu(sent["operationId"]))
+
+        assert run(funded.keymaster.reclaim_cashu(sent["operationId"])) == {"amount": 30, "mint": PUBLIC_URL}
+        assert funded.balance() == {"spendable": 100, "inFlight": 0, "outstanding": 0}
+
+    def test_sends_nothing_and_keeps_its_proofs_when_the_journal_cannot_be_saved(self, funded):
+        store = funded.testbed.wallet_store
+        save = store.save_wallet
+
+        def failing(wallet, overwrite=False):
+            raise OSError("disk full")
+
+        store.save_wallet = failing
+        funded.mint.requests.clear()
+
+        with pytest.raises(OSError, match="disk full"):
+            run(funded.keymaster.send_cashu(30))
+        store.save_wallet = save
+
+        assert funded.balance() == {"spendable": 100, "inFlight": 0, "outstanding": 0}
+        assert run(funded.keymaster.check_cashu()) == {"settled": 0, "open": 0}
+        assert "POST /v1/swap" not in funded.mint.requests
+
+    def test_rejects_a_token_that_repeats_a_proof_crediting_nothing(self, funded):
+        token = run(funded.keymaster.send_cashu(8))["token"]
+        proofs = decode_token(token)["proofs"]
+        doubled = encode_token(PUBLIC_URL, "sat", [*proofs, *proofs])
+
+        with pytest.raises(KeymasterError, match="duplicate inputs"):
+            run(funded.keymaster.receive_cashu(doubled, "Bob"))
+
+        assert funded.balance("Bob") == {"spendable": 0, "inFlight": 0, "outstanding": 0}
 
     def test_rejects_a_malformed_token(self, funded):
         with pytest.raises(KeymasterError, match="Invalid parameter: token"):
@@ -538,6 +684,44 @@ class TestMelting:
     def test_requires_an_invoice(self, bed):
         with pytest.raises(KeymasterError, match="Invalid parameter: bolt11"):
             run(bed.keymaster.melt_cashu(None))
+
+    def test_frees_the_other_inputs_of_a_melt_whose_input_was_spent_elsewhere(self, bed):
+        sixty_four = next(proof for proof in bed.entry()["proofs"] if proof["amount"] == 64)
+        bed.mint.spent.add(proof_y(sixty_four["secret"]))
+
+        with pytest.raises(KeymasterError, match="token already spent"):
+            run(bed.keymaster.melt_cashu("lnbc-amount=150"))
+
+        # 8 + 128, the 128 swapped to new proofs since another copy may hold it.
+        assert bed.balance() == {"spendable": 136, "inFlight": 0, "outstanding": 0}
+        assert run(bed.keymaster.list_cashu_quotes()) == []
+
+    def pending_melt_turning(self, bed, state):
+        bed.mint.melt_outcome = "PENDING"
+        run(bed.keymaster.melt_cashu("lnbc-amount=100"))
+        quote = next(iter(bed.mint.melt_quotes.values()))
+        quote["state"] = "UNPAID"
+
+        async def turn(path):
+            if path == "/v1/checkstate":
+                quote["state"] = state
+
+        bed.mint.on_request = turn
+
+    def test_settles_a_melt_as_paid_when_the_quote_becomes_paid_between_the_two_reads(self, bed):
+        self.pending_melt_turning(bed, "PAID")
+
+        result = run(bed.keymaster.check_cashu())
+
+        assert result["settled"] == 1 and result["open"] == 0
+        assert bed.balance() == {"spendable": 72, "inFlight": 0, "outstanding": 0}
+
+    def test_stays_open_when_a_re_read_quote_is_neither_paid_nor_unpaid(self, bed):
+        self.pending_melt_turning(bed, "UNKNOWN")
+
+        result = run(bed.keymaster.check_cashu())
+
+        assert result["settled"] == 0 and result["open"] == 1
 
     def test_fails_a_melt_it_cannot_cover(self, bed):
         with pytest.raises(CashuInsufficientFundsError):

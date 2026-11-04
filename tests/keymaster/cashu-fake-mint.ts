@@ -62,6 +62,8 @@ export class FakeMint {
     meltOutcome: 'PAID' | 'PENDING' | 'UNPAID' = 'PAID';
     // Mints differ here: NUT-00 lists 11003, cdk-mintd sends 20006 on a mint.
     alreadySignedCode = 11003;
+    // When set, /v1/checkstate answers for only this many proofs.
+    statesLimit?: number;
     // Runs while a request is on the wire, before the mint answers it.
     onRequest?: (path: string) => Promise<void>;
     // Requests whose work is done but whose response never arrives.
@@ -134,7 +136,12 @@ export class FakeMint {
 
     private spend(inputs: { amount: number; secret: string; C: string }[]): void {
         const encoder = new TextEncoder();
+        const seen = new Set<string>();
         for (const input of inputs) {
+            if (seen.has(input.secret)) {
+                throw new MintRefusal(11007, 'duplicate inputs');
+            }
+            seen.add(input.secret);
             const valid = verifyUnblindedSignature({
                 C: pointFromHex(input.C),
                 secret: encoder.encode(input.secret),
@@ -249,7 +256,7 @@ export class FakeMint {
         }
         if (method === 'POST' && path === '/v1/checkstate') {
             return {
-                states: body.Ys.map((Y: string) => ({ Y, state: this.spent.has(Y) ? 'SPENT' : 'UNSPENT', witness: null })),
+                states: body.Ys.slice(0, this.statesLimit).map((Y: string) => ({ Y, state: this.spent.has(Y) ? 'SPENT' : 'UNSPENT', witness: null })),
             };
         }
         if (method === 'POST' && path === '/v1/restore') {

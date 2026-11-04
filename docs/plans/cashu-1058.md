@@ -117,7 +117,9 @@ saved.
 The journal also says what each unspent proof is for, which NUT-07 alone cannot.
 `checkCashu` settles each record by kind. Every mutating Cashu operation on a
 mint first settles that mint's open records for the identity, so a restart needs
-no separate step; `cashu-check` runs the same settlement on demand. Read methods
+no separate step; `cashu-check` runs the same settlement on demand, and also
+drops spendable proofs the mint reports spent, which only happens when something
+else spent them, reporting their value. Read methods
 (`getCashuBalance`, `listCashuMints`, `listCashuQuotes`, `listCashuSends`,
 `listCashuMessages`) never settle or send anything: they report open records as
 in flight, so they stay safe to expose as read-only MCP tools.
@@ -125,8 +127,8 @@ in flight, so they stay safe to expose as read-only MCP tools.
 | Kind | Settled when | Outcome |
 |---|---|---|
 | `mint` | the quote is paid, or expires unpaid | claim the proofs, or drop the record |
-| `melt` | the quote is paid or unpaid; while it is `PENDING` the record stays open | keep the change, from the quote state if the response was lost, or return the inputs to `proofs` |
-| `swap` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09, or return the inputs once NUT-07 shows them unspent |
+| `melt` | the quote is paid or unpaid; while it or an input is `PENDING` the record stays open | keep the change, from the quote state if the response was lost, or return the inputs to `proofs`; if an input is spent and a fresh read still says `UNPAID`, something else spent it, so swap the rest to new proofs and keep the change counters used |
+| `swap` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09 if every input is spent and the amounts match; on a refusal with unspent inputs, keep them as an outstanding send, since they may be a token someone else holds |
 | `receive` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09, or drop the record and report the token as already spent |
 | `send`, `locked-send` | the swap settles as above, then every `sent` proof is spent | the token was redeemed; until then it is outstanding, not balance |
 
@@ -151,7 +153,9 @@ recipient may not have redeemed it yet. `reclaimCashu` takes back one unredeemed
 send, named by its operation id from `listCashuSends`: an unlocked token by
 swapping it, a locked one with the refund key once its locktime has passed.
 Reclaiming is per send because taking back every outstanding token would cancel
-payments still in transit.
+payments still in transit. If the recipient redeemed part of a token, the rest is
+swapped to new proofs and the result adds what they took as `redeemed`, and
+anything not yet spendable as `pending`; nothing recovered is an error.
 
 Counters are reserved and saved before the blinded outputs they cover are sent to
 the mint, so a crash can never reuse a counter the mint has signed. A reservation
@@ -289,7 +293,8 @@ not received until the mint confirms its proofs are unspent.
 - TypeScript uses `@cashu/cashu-ts` 4.x for cryptography and tokens, with a thin
   mint HTTP client of its own rather than cashu-ts's `Mint`, so both ports share
   one client shape and the wallet keeps the mint's error codes and the melt's lack
-  of a timeout. Its `@noble/curves` 2 and `@noble/hashes` 2 dependencies are
+  of a timeout. `mutateWallet` publishes a mutation only after saving it, so a
+  failed write cannot leave a journal record that settlement would submit. Its `@noble/curves` 2 and `@noble/hashes` 2 dependencies are
   already in `packages/cipher`'s tree, so it adds no second copy to the browser
   wallets.
 - Python implements NUT-00 hash-to-curve, blinding and unblinding, NUT-12 DLEQ
@@ -361,7 +366,8 @@ not received until the mint confirms its proofs are unspent.
   `state`, `expiry`), `CashuMeltResult` (`paid`, `preimage`, `fee`, `change` as an amount, never
   the proofs),
   `CashuSendResult` (`token`, `amount`, `fee`, `operationId`), `CashuReceiveResult` (`amount`,
-  `mint`), `CashuCheckResult` (counts of records settled and still open), and
+  `mint`), `CashuCheckResult` (counts of records settled and still open, and `dropped`, the
+  value of spent proofs removed, when there was any), and
   `CashuSendToResult` (`token`, `messageId`, `delivered`).
 - `KeymasterClient` and the Python SDK.
 - The CLI commands below, in `scripts/archon-cli.js`,

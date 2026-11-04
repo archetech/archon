@@ -338,19 +338,100 @@ describe('sending and receiving', () => {
         expect((await keymaster.getCashuBalance(undefined, 'Bob')).spendable).toBe(0);
     });
 
-    it('re-swaps the unspent part of a partly redeemed reclaim', async () => {
+    async function partlyRedeemed(): Promise<{ operationId: string; four: { secret: string } }> {
         const { operationId } = await keymaster.sendCashu(6);
-        const sent = (await entry()).operations.find((op: { id: string }) => op.id === operationId).sent;
+        const { sent } = (await entry()).operations.find((op: { id: string }) => op.id === operationId);
         const two = sent.find((proof: { amount: number }) => proof.amount === 2);
-        const four = sent.find((proof: { amount: number }) => proof.amount === 4);
         mint.spent.add(proofY(two.secret));
+        return { operationId, four: sent.find((proof: { amount: number }) => proof.amount === 4) };
+    }
 
-        await expect(keymaster.reclaimCashu(operationId)).rejects.toThrow(CashuTokenSpentError);
+    it('re-swaps the unspent part of a partly redeemed reclaim, and says what happened', async () => {
+        const { operationId, four } = await partlyRedeemed();
+
+        await expect(keymaster.reclaimCashu(operationId)).resolves.toEqual({ amount: 4, mint: PUBLIC_URL, redeemed: 2 });
 
         expect(await keymaster.getCashuBalance()).toEqual({ spendable: 98, inFlight: 0, outstanding: 0 });
         // The recipient still holds the original, so it must not come back as is.
         expect((await entry()).proofs.map((proof: { secret: string }) => proof.secret)).not.toContain(four.secret);
         expect(mint.spent.has(proofY(four.secret))).toBe(true);
+    });
+
+    it('reports what is still in flight when the remainder swap does not finish', async () => {
+        const { operationId } = await partlyRedeemed();
+        mint.loseResponse('/v1/swap');
+
+        await expect(keymaster.reclaimCashu(operationId)).resolves.toEqual({ amount: 0, mint: PUBLIC_URL, redeemed: 2, pending: 4 });
+
+        expect(await keymaster.getCashuBalance()).toEqual({ spendable: 94, inFlight: 4, outstanding: 0 });
+        await keymaster.checkCashu();
+        expect(await keymaster.getCashuBalance()).toEqual({ spendable: 98, inFlight: 0, outstanding: 0 });
+    });
+
+    it('does not take a backup\'s stale counters as its own lost response', async () => {
+        const stored = await wallet.loadWallet();
+        const copy = new WalletJsonMemory();
+        await copy.saveWallet(structuredClone(stored!), true);
+        const backup = newKeymaster(copy);
+        await keymaster.sendCashu(30);
+
+        // The 64 it selects is spent, and the original signed the same counters.
+        await expect(backup.sendCashu(60)).rejects.toThrow(CashuTokenSpentError);
+
+        expect(await backup.getCashuBalance()).toEqual({ spendable: 36, inFlight: 0, outstanding: 0 });
+        expect(await backup.listCashuSends()).toEqual([]);
+    });
+
+    it('keeps what a backup had not spent when a send selects both', async () => {
+        const stored = await wallet.loadWallet();
+        const copy = new WalletJsonMemory();
+        await copy.saveWallet(structuredClone(stored!), true);
+        const backup = newKeymaster(copy);
+        await keymaster.sendCashu(30);
+
+        await expect(backup.sendCashu(90)).rejects.toThrow(CashuTokenSpentError);
+
+        expect(await backup.getCashuBalance()).toMatchObject({ spendable: 36, inFlight: 0, outstanding: 0 });
+    });
+
+    it('drops proofs the mint reports spent when checking, and reports their value', async () => {
+        const four = (await entry()).proofs.find((proof: { amount: number }) => proof.amount === 4);
+        mint.spent.add(proofY(four.secret));
+
+        await expect(keymaster.checkCashu()).resolves.toEqual({ settled: 0, open: 0, dropped: 4 });
+
+        expect((await keymaster.getCashuBalance()).spendable).toBe(96);
+    });
+
+    it('keeps checking through a mint that cannot report proof states', async () => {
+        mint.refuseNext('/v1/checkstate', 20000, 'try later');
+
+        await expect(keymaster.checkCashu()).resolves.toEqual({ settled: 0, open: 0 });
+
+        expect((await keymaster.getCashuBalance()).spendable).toBe(100);
+    });
+
+    it('does not read a proof the mint left out as unspent', async () => {
+        mint.refuseNext('/v1/swap', 11002, 'transaction unbalanced');
+        mint.statesLimit = 0;
+
+        await expect(keymaster.sendCashu(30)).rejects.toThrow(CashuUnavailableError);
+        expect((await keymaster.getCashuBalance()).inFlight).toBe(64);
+
+        mint.statesLimit = undefined;
+        await keymaster.checkCashu();
+        expect(await keymaster.getCashuBalance()).toEqual({ spendable: 70, inFlight: 0, outstanding: 30 });
+    });
+
+    it('does not retire an outstanding send on a partial state answer', async () => {
+        const { operationId } = await keymaster.sendCashu(30);
+        const { sent } = (await entry()).operations.find((op: { id: string }) => op.id === operationId);
+        mint.spent.add(proofY(sent[0].secret));
+        mint.statesLimit = 1;
+
+        await keymaster.checkCashu();
+
+        expect(await keymaster.listCashuSends()).toHaveLength(1);
     });
 
     it('keeps nothing of a partly spent token it was receiving', async () => {
@@ -381,6 +462,71 @@ describe('sending and receiving', () => {
 
         expect(mint.requests.filter(request => request === 'POST /v1/swap')).toHaveLength(1);
         expect(await keymaster.getCashuBalance()).toEqual({ spendable: 70, inFlight: 0, outstanding: 30 });
+    });
+
+    it('keeps a token outstanding when the mint refuses to reclaim it', async () => {
+        const { operationId, token } = await keymaster.sendCashu(30);
+        mint.refuseNext('/v1/swap', 11002, 'transaction unbalanced');
+
+        await expect(keymaster.reclaimCashu(operationId)).rejects.toThrow('transaction unbalanced');
+
+        // The recipient still holds these proofs, so they cannot become balance.
+        expect(await keymaster.getCashuBalance()).toEqual({ spendable: 70, inFlight: 0, outstanding: 30 });
+        expect(await keymaster.listCashuSends()).toEqual([expect.objectContaining({ operationId, amount: 30 })]);
+
+        await keymaster.receiveCashu(token, 'Bob');
+        await keymaster.checkCashu();
+        expect(await keymaster.getCashuBalance()).toEqual({ spendable: 70, inFlight: 0, outstanding: 0 });
+    });
+
+    it('refuses to reclaim a send while settlement is working on it', async () => {
+        const { operationId } = await keymaster.sendCashu(30);
+        let reclaim: Promise<unknown> | undefined;
+        mint.onRequest = async (path) => {
+            if (path === '/v1/checkstate' && !reclaim) {
+                reclaim = keymaster.reclaimCashu(operationId).catch(error => error);
+                await reclaim;
+            }
+        };
+
+        await keymaster.checkCashu();
+
+        expect(await reclaim).toBeInstanceOf(CashuUnavailableError);
+        expect(await keymaster.listCashuSends()).toHaveLength(1);
+    });
+
+    it('can retry a reclaim the mint refused', async () => {
+        const { operationId } = await keymaster.sendCashu(30);
+        mint.refuseNext('/v1/swap', 11002, 'transaction unbalanced');
+        await expect(keymaster.reclaimCashu(operationId)).rejects.toThrow('transaction unbalanced');
+
+        await expect(keymaster.reclaimCashu(operationId)).resolves.toEqual({ amount: 30, mint: PUBLIC_URL });
+
+        expect(await keymaster.getCashuBalance()).toEqual({ spendable: 100, inFlight: 0, outstanding: 0 });
+    });
+
+    it('sends nothing, and keeps its proofs, when the journal cannot be saved', async () => {
+        const save = wallet.saveWallet.bind(wallet);
+        wallet.saveWallet = async () => { throw new Error('disk full'); };
+        mint.requests = [];
+
+        await expect(keymaster.sendCashu(30)).rejects.toThrow('disk full');
+        wallet.saveWallet = save;
+
+        expect(await keymaster.getCashuBalance()).toEqual({ spendable: 100, inFlight: 0, outstanding: 0 });
+        expect(await keymaster.checkCashu()).toEqual({ settled: 0, open: 0 });
+        expect(mint.requests).not.toContain('POST /v1/swap');
+    });
+
+    it('rejects a token that repeats a proof, crediting nothing', async () => {
+        const { getDecodedToken } = await import('@cashu/cashu-ts');
+        const { token } = await keymaster.sendCashu(8);
+        const decoded = getDecodedToken(token, [mint.keysetId]);
+        const doubled = getEncodedToken({ ...decoded, proofs: [...decoded.proofs, ...decoded.proofs] });
+
+        await expect(keymaster.receiveCashu(doubled, 'Bob')).rejects.toThrow('duplicate inputs');
+
+        expect(await keymaster.getCashuBalance(undefined, 'Bob')).toEqual({ spendable: 0, inFlight: 0, outstanding: 0 });
     });
 
     it('rejects a malformed token', async () => {
@@ -594,6 +740,53 @@ describe('melting', () => {
 
     it('requires an invoice', async () => {
         await expect(keymaster.meltCashu(undefined as never)).rejects.toThrow('Invalid parameter: bolt11');
+    });
+
+    function spendElsewhere(amount: number) {
+        return entry().then((held) => {
+            const proof = held.proofs.find((item: { amount: number }) => item.amount === amount);
+            mint.spent.add(proofY(proof.secret));
+        });
+    }
+
+    it('frees the other inputs of a melt whose input was spent elsewhere', async () => {
+        await spendElsewhere(64);
+
+        await expect(keymaster.meltCashu('lnbc-amount=150')).rejects.toThrow('token already spent');
+
+        // 8 + 128, the 128 swapped to new proofs since another copy may hold it.
+        expect(await keymaster.getCashuBalance()).toEqual({ spendable: 136, inFlight: 0, outstanding: 0 });
+        expect(await keymaster.listCashuQuotes()).toEqual([]);
+    });
+
+    it('settles a melt as paid when the quote becomes paid between the two reads', async () => {
+        mint.meltOutcome = 'PENDING';
+        await keymaster.meltCashu('lnbc-amount=100');
+        const quote = [...mint.meltQuotes.values()][0];
+        quote.state = 'UNPAID';
+        mint.onRequest = async (path) => {
+            if (path === '/v1/checkstate') {
+                quote.state = 'PAID';
+            }
+        };
+
+        await expect(keymaster.checkCashu()).resolves.toMatchObject({ settled: 1, open: 0 });
+
+        expect(await keymaster.getCashuBalance()).toEqual({ spendable: 72, inFlight: 0, outstanding: 0 });
+    });
+
+    it('stays open when a re-read quote is neither paid nor unpaid', async () => {
+        mint.meltOutcome = 'PENDING';
+        await keymaster.meltCashu('lnbc-amount=100');
+        const quote = [...mint.meltQuotes.values()][0];
+        quote.state = 'UNPAID';
+        mint.onRequest = async (path) => {
+            if (path === '/v1/checkstate') {
+                quote.state = 'UNKNOWN' as never;
+            }
+        };
+
+        await expect(keymaster.checkCashu()).resolves.toMatchObject({ settled: 0, open: 1 });
     });
 
     it('fails a melt it cannot cover', async () => {

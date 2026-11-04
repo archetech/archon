@@ -44,6 +44,8 @@ class FakeMint:
         self.melt_outcome = "PAID"
         # Mints differ here: NUT-00 lists 11003, cdk-mintd sends 20006 on a mint.
         self.already_signed_code = 11003
+        # When set, /v1/checkstate answers for only this many proofs.
+        self.states_limit = None
         # Runs while a request is on the wire, before the mint answers it.
         self.on_request = None
         self._lose: set[str] = set()
@@ -79,6 +81,8 @@ class FakeMint:
             raise MintRefusal(self.already_signed_code, "outputs already signed")
 
     def _spend(self, inputs: list[dict[str, Any]]) -> None:
+        if len({proof["secret"] for proof in inputs}) != len(inputs):
+            raise MintRefusal(11007, "duplicate inputs")
         for proof in inputs:
             expected = hash_to_curve(proof["secret"].encode()).multiply(self.private_keys[proof["amount"]])
             if expected.format().hex() != proof["C"]:
@@ -151,7 +155,7 @@ class FakeMint:
             quote["change"] = self._sign(change)
             return {"quote": body["quote"], "unit": "sat", "expiry": 0, **quote}
         if method == "POST" and path == "/v1/checkstate":
-            return {"states": [{"Y": y, "state": "SPENT" if y in self.spent else "UNSPENT", "witness": None} for y in body["Ys"]]}
+            return {"states": [{"Y": y, "state": "SPENT" if y in self.spent else "UNSPENT", "witness": None} for y in body["Ys"][:self.states_limit]]}
         if method == "POST" and path == "/v1/restore":
             found = [output for output in body["outputs"] if output["B_"] in self.signed]
             return {"outputs": found, "signatures": [self.signed[output["B_"]] for output in found]}

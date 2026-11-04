@@ -266,6 +266,7 @@ export default class Keymaster implements KeymasterInterface {
     private readonly maxAliasLength: number;
     private readonly maxDataLength: number;
     private readonly cashu: CashuWallet;
+    private _mutations: Promise<unknown> = Promise.resolve();
     // Node capability manifest (`<nodeURL>/api/v1/capabilities`), fetched once and
     // memoized. `undefined` = not yet fetched; `null` = node has no manifest
     // (older node / not a gateway) → callers proceed lazily rather than regress.
@@ -321,30 +322,45 @@ export default class Keymaster implements KeymasterInterface {
         return this.gatekeeper.listRegistries();
     }
 
-    private async mutateWallet(
+    // On a copy, published only once it is saved: a mutator that throws or a write
+    // that fails leaves the wallet as it was. Cashu depends on this, since a journal
+    // record visible in the cache but not on disk could be submitted and then lost.
+    // The queue spans the publish, which the store's own lock does not cover.
+    private mutateWallet(
         mutator: (wallet: WalletFile) => void | Promise<void>
     ): Promise<void> {
-        // Make sure _walletCache is set; refuses if there is no wallet to load
-        if (!this._walletCache) {
-            await this.loadWallet();
-        }
-
-        await this.db.updateWallet(async (stored: StoredWallet) => {
-            const decrypted = this._walletCache!;
-
-            const before = JSON.stringify(decrypted);
-            await mutator(decrypted);
-            const after = JSON.stringify(decrypted);
-
-            if (before === after) {
-                return;
+        const run = async () => {
+            // Make sure _walletCache is set; refuses if there is no wallet to load
+            if (!this._walletCache) {
+                await this.loadWallet();
             }
 
-            const reenc = await this.encryptWalletForStorage(decrypted);
-            Object.assign(stored as WalletEncFile, reenc);
+            let saved: WalletFile | undefined;
 
-            this._walletCache = decrypted;
-        });
+            await this.db.updateWallet(async (stored: StoredWallet) => {
+                const before = JSON.stringify(this._walletCache);
+                const decrypted: WalletFile = JSON.parse(before);
+
+                await mutator(decrypted);
+                const after = JSON.stringify(decrypted);
+
+                if (before === after) {
+                    return;
+                }
+
+                const reenc = await this.encryptWalletForStorage(decrypted);
+                Object.assign(stored as WalletEncFile, reenc);
+                saved = decrypted;
+            });
+
+            if (saved) {
+                this._walletCache = saved;
+            }
+        };
+
+        const queued = this._mutations.then(run, run);
+        this._mutations = queued.catch(() => {});
+        return queued;
     }
 
     async loadWallet(): Promise<WalletFile> {

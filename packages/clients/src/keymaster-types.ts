@@ -413,9 +413,19 @@ export interface CashuReceiveResult {
     mint: string;
 }
 
+// A reclaim of a token the recipient partly redeemed also says what they took
+// (redeemed) and what is not yet spendable (pending). `amount` is what reached the
+// balance.
+export interface CashuReclaimResult extends CashuReceiveResult {
+    redeemed?: number;
+    pending?: number;
+}
+
 export interface CashuCheckResult {
     settled: number;
     open: number;
+    // Value of spendable proofs dropped because the mint reports them spent.
+    dropped?: number;
 }
 
 export interface CashuRestoreResult {
