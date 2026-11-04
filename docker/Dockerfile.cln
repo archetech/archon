@@ -1,4 +1,4 @@
-FROM elementsproject/lightningd:v26.06.9
+FROM elementsproject/lightningd:v26.06.10
 
 COPY docker/cln/entrypoint.sh /usr/local/bin/cln-entrypoint
 COPY docker/cln/healthcheck.sh /usr/local/bin/cln-healthcheck
