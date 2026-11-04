@@ -108,6 +108,9 @@ export interface FixWalletResult {
     ownedRemoved: number;
     heldRemoved: number;
     aliasesRemoved: number;
+    // Identities that would have been removed but hold Cashu proofs or journal
+    // records, which are the funds themselves.
+    idsKept?: string[];
 }
 
 export interface CreateAssetOptions {
@@ -317,6 +320,126 @@ export type {
     LightningPaymentRecord,
     LightningPaymentStatus,
 } from './gatekeeper-types.js';
+
+// A Cashu proof as stored in the wallet: plain JSON, with its amount in sats.
+export interface CashuProof {
+    id: string;
+    amount: number;
+    secret: string;
+    C: string;
+    dleq?: { e: string; s: string; r?: string };
+    witness?: string;
+}
+
+// A journaled mint operation; see docs/plans/cashu-1058.md. A record is saved
+// before its request is sent and retired only after its result is saved.
+export interface CashuOperation {
+    id: string;
+    kind: 'mint' | 'melt' | 'swap' | 'receive' | 'send' | 'locked-send';
+    quote?: string;
+    quoteKey?: string;
+    request?: string;
+    expiry?: number;
+    amount?: number;
+    inputs: CashuProof[];
+    keyset: string;
+    outputs: {
+        amount: number;
+        role: 'keep' | 'send';
+        counter?: number;
+        secret?: string;
+        r?: string;
+    }[];
+    sent?: CashuProof[];
+    created: string;
+}
+
+export interface CashuMintEntry {
+    added: string;
+    node?: string;
+    proofs: CashuProof[];
+    operations?: CashuOperation[];
+}
+
+export interface CashuCounters {
+    counters: Record<string, { next: number; free: [number, number][] }>;
+}
+
+export interface CashuMintInfo {
+    url: string;
+    name?: string;
+    nuts: Record<string, unknown>;
+    keysets: { id: string; unit: string; active: boolean; input_fee_ppk?: number }[];
+    isNodeMint: boolean;
+}
+
+export interface CashuBalance {
+    spendable: number;
+    inFlight: number;
+    outstanding: number;
+    mints?: Record<string, { spendable: number; inFlight: number; outstanding: number }>;
+}
+
+export interface CashuMintQuote {
+    quote: string;
+    request: string;
+    amount: number;
+    state: string;
+    expiry?: number;
+}
+
+export interface CashuClaimResult {
+    amount: number;
+    mint: string;
+}
+
+export interface CashuMeltResult {
+    paid: boolean;
+    pending?: boolean;
+    preimage?: string;
+    fee?: number;
+    change: number;
+}
+
+export interface CashuSendResult {
+    token: string;
+    amount: number;
+    fee: number;
+    operationId: string;
+}
+
+export interface CashuReceiveResult {
+    amount: number;
+    mint: string;
+}
+
+export interface CashuCheckResult {
+    settled: number;
+    open: number;
+}
+
+export interface CashuRestoreResult {
+    restored: number;
+    amount: number;
+}
+
+export interface CashuQuoteRecord {
+    operationId: string;
+    kind: 'mint' | 'melt';
+    quote: string;
+    mint: string;
+    amount?: number;
+    request?: string;
+    expiry?: number;
+    created: string;
+}
+
+export interface CashuSendRecord {
+    operationId: string;
+    mint: string;
+    amount: number;
+    created: string;
+}
 
 export interface DecodedLightningInvoice {
     amount?: string;

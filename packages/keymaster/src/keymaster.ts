@@ -1,6 +1,8 @@
 import { attachedJson, issueCredentialMessage, type DidCommPlaintext } from './didcomm-protocols.js';
 import { proofsOf } from '@didcid/common/utils';
 import { isPrivateHostname, fetchPublicHttps } from '@didcid/common/net';
+import { CashuWallet, hasCashuState } from './cashu.js';
+import type { CashuHost } from './cashu.js';
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
@@ -15,6 +17,7 @@ import {
     KeymasterError,
     UnknownIDError,
     LightningNotConfiguredError,
+    CashuStateError,
     LightningUnavailableError,
     WalletNotFoundError,
 } from '@didcid/common/errors';
@@ -262,6 +265,7 @@ export default class Keymaster implements KeymasterInterface {
     private readonly ephemeralRegistry: string;
     private readonly maxAliasLength: number;
     private readonly maxDataLength: number;
+    private readonly cashu: CashuWallet;
     // Node capability manifest (`<nodeURL>/api/v1/capabilities`), fetched once and
     // memoized. `undefined` = not yet fetched; `null` = node has no manifest
     // (older node / not a gateway) → callers proceed lazily rather than regress.
@@ -301,6 +305,16 @@ export default class Keymaster implements KeymasterInterface {
         this.ephemeralRegistry = 'hyperswarm';
         this.maxAliasLength = options.maxAliasLength || 32;
         this.maxDataLength = 8 * 1024; // 8 KB max data to store in a JSON object
+        this.cashu = new CashuWallet({
+            gatekeeper: this.gatekeeper as unknown as CashuHost['gatekeeper'],
+            mutateWallet: mutator => this.mutateWallet(mutator),
+            loadWallet: () => this.loadWallet(),
+            fetchIdInfo: (name, wallet) => this.fetchIdInfo(name, wallet),
+            getSeed: wallet => this.getSeedFromCacheOrMnemonic(wallet),
+            getCapabilities: async () => (await this.getNodeCapabilities()) as Record<string, unknown> | null,
+            resolveDID: did => this.resolveDID(did),
+            updateDID: (did, doc) => this.updateDID(did, doc),
+        });
     }
 
     async listRegistries(): Promise<string[]> {
@@ -551,6 +565,7 @@ export default class Keymaster implements KeymasterInterface {
         let ownedRemoved = 0;
         let heldRemoved = 0;
         let aliasesRemoved = 0;
+        const idsKept: string[] = [];
 
         await this.mutateWallet(async (wallet) => {
 
@@ -567,6 +582,10 @@ export default class Keymaster implements KeymasterInterface {
                 }
 
                 if (remove) {
+                    if (hasCashuState(wallet.ids[name])) {
+                        idsKept.push(name);
+                        continue;
+                    }
                     delete wallet.ids[name];
                     idsRemoved++;
                 }
@@ -637,7 +656,7 @@ export default class Keymaster implements KeymasterInterface {
             }
         });
 
-        return { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved };
+        return { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved, ...(idsKept.length > 0 && { idsKept }) };
     }
 
     async resolveSeedBank(): Promise<DidCidDocument> {
@@ -2255,6 +2274,11 @@ export default class Keymaster implements KeymasterInterface {
         await this.mutateWallet((wallet) => {
             if (!(name in wallet.ids)) {
                 throw new UnknownIDError();
+            }
+            // Its proofs are the funds themselves, and its journal the only
+            // record of paid quotes and outstanding tokens.
+            if (hasCashuState(wallet.ids[name])) {
+                throw new CashuStateError(`${name} holds ecash or open Cashu operations`);
             }
             delete wallet.ids[name];
             if (wallet.current === name) {
@@ -3988,6 +4012,27 @@ export default class Keymaster implements KeymasterInterface {
         }
         return config;
     }
+
+    // Cashu methods (see cashu.ts)
+
+    addCashu(name?: string) { return this.cashu.addCashu(name); }
+    removeCashu(force?: boolean, name?: string) { return this.cashu.removeCashu(force, name); }
+    addCashuMint(url: string, name?: string) { return this.cashu.addCashuMint(url, name); }
+    removeCashuMint(url: string, force?: boolean, name?: string) { return this.cashu.removeCashuMint(url, force, name); }
+    listCashuMints(name?: string) { return this.cashu.listCashuMints(name); }
+    publishCashu(name?: string) { return this.cashu.publishCashu(name); }
+    unpublishCashu(name?: string) { return this.cashu.unpublishCashu(name); }
+    getCashuBalance(mint?: string, name?: string) { return this.cashu.getCashuBalance(mint, name); }
+    createCashuMintQuote(amount: number, mint?: string, name?: string) { return this.cashu.createCashuMintQuote(amount, mint, name); }
+    claimCashuMintQuote(quoteId: string, mint?: string, name?: string) { return this.cashu.claimCashuMintQuote(quoteId, mint, name); }
+    listCashuQuotes(mint?: string, name?: string) { return this.cashu.listCashuQuotes(mint, name); }
+    meltCashu(bolt11: string, mint?: string, name?: string) { return this.cashu.meltCashu(bolt11, mint, name); }
+    sendCashu(amount: number, mint?: string, name?: string) { return this.cashu.sendCashu(amount, mint, name); }
+    receiveCashu(token: string, name?: string) { return this.cashu.receiveCashu(token, name); }
+    checkCashu(mint?: string, name?: string) { return this.cashu.checkCashu(mint, name); }
+    restoreCashu(mint?: string, name?: string) { return this.cashu.restoreCashu(mint, name); }
+    listCashuSends(mint?: string, name?: string) { return this.cashu.listCashuSends(mint, name); }
+    reclaimCashu(operationId: string, name?: string) { return this.cashu.reclaimCashu(operationId, name); }
 
     // Lightning methods
 

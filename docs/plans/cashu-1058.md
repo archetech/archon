@@ -74,6 +74,9 @@ interface CashuOperation {
     kind: 'mint' | 'melt' | 'swap' | 'receive' | 'send' | 'locked-send';
     quote?: string;                // mint or melt quote id
     quoteKey?: string;             // NUT-20 private key for a mint quote
+    request?: string;              // the quote's BOLT11 invoice
+    expiry?: number;               // the quote's expiry, in seconds
+    amount?: number;               // the quote's amount
     inputs: Proof[];               // proofs the operation spends
     keyset: string;                // keyset of the outputs
     outputs: {                     // in request order
@@ -173,13 +176,13 @@ mnemonic, from a backup (`recoverWallet`) or an identity recovered with
 each keyset's `next` past the highest signed counter it finds, and a request the
 mint rejects because its outputs are already signed triggers a NUT-09 scan of
 that keyset and a retry with fresh counters, so stale counters repair themselves
-instead of failing every operation. Mints report already-signed outputs with
-error code 11003 on a swap, mint or melt, and only that code triggers this path;
-11004 (outputs pending) leaves the record open, and other errors, such as 11008
-(duplicate outputs in one request) or 20006 (invoice already paid), fail the
-operation without touching counters. The `customRequest` wrapper and the Python
-client keep the mint's error code in the errors they raise so these cases can be
-told apart.
+instead of failing every operation. The wallet recognizes that case by asking
+the mint: after any refusal, NUT-09 shows whether the request's outputs were
+already signed. The error code cannot decide it, because mints disagree: NUT-00
+lists 11003, while cdk-mintd 0.18.3 sends 20006 on a mint or melt and 11008 on a
+swap. Code 11004 (outputs pending) leaves the record open, and a refusal whose
+outputs were not signed fails the operation without touching counters. Both mint
+clients keep the mint's error code in the errors they raise.
 
 `proofs` is a set keyed by each proof's `Y` (the hash-to-curve point of its
 secret). No path adds a proof whose `Y` is already in any identity's `proofs` or
@@ -233,9 +236,9 @@ Keymaster reaches mints in two ways.
   the entry stores (Phase 3). An entry whose `node` names a different node, as
   after recovering the wallet elsewhere, is an outside mint at its public URL.
 - **Any other mint** is a URL a caller chose, which on a server-side Keymaster
-  makes it a request-forgery vector. TypeScript passes cashu-ts's `Mint` a
-  `customRequest` built on `fetchPublicHttps` from `@didcid/common/net`; Python
-  uses `fetch_public_https` from `keymaster.net`. Both require https, reject
+  makes it a request-forgery vector. TypeScript uses `fetchPublicHttps` from
+  `@didcid/common/net`; Python uses `fetch_public_https` from `keymaster.net`.
+  Both require https, reject
   private addresses at connection time and revalidate redirects, as the existing
   Lightning Address and Herald fetches do. In a browser the same import resolves
   to the browser build, which still requires https and rejects private host
@@ -283,14 +286,17 @@ not received until the mint confirms its proofs are unspent.
 
 ### Implementation
 
-- TypeScript uses `@cashu/cashu-ts` 4.x. Its `@noble/curves` 2 and
-  `@noble/hashes` 2 dependencies are already in `packages/cipher`'s tree, so it
-  adds no second copy to the browser wallets.
+- TypeScript uses `@cashu/cashu-ts` 4.x for cryptography and tokens, with a thin
+  mint HTTP client of its own rather than cashu-ts's `Mint`, so both ports share
+  one client shape and the wallet keeps the mint's error codes and the melt's lack
+  of a timeout. Its `@noble/curves` 2 and `@noble/hashes` 2 dependencies are
+  already in `packages/cipher`'s tree, so it adds no second copy to the browser
+  wallets.
 - Python implements NUT-00 hash-to-curve, blinding and unblinding, NUT-12 DLEQ
   verification, NUT-13 derivation, NUT-11 signing and the V4 (`cashuB`, CBOR)
   token format, plus a mint HTTP client. Elliptic-curve operations and BIP-340
   Schnorr signatures use `coincurve`, already a dependency; CBOR adds `cbor2`,
-  pinned like the other dependencies.
+  pinned like the other dependencies, at the 5.x line `bip-utils` requires.
 - NUT-13 derivation depends on the keyset ID version: keysets whose IDs start
   with `01` use the HMAC-SHA256 derivation, and deprecated `00` keysets use the
   BIP32 path `m/129372'/0'/<keyset>'/<counter>'/{0,1}`. Both ports implement
@@ -299,8 +305,10 @@ not received until the mint confirms its proofs are unspent.
   committed TypeScript-generated vectors, as the DIDComm port was.
 - Amounts account for NUT-02 input fees: a send or melt selects enough proofs to
   cover the keyset's `input_fee_ppk` as well as the amount. A send's `amount` is
-  what the recipient nets: the sender adds the fee the recipient's redemption
-  swap will pay on the sent proofs, and the result reports that fee.
+  the least the recipient nets: the sender adds the fee the recipient's redemption
+  swap will pay on the sent proofs, and the result reports that fee. The fee
+  depends on how many proofs the value splits into, so no gross may net the amount
+  exactly, in which case the smallest that nets more is sent.
 - Tokens are decoded in both formats, V4 `cashuB` and V3 `cashuA`, and issued as
   V4. A V4 token may carry a short keyset id, which is resolved against the
   mint's keysets, and an ambiguous id rejects the token, as NUT-00 requires. In
@@ -352,7 +360,7 @@ not received until the mint confirms its proofs are unspent.
   totalled across several), `CashuMintQuote` (`quote`, `request`, `amount`,
   `state`, `expiry`), `CashuMeltResult` (`paid`, `preimage`, `fee`, `change` as an amount, never
   the proofs),
-  `CashuSendResult` (`token`, `amount`, `fee`), `CashuReceiveResult` (`amount`,
+  `CashuSendResult` (`token`, `amount`, `fee`, `operationId`), `CashuReceiveResult` (`amount`,
   `mint`), `CashuCheckResult` (counts of records settled and still open), and
   `CashuSendToResult` (`token`, `messageId`, `delivered`).
 - `KeymasterClient` and the Python SDK.

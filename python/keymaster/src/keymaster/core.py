@@ -13,6 +13,8 @@ from urllib.parse import urlparse
 
 import httpx
 
+from .cashu import CashuStateError, CashuWallet, has_cashu_state
+from .errors import KeymasterError
 from .net import fetch_public_https, is_private_hostname
 from bolt11 import decode as decode_bolt11
 from cryptography.exceptions import InvalidTag
@@ -145,10 +147,6 @@ def _absolute_key_id(ref: Any, did: str) -> str | None:
     return f"{did}{ref}" if ref.startswith("#") else ref
 
 
-class KeymasterError(Exception):
-    pass
-
-
 class WalletNotFoundError(KeymasterError):
     """The wallet store is empty and this surface does not provision wallets."""
 
@@ -221,6 +219,7 @@ class Keymaster:
         self._wallet_cache: dict[str, Any] | None = None
         self._root_cache: _RootCache | None = None
         self._lock = asyncio.Lock()
+        self.cashu = CashuWallet(self)
         # Node capability manifest (<nodeURL>/api/v1/capabilities), fetched once and
         # memoized. _UNFETCHED until first read; None = node has no manifest (older
         # node / not a gateway) → callers proceed lazily rather than regress.
@@ -558,6 +557,8 @@ class Keymaster:
             wallet = await self.load_wallet()
             if name not in wallet["ids"]:
                 raise UnknownIDError("Unknown ID")
+            if has_cashu_state(wallet["ids"][name]):
+                raise CashuStateError(f"{name} holds ecash or open operations; use removeCashu with force first")
             del wallet["ids"][name]
             if wallet.get("current") == name:
                 wallet["current"] = next(iter(wallet["ids"].keys()), "")
@@ -740,6 +741,62 @@ class Keymaster:
         if not isinstance(config, dict):
             raise KeymasterError(f"No Lightning wallet configured for {id_info['did']} on {url}")
         return config
+
+    # Cashu, in cashu.py.
+
+    async def add_cashu(self, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.add_cashu(name)
+
+    async def remove_cashu(self, force: bool = False, name: str | None = None) -> bool:
+        return await self.cashu.remove_cashu(force, name)
+
+    async def add_cashu_mint(self, url: str, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.add_cashu_mint(url, name)
+
+    async def remove_cashu_mint(self, url: str, force: bool = False, name: str | None = None) -> bool:
+        return await self.cashu.remove_cashu_mint(url, force, name)
+
+    async def list_cashu_mints(self, name: str | None = None) -> list[dict[str, Any]]:
+        return await self.cashu.list_cashu_mints(name)
+
+    async def publish_cashu(self, name: str | None = None) -> bool:
+        return await self.cashu.publish_cashu(name)
+
+    async def unpublish_cashu(self, name: str | None = None) -> bool:
+        return await self.cashu.unpublish_cashu(name)
+
+    async def get_cashu_balance(self, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.get_cashu_balance(mint, name)
+
+    async def create_cashu_mint_quote(self, amount: int, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.create_cashu_mint_quote(amount, mint, name)
+
+    async def claim_cashu_mint_quote(self, quote: str, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.claim_cashu_mint_quote(quote, mint, name)
+
+    async def list_cashu_quotes(self, mint: str | None = None, name: str | None = None) -> list[dict[str, Any]]:
+        return await self.cashu.list_cashu_quotes(mint, name)
+
+    async def melt_cashu(self, bolt11: str, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.melt_cashu(bolt11, mint, name)
+
+    async def send_cashu(self, amount: int, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.send_cashu(amount, mint, name)
+
+    async def receive_cashu(self, token: str, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.receive_cashu(token, name)
+
+    async def check_cashu(self, mint: str | None = None, name: str | None = None) -> dict[str, int]:
+        return await self.cashu.check_cashu(mint, name)
+
+    async def restore_cashu(self, mint: str | None = None, name: str | None = None) -> dict[str, int]:
+        return await self.cashu.restore_cashu(mint, name)
+
+    async def list_cashu_sends(self, mint: str | None = None, name: str | None = None) -> list[dict[str, Any]]:
+        return await self.cashu.list_cashu_sends(mint, name)
+
+    async def reclaim_cashu(self, operation_id: str, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.reclaim_cashu(operation_id, name)
 
     async def add_lightning(self, name: str | None = None) -> dict[str, Any]:
         try:
@@ -2530,8 +2587,9 @@ class Keymaster:
 
         return {"checked": checked, "invalid": invalid, "deleted": deleted}
 
-    async def fix_wallet(self) -> dict[str, int]:
+    async def fix_wallet(self) -> dict[str, Any]:
         ids_removed = 0
+        ids_kept: list[str] = []
         owned_removed = 0
         held_removed = 0
         aliases_removed = 0
@@ -2543,6 +2601,10 @@ class Keymaster:
                     if doc.get("didDocumentMetadata", {}).get("deactivated"):
                         raise KeymasterError("deactivated")
                 except Exception:
+                    # Ecash is value that does not depend on the DID resolving.
+                    if has_cashu_state(wallet["ids"][name]):
+                        ids_kept.append(name)
+                        continue
                     del wallet["ids"][name]
                     ids_removed += 1
 
@@ -2579,6 +2641,7 @@ class Keymaster:
             "ownedRemoved": owned_removed,
             "heldRemoved": held_removed,
             "aliasesRemoved": aliases_removed,
+            **({"idsKept": ids_kept} if ids_kept else {}),
         }
 
     async def resolve_seed_bank(self) -> dict[str, Any]:

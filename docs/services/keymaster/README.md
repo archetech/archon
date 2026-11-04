@@ -335,7 +335,7 @@ decrement the counter — account numbers are never reused.
 | `POST /api/v1/wallet/backup` | Encrypts the wallet to a new backup asset DID, records that DID on the seed bank document (see §3.5), and returns `{ "ok": "<backup DID>" }`. |
 | `POST /api/v1/wallet/recover` | Restores the wallet from the seed bank using the current passphrase. Returns `{ "wallet": WalletFile }`. |
 | `POST /api/v1/wallet/check` | Walks every DID owned/held/aliased and verifies it resolves. Returns `{ "check": { checked, invalid, deleted } }`. |
-| `POST /api/v1/wallet/fix` | Removes invalid/deleted entries identified by `check`. Returns `{ "fix": { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved } }`. |
+| `POST /api/v1/wallet/fix` | Removes invalid/deleted entries identified by `check`. Returns `{ "fix": { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved, idsKept? } }`; `idsKept` names identities it would have removed but kept because they hold Cashu state. |
 | `GET /api/v1/wallet/mnemonic` | Returns the decrypted BIP39 mnemonic as `{ "mnemonic": string }`. |
 | `POST /api/v1/wallet/passphrase` | Body: `{ "passphrase": "<new>" }`. Re-encrypts `mnemonicEnc` and the wallet body with a new passphrase. Returns `{ "ok": boolean }`. |
 | `GET /api/v1/export/wallet/encrypted` | Returns the on-disk `WalletEncFile` (no decryption). Useful for manual backup. |
@@ -1206,6 +1206,38 @@ reach Lightning functionality via the same `DrawbridgeClient`.
 | `POST /api/v1/lightning/unpublish` | |
 | `POST /api/v1/lightning/zap` | `{ "did": string, "amount": number, "memo"?: string, "id"?: string }` where `did` is the recipient (DID, alias, or LUD-16) and `id` is the optional sender identity. Resolves recipient and pays. |
 | `POST /api/v1/lightning/payments` | `{ "payments": LightningPaymentRecord[] }`. |
+
+### 12.3 Cashu
+
+Unlike Lightning, Cashu is not a passthrough: the Keymaster holds the identity's
+proofs in the wallet and talks to mints itself, with a journal that lets an
+interrupted operation be finished rather than lost. `mint` selects a mint by URL;
+it defaults to the node's mint when the identity has it, else to its only mint.
+See `docs/plans/cashu-1058.md`.
+
+| Route | Behavior |
+| --- | --- |
+| `POST /api/v1/cashu` | `{ "id"?: string }`. Adds the node's mint → `CashuMintInfo`. 503 if the node has none. |
+| `DELETE /api/v1/cashu` | `{ "force"?: boolean, "id"?: string }`. Removes every mint; refused while holding proofs or open operations unless forced. |
+| `POST /api/v1/cashu/mints` | `{ "url": string, "id"?: string }`. Adds an outside mint → `CashuMintInfo`. |
+| `DELETE /api/v1/cashu/mints` | `{ "url": string, "force"?: boolean, "id"?: string }`. Removes one mint, with the same refusal. |
+| `POST /api/v1/cashu/mints/list` | `{ "mints": CashuMintInfo[] }`. |
+| `POST /api/v1/cashu/publish` | Adds the `#cashu` service listing the identity's mints to its DID document. |
+| `POST /api/v1/cashu/unpublish` | Removes it. |
+| `POST /api/v1/cashu/balance` | `{ "mint"?: string, "id"?: string }` → `CashuBalance`. Contacts no mint. |
+| `POST /api/v1/cashu/quote` | `{ "amount": number, "mint"?: string, "id"?: string }` → `CashuMintQuote`, with the BOLT11 invoice to pay. |
+| `POST /api/v1/cashu/claim` | `{ "quote": string, "mint"?: string, "id"?: string }` → `CashuClaimResult`. |
+| `POST /api/v1/cashu/quotes` | `{ "quotes": CashuQuoteRecord[] }`. Contacts no mint. |
+| `POST /api/v1/cashu/melt` | `{ "bolt11": string, "mint"?: string, "id"?: string }` → `CashuMeltResult`. |
+| `POST /api/v1/cashu/send` | `{ "amount": number, "mint"?: string, "id"?: string }` → `CashuSendResult`, a `cashuB` token. |
+| `POST /api/v1/cashu/receive` | `{ "token": string, "id"?: string }` → `CashuReceiveResult`. The token's mint must already be added. |
+| `POST /api/v1/cashu/check` | `{ "mint"?: string, "id"?: string }` → `CashuCheckResult`, after settling open operations. |
+| `POST /api/v1/cashu/restore` | `{ "mint"?: string, "id"?: string }` → `CashuRestoreResult`, recovering proofs from the mnemonic. |
+| `POST /api/v1/cashu/sends` | `{ "sends": CashuSendRecord[] }`. Contacts no mint. |
+| `POST /api/v1/cashu/reclaim` | `{ "operationId": string, "id"?: string }` → `CashuReceiveResult`, taking back one unredeemed send. |
+
+A mint's refusal and the other Cashu errors are 400. `CashuUnavailableError`, when
+a mint cannot be reached, is 503.
 
 ---
 

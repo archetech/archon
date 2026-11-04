@@ -6,6 +6,7 @@ import { InvalidParameterError, UnknownIDError } from '@didcid/common/errors';
 import { createAddressRouter } from '../../services/keymaster/server/src/keymaster-address-router.ts';
 import { createAgentRouter } from '../../services/keymaster/server/src/keymaster-agent-router.ts';
 import { createAssetRouter } from '../../services/keymaster/server/src/keymaster-asset-router.ts';
+import { createCashuRouter } from '../../services/keymaster/server/src/keymaster-cashu-router.ts';
 import { createChallengeRouter } from '../../services/keymaster/server/src/keymaster-challenge-router.ts';
 import { createCoreRouter } from '../../services/keymaster/server/src/keymaster-core-router.ts';
 import { createCredentialRouter } from '../../services/keymaster/server/src/keymaster-credential-router.ts';
@@ -77,7 +78,7 @@ function mount(configOverrides: Record<string, unknown> = {}) {
     app.use(express.json());
     for (const create of [
         createPublicRouter, createCoreRouter, createIdentityRouter, createAddressRouter,
-        createDidCommRouter, createNostrRouter, createLightningRouter, createChallengeRouter,
+        createDidCommRouter, createNostrRouter, createLightningRouter, createCashuRouter, createChallengeRouter,
         createResponseRouter, createGroupRouter, createSchemaRouter, createSchemaTemplateRouter,
         createAgentRouter, createCredentialRouter, createKeyRouter, createAssetRouter,
         createPollRouter, createImageRouter, createFileRouter, createVaultRouter,
@@ -222,6 +223,25 @@ const ROUTES: Array<[Method, string, number]> = [
     ['POST', '/keys/decrypt/json', 400],
     ['POST', '/keys/sign', 500],
     ['POST', '/keys/verify', 400],
+    // cashu
+    ['POST', '/cashu', 400],
+    ['DELETE', '/cashu', 400],
+    ['POST', '/cashu/mints', 400],
+    ['DELETE', '/cashu/mints', 400],
+    ['POST', '/cashu/mints/list', 400],
+    ['POST', '/cashu/publish', 400],
+    ['POST', '/cashu/unpublish', 400],
+    ['POST', '/cashu/balance', 400],
+    ['POST', '/cashu/quote', 400],
+    ['POST', '/cashu/claim', 400],
+    ['POST', '/cashu/quotes', 400],
+    ['POST', '/cashu/melt', 400],
+    ['POST', '/cashu/send', 400],
+    ['POST', '/cashu/receive', 400],
+    ['POST', '/cashu/check', 400],
+    ['POST', '/cashu/restore', 400],
+    ['POST', '/cashu/sends', 400],
+    ['POST', '/cashu/reclaim', 400],
     // lightning
     ['POST', '/lightning', 400],
     ['DELETE', '/lightning', 400],
@@ -369,6 +389,37 @@ describe('keymaster server routers', () => {
 
         keymaster.createId.mockRejectedValueOnce(new Error('boom'));
         expect((await send(app, 'POST', '/ids')).status).toBe(500);
+    });
+});
+
+describe('keymaster cashu routes', () => {
+    it.each([
+        ['DELETE', '/cashu', { force: true, id: 'Bob' }, 'removeCashu', [true, 'Bob']],
+        ['POST', '/cashu/mints', { url: 'https://m', id: 'Bob' }, 'addCashuMint', ['https://m', 'Bob']],
+        ['DELETE', '/cashu/mints', { url: 'https://m', force: true, id: 'Bob' }, 'removeCashuMint', ['https://m', true, 'Bob']],
+        ['POST', '/cashu/balance', { mint: 'https://m', id: 'Bob' }, 'getCashuBalance', ['https://m', 'Bob']],
+        ['POST', '/cashu/quote', { amount: 5, mint: 'https://m', id: 'Bob' }, 'createCashuMintQuote', [5, 'https://m', 'Bob']],
+        ['POST', '/cashu/claim', { quote: 'q', mint: 'https://m', id: 'Bob' }, 'claimCashuMintQuote', ['q', 'https://m', 'Bob']],
+        ['POST', '/cashu/melt', { bolt11: 'ln', mint: 'https://m', id: 'Bob' }, 'meltCashu', ['ln', 'https://m', 'Bob']],
+        ['POST', '/cashu/send', { amount: 5, mint: 'https://m', id: 'Bob' }, 'sendCashu', [5, 'https://m', 'Bob']],
+        ['POST', '/cashu/receive', { token: 't', id: 'Bob' }, 'receiveCashu', ['t', 'Bob']],
+        ['POST', '/cashu/reclaim', { operationId: 'o', id: 'Bob' }, 'reclaimCashu', ['o', 'Bob']],
+    ])('%s %s passes its body in the method\'s argument order', async (method, path, body, name, args) => {
+        const { app, keymaster } = mount();
+        const agent = request(app);
+
+        await (method === 'POST' ? agent.post(path as string) : agent.delete(path as string)).send(body as object).expect(200);
+
+        expect(keymaster[name as string]).toHaveBeenCalledWith(...(args as unknown[]));
+    });
+
+    it('wraps the lists and the removals', async () => {
+        const { app } = mount();
+
+        const listed = await request(app).post('/cashu/sends').send({});
+        expect(listed.body).toEqual({ sends: { ok: true, name: 'listCashuSends' } });
+        const removed = await request(app).delete('/cashu').send({});
+        expect(removed.body).toHaveProperty('ok');
     });
 });
 

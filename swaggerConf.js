@@ -50,6 +50,7 @@ const keymasterOptions = {
         'services/keymaster/server/src/keymaster-didcomm-router.ts',
         'services/keymaster/server/src/keymaster-nostr-router.ts',
         'services/keymaster/server/src/keymaster-lightning-router.ts',
+        'services/keymaster/server/src/keymaster-cashu-router.ts',
         'services/keymaster/server/src/keymaster-challenge-router.ts',
         'services/keymaster/server/src/keymaster-response-router.ts',
         'services/keymaster/server/src/keymaster-group-router.ts',

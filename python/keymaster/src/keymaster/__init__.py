@@ -1,3 +1,14 @@
+from .cashu import (
+    CashuInsufficientFundsError,
+    CashuMintError,
+    CashuMintNotAddedError,
+    CashuMintUnsupportedError,
+    CashuNotConfiguredError,
+    CashuQuoteUnpaidError,
+    CashuStateError,
+    CashuTokenSpentError,
+    CashuUnavailableError,
+)
 from .core import (
     DmailTags,
     Keymaster,
@@ -8,6 +19,15 @@ from .core import (
 )
 
 __all__ = [
+    "CashuInsufficientFundsError",
+    "CashuMintError",
+    "CashuMintNotAddedError",
+    "CashuMintUnsupportedError",
+    "CashuNotConfiguredError",
+    "CashuQuoteUnpaidError",
+    "CashuStateError",
+    "CashuTokenSpentError",
+    "CashuUnavailableError",
     "DmailTags",
     "Keymaster",
     "KeymasterError",

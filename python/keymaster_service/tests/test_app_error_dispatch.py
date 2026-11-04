@@ -19,6 +19,7 @@ sys.path.insert(0, str(ROOT.parent / "keymaster" / "src"))
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from keymaster.cashu import CashuStateError, CashuUnavailableError  # noqa: E402
 from keymaster.core import KeymasterError, UnknownIDError, WalletNotFoundError  # noqa: E402
 from keymaster.gatekeeper_client import (  # noqa: E402
     GatekeeperTimeoutError,
@@ -34,6 +35,14 @@ def _client() -> TestClient:
     app = FastAPI()
     for exc_type, handler in app_module.app.exception_handlers.items():
         app.add_exception_handler(exc_type, handler)
+
+    @app.get("/cashu-unavailable")
+    async def _cashu_unavailable():
+        raise CashuUnavailableError("mint down")
+
+    @app.get("/cashu-state")
+    async def _cashu_state():
+        raise CashuStateError("holds ecash")
 
     @app.get("/operation-error")
     async def _op():
@@ -111,3 +120,9 @@ def test_did_repair_routes_accept_encoded_slashes(monkeypatch):
         assert repaired.status_code == 200
         assert repaired.json() == {"report": {**report, "submitted": False}}
         assert calls[-2:] == [("check", identifier), ("repair", identifier)]
+
+
+def test_cashu_errors_dispatch_like_the_typescript_service():
+    client = _client()
+    assert client.get("/cashu-unavailable").status_code == 503
+    assert client.get("/cashu-state").status_code == 400
