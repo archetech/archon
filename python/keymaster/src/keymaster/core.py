@@ -285,9 +285,12 @@ class Keymaster:
             return await self.new_wallet()
 
     async def save_wallet(self, wallet: dict[str, Any], overwrite: bool = True) -> bool:
-        decrypted = await self.decrypt_wallet(wallet)
-        upgraded = self._upgrade_wallet(decrypted)
-        return await self._save_loaded_wallet(upgraded, overwrite=overwrite)
+        # Under the lock, so a restore cannot land under a mutation working on its
+        # own copy of the wallet, as Cashu's do.
+        async with self._lock:
+            decrypted = await self.decrypt_wallet(wallet)
+            upgraded = self._upgrade_wallet(decrypted)
+            return await self._save_loaded_wallet(upgraded, overwrite=overwrite)
 
     async def new_wallet(self, mnemonic: str | None = None, overwrite: bool = False) -> dict[str, Any]:
         if not mnemonic:
@@ -346,18 +349,23 @@ class Keymaster:
         if not isinstance(new_passphrase, str) or not new_passphrase:
             raise KeymasterError("Invalid parameter: newPassphrase")
 
-        wallet = await self.load_wallet()
-        mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
-        wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, new_passphrase)
+        # Under the lock, so it cannot land under a mutation working on its own copy
+        # of the wallet, as Cashu's do.
+        async with self._lock:
+            wallet = deepcopy(await self.load_wallet())
+            mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
+            wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, new_passphrase)
 
-        self.passphrase = new_passphrase
-        self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
-        self._wallet_cache = wallet
+            self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
 
-        encrypted = await self.encrypt_wallet_for_storage(wallet)
-        ok = self.wallet_store.save_wallet(encrypted, overwrite=True)
-        if not ok:
-            raise KeymasterError("Failed to save wallet with new passphrase")
+            encrypted = await self.encrypt_wallet_for_storage(wallet)
+            ok = self.wallet_store.save_wallet(encrypted, overwrite=True)
+            if not ok:
+                raise KeymasterError("Failed to save wallet with new passphrase")
+
+            # Only now, together: a failed save leaves the old passphrase working.
+            self.passphrase = new_passphrase
+            self._wallet_cache = wallet
         return True
 
     async def export_encrypted_wallet(self) -> dict[str, Any]:

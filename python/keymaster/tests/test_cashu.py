@@ -814,6 +814,43 @@ class TestRecovery:
         assert bed.mint.requests.count("POST /v1/restore") == 3
 
 
+class TestPassphraseChange:
+    def test_waits_for_a_wallet_mutation_in_flight_which_keeps_its_result(self, bed):
+        run(bed.keymaster.add_cashu())
+
+        async def go():
+            changing = []
+
+            async def mutator(wallet):
+                changing.append(asyncio.create_task(bed.keymaster.change_passphrase("rotated")))
+                await asyncio.sleep(0.02)
+                wallet["ids"]["Alice"]["cashu"][PUBLIC_URL]["added"] = "changed"
+
+            await bed.keymaster.cashu._mutate(mutator)
+            return await changing[0]
+
+        assert run(go()) is True
+
+        fresh = Keymaster(gatekeeper=bed.gatekeeper, wallet_store=bed.testbed.wallet_store, passphrase="rotated")
+        assert run(fresh.load_wallet())["ids"]["Alice"]["cashu"][PUBLIC_URL]["added"] == "changed"
+
+    def test_changes_nothing_when_the_new_passphrase_cannot_be_saved(self, bed):
+        store = bed.testbed.wallet_store
+        save = store.save_wallet
+
+        def failing(wallet, overwrite=False):
+            raise OSError("disk full")
+
+        store.save_wallet = failing
+        with pytest.raises(OSError, match="disk full"):
+            run(bed.keymaster.change_passphrase("rotated"))
+        store.save_wallet = save
+
+        run(bed.keymaster.create_id("Bob"))
+        fresh = Keymaster(gatekeeper=bed.gatekeeper, wallet_store=store, passphrase="passphrase")
+        assert sorted(run(fresh.load_wallet())["ids"]) == ["Alice", "Bob"]
+
+
 class TestKeysetRotation:
     @pytest.fixture(autouse=True)
     def enabled(self, bed):

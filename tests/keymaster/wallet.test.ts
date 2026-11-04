@@ -380,6 +380,39 @@ describe('changePassphrase', () => {
         await keymaster.loadOrCreateWallet();
     });
 
+    it('waits for a wallet mutation in flight, which keeps its result', async () => {
+        await keymaster.loadOrCreateWallet();
+        await keymaster.createId('Alice');
+        const before = (await keymaster.loadWallet()).ids.Alice.index;
+        const update = keymaster.updateDID.bind(keymaster);
+        let change: Promise<boolean> | undefined;
+        keymaster.updateDID = async (...args: Parameters<typeof update>) => {
+            change = keymaster.changePassphrase('rotated');
+            await new Promise(resolve => setTimeout(resolve, 20));
+            return update(...args);
+        };
+
+        await expect(keymaster.rotateKeys()).resolves.toBe(true);
+        await expect(change).resolves.toBe(true);
+
+        const fresh = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'rotated' });
+        expect((await fresh.loadWallet()).ids.Alice.index).toBe(before + 1);
+    });
+
+    it('changes nothing when the new passphrase cannot be saved', async () => {
+        await keymaster.loadOrCreateWallet();
+        await keymaster.createId('Alice');
+        const save = wallet.saveWallet.bind(wallet);
+        wallet.saveWallet = async () => { throw new Error('disk full'); };
+
+        await expect(keymaster.changePassphrase('rotated')).rejects.toThrow('disk full');
+        wallet.saveWallet = save;
+
+        await keymaster.createId('Bob');
+        const fresh = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+        expect(Object.keys((await fresh.loadWallet()).ids)).toEqual(['Alice', 'Bob']);
+    });
+
     it('should re-encrypt wallet with new passphrase', async () => {
         const did = await keymaster.createId('Bob');
         const mnemonicBefore = await keymaster.decryptMnemonic();

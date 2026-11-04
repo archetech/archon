@@ -322,14 +322,22 @@ export default class Keymaster implements KeymasterInterface {
         return this.gatekeeper.listRegistries();
     }
 
+    // Whatever replaces the wallet takes its turn here, so nothing can change the
+    // passphrase or the wallet under a mutation working on its own copy. A mutator
+    // must not call anything that queues, which would wait on itself.
+    private enqueue<T>(work: () => Promise<T>): Promise<T> {
+        const queued = this._mutations.then(work, work);
+        this._mutations = queued.catch(() => {});
+        return queued;
+    }
+
     // On a copy, published only once it is saved: a mutator that throws or a write
     // that fails leaves the wallet as it was. Cashu depends on this, since a journal
     // record visible in the cache but not on disk could be submitted and then lost.
-    // The queue spans the publish, which the store's own lock does not cover.
     private mutateWallet(
         mutator: (wallet: WalletFile) => void | Promise<void>
     ): Promise<void> {
-        const run = async () => {
+        return this.enqueue(async () => {
             // Make sure _walletCache is set; refuses if there is no wallet to load
             if (!this._walletCache) {
                 await this.loadWallet();
@@ -356,11 +364,7 @@ export default class Keymaster implements KeymasterInterface {
             if (saved) {
                 this._walletCache = saved;
             }
-        };
-
-        const queued = this._mutations.then(run, run);
-        this._mutations = queued.catch(() => {});
-        return queued;
+        });
     }
 
     async loadWallet(): Promise<WalletFile> {
@@ -411,16 +415,18 @@ export default class Keymaster implements KeymasterInterface {
         wallet: StoredWallet,
         overwrite = true
     ): Promise<boolean> {
-        // Decrypt if encrypted to verify passphrase and get decrypted form
-        const decrypted = await this.decryptWallet(wallet);
-        const upgraded: WalletFile = await this.upgradeWallet(decrypted);
-        let toStore: WalletEncFile = await this.encryptWalletForStorage(upgraded);
+        return this.enqueue(async () => {
+            // Decrypt if encrypted to verify passphrase and get decrypted form
+            const decrypted = await this.decryptWallet(wallet);
+            const upgraded: WalletFile = await this.upgradeWallet(decrypted);
+            let toStore: WalletEncFile = await this.encryptWalletForStorage(upgraded);
 
-        const ok = await this.db.saveWallet(toStore, overwrite);
-        if (ok) {
-            this._walletCache = upgraded;
-        }
-        return ok;
+            const ok = await this.db.saveWallet(toStore, overwrite);
+            if (ok) {
+                this._walletCache = upgraded;
+            }
+            return ok;
+        });
     }
 
     async newWallet(
@@ -471,28 +477,30 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('newPassphrase');
         }
 
-        const wallet = await this.loadWallet();
-        const mnemonic = await decryptWithPassphrase(wallet.seed.mnemonicEnc!, this.passphrase);
-        const mnemonicEnc = await encryptWithPassphrase(mnemonic, newPassphrase);
+        return this.enqueue(async () => {
+            const wallet: WalletFile = JSON.parse(JSON.stringify(await this.loadWallet()));
+            const mnemonic = await decryptWithPassphrase(wallet.seed.mnemonicEnc!, this.passphrase);
+            wallet.seed.mnemonicEnc = await encryptWithPassphrase(mnemonic, newPassphrase);
 
-        wallet.seed.mnemonicEnc = mnemonicEnc;
-        this.passphrase = newPassphrase;
-        this._walletCache = wallet;
-        // Rotation re-encrypts the same mnemonic, so the HD key is unchanged.
-        // Derive it rather than adopt whatever the cache holds, so the new
-        // identity cannot be attached to another wallet's key; the re-encrypt
-        // below then reuses this entry instead of re-deriving.
-        const hdkey = this.cipher.generateHDKey(mnemonic);
-        this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(mnemonic), id: this.hdkeyCacheId(wallet.seed) };
+            // Rotation re-encrypts the same mnemonic, so the HD key is unchanged.
+            // Derive it rather than adopt whatever the cache holds, so the new
+            // identity cannot be attached to another wallet's key; the re-encrypt
+            // below then reuses this entry instead of re-deriving.
+            const hdkey = this.cipher.generateHDKey(mnemonic);
+            this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(mnemonic), id: this.hdkeyCacheId(wallet.seed) };
 
-        const encrypted = await this.encryptWalletForStorage(wallet);
-        const ok = await this.db.saveWallet(encrypted, true);
+            const encrypted = await this.encryptWalletForStorage(wallet);
+            const ok = await this.db.saveWallet(encrypted, true);
 
-        if (!ok) {
-            throw new KeymasterError('Failed to save wallet with new passphrase');
-        }
+            if (!ok) {
+                throw new KeymasterError('Failed to save wallet with new passphrase');
+            }
 
-        return true;
+            // Only now, together: a failed save leaves the old passphrase working.
+            this.passphrase = newPassphrase;
+            this._walletCache = wallet;
+            return true;
+        });
     }
 
     async checkWallet(): Promise<CheckWalletResult> {
