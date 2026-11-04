@@ -18,7 +18,7 @@ from keymaster import (
     KeymasterError,
 )
 from keymaster.cashu import normalize_mint_url, split_amount
-from keymaster.cashu_crypto import decode_token, encode_token, resolve_keyset_ids
+from keymaster.cashu_crypto import decode_token, encode_token, proof_y, resolve_keyset_ids
 
 from .cashu_fake_mint import FakeMint
 from .helpers import FakeWalletStore, make_testbed, run
@@ -190,6 +190,16 @@ class TestMinting:
             run(bed.keymaster.claim_cashu_mint_quote(quote["quote"]))
         assert len(run(bed.keymaster.list_cashu_quotes())) == 1
 
+    def test_reports_an_expired_unpaid_quote_as_unpaid_and_drops_it(self, bed):
+        quote = run(bed.keymaster.create_cashu_mint_quote(10))
+        bed.mint.mint_quotes[quote["quote"]]["expiry"] = 1
+
+        with pytest.raises(CashuQuoteUnpaidError):
+            run(bed.keymaster.claim_cashu_mint_quote(quote["quote"]))
+
+        assert run(bed.keymaster.list_cashu_quotes()) == []
+        assert bed.balance()["spendable"] == 0
+
     def test_recovers_a_claim_whose_response_was_lost(self, bed):
         quote = run(bed.keymaster.create_cashu_mint_quote(21))
         bed.mint.pay_mint_quote(quote["quote"])
@@ -291,6 +301,67 @@ class TestSendingAndReceiving:
 
         with pytest.raises(KeymasterError, match="Invalid parameter: token"):
             run(funded.keymaster.receive_cashu(v3, "Bob"))
+
+    def test_another_identity_cannot_restore_the_outputs_of_an_unfinished_send(self, funded):
+        funded.mint.lose_response("/v1/swap")
+        with pytest.raises(CashuUnavailableError):
+            run(funded.keymaster.send_cashu(30))
+
+        assert run(funded.keymaster.restore_cashu(None, "Bob")) == {"restored": 0, "amount": 0}
+        run(funded.keymaster.check_cashu())
+
+        assert funded.balance() == {"spendable": 70, "inFlight": 0, "outstanding": 30}
+        assert funded.balance("Bob")["spendable"] == 0
+
+    def test_re_swaps_the_unspent_part_of_a_partly_redeemed_reclaim(self, funded):
+        sent = run(funded.keymaster.send_cashu(6))
+        record = next(op for op in funded.entry()["operations"] if op["id"] == sent["operationId"])
+        two = next(proof for proof in record["sent"] if proof["amount"] == 2)
+        four = next(proof for proof in record["sent"] if proof["amount"] == 4)
+        funded.mint.spent.add(proof_y(two["secret"]))
+
+        with pytest.raises(CashuTokenSpentError):
+            run(funded.keymaster.reclaim_cashu(sent["operationId"]))
+
+        assert funded.balance() == {"spendable": 98, "inFlight": 0, "outstanding": 0}
+        # The recipient still holds the original, so it must not come back as is.
+        assert four["secret"] not in [proof["secret"] for proof in funded.entry()["proofs"]]
+        assert proof_y(four["secret"]) in funded.mint.spent
+
+    def test_keeps_nothing_of_a_partly_spent_token_it_was_receiving(self, funded):
+        sent = run(funded.keymaster.send_cashu(6))
+        record = next(op for op in funded.entry()["operations"] if op["id"] == sent["operationId"])
+        funded.mint.spent.add(proof_y(record["sent"][0]["secret"]))
+
+        with pytest.raises(CashuTokenSpentError):
+            run(funded.keymaster.receive_cashu(sent["token"], "Bob"))
+
+        assert funded.balance("Bob") == {"spendable": 0, "inFlight": 0, "outstanding": 0}
+
+    def test_settlement_does_not_submit_a_record_still_being_journaled(self, funded):
+        km = funded.keymaster
+        save = km._save_loaded_wallet
+        checks = []
+
+        async def saving(wallet, overwrite=True):
+            result = await save(wallet, overwrite)
+            operations = wallet["ids"]["Alice"]["cashu"][PUBLIC_URL].get("operations") or []
+            if not checks and any(op["kind"] == "send" and not op.get("sent") for op in operations):
+                checks.append(asyncio.create_task(km.check_cashu()))
+                await asyncio.sleep(0.05)
+            return result
+
+        km._save_loaded_wallet = saving
+        funded.mint.requests.clear()
+
+        async def go():
+            await km.send_cashu(30)
+            await checks[0]
+
+        run(go())
+
+        assert funded.mint.requests.count("POST /v1/swap") == 1
+        assert funded.balance() == {"spendable": 70, "inFlight": 0, "outstanding": 30}
 
     def test_rejects_a_malformed_token(self, funded):
         with pytest.raises(KeymasterError, match="Invalid parameter: token"):

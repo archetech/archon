@@ -445,6 +445,21 @@ class CashuWallet:
         taken = {proof["secret"] for proof in proofs}
         entry["proofs"] = [proof for proof in entry["proofs"] if proof["secret"] not in taken]
 
+    async def _journaled(
+        self,
+        op_id: str,
+        mutator: Callable[[dict[str, Any]], Awaitable[Any]],
+        work: Callable[[Any], Awaitable[Any]],
+    ) -> Any:
+        """Saves a new record and runs it, marked active throughout, so settlement
+        can never pick the record up between the two. `work` gets what `mutator`
+        returned."""
+
+        async def run() -> Any:
+            return await work(await self._mutate(mutator))
+
+        return await self._with_active(op_id, run)
+
     async def _with_active(self, op_id: str, work: Callable[[], Awaitable[Any]]) -> Any:
         self._active.add(op_id)
         try:
@@ -454,19 +469,11 @@ class CashuWallet:
 
     # ---- settlement ----
 
-    async def _reserve_fresh(self, ctx: _MintContext, op_id: str) -> None:
-        async def mutator(wallet: dict[str, Any]) -> None:
-            stored = self._find_op(await self._entry_of(wallet, ctx), op_id)
-            fresh = self._reserve(wallet, stored["keyset"], len(stored["outputs"]))
-            for output, counter in zip(stored["outputs"], fresh):
-                output["counter"] = counter
-
-        await self._mutate(mutator)
-
-    async def _repair_counters(self, ctx: _MintContext, keyset_id: str) -> None:
+    async def _repair_and_renumber(self, ctx: _MintContext, op_id: str, keyset_id: str) -> None:
         """After a mint refused a request whose outputs it had already signed,
         although this request was never accepted: the counters are stale, as after
-        recovering a wallet."""
+        recovering a wallet. In one write, so the request's old outputs are no longer
+        reserved when what the scan found is credited."""
         proofs, highest, signed = await self._scan_keyset(ctx, keyset_id)
         spendable = await self._unspent(ctx, proofs)
 
@@ -479,9 +486,27 @@ class CashuWallet:
                 for counter in range(start, end + 1)
                 if counter not in signed and counter < state["next"]
             ]
-            self._credit(wallet, await self._entry_of(wallet, ctx), spendable)
+            entry = await self._entry_of(wallet, ctx)
+            stored = self._find_op(entry, op_id)
+            fresh = self._reserve(wallet, stored["keyset"], len(stored["outputs"]))
+            for output, counter in zip(stored["outputs"], fresh):
+                output["counter"] = counter
+            self._credit(wallet, entry, await self._without_reserved(wallet, spendable))
 
         await self._mutate(mutator)
+
+    async def _without_reserved(self, wallet: dict[str, Any], proofs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """A scan finds every signed output of the seed, including those an unfinished
+        operation of any identity is waiting to collect. Those are that operation's."""
+        seed = await self.host._bip39_seed(wallet)
+        reserved: set[str] = set()
+        for id_info in wallet["ids"].values():
+            for entry in _mints(id_info).values():
+                for op in entry.get("operations") or []:
+                    for output in op["outputs"]:
+                        if output.get("counter") is not None:
+                            reserved.add(cc.derive_secret_and_r(seed, op["keyset"], output["counter"])[0])
+        return [proof for proof in proofs if proof["secret"] not in reserved]
 
     async def _unspent(self, ctx: _MintContext, proofs: list[dict[str, Any]]) -> list[dict[str, Any]]:
         states = await ctx.client.states([cc.proof_y(proof["secret"]) for proof in proofs])
@@ -530,14 +555,13 @@ class CashuWallet:
             await self._apply_swap(ctx, op_id, [recovered[output["B_"]] for output in blinded], data)
             return "done"
         if not spent and recovered and not retried:
-            await self._repair_counters(ctx, op["keyset"])
-            await self._reserve_fresh(ctx, op_id)
+            await self._repair_and_renumber(ctx, op_id, op["keyset"])
             return await self._run_swap(ctx, op_id, True)
 
         # Settled and unable to sign: its unsigned counters are free again.
         unsigned = [output["counter"] for output, sent in zip(op["outputs"], blinded) if sent["B_"] not in recovered]
 
-        async def mutator(wallet: dict[str, Any]) -> None:
+        async def retire(wallet: dict[str, Any]) -> dict[str, Any]:
             entry = await self._entry_of(wallet, ctx)
             self._retire(entry, op_id)
             self._release(wallet, op["keyset"], unsigned)
@@ -545,11 +569,66 @@ class CashuWallet:
             # were never its own.
             if not spent and op["kind"] != "receive":
                 self._credit(wallet, entry, op["inputs"])
+            return entry
 
-        await self._mutate(mutator)
+        remainder = []
+        if spent and op["kind"] != "receive":
+            remainder = [proof for proof in op["inputs"] if states.get(cc.proof_y(proof["secret"])) == "UNSPENT"]
+        if remainder:
+            await self._swap_remainder(ctx, remainder, retire)
+        else:
+            await self._mutate(retire)
         if not spent:
             raise error
         return "spent"
+
+    async def _swap_remainder(
+        self,
+        ctx: _MintContext,
+        inputs: list[dict[str, Any]],
+        retire: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]],
+    ) -> None:
+        """What is left of a partly spent operation. It is swapped rather than
+        credited: when reclaiming a token, the recipient still holds these proofs. A
+        failure here leaves the new record for settlement to finish."""
+        keyset, keysets = await self._active_keyset(ctx)
+        value = _sum_proofs(inputs) - _fee_for(inputs, keysets)
+        swap_id = secrets.token_hex(16)
+
+        async def mutator(wallet: dict[str, Any]) -> None:
+            entry = await retire(wallet)
+            # Worth less than the fee to redeem it, it is not worth a record.
+            if value > 0:
+                self._journal_swap(wallet, entry, swap_id, "swap", inputs, keyset["id"], value)
+
+        async def work(_: Any) -> str:
+            return await self._run_swap(ctx, swap_id) if value > 0 else "done"
+
+        try:
+            await self._journaled(swap_id, mutator, work)
+        except (CashuMintError, CashuUnavailableError):
+            pass
+
+    def _journal_swap(
+        self,
+        wallet: dict[str, Any],
+        entry: dict[str, Any],
+        op_id: str,
+        kind: str,
+        inputs: list[dict[str, Any]],
+        keyset: str,
+        value: int,
+    ) -> None:
+        parts = split_amount(value)
+        counters = self._reserve(wallet, keyset, len(parts))
+        entry.setdefault("operations", []).append({
+            "id": op_id,
+            "kind": kind,
+            "inputs": inputs,
+            "keyset": keyset,
+            "outputs": [{"amount": part, "role": "keep", "counter": counters[i]} for i, part in enumerate(parts)],
+            "created": _now(),
+        })
 
     async def _apply_swap(self, ctx: _MintContext, op_id: str, signatures: list[dict[str, Any]], data: list[tuple[str, int]]) -> None:
         op = await self._read_op(ctx, op_id)
@@ -604,7 +683,7 @@ class CashuWallet:
             expiry = quote.get("expiry") or op.get("expiry")
             if expiry and expiry < datetime.now(timezone.utc).timestamp():
                 await self._release_unsigned(ctx, op_id)
-                return "done"
+                return "rejected"
             return "open"
 
         if not op["outputs"]:
@@ -631,8 +710,7 @@ class CashuWallet:
             if after.get("state") == "ISSUED":
                 return await self._recover_mint(ctx, op_id)
             if not retried and await ctx.client.restore(blinded):
-                await self._repair_counters(ctx, current["keyset"])
-                await self._reserve_fresh(ctx, op_id)
+                await self._repair_and_renumber(ctx, op_id, current["keyset"])
                 return await self._run_mint(ctx, op_id, True)
             raise
 
@@ -740,8 +818,7 @@ class CashuWallet:
             if not retried and await ctx.client.restore(blinded):
                 quote = await ctx.client.check_melt_quote(op["quote"])
                 if quote.get("state") == "UNPAID":
-                    await self._repair_counters(ctx, op["keyset"])
-                    await self._reserve_fresh(ctx, op_id)
+                    await self._repair_and_renumber(ctx, op_id, op["keyset"])
                     return await self._submit_melt(ctx, op_id, True)
             return None, error
 
@@ -1058,9 +1135,7 @@ class CashuWallet:
             })
             return spent_total
 
-        spent = await self._mutate(mutator)
-
-        async def work() -> dict[str, Any]:
+        async def work(spent: int) -> dict[str, Any]:
             # On a refusal the quote says what actually happened.
             response, refusal = await self._submit_melt(ctx, op_id)
             known = response if isinstance(response, dict) and response.get("state") else None
@@ -1076,7 +1151,7 @@ class CashuWallet:
                 result["fee"] = spent - quote["amount"] - change
             return result
 
-        return await self._with_active(op_id, work)
+        return await self._journaled(op_id, mutator, work)
 
     async def send_cashu(self, amount: int, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
         self._require_amount(amount)
@@ -1114,9 +1189,10 @@ class CashuWallet:
                 "created": _now(),
             })
 
-        await self._mutate(mutator)
+        async def run(_: Any) -> str:
+            return await self._run_swap(ctx, op_id)
 
-        outcome = await self._with_active(op_id, lambda: self._run_swap(ctx, op_id))
+        outcome = await self._journaled(op_id, mutator, run)
         if outcome == "spent":
             raise CashuTokenSpentError("the selected proofs were already spent; run cashu-check")
         if outcome != "done":
@@ -1160,20 +1236,12 @@ class CashuWallet:
             held = {proof["secret"] for proof in entry["proofs"]}
             if any(proof["secret"] in held for proof in proofs):
                 raise CashuTokenSpentError("this token is already in the wallet")
-            parts = split_amount(amount)
-            counters = self._reserve(wallet, keyset["id"], len(parts))
-            entry.setdefault("operations", []).append({
-                "id": op_id,
-                "kind": "receive",
-                "inputs": proofs,
-                "keyset": keyset["id"],
-                "outputs": [{"amount": part, "role": "keep", "counter": counters[i]} for i, part in enumerate(parts)],
-                "created": _now(),
-            })
+            self._journal_swap(wallet, entry, op_id, "receive", proofs, keyset["id"], amount)
 
-        await self._mutate(mutator)
+        async def run(_: Any) -> str:
+            return await self._run_swap(ctx, op_id)
 
-        outcome = await self._with_active(op_id, lambda: self._run_swap(ctx, op_id))
+        outcome = await self._journaled(op_id, mutator, run)
         if outcome == "spent":
             raise CashuTokenSpentError()
         if outcome == "open":
@@ -1205,7 +1273,7 @@ class CashuWallet:
                 entry = await self._entry_of(wallet, ctx)
                 before = len(entry["proofs"])
                 value = _sum_proofs(entry["proofs"])
-                self._credit(wallet, entry, found)
+                self._credit(wallet, entry, await self._without_reserved(wallet, found))
                 totals["restored"] += len(entry["proofs"]) - before
                 totals["amount"] += _sum_proofs(entry["proofs"]) - value
 
@@ -1235,24 +1303,16 @@ class CashuWallet:
                 raise _invalid("operationId")
             inputs = op["sent"]
             value = _sum_proofs(inputs) - _fee_for(inputs, keysets)
-            parts = split_amount(value)
-            counters = self._reserve(wallet, keyset["id"], len(parts))
             self._retire(entry, operation_id)
-            entry.setdefault("operations", []).append({
-                "id": swap_id,
-                "kind": "swap",
-                "inputs": inputs,
-                "keyset": keyset["id"],
-                "outputs": [{"amount": part, "role": "keep", "counter": counters[i]} for i, part in enumerate(parts)],
-                "created": _now(),
-            })
+            self._journal_swap(wallet, entry, swap_id, "swap", inputs, keyset["id"], value)
             return value
 
-        amount = await self._mutate(mutator)
+        async def run(value: int) -> tuple[int, str]:
+            return value, await self._run_swap(ctx, swap_id)
 
-        outcome = await self._with_active(swap_id, lambda: self._run_swap(ctx, swap_id))
+        amount, outcome = await self._journaled(swap_id, mutator, run)
         if outcome == "spent":
-            raise CashuTokenSpentError("the recipient already redeemed this token")
+            raise CashuTokenSpentError("the recipient redeemed this token; any part they did not was reclaimed")
         if outcome != "done":
             raise CashuUnavailableError(f"{ctx.url} has the reclaim pending; run cashu-check")
         return {"amount": amount, "mint": ctx.url}

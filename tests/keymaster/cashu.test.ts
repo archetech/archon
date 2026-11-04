@@ -16,7 +16,7 @@ import {
     CashuUnavailableError,
 } from '@didcid/common/errors';
 import { getEncodedToken } from '@cashu/cashu-ts';
-import { CashuWallet, normalizeMintUrl, splitAmount } from '../../packages/keymaster/src/cashu.ts';
+import { CashuWallet, normalizeMintUrl, proofY, splitAmount } from '../../packages/keymaster/src/cashu.ts';
 import { FakeMint } from './cashu-fake-mint.ts';
 import type { FakeMintOptions } from './cashu-fake-mint.ts';
 
@@ -184,6 +184,16 @@ describe('minting', () => {
         expect(await keymaster.listCashuQuotes()).toHaveLength(1);
     });
 
+    it('reports an expired unpaid quote as unpaid, and drops it', async () => {
+        const quote = await keymaster.createCashuMintQuote(10);
+        mint.mintQuotes.get(quote.quote)!.expiry = 1;
+
+        await expect(keymaster.claimCashuMintQuote(quote.quote)).rejects.toThrow(CashuQuoteUnpaidError);
+
+        expect(await keymaster.listCashuQuotes()).toEqual([]);
+        expect((await keymaster.getCashuBalance()).spendable).toBe(0);
+    });
+
     it('recovers a claim whose response was lost', async () => {
         const quote = await keymaster.createCashuMintQuote(21);
         mint.payMintQuote(quote.quote);
@@ -315,6 +325,62 @@ describe('sending and receiving', () => {
 
         expect(await keymaster.getCashuBalance(undefined, 'Alice')).toEqual({ spendable: 70, inFlight: 0, outstanding: 30 });
         expect(await keymaster.getCashuBalance(undefined, 'Bob')).toEqual({ spendable: 0, inFlight: 0, outstanding: 0 });
+    });
+
+    it('does not let another identity restore the outputs of an unfinished send', async () => {
+        mint.loseResponse('/v1/swap');
+        await expect(keymaster.sendCashu(30)).rejects.toThrow(CashuUnavailableError);
+
+        await expect(keymaster.restoreCashu(undefined, 'Bob')).resolves.toEqual({ restored: 0, amount: 0 });
+        await keymaster.checkCashu();
+
+        expect(await keymaster.getCashuBalance()).toEqual({ spendable: 70, inFlight: 0, outstanding: 30 });
+        expect((await keymaster.getCashuBalance(undefined, 'Bob')).spendable).toBe(0);
+    });
+
+    it('re-swaps the unspent part of a partly redeemed reclaim', async () => {
+        const { operationId } = await keymaster.sendCashu(6);
+        const sent = (await entry()).operations.find((op: { id: string }) => op.id === operationId).sent;
+        const two = sent.find((proof: { amount: number }) => proof.amount === 2);
+        const four = sent.find((proof: { amount: number }) => proof.amount === 4);
+        mint.spent.add(proofY(two.secret));
+
+        await expect(keymaster.reclaimCashu(operationId)).rejects.toThrow(CashuTokenSpentError);
+
+        expect(await keymaster.getCashuBalance()).toEqual({ spendable: 98, inFlight: 0, outstanding: 0 });
+        // The recipient still holds the original, so it must not come back as is.
+        expect((await entry()).proofs.map((proof: { secret: string }) => proof.secret)).not.toContain(four.secret);
+        expect(mint.spent.has(proofY(four.secret))).toBe(true);
+    });
+
+    it('keeps nothing of a partly spent token it was receiving', async () => {
+        const { token, operationId } = await keymaster.sendCashu(6);
+        const sent = (await entry()).operations.find((op: { id: string }) => op.id === operationId).sent;
+        mint.spent.add(proofY(sent[0].secret));
+
+        await expect(keymaster.receiveCashu(token, 'Bob')).rejects.toThrow(CashuTokenSpentError);
+
+        expect(await keymaster.getCashuBalance(undefined, 'Bob')).toEqual({ spendable: 0, inFlight: 0, outstanding: 0 });
+    });
+
+    it('does not let settlement submit a record still being saved', async () => {
+        const save = wallet.saveWallet.bind(wallet);
+        let check: Promise<unknown> | undefined;
+        wallet.saveWallet = async (stored, overwrite) => {
+            const operations = (await keymaster.loadWallet()).ids.Alice.cashu[PUBLIC_URL].operations ?? [];
+            if (!check && operations.some((op: { kind: string; sent?: unknown }) => op.kind === 'send' && !op.sent)) {
+                check = keymaster.checkCashu();
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            return save(stored, overwrite);
+        };
+        mint.requests = [];
+
+        await keymaster.sendCashu(30);
+        await check;
+
+        expect(mint.requests.filter(request => request === 'POST /v1/swap')).toHaveLength(1);
+        expect(await keymaster.getCashuBalance()).toEqual({ spendable: 70, inFlight: 0, outstanding: 30 });
     });
 
     it('rejects a malformed token', async () => {
