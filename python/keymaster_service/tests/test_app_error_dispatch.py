@@ -126,3 +126,50 @@ def test_cashu_errors_dispatch_like_the_typescript_service():
     client = _client()
     assert client.get("/cashu-unavailable").status_code == 503
     assert client.get("/cashu-state").status_code == 400
+
+
+def _cashu_client() -> TestClient:
+    app = FastAPI()
+    for exc_type, handler in app_module.app.exception_handlers.items():
+        app.add_exception_handler(exc_type, handler)
+    app.include_router(app_module.protected_api)
+    app.dependency_overrides[app_module.require_admin_key] = lambda: None
+    return TestClient(app, raise_server_exceptions=False)
+
+
+def test_cashu_routes_accept_a_request_with_no_body(monkeypatch):
+    calls = []
+
+    async def add_cashu(name):
+        calls.append(("add", name))
+        return {"url": "https://mint.example"}
+
+    async def get_cashu_balance(mint, name):
+        calls.append(("balance", mint, name))
+        return {"spendable": 0}
+
+    async def remove_cashu(force, name):
+        calls.append(("remove", force, name))
+        return True
+
+    monkeypatch.setattr(app_module.service, "add_cashu", add_cashu)
+    monkeypatch.setattr(app_module.service, "get_cashu_balance", get_cashu_balance)
+    monkeypatch.setattr(app_module.service, "remove_cashu", remove_cashu)
+    client = _cashu_client()
+
+    assert client.post("/api/v1/cashu").status_code == 200
+    assert client.post("/api/v1/cashu/balance").status_code == 200
+    assert client.delete("/api/v1/cashu").json() == {"ok": True}
+    assert calls == [("add", None), ("balance", None, None), ("remove", None, None)]
+
+
+def test_cashu_routes_leave_a_missing_field_to_the_wallet(monkeypatch):
+    async def send_cashu(amount, mint, name):
+        raise KeymasterError(f"Invalid parameter: amount {amount}")
+
+    monkeypatch.setattr(app_module.service, "send_cashu", send_cashu)
+
+    response = _cashu_client().post("/api/v1/cashu/send")
+
+    assert response.status_code == 400
+    assert response.json() == {"error": "Invalid parameter: amount None"}

@@ -267,6 +267,31 @@ class TestSendingAndReceiving:
             run(funded.keymaster.receive_cashu(token))
         assert funded.mint.requests == []
 
+    def test_stays_with_the_identity_it_started_on_when_the_current_one_changes(self, funded):
+        async def switch(path):
+            if path == "/v1/swap":
+                funded.mint.on_request = None
+                await funded.keymaster.set_current_id("Bob")
+
+        funded.mint.on_request = switch
+
+        assert run(funded.keymaster.send_cashu(30))["amount"] == 30
+
+        assert funded.balance("Alice") == {"spendable": 70, "inFlight": 0, "outstanding": 30}
+        assert funded.balance("Bob") == {"spendable": 0, "inFlight": 0, "outstanding": 0}
+
+    def test_rejects_an_oversized_dleq_as_an_invalid_token(self, funded):
+        import base64
+
+        token = run(funded.keymaster.send_cashu(8))["token"]
+        proofs = resolve_keyset_ids(decode_token(token)["proofs"], [funded.mint.keyset_id])
+        forged = [{**proof, "dleq": {**proof["dleq"], "e": "ff" * 33}} for proof in proofs]
+        payload = json.dumps({"token": [{"mint": PUBLIC_URL, "proofs": forged}], "unit": "sat"}).encode()
+        v3 = "cashuA" + base64.urlsafe_b64encode(payload).decode().rstrip("=")
+
+        with pytest.raises(KeymasterError, match="Invalid parameter: token"):
+            run(funded.keymaster.receive_cashu(v3, "Bob"))
+
     def test_rejects_a_malformed_token(self, funded):
         with pytest.raises(KeymasterError, match="Invalid parameter: token"):
             run(funded.keymaster.receive_cashu("cashuBnot-a-token"))
@@ -439,6 +464,10 @@ class TestMelting:
         run(bed.keymaster.check_cashu())
         assert bed.balance() == {"spendable": 99, "inFlight": 0, "outstanding": 0}
 
+    def test_requires_an_invoice(self, bed):
+        with pytest.raises(KeymasterError, match="Invalid parameter: bolt11"):
+            run(bed.keymaster.melt_cashu(None))
+
     def test_fails_a_melt_it_cannot_cover(self, bed):
         with pytest.raises(CashuInsufficientFundsError):
             run(bed.keymaster.melt_cashu("lnbc-amount=500"))
@@ -549,6 +578,15 @@ class TestRemovalGuards:
 
         run(bed.keymaster.remove_cashu(True))
         assert "cashu" not in run(bed.keymaster.load_wallet())["ids"]["Alice"]
+
+    @pytest.mark.parametrize("force", ["false", "true", 1, {}])
+    def test_does_not_take_a_non_boolean_as_force(self, bed, force):
+        run(bed.keymaster.create_cashu_mint_quote(5))
+
+        with pytest.raises(CashuStateError):
+            run(bed.keymaster.remove_cashu(force))
+        with pytest.raises(CashuStateError):
+            run(bed.keymaster.remove_cashu_mint(PUBLIC_URL, force))
 
     def test_refuses_to_remove_an_identity_holding_state(self, bed):
         bed.fund(5)

@@ -316,7 +316,13 @@ export class CashuWallet {
             }
             url = own ?? urls[0];
         }
-        return { name, url, client: this.clientFor(url, mints[url]) };
+        // By DID, not the name given: with none given it means the current identity,
+        // which can change while a request is out, and proofs must not follow it.
+        return { name: idInfo.did, url, client: this.clientFor(url, mints[url]) };
+    }
+
+    private async boundIdentity(name?: string): Promise<string> {
+        return (await this.host.fetchIdInfo(name, await this.host.loadWallet())).did;
     }
 
     private async entryOf(wallet: WalletFile, ctx: MintContext): Promise<CashuMintEntry> {
@@ -888,6 +894,7 @@ export class CashuWallet {
     }
 
     async addCashu(name?: string): Promise<CashuMintInfo> {
+        const identity = await this.boundIdentity(name);
         const node = this.nodeUrl();
         const capabilities = await this.host.getCapabilities();
         const url = capabilities?.cashu === false ? undefined : await this.host.gatekeeper.getCashuMint?.();
@@ -900,7 +907,7 @@ export class CashuWallet {
         const listed = new Set((await client.keysets()).map(keyset => keyset.id));
 
         await this.host.mutateWallet(async (wallet) => {
-            const idInfo = await this.host.fetchIdInfo(name, wallet);
+            const idInfo = await this.host.fetchIdInfo(identity, wallet);
             const mints = (idInfo.cashu ??= {}) as Record<string, CashuMintEntry>;
             if (mints[normalized]) {
                 return;
@@ -928,11 +935,12 @@ export class CashuWallet {
     }
 
     async addCashuMint(url: string, name?: string): Promise<CashuMintInfo> {
+        const identity = await this.boundIdentity(name);
         const normalized = normalizeMintUrl(url);
         const client = new CashuMintClient(normalized, this.publicFetch);
         await this.requireNuts(client, normalized);
         await this.host.mutateWallet(async (wallet) => {
-            const idInfo = await this.host.fetchIdInfo(name, wallet);
+            const idInfo = await this.host.fetchIdInfo(identity, wallet);
             const mints = (idInfo.cashu ??= {}) as Record<string, CashuMintEntry>;
             mints[normalized] ??= { added: new Date().toISOString(), proofs: [] };
         });
@@ -952,7 +960,7 @@ export class CashuWallet {
             if (!entry) {
                 throw new CashuMintNotAddedError(normalized);
             }
-            if (!force && (entry.proofs.length > 0 || (entry.operations?.length ?? 0) > 0)) {
+            if (force !== true && (entry.proofs.length > 0 || (entry.operations?.length ?? 0) > 0)) {
                 throw new CashuStateError(`${normalized} holds ecash or open operations; use force to discard them`);
             }
             delete idInfo.cashu[normalized];
@@ -966,7 +974,7 @@ export class CashuWallet {
     async removeCashu(force = false, name?: string): Promise<boolean> {
         await this.host.mutateWallet(async (wallet) => {
             const idInfo = await this.host.fetchIdInfo(name, wallet);
-            if (!force && hasCashuState(idInfo)) {
+            if (force !== true && hasCashuState(idInfo)) {
                 throw new CashuStateError('this identity holds ecash or open operations; use force to discard them');
             }
             delete idInfo.cashu;
@@ -1148,6 +1156,9 @@ export class CashuWallet {
     }
 
     async meltCashu(bolt11: string, mint?: string, name?: string): Promise<CashuMeltResult> {
+        if (typeof bolt11 !== 'string' || !bolt11) {
+            throw new InvalidParameterError('bolt11');
+        }
         const ctx = await this.context(mint, name);
         await this.settle(ctx);
         const quote = await ctx.client.createMeltQuote(bolt11);
@@ -1316,10 +1327,11 @@ export class CashuWallet {
     }
 
     async checkCashu(mint?: string, name?: string): Promise<CashuCheckResult> {
-        const entries = await this.scopedEntries(mint, name);
+        const identity = await this.boundIdentity(name);
+        const entries = await this.scopedEntries(mint, identity);
         const total: CashuCheckResult = { settled: 0, open: 0 };
         for (const [url] of entries) {
-            const result = await this.settle(await this.context(url, name));
+            const result = await this.settle(await this.context(url, identity));
             total.settled += result.settled;
             total.open += result.open;
         }
@@ -1358,12 +1370,13 @@ export class CashuWallet {
     }
 
     async reclaimCashu(operationId: string, name?: string): Promise<CashuReceiveResult> {
-        const entries = await this.scopedEntries(undefined, name);
+        const identity = await this.boundIdentity(name);
+        const entries = await this.scopedEntries(undefined, identity);
         const found = entries.find(([, entry]) => entry.operations?.some(op => op.id === operationId && op.sent));
         if (!found) {
             throw new InvalidParameterError('operationId');
         }
-        const ctx = await this.context(found[0], name);
+        const ctx = await this.context(found[0], identity);
         const { keyset, keysets } = await this.activeKeyset(ctx);
 
         // The token becomes an ordinary swap's inputs, in one write, so the record

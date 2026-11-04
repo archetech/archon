@@ -303,6 +303,20 @@ describe('sending and receiving', () => {
         }
     });
 
+    it('stays with the identity it started on when the current one changes', async () => {
+        mint.onRequest = async (path) => {
+            if (path === '/v1/swap') {
+                mint.onRequest = undefined;
+                await keymaster.setCurrentId('Bob');
+            }
+        };
+
+        await expect(keymaster.sendCashu(30)).resolves.toMatchObject({ amount: 30 });
+
+        expect(await keymaster.getCashuBalance(undefined, 'Alice')).toEqual({ spendable: 70, inFlight: 0, outstanding: 30 });
+        expect(await keymaster.getCashuBalance(undefined, 'Bob')).toEqual({ spendable: 0, inFlight: 0, outstanding: 0 });
+    });
+
     it('rejects a malformed token', async () => {
         await expect(keymaster.receiveCashu('cashuBnot-a-token')).rejects.toThrow('Invalid parameter: token');
     });
@@ -512,6 +526,10 @@ describe('melting', () => {
         expect(await keymaster.getCashuBalance()).toEqual({ spendable: 99, inFlight: 0, outstanding: 0 });
     });
 
+    it('requires an invoice', async () => {
+        await expect(keymaster.meltCashu(undefined as never)).rejects.toThrow('Invalid parameter: bolt11');
+    });
+
     it('fails a melt it cannot cover', async () => {
         await expect(keymaster.meltCashu('lnbc-amount=500')).rejects.toThrow(CashuInsufficientFundsError);
     });
@@ -632,6 +650,13 @@ describe('removal guards', () => {
 
         await keymaster.removeCashu(true);
         expect((await keymaster.loadWallet()).ids.Alice.cashu).toBeUndefined();
+    });
+
+    it.each(['false', 'true', 1, {}])('does not take %j as force', async (force) => {
+        await keymaster.createCashuMintQuote(5);
+
+        await expect(keymaster.removeCashu(force as never)).rejects.toThrow(CashuStateError);
+        await expect(keymaster.removeCashuMint(PUBLIC_URL, force as never)).rejects.toThrow(CashuStateError);
     });
 
     it('refuses to remove an identity holding Cashu state', async () => {

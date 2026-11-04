@@ -62,6 +62,8 @@ export class FakeMint {
     meltOutcome: 'PAID' | 'PENDING' | 'UNPAID' = 'PAID';
     // Mints differ here: NUT-00 lists 11003, cdk-mintd sends 20006 on a mint.
     alreadySignedCode = 11003;
+    // Runs while a request is on the wire, before the mint answers it.
+    onRequest?: (path: string) => Promise<void>;
     // Requests whose work is done but whose response never arrives.
     private lose = new Set<string>();
     private refuseWith = new Map<string, MintRefusal>();
@@ -260,9 +262,10 @@ export class FakeMint {
         return undefined;
     }
 
-    private handle(req: http.IncomingMessage, res: http.ServerResponse, raw: string): void {
+    private async handle(req: http.IncomingMessage, res: http.ServerResponse, raw: string): Promise<void> {
         const path = req.url!.replace(/^\/cashu/, '');
         this.requests.push(`${req.method} ${path}`);
+        await this.onRequest?.(path);
         res.setHeader('Content-Type', 'application/json');
         try {
             const refusal = this.refuseWith.get(path);

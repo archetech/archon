@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 
@@ -81,7 +82,7 @@ def test_decodes_v4_tokens(name):
     assert decoded["proofs"] == vector["proofs"]
 
 
-@pytest.mark.parametrize("token", ["cashuB", "cashuBnot-a-token", "cashuC", "cashuBoWF0gA", None])
+@pytest.mark.parametrize("token", ["cashuB", "cashuBnot-a-token", "cashuC", "cashuBoWF0gA", "cashuBé", "cashuAé", None])
 def test_rejects_malformed_tokens(token):
     with pytest.raises(CashuTokenError):
         proofs = decode_token(token)["proofs"]
@@ -92,6 +93,21 @@ def test_hash_e():
     vector = NUT["nut12"]["hashE"]
     points = [PublicKey(bytes.fromhex(vector[key])) for key in ("R1", "R2", "K", "C_")]
     assert hash_e(*points).hex() == vector["hash"]
+
+
+@pytest.mark.parametrize("field", ["e", "s"])
+@pytest.mark.parametrize("value", ["ff" * 33, "ff" * 31, "zz", 7, None])
+def test_rejects_a_dleq_scalar_of_the_wrong_shape(field, value):
+    vector = NUT["nut12"]["deterministic"]
+    scalars = {"e": vector["e"], "s": vector["s"], field: value}
+    assert not verify_dleq(scalars["e"], scalars["s"], vector["B_"], vector["C_"], vector["A"])
+
+
+def test_rejects_a_secret_that_is_not_valid_text():
+    payload = '{"token":[{"mint":"https://m","proofs":[{"id":"00","amount":1,"secret":"\\ud800","C":"02"}]}]}'
+    token = "cashuA" + base64.urlsafe_b64encode(payload.encode()).decode()
+    with pytest.raises(CashuTokenError):
+        decode_token(token)
 
 
 def test_verifies_dleq_on_a_blind_signature():

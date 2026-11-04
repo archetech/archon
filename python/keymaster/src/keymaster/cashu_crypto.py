@@ -9,7 +9,6 @@ coincurve, as didcomm_crypto.py is for DIDComm.
 from __future__ import annotations
 
 import base64
-import binascii
 import hashlib
 import hmac
 import json
@@ -73,12 +72,22 @@ def hash_e(*points: PublicKey) -> bytes:
     return hashlib.sha256(joined.encode()).digest()
 
 
+def _scalar_field(value: Any) -> bytes:
+    """A 32-byte scalar from a token or a mint, which may hold anything."""
+    if not isinstance(value, str):
+        raise ValueError("scalar must be a hex string")
+    raw = bytes.fromhex(value)
+    if len(raw) != 32:
+        raise ValueError("scalar must be 32 bytes")
+    return raw
+
+
 def verify_dleq(e_hex: str, s_hex: str, blinded: str, signature: str, mint_public_key: str) -> bool:
     """NUT-12: R1 = sG - eA, R2 = sB_ - eC_, and e = hash(R1, R2, A, C_)."""
     try:
-        e = int(e_hex, 16)
-        s = bytes.fromhex(s_hex)
-        negated_e = _scalar_bytes(CURVE_ORDER - e)
+        e = _scalar_field(e_hex)
+        s = _scalar_field(s_hex)
+        negated_e = _scalar_bytes(CURVE_ORDER - int.from_bytes(e, "big"))
         A = PublicKey(bytes.fromhex(mint_public_key))
         B_ = PublicKey(bytes.fromhex(blinded))
         C_ = PublicKey(bytes.fromhex(signature))
@@ -86,7 +95,7 @@ def verify_dleq(e_hex: str, s_hex: str, blinded: str, signature: str, mint_publi
         R2 = PublicKey.combine_keys([B_.multiply(s), C_.multiply(negated_e)])
     except ValueError:
         return False
-    return hmac.compare_digest(hash_e(R1, R2, A, C_), e.to_bytes(32, "big"))
+    return hmac.compare_digest(hash_e(R1, R2, A, C_), e)
 
 
 def verify_proof_dleq(proof: dict[str, Any], mint_public_key: str) -> bool:
@@ -95,7 +104,7 @@ def verify_proof_dleq(proof: dict[str, Any], mint_public_key: str) -> bool:
     if not all(isinstance(dleq.get(field), str) for field in ("e", "s", "r")):
         return False
     try:
-        r = int(dleq["r"], 16)
+        r = int.from_bytes(_scalar_field(dleq["r"]), "big")
         A = PublicKey(bytes.fromhex(mint_public_key))
         blinded = blind(proof["secret"].encode(), r)
         point = PublicKey.combine_keys([PublicKey(bytes.fromhex(proof["C"])), A.multiply(_scalar_bytes(r))])
@@ -178,6 +187,10 @@ def _hex_field(value: Any, label: str) -> str:
 def _text_field(value: Any, label: str) -> str:
     if not isinstance(value, str) or not value:
         raise CashuTokenError(f"Invalid token: {label} must be a non-empty string")
+    try:
+        value.encode()
+    except UnicodeEncodeError as exc:
+        raise CashuTokenError(f"Invalid token: {label} is not valid text") from exc
     return value
 
 
@@ -191,14 +204,14 @@ def _decode_base64url(data: str) -> bytes:
     normalized = data.replace("-", "+").replace("_", "/").rstrip("=")
     try:
         return base64.b64decode(normalized + "=" * (-len(normalized) % 4), validate=True)
-    except binascii.Error as exc:
+    except ValueError as exc:
         raise CashuTokenError("Invalid token: not base64") from exc
 
 
 def _decode_v3(payload: str) -> dict[str, Any]:
     try:
         token = json.loads(_decode_base64url(payload))
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:
         raise CashuTokenError("Invalid token") from exc
     entries = token.get("token") if isinstance(token, dict) else None
     if not isinstance(entries, list) or len(entries) != 1:
@@ -229,7 +242,7 @@ def _decode_v3(payload: str) -> dict[str, Any]:
 def _decode_v4(payload: str) -> dict[str, Any]:
     try:
         token = cbor2.loads(_decode_base64url(payload))
-    except cbor2.CBORDecodeError as exc:
+    except (cbor2.CBORDecodeError, ValueError, TypeError, OverflowError, RecursionError) as exc:
         raise CashuTokenError("Invalid token") from exc
     if not isinstance(token, dict) or not isinstance(token.get("t"), list):
         raise CashuTokenError("Invalid token")

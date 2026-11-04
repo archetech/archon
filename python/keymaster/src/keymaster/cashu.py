@@ -310,7 +310,12 @@ class CashuWallet:
             if own is None and len(mints) > 1:
                 raise _invalid("mint is required: this identity uses several")
             url = own if own is not None else next(iter(mints))
-        return _MintContext(name, url, self._client_for(url, mints[url]))
+        # By DID, not the name given: with none given it means the current identity,
+        # which can change while a request is out, and proofs must not follow it.
+        return _MintContext(id_info["did"], url, self._client_for(url, mints[url]))
+
+    async def _bound_identity(self, name: str | None) -> str:
+        return (await self.host.fetch_id_info(name, await self.host.load_wallet()))["did"]
 
     async def _entry_of(self, wallet: dict[str, Any], ctx: _MintContext) -> dict[str, Any]:
         id_info = await self.host.fetch_id_info(ctx.name, wallet)
@@ -786,6 +791,7 @@ class CashuWallet:
             raise CashuMintUnsupportedError(f"{url} does not support " + ", ".join(f"NUT-{nut}" for nut in missing))
 
     async def add_cashu(self, name: str | None = None) -> dict[str, Any]:
+        identity = await self._bound_identity(name)
         node = self._node_url()
         capabilities = await self.host.get_node_capabilities()
         get_mint = getattr(self.host.gatekeeper, "get_cashu_mint", None)
@@ -800,7 +806,7 @@ class CashuWallet:
         listed = {keyset["id"] for keyset in await client.keysets()}
 
         async def mutator(wallet: dict[str, Any]) -> None:
-            id_info = await self.host.fetch_id_info(name, wallet)
+            id_info = await self.host.fetch_id_info(identity, wallet)
             mints = id_info.setdefault("cashu", {})
             if normalized in mints:
                 return
@@ -821,12 +827,13 @@ class CashuWallet:
         return await self._describe(normalized, client, True)
 
     async def add_cashu_mint(self, url: str, name: str | None = None) -> dict[str, Any]:
+        identity = await self._bound_identity(name)
         normalized = normalize_mint_url(url)
         client = CashuMintClient(normalized, self.public_fetch)
         await self._require_nuts(client, normalized)
 
         async def mutator(wallet: dict[str, Any]) -> None:
-            id_info = await self.host.fetch_id_info(name, wallet)
+            id_info = await self.host.fetch_id_info(identity, wallet)
             id_info.setdefault("cashu", {}).setdefault(normalized, {"added": _now(), "proofs": []})
 
         await self._mutate(mutator)
@@ -849,7 +856,7 @@ class CashuWallet:
             entry = _mints(id_info).get(normalized)
             if entry is None:
                 raise CashuMintNotAddedError(normalized)
-            if not force and (entry["proofs"] or entry.get("operations")):
+            if force is not True and (entry["proofs"] or entry.get("operations")):
                 raise CashuStateError(f"{normalized} holds ecash or open operations; use force to discard them")
             del id_info["cashu"][normalized]
             if not id_info["cashu"]:
@@ -861,7 +868,7 @@ class CashuWallet:
     async def remove_cashu(self, force: bool = False, name: str | None = None) -> bool:
         async def mutator(wallet: dict[str, Any]) -> None:
             id_info = await self.host.fetch_id_info(name, wallet)
-            if not force and has_cashu_state(id_info):
+            if force is not True and has_cashu_state(id_info):
                 raise CashuStateError("this identity holds ecash or open operations; use force to discard them")
             id_info.pop("cashu", None)
 
@@ -1020,6 +1027,8 @@ class CashuWallet:
         return {"amount": op["amount"], "mint": ctx.url}
 
     async def melt_cashu(self, bolt11: str, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
+        if not isinstance(bolt11, str) or not bolt11:
+            raise _invalid("bolt11")
         ctx = await self._context(mint, name)
         await self._settle(ctx)
         quote = await ctx.client.create_melt_quote(bolt11)
@@ -1173,8 +1182,9 @@ class CashuWallet:
 
     async def check_cashu(self, mint: str | None = None, name: str | None = None) -> dict[str, int]:
         total = {"settled": 0, "open": 0}
-        for url, _ in await self._scoped_entries(mint, name):
-            result = await self._settle(await self._context(url, name))
+        identity = await self._bound_identity(name)
+        for url, _ in await self._scoped_entries(mint, identity):
+            result = await self._settle(await self._context(url, identity))
             total["settled"] += result["settled"]
             total["open"] += result["open"]
         return total
@@ -1203,14 +1213,15 @@ class CashuWallet:
         return totals
 
     async def reclaim_cashu(self, operation_id: str, name: str | None = None) -> dict[str, Any]:
-        entries = await self._scoped_entries(None, name)
+        identity = await self._bound_identity(name)
+        entries = await self._scoped_entries(None, identity)
         found = next(
             (url for url, entry in entries if any(op["id"] == operation_id and op.get("sent") for op in entry.get("operations") or [])),
             None,
         )
         if found is None:
             raise _invalid("operationId")
-        ctx = await self._context(found, name)
+        ctx = await self._context(found, identity)
         keyset, keysets = await self._active_keyset(ctx)
 
         # The token becomes an ordinary swap's inputs, in one write, so the record

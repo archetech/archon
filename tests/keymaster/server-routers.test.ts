@@ -413,6 +413,20 @@ describe('keymaster cashu routes', () => {
         expect(keymaster[name as string]).toHaveBeenCalledWith(...(args as unknown[]));
     });
 
+    it.each([
+        ['POST', '/cashu', 'addCashu'],
+        ['DELETE', '/cashu', 'removeCashu'],
+        ['POST', '/cashu/balance', 'getCashuBalance'],
+        ['POST', '/cashu/check', 'checkCashu'],
+    ])('%s %s accepts a request with no body', async (method, path, name) => {
+        const { app, keymaster } = mount();
+        const agent = request(app);
+
+        await (method === 'POST' ? agent.post(path) : agent.delete(path)).expect(200);
+
+        expect(keymaster[name]).toHaveBeenCalled();
+    });
+
     it('wraps the lists and the removals', async () => {
         const { app } = mount();
 

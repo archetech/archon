@@ -44,6 +44,8 @@ class FakeMint:
         self.melt_outcome = "PAID"
         # Mints differ here: NUT-00 lists 11003, cdk-mintd sends 20006 on a mint.
         self.already_signed_code = 11003
+        # Runs while a request is on the wire, before the mint answers it.
+        self.on_request = None
         self._lose: set[str] = set()
         self._refuse: dict[str, MintRefusal] = {}
         self._next = 0
@@ -158,6 +160,8 @@ class FakeMint:
     async def fetch(self, method: str, url: str, headers: Any = None, json_body: Any = None, timeout: float = 30.0) -> httpx.Response:
         path = httpx.URL(url).path.removeprefix("/cashu")
         self.requests.append(f"{method} {path}")
+        if self.on_request:
+            await self.on_request(path)
         refusal = self._refuse.pop(path, None)
         try:
             if refusal:

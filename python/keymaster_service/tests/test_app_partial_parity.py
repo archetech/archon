@@ -123,6 +123,7 @@ def _install_fastapi_stubs() -> None:
             super().__init__(content=content, media_type=media_type, status_code=status_code)
 
     fastapi.APIRouter = APIRouter
+    fastapi.Body = lambda **_: None
     fastapi.Depends = Depends
     fastapi.FastAPI = FastAPI
     fastapi.HTTPException = HTTPException

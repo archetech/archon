@@ -6,6 +6,13 @@ export function createCashuRouter(options: CreateKeymasterRouterOptions): expres
     const { getKeymaster } = options;
     const router = express.Router();
 
+    // Express 5 leaves the body undefined on a request without one, and every
+    // field of most of these routes is optional.
+    router.use('/cashu', (req, _res, next) => {
+        req.body ??= {};
+        next();
+    });
+
     /**
      * @swagger
      * /cashu:
