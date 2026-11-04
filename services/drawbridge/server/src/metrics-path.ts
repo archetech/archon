@@ -1,3 +1,11 @@
+// The route label for a finished request. It reads originalUrl, not path: a
+// handler mounted with app.use() sees req.path without its mount prefix, and
+// still does when the response finishes, so `/cashu/v1/keys/<id>` would be
+// labelled `/v1/keys/<id>` and miss the replacements below.
+export function routeLabel(req: { originalUrl: string }): string {
+    return normalizePath(req.originalUrl.split('?')[0]);
+}
+
 // Route labels for Drawbridge's request metrics. Dynamic segments (DIDs, CIDs,
 // registries, identifiers) are replaced with placeholders so dashboards do not
 // get one time series per identifier.

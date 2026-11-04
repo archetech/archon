@@ -33,17 +33,14 @@ positive_int() {
     esac
 }
 
-case "$BACKEND" in
-    fakewallet|cln) ;;
-    *) die "ARCHON_CASHU_MINT_BACKEND must be fakewallet or cln, not '$BACKEND'" ;;
-esac
-[ -n "$MINT_URL" ] || die "MINT_URL is required"
-
-# The cln backend talks to the node's RPC socket through the relay the CLN
-# container opens when ARCHON_CLN_RPC_SHARE=true.
-if [ "$BACKEND" = cln ] && [ ! -S "$CLN_RPC" ]; then
-    die "no CLN RPC socket at $CLN_RPC; the cln backend needs the lightning profile and ARCHON_CLN_RPC_SHARE=true"
-fi
+# A TOML basic string. Backslashes and quotes are escaped; control characters,
+# newlines included, are refused rather than encoded.
+toml_string() {
+    case "$2" in
+        *[[:cntrl:]]*) die "$1 must not contain control characters" ;;
+    esac
+    printf '"%s"' "$(printf '%s' "$2" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+}
 
 # Secrets and the database are the mint's funds.
 umask 077
@@ -58,9 +55,24 @@ if [ "$initialized" = false ]; then
         *) die "cannot read the mint configuration: $state" ;;
     esac
 
+    # The environment matters only now; a configured mint runs from its
+    # database, so these are not checked on later starts.
+    case "$BACKEND" in
+        fakewallet|cln) ;;
+        *) die "ARCHON_CASHU_MINT_BACKEND must be fakewallet or cln, not '$BACKEND'" ;;
+    esac
+    [ -n "$MINT_URL" ] || die "MINT_URL is required"
+    # The cln backend talks to the node's RPC socket through the relay the CLN
+    # container opens when ARCHON_CLN_RPC_SHARE=true.
+    if [ "$BACKEND" = cln ] && [ ! -S "$CLN_RPC" ]; then
+        die "no CLN RPC socket at $CLN_RPC; the cln backend needs the lightning profile and ARCHON_CLN_RPC_SHARE=true"
+    fi
     for name in MIN_MINT MAX_MINT MIN_MELT MAX_MELT INPUT_FEE_PPK LN_RESERVE_FEE_MIN; do
         eval "positive_int \"ARCHON_CASHU_MINT_$name\" \"\$$name\""
     done
+    url=$(toml_string MINT_URL "$MINT_URL")
+    mint_name=$(toml_string ARCHON_CASHU_MINT_NAME "$MINT_NAME")
+    description=$(toml_string ARCHON_CASHU_MINT_DESCRIPTION "$MINT_DESCRIPTION")
 
     # The signing seed: 32 random bytes, hex-encoded. cdk-mintd uses the file's
     # bytes as the BIP32 master seed. With the database, it is what restores
@@ -72,7 +84,7 @@ if [ "$initialized" = false ]; then
 
     {
         echo '[info]'
-        echo "url = \"$MINT_URL\""
+        echo "url = $url"
         echo 'listen_host = "0.0.0.0"'
         echo 'listen_port = 8085'
         echo "seed = \"file:$DATA/seed\""
@@ -82,8 +94,8 @@ if [ "$initialized" = false ]; then
         echo 'output = "stderr"'
         echo
         echo '[mint_info]'
-        echo "name = \"$MINT_NAME\""
-        [ -n "$MINT_DESCRIPTION" ] && echo "description = \"$MINT_DESCRIPTION\""
+        echo "name = $mint_name"
+        [ -n "$MINT_DESCRIPTION" ] && echo "description = $description"
         echo
         echo '[database]'
         echo 'engine = "sqlite"'

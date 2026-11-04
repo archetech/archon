@@ -4,6 +4,7 @@ import http from 'http';
 import request from 'supertest';
 import type { AddressInfo } from 'net';
 import type { Server } from 'http';
+import { gzipSync } from 'zlib';
 
 import { cashuProxyHandlers } from '../../services/drawbridge/server/src/cashu-proxy.ts';
 import type { DrawbridgeStore, RateLimitResult } from '../../services/drawbridge/server/src/types.ts';
@@ -55,6 +56,11 @@ beforeAll(async () => {
         req.on('end', () => {
             received.push({ method: req.method!, url: req.url!, headers: req.headers, body });
             res.setHeader('Content-Type', 'application/json');
+            if (req.url === '/v1/compressed' && /gzip/.test(String(req.headers['accept-encoding']))) {
+                res.setHeader('Content-Encoding', 'gzip');
+                res.end(gzipSync(JSON.stringify({ ok: true })));
+                return;
+            }
             res.end(JSON.stringify({ ok: true }));
         });
     });
@@ -124,6 +130,14 @@ describe('the /cashu mint proxy', () => {
 
         expect(response.status).toBe(429);
         expect(charged).toEqual(['cashu:read:global']);
+    });
+
+    it('passes on a compressed response as the plain body it read, without the encoding header', async () => {
+        const response = await request(drawbridge()).get('/cashu/v1/compressed').set('Accept-Encoding', 'gzip');
+
+        expect(response.status).toBe(200);
+        expect(response.headers['content-encoding']).toBeUndefined();
+        expect(response.body).toEqual({ ok: true });
     });
 
     it('answers 501 when the node runs no mint', async () => {
