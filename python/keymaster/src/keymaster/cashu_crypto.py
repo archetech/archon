@@ -12,6 +12,7 @@ import base64
 import hashlib
 import hmac
 import json
+import re
 import secrets
 from typing import Any
 
@@ -192,23 +193,33 @@ def p2pk_lock(secret: str) -> dict[str, Any] | None:
     data = parsed[1] if len(parsed) > 1 else None
     if kind != "P2PK" or not isinstance(data, dict) or not isinstance(data.get("data"), str):
         raise ValueError(f"spending condition {kind}")
+    raw_tags = data.get("tags")
+    if raw_tags is not None and not isinstance(raw_tags, list):
+        raise ValueError("a malformed spending condition")
     tags: dict[str, list[str]] = {}
-    for tag in data.get("tags") or []:
-        tags[str(tag[0])] = [str(value) for value in tag[1:]]
+    for tag in raw_tags or []:
+        if not isinstance(tag, list) or not tag or not all(isinstance(value, str) for value in tag):
+            raise ValueError("a malformed spending condition")
+        tags[tag[0]] = tag[1:]
 
-    def count(name: str) -> int:
+    def integer(name: str, fallback: int | None = None) -> int | None:
         values = tags.get(name)
-        return int(values[0]) if values else 1
+        if not values:
+            return fallback
+        if not re.fullmatch(r"[0-9]+", values[0]):
+            raise ValueError("a malformed spending condition")
+        return int(values[0])
 
     lock: dict[str, Any] = {
         "keys": [data["data"], *tags.get("pubkeys", [])],
         "refund": tags.get("refund", []),
-        "signatures": count("n_sigs"),
-        "refundSignatures": count("n_sigs_refund"),
+        "signatures": integer("n_sigs", 1),
+        "refundSignatures": integer("n_sigs_refund", 1),
         "sigAll": (tags.get("sigflag") or [None])[0] == "SIG_ALL",
     }
-    if tags.get("locktime"):
-        lock["locktime"] = int(tags["locktime"][0])
+    locktime = integer("locktime")
+    if locktime is not None:
+        lock["locktime"] = locktime
     return lock
 
 

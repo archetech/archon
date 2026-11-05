@@ -14,6 +14,7 @@ import {
     InvalidParameterError,
 } from '@didcid/common/errors';
 import { CASHU_TOKEN_TYPE, isCashuTokenMessage } from '../../packages/keymaster/src/didcomm-protocols.ts';
+import { proofY } from '../../packages/keymaster/src/cashu.ts';
 import { FakeMint } from './cashu-fake-mint.ts';
 import type { FakeMintOptions } from './cashu-fake-mint.ts';
 
@@ -114,6 +115,13 @@ describe('sendCashuTo', () => {
         await expect(send(1, { locktime: 7 * DAY + 1 })).rejects.toThrow(InvalidParameterError);
         await expect(send(1, { locktime: 0 })).rejects.toThrow(InvalidParameterError);
         await expect(send(1, { locktime: 1.5 })).rejects.toThrow(InvalidParameterError);
+    });
+
+    it('treats null options as absent, as a JSON caller sends them', async () => {
+        const result = await keymaster.sendCashuTo('Bob', 5, { name: 'Alice', memo: null, locktime: null, mint: null } as never);
+
+        expect(result.delivered).toBe(true);
+        expect(result.locktime).toBeGreaterThan(Date.now() / 1000 + 2 * DAY);
     });
 
     it.each([0, -1, 1.5, '10'])('refuses the amount %s', async (amount) => {
@@ -451,6 +459,119 @@ describe('receiveCashuMessages', () => {
     });
 });
 
+describe('a token partly spent already', () => {
+    beforeEach(() => setup());
+
+    // A 30 sat token is four proofs, and this spends the 2 sat one at the mint.
+    async function sendWithOneSpent(): Promise<void> {
+        await send();
+        const wallet = await keymaster.loadWallet();
+        const { sent } = wallet.ids.Alice.cashu[PUBLIC_URL].operations[0];
+        const smallest = sent.reduce((a: { amount: number }, b: { amount: number }) => (b.amount < a.amount ? b : a));
+        mint.spent.add(proofY(smallest.secret));
+    }
+
+    function onSecondSwap(act: () => void): void {
+        let swaps = 0;
+        mint.onRequest = async (path) => {
+            if (path === '/v1/swap' && ++swaps === 2) {
+                act();
+            }
+        };
+    }
+
+    it('redeems the rest and says what was already gone', async () => {
+        await sendWithOneSpent();
+
+        const { redeemed, failed } = await keymaster.receiveCashuMessages('Bob');
+
+        expect(failed).toEqual([]);
+        expect(redeemed[0]).toMatchObject({ amount: 28, spent: 2 });
+        expect(await balance('Bob')).toMatchObject({ spendable: 28, inFlight: 0 });
+        expect(mint.mailbox).toHaveLength(0);
+    });
+
+    it('redeems the rest of a token given directly too', async () => {
+        await send();
+        const { token } = await keymaster.sendCashuTo('Bob', 30, { name: 'Alice' });
+        const wallet = await keymaster.loadWallet();
+        const { sent } = wallet.ids.Alice.cashu[PUBLIC_URL].operations[1];
+        mint.spent.add(proofY(sent.find((proof: { amount: number }) => proof.amount === 2).secret));
+
+        await expect(keymaster.receiveCashu(token, 'Bob')).resolves.toMatchObject({ amount: 28, spent: 2 });
+    });
+
+    it('keeps the message when the mint refuses the rest, and can try again', async () => {
+        await sendWithOneSpent();
+        onSecondSwap(() => mint.refuseNext('/v1/swap', 12345, 'temporarily refused'));
+
+        const first = await keymaster.receiveCashuMessages('Bob');
+
+        expect(first.redeemed).toEqual([]);
+        expect(first.failed[0]).toMatchObject({ acknowledged: false });
+        expect(mint.mailbox).toHaveLength(1);
+        expect(await balance('Bob')).toMatchObject({ spendable: 0, inFlight: 0 });
+
+        mint.onRequest = undefined;
+        const second = await keymaster.receiveCashuMessages('Bob');
+
+        expect(second.redeemed[0]).toMatchObject({ amount: 28 });
+        expect(mint.mailbox).toHaveLength(0);
+    });
+
+    it('keeps the message while the rest is unresolved, and credits it once', async () => {
+        await sendWithOneSpent();
+        onSecondSwap(() => mint.loseResponse('/v1/swap'));
+
+        const first = await keymaster.receiveCashuMessages('Bob');
+
+        expect(first.redeemed).toEqual([]);
+        expect(first.failed[0]).toMatchObject({ acknowledged: false });
+        expect(mint.mailbox).toHaveLength(1);
+
+        mint.onRequest = undefined;
+        expect(await keymaster.receiveCashuMessages('Bob')).toEqual({ redeemed: [], failed: [] });
+
+        expect(await balance('Bob')).toMatchObject({ spendable: 28, inFlight: 0 });
+        expect(mint.mailbox).toHaveLength(0);
+    });
+
+    it('still clears the message when every proof is spent', async () => {
+        await send();
+        const wallet = await keymaster.loadWallet();
+        for (const { secret } of wallet.ids.Alice.cashu[PUBLIC_URL].operations[0].sent) {
+            mint.spent.add(proofY(secret));
+        }
+
+        const { failed } = await keymaster.receiveCashuMessages('Bob');
+
+        expect(failed[0]).toMatchObject({ acknowledged: true });
+        expect(mint.mailbox).toHaveLength(0);
+    });
+});
+
+describe('keys', () => {
+    beforeEach(() => setup());
+
+    // NUT-11 and BIP-340 work on the x-coordinate, so either prefix names the key.
+    it('recognizes a key written with the opposite parity prefix', async () => {
+        const host = (keymaster as any).cashu.host;
+        const documentPublicKey = host.documentPublicKey;
+        host.documentPublicKey = (doc: unknown) => {
+            const key: string = documentPublicKey(doc);
+            return `${key.startsWith('02') ? '03' : '02'}${key.slice(2)}`;
+        };
+        await send();
+        host.documentPublicKey = documentPublicKey;
+
+        expect((await keymaster.listCashuMessages('Bob'))[0].redeemable).toBe(true);
+        const { redeemed, failed } = await keymaster.receiveCashuMessages('Bob');
+
+        expect(failed).toEqual([]);
+        expect(redeemed[0].amount).toBe(30);
+    });
+});
+
 describe('listCashuMessages', () => {
     beforeEach(() => setup());
 
@@ -563,6 +684,57 @@ describe('reclaiming a locked send', () => {
         expect(redeemed).toEqual([]);
         expect(failed[0]).toMatchObject({ acknowledged: true });
         expect(mint.mailbox).toHaveLength(0);
+    });
+
+    it('lets only one of two concurrent reclaims through', async () => {
+        const { operationId } = await send(30, { locktime: 60 });
+        after(120);
+        mint.requests.length = 0;
+
+        const results = await Promise.allSettled([
+            keymaster.reclaimCashu(operationId, 'Alice'),
+            keymaster.reclaimCashu(operationId, 'Alice'),
+        ]);
+
+        expect(results.map(result => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+        expect(mint.requests.filter(request => request === 'POST /v1/swap')).toHaveLength(1);
+        expect(await balance('Alice')).toMatchObject({ spendable: 100, inFlight: 0, outstanding: 0 });
+    });
+
+    it('keeps a settlement off a reclaim still running', async () => {
+        const { operationId } = await send(30, { locktime: 60 });
+        after(120);
+        mint.requests.length = 0;
+
+        // Whichever gets there first, the other is told to wait, and the send is whole.
+        await Promise.allSettled([
+            keymaster.reclaimCashu(operationId, 'Alice'),
+            keymaster.checkCashu(undefined, 'Alice'),
+            keymaster.reclaimCashu(operationId, 'Alice'),
+        ]);
+
+        expect(mint.requests.filter(request => request === 'POST /v1/swap').length).toBeLessThanOrEqual(1);
+        const { spendable, inFlight, outstanding } = await balance('Alice');
+        expect(inFlight).toBe(0);
+        expect(spendable + outstanding).toBe(100);
+    });
+
+    it('can still deliver a token whose reclaim was refused', async () => {
+        mint.relayDown = true;
+        const { operationId, messageId } = await send(30, { locktime: 60 });
+        after(120);
+        mint.relayDown = false;
+        mint.refuseNext('/v1/swap', 12345, 'temporarily refused');
+        // Delivered by the check inside the reclaim's own settlement otherwise.
+        await expect(keymaster.reclaimCashu(operationId, 'Alice')).rejects.toThrow(/temporarily refused/);
+
+        const [listed] = await keymaster.listCashuSends(undefined, 'Alice');
+        expect(listed).toMatchObject({ recipient: bobDid, delivered: false });
+
+        await keymaster.checkCashu(undefined, 'Alice');
+
+        const [message] = await keymaster.receiveDidComm({ name: 'Bob', ack: false });
+        expect(message.message.id).toBe(messageId);
     });
 
     it('puts a refused reclaim back, to be reclaimed again', async () => {

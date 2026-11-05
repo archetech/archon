@@ -483,3 +483,19 @@ def test_cashu_wrappers_forward_expected_requests(monkeypatch):
         ("POST", "/cashu/messages", {"id": "A"}),
         ("POST", "/cashu/accept", {"id": "A"}),
     ]
+
+
+def test_send_cashu_to_omits_what_was_not_given(monkeypatch):
+    calls: list[dict] = []
+
+    def fake_proxy_request(method, url, **kwargs):
+        calls.append(kwargs["json"])
+        return {"delivered": True}
+
+    monkeypatch.setattr(sdk, "proxy_request", fake_proxy_request)
+    monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
+
+    sdk.send_cashu_to("Bob", 21)
+    sdk.send_cashu_to("Bob", 21, locktime=60)
+
+    assert calls == [{"recipient": "Bob", "amount": 21}, {"recipient": "Bob", "amount": 21, "locktime": 60}]

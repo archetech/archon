@@ -775,10 +775,12 @@ class Keymaster:
     async def _find_private_key(self, public_keys: list[str], name: str | None = None) -> str | None:
         wallet = await self.load_wallet()
         id_info = await self.fetch_id_info(name, wallet)
-        wanted = {key.lower() for key in public_keys}
+        # NUT-11 and BIP-340 work on the x-coordinate, so either parity prefix names
+        # the same key.
+        wanted = {key.lower()[-64:] for key in public_keys}
         for index in range(id_info.get("index", 0), -1, -1):
             keypair = await self.derive_key_pair(id_info["account"], index, wallet)
-            if self._compressed_key_hex(keypair["publicJwk"]) in wanted:
+            if self._compressed_key_hex(keypair["publicJwk"])[-64:] in wanted:
                 d = keypair["privateJwk"]["d"]
                 return base64.urlsafe_b64decode(d + "=" * (-len(d) % 4)).hex()
         return None

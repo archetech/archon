@@ -457,12 +457,31 @@ describe('sending and receiving', () => {
         expect(await keymaster.listCashuSends()).toHaveLength(1);
     });
 
-    it('keeps nothing of a partly spent token it was receiving', async () => {
+    it('swaps the rest of a partly spent token it was receiving, and credits only that', async () => {
         const { token, operationId } = await keymaster.sendCashu(6);
         const sent = (await entry()).operations.find((op: { id: string }) => op.id === operationId).sent;
         mint.spent.add(proofY(sent[0].secret));
 
-        await expect(keymaster.receiveCashu(token, 'Bob')).rejects.toThrow(CashuTokenSpentError);
+        const value = sent[1].amount;
+        await expect(keymaster.receiveCashu(token, 'Bob')).resolves.toMatchObject({ amount: value, spent: sent[0].amount });
+
+        expect(await keymaster.getCashuBalance(undefined, 'Bob')).toEqual({ spendable: value, inFlight: 0, outstanding: 0 });
+        const held = (await entry(keymaster, 'Bob')).proofs.map((proof: { secret: string }) => proof.secret);
+        expect(held).not.toContain(sent[1].secret);
+    });
+
+    it('credits nothing of a partly spent token when the mint refuses the rest', async () => {
+        const { token, operationId } = await keymaster.sendCashu(6);
+        const sent = (await entry()).operations.find((op: { id: string }) => op.id === operationId).sent;
+        mint.spent.add(proofY(sent[0].secret));
+        let swaps = 0;
+        mint.onRequest = async (path) => {
+            if (path === '/v1/swap' && ++swaps === 2) {
+                mint.refuseNext('/v1/swap', 12345, 'refused');
+            }
+        };
+
+        await expect(keymaster.receiveCashu(token, 'Bob')).rejects.toThrow(CashuUnavailableError);
 
         expect(await keymaster.getCashuBalance(undefined, 'Bob')).toEqual({ spendable: 0, inFlight: 0, outstanding: 0 });
     });

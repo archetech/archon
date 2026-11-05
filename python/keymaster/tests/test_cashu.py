@@ -424,12 +424,33 @@ class TestSendingAndReceiving:
 
         assert len(run(funded.keymaster.list_cashu_sends())) == 1
 
-    def test_keeps_nothing_of_a_partly_spent_token_it_was_receiving(self, funded):
+    def test_swaps_the_rest_of_a_partly_spent_token_and_credits_only_that(self, funded):
         sent = run(funded.keymaster.send_cashu(6))
         record = next(op for op in funded.entry()["operations"] if op["id"] == sent["operationId"])
         funded.mint.spent.add(proof_y(record["sent"][0]["secret"]))
+        value = record["sent"][1]["amount"]
 
-        with pytest.raises(CashuTokenSpentError):
+        result = run(funded.keymaster.receive_cashu(sent["token"], "Bob"))
+
+        assert (result["amount"], result["spent"]) == (value, record["sent"][0]["amount"])
+        assert funded.balance("Bob") == {"spendable": value, "inFlight": 0, "outstanding": 0}
+        assert record["sent"][1]["secret"] not in [proof["secret"] for proof in funded.entry("Bob")["proofs"]]
+
+    def test_credits_nothing_of_a_partly_spent_token_when_the_rest_is_refused(self, funded):
+        sent = run(funded.keymaster.send_cashu(6))
+        record = next(op for op in funded.entry()["operations"] if op["id"] == sent["operationId"])
+        funded.mint.spent.add(proof_y(record["sent"][0]["secret"]))
+        swaps = []
+
+        async def hook(path: str) -> None:
+            if path == "/v1/swap":
+                swaps.append(path)
+                if len(swaps) == 2:
+                    funded.mint.refuse_next("/v1/swap", 12345, "refused")
+
+        funded.mint.on_request = hook
+
+        with pytest.raises(CashuUnavailableError):
             run(funded.keymaster.receive_cashu(sent["token"], "Bob"))
 
         assert funded.balance("Bob") == {"spendable": 0, "inFlight": 0, "outstanding": 0}

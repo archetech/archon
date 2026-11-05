@@ -1236,7 +1236,7 @@ removes it.
 | `POST /api/v1/cashu/quotes` | `{ "quotes": CashuQuoteRecord[] }`. Contacts no mint. |
 | `POST /api/v1/cashu/melt` | `{ "bolt11": string, "mint"?: string, "id"?: string }` → `CashuMeltResult`. |
 | `POST /api/v1/cashu/send` | `{ "amount": number, "mint"?: string, "id"?: string }` → `CashuSendResult`, a `cashuB` token. |
-| `POST /api/v1/cashu/receive` | `{ "token": string, "id"?: string }` → `CashuReceiveResult`. The token's mint must already be added. |
+| `POST /api/v1/cashu/receive` | `{ "token": string, "id"?: string }` → `CashuReceiveResult`. The token's mint must already be added. If someone else already spent part of the token, the rest is swapped and `spent` says how much was gone. |
 | `POST /api/v1/cashu/check` | `{ "mint"?: string, "id"?: string }` → `CashuCheckResult`, after settling open operations, dropping proofs the mint reports spent, and moving proofs off inactive keysets. |
 | `POST /api/v1/cashu/restore` | `{ "mint"?: string, "id"?: string }` → `CashuRestoreResult`, recovering proofs from the mnemonic. |
 | `POST /api/v1/cashu/sends` | `{ "sends": CashuSendRecord[] }`. Contacts no mint. |

@@ -227,6 +227,12 @@ def test_treats_other_secrets_as_ordinary(secret):
     assert p2pk_lock(secret) is None
 
 
+@pytest.mark.parametrize("secret", P2PK["malformed"])
+def test_refuses_a_malformed_secret(secret):
+    with pytest.raises(ValueError):
+        p2pk_lock(secret)
+
+
 def test_refuses_a_spending_condition_it_does_not_implement():
     with pytest.raises(ValueError):
         p2pk_lock(P2PK["unsupported"])

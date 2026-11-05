@@ -96,6 +96,8 @@ interface SwapReport {
     redeemed: number;
     recovered: number;
     pending: number;
+    // What the mint refused of a received token's remainder.
+    refused: number;
 }
 
 interface MintKeyset {
@@ -289,25 +291,38 @@ export function p2pkLock(secret: string): P2PKLock | undefined {
     if (!Array.isArray(parsed)) {
         return undefined;
     }
-    const [kind, data] = parsed as [unknown, { data?: unknown; tags?: unknown }];
+    const [kind, data] = parsed as [unknown, { data?: unknown; tags?: unknown } | undefined];
     if (kind !== 'P2PK' || typeof data?.data !== 'string') {
         throw new CashuMintUnsupportedError(`spending condition ${String(kind)}`);
     }
-    const tags = new Map<string, string[]>();
-    for (const tag of Array.isArray(data.tags) ? data.tags : []) {
-        tags.set(String(tag[0]), (tag as unknown[]).slice(1).map(String));
+    const malformed = new CashuMintUnsupportedError('a malformed spending condition');
+    if (data.tags !== undefined && data.tags !== null && !Array.isArray(data.tags)) {
+        throw malformed;
     }
-    const count = (name: string): number => {
+    const tags = new Map<string, string[]>();
+    for (const tag of (data.tags ?? []) as unknown[]) {
+        if (!Array.isArray(tag) || tag.length === 0 || !tag.every(value => typeof value === 'string')) {
+            throw malformed;
+        }
+        tags.set(tag[0], tag.slice(1));
+    }
+    const integer = (name: string, fallback?: number): number | undefined => {
         const value = tags.get(name)?.[0];
-        return value === undefined ? 1 : Number(value);
+        if (value === undefined) {
+            return fallback;
+        }
+        if (!/^[0-9]+$/.test(value)) {
+            throw malformed;
+        }
+        return Number(value);
     };
-    const locktime = tags.get('locktime')?.[0];
+    const locktime = integer('locktime');
     return {
         keys: [data.data, ...(tags.get('pubkeys') ?? [])],
         refund: tags.get('refund') ?? [],
-        ...(locktime !== undefined && { locktime: Number(locktime) }),
-        signatures: count('n_sigs'),
-        refundSignatures: count('n_sigs_refund'),
+        ...(locktime !== undefined && { locktime }),
+        signatures: integer('n_sigs', 1)!,
+        refundSignatures: integer('n_sigs_refund', 1)!,
         sigAll: tags.get('sigflag')?.[0] === 'SIG_ALL',
     };
 }
@@ -771,11 +786,13 @@ export class CashuWallet {
         if (report) {
             report.redeemed += sumProofs(op.inputs.filter((_, i) => inputStates[i] === 'SPENT'));
         }
-        const remainder = spent && op.kind !== 'receive'
+        // Spent only in part, the rest is still worth having: a token's other holder
+        // may be slower, and a received token's proofs are as good as they were.
+        const remainder = spent
             ? op.inputs.filter((_, i) => inputStates[i] === 'UNSPENT')
             : [];
         if (remainder.length > 0) {
-            await this.swapRemainder(ctx, remainder, retire, report, op.token);
+            await this.swapRemainder(ctx, remainder, retire, report, op);
         }
         else {
             await this.host.mutateWallet(async (wallet) => { await retire(wallet); });
@@ -795,7 +812,7 @@ export class CashuWallet {
         inputs: CashuProof[],
         retire: (wallet: WalletFile) => Promise<CashuMintEntry>,
         report?: SwapReport,
-        token?: boolean,
+        from?: Pick<CashuOperation, 'kind' | 'token' | 'message'>,
     ): Promise<void> {
         const { keyset, keysets } = await this.activeKeyset(ctx);
         const value = sumProofs(inputs) - feeFor(inputs, keysets);
@@ -809,12 +826,21 @@ export class CashuWallet {
         try {
             outcome = await this.journaled(swapId, async (wallet) => {
                 const entry = await retire(wallet);
-                this.journalSwap(wallet, entry, swapId, 'swap', inputs, keyset.id, value, token);
+                // A received token stays one: a refusal must not make its proofs balance.
+                const received = from?.kind === 'receive';
+                this.journalSwap(wallet, entry, swapId, received ? 'receive' : 'swap', inputs, keyset.id, value, from?.token);
+                if (from?.message) {
+                    entry.operations![entry.operations!.length - 1].message = from.message;
+                }
             }, () => this.runSwap(ctx, swapId, false, report));
         }
         catch (error) {
             if (!(error instanceof CashuMintError || error instanceof CashuUnavailableError)) {
                 throw error;
+            }
+            if (report && from?.kind === 'receive' && error instanceof CashuMintError) {
+                report.refused += sumProofs(inputs);
+                return;
             }
         }
         if (report && outcome === 'done') {
@@ -1643,6 +1669,7 @@ export class CashuWallet {
         const inputs = await this.signLocked(ctx, proofs);
 
         const id = newId();
+        const report: SwapReport = { redeemed: 0, recovered: 0, pending: 0, refused: 0 };
         const outcome = await this.journaled(id, async (wallet) => {
             const entry = await this.entryOf(wallet, ctx);
             const held = new Set(entry.proofs.map(proof => proof.secret));
@@ -1654,9 +1681,18 @@ export class CashuWallet {
                 entry.operations![entry.operations!.length - 1].message = message;
                 this.rememberMessage(await this.host.fetchIdInfo(ctx.name, wallet), message);
             }
-        }, () => this.runSwap(ctx, id));
+        }, () => this.runSwap(ctx, id, false, report));
         if (outcome === 'spent') {
-            throw new CashuTokenSpentError();
+            if (report.refused > 0) {
+                throw new CashuUnavailableError(`${ctx.url} refused the part of this token still unspent`);
+            }
+            if (report.pending > 0) {
+                throw new CashuUnavailableError(`${ctx.url} has the token pending; run cashu-check`);
+            }
+            if (report.recovered === 0) {
+                throw new CashuTokenSpentError();
+            }
+            return { amount: report.recovered, mint: ctx.url, spent: report.redeemed };
         }
         if (outcome === 'open') {
             throw new CashuUnavailableError(`${ctx.url} has the token pending; run cashu-check`);
@@ -1703,7 +1739,10 @@ export class CashuWallet {
     }
 
     async sendCashuTo(recipient: string, amount: number, options: CashuSendToOptions = {}): Promise<CashuSendToResult> {
-        const { memo, locktime = LOCKTIME_DEFAULT_SECONDS, mint, name } = options;
+        // A JSON caller may send null for what it does not set.
+        const memo = options.memo ?? undefined;
+        const locktime = options.locktime ?? LOCKTIME_DEFAULT_SECONDS;
+        const { mint, name } = options;
         if (!Number.isSafeInteger(amount) || amount <= 0) {
             throw new InvalidParameterError('amount');
         }
@@ -1939,8 +1978,15 @@ export class CashuWallet {
                     continue;
                 }
 
-                const { amount } = await this.redeem(ctx, token, key);
-                result.redeemed.push({ id: item.id, ...(sender && { sender }), amount, mint, ...(memo && { memo }) });
+                const { amount, spent } = await this.redeem(ctx, token, key);
+                result.redeemed.push({
+                    id: item.id,
+                    ...(sender && { sender }),
+                    amount,
+                    mint,
+                    ...(memo && { memo }),
+                    ...(spent !== undefined && { spent }),
+                });
                 acknowledge.push(item.id);
             }
             catch (error: any) {
@@ -2074,42 +2120,51 @@ export class CashuWallet {
             throw new CashuUnavailableError(`send ${operationId} is being settled; try again`);
         }
 
-        // A locked token is signed before the record changes: a lock still in force
-        // refuses here and leaves the send outstanding.
-        const held = (await this.readOp(ctx, operationId))?.sent ?? [];
-        const signed = await this.signLocked(ctx, held);
+        // Reserved before anything is awaited, and held through the mint request, so a
+        // concurrent call or settlement cannot get in, or clear the mark by failing.
+        return this.withActive(operationId, async () => {
+            // A locked token is signed before the record changes: a lock still in force
+            // refuses here and leaves the send outstanding.
+            const held = (await this.readOp(ctx, operationId))?.sent ?? [];
+            const signed = await this.signLocked(ctx, held);
 
-        // The token becomes an ordinary swap's inputs, in one write, so the record
-        // can be finished after a crash and the value never appears twice. It keeps
-        // its id: a refusal puts the token back, to be reclaimed again.
-        const swapId = operationId;
-        let amount = 0;
-        const report: SwapReport = { redeemed: 0, recovered: 0, pending: 0 };
-        const outcome = await this.journaled(swapId, async (wallet) => {
-            const entry = await this.entryOf(wallet, ctx);
-            const op = entry.operations?.find(item => item.id === operationId && item.sent);
-            if (!op) {
-                throw new InvalidParameterError('operationId');
+            // The token becomes an ordinary swap's inputs, in one write, so the record
+            // can be finished after a crash and the value never appears twice. It keeps
+            // its id: a refusal puts the token back, to be reclaimed again.
+            let amount = 0;
+            const report: SwapReport = { redeemed: 0, recovered: 0, pending: 0, refused: 0 };
+            await this.host.mutateWallet(async (wallet) => {
+                const entry = await this.entryOf(wallet, ctx);
+                const op = entry.operations?.find(item => item.id === operationId && item.sent);
+                if (!op) {
+                    throw new InvalidParameterError('operationId');
+                }
+                const inputs = signed;
+                amount = sumProofs(inputs) - feeFor(inputs, keysets);
+                const { delivery } = op;
+                this.retire(entry, operationId);
+                this.journalSwap(wallet, entry, operationId, 'swap', inputs, keyset.id, amount, true);
+                // A refusal puts the send back as it was, still to be delivered.
+                if (delivery) {
+                    entry.operations![entry.operations!.length - 1].delivery = delivery;
+                }
+            });
+            const outcome = await this.runSwap(ctx, operationId, false, report);
+            if (outcome === 'spent') {
+                if (report.recovered === 0 && report.pending === 0) {
+                    throw new CashuTokenSpentError('the recipient already redeemed this token');
+                }
+                return {
+                    amount: report.recovered,
+                    mint: ctx.url,
+                    redeemed: report.redeemed,
+                    ...(report.pending > 0 && { pending: report.pending }),
+                };
             }
-            const inputs = signed;
-            amount = sumProofs(inputs) - feeFor(inputs, keysets);
-            this.retire(entry, operationId);
-            this.journalSwap(wallet, entry, swapId, 'swap', inputs, keyset.id, amount, true);
-        }, () => this.runSwap(ctx, swapId, false, report));
-        if (outcome === 'spent') {
-            if (report.recovered === 0 && report.pending === 0) {
-                throw new CashuTokenSpentError('the recipient already redeemed this token');
+            if (outcome !== 'done') {
+                throw new CashuUnavailableError(`${ctx.url} has the reclaim pending; run cashu-check`);
             }
-            return {
-                amount: report.recovered,
-                mint: ctx.url,
-                redeemed: report.redeemed,
-                ...(report.pending > 0 && { pending: report.pending }),
-            };
-        }
-        if (outcome !== 'done') {
-            throw new CashuUnavailableError(`${ctx.url} has the reclaim pending; run cashu-check`);
-        }
-        return { amount, mint: ctx.url };
+            return { amount, mint: ctx.url };
+        });
     }
 }

@@ -4073,10 +4073,13 @@ export default class Keymaster implements KeymasterInterface {
         const wallet = await this.loadWallet();
         const id = await this.fetchIdInfo(name, wallet);
         const hdkey = await this.getHDKeyFromCacheOrMnemonic(wallet);
-        const wanted = new Set(publicKeys.map(key => key.toLowerCase()));
+        // NUT-11 and BIP-340 work on the x-coordinate, so either parity prefix names
+        // the same key.
+        const xOnly = (key: string) => key.toLowerCase().slice(-64);
+        const wanted = new Set(publicKeys.map(xOnly));
         for (let i = id.index; i >= 0; i--) {
             const didkey = hdkey.derive(`m/44'/0'/${id.account}'/0/${i}`);
-            if (wanted.has(Buffer.from(didkey.publicKey!).toString('hex'))) {
+            if (wanted.has(xOnly(Buffer.from(didkey.publicKey!).toString('hex')))) {
                 return Buffer.from(didkey.privateKey!).toString('hex');
             }
         }

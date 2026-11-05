@@ -161,6 +161,10 @@ describe('NUT-11 vectors', () => {
         expect(p2pkLock(secret)).toBeUndefined();
     });
 
+    it.each(p2pk.malformed as string[])('refuses the malformed secret %s', (secret) => {
+        expect(() => p2pkLock(secret)).toThrow(CashuMintUnsupportedError);
+    });
+
     it('refuses a spending condition it does not implement', () => {
         expect(() => p2pkLock(p2pk.unsupported)).toThrow(CashuMintUnsupportedError);
     });

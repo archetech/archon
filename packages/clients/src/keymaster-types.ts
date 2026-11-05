@@ -423,6 +423,9 @@ export interface CashuSendResult {
 export interface CashuReceiveResult {
     amount: number;
     mint: string;
+    // The value of proofs someone else had already spent. `amount` is what the rest
+    // brought in.
+    spent?: number;
 }
 
 // A reclaim of a token the recipient partly redeemed also says what they took
@@ -507,6 +510,8 @@ export interface CashuRedeemedMessage {
     amount: number;
     mint: string;
     memo?: string;
+    // As in CashuReceiveResult.
+    spent?: number;
 }
 
 // A message that could not be redeemed. It stays in the inbox to try again unless

@@ -132,7 +132,7 @@ in flight, so they stay safe to expose as read-only MCP tools.
 | `mint` | the quote is paid, or expires unpaid | claim the proofs, or drop the record |
 | `melt` | the quote is paid or unpaid; while it or an input is `PENDING` the record stays open | keep the change, from the quote state if the response was lost, or return the inputs to `proofs`; if an input is spent and a fresh read still says `UNPAID`, something else spent it, so swap the rest to new proofs and keep the change counters used |
 | `swap` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09 if every input is spent and the amounts match; on a refusal with unspent inputs, return them to `proofs`, or keep them as an outstanding send if `token` says the recipient may still hold them |
-| `receive` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09, or drop the record and report the token as already spent |
+| `receive` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09; if only some inputs are spent, swap the rest and report what was gone; or drop the record and report the token as already spent |
 | `send`, `locked-send` | the swap settles as above, then every `sent` proof is spent | the token was redeemed; until then it is outstanding, not balance |
 
 Mint quotes are created with a NUT-20 public key whenever the mint advertises
@@ -148,8 +148,9 @@ open and the quote is polled instead.
 
 Inputs return to `proofs` only when the identity owned them and NUT-07 shows them
 unspent. A received token's proofs were never the identity's, so its value is
-credited only from the swap's outputs: if someone else spent the token first, the
-receive yields nothing.
+credited only from the swap's outputs: if someone else spent the whole token first,
+the receive yields nothing, and if they spent part of it, the rest is swapped and the
+result says how much was already gone.
 
 A sent token is never returned to the balance because its proofs are unspent: the
 recipient may not have redeemed it yet. `reclaimCashu` takes back one unredeemed

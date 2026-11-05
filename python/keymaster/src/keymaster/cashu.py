@@ -653,11 +653,13 @@ class CashuWallet:
 
         if report is not None:
             report["redeemed"] += _sum_proofs([proof for proof, state in zip(op["inputs"], input_states) if state == "SPENT"])
+        # Spent only in part, the rest is still worth having: a token's other holder
+        # may be slower, and a received token's proofs are as good as they were.
         remainder = []
-        if spent and op["kind"] != "receive":
+        if spent:
             remainder = [proof for proof, state in zip(op["inputs"], input_states) if state == "UNSPENT"]
         if remainder:
-            await self._swap_remainder(ctx, remainder, retire, report, bool(op.get("token")))
+            await self._swap_remainder(ctx, remainder, retire, report, op)
         else:
             await self._mutate(retire)
         if not spent:
@@ -670,7 +672,7 @@ class CashuWallet:
         inputs: list[dict[str, Any]],
         retire: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]],
         report: dict[str, int] | None = None,
-        token: bool = False,
+        origin: dict[str, Any] | None = None,
     ) -> None:
         """What is left of a partly spent operation. It is swapped rather than
         credited: when reclaiming a token, the recipient still holds these proofs. If
@@ -679,6 +681,7 @@ class CashuWallet:
         keyset, keysets = await self._active_keyset(ctx)
         value = _sum_proofs(inputs) - _fee_for(inputs, keysets)
         swap_id = secrets.token_hex(16)
+        received = (origin or {}).get("kind") == "receive"
 
         # Worth less than the fee to redeem it, it is not worth a record.
         if value <= 0:
@@ -687,7 +690,11 @@ class CashuWallet:
 
         async def mutator(wallet: dict[str, Any]) -> None:
             entry = await retire(wallet)
-            self._journal_swap(wallet, entry, swap_id, "swap", inputs, keyset["id"], value, token)
+            # A received token stays one: a refusal must not make its proofs balance.
+            kind = "receive" if received else "swap"
+            self._journal_swap(wallet, entry, swap_id, kind, inputs, keyset["id"], value, bool((origin or {}).get("token")))
+            if (origin or {}).get("message"):
+                entry["operations"][-1]["message"] = origin["message"]
 
         async def work(_: Any) -> str:
             return await self._run_swap(ctx, swap_id, False, report)
@@ -695,7 +702,11 @@ class CashuWallet:
         outcome = "open"
         try:
             outcome = await self._journaled(swap_id, mutator, work)
-        except (CashuMintError, CashuUnavailableError):
+        except CashuMintError:
+            if report is not None and received:
+                report["refused"] += _sum_proofs(inputs)
+                return
+        except CashuUnavailableError:
             pass
         if report is not None and outcome == "done":
             report["recovered"] += value
@@ -1420,6 +1431,7 @@ class CashuWallet:
         inputs = await self._sign_locked(ctx, proofs)
 
         op_id = secrets.token_hex(16)
+        report = {"redeemed": 0, "recovered": 0, "pending": 0, "refused": 0}
 
         async def mutator(wallet: dict[str, Any]) -> None:
             entry = await self._entry_of(wallet, ctx)
@@ -1432,11 +1444,17 @@ class CashuWallet:
                 self._remember_message(await self.host.fetch_id_info(ctx.name, wallet), message)
 
         async def run(_: Any) -> str:
-            return await self._run_swap(ctx, op_id)
+            return await self._run_swap(ctx, op_id, False, report)
 
         outcome = await self._journaled(op_id, mutator, run)
         if outcome == "spent":
-            raise CashuTokenSpentError()
+            if report["refused"]:
+                raise CashuUnavailableError(f"{ctx.url} refused the part of this token still unspent")
+            if report["pending"]:
+                raise CashuUnavailableError(f"{ctx.url} has the token pending; run cashu-check")
+            if not report["recovered"]:
+                raise CashuTokenSpentError()
+            return {"amount": report["recovered"], "mint": ctx.url, "spent": report["redeemed"]}
         if outcome == "open":
             raise CashuUnavailableError(f"{ctx.url} has the token pending; run cashu-check")
         return {"amount": amount, "mint": ctx.url}
@@ -1641,7 +1659,7 @@ class CashuWallet:
                     result.append({**described, "redeemable": False, "reason": f"the mint {mint} is not added"})
                 else:
                     result.append({**described, **await self._redeemable_by(decoded["proofs"], identity)})
-            except (cc.CashuTokenError, KeymasterError, ValueError, TypeError):
+            except Exception:
                 result.append({**base, "redeemable": False, "reason": "not a valid token"})
         return result
 
@@ -1709,12 +1727,14 @@ class CashuWallet:
                     record["sender"] = sender
                 if isinstance(body.get("memo"), str) and body["memo"]:
                     record["memo"] = body["memo"]
+                if "spent" in redeemed:
+                    record["spent"] = redeemed["spent"]
                 result["redeemed"].append(record)
                 acknowledge.append(item["id"])
             except CashuTokenSpentError as exc:
                 fail(str(exc), mint, True)
-            except (KeymasterError, cc.CashuTokenError, ValueError, TypeError) as exc:
-                fail(str(exc), mint)
+            except Exception as exc:
+                fail(str(exc) or type(exc).__name__, mint)
 
         if acknowledge:
             # A failure here only repeats the messages, which are then seen before.
@@ -1825,40 +1845,43 @@ class CashuWallet:
         if operation_id in self._active:
             raise CashuUnavailableError(f"send {operation_id} is being settled; try again")
 
-        # A locked token is signed before the record changes: a lock still in force
-        # refuses here and leaves the send outstanding.
-        held = (await self._read_op(ctx, operation_id) or {}).get("sent") or []
-        signed = await self._sign_locked(ctx, held)
+        # Reserved before anything is awaited, and held through the mint request, so a
+        # concurrent call or settlement cannot get in, or clear the mark by failing.
+        async def work() -> dict[str, Any]:
+            # A locked token is signed before the record changes: a lock still in force
+            # refuses here and leaves the send outstanding.
+            held = (await self._read_op(ctx, operation_id) or {}).get("sent") or []
+            signed = await self._sign_locked(ctx, held)
 
-        # The token becomes an ordinary swap's inputs, in one write, so the record
-        # can be finished after a crash and the value never appears twice. It keeps
-        # its id: a refusal puts the token back, to be reclaimed again.
-        swap_id = operation_id
+            # The token becomes an ordinary swap's inputs, in one write, so the record
+            # can be finished after a crash and the value never appears twice. It keeps
+            # its id: a refusal puts the token back, to be reclaimed again.
+            async def mutator(wallet: dict[str, Any]) -> int:
+                entry = await self._entry_of(wallet, ctx)
+                op = next((item for item in entry.get("operations") or [] if item["id"] == operation_id and item.get("sent")), None)
+                if op is None:
+                    raise _invalid("operationId")
+                value = _sum_proofs(signed) - _fee_for(signed, keysets)
+                delivery = op.get("delivery")
+                self._retire(entry, operation_id)
+                self._journal_swap(wallet, entry, operation_id, "swap", signed, keyset["id"], value, True)
+                # A refusal puts the send back as it was, still to be delivered.
+                if delivery:
+                    entry["operations"][-1]["delivery"] = delivery
+                return value
 
-        async def mutator(wallet: dict[str, Any]) -> int:
-            entry = await self._entry_of(wallet, ctx)
-            op = next((item for item in entry.get("operations") or [] if item["id"] == operation_id and item.get("sent")), None)
-            if op is None:
-                raise _invalid("operationId")
-            inputs = signed
-            value = _sum_proofs(inputs) - _fee_for(inputs, keysets)
-            self._retire(entry, operation_id)
-            self._journal_swap(wallet, entry, swap_id, "swap", inputs, keyset["id"], value, True)
-            return value
+            report = {"redeemed": 0, "recovered": 0, "pending": 0, "refused": 0}
+            amount = await self._mutate(mutator)
+            outcome = await self._run_swap(ctx, operation_id, False, report)
+            if outcome == "spent":
+                if not report["recovered"] and not report["pending"]:
+                    raise CashuTokenSpentError("the recipient already redeemed this token")
+                result = {"amount": report["recovered"], "mint": ctx.url, "redeemed": report["redeemed"]}
+                if report["pending"]:
+                    result["pending"] = report["pending"]
+                return result
+            if outcome != "done":
+                raise CashuUnavailableError(f"{ctx.url} has the reclaim pending; run cashu-check")
+            return {"amount": amount, "mint": ctx.url}
 
-        report = {"redeemed": 0, "recovered": 0, "pending": 0}
-
-        async def run(value: int) -> tuple[int, str]:
-            return value, await self._run_swap(ctx, swap_id, False, report)
-
-        amount, outcome = await self._journaled(swap_id, mutator, run)
-        if outcome == "spent":
-            if not report["recovered"] and not report["pending"]:
-                raise CashuTokenSpentError("the recipient already redeemed this token")
-            result = {"amount": report["recovered"], "mint": ctx.url, "redeemed": report["redeemed"]}
-            if report["pending"]:
-                result["pending"] = report["pending"]
-            return result
-        if outcome != "done":
-            raise CashuUnavailableError(f"{ctx.url} has the reclaim pending; run cashu-check")
-        return {"amount": amount, "mint": ctx.url}
+        return await self._with_active(operation_id, work)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 
 import pytest
@@ -13,6 +14,7 @@ from keymaster import (
     KeymasterError,
     core,
 )
+from keymaster.cashu_crypto import proof_y
 from keymaster.didcomm_protocols import CASHU_TOKEN_TYPE, is_cashu_token_message
 
 from .cashu_fake_mint import FakeMint, FakeRelay
@@ -392,6 +394,122 @@ class TestAccept:
         assert len(bed.relay.mailbox) == 1
 
 
+class TestPartlySpent:
+    # A 30 sat token is four proofs, and this spends the 2 sat one at the mint.
+    @staticmethod
+    def send_with_one_spent(bed) -> None:
+        bed.send()
+        sent = run(bed.km.load_wallet())["ids"]["Alice"]["cashu"][PUBLIC_URL]["operations"][0]["sent"]
+        bed.mint.spent.add(proof_y(min(sent, key=lambda proof: proof["amount"])["secret"]))
+
+    @staticmethod
+    def on_second_swap(bed, act) -> None:
+        swaps = []
+
+        async def hook(path: str) -> None:
+            if path == "/v1/swap":
+                swaps.append(path)
+                if len(swaps) == 2:
+                    act()
+
+        bed.mint.on_request = hook
+
+    def test_redeems_the_rest_and_says_what_was_gone(self, bed):
+        self.send_with_one_spent(bed)
+
+        result = bed.accept()
+
+        assert result["failed"] == []
+        record = result["redeemed"][0]
+        assert (record["amount"], record["spent"]) == (28, 2)
+        assert bed.balance("Bob")["spendable"] == 28
+        assert bed.relay.mailbox == []
+
+    def test_redeems_the_rest_of_a_token_given_directly(self, bed):
+        token = bed.send()["token"]
+        sent = run(bed.km.load_wallet())["ids"]["Alice"]["cashu"][PUBLIC_URL]["operations"][0]["sent"]
+        bed.mint.spent.add(proof_y(min(sent, key=lambda proof: proof["amount"])["secret"]))
+
+        result = run(bed.km.receive_cashu(token, "Bob"))
+
+        assert (result["amount"], result["spent"]) == (28, 2)
+
+    def test_keeps_the_message_when_the_rest_is_refused(self, bed):
+        self.send_with_one_spent(bed)
+        self.on_second_swap(bed, lambda: bed.mint.refuse_next("/v1/swap", 12345, "temporarily refused"))
+
+        first = bed.accept()
+
+        assert first["redeemed"] == []
+        assert first["failed"][0]["acknowledged"] is False
+        assert len(bed.relay.mailbox) == 1
+        assert bed.balance("Bob")["inFlight"] == 0
+
+        bed.mint.on_request = None
+
+        assert bed.accept()["redeemed"][0]["amount"] == 28
+        assert bed.relay.mailbox == []
+
+    def test_keeps_the_message_while_the_rest_is_unresolved(self, bed):
+        self.send_with_one_spent(bed)
+        self.on_second_swap(bed, lambda: bed.mint.lose_response("/v1/swap"))
+
+        first = bed.accept()
+
+        assert first["redeemed"] == []
+        assert first["failed"][0]["acknowledged"] is False
+        assert len(bed.relay.mailbox) == 1
+
+        bed.mint.on_request = None
+
+        assert bed.accept() == {"redeemed": [], "failed": []}
+        assert bed.balance("Bob")["spendable"] == 28
+        assert bed.relay.mailbox == []
+
+    def test_still_clears_the_message_when_every_proof_is_spent(self, bed):
+        bed.send()
+        for proof in run(bed.km.load_wallet())["ids"]["Alice"]["cashu"][PUBLIC_URL]["operations"][0]["sent"]:
+            bed.mint.spent.add(proof_y(proof["secret"]))
+
+        assert bed.accept()["failed"][0]["acknowledged"] is True
+        assert bed.relay.mailbox == []
+
+
+def test_recognizes_a_key_with_the_opposite_parity_prefix(bed, monkeypatch):
+    original = bed.km._document_public_key
+
+    async def flipped(doc):
+        key = await original(doc)
+        return ("03" if key.startswith("02") else "02") + key[2:]
+
+    monkeypatch.setattr(bed.km, "_document_public_key", flipped)
+    bed.send()
+    monkeypatch.setattr(bed.km, "_document_public_key", original)
+
+    assert run(bed.km.list_cashu_messages("Bob"))[0]["redeemable"] is True
+    result = bed.accept()
+
+    assert result["failed"] == []
+    assert result["redeemed"][0]["amount"] == 30
+
+
+def test_a_malformed_message_does_not_block_the_next(bed):
+    # A proof of the wallet's own, relabelled with a secret whose tags are malformed,
+    # is reported rather than ending the whole accept.
+    from keymaster.cashu_crypto import encode_token
+
+    bed.send()
+    sent = run(bed.km.load_wallet())["ids"]["Alice"]["cashu"][PUBLIC_URL]["operations"][0]["sent"]
+    bad = {**sent[0], "secret": '["P2PK",{"nonce":"00","data":"00","tags":[[]]}]'}
+    run(bed.km.send_didcomm({"type": CASHU_TOKEN_TYPE, "id": "bad", "body": {"token": encode_token(PUBLIC_URL, "sat", [bad])}}, "Bob", {"name": "Alice"}))
+
+    assert len(run(bed.km.list_cashu_messages("Bob"))) == 2
+    result = bed.accept()
+
+    assert result["redeemed"][0]["amount"] == 30
+    assert len(result["failed"]) == 1
+
+
 class TestListMessages:
     def test_describes_a_waiting_token_and_changes_nothing(self, bed):
         bed.send(30, memo="lunch")
@@ -489,6 +607,43 @@ class TestReclaim:
         assert result["redeemed"] == []
         assert result["failed"][0]["acknowledged"] is True
         assert bed.relay.mailbox == []
+
+    def test_lets_only_one_of_two_concurrent_reclaims_through(self, bed):
+        operation = bed.send(locktime=60)["operationId"]
+        bed.after(120)
+        bed.mint.requests.clear()
+
+        async def both():
+            return await asyncio.gather(
+                bed.km.reclaim_cashu(operation, "Alice"),
+                bed.km.reclaim_cashu(operation, "Alice"),
+                return_exceptions=True,
+            )
+
+        results = run(both())
+
+        assert sum(isinstance(result, Exception) for result in results) == 1
+        assert len([request for request in bed.mint.requests if request == "POST /v1/swap"]) == 1
+        balance = bed.balance("Alice")
+        assert (balance["spendable"], balance["inFlight"], balance["outstanding"]) == (100, 0, 0)
+
+    def test_can_still_deliver_a_token_whose_reclaim_was_refused(self, bed):
+        bed.relay.down = True
+        sent = bed.send(locktime=60)
+        bed.after(120)
+        bed.relay.down = False
+        bed.mint.refuse_next("/v1/swap", 12345, "temporarily refused")
+
+        with pytest.raises(KeymasterError, match="temporarily refused"):
+            run(bed.km.reclaim_cashu(sent["operationId"], "Alice"))
+
+        listed = run(bed.km.list_cashu_sends(None, "Alice"))[0]
+        assert (listed["recipient"], listed["delivered"]) == (bed.bob, False)
+
+        run(bed.km.check_cashu(None, "Alice"))
+
+        message = run(bed.km.receive_didcomm({"name": "Bob", "ack": False}))[0]
+        assert message["message"]["id"] == sent["messageId"]
 
     def test_a_refused_reclaim_can_be_tried_again(self, bed):
         operation = bed.send(locktime=60)["operationId"]

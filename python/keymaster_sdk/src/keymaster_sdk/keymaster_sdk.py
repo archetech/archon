@@ -1555,10 +1555,11 @@ def reclaim_cashu(operation_id, id=None):
 
 
 def send_cashu_to(recipient, amount, memo=None, locktime=None, mint=None, id=None):
+    optional = {"memo": memo, "locktime": locktime, "mint": mint, "id": id}
     response = proxy_request(
         "POST",
         f"{_keymaster_api}/cashu/send-to",
-        json={"recipient": recipient, "amount": amount, "memo": memo, "locktime": locktime, "mint": mint, "id": id},
+        json={"recipient": recipient, "amount": amount, **{key: value for key, value in optional.items() if value is not None}},
     )
     return response
 

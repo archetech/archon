@@ -50,5 +50,17 @@
         "12e5",
         "123"
     ],
-    "unsupported": "[\"HTLC\",{\"nonce\":\"00\",\"data\":\"00\",\"tags\":[]}]"
+    "unsupported": "[\"HTLC\",{\"nonce\":\"00\",\"data\":\"00\",\"tags\":[]}]",
+    "malformed": [
+        "[\"P2PK\",{\"nonce\":\"00\",\"data\":\"034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa\",\"tags\":[[]]}]",
+        "[\"P2PK\",{\"nonce\":\"00\",\"data\":\"034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa\",\"tags\":[1]}]",
+        "[\"P2PK\",{\"nonce\":\"00\",\"data\":\"034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa\",\"tags\":\"tags\"}]",
+        "[\"P2PK\",{\"nonce\":\"00\",\"data\":\"034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa\",\"tags\":[[\"locktime\",\"soon\"]]}]",
+        "[\"P2PK\",{\"nonce\":\"00\",\"data\":\"034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa\",\"tags\":[[\"n_sigs\",\"many\"]]}]",
+        "[\"P2PK\",{\"nonce\":\"00\",\"data\":\"034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa\",\"tags\":[[\"n_sigs_refund\",\"x\"]]}]",
+        "[\"P2PK\",{\"nonce\":\"00\",\"data\":\"034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa\",\"tags\":[[7,\"x\"]]}]",
+        "[\"P2PK\",{\"nonce\":\"00\",\"data\":\"034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa\",\"tags\":[[\"refund\",7]]}]",
+        "[\"P2PK\",{\"nonce\":\"00\",\"tags\":[]}]",
+        "[\"P2PK\"]"
+    ]
 }
