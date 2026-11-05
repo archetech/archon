@@ -73,10 +73,12 @@ const defaultToolArgs = {
     nsec: 'nsec1example',
     object: { hello: 'world' },
     oldName: 'Alice',
+    operationId: 'op',
     owner: 'did:cid:alice',
     packed: 'packed-message',
     paymentHash: 'hash',
     poll: 'did:cid:poll',
+    quoteId: 'quote-1',
     recoveryPhrase: 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about',
     registry: 'hyperswarm',
     recipient: 'did:cid:bob',
@@ -88,6 +90,8 @@ const defaultToolArgs = {
     subject: 'did:cid:subject',
     tags: ['inbox'],
     to: 'did:cid:bob',
+    token: 'cashuB',
+    url: 'https://mint.example',
     validFrom: '2026-01-01T00:00:00.000Z',
     validUntil: '2026-12-31T00:00:00.000Z',
     value: 'world',
@@ -220,6 +224,24 @@ function mockRuntime(overrides: Record<string, unknown> = {}) {
         unpublishLightning: jest.fn<any>().mockResolvedValue(true),
         zapLightning: jest.fn<any>().mockResolvedValue({ paymentHash: 'hash' }),
         getLightningPayments: jest.fn<any>().mockResolvedValue([]),
+        addCashu: jest.fn<any>().mockResolvedValue({ url: 'https://mint.example' }),
+        removeCashu: jest.fn<any>().mockResolvedValue(true),
+        addCashuMint: jest.fn<any>().mockResolvedValue({ url: 'https://mint.example' }),
+        removeCashuMint: jest.fn<any>().mockResolvedValue(true),
+        listCashuMints: jest.fn<any>().mockResolvedValue([]),
+        publishCashu: jest.fn<any>().mockResolvedValue(true),
+        unpublishCashu: jest.fn<any>().mockResolvedValue(true),
+        getCashuBalance: jest.fn<any>().mockResolvedValue({ spendable: 0, inFlight: 0, outstanding: 0 }),
+        createCashuMintQuote: jest.fn<any>().mockResolvedValue({ quote: 'quote-1', request: 'lnbc...', amount: 21, state: 'UNPAID' }),
+        claimCashuMintQuote: jest.fn<any>().mockResolvedValue({ amount: 21, mint: 'https://mint.example' }),
+        listCashuQuotes: jest.fn<any>().mockResolvedValue([]),
+        meltCashu: jest.fn<any>().mockResolvedValue({ paid: true, change: 0 }),
+        sendCashu: jest.fn<any>().mockResolvedValue({ token: 'cashuB', amount: 21, fee: 0, operationId: 'op' }),
+        receiveCashu: jest.fn<any>().mockResolvedValue({ amount: 21, mint: 'https://mint.example' }),
+        checkCashu: jest.fn<any>().mockResolvedValue({ settled: 0, open: 0 }),
+        restoreCashu: jest.fn<any>().mockResolvedValue({ restored: 0, amount: 0 }),
+        listCashuSends: jest.fn<any>().mockResolvedValue([]),
+        reclaimCashu: jest.fn<any>().mockResolvedValue({ amount: 21, mint: 'https://mint.example' }),
         createGroup: jest.fn<any>().mockResolvedValue('did:cid:group'),
         listGroups: jest.fn<any>().mockResolvedValue(['did:cid:group']),
         getGroup: jest.fn<any>().mockResolvedValue({ members: [] }),
@@ -421,6 +443,53 @@ describe('mcp server tools', () => {
 
         expect(expectFail(response)).toContain('Invalid input: expected true');
         expect(runtime.keymaster.revokeDID).not.toHaveBeenCalled();
+    });
+
+    describe('archon_cashu_mint', () => {
+        function setup(overrides: Record<string, unknown> = {}) {
+            const server = new FakeServer();
+            const runtime = mockRuntime(overrides);
+            registerArchonTools(server, runtime as any, baseConfig);
+            return { handler: server.tools.get('archon_cashu_mint')!.handler, keymaster: runtime.keymaster };
+        }
+
+        it('returns the quote without paying it', async () => {
+            const { handler, keymaster } = setup();
+
+            expect(expectOk(await handler({ amount: 21 }))).toMatchObject({ quote: 'quote-1', request: 'lnbc...' });
+            expect(keymaster.payLightningInvoice).not.toHaveBeenCalled();
+        });
+
+        it('will not pay without confirmPayment, and creates no quote', async () => {
+            const { handler, keymaster } = setup();
+
+            expect(expectFail(await handler({ amount: 21, pay: true }))).toContain('confirmPayment');
+            expect(keymaster.createCashuMintQuote).not.toHaveBeenCalled();
+            expect(keymaster.payLightningInvoice).not.toHaveBeenCalled();
+        });
+
+        it('pays the quote and retries the claim until the mint has seen it', async () => {
+            const claim = jest.fn<any>()
+                .mockRejectedValueOnce(new Error('Cashu quote not paid'))
+                .mockResolvedValueOnce({ amount: 21, mint: 'https://mint.example' });
+            const { handler, keymaster } = setup({ claimCashuMintQuote: claim });
+
+            const result = expectOk(await handler({ amount: 21, pay: true, confirmPayment: true, mint: 'https://mint.example', id: 'Alice' }));
+
+            expect(result).toEqual({ quote: 'quote-1', amount: 21, mint: 'https://mint.example' });
+            expect(keymaster.payLightningInvoice).toHaveBeenCalledWith('lnbc...', 'Alice');
+            expect(claim).toHaveBeenCalledTimes(2);
+            expect(claim).toHaveBeenLastCalledWith('quote-1', 'https://mint.example', 'Alice');
+        });
+
+        it('names the quote when a failure leaves it unclaimed', async () => {
+            const { handler } = setup({ claimCashuMintQuote: jest.fn<any>().mockRejectedValue(new Error('mint is down')) });
+
+            const message = expectFail(await handler({ amount: 21, pay: true, confirmPayment: true }));
+
+            expect(message).toContain('quote-1');
+            expect(message).toContain('mint is down');
+        });
     });
 
     it('requires explicit reveal for secret-revealing tools', async () => {

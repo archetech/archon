@@ -1390,6 +1390,170 @@ def get_lightning_payments(id=None):
     return response["payments"]
 
 
+# Cashu
+
+def add_cashu(id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu",
+        json={"id": id},
+    )
+    return response
+
+
+def remove_cashu(force=False, id=None):
+    response = proxy_request(
+        "DELETE",
+        f"{_keymaster_api}/cashu",
+        json={"force": force, "id": id},
+    )
+    return response["ok"]
+
+
+def add_cashu_mint(url, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/mints",
+        json={"url": url, "id": id},
+    )
+    return response
+
+
+def remove_cashu_mint(url, force=False, id=None):
+    response = proxy_request(
+        "DELETE",
+        f"{_keymaster_api}/cashu/mints",
+        json={"url": url, "force": force, "id": id},
+    )
+    return response["ok"]
+
+
+def list_cashu_mints(id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/mints/list",
+        json={"id": id},
+    )
+    return response["mints"]
+
+
+def publish_cashu(id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/publish",
+        json={"id": id},
+    )
+    return response["ok"]
+
+
+def unpublish_cashu(id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/unpublish",
+        json={"id": id},
+    )
+    return response["ok"]
+
+
+def get_cashu_balance(mint=None, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/balance",
+        json={"mint": mint, "id": id},
+    )
+    return response
+
+
+def create_cashu_mint_quote(amount, mint=None, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/quote",
+        json={"amount": amount, "mint": mint, "id": id},
+    )
+    return response
+
+
+def claim_cashu_mint_quote(quote_id, mint=None, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/claim",
+        json={"quote": quote_id, "mint": mint, "id": id},
+    )
+    return response
+
+
+def list_cashu_quotes(mint=None, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/quotes",
+        json={"mint": mint, "id": id},
+    )
+    return response["quotes"]
+
+
+def melt_cashu(bolt11, mint=None, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/melt",
+        json={"bolt11": bolt11, "mint": mint, "id": id},
+    )
+    return response
+
+
+def send_cashu(amount, mint=None, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/send",
+        json={"amount": amount, "mint": mint, "id": id},
+    )
+    return response
+
+
+def receive_cashu(token, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/receive",
+        json={"token": token, "id": id},
+    )
+    return response
+
+
+def check_cashu(mint=None, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/check",
+        json={"mint": mint, "id": id},
+    )
+    return response
+
+
+def restore_cashu(mint=None, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/restore",
+        json={"mint": mint, "id": id},
+    )
+    return response
+
+
+def list_cashu_sends(mint=None, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/sends",
+        json={"mint": mint, "id": id},
+    )
+    return response["sends"]
+
+
+def reclaim_cashu(operation_id, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/reclaim",
+        json={"operationId": operation_id, "id": id},
+    )
+    return response
+
+
 def get_node_capabilities():
     response = proxy_request("GET", f"{_keymaster_api}/capabilities")
     return response["capabilities"]

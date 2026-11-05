@@ -66,6 +66,7 @@ const Endpoints = {
     lightning_unpublish: '/api/v1/lightning/unpublish',
     lightning_zap: '/api/v1/lightning/zap',
     lightning_payments: '/api/v1/lightning/payments',
+    cashu: '/api/v1/cashu',
 };
 
 const mockConsole = {
@@ -5272,5 +5273,45 @@ describe('DID document repair', () => {
         expect(await client.checkDID(id)).toEqual(report);
         expect(await client.repairDID(id)).toEqual({ ...report, submitted: false });
         expect(scope.isDone()).toBe(true);
+    });
+});
+
+describe('Cashu', () => {
+    const mint = 'https://mint.example';
+    const cases: [string, 'post' | 'delete', string, (keymaster: KeymasterClient) => Promise<unknown>, object, object, unknown][] = [
+        ['addCashu', 'post', '', k => k.addCashu('Alice'), { id: 'Alice' }, { url: mint }, { url: mint }],
+        ['removeCashu', 'delete', '', k => k.removeCashu(true, 'Alice'), { force: true, id: 'Alice' }, { ok: true }, true],
+        ['addCashuMint', 'post', '/mints', k => k.addCashuMint(mint, 'Alice'), { url: mint, id: 'Alice' }, { url: mint }, { url: mint }],
+        ['removeCashuMint', 'delete', '/mints', k => k.removeCashuMint(mint, true, 'Alice'), { url: mint, force: true, id: 'Alice' }, { ok: true }, true],
+        ['listCashuMints', 'post', '/mints/list', k => k.listCashuMints('Alice'), { id: 'Alice' }, { mints: [{ url: mint }] }, [{ url: mint }]],
+        ['publishCashu', 'post', '/publish', k => k.publishCashu('Alice'), { id: 'Alice' }, { ok: true }, true],
+        ['unpublishCashu', 'post', '/unpublish', k => k.unpublishCashu('Alice'), { id: 'Alice' }, { ok: true }, true],
+        ['getCashuBalance', 'post', '/balance', k => k.getCashuBalance(mint, 'Alice'), { mint, id: 'Alice' }, { spendable: 1 }, { spendable: 1 }],
+        ['createCashuMintQuote', 'post', '/quote', k => k.createCashuMintQuote(21, mint, 'Alice'), { amount: 21, mint, id: 'Alice' }, { quote: 'q' }, { quote: 'q' }],
+        ['claimCashuMintQuote', 'post', '/claim', k => k.claimCashuMintQuote('q', mint, 'Alice'), { quote: 'q', mint, id: 'Alice' }, { amount: 21 }, { amount: 21 }],
+        ['listCashuQuotes', 'post', '/quotes', k => k.listCashuQuotes(mint, 'Alice'), { mint, id: 'Alice' }, { quotes: [{ quote: 'q' }] }, [{ quote: 'q' }]],
+        ['meltCashu', 'post', '/melt', k => k.meltCashu('lnbc', mint, 'Alice'), { bolt11: 'lnbc', mint, id: 'Alice' }, { paid: true }, { paid: true }],
+        ['sendCashu', 'post', '/send', k => k.sendCashu(21, mint, 'Alice'), { amount: 21, mint, id: 'Alice' }, { token: 'cashuB' }, { token: 'cashuB' }],
+        ['receiveCashu', 'post', '/receive', k => k.receiveCashu('cashuB', 'Alice'), { token: 'cashuB', id: 'Alice' }, { amount: 21 }, { amount: 21 }],
+        ['checkCashu', 'post', '/check', k => k.checkCashu(mint, 'Alice'), { mint, id: 'Alice' }, { settled: 1 }, { settled: 1 }],
+        ['restoreCashu', 'post', '/restore', k => k.restoreCashu(mint, 'Alice'), { mint, id: 'Alice' }, { restored: 1 }, { restored: 1 }],
+        ['listCashuSends', 'post', '/sends', k => k.listCashuSends(mint, 'Alice'), { mint, id: 'Alice' }, { sends: [{ amount: 21 }] }, [{ amount: 21 }]],
+        ['reclaimCashu', 'post', '/reclaim', k => k.reclaimCashu('op', 'Alice'), { operationId: 'op', id: 'Alice' }, { amount: 21 }, { amount: 21 }],
+    ];
+
+    it.each(cases)('%s sends its arguments and unwraps the reply', async (_name, verb, path, call, body, reply, expected) => {
+        nock(KeymasterURL)[verb](`${Endpoints.cashu}${path}`, body as nock.RequestBodyMatcher).reply(200, reply);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        expect(await call(keymaster)).toStrictEqual(expected);
+    });
+
+    it.each(cases)('%s throws the server error', async (_name, verb, path, call) => {
+        nock(KeymasterURL)[verb](`${Endpoints.cashu}${path}`).reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        await expect(call(keymaster)).rejects.toMatchObject({ message: ServerError.message });
     });
 });

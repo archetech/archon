@@ -24,6 +24,8 @@ const UPDATE_OK = "OK";
 const UPDATE_FAILED = "Update failed";
 const LIGHTNING_ZAP_STATUS_CHECKS = 3;
 const LIGHTNING_ZAP_STATUS_DELAY_MS = 1000;
+const CASHU_CLAIM_ATTEMPTS = 5;
+const CASHU_CLAIM_DELAY_MS = 1000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,6 +36,53 @@ const SAVED_PASSPHRASE_FILE = path.join(os.homedir(), ARCHON_HOME_DIRECTORY, 'pa
 
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Progress for a person, on stderr so stdout stays parseable. Not a failure: those go
+// through fail(), which also sets the exit status.
+function note(text: string): void {
+    console.error(text);
+}
+
+// Strict because this is money: parseInt would read '10abc' as 10 and '1.5' as 1.
+function parseSats(value: string): number {
+    const amount = Number(value);
+    if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(amount)) {
+        throw new Error(`amount must be a positive whole number of sats, not '${value}'`);
+    }
+    return amount;
+}
+
+// By the time a balance is read the operation has happened, so failing to read it
+// must not report the operation as failed.
+async function readCashuBalance(mint?: string, id?: string) {
+    try {
+        return await keymaster.getCashuBalance(mint, id);
+    }
+    catch {
+        return undefined;
+    }
+}
+
+async function printCashuResult(result: object, mint?: string, id?: string): Promise<void> {
+    const balance = await readCashuBalance(mint, id);
+    console.log(JSON.stringify(balance ? { ...result, balance } : result, null, 4));
+}
+
+// A Lightning payment can settle a moment before the mint sees it.
+async function claimPaidCashuQuote(quote: string, mint?: string, id?: string) {
+    for (let attempt = 1; ; attempt++) {
+        try {
+            return await keymaster.claimCashuMintQuote(quote, mint, id);
+        }
+        catch (error: any) {
+            const unpaid = String(error.error || error.message || error).includes('Cashu quote not paid');
+            if (!unpaid || attempt >= CASHU_CLAIM_ATTEMPTS) {
+                throw error;
+            }
+            await sleep(CASHU_CLAIM_DELAY_MS);
+        }
+    }
 }
 
 // readline redraws the whole line on every keystroke, so the query is written
@@ -1328,6 +1377,264 @@ program
                 const status = p.pending ? ' [pending]' : '';
                 console.log(`${date}  ${p.amount} sats${fee}${memo}${status}`);
             }
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+// Cashu commands
+program
+    .command('add-cashu [id]')
+    .description("Enable Cashu on the node's mint")
+    .action(async (id) => {
+        try {
+            const info = await keymaster.addCashu(id);
+            console.log(`Cashu mint: ${info.url}`);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('remove-cashu [id]')
+    .description('Remove every Cashu mint from a DID')
+    .option('--force', 'remove even if ecash or open operations would be lost')
+    .action(async (id, options) => {
+        try {
+            await keymaster.removeCashu(options.force, id);
+            console.log(UPDATE_OK);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('add-cashu-mint <url> [id]')
+    .description('Add an outside Cashu mint to a DID')
+    .action(async (url, id) => {
+        try {
+            const info = await keymaster.addCashuMint(url, id);
+            console.log(`Cashu mint: ${info.url}`);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('remove-cashu-mint <url> [id]')
+    .description('Remove one Cashu mint from a DID')
+    .option('--force', 'remove even if ecash or open operations would be lost')
+    .action(async (url, id, options) => {
+        try {
+            await keymaster.removeCashuMint(url, options.force, id);
+            console.log(UPDATE_OK);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('list-cashu-mints [id]')
+    .description("List a DID's Cashu mints")
+    .action(async (id) => {
+        try {
+            console.log(JSON.stringify(await keymaster.listCashuMints(id), null, 4));
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('publish-cashu [id]')
+    .description("Publish a DID's Cashu mints as a service endpoint")
+    .action(async (id) => {
+        try {
+            await keymaster.publishCashu(id);
+            console.log(UPDATE_OK);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('unpublish-cashu [id]')
+    .description('Remove the Cashu service endpoint from a DID')
+    .action(async (id) => {
+        try {
+            await keymaster.unpublishCashu(id);
+            console.log(UPDATE_OK);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-balance [id]')
+    .description('Show spendable, in-flight and outstanding ecash')
+    .option('-m, --mint <url>', 'mint to use')
+    .action(async (id, options) => {
+        try {
+            console.log(JSON.stringify(await keymaster.getCashuBalance(options.mint, id), null, 4));
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-mint <amount> [id]')
+    .description('Get a mint quote for ecash, or with --pay also pay and claim it')
+    .option('--pay', "pay the quote from the DID's Lightning wallet and claim the ecash")
+    .option('-m, --mint <url>', 'mint to use')
+    .action(async (amount, id, options) => {
+        try {
+            const quote = await keymaster.createCashuMintQuote(parseSats(amount), options.mint, id);
+            if (!options.pay) {
+                console.log(JSON.stringify(quote, null, 4));
+                return;
+            }
+
+            // Named before paying, so cashu-claim can finish whatever fails below.
+            note(`Paying Cashu quote ${quote.quote}`);
+            await keymaster.payLightningInvoice(quote.request, id);
+            const result = await claimPaidCashuQuote(quote.quote, options.mint, id);
+            await printCashuResult(result, result.mint, id);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-claim <quoteId> [id]')
+    .description('Mint the ecash of a paid quote')
+    .option('-m, --mint <url>', 'mint to use')
+    .action(async (quoteId, id, options) => {
+        try {
+            const result = await keymaster.claimCashuMintQuote(quoteId, options.mint, id);
+            await printCashuResult(result, result.mint, id);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-quotes [id]')
+    .description('List open Cashu mint and melt quotes')
+    .option('-m, --mint <url>', 'mint to use')
+    .action(async (id, options) => {
+        try {
+            console.log(JSON.stringify(await keymaster.listCashuQuotes(options.mint, id), null, 4));
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-melt <bolt11> [id]')
+    .description('Pay a Lightning invoice from ecash')
+    .option('-m, --mint <url>', 'mint to use')
+    .action(async (bolt11, id, options) => {
+        try {
+            const result = await keymaster.meltCashu(bolt11, options.mint, id);
+            await printCashuResult(result, options.mint, id);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-send <amount> [id]')
+    .description('Create a Cashu token and print it')
+    .option('-m, --mint <url>', 'mint to use')
+    .action(async (amount, id, options) => {
+        try {
+            const result = await keymaster.sendCashu(parseSats(amount), options.mint, id);
+            // The token alone on stdout, so it can be piped.
+            console.log(result.token);
+            note(`Sent ${result.amount} sats, fee ${result.fee}, operation ${result.operationId}`);
+            const balance = await readCashuBalance(options.mint, id);
+            if (balance) {
+                note(`Balance: ${balance.spendable} sats spendable`);
+            }
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-receive <token> [id]')
+    .description('Redeem a Cashu token at its mint')
+    .action(async (token, id) => {
+        try {
+            const result = await keymaster.receiveCashu(token, id);
+            await printCashuResult(result, result.mint, id);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-check [id]')
+    .description('Settle open Cashu operations and drop spent proofs')
+    .option('-m, --mint <url>', 'mint to use')
+    .action(async (id, options) => {
+        try {
+            const result = await keymaster.checkCashu(options.mint, id);
+            await printCashuResult(result, options.mint, id);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-restore [id]')
+    .description('Recover ecash from the wallet seed')
+    .option('-m, --mint <url>', 'mint to use')
+    .action(async (id, options) => {
+        try {
+            const result = await keymaster.restoreCashu(options.mint, id);
+            await printCashuResult(result, options.mint, id);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-sends [id]')
+    .description('List sent Cashu tokens not yet settled')
+    .option('-m, --mint <url>', 'mint to use')
+    .action(async (id, options) => {
+        try {
+            console.log(JSON.stringify(await keymaster.listCashuSends(options.mint, id), null, 4));
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-reclaim <operationId> [id]')
+    .description('Take back a sent Cashu token not yet redeemed')
+    .action(async (operationId, id) => {
+        try {
+            const result = await keymaster.reclaimCashu(operationId, id);
+            await printCashuResult(result, result.mint, id);
         }
         catch (error: any) {
             fail(error.error || error.message || error);

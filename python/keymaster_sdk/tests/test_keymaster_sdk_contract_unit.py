@@ -402,3 +402,75 @@ def test_did_repair_endpoints(monkeypatch):
         ("GET", "http://unit.test/api/v1/did/Alice%20%2F%20backup/check"),
         ("POST", "http://unit.test/api/v1/did/Alice%20%2F%20backup/repair"),
     ]
+
+
+def test_cashu_wrappers_forward_expected_requests(monkeypatch):
+    calls: list[tuple[str, str, dict]] = []
+    replies = {
+        ("POST", "/cashu"): {"url": "m"},
+        ("DELETE", "/cashu"): {"ok": True},
+        ("POST", "/cashu/mints"): {"url": "m"},
+        ("DELETE", "/cashu/mints"): {"ok": True},
+        ("POST", "/cashu/mints/list"): {"mints": [{"url": "m"}]},
+        ("POST", "/cashu/publish"): {"ok": True},
+        ("POST", "/cashu/unpublish"): {"ok": True},
+        ("POST", "/cashu/balance"): {"spendable": 1},
+        ("POST", "/cashu/quote"): {"quote": "q"},
+        ("POST", "/cashu/claim"): {"amount": 21},
+        ("POST", "/cashu/quotes"): {"quotes": [{"quote": "q"}]},
+        ("POST", "/cashu/melt"): {"paid": True},
+        ("POST", "/cashu/send"): {"token": "cashuB"},
+        ("POST", "/cashu/receive"): {"amount": 21},
+        ("POST", "/cashu/check"): {"settled": 1},
+        ("POST", "/cashu/restore"): {"restored": 1},
+        ("POST", "/cashu/sends"): {"sends": [{"amount": 21}]},
+        ("POST", "/cashu/reclaim"): {"amount": 21},
+    }
+
+    def fake_proxy_request(method, url, **kwargs):
+        path = url.removeprefix("http://unit.test/api/v1")
+        calls.append((method, path, kwargs["json"]))
+        return replies[(method, path)]
+
+    monkeypatch.setattr(sdk, "proxy_request", fake_proxy_request)
+    monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
+
+    assert sdk.add_cashu("A") == {"url": "m"}
+    assert sdk.remove_cashu(True, "A") is True
+    assert sdk.add_cashu_mint("m", "A") == {"url": "m"}
+    assert sdk.remove_cashu_mint("m", True, "A") is True
+    assert sdk.list_cashu_mints("A") == [{"url": "m"}]
+    assert sdk.publish_cashu("A") is True
+    assert sdk.unpublish_cashu("A") is True
+    assert sdk.get_cashu_balance("m", "A") == {"spendable": 1}
+    assert sdk.create_cashu_mint_quote(21, "m", "A") == {"quote": "q"}
+    assert sdk.claim_cashu_mint_quote("q", "m", "A") == {"amount": 21}
+    assert sdk.list_cashu_quotes("m", "A") == [{"quote": "q"}]
+    assert sdk.melt_cashu("lnbc", "m", "A") == {"paid": True}
+    assert sdk.send_cashu(21, "m", "A") == {"token": "cashuB"}
+    assert sdk.receive_cashu("cashuB", "A") == {"amount": 21}
+    assert sdk.check_cashu("m", "A") == {"settled": 1}
+    assert sdk.restore_cashu("m", "A") == {"restored": 1}
+    assert sdk.list_cashu_sends("m", "A") == [{"amount": 21}]
+    assert sdk.reclaim_cashu("op", "A") == {"amount": 21}
+
+    assert calls == [
+        ("POST", "/cashu", {"id": "A"}),
+        ("DELETE", "/cashu", {"force": True, "id": "A"}),
+        ("POST", "/cashu/mints", {"url": "m", "id": "A"}),
+        ("DELETE", "/cashu/mints", {"url": "m", "force": True, "id": "A"}),
+        ("POST", "/cashu/mints/list", {"id": "A"}),
+        ("POST", "/cashu/publish", {"id": "A"}),
+        ("POST", "/cashu/unpublish", {"id": "A"}),
+        ("POST", "/cashu/balance", {"mint": "m", "id": "A"}),
+        ("POST", "/cashu/quote", {"amount": 21, "mint": "m", "id": "A"}),
+        ("POST", "/cashu/claim", {"quote": "q", "mint": "m", "id": "A"}),
+        ("POST", "/cashu/quotes", {"mint": "m", "id": "A"}),
+        ("POST", "/cashu/melt", {"bolt11": "lnbc", "mint": "m", "id": "A"}),
+        ("POST", "/cashu/send", {"amount": 21, "mint": "m", "id": "A"}),
+        ("POST", "/cashu/receive", {"token": "cashuB", "id": "A"}),
+        ("POST", "/cashu/check", {"mint": "m", "id": "A"}),
+        ("POST", "/cashu/restore", {"mint": "m", "id": "A"}),
+        ("POST", "/cashu/sends", {"mint": "m", "id": "A"}),
+        ("POST", "/cashu/reclaim", {"operationId": "op", "id": "A"}),
+    ]

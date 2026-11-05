@@ -35,6 +35,7 @@ from dotenv import load_dotenv
 from collections.abc import Mapping
 from typing import Any, Callable
 
+from keymaster.cashu import CashuQuoteUnpaidError
 from keymaster.core import Keymaster, KeymasterError, WalletNotFoundError
 from keymaster.gatekeeper_client import GatekeeperClient
 from keymaster.wallet_store import JsonWalletStore, SqliteWalletStore
@@ -44,6 +45,8 @@ UPDATE_OK = "OK"
 UPDATE_FAILED = "Update failed"
 LIGHTNING_ZAP_STATUS_CHECKS = 3
 LIGHTNING_ZAP_STATUS_DELAY_MS = 1000
+CASHU_CLAIM_ATTEMPTS = 5
+CASHU_CLAIM_DELAY_MS = 1000
 
 
 def _print_json(value: Any) -> None:
@@ -933,6 +936,139 @@ async def cmd_lightning_payments(km: Keymaster, args: argparse.Namespace) -> Non
 
 # Groups ----------------------------------------------------------------------
 
+# Strict because this is money: a lenient parse would read 10abc as 10.
+def _parse_sats(value: str) -> int:
+    if not re.fullmatch(r"[1-9][0-9]*", value):
+        raise CommandError(f"amount must be a positive whole number of sats, not '{value}'")
+    return int(value)
+
+
+# By the time a balance is read the operation has happened, so failing to read it
+# must not report the operation as failed.
+async def _read_cashu_balance(km: Keymaster, mint: str | None, identity: str | None) -> dict[str, Any] | None:
+    try:
+        return await km.get_cashu_balance(mint, identity)
+    except Exception:
+        return None
+
+
+async def _print_cashu_result(km: Keymaster, result: dict[str, Any], mint: str | None, identity: str | None) -> None:
+    balance = await _read_cashu_balance(km, mint, identity)
+    _print_json({**result, "balance": balance} if balance else result)
+
+
+# A Lightning payment can settle a moment before the mint sees it.
+async def _claim_paid_cashu_quote(km: Keymaster, quote: str, mint: str | None, identity: str | None) -> dict[str, Any]:
+    attempt = 1
+    while True:
+        try:
+            return await km.claim_cashu_mint_quote(quote, mint, identity)
+        except CashuQuoteUnpaidError:
+            if attempt >= CASHU_CLAIM_ATTEMPTS:
+                raise
+        attempt += 1
+        await asyncio.sleep(CASHU_CLAIM_DELAY_MS / 1000)
+
+
+async def cmd_add_cashu(km: Keymaster, args: argparse.Namespace) -> None:
+    info = await km.add_cashu(args.id)
+    print(f"Cashu mint: {info['url']}")
+
+
+async def cmd_remove_cashu(km: Keymaster, args: argparse.Namespace) -> None:
+    await km.remove_cashu(args.force, args.id)
+    print(UPDATE_OK)
+
+
+async def cmd_add_cashu_mint(km: Keymaster, args: argparse.Namespace) -> None:
+    info = await km.add_cashu_mint(args.url, args.id)
+    print(f"Cashu mint: {info['url']}")
+
+
+async def cmd_remove_cashu_mint(km: Keymaster, args: argparse.Namespace) -> None:
+    await km.remove_cashu_mint(args.url, args.force, args.id)
+    print(UPDATE_OK)
+
+
+async def cmd_list_cashu_mints(km: Keymaster, args: argparse.Namespace) -> None:
+    _print_json(await km.list_cashu_mints(args.id))
+
+
+async def cmd_publish_cashu(km: Keymaster, args: argparse.Namespace) -> None:
+    await km.publish_cashu(args.id)
+    print(UPDATE_OK)
+
+
+async def cmd_unpublish_cashu(km: Keymaster, args: argparse.Namespace) -> None:
+    await km.unpublish_cashu(args.id)
+    print(UPDATE_OK)
+
+
+async def cmd_cashu_balance(km: Keymaster, args: argparse.Namespace) -> None:
+    _print_json(await km.get_cashu_balance(args.mint, args.id))
+
+
+async def cmd_cashu_mint(km: Keymaster, args: argparse.Namespace) -> None:
+    quote = await km.create_cashu_mint_quote(_parse_sats(args.amount), args.mint, args.id)
+    if not args.pay:
+        _print_json(quote)
+        return
+
+    # Named before paying, so cashu-claim can finish whatever fails below.
+    print(f"Paying Cashu quote {quote['quote']}", file=sys.stderr)
+    await km.pay_lightning_invoice(quote["request"], args.id)
+    result = await _claim_paid_cashu_quote(km, quote["quote"], args.mint, args.id)
+    await _print_cashu_result(km, result, result["mint"], args.id)
+
+
+async def cmd_cashu_claim(km: Keymaster, args: argparse.Namespace) -> None:
+    result = await km.claim_cashu_mint_quote(args.quote_id, args.mint, args.id)
+    await _print_cashu_result(km, result, result["mint"], args.id)
+
+
+async def cmd_cashu_quotes(km: Keymaster, args: argparse.Namespace) -> None:
+    _print_json(await km.list_cashu_quotes(args.mint, args.id))
+
+
+async def cmd_cashu_melt(km: Keymaster, args: argparse.Namespace) -> None:
+    result = await km.melt_cashu(args.bolt11, args.mint, args.id)
+    await _print_cashu_result(km, result, args.mint, args.id)
+
+
+async def cmd_cashu_send(km: Keymaster, args: argparse.Namespace) -> None:
+    result = await km.send_cashu(_parse_sats(args.amount), args.mint, args.id)
+    # The token alone on stdout, so it can be piped.
+    print(result["token"], flush=True)
+    print(f"Sent {result['amount']} sats, fee {result['fee']}, operation {result['operationId']}", file=sys.stderr)
+    balance = await _read_cashu_balance(km, args.mint, args.id)
+    if balance:
+        print(f"Balance: {balance['spendable']} sats spendable", file=sys.stderr)
+
+
+async def cmd_cashu_receive(km: Keymaster, args: argparse.Namespace) -> None:
+    result = await km.receive_cashu(args.token, args.id)
+    await _print_cashu_result(km, result, result["mint"], args.id)
+
+
+async def cmd_cashu_check(km: Keymaster, args: argparse.Namespace) -> None:
+    result = await km.check_cashu(args.mint, args.id)
+    await _print_cashu_result(km, result, args.mint, args.id)
+
+
+async def cmd_cashu_restore(km: Keymaster, args: argparse.Namespace) -> None:
+    result = await km.restore_cashu(args.mint, args.id)
+    await _print_cashu_result(km, result, args.mint, args.id)
+
+
+async def cmd_cashu_sends(km: Keymaster, args: argparse.Namespace) -> None:
+    _print_json(await km.list_cashu_sends(args.mint, args.id))
+
+
+async def cmd_cashu_reclaim(km: Keymaster, args: argparse.Namespace) -> None:
+    result = await km.reclaim_cashu(args.operation_id, args.id)
+    await _print_cashu_result(km, result, result["mint"], args.id)
+
+
 async def cmd_create_group(km: Keymaster, args: argparse.Namespace) -> None:
     opts: dict[str, Any] = {}
     if args.alias:
@@ -1593,6 +1729,66 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("amount")
     sp.add_argument("memo", nargs="?")
     sp = add("lightning-payments", "Show Lightning payment history", cmd_lightning_payments)
+    sp.add_argument("id", nargs="?")
+
+    # Cashu
+    force_help = "remove even if ecash or open operations would be lost"
+    mint_help = "mint to use"
+    sp = add("add-cashu", "Enable Cashu on the node's mint", cmd_add_cashu)
+    sp.add_argument("id", nargs="?")
+    sp = add("remove-cashu", "Remove every Cashu mint from a DID", cmd_remove_cashu)
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("--force", action="store_true", help=force_help)
+    sp = add("add-cashu-mint", "Add an outside Cashu mint to a DID", cmd_add_cashu_mint)
+    sp.add_argument("url")
+    sp.add_argument("id", nargs="?")
+    sp = add("remove-cashu-mint", "Remove one Cashu mint from a DID", cmd_remove_cashu_mint)
+    sp.add_argument("url")
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("--force", action="store_true", help=force_help)
+    sp = add("list-cashu-mints", "List a DID's Cashu mints", cmd_list_cashu_mints)
+    sp.add_argument("id", nargs="?")
+    sp = add("publish-cashu", "Publish a DID's Cashu mints as a service endpoint", cmd_publish_cashu)
+    sp.add_argument("id", nargs="?")
+    sp = add("unpublish-cashu", "Remove the Cashu service endpoint from a DID", cmd_unpublish_cashu)
+    sp.add_argument("id", nargs="?")
+    sp = add("cashu-balance", "Show spendable, in-flight and outstanding ecash", cmd_cashu_balance)
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("-m", "--mint", help=mint_help)
+    sp = add("cashu-mint", "Get a mint quote for ecash, or with --pay also pay and claim it", cmd_cashu_mint)
+    sp.add_argument("amount")
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("--pay", action="store_true", help="pay the quote from the DID's Lightning wallet and claim the ecash")
+    sp.add_argument("-m", "--mint", help=mint_help)
+    sp = add("cashu-claim", "Mint the ecash of a paid quote", cmd_cashu_claim)
+    sp.add_argument("quote_id", metavar="quoteId")
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("-m", "--mint", help=mint_help)
+    sp = add("cashu-quotes", "List open Cashu mint and melt quotes", cmd_cashu_quotes)
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("-m", "--mint", help=mint_help)
+    sp = add("cashu-melt", "Pay a Lightning invoice from ecash", cmd_cashu_melt)
+    sp.add_argument("bolt11")
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("-m", "--mint", help=mint_help)
+    sp = add("cashu-send", "Create a Cashu token and print it", cmd_cashu_send)
+    sp.add_argument("amount")
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("-m", "--mint", help=mint_help)
+    sp = add("cashu-receive", "Redeem a Cashu token at its mint", cmd_cashu_receive)
+    sp.add_argument("token")
+    sp.add_argument("id", nargs="?")
+    sp = add("cashu-check", "Settle open Cashu operations and drop spent proofs", cmd_cashu_check)
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("-m", "--mint", help=mint_help)
+    sp = add("cashu-restore", "Recover ecash from the wallet seed", cmd_cashu_restore)
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("-m", "--mint", help=mint_help)
+    sp = add("cashu-sends", "List sent Cashu tokens not yet settled", cmd_cashu_sends)
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("-m", "--mint", help=mint_help)
+    sp = add("cashu-reclaim", "Take back a sent Cashu token not yet redeemed", cmd_cashu_reclaim)
+    sp.add_argument("operation_id", metavar="operationId")
     sp.add_argument("id", nargs="?")
 
     # Groups

@@ -347,6 +347,45 @@ function signableJson(input: unknown): object {
 
 // Generic so each handler's args are inferred from that tool's own input schema,
 // letting tsc catch schema/handler drift instead of silently passing `any` through.
+const CASHU_CLAIM_ATTEMPTS = 5;
+const CASHU_CLAIM_DELAY_MS = 1000;
+
+async function mintCashu(
+    keymaster: ReturnType<typeof requireKeymaster>,
+    amount: number,
+    options: { pay?: boolean, confirmPayment?: true, mint?: string, id?: string },
+) {
+    const { pay, confirmPayment, mint, id } = options;
+    if (pay && !confirmPayment) {
+        throw new Error('pay requires confirmPayment: true');
+    }
+
+    const quote = await keymaster.createCashuMintQuote(amount, mint, id);
+    if (!pay) {
+        return quote;
+    }
+
+    // Any failure from here names the quote, so archon_cashu_claim can finish it.
+    try {
+        await keymaster.payLightningInvoice(quote.request, id);
+        for (let attempt = 1; ; attempt++) {
+            try {
+                return { quote: quote.quote, ...await keymaster.claimCashuMintQuote(quote.quote, mint, id) };
+            }
+            catch (error) {
+                // A Lightning payment can settle a moment before the mint sees it.
+                if (!errorMessage(error).includes('Cashu quote not paid') || attempt >= CASHU_CLAIM_ATTEMPTS) {
+                    throw error;
+                }
+                await new Promise(resolve => setTimeout(resolve, CASHU_CLAIM_DELAY_MS));
+            }
+        }
+    }
+    catch (error) {
+        throw new Error(`Cashu quote ${quote.quote} not claimed: ${errorMessage(error)}`);
+    }
+}
+
 function tool<S extends z.ZodTypeAny>(definition: TypedToolDefinition<S>): ArchonToolDefinition {
     return definition as ArchonToolDefinition;
 }
@@ -461,6 +500,25 @@ export const ARCHON_MCP_TOOL_DEFINITIONS: ArchonToolDefinition[] = [
     tool({ name: 'archon_unpublish_lightning', cliCommand: 'unpublish-lightning', description: 'Remove Lightning service endpoint from a DID.', schema: z.object({ id: z.string().optional() }), mutates: true, handler: (runtime, { id }) => requireKeymaster(runtime).unpublishLightning(id) }),
     tool({ name: 'archon_lightning_zap', cliCommand: 'lightning-zap', description: 'Send sats via Lightning to a DID, alias, or Lightning address.', schema: z.object({ recipient: z.string(), amount: z.number().int().positive(), memo: z.string().optional(), id: z.string().optional() }).merge(ConfirmPaymentSchema), mutates: true, handler: (runtime, { recipient, amount, memo, id }) => requireKeymaster(runtime).zapLightning(recipient, amount, memo, id) }),
     tool({ name: 'archon_lightning_payments', cliCommand: 'lightning-payments', description: 'Show Lightning payment history.', schema: z.object({ id: z.string().optional() }), handler: (runtime, { id }) => requireKeymaster(runtime).getLightningPayments(id) }),
+
+    tool({ name: 'archon_add_cashu', cliCommand: 'add-cashu', description: "Enable Cashu on the node's mint for a DID.", schema: z.object({ id: z.string().optional() }), mutates: true, handler: (runtime, { id }) => requireKeymaster(runtime).addCashu(id) }),
+    tool({ name: 'archon_remove_cashu', cliCommand: 'remove-cashu', description: 'Remove every Cashu mint from a DID. force also discards any ecash and open operations they hold.', schema: z.object({ force: z.boolean().optional(), id: z.string().optional() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { force, id }) => requireKeymaster(runtime).removeCashu(force, id) }),
+    tool({ name: 'archon_add_cashu_mint', cliCommand: 'add-cashu-mint', description: 'Add an outside Cashu mint to a DID.', schema: z.object({ url: z.string(), id: z.string().optional() }), mutates: true, handler: (runtime, { url, id }) => requireKeymaster(runtime).addCashuMint(url, id) }),
+    tool({ name: 'archon_remove_cashu_mint', cliCommand: 'remove-cashu-mint', description: 'Remove one Cashu mint from a DID. force also discards any ecash and open operations it holds.', schema: z.object({ url: z.string(), force: z.boolean().optional(), id: z.string().optional() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { url, force, id }) => requireKeymaster(runtime).removeCashuMint(url, force, id) }),
+    tool({ name: 'archon_list_cashu_mints', cliCommand: 'list-cashu-mints', description: "List a DID's Cashu mints.", schema: z.object({ id: z.string().optional() }), handler: (runtime, { id }) => requireKeymaster(runtime).listCashuMints(id) }),
+    tool({ name: 'archon_publish_cashu', cliCommand: 'publish-cashu', description: "Publish a DID's Cashu mints as a service endpoint.", schema: z.object({ id: z.string().optional() }), mutates: true, handler: (runtime, { id }) => requireKeymaster(runtime).publishCashu(id) }),
+    tool({ name: 'archon_unpublish_cashu', cliCommand: 'unpublish-cashu', description: 'Remove the Cashu service endpoint from a DID.', schema: z.object({ id: z.string().optional() }), mutates: true, handler: (runtime, { id }) => requireKeymaster(runtime).unpublishCashu(id) }),
+    tool({ name: 'archon_cashu_balance', cliCommand: 'cashu-balance', description: 'Show spendable, in-flight and outstanding ecash.', schema: z.object({ mint: z.string().optional(), id: z.string().optional() }), handler: (runtime, { mint, id }) => requireKeymaster(runtime).getCashuBalance(mint, id) }),
+    tool({ name: 'archon_cashu_mint', cliCommand: 'cashu-mint', description: "Get a mint quote for ecash. With pay, also pay it from the DID's Lightning wallet and claim the ecash, which requires confirmPayment.", schema: z.object({ amount: z.number().int().positive(), pay: z.boolean().optional(), confirmPayment: z.literal(true).optional(), mint: z.string().optional(), id: z.string().optional() }), mutates: true, handler: (runtime, { amount, pay, confirmPayment, mint, id }) => mintCashu(requireKeymaster(runtime), amount, { pay, confirmPayment, mint, id }) }),
+    tool({ name: 'archon_cashu_claim', cliCommand: 'cashu-claim', description: 'Mint the ecash of a paid quote.', schema: z.object({ quoteId: z.string(), mint: z.string().optional(), id: z.string().optional() }), mutates: true, handler: (runtime, { quoteId, mint, id }) => requireKeymaster(runtime).claimCashuMintQuote(quoteId, mint, id) }),
+    tool({ name: 'archon_cashu_quotes', cliCommand: 'cashu-quotes', description: 'List open Cashu mint and melt quotes.', schema: z.object({ mint: z.string().optional(), id: z.string().optional() }), handler: (runtime, { mint, id }) => requireKeymaster(runtime).listCashuQuotes(mint, id) }),
+    tool({ name: 'archon_cashu_melt', cliCommand: 'cashu-melt', description: 'Pay a Lightning invoice from ecash.', schema: z.object({ bolt11: z.string(), mint: z.string().optional(), id: z.string().optional() }).merge(ConfirmPaymentSchema), mutates: true, handler: (runtime, { bolt11, mint, id }) => requireKeymaster(runtime).meltCashu(bolt11, mint, id) }),
+    tool({ name: 'archon_cashu_send', cliCommand: 'cashu-send', description: 'Create a Cashu token. The token is bearer money: whoever holds it can redeem it.', schema: z.object({ amount: z.number().int().positive(), mint: z.string().optional(), id: z.string().optional() }).merge(ConfirmPaymentSchema), mutates: true, handler: (runtime, { amount, mint, id }) => requireKeymaster(runtime).sendCashu(amount, mint, id) }),
+    tool({ name: 'archon_cashu_receive', cliCommand: 'cashu-receive', description: 'Redeem a Cashu token at its mint.', schema: z.object({ token: z.string(), id: z.string().optional() }), mutates: true, handler: (runtime, { token, id }) => requireKeymaster(runtime).receiveCashu(token, id) }),
+    tool({ name: 'archon_cashu_check', cliCommand: 'cashu-check', description: 'Settle open Cashu operations and drop spent proofs.', schema: z.object({ mint: z.string().optional(), id: z.string().optional() }), mutates: true, handler: (runtime, { mint, id }) => requireKeymaster(runtime).checkCashu(mint, id) }),
+    tool({ name: 'archon_cashu_restore', cliCommand: 'cashu-restore', description: 'Recover ecash from the wallet seed.', schema: z.object({ mint: z.string().optional(), id: z.string().optional() }), mutates: true, handler: (runtime, { mint, id }) => requireKeymaster(runtime).restoreCashu(mint, id) }),
+    tool({ name: 'archon_cashu_sends', cliCommand: 'cashu-sends', description: 'List sent Cashu tokens not yet settled.', schema: z.object({ mint: z.string().optional(), id: z.string().optional() }), handler: (runtime, { mint, id }) => requireKeymaster(runtime).listCashuSends(mint, id) }),
+    tool({ name: 'archon_cashu_reclaim', cliCommand: 'cashu-reclaim', description: 'Take back a sent Cashu token not yet redeemed, which invalidates it for its recipient.', schema: z.object({ operationId: z.string(), id: z.string().optional() }).merge(ConfirmSchema), mutates: true, handler: (runtime, { operationId, id }) => requireKeymaster(runtime).reclaimCashu(operationId, id) }),
 
     tool({ name: 'archon_create_group', cliCommand: 'create-group', description: 'Create a new group.', schema: z.object({ groupName: z.string() }).merge(AliasOptionsSchema), mutates: true, handler: (runtime, { groupName, alias, registry }) => requireKeymaster(runtime).createGroup(groupName, compactOptions({ alias, registry })) }),
     tool({ name: 'archon_list_groups', cliCommand: 'list-groups', description: 'List groups owned by an ID.', schema: z.object({ owner: z.string().optional() }), handler: (runtime, { owner }) => requireKeymaster(runtime).listGroups(owner) }),
