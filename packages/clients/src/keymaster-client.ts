@@ -3,6 +3,18 @@ import {
     ResolveDIDOptions,
 } from './gatekeeper-types.js';
 import {
+    CashuBalance,
+    CashuCheckResult,
+    CashuClaimResult,
+    CashuMeltResult,
+    CashuMintInfo,
+    CashuMintQuote,
+    CashuQuoteRecord,
+    CashuReceiveResult,
+    CashuReclaimResult,
+    CashuRestoreResult,
+    CashuSendRecord,
+    CashuSendResult,
     Challenge,
     ChallengeResponse,
     AddressInfo,
@@ -114,13 +126,15 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    // Diagnostics go to stderr: a CLI's stdout is its output, which may be a token or
+    // JSON that something is reading.
     async waitUntilReady(options: WaitUntilReadyOptions = {}): Promise<void> {
         let { intervalSeconds = 5, chatty = false, becomeChattyAfter = 0, maxRetries = 0 } = options;
         let ready = false;
         let retries = 0;
 
         if (chatty) {
-            console.log(`Connecting to Keymaster at ${this.API}`);
+            console.error(`Connecting to Keymaster at ${this.API}`);
         }
 
         while (!ready) {
@@ -128,7 +142,7 @@ export default class KeymasterClient implements KeymasterInterface {
 
             if (!ready) {
                 if (chatty) {
-                    console.log('Waiting for Keymaster to be ready...');
+                    console.error('Waiting for Keymaster to be ready...');
                 }
                 // wait for 1 second before checking again
                 await new Promise(resolve => setTimeout(resolve, intervalSeconds * 1000));
@@ -141,13 +155,13 @@ export default class KeymasterClient implements KeymasterInterface {
             }
 
             if (!chatty && becomeChattyAfter > 0 && retries > becomeChattyAfter) {
-                console.log(`Connecting to Keymaster at ${this.API}`);
+                console.error(`Connecting to Keymaster at ${this.API}`);
                 chatty = true;
             }
         }
 
         if (chatty) {
-            console.log('Keymaster service is ready!');
+            console.error('Keymaster service is ready!');
         }
     }
 
@@ -851,6 +865,188 @@ export default class KeymasterClient implements KeymasterInterface {
         try {
             const response = await this.axios.post(`${this.API}/lightning/payments`, { id: name });
             return response.data.payments;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    // Cashu
+
+    async addCashu(name?: string): Promise<CashuMintInfo> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu`, { id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeCashu(force?: boolean, name?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/cashu`, { data: { force, id: name } });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async addCashuMint(url: string, name?: string): Promise<CashuMintInfo> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/mints`, { url, id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async removeCashuMint(url: string, force?: boolean, name?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.delete(`${this.API}/cashu/mints`, { data: { url, force, id: name } });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listCashuMints(name?: string): Promise<CashuMintInfo[]> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/mints/list`, { id: name });
+            return response.data.mints;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async publishCashu(name?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/publish`, { id: name });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async unpublishCashu(name?: string): Promise<boolean> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/unpublish`, { id: name });
+            return response.data.ok;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async getCashuBalance(mint?: string, name?: string): Promise<CashuBalance> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/balance`, { mint, id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async createCashuMintQuote(amount: number, mint?: string, name?: string): Promise<CashuMintQuote> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/quote`, { amount, mint, id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async claimCashuMintQuote(quoteId: string, mint?: string, name?: string): Promise<CashuClaimResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/claim`, { quote: quoteId, mint, id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listCashuQuotes(mint?: string, name?: string): Promise<CashuQuoteRecord[]> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/quotes`, { mint, id: name });
+            return response.data.quotes;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async meltCashu(bolt11: string, mint?: string, name?: string): Promise<CashuMeltResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/melt`, { bolt11, mint, id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async sendCashu(amount: number, mint?: string, name?: string): Promise<CashuSendResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/send`, { amount, mint, id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async receiveCashu(token: string, name?: string): Promise<CashuReceiveResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/receive`, { token, id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async checkCashu(mint?: string, name?: string): Promise<CashuCheckResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/check`, { mint, id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async restoreCashu(mint?: string, name?: string): Promise<CashuRestoreResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/restore`, { mint, id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listCashuSends(mint?: string, name?: string): Promise<CashuSendRecord[]> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/sends`, { mint, id: name });
+            return response.data.sends;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async reclaimCashu(operationId: string, name?: string): Promise<CashuReclaimResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/reclaim`, { operationId, id: name });
+            return response.data;
         }
         catch (error) {
             throwError(error);

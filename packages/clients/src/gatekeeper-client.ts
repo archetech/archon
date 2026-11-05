@@ -112,13 +112,15 @@ export default class GatekeeperClient implements GatekeeperInterface {
         }
     }
 
+    // Diagnostics go to stderr: a CLI's stdout is its output, which may be a token or
+    // JSON that something is reading.
     async waitUntilReady(options: GatekeeperClientOptions) {
         let { intervalSeconds = 5, chatty = false, becomeChattyAfter = 0, maxRetries = 0 } = options;
         let ready = false;
         let retries = 0;
 
         if (chatty) {
-            console.log(`Connecting to gatekeeper at ${this.API}`);
+            console.error(`Connecting to gatekeeper at ${this.API}`);
         }
 
         while (!ready) {
@@ -126,7 +128,7 @@ export default class GatekeeperClient implements GatekeeperInterface {
 
             if (!ready) {
                 if (chatty) {
-                    console.log('Waiting for Gatekeeper to be ready...');
+                    console.error('Waiting for Gatekeeper to be ready...');
                 }
                 // wait for 1 second before checking again
                 await new Promise(resolve => setTimeout(resolve, intervalSeconds * 1000));
@@ -139,13 +141,13 @@ export default class GatekeeperClient implements GatekeeperInterface {
             }
 
             if (!chatty && becomeChattyAfter > 0 && retries > becomeChattyAfter) {
-                console.log(`Connecting to gatekeeper at ${this.API}`);
+                console.error(`Connecting to gatekeeper at ${this.API}`);
                 chatty = true;
             }
         }
 
         if (chatty) {
-            console.log('Gatekeeper service is ready!');
+            console.error('Gatekeeper service is ready!');
         }
     }
 

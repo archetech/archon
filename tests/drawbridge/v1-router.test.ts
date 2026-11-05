@@ -280,6 +280,21 @@ describe('drawbridge v1 gatekeeper proxy routes', () => {
         expect(gatekeeper.addJSON).toHaveBeenCalled();
     });
 
+    // Gatekeeper answers with the bare CID. A client reading the body as text, as the
+    // Python Keymaster does, would otherwise store the quotes as part of the CID.
+    it('answers IPFS writes with the bare CID, as Gatekeeper does', async () => {
+        const { app } = mount();
+
+        const json = await request(app).post('/api/v1/ipfs/json').send({ a: 1 });
+        expect(json.text).toBe('cid-json');
+
+        const text = await request(app).post('/api/v1/ipfs/text').set('Content-Type', 'text/plain').send('hello');
+        expect(text.text).toBe('cid-text');
+
+        const data = await request(app).post('/api/v1/ipfs/data').set('Content-Type', 'application/octet-stream').send(Buffer.from('bytes'));
+        expect(data.text).toBe('cid-data');
+    });
+
     it('writes text, binary, and streamed payloads upstream', async () => {
         const { app, gatekeeper } = mount();
 
@@ -471,7 +486,7 @@ describe('Drawbridge internal L402 exemption', () => {
         const call = request(app)[method](path).set('X-Archon-Admin-Key', adminKey);
         const response = await (body ? call.send(body) : call);
         expect(response.status).toBe(200);
-        expect(response.body).toEqual(expected);
+        expect(path.includes('/ipfs/') ? response.text : response.body).toEqual(expected);
         expect(gatekeeper[upstream]).toHaveBeenCalledTimes(1);
         expect(onAdminBypass).toHaveBeenCalledTimes(1);
     });

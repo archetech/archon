@@ -15,6 +15,7 @@ import {
     CashuTokenSpentError,
     CashuUnavailableError,
 } from '@didcid/common/errors';
+import { signedInvoice } from '../cli/helpers.ts';
 import { getEncodedToken } from '@cashu/cashu-ts';
 import { CashuWallet, normalizeMintUrl, proofY, splitAmount } from '../../packages/keymaster/src/cashu.ts';
 import { FakeMint } from './cashu-fake-mint.ts';
@@ -159,6 +160,21 @@ describe('minting', () => {
     beforeEach(async () => {
         await setup();
         await keymaster.addCashu();
+    });
+
+    // A quote's invoice comes from the mint and may be paid automatically, so an
+    // outside mint must not be able to ask for more than the wallet asked for.
+    it.each([
+        ['more than asked', () => signedInvoice(10000)],
+        ['less than asked', () => signedInvoice(20)],
+        ['no amount', () => signedInvoice()],
+        ['something that is not an invoice', () => 'lnbc-garbage'],
+    ])('refuses a quote whose invoice is for %s', async (_case, invoice) => {
+        mint.invoiceFor = invoice;
+
+        await expect(keymaster.createCashuMintQuote(21)).rejects.toThrow(CashuMintUnsupportedError);
+
+        expect(await keymaster.listCashuQuotes()).toEqual([]);
     });
 
     it('claims a paid quote with a NUT-20 signature and credits the balance', async () => {

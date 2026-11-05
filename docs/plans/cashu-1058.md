@@ -287,6 +287,10 @@ when the identity has it, else the identity's only mint, else an error.
 `getCashuBalance` with no mint and an identity using several returns a total and
 a per-mint breakdown instead of failing.
 
+`createCashuMintQuote` refuses a quote whose invoice is not for exactly the amount
+requested, since the mint chooses the invoice and the quote's own amount only echoes
+the request.
+
 A wallet with Lightning funds the quote with `payLightningInvoice`; the CLI and UI
 offer that in one step. `receiveCashu` always swaps at the mint, since a token is
 not received until the mint confirms its proofs are unspent.

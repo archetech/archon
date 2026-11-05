@@ -667,6 +667,26 @@ export interface KeymasterInterface {
     zapLightning(id: string, amount: number, memo?: string, name?: string): Promise<LightningPayment>;
     getLightningPayments(name?: string): Promise<LightningPaymentRecord[]>;
 
+    // Cashu
+    addCashu(name?: string): Promise<CashuMintInfo>;
+    removeCashu(force?: boolean, name?: string): Promise<boolean>;
+    addCashuMint(url: string, name?: string): Promise<CashuMintInfo>;
+    removeCashuMint(url: string, force?: boolean, name?: string): Promise<boolean>;
+    listCashuMints(name?: string): Promise<CashuMintInfo[]>;
+    publishCashu(name?: string): Promise<boolean>;
+    unpublishCashu(name?: string): Promise<boolean>;
+    getCashuBalance(mint?: string, name?: string): Promise<CashuBalance>;
+    createCashuMintQuote(amount: number, mint?: string, name?: string): Promise<CashuMintQuote>;
+    claimCashuMintQuote(quoteId: string, mint?: string, name?: string): Promise<CashuClaimResult>;
+    listCashuQuotes(mint?: string, name?: string): Promise<CashuQuoteRecord[]>;
+    meltCashu(bolt11: string, mint?: string, name?: string): Promise<CashuMeltResult>;
+    sendCashu(amount: number, mint?: string, name?: string): Promise<CashuSendResult>;
+    receiveCashu(token: string, name?: string): Promise<CashuReceiveResult>;
+    checkCashu(mint?: string, name?: string): Promise<CashuCheckResult>;
+    restoreCashu(mint?: string, name?: string): Promise<CashuRestoreResult>;
+    listCashuSends(mint?: string, name?: string): Promise<CashuSendRecord[]>;
+    reclaimCashu(operationId: string, name?: string): Promise<CashuReclaimResult>;
+
     // DIDs
     checkDID(did: string): Promise<CheckDIDResult>;
     repairDID(did: string): Promise<RepairDIDResult>;

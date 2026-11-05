@@ -41,6 +41,11 @@ describe('mcp server CLI parity', () => {
             archon_reveal_poll: { poll: 'did:cid:poll' },
             archon_lightning_pay: { bolt11: 'lnbc...' },
             archon_lightning_zap: { recipient: 'alice@example.com', amount: 1 },
+            archon_remove_cashu: {},
+            archon_remove_cashu_mint: { url: 'https://mint.example' },
+            archon_cashu_melt: { bolt11: 'lnbc...' },
+            archon_cashu_send: { amount: 1 },
+            archon_cashu_reclaim: { operationId: 'op' },
         };
 
         for (const [toolName, args] of Object.entries(guardedInputs)) {

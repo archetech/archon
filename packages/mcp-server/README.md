@@ -64,7 +64,7 @@ CLI file commands use inline data instead of arbitrary local paths. Binary/text 
 
 Use `"encoding": "utf8"` when passing plain text directly. This inline shape is for tool *arguments* only — MCP defines content blocks for results, not arguments, and file paths aren't usable in an MCP server context. No tool *returns* this shape; returned binary data uses MCP content blocks — see [Tool results](#tool-results).
 
-Destructive tools require `"confirm": true`, secret-revealing tools require `"reveal": true`, and Lightning payment/broadcast tools require `"confirmPayment": true`.
+Destructive tools require `"confirm": true`, secret-revealing tools require `"reveal": true`, and Lightning payment/broadcast tools and the Cashu tools that spend ecash require `"confirmPayment": true`.
 
 Use `archon_check_did` with `{ "did": "Alice" }` to inspect a DID or wallet alias.
 Apply a supported repair explicitly with `archon_repair_did` and
@@ -385,6 +385,24 @@ Pay a Lightning invoice:
 | `unpublish-lightning` | `archon_unpublish_lightning` |
 | `lightning-zap` | `archon_lightning_zap` |
 | `lightning-payments` | `archon_lightning_payments` |
+| `add-cashu` | `archon_add_cashu` |
+| `remove-cashu` | `archon_remove_cashu` |
+| `add-cashu-mint` | `archon_add_cashu_mint` |
+| `remove-cashu-mint` | `archon_remove_cashu_mint` |
+| `list-cashu-mints` | `archon_list_cashu_mints` |
+| `publish-cashu` | `archon_publish_cashu` |
+| `unpublish-cashu` | `archon_unpublish_cashu` |
+| `cashu-balance` | `archon_cashu_balance` |
+| `cashu-mint` | `archon_cashu_mint` |
+| `cashu-claim` | `archon_cashu_claim` |
+| `cashu-quotes` | `archon_cashu_quotes` |
+| `cashu-melt` | `archon_cashu_melt` |
+| `cashu-send` | `archon_cashu_send` |
+| `cashu-receive` | `archon_cashu_receive` |
+| `cashu-check` | `archon_cashu_check` |
+| `cashu-restore` | `archon_cashu_restore` |
+| `cashu-sends` | `archon_cashu_sends` |
+| `cashu-reclaim` | `archon_cashu_reclaim` |
 | `create-group` | `archon_create_group` |
 | `list-groups` | `archon_list_groups` |
 | `get-group` | `archon_get_group` |

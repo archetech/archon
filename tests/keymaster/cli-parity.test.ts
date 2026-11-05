@@ -129,6 +129,29 @@ describe('CLI parity across entry points', () => {
         expect(mismatches).toEqual([]);
     });
 
+    it('gives the Cashu commands the same options in the Python CLI', () => {
+        const pythonOptions = (command: string) => {
+            const start = pythonCli.indexOf(`add("${command}"`);
+            const block = pythonCli.slice(start, pythonCli.indexOf('    sp = add(', start + 1));
+            return [...block.matchAll(/add_argument\((?:"-\w", )?"(--[a-z-]+)"/g)].map(match => match[1]).sort();
+        };
+        const commands = expected.filter(command => command.includes('cashu'));
+
+        expect(commands).toHaveLength(18);
+        for (const command of commands) {
+            const options = optionsFor(packageCli, command).map(option => option.split(' ')[0]);
+            expect({ command, options: pythonOptions(command) }).toEqual({ command, options });
+        }
+    });
+
+    it('runs the same Cashu handlers in both JS CLIs', () => {
+        const withoutTypes = (block: string) => block.replace(/error: any/g, 'error').replace(/\n\s*\n/g, '\n').trimEnd();
+
+        for (const command of expected.filter(name => name.includes('cashu'))) {
+            expect(withoutTypes(commandBlock(packageCli, command))).toBe(withoutTypes(commandBlock(scriptCli, command)));
+        }
+    });
+
     it('does not let a script-only command quietly become a general exception', () => {
         // If a SCRIPT_ONLY command ever does appear in the other CLIs, the
         // exception is stale and should be deleted rather than left to hide drift.

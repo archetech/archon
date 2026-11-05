@@ -20,7 +20,7 @@ from keymaster import (
 from keymaster.cashu import normalize_mint_url, split_amount
 from keymaster.cashu_crypto import decode_token, encode_token, proof_y, resolve_keyset_ids
 
-from .cashu_fake_mint import FakeMint
+from .cashu_fake_mint import FakeMint, signed_invoice
 from .helpers import FakeWalletStore, make_testbed, run
 
 PUBLIC_URL = "https://mint.example/cashu"
@@ -166,6 +166,26 @@ class TestEnabling:
 
 
 class TestMinting:
+    # A quote's invoice comes from the mint and may be paid automatically, so an
+    # outside mint must not be able to ask for more than the wallet asked for.
+    @pytest.mark.parametrize(
+        "invoice",
+        [
+            lambda _amount: signed_invoice(10000),
+            lambda _amount: signed_invoice(20),
+            lambda _amount: signed_invoice(),
+            lambda _amount: "lnbc-garbage",
+        ],
+        ids=["more than asked", "less than asked", "no amount", "not an invoice"],
+    )
+    def test_refuses_a_quote_whose_invoice_differs(self, bed, invoice) -> None:
+        bed.mint.invoice_for = invoice
+
+        with pytest.raises(CashuMintUnsupportedError):
+            run(bed.keymaster.create_cashu_mint_quote(21))
+
+        assert run(bed.keymaster.list_cashu_quotes()) == []
+
     @pytest.fixture(autouse=True)
     def enabled(self, bed):
         run(bed.keymaster.add_cashu())
