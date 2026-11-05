@@ -27,6 +27,7 @@ dependencies = [
   "bip-utils==2.9.3",
   "bitstring==4.4.0",
   "bolt11==2.2.0",
+  "cbor2==5.9.0",
   "coincurve==21.0.0",
   "cryptography==50.0.0",
   "python-dotenv==1.2.3",

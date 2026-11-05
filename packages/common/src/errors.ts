@@ -66,6 +66,70 @@ export class LightningUnavailableError extends ArchonError {
     }
 }
 
+export class CashuNotConfiguredError extends ArchonError {
+    static type = 'Cashu not configured';
+
+    constructor(detail?: string) {
+        super(CashuNotConfiguredError.type, detail);
+    }
+}
+
+export class CashuUnavailableError extends ArchonError {
+    static type = 'Cashu mint unavailable';
+
+    constructor(detail?: string) {
+        super(CashuUnavailableError.type, detail);
+    }
+}
+
+export class CashuMintNotAddedError extends ArchonError {
+    static type = 'Cashu mint not added';
+
+    constructor(detail?: string) {
+        super(CashuMintNotAddedError.type, detail);
+    }
+}
+
+export class CashuMintUnsupportedError extends ArchonError {
+    static type = 'Cashu mint unsupported';
+
+    constructor(detail?: string) {
+        super(CashuMintUnsupportedError.type, detail);
+    }
+}
+
+export class CashuInsufficientFundsError extends ArchonError {
+    static type = 'Insufficient ecash';
+
+    constructor(detail?: string) {
+        super(CashuInsufficientFundsError.type, detail);
+    }
+}
+
+export class CashuQuoteUnpaidError extends ArchonError {
+    static type = 'Cashu quote not paid';
+
+    constructor(detail?: string) {
+        super(CashuQuoteUnpaidError.type, detail);
+    }
+}
+
+export class CashuTokenSpentError extends ArchonError {
+    static type = 'Cashu token already spent';
+
+    constructor(detail?: string) {
+        super(CashuTokenSpentError.type, detail);
+    }
+}
+
+export class CashuStateError extends ArchonError {
+    static type = 'Cashu state present';
+
+    constructor(detail?: string) {
+        super(CashuStateError.type, detail);
+    }
+}
+
 export class WalletNotFoundError extends ArchonError {
     static type = 'Wallet not found';
 

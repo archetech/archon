@@ -7,6 +7,9 @@ import {
     InvalidOperationError,
     InvalidParameterError,
     KeymasterError,
+    CashuInsufficientFundsError,
+    CashuStateError,
+    CashuUnavailableError,
     LightningNotConfiguredError,
     LightningUnavailableError,
     UnknownIDError,
@@ -23,6 +26,7 @@ describe('statusForError', () => {
 
     it('maps an unavailable upstream service to 503', () => {
         expect(statusForError(new LightningUnavailableError('x'))).toBe(503);
+        expect(statusForError(new CashuUnavailableError('x'))).toBe(503);
         expect(statusForError(new GatekeeperUnavailableError('x'))).toBe(503);
     });
 
@@ -36,6 +40,8 @@ describe('statusForError', () => {
         expect(statusForError(new InvalidOperationError('x'))).toBe(400);
         expect(statusForError(new KeymasterError('x'))).toBe(400);
         expect(statusForError(new LightningNotConfiguredError('x'))).toBe(400);
+        expect(statusForError(new CashuStateError('x'))).toBe(400);
+        expect(statusForError(new CashuInsufficientFundsError('x'))).toBe(400);
     });
 
     it('maps an unclassified error to 500', () => {

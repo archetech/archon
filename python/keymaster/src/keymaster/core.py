@@ -13,6 +13,8 @@ from urllib.parse import urlparse
 
 import httpx
 
+from .cashu import CashuStateError, CashuWallet, has_cashu_state
+from .errors import KeymasterError
 from .net import fetch_public_https, is_private_hostname
 from bolt11 import decode as decode_bolt11
 from cryptography.exceptions import InvalidTag
@@ -145,10 +147,6 @@ def _absolute_key_id(ref: Any, did: str) -> str | None:
     return f"{did}{ref}" if ref.startswith("#") else ref
 
 
-class KeymasterError(Exception):
-    pass
-
-
 class WalletNotFoundError(KeymasterError):
     """The wallet store is empty and this surface does not provision wallets."""
 
@@ -221,6 +219,7 @@ class Keymaster:
         self._wallet_cache: dict[str, Any] | None = None
         self._root_cache: _RootCache | None = None
         self._lock = asyncio.Lock()
+        self.cashu = CashuWallet(self)
         # Node capability manifest (<nodeURL>/api/v1/capabilities), fetched once and
         # memoized. _UNFETCHED until first read; None = node has no manifest (older
         # node / not a gateway) → callers proceed lazily rather than regress.
@@ -286,9 +285,12 @@ class Keymaster:
             return await self.new_wallet()
 
     async def save_wallet(self, wallet: dict[str, Any], overwrite: bool = True) -> bool:
-        decrypted = await self.decrypt_wallet(wallet)
-        upgraded = self._upgrade_wallet(decrypted)
-        return await self._save_loaded_wallet(upgraded, overwrite=overwrite)
+        # Under the lock, so a restore cannot land under a mutation working on its
+        # own copy of the wallet, as Cashu's do.
+        async with self._lock:
+            decrypted = await self.decrypt_wallet(wallet)
+            upgraded = self._upgrade_wallet(decrypted)
+            return await self._save_loaded_wallet(upgraded, overwrite=overwrite)
 
     async def new_wallet(self, mnemonic: str | None = None, overwrite: bool = False) -> dict[str, Any]:
         if not mnemonic:
@@ -299,21 +301,23 @@ class Keymaster:
         except Exception as exc:
             raise KeymasterError("Invalid parameter: mnemonic") from exc
 
-        wallet = {
-            "version": 2,
-            "seed": {"mnemonicEnc": encrypt_with_passphrase(mnemonic, self.passphrase)},
-            "counter": 0,
-            "ids": {},
-            "aliases": {},
-        }
-        # Warm for the save below, which would otherwise re-derive this root.
-        self._root_cache = _RootCache(root, bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
-        ok = await self.save_wallet(wallet, overwrite=overwrite)
-        if not ok:
-            raise KeymasterError("save wallet failed")
-        # save_wallet installed an upgraded copy as the cache; hand back that
-        # object, so a caller's edits are the ones load_wallet then sees.
-        return self._wallet_cache if self._wallet_cache is not None else wallet
+        # Encrypted in its turn, so the passphrase is the one current when it is saved.
+        async with self._lock:
+            wallet = {
+                "version": 2,
+                "seed": {"mnemonicEnc": encrypt_with_passphrase(mnemonic, self.passphrase)},
+                "counter": 0,
+                "ids": {},
+                "aliases": {},
+            }
+            # Warm for the save below, which would otherwise re-derive this root.
+            self._root_cache = _RootCache(root, bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
+            ok = await self._save_loaded_wallet(self._upgrade_wallet(wallet), overwrite=overwrite)
+            if not ok:
+                raise KeymasterError("save wallet failed")
+            # The save installed an upgraded copy as the cache; hand back that
+            # object, so a caller's edits are the ones load_wallet then sees.
+            return self._wallet_cache if self._wallet_cache is not None else wallet
 
     async def decrypt_wallet(self, stored: dict[str, Any]) -> dict[str, Any]:
         if "enc" not in stored:
@@ -347,18 +351,23 @@ class Keymaster:
         if not isinstance(new_passphrase, str) or not new_passphrase:
             raise KeymasterError("Invalid parameter: newPassphrase")
 
-        wallet = await self.load_wallet()
-        mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
-        wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, new_passphrase)
+        # Under the lock, so it cannot land under a mutation working on its own copy
+        # of the wallet, as Cashu's do.
+        async with self._lock:
+            wallet = deepcopy(await self.load_wallet())
+            mnemonic = decrypt_with_passphrase(wallet["seed"]["mnemonicEnc"], self.passphrase)
+            wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, new_passphrase)
 
-        self.passphrase = new_passphrase
-        self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
-        self._wallet_cache = wallet
+            self._root_cache = _RootCache(hd_root_from_mnemonic(mnemonic), bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
 
-        encrypted = await self.encrypt_wallet_for_storage(wallet)
-        ok = self.wallet_store.save_wallet(encrypted, overwrite=True)
-        if not ok:
-            raise KeymasterError("Failed to save wallet with new passphrase")
+            encrypted = await self.encrypt_wallet_for_storage(wallet)
+            ok = self.wallet_store.save_wallet(encrypted, overwrite=True)
+            if not ok:
+                raise KeymasterError("Failed to save wallet with new passphrase")
+
+            # Only now, together: a failed save leaves the old passphrase working.
+            self.passphrase = new_passphrase
+            self._wallet_cache = wallet
         return True
 
     async def export_encrypted_wallet(self) -> dict[str, Any]:
@@ -558,6 +567,8 @@ class Keymaster:
             wallet = await self.load_wallet()
             if name not in wallet["ids"]:
                 raise UnknownIDError("Unknown ID")
+            if has_cashu_state(wallet["ids"][name]):
+                raise CashuStateError(f"{name} holds ecash or open operations; use removeCashu with force first")
             del wallet["ids"][name]
             if wallet.get("current") == name:
                 wallet["current"] = next(iter(wallet["ids"].keys()), "")
@@ -740,6 +751,62 @@ class Keymaster:
         if not isinstance(config, dict):
             raise KeymasterError(f"No Lightning wallet configured for {id_info['did']} on {url}")
         return config
+
+    # Cashu, in cashu.py.
+
+    async def add_cashu(self, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.add_cashu(name)
+
+    async def remove_cashu(self, force: bool = False, name: str | None = None) -> bool:
+        return await self.cashu.remove_cashu(force, name)
+
+    async def add_cashu_mint(self, url: str, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.add_cashu_mint(url, name)
+
+    async def remove_cashu_mint(self, url: str, force: bool = False, name: str | None = None) -> bool:
+        return await self.cashu.remove_cashu_mint(url, force, name)
+
+    async def list_cashu_mints(self, name: str | None = None) -> list[dict[str, Any]]:
+        return await self.cashu.list_cashu_mints(name)
+
+    async def publish_cashu(self, name: str | None = None) -> bool:
+        return await self.cashu.publish_cashu(name)
+
+    async def unpublish_cashu(self, name: str | None = None) -> bool:
+        return await self.cashu.unpublish_cashu(name)
+
+    async def get_cashu_balance(self, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.get_cashu_balance(mint, name)
+
+    async def create_cashu_mint_quote(self, amount: int, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.create_cashu_mint_quote(amount, mint, name)
+
+    async def claim_cashu_mint_quote(self, quote: str, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.claim_cashu_mint_quote(quote, mint, name)
+
+    async def list_cashu_quotes(self, mint: str | None = None, name: str | None = None) -> list[dict[str, Any]]:
+        return await self.cashu.list_cashu_quotes(mint, name)
+
+    async def melt_cashu(self, bolt11: str, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.melt_cashu(bolt11, mint, name)
+
+    async def send_cashu(self, amount: int, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.send_cashu(amount, mint, name)
+
+    async def receive_cashu(self, token: str, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.receive_cashu(token, name)
+
+    async def check_cashu(self, mint: str | None = None, name: str | None = None) -> dict[str, int]:
+        return await self.cashu.check_cashu(mint, name)
+
+    async def restore_cashu(self, mint: str | None = None, name: str | None = None) -> dict[str, int]:
+        return await self.cashu.restore_cashu(mint, name)
+
+    async def list_cashu_sends(self, mint: str | None = None, name: str | None = None) -> list[dict[str, Any]]:
+        return await self.cashu.list_cashu_sends(mint, name)
+
+    async def reclaim_cashu(self, operation_id: str, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.reclaim_cashu(operation_id, name)
 
     async def add_lightning(self, name: str | None = None) -> dict[str, Any]:
         try:
@@ -2530,8 +2597,9 @@ class Keymaster:
 
         return {"checked": checked, "invalid": invalid, "deleted": deleted}
 
-    async def fix_wallet(self) -> dict[str, int]:
+    async def fix_wallet(self) -> dict[str, Any]:
         ids_removed = 0
+        ids_kept: list[str] = []
         owned_removed = 0
         held_removed = 0
         aliases_removed = 0
@@ -2543,6 +2611,10 @@ class Keymaster:
                     if doc.get("didDocumentMetadata", {}).get("deactivated"):
                         raise KeymasterError("deactivated")
                 except Exception:
+                    # Ecash is value that does not depend on the DID resolving.
+                    if has_cashu_state(wallet["ids"][name]):
+                        ids_kept.append(name)
+                        continue
                     del wallet["ids"][name]
                     ids_removed += 1
 
@@ -2579,6 +2651,7 @@ class Keymaster:
             "ownedRemoved": owned_removed,
             "heldRemoved": held_removed,
             "aliasesRemoved": aliases_removed,
+            **({"idsKept": ids_kept} if ids_kept else {}),
         }
 
     async def resolve_seed_bank(self) -> dict[str, Any]:
@@ -2673,11 +2746,12 @@ class Keymaster:
             return current_wallet
 
         wallet = json.loads(decrypt_message(keypair["privateJwk"], backup))
-        if isinstance(wallet, dict) and wallet.get("seed", {}).get("mnemonicEnc"):
-            mnemonic = await self.decrypt_mnemonic()
-            wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, self.passphrase)
 
         async with self._lock:
+            if isinstance(wallet, dict) and wallet.get("seed", {}).get("mnemonicEnc"):
+                mnemonic = await self.decrypt_mnemonic()
+                wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, self.passphrase)
+
             upgraded = self._upgrade_wallet(wallet)
             await self._save_loaded_wallet(upgraded, overwrite=True)
         return upgraded

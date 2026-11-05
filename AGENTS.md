@@ -313,4 +313,6 @@ These rules apply to coding agents working in this repository.
 - When simplifying Memeplex, keep attribution and publication-state rules in one protocol core; derive kind-specific counts and withdrawals from that state. Preserve agreed wire fields and grant policy, keep Memepool choices separate, and distinguish protocol changes from editorial restructuring.
 - Validate the whole proposal when asked for a protocol review, not only its latest fix commit.
 
+- Validate Cashu wallet changes against a real `cashubtc/mintd` with its fakewallet backend, in a throwaway container, as well as the in-process fake mints. Stale NUT-13 counters are detected from NUT-09, not an error code: cdk-mintd sends 20006 on mint and melt and 11008 on swap where NUT-00 lists 11003. Keep `packages/keymaster/src/cashu.ts` and `python/keymaster/src/keymaster/cashu.py` in step; both run on `tests/fixtures/cashu-*-vectors.json`.
+
 - Pushing a release tag runs the Android workflow, whose `softprops/action-gh-release` step uploads the APK to that tag's release and publishes any draft it finds (`draft` defaults to false). Draft GitHub release notes only after that run has finished, or the maintainer loses the chance to review them before they go public.

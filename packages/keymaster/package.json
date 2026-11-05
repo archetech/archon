@@ -168,6 +168,7 @@
   "author": "David McFadzean <davidmc@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "@cashu/cashu-ts": "4.13.0",
     "@didcid/cipher": "^0.6.0",
     "@didcid/clients": "^0.3.0",
     "@didcid/common": "^0.5.0",

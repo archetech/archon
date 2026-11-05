@@ -5,13 +5,14 @@ import hmac
 import json
 import logging
 import time
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
+from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from keymaster.cashu import CashuUnavailableError
 from keymaster.core import KeymasterError, UnknownIDError, WalletNotFoundError
 from keymaster.gatekeeper_client import GatekeeperTimeoutError, GatekeeperUnavailableError
 
@@ -127,6 +128,12 @@ async def keymaster_not_found_handler(_: Request, exc: KeymasterError):
 @app.exception_handler(KeymasterError)
 async def keymaster_bad_request_handler(_: Request, exc: KeymasterError):
     return JSONResponse(status_code=400, content={"error": str(exc)})
+
+
+# An unreachable mint is an upstream outage, as for Gatekeeper below.
+@app.exception_handler(CashuUnavailableError)
+async def cashu_unavailable_handler(_: Request, exc: CashuUnavailableError):
+    return JSONResponse(status_code=503, content={"error": str(exc)})
 
 
 @app.exception_handler(HTTPException)
@@ -401,6 +408,102 @@ async def export_nsec(body: dict[str, Any]) -> dict[str, str]:
 @protected_api.post("/nostr/sign")
 async def sign_nostr_event(body: dict[str, Any]) -> dict[str, Any]:
     return await service.sign_nostr_event(body["event"])
+
+
+# Most fields of these routes are optional, and so the body is. Required ones are
+# left to the wallet to validate, so a missing one is a 400 as in the TypeScript
+# service rather than a KeyError here.
+CashuBody = Annotated[dict[str, Any], Body(default_factory=dict)]
+
+
+@protected_api.post("/cashu")
+async def add_cashu(body: CashuBody) -> dict[str, Any]:
+    return await service.add_cashu(body.get("id"))
+
+
+@protected_api.delete("/cashu")
+async def remove_cashu(body: CashuBody) -> dict[str, bool]:
+    return {"ok": await service.remove_cashu(body.get("force"), body.get("id"))}
+
+
+@protected_api.post("/cashu/mints")
+async def add_cashu_mint(body: CashuBody) -> dict[str, Any]:
+    return await service.add_cashu_mint(body.get("url"), body.get("id"))
+
+
+@protected_api.delete("/cashu/mints")
+async def remove_cashu_mint(body: CashuBody) -> dict[str, bool]:
+    return {"ok": await service.remove_cashu_mint(body.get("url"), body.get("force"), body.get("id"))}
+
+
+@protected_api.post("/cashu/mints/list")
+async def list_cashu_mints(body: CashuBody) -> dict[str, Any]:
+    return {"mints": await service.list_cashu_mints(body.get("id"))}
+
+
+@protected_api.post("/cashu/publish")
+async def publish_cashu(body: CashuBody) -> dict[str, bool]:
+    return {"ok": await service.publish_cashu(body.get("id"))}
+
+
+@protected_api.post("/cashu/unpublish")
+async def unpublish_cashu(body: CashuBody) -> dict[str, bool]:
+    return {"ok": await service.unpublish_cashu(body.get("id"))}
+
+
+@protected_api.post("/cashu/balance")
+async def get_cashu_balance(body: CashuBody) -> dict[str, Any]:
+    return await service.get_cashu_balance(body.get("mint"), body.get("id"))
+
+
+@protected_api.post("/cashu/quote")
+async def create_cashu_mint_quote(body: CashuBody) -> dict[str, Any]:
+    return await service.create_cashu_mint_quote(body.get("amount"), body.get("mint"), body.get("id"))
+
+
+@protected_api.post("/cashu/claim")
+async def claim_cashu_mint_quote(body: CashuBody) -> dict[str, Any]:
+    return await service.claim_cashu_mint_quote(body.get("quote"), body.get("mint"), body.get("id"))
+
+
+@protected_api.post("/cashu/quotes")
+async def list_cashu_quotes(body: CashuBody) -> dict[str, Any]:
+    return {"quotes": await service.list_cashu_quotes(body.get("mint"), body.get("id"))}
+
+
+@protected_api.post("/cashu/melt")
+async def melt_cashu(body: CashuBody) -> dict[str, Any]:
+    return await service.melt_cashu(body.get("bolt11"), body.get("mint"), body.get("id"))
+
+
+@protected_api.post("/cashu/send")
+async def send_cashu(body: CashuBody) -> dict[str, Any]:
+    return await service.send_cashu(body.get("amount"), body.get("mint"), body.get("id"))
+
+
+@protected_api.post("/cashu/receive")
+async def receive_cashu(body: CashuBody) -> dict[str, Any]:
+    return await service.receive_cashu(body.get("token"), body.get("id"))
+
+
+@protected_api.post("/cashu/check")
+async def check_cashu(body: CashuBody) -> dict[str, Any]:
+    return await service.check_cashu(body.get("mint"), body.get("id"))
+
+
+@protected_api.post("/cashu/restore")
+async def restore_cashu(body: CashuBody) -> dict[str, Any]:
+    return await service.restore_cashu(body.get("mint"), body.get("id"))
+
+
+@protected_api.post("/cashu/sends")
+async def list_cashu_sends(body: CashuBody) -> dict[str, Any]:
+    return {"sends": await service.list_cashu_sends(body.get("mint"), body.get("id"))}
+
+
+@protected_api.post("/cashu/reclaim")
+async def reclaim_cashu(body: CashuBody) -> dict[str, Any]:
+    return await service.reclaim_cashu(body.get("operationId"), body.get("id"))
 
 
 @protected_api.post("/lightning")

@@ -2,6 +2,7 @@ import type express from 'express';
 import { GatekeeperTimeoutError, GatekeeperUnavailableError } from '@didcid/clients/gatekeeper';
 import {
     ArchonError,
+    CashuUnavailableError,
     LightningUnavailableError,
     UnknownIDError,
     WalletNotFoundError,
@@ -22,7 +23,7 @@ export function statusForError(error: unknown): number {
     if (error instanceof GatekeeperUnavailableError) {
         return 503;
     }
-    if (error instanceof LightningUnavailableError) {
+    if (error instanceof LightningUnavailableError || error instanceof CashuUnavailableError) {
         // An upstream service is down -- not the caller's fault, not this
         // node's bug either.
         return 503;

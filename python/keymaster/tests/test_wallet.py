@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from keymaster import Keymaster, KeymasterError
@@ -188,6 +190,42 @@ def test_change_passphrase_allows_reload_with_new_passphrase(testbed):
     )
     loaded = run(km2.load_wallet())
     assert "Bob" in loaded["ids"]
+
+
+def _during_rotation(keymaster, replace):
+    """Run ``replace`` once it is waiting behind a passphrase change in progress."""
+
+    async def scenario():
+        await keymaster._lock.acquire()
+        change = asyncio.create_task(keymaster.change_passphrase("rotated"))
+        await asyncio.sleep(0.01)
+        replacing = asyncio.create_task(replace())
+        await asyncio.sleep(0.01)
+        keymaster._lock.release()
+        await asyncio.gather(change, replacing)
+
+    run(scenario())
+
+
+def test_wallet_replaced_during_passphrase_change_uses_the_new_passphrase(testbed):
+    keymaster = testbed.keymaster
+    _during_rotation(keymaster, lambda: keymaster.new_wallet(overwrite=True))
+
+    fresh = Keymaster(gatekeeper=testbed.gatekeeper, wallet_store=testbed.wallet_store, passphrase="rotated")
+    assert run(fresh.decrypt_mnemonic()) == run(keymaster.decrypt_mnemonic())
+    assert run(fresh.load_wallet())["ids"] == {}
+
+
+def test_wallet_recovered_during_passphrase_change_uses_the_new_passphrase(testbed):
+    keymaster = testbed.keymaster
+    run(keymaster.create_id("Bob"))
+    backup_did = run(keymaster.backup_wallet())
+    run(keymaster.create_id("Carol"))
+    _during_rotation(keymaster, lambda: keymaster.recover_wallet(backup_did))
+
+    fresh = Keymaster(gatekeeper=testbed.gatekeeper, wallet_store=testbed.wallet_store, passphrase="rotated")
+    assert run(fresh.decrypt_mnemonic()) == run(keymaster.decrypt_mnemonic())
+    assert list(run(fresh.load_wallet())["ids"]) == ["Bob"]
 
 
 def test_change_passphrase_rejects_old_passphrase_after_rotation(testbed):

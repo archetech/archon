@@ -1,6 +1,8 @@
 import { attachedJson, issueCredentialMessage, type DidCommPlaintext } from './didcomm-protocols.js';
 import { proofsOf } from '@didcid/common/utils';
 import { isPrivateHostname, fetchPublicHttps } from '@didcid/common/net';
+import { CashuWallet, hasCashuState } from './cashu.js';
+import type { CashuHost } from './cashu.js';
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
@@ -15,6 +17,7 @@ import {
     KeymasterError,
     UnknownIDError,
     LightningNotConfiguredError,
+    CashuStateError,
     LightningUnavailableError,
     WalletNotFoundError,
 } from '@didcid/common/errors';
@@ -262,6 +265,8 @@ export default class Keymaster implements KeymasterInterface {
     private readonly ephemeralRegistry: string;
     private readonly maxAliasLength: number;
     private readonly maxDataLength: number;
+    private readonly cashu: CashuWallet;
+    private _mutations: Promise<unknown> = Promise.resolve();
     // Node capability manifest (`<nodeURL>/api/v1/capabilities`), fetched once and
     // memoized. `undefined` = not yet fetched; `null` = node has no manifest
     // (older node / not a gateway) → callers proceed lazily rather than regress.
@@ -301,35 +306,64 @@ export default class Keymaster implements KeymasterInterface {
         this.ephemeralRegistry = 'hyperswarm';
         this.maxAliasLength = options.maxAliasLength || 32;
         this.maxDataLength = 8 * 1024; // 8 KB max data to store in a JSON object
+        this.cashu = new CashuWallet({
+            gatekeeper: this.gatekeeper as unknown as CashuHost['gatekeeper'],
+            mutateWallet: mutator => this.mutateWallet(mutator),
+            loadWallet: () => this.loadWallet(),
+            fetchIdInfo: (name, wallet) => this.fetchIdInfo(name, wallet),
+            getSeed: wallet => this.getSeedFromCacheOrMnemonic(wallet),
+            getCapabilities: async () => (await this.getNodeCapabilities()) as Record<string, unknown> | null,
+            resolveDID: did => this.resolveDID(did),
+            updateDID: (did, doc) => this.updateDID(did, doc),
+        });
     }
 
     async listRegistries(): Promise<string[]> {
         return this.gatekeeper.listRegistries();
     }
 
-    private async mutateWallet(
+    // Whatever replaces the wallet takes its turn here, so nothing can change the
+    // passphrase or the wallet under a mutation working on its own copy. A mutator
+    // must not call anything that queues, which would wait on itself.
+    private enqueue<T>(work: () => Promise<T>): Promise<T> {
+        const queued = this._mutations.then(work, work);
+        this._mutations = queued.catch(() => {});
+        return queued;
+    }
+
+    // On a copy, published only once it is saved: a mutator that throws or a write
+    // that fails leaves the wallet as it was. Cashu depends on this, since a journal
+    // record visible in the cache but not on disk could be submitted and then lost.
+    private mutateWallet(
         mutator: (wallet: WalletFile) => void | Promise<void>
     ): Promise<void> {
-        // Make sure _walletCache is set; refuses if there is no wallet to load
-        if (!this._walletCache) {
-            await this.loadWallet();
-        }
-
-        await this.db.updateWallet(async (stored: StoredWallet) => {
-            const decrypted = this._walletCache!;
-
-            const before = JSON.stringify(decrypted);
-            await mutator(decrypted);
-            const after = JSON.stringify(decrypted);
-
-            if (before === after) {
-                return;
+        return this.enqueue(async () => {
+            // Make sure _walletCache is set; refuses if there is no wallet to load
+            if (!this._walletCache) {
+                await this.loadWallet();
             }
 
-            const reenc = await this.encryptWalletForStorage(decrypted);
-            Object.assign(stored as WalletEncFile, reenc);
+            let saved: WalletFile | undefined;
 
-            this._walletCache = decrypted;
+            await this.db.updateWallet(async (stored: StoredWallet) => {
+                const before = JSON.stringify(this._walletCache);
+                const decrypted: WalletFile = JSON.parse(before);
+
+                await mutator(decrypted);
+                const after = JSON.stringify(decrypted);
+
+                if (before === after) {
+                    return;
+                }
+
+                const reenc = await this.encryptWalletForStorage(decrypted);
+                Object.assign(stored as WalletEncFile, reenc);
+                saved = decrypted;
+            });
+
+            if (saved) {
+                this._walletCache = saved;
+            }
         });
     }
 
@@ -381,6 +415,13 @@ export default class Keymaster implements KeymasterInterface {
         wallet: StoredWallet,
         overwrite = true
     ): Promise<boolean> {
+        return this.enqueue(() => this.storeWallet(wallet, overwrite));
+    }
+
+    private async storeWallet(
+        wallet: StoredWallet,
+        overwrite: boolean
+    ): Promise<boolean> {
         // Decrypt if encrypted to verify passphrase and get decrypted form
         const decrypted = await this.decryptWallet(wallet);
         const upgraded: WalletFile = await this.upgradeWallet(decrypted);
@@ -397,34 +438,35 @@ export default class Keymaster implements KeymasterInterface {
         mnemonic?: string,
         overwrite = false
     ): Promise<WalletFile> {
+        let phrase: string;
         let hdkey: any;
 
         try {
-            if (!mnemonic) {
-                mnemonic = this.cipher.generateMnemonic();
-            }
-
-            hdkey = this.cipher.generateHDKey(mnemonic);
+            phrase = mnemonic || this.cipher.generateMnemonic();
+            hdkey = this.cipher.generateHDKey(phrase);
         } catch (error) {
             throw new InvalidParameterError('mnemonic');
         }
 
-        const mnemonicEnc = await encryptWithPassphrase(mnemonic, this.passphrase);
-        const wallet: WalletFile = {
-            version: 2,
-            seed: { mnemonicEnc },
-            counter: 0,
-            ids: {}
-        };
-        // Warm for the save below, which would otherwise re-derive this key.
-        this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(mnemonic), id: this.hdkeyCacheId(wallet.seed) };
+        // Encrypted in its turn, so the passphrase is the one current when it is saved.
+        return this.enqueue(async () => {
+            const mnemonicEnc = await encryptWithPassphrase(phrase, this.passphrase);
+            const wallet: WalletFile = {
+                version: 2,
+                seed: { mnemonicEnc },
+                counter: 0,
+                ids: {}
+            };
+            // Warm for the save below, which would otherwise re-derive this key.
+            this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(phrase), id: this.hdkeyCacheId(wallet.seed) };
 
-        const ok = await this.saveWallet(wallet, overwrite)
-        if (!ok) {
-            throw new KeymasterError('save wallet failed');
-        }
+            const ok = await this.storeWallet(wallet, overwrite);
+            if (!ok) {
+                throw new KeymasterError('save wallet failed');
+            }
 
-        return wallet;
+            return wallet;
+        });
     }
 
     async decryptMnemonic(): Promise<string> {
@@ -441,28 +483,30 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('newPassphrase');
         }
 
-        const wallet = await this.loadWallet();
-        const mnemonic = await decryptWithPassphrase(wallet.seed.mnemonicEnc!, this.passphrase);
-        const mnemonicEnc = await encryptWithPassphrase(mnemonic, newPassphrase);
+        return this.enqueue(async () => {
+            const wallet: WalletFile = JSON.parse(JSON.stringify(await this.loadWallet()));
+            const mnemonic = await decryptWithPassphrase(wallet.seed.mnemonicEnc!, this.passphrase);
+            wallet.seed.mnemonicEnc = await encryptWithPassphrase(mnemonic, newPassphrase);
 
-        wallet.seed.mnemonicEnc = mnemonicEnc;
-        this.passphrase = newPassphrase;
-        this._walletCache = wallet;
-        // Rotation re-encrypts the same mnemonic, so the HD key is unchanged.
-        // Derive it rather than adopt whatever the cache holds, so the new
-        // identity cannot be attached to another wallet's key; the re-encrypt
-        // below then reuses this entry instead of re-deriving.
-        const hdkey = this.cipher.generateHDKey(mnemonic);
-        this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(mnemonic), id: this.hdkeyCacheId(wallet.seed) };
+            // Rotation re-encrypts the same mnemonic, so the HD key is unchanged.
+            // Derive it rather than adopt whatever the cache holds, so the new
+            // identity cannot be attached to another wallet's key; the re-encrypt
+            // below then reuses this entry instead of re-deriving.
+            const hdkey = this.cipher.generateHDKey(mnemonic);
+            this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(mnemonic), id: this.hdkeyCacheId(wallet.seed) };
 
-        const encrypted = await this.encryptWalletForStorage(wallet);
-        const ok = await this.db.saveWallet(encrypted, true);
+            const encrypted = await this.encryptWalletForStorage(wallet);
+            const ok = await this.db.saveWallet(encrypted, true);
 
-        if (!ok) {
-            throw new KeymasterError('Failed to save wallet with new passphrase');
-        }
+            if (!ok) {
+                throw new KeymasterError('Failed to save wallet with new passphrase');
+            }
 
-        return true;
+            // Only now, together: a failed save leaves the old passphrase working.
+            this.passphrase = newPassphrase;
+            this._walletCache = wallet;
+            return true;
+        });
     }
 
     async checkWallet(): Promise<CheckWalletResult> {
@@ -551,6 +595,7 @@ export default class Keymaster implements KeymasterInterface {
         let ownedRemoved = 0;
         let heldRemoved = 0;
         let aliasesRemoved = 0;
+        const idsKept: string[] = [];
 
         await this.mutateWallet(async (wallet) => {
 
@@ -567,6 +612,10 @@ export default class Keymaster implements KeymasterInterface {
                 }
 
                 if (remove) {
+                    if (hasCashuState(wallet.ids[name])) {
+                        idsKept.push(name);
+                        continue;
+                    }
                     delete wallet.ids[name];
                     idsRemoved++;
                 }
@@ -637,7 +686,7 @@ export default class Keymaster implements KeymasterInterface {
             }
         });
 
-        return { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved };
+        return { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved, ...(idsKept.length > 0 && { idsKept }) };
     }
 
     async resolveSeedBank(): Promise<DidCidDocument> {
@@ -767,13 +816,13 @@ export default class Keymaster implements KeymasterInterface {
             const backup = this.cipher.decryptMessage(keypair.privateJwk, castData.backup, keypair.publicJwk);
             let wallet = JSON.parse(backup);
 
-            if (isWalletFile(wallet)) {
-                const mnemonic = await this.decryptMnemonic();
-                // Backup might have a different mnemonic passphase so re-encrypt
-                wallet.seed.mnemonicEnc = await encryptWithPassphrase(mnemonic, this.passphrase);
-            }
-
             await this.mutateWallet(async (current) => {
+                if (isWalletFile(wallet)) {
+                    const mnemonic = await this.decryptMnemonic();
+                    // Backup might have a different mnemonic passphase so re-encrypt
+                    wallet.seed.mnemonicEnc = await encryptWithPassphrase(mnemonic, this.passphrase);
+                }
+
                 // Clear all existing properties from the current wallet
                 // This ensures a clean slate before restoring the recovered wallet
                 for (const k in current) {
@@ -2255,6 +2304,11 @@ export default class Keymaster implements KeymasterInterface {
         await this.mutateWallet((wallet) => {
             if (!(name in wallet.ids)) {
                 throw new UnknownIDError();
+            }
+            // Its proofs are the funds themselves, and its journal the only
+            // record of paid quotes and outstanding tokens.
+            if (hasCashuState(wallet.ids[name])) {
+                throw new CashuStateError(`${name} holds ecash or open Cashu operations`);
             }
             delete wallet.ids[name];
             if (wallet.current === name) {
@@ -3988,6 +4042,27 @@ export default class Keymaster implements KeymasterInterface {
         }
         return config;
     }
+
+    // Cashu methods (see cashu.ts)
+
+    addCashu(name?: string) { return this.cashu.addCashu(name); }
+    removeCashu(force?: boolean, name?: string) { return this.cashu.removeCashu(force, name); }
+    addCashuMint(url: string, name?: string) { return this.cashu.addCashuMint(url, name); }
+    removeCashuMint(url: string, force?: boolean, name?: string) { return this.cashu.removeCashuMint(url, force, name); }
+    listCashuMints(name?: string) { return this.cashu.listCashuMints(name); }
+    publishCashu(name?: string) { return this.cashu.publishCashu(name); }
+    unpublishCashu(name?: string) { return this.cashu.unpublishCashu(name); }
+    getCashuBalance(mint?: string, name?: string) { return this.cashu.getCashuBalance(mint, name); }
+    createCashuMintQuote(amount: number, mint?: string, name?: string) { return this.cashu.createCashuMintQuote(amount, mint, name); }
+    claimCashuMintQuote(quoteId: string, mint?: string, name?: string) { return this.cashu.claimCashuMintQuote(quoteId, mint, name); }
+    listCashuQuotes(mint?: string, name?: string) { return this.cashu.listCashuQuotes(mint, name); }
+    meltCashu(bolt11: string, mint?: string, name?: string) { return this.cashu.meltCashu(bolt11, mint, name); }
+    sendCashu(amount: number, mint?: string, name?: string) { return this.cashu.sendCashu(amount, mint, name); }
+    receiveCashu(token: string, name?: string) { return this.cashu.receiveCashu(token, name); }
+    checkCashu(mint?: string, name?: string) { return this.cashu.checkCashu(mint, name); }
+    restoreCashu(mint?: string, name?: string) { return this.cashu.restoreCashu(mint, name); }
+    listCashuSends(mint?: string, name?: string) { return this.cashu.listCashuSends(mint, name); }
+    reclaimCashu(operationId: string, name?: string) { return this.cashu.reclaimCashu(operationId, name); }
 
     // Lightning methods
 

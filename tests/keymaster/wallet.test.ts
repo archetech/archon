@@ -380,6 +380,77 @@ describe('changePassphrase', () => {
         await keymaster.loadOrCreateWallet();
     });
 
+    it('waits for a wallet mutation in flight, which keeps its result', async () => {
+        await keymaster.loadOrCreateWallet();
+        await keymaster.createId('Alice');
+        const before = (await keymaster.loadWallet()).ids.Alice.index;
+        const update = keymaster.updateDID.bind(keymaster);
+        let change: Promise<boolean> | undefined;
+        keymaster.updateDID = async (...args: Parameters<typeof update>) => {
+            change = keymaster.changePassphrase('rotated');
+            await new Promise(resolve => setTimeout(resolve, 20));
+            return update(...args);
+        };
+
+        await expect(keymaster.rotateKeys()).resolves.toBe(true);
+        await expect(change).resolves.toBe(true);
+
+        const fresh = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'rotated' });
+        expect((await fresh.loadWallet()).ids.Alice.index).toBe(before + 1);
+    });
+
+    it('encrypts a wallet replaced during the change under the new passphrase', async () => {
+        const change = keymaster.changePassphrase('rotated');
+        const replaced = keymaster.newWallet(undefined, true);
+        await Promise.all([change, replaced]);
+
+        const fresh = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'rotated' });
+        expect(await fresh.decryptMnemonic()).toBe(await keymaster.decryptMnemonic());
+        expect((await fresh.loadWallet()).ids).toEqual({});
+    });
+
+    it('encrypts a wallet recovered during the change under the new passphrase', async () => {
+        await keymaster.createId('Alice');
+        const backup = await keymaster.backupWallet();
+        await keymaster.createId('Bob');
+
+        // Rotate once recovery has read the backup, and keep the save pending long
+        // enough for recovery to reach the passphrase while it is still the old one.
+        const resolveAsset = keymaster.resolveAsset.bind(keymaster);
+        const save = wallet.saveWallet.bind(wallet);
+        let change: Promise<boolean> | undefined;
+        keymaster.resolveAsset = async (...args: Parameters<typeof resolveAsset>) => {
+            const asset = await resolveAsset(...args);
+            wallet.saveWallet = async (...saved: Parameters<typeof save>) => {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                return save(...saved);
+            };
+            change = keymaster.changePassphrase('rotated');
+            return asset;
+        };
+
+        await keymaster.recoverWallet(backup);
+        await change;
+
+        const fresh = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'rotated' });
+        expect(await fresh.decryptMnemonic()).toBe(await keymaster.decryptMnemonic());
+        expect(Object.keys((await fresh.loadWallet()).ids)).toEqual(['Alice']);
+    });
+
+    it('changes nothing when the new passphrase cannot be saved', async () => {
+        await keymaster.loadOrCreateWallet();
+        await keymaster.createId('Alice');
+        const save = wallet.saveWallet.bind(wallet);
+        wallet.saveWallet = async () => { throw new Error('disk full'); };
+
+        await expect(keymaster.changePassphrase('rotated')).rejects.toThrow('disk full');
+        wallet.saveWallet = save;
+
+        await keymaster.createId('Bob');
+        const fresh = new Keymaster({ gatekeeper, wallet, cipher, passphrase: PASSPHRASE });
+        expect(Object.keys((await fresh.loadWallet()).ids)).toEqual(['Alice', 'Bob']);
+    });
+
     it('should re-encrypt wallet with new passphrase', async () => {
         const did = await keymaster.createId('Bob');
         const mnemonicBefore = await keymaster.decryptMnemonic();
