@@ -95,10 +95,7 @@ describe('cashu', () => {
 
     test('cashu-restore recovers ecash from the seed', async () => {
         await fund(50);
-        const mnemonic = await archon('show-mnemonic');
-
-        await archon('import-wallet', mnemonic);
-        await archon('create-id', '-r', 'local', 'alice');
+        await archon('remove-cashu', '--force');
         await archon('add-cashu');
         expect(await balance()).toMatchObject({ spendable: 0 });
 

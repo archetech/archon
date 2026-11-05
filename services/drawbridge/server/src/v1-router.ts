@@ -185,7 +185,7 @@ export function createV1Router(options: CreateV1RouterOptions): express.Router {
     v1router.post('/ipfs/json', ...authMiddleware, async (req, res) => {
         try {
             const result = await gatekeeper.addJSON(req.body);
-            res.json(result);
+            res.send(result);
         } catch (error: any) {
             logger.error({ err: error }, 'Gatekeeper proxy error');
             res.status(502).json({ error: 'Upstream gatekeeper error' });
@@ -205,7 +205,7 @@ export function createV1Router(options: CreateV1RouterOptions): express.Router {
     v1router.post('/ipfs/text', ...authMiddleware, async (req, res) => {
         try {
             const result = await gatekeeper.addText(req.body);
-            res.json(result);
+            res.send(result);
         } catch (error: any) {
             logger.error({ err: error }, 'Gatekeeper proxy error');
             res.status(502).json({ error: 'Upstream gatekeeper error' });
@@ -225,7 +225,7 @@ export function createV1Router(options: CreateV1RouterOptions): express.Router {
     v1router.post('/ipfs/data', ...authMiddleware, async (req, res) => {
         try {
             const result = await gatekeeper.addData(req.body);
-            res.json(result);
+            res.send(result);
         } catch (error: any) {
             logger.error({ err: error }, 'Gatekeeper proxy error');
             res.status(502).json({ error: 'Upstream gatekeeper error' });
