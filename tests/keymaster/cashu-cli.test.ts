@@ -22,6 +22,7 @@ let url: string;
 let cwd: string;
 let routes: Record<string, Handler>;
 let requests: { path: string, body: any }[];
+let notReady: number;
 
 beforeAll(async () => {
     // Away from the repo, so a developer's .env cannot reach the command.
@@ -34,7 +35,7 @@ beforeAll(async () => {
             const body = raw ? JSON.parse(raw) : {};
             let reply: Reply;
             if (route === '/ready') {
-                reply = { body: { ready: true } };
+                reply = { body: { ready: --notReady < 0 } };
             }
             else if (routes[route]) {
                 requests.push({ path: route, body });
@@ -58,6 +59,7 @@ afterAll(async () => {
 
 beforeEach(() => {
     requests = [];
+    notReady = 0;
     routes = {
         '/ids/current': () => ({ body: { current: 'alice' } }),
         '/did/alice': () => ({ body: { docs: { didDocument: { id: DID } } } }),
@@ -168,6 +170,16 @@ describe('cashu-send', () => {
         expect(stdout).toBe('cashuBtoken');
         expect(stderr).toContain('op-1');
         expect(stderr).toContain('Balance: 21');
+    });
+
+    it('keeps stdout to the token while waiting for a slow service', async () => {
+        notReady = 3;
+
+        const { status, stdout, stderr } = await run('cashu-send', '21');
+
+        expect(status).toBe(0);
+        expect(stdout).toBe('cashuBtoken');
+        expect(stderr).toContain('Connecting to Keymaster');
     });
 
     it('still prints the token and succeeds when the balance cannot be read', async () => {

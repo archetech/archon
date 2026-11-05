@@ -210,6 +210,23 @@ describe('isReady', () => {
         expect(keymaster != null).toBe(true);
     });
 
+    it('reports readiness on stderr, leaving stdout to the CLI', async () => {
+        nock(KeymasterURL)
+            .get(Endpoints.ready)
+            .reply(200, { ready: true });
+        const lines = { log: [] as unknown[], error: [] as unknown[] };
+
+        await KeymasterClient.create({
+            url: KeymasterURL,
+            waitUntilReady: true,
+            chatty: true,
+            console: { ...mockConsole, log: (line: unknown) => lines.log.push(line), error: (line: unknown) => lines.error.push(line) },
+        });
+
+        expect(lines.log).toEqual([]);
+        expect(lines.error).toHaveLength(2);
+    });
+
     it('should timeout if not ready', async () => {
         nock(KeymasterURL)
             .get(Endpoints.ready)

@@ -126,13 +126,15 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
+    // Diagnostics go to stderr: a CLI's stdout is its output, which may be a token or
+    // JSON that something is reading.
     async waitUntilReady(options: WaitUntilReadyOptions = {}): Promise<void> {
         let { intervalSeconds = 5, chatty = false, becomeChattyAfter = 0, maxRetries = 0 } = options;
         let ready = false;
         let retries = 0;
 
         if (chatty) {
-            console.log(`Connecting to Keymaster at ${this.API}`);
+            console.error(`Connecting to Keymaster at ${this.API}`);
         }
 
         while (!ready) {
@@ -140,7 +142,7 @@ export default class KeymasterClient implements KeymasterInterface {
 
             if (!ready) {
                 if (chatty) {
-                    console.log('Waiting for Keymaster to be ready...');
+                    console.error('Waiting for Keymaster to be ready...');
                 }
                 // wait for 1 second before checking again
                 await new Promise(resolve => setTimeout(resolve, intervalSeconds * 1000));
@@ -153,13 +155,13 @@ export default class KeymasterClient implements KeymasterInterface {
             }
 
             if (!chatty && becomeChattyAfter > 0 && retries > becomeChattyAfter) {
-                console.log(`Connecting to Keymaster at ${this.API}`);
+                console.error(`Connecting to Keymaster at ${this.API}`);
                 chatty = true;
             }
         }
 
         if (chatty) {
-            console.log('Keymaster service is ready!');
+            console.error('Keymaster service is ready!');
         }
     }
 

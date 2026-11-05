@@ -95,6 +95,23 @@ describe('isReady', () => {
         expect(gatekeeper != null).toBe(true);
     });
 
+    it('reports readiness on stderr, leaving stdout to the CLI', async () => {
+        nock(GatekeeperURL)
+            .get(Endpoints.ready)
+            .reply(200, 'true');
+        const lines = { log: [] as unknown[], error: [] as unknown[] };
+
+        await GatekeeperClient.create({
+            url: GatekeeperURL,
+            waitUntilReady: true,
+            chatty: true,
+            console: { ...mockConsole, log: (line: unknown) => lines.log.push(line), error: (line: unknown) => lines.error.push(line) },
+        });
+
+        expect(lines.log).toEqual([]);
+        expect(lines.error).toHaveLength(2);
+    });
+
     it('should timeout if not ready', async () => {
         nock(GatekeeperURL)
             .get(Endpoints.ready)
