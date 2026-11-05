@@ -1554,6 +1554,34 @@ def reclaim_cashu(operation_id, id=None):
     return response
 
 
+def send_cashu_to(recipient, amount, memo=None, locktime=None, mint=None, id=None):
+    optional = {"memo": memo, "locktime": locktime, "mint": mint, "id": id}
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/send-to",
+        json={"recipient": recipient, "amount": amount, **{key: value for key, value in optional.items() if value is not None}},
+    )
+    return response
+
+
+def list_cashu_messages(id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/messages",
+        json={"id": id},
+    )
+    return response["messages"]
+
+
+def receive_cashu_messages(id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/accept",
+        json={"id": id},
+    )
+    return response
+
+
 def get_node_capabilities():
     response = proxy_request("GET", f"{_keymaster_api}/capabilities")
     return response["capabilities"]

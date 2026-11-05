@@ -5,6 +5,7 @@ import {
     createNewMintKeys,
     createDLEQProof,
     hashToCurve,
+    isP2PKSpendAuthorised,
     pointFromHex,
     serializeMintKeys,
     verifyMintQuoteSignature,
@@ -79,7 +80,7 @@ export class FakeMint {
 
     constructor(options: FakeMintOptions = {}) {
         this.inputFeePpk = options.inputFeePpk ?? 0;
-        this.nuts = options.nuts ?? [4, 5, 7, 8, 9, 12];
+        this.nuts = options.nuts ?? [4, 5, 7, 8, 9, 11, 12];
         this.nut20 = options.nut20 ?? true;
         this.keyset = this.newKeyset();
     }
@@ -154,7 +155,7 @@ export class FakeMint {
         }
     }
 
-    private spend(inputs: { id: string; amount: number; secret: string; C: string }[]): void {
+    private spend(inputs: { id: string; amount: number; secret: string; C: string; witness?: string }[]): void {
         const encoder = new TextEncoder();
         const seen = new Set<string>();
         for (const input of inputs) {
@@ -172,6 +173,9 @@ export class FakeMint {
             }
             if (this.spent.has(this.Y(input.secret))) {
                 throw new MintRefusal(11001, 'token already spent');
+            }
+            if (input.secret.startsWith('[') && !isP2PKSpendAuthorised(input as never)) {
+                throw new MintRefusal(20008, 'witness missing or invalid');
             }
         }
         inputs.forEach(input => this.spent.add(this.Y(input.secret)));
@@ -297,7 +301,52 @@ export class FakeMint {
         return undefined;
     }
 
+    // A DIDComm mailbox on the same server, standing in for the node's relay.
+    mailbox: { id: string; to: string; message: string }[] = [];
+    relayDown = false;
+    private relayNext = 0;
+
+    private relay(path: string, raw: string): unknown {
+        if (this.relayDown) {
+            throw new Error('relay down');
+        }
+        if (path.endsWith('/challenge')) {
+            return { challenge: 'challenge' };
+        }
+        if (path.endsWith('/messages')) {
+            const ids = (JSON.parse(raw).recipients as { header: { kid: string } }[]).map(({ header }) => {
+                const id = `mail-${++this.relayNext}`;
+                this.mailbox.push({ id, to: header.kid.split('#')[0], message: raw });
+                return id;
+            });
+            return { ids };
+        }
+        const body = JSON.parse(raw);
+        if (path.endsWith('/messages/fetch')) {
+            return { messages: this.mailbox.filter(item => item.to === body.did).map(({ id, message }) => ({ id, message })) };
+        }
+        if (path.endsWith('/messages/remove')) {
+            const before = this.mailbox.length;
+            this.mailbox = this.mailbox.filter(item => item.to !== body.did || !body.ids.includes(item.id));
+            return { removed: before - this.mailbox.length };
+        }
+        return undefined;
+    }
+
     private async handle(req: http.IncomingMessage, res: http.ServerResponse, raw: string): Promise<void> {
+        if (req.url!.startsWith('/didcomm/')) {
+            res.setHeader('Content-Type', 'application/json');
+            try {
+                const answer = this.relay(req.url!, raw);
+                res.statusCode = answer === undefined ? 404 : 200;
+                res.end(JSON.stringify(answer ?? {}));
+            }
+            catch (error) {
+                res.statusCode = 503;
+                res.end(JSON.stringify({ error: (error as Error).message }));
+            }
+            return;
+        }
         const path = req.url!.replace(/^\/cashu/, '');
         this.requests.push(`${req.method} ${path}`);
         await this.onRequest?.(path);

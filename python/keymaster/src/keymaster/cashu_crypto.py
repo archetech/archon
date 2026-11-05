@@ -12,6 +12,8 @@ import base64
 import hashlib
 import hmac
 import json
+import re
+import secrets
 from typing import Any
 
 import cbor2
@@ -167,6 +169,74 @@ def verify_mint_quote(public_key_hex: str, quote: str, blinded: list[dict[str, A
         key = PublicKeyXOnly(bytes.fromhex(public_key_hex)[1:])
         return key.verify(bytes.fromhex(signature_hex), _mint_quote_digest(quote, blinded))
     except ValueError:
+        return False
+
+
+def p2pk_secret(public_key: str, locktime: int, refund_key: str) -> str:
+    """A NUT-11 secret locking a proof to a key, refundable after the locktime."""
+    tags = [["sigflag", "SIG_INPUTS"], ["locktime", str(locktime)], ["refund", refund_key]]
+    return json.dumps(["P2PK", {"nonce": secrets.token_hex(32), "data": public_key, "tags": tags}], separators=(",", ":"))
+
+
+def p2pk_lock(secret: str) -> dict[str, Any] | None:
+    """The spending conditions of a NUT-11 secret; None for an ordinary one.
+
+    Raises ValueError for a spending condition other than P2PK.
+    """
+    try:
+        parsed = json.loads(secret)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(parsed, list):
+        return None
+    kind = parsed[0] if parsed else None
+    data = parsed[1] if len(parsed) > 1 else None
+    if kind != "P2PK" or not isinstance(data, dict) or not isinstance(data.get("data"), str):
+        raise ValueError(f"spending condition {kind}")
+    raw_tags = data.get("tags")
+    if raw_tags is not None and not isinstance(raw_tags, list):
+        raise ValueError("a malformed spending condition")
+    tags: dict[str, list[str]] = {}
+    for tag in raw_tags or []:
+        if not isinstance(tag, list) or not tag or not all(isinstance(value, str) for value in tag):
+            raise ValueError("a malformed spending condition")
+        tags[tag[0]] = tag[1:]
+
+    def integer(name: str, fallback: int | None = None) -> int | None:
+        values = tags.get(name)
+        if not values:
+            return fallback
+        if not re.fullmatch(r"[0-9]+", values[0]):
+            raise ValueError("a malformed spending condition")
+        return int(values[0])
+
+    lock: dict[str, Any] = {
+        "keys": [data["data"], *tags.get("pubkeys", [])],
+        "refund": tags.get("refund", []),
+        "signatures": integer("n_sigs", 1),
+        "refundSignatures": integer("n_sigs_refund", 1),
+        "sigAll": (tags.get("sigflag") or [None])[0] == "SIG_ALL",
+    }
+    locktime = integer("locktime")
+    if locktime is not None:
+        lock["locktime"] = locktime
+    return lock
+
+
+def p2pk_witness(secret: str, private_key_hex: str) -> str:
+    """NUT-11 SIG_INPUTS: a BIP-340 signature on the SHA-256 of the secret."""
+    digest = hashlib.sha256(secret.encode()).digest()
+    signature = PrivateKey(bytes.fromhex(private_key_hex)).sign_schnorr(digest).hex()
+    return json.dumps({"signatures": [signature]}, separators=(",", ":"))
+
+
+def verify_p2pk_witness(secret: str, witness: Any, public_key: str) -> bool:
+    try:
+        signatures = json.loads(witness)["signatures"]
+        key = PublicKeyXOnly(bytes.fromhex(public_key)[1:])
+        digest = hashlib.sha256(secret.encode()).digest()
+        return any(key.verify(bytes.fromhex(signature), digest) for signature in signatures)
+    except (KeyError, TypeError, ValueError):
         return False
 
 

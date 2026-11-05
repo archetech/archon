@@ -114,6 +114,14 @@ export class CashuQuoteUnpaidError extends ArchonError {
     }
 }
 
+export class CashuTokenLockedError extends ArchonError {
+    static type = 'Cashu token locked';
+
+    constructor(detail?: string) {
+        super(CashuTokenLockedError.type, detail);
+    }
+}
+
 export class CashuTokenSpentError extends ArchonError {
     static type = 'Cashu token already spent';
 

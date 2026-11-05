@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 from collections.abc import AsyncIterable
 from copy import deepcopy
 import json
@@ -753,6 +754,59 @@ class Keymaster:
         return config
 
     # Cashu, in cashu.py.
+
+    @staticmethod
+    def _compressed_key_hex(public_jwk: dict[str, str]) -> str:
+        x = base64.urlsafe_b64decode(public_jwk["x"] + "=" * (-len(public_jwk["x"]) % 4))
+        y = base64.urlsafe_b64decode(public_jwk["y"] + "=" * (-len(public_jwk["y"]) % 4))
+        return (b"\x03" if y[-1] % 2 else b"\x02").hex() + x.hex()
+
+    async def _own_public_key(self, name: str | None = None) -> str:
+        keypair = await self.fetch_key_pair(name)
+        if not keypair:
+            raise KeymasterError("unable to resolve signing key")
+        return self._compressed_key_hex(keypair["publicJwk"])
+
+    async def _document_public_key(self, doc: dict[str, Any]) -> str:
+        return self._compressed_key_hex(await self.get_public_key_jwk(doc))
+
+    # Every retained derivation, unlike fetch_key_pair, which finds only the key the
+    # DID document names now: a token may be locked to a key since rotated away.
+    async def _find_private_key(self, public_keys: list[str], name: str | None = None) -> str | None:
+        wallet = await self.load_wallet()
+        id_info = await self.fetch_id_info(name, wallet)
+        # NUT-11 and BIP-340 work on the x-coordinate, so either parity prefix names
+        # the same key.
+        wanted = {key.lower()[-64:] for key in public_keys}
+        for index in range(id_info.get("index", 0), -1, -1):
+            keypair = await self.derive_key_pair(id_info["account"], index, wallet)
+            if self._compressed_key_hex(keypair["publicJwk"])[-64:] in wanted:
+                d = keypair["privateJwk"]["d"]
+                return base64.urlsafe_b64decode(d + "=" * (-len(d) % 4)).hex()
+        return None
+
+    async def _require_didcomm_route(self, recipient: str, name: str | None = None) -> None:
+        self._didcomm_gateway_base()
+        await self._require_node_capability("didcomm", "DIDComm messaging")
+        endpoint = await self._resolve_didcomm_endpoint(recipient)
+        if not endpoint:
+            raise KeymasterError(f"recipient {recipient} has no DIDCommMessaging endpoint")
+        self._resolve_key_agreement(await self._resolve_did_for_didcomm(recipient))
+        if endpoint["routingKeys"]:
+            await self._resolve_routing_key(endpoint["routingKeys"][0])
+        elif endpoint["uri"].startswith("did:"):
+            await self._resolve_mediator(endpoint["uri"], recipient)
+        own = await self.fetch_id_info(name)
+        self._resolve_key_agreement(await self.resolve_did(own["did"]))
+
+    async def send_cashu_to(self, recipient: str, amount: int, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        return await self.cashu.send_cashu_to(recipient, amount, options)
+
+    async def list_cashu_messages(self, name: str | None = None) -> list[dict[str, Any]]:
+        return await self.cashu.list_cashu_messages(name)
+
+    async def receive_cashu_messages(self, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.receive_cashu_messages(name)
 
     async def add_cashu(self, name: str | None = None) -> dict[str, Any]:
         return await self.cashu.add_cashu(name)
@@ -4814,6 +4868,13 @@ class Keymaster:
         challenge = response.json()["challenge"]
         return {"challenge": challenge, "signature": sign_hash(hash_message(challenge), keypair["privateJwk"])}
 
+    # A mediator named by a recipient's service, which must be reachable directly.
+    async def _resolve_mediator(self, mediator_did: str, recipient_did: str) -> tuple[str, dict[str, Any]]:
+        endpoint = await self._resolve_didcomm_endpoint(mediator_did)
+        if not endpoint or endpoint["routingKeys"] or endpoint["uri"].startswith("did:"):
+            raise KeymasterError(f"mediator {mediator_did} for {recipient_did} has no direct DIDCommMessaging endpoint")
+        return endpoint["uri"], await self._resolve_routing_key(mediator_did)
+
     async def send_didcomm(self, message: dict[str, Any], to: str | list[str], options: dict[str, Any] | None = None) -> list[str]:
         # Pack + resolve + Forward-wrap here (crypto), then hand each sealed envelope
         # to the DIDComm service for delivery (egress + Tor). The egress is reached
@@ -4852,13 +4913,8 @@ class Keymaster:
                 # endpoint, in a Forward for its key-agreement key whose next is
                 # the recipient DID the mediator registered.
                 elif endpoint["uri"].startswith("did:"):
-                    mediator_did = endpoint["uri"]
-                    mediator_endpoint = await self._resolve_didcomm_endpoint(mediator_did)
-                    if not mediator_endpoint or mediator_endpoint["routingKeys"] or mediator_endpoint["uri"].startswith("did:"):
-                        raise KeymasterError(f"mediator {mediator_did} for {recipient_did} has no direct DIDCommMessaging endpoint")
-                    routing = await self._resolve_routing_key(mediator_did)
+                    delivery_uri, routing = await self._resolve_mediator(endpoint["uri"], recipient_did)
                     envelope = dc.wrap_forward(packed, recipient_did, {"kid": routing["kid"], "publicJwk": routing["publicJwk"]})
-                    delivery_uri = mediator_endpoint["uri"]
                     mediated = True
 
                 # A recipient whose mailbox is on this node needs no egress: deposit
@@ -4949,7 +5005,10 @@ class Keymaster:
                     unpacked = await self.unpack_didcomm(entry["message"], {"name": name})
                     unpacked["id"] = entry["id"]
                     results.append(unpacked)
-                    handled.append(entry["id"])
+                    # A token message stays until redeemed: it may be the only copy of
+                    # the value. Only an explicit ack_didcomm of its id removes it.
+                    if not dc_protocols.is_cashu_token_message(unpacked.get("message")):
+                        handled.append(entry["id"])
                 except Exception:
                     # Leave messages we can't unpack on the server for inspection/retry.
                     pass

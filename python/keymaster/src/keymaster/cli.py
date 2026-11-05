@@ -943,6 +943,14 @@ def _parse_sats(value: str) -> int:
     return int(value)
 
 
+# Seconds, or a count of minutes, hours or days.
+def _parse_duration(value: str) -> int:
+    match = re.fullmatch(r"([1-9][0-9]*)([mhd]?)", value)
+    if not match:
+        raise CommandError(f"locktime must be seconds, or like 30m, 12h or 7d, not '{value}'")
+    return int(match.group(1)) * {"": 1, "m": 60, "h": 3600, "d": 86400}[match.group(2)]
+
+
 # By the time a balance is read the operation has happened, so failing to read it
 # must not report the operation as failed.
 async def _read_cashu_balance(km: Keymaster, mint: str | None, identity: str | None) -> dict[str, Any] | None:
@@ -1062,6 +1070,28 @@ async def cmd_cashu_restore(km: Keymaster, args: argparse.Namespace) -> None:
 
 async def cmd_cashu_sends(km: Keymaster, args: argparse.Namespace) -> None:
     _print_json(await km.list_cashu_sends(args.mint, args.id))
+
+
+async def cmd_cashu_send_to(km: Keymaster, args: argparse.Namespace) -> None:
+    options = {
+        "memo": args.memo,
+        "locktime": None if args.locktime is None else _parse_duration(args.locktime),
+        "mint": args.mint,
+        "name": args.id,
+    }
+    result = await km.send_cashu_to(args.recipient, _parse_sats(args.amount), options)
+    if not result["delivered"]:
+        print(f"Not delivered yet ({result.get('error')}); cashu-check sends it again", file=sys.stderr)
+    await _print_cashu_result(km, result, result["mint"], args.id)
+
+
+async def cmd_cashu_messages(km: Keymaster, args: argparse.Namespace) -> None:
+    _print_json(await km.list_cashu_messages(args.id))
+
+
+async def cmd_cashu_accept(km: Keymaster, args: argparse.Namespace) -> None:
+    result = await km.receive_cashu_messages(args.id)
+    await _print_cashu_result(km, result, None, args.id)
 
 
 async def cmd_cashu_reclaim(km: Keymaster, args: argparse.Namespace) -> None:
@@ -1787,6 +1817,17 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("cashu-sends", "List sent Cashu tokens not yet settled", cmd_cashu_sends)
     sp.add_argument("id", nargs="?")
     sp.add_argument("-m", "--mint", help=mint_help)
+    sp = add("cashu-send-to", "Send ecash locked to a DID, over DIDComm", cmd_cashu_send_to)
+    sp.add_argument("recipient")
+    sp.add_argument("amount")
+    sp.add_argument("memo", nargs="?")
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("--locktime", help="when the sender can reclaim it: seconds, or 30m, 12h, 7d (default 3d)")
+    sp.add_argument("-m", "--mint", help=mint_help)
+    sp = add("cashu-messages", "List token messages waiting in the DIDComm inbox", cmd_cashu_messages)
+    sp.add_argument("id", nargs="?")
+    sp = add("cashu-accept", "Redeem the token messages in the DIDComm inbox", cmd_cashu_accept)
+    sp.add_argument("id", nargs="?")
     sp = add("cashu-reclaim", "Take back a sent Cashu token not yet redeemed", cmd_cashu_reclaim)
     sp.add_argument("operation_id", metavar="operationId")
     sp.add_argument("id", nargs="?")

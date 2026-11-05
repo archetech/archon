@@ -19,6 +19,9 @@ from keymaster.cashu_crypto import (
     hash_e,
     hash_to_curve,
     keyset_id_int,
+    p2pk_lock,
+    p2pk_secret,
+    p2pk_witness,
     proof_y,
     public_key_hex,
     resolve_keyset_ids,
@@ -26,6 +29,7 @@ from keymaster.cashu_crypto import (
     unblind,
     verify_dleq,
     verify_mint_quote,
+    verify_p2pk_witness,
     verify_proof_dleq,
 )
 
@@ -200,3 +204,42 @@ def test_short_keyset_ids():
         resolve_keyset_ids(proofs, [])
     with pytest.raises(CashuTokenError):
         resolve_keyset_ids(proofs, [full, full[:-2] + "cd"])
+
+
+P2PK = json.loads((Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "cashu-p2pk-vectors.json").read_text())
+
+
+@pytest.mark.parametrize("field", ["typescriptWitness", "pythonWitness"])
+def test_verifies_each_ports_p2pk_witness(field):
+    assert verify_p2pk_witness(P2PK["secret"], P2PK[field], P2PK["publicKey"])
+    assert not verify_p2pk_witness(P2PK["secret"], P2PK[field], P2PK["refundKey"])
+    assert not verify_p2pk_witness(P2PK["secret"] + " ", P2PK[field], P2PK["publicKey"])
+
+
+def test_reads_p2pk_conditions():
+    assert p2pk_lock(P2PK["secret"]) == P2PK["conditions"]
+    for other in P2PK["others"]:
+        assert p2pk_lock(other["secret"]) == other["conditions"]
+
+
+@pytest.mark.parametrize("secret", P2PK["plain"])
+def test_treats_other_secrets_as_ordinary(secret):
+    assert p2pk_lock(secret) is None
+
+
+@pytest.mark.parametrize("secret", P2PK["malformed"])
+def test_refuses_a_malformed_secret(secret):
+    with pytest.raises(ValueError):
+        p2pk_lock(secret)
+
+
+def test_refuses_a_spending_condition_it_does_not_implement():
+    with pytest.raises(ValueError):
+        p2pk_lock(P2PK["unsupported"])
+
+
+def test_a_new_secret_is_read_back_the_same():
+    secret = p2pk_secret(P2PK["publicKey"], 1900000000, P2PK["refundKey"])
+
+    assert p2pk_lock(secret) == P2PK["conditions"]
+    assert verify_p2pk_witness(secret, p2pk_witness(secret, P2PK["privateKey"]), P2PK["publicKey"])

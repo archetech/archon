@@ -132,7 +132,7 @@ in flight, so they stay safe to expose as read-only MCP tools.
 | `mint` | the quote is paid, or expires unpaid | claim the proofs, or drop the record |
 | `melt` | the quote is paid or unpaid; while it or an input is `PENDING` the record stays open | keep the change, from the quote state if the response was lost, or return the inputs to `proofs`; if an input is spent and a fresh read still says `UNPAID`, something else spent it, so swap the rest to new proofs and keep the change counters used |
 | `swap` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09 if every input is spent and the amounts match; on a refusal with unspent inputs, return them to `proofs`, or keep them as an outstanding send if `token` says the recipient may still hold them |
-| `receive` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09, or drop the record and report the token as already spent |
+| `receive` | the inputs are spent, or the mint rejects a retry | recover outputs through NUT-09; if only some inputs are spent, swap the rest and report what was gone; or drop the record and report the token as already spent |
 | `send`, `locked-send` | the swap settles as above, then every `sent` proof is spent | the token was redeemed; until then it is outstanding, not balance |
 
 Mint quotes are created with a NUT-20 public key whenever the mint advertises
@@ -148,8 +148,9 @@ open and the quote is polled instead.
 
 Inputs return to `proofs` only when the identity owned them and NUT-07 shows them
 unspent. A received token's proofs were never the identity's, so its value is
-credited only from the swap's outputs: if someone else spent the token first, the
-receive yields nothing.
+credited only from the swap's outputs: if someone else spent the whole token first,
+the receive yields nothing, and if they spent part of it, the rest is swapped and the
+result says how much was already gone.
 
 A sent token is never returned to the balance because its proofs are unspent: the
 recipient may not have redeemed it yet. `reclaimCashu` takes back one unredeemed
@@ -483,7 +484,14 @@ reclaim the value before the message could expire unread:
    lost, and sends it with the same message id, which the recipient deduplicates.
 
 An intercepted token is unspendable, and an unclaimed one returns to the sender
-after the locktime through `reclaimCashu`.
+after the locktime through `reclaimCashu`. NUT-11 lets either side spend after the
+locktime: the refund key becomes valid and the recipient's stays valid, so the
+first to reach the mint gets the value. The refund key must always be present,
+because a proof past its locktime with no refund key is spendable by anyone.
+
+The mints come from the recipient's latest DID document, since a service just
+published need not be anchored yet, and the key from its anchored document, as for
+encrypting to a DID.
 
 ### Message
 
@@ -498,8 +506,9 @@ Archon's own DIDComm protocols live under `https://archetech.com/didcomm/`,
 published from a new `archetech/didcomm` repository through GitHub Pages, as
 `archetech.com/schemas/` is. The protocol URI `https://archetech.com/didcomm/cashu/1.0`
 resolves to the protocol's specification. Versions follow DIDComm v2: a minor
-version only adds, and receivers accept higher minor versions. Keymaster lists the
-protocol in its discover-features disclosures so a sender can check support first.
+version only adds, and receivers accept higher minor versions. `CASHU_PROTOCOL` in
+`didcomm-protocols` names the protocol for a discover-features disclosure, but
+Keymaster has no discover-features responder yet, so nothing answers that query.
 
 ### Receiving
 
@@ -510,14 +519,17 @@ it is redeemed; an explicit `ack-didcomm` of a token message's id still removes 
 
 `receiveCashuMessages(name?)` takes token messages from the DIDComm inbox, signs
 each locked proof with the matching private key and swaps it. The matching key
-may be an earlier derivation if the recipient has rotated keys; Keymaster already
-searches retained derivations. It journals each redemption as a `receive` and
-acknowledges the message only after the record is saved, so a crash cannot lose
-a token between the mailbox and the wallet. A message it cannot redeem — a mint
-the identity has not added, a token already spent, a mint unreachable — stays
-unacknowledged and is reported with the reason, so the user can add the mint and
-accept it again; a spent token's message is acknowledged once reported. Processed message ids are recorded so
-a resent message is not redeemed twice.
+may be an earlier derivation if the recipient has rotated keys, so it searches every
+retained derivation, where `fetchKeyPair` finds only the key the DID document names
+now. It journals each redemption as a `receive`, recording the message as processed
+in the same write, and acknowledges the message only once the redemption has settled,
+so neither a crash nor a mint's refusal can lose a token between the mailbox and the
+wallet. A refusal clears the processed mark, so the message can be accepted again. A
+message it cannot redeem — a mint the identity has not added, a mint unreachable, a
+redemption still pending — stays unacknowledged and is reported with the reason, so
+the user can add the mint and accept it again; a spent token's message is acknowledged
+once reported. Processed messages are remembered by sender and message id, so a resent
+message is not redeemed twice.
 
 The specification for DID-locked ecash is `cashu/1.0/README.md` in
 `archetech/didcomm`, with a JSON Schema for the message body: the key selection

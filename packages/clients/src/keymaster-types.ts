@@ -353,6 +353,16 @@ export interface CashuOperation {
     // A swap whose inputs are a sent token, which the recipient may still hold.
     token?: boolean;
     sent?: CashuProof[];
+    // A locked send's DIDComm delivery, saved before the swap so a restart can
+    // still deliver. The message id is stable across resends.
+    delivery?: {
+        recipient: string;
+        memo?: string;
+        messageId: string;
+        delivered: boolean;
+    };
+    // A receive from a DIDComm message: its key in the identity's cashuInbox.
+    message?: string;
     created: string;
 }
 
@@ -413,6 +423,9 @@ export interface CashuSendResult {
 export interface CashuReceiveResult {
     amount: number;
     mint: string;
+    // The value of proofs someone else had already spent. `amount` is what the rest
+    // brought in.
+    spent?: number;
 }
 
 // A reclaim of a token the recipient partly redeemed also says what they took
@@ -453,6 +466,67 @@ export interface CashuSendRecord {
     mint: string;
     amount: number;
     created: string;
+    // A locked send only.
+    recipient?: string;
+    locktime?: number;
+    delivered?: boolean;
+    memo?: string;
+}
+
+export interface CashuSendToOptions {
+    memo?: string;
+    // Seconds until the sender can reclaim the token: three days by default, and
+    // never more than the mailbox keeps a message.
+    locktime?: number;
+    mint?: string;
+    name?: string;
+}
+
+export interface CashuSendToResult extends CashuSendResult {
+    mint: string;
+    recipient: string;
+    messageId: string;
+    locktime: number;
+    delivered: boolean;
+    // Why it is not delivered yet. checkCashu sends it again.
+    error?: string;
+}
+
+// A token message waiting in the DIDComm inbox. `sender` is present only when the
+// envelope authenticated it.
+export interface CashuMessage {
+    id: string;
+    sender?: string;
+    amount?: number;
+    mint?: string;
+    memo?: string;
+    redeemable: boolean;
+    reason?: string;
+}
+
+export interface CashuRedeemedMessage {
+    id: string;
+    sender?: string;
+    amount: number;
+    mint: string;
+    memo?: string;
+    // As in CashuReceiveResult.
+    spent?: number;
+}
+
+// A message that could not be redeemed. It stays in the inbox to try again unless
+// `acknowledged`, as for a token already spent.
+export interface CashuUnredeemedMessage {
+    id: string;
+    sender?: string;
+    mint?: string;
+    reason: string;
+    acknowledged: boolean;
+}
+
+export interface CashuAcceptResult {
+    redeemed: CashuRedeemedMessage[];
+    failed: CashuUnredeemedMessage[];
 }
 
 export interface DecodedLightningInvoice {
@@ -686,6 +760,9 @@ export interface KeymasterInterface {
     restoreCashu(mint?: string, name?: string): Promise<CashuRestoreResult>;
     listCashuSends(mint?: string, name?: string): Promise<CashuSendRecord[]>;
     reclaimCashu(operationId: string, name?: string): Promise<CashuReclaimResult>;
+    sendCashuTo(recipient: string, amount: number, options?: CashuSendToOptions): Promise<CashuSendToResult>;
+    listCashuMessages(name?: string): Promise<CashuMessage[]>;
+    receiveCashuMessages(name?: string): Promise<CashuAcceptResult>;
 
     // DIDs
     checkDID(did: string): Promise<CheckDIDResult>;

@@ -1215,6 +1215,12 @@ interrupted operation be finished rather than lost. `mint` selects a mint by URL
 it defaults to the node's mint when the identity has it, else to its only mint.
 See `docs/plans/cashu-1058.md`.
 
+Tokens sent with `/cashu/send-to` follow the
+[DID-locked ecash protocol](https://archetech.com/didcomm/cashu/1.0). The general
+inbox does not consume them: `POST /didcomm/receive` returns a token message but
+leaves it out of what it acknowledges, so only `/cashu/accept` or an explicit ack
+removes it.
+
 | Route | Behavior |
 | --- | --- |
 | `POST /api/v1/cashu` | `{ "id"?: string }`. Adds the node's mint → `CashuMintInfo`. 503 if the node has none. |
@@ -1230,11 +1236,14 @@ See `docs/plans/cashu-1058.md`.
 | `POST /api/v1/cashu/quotes` | `{ "quotes": CashuQuoteRecord[] }`. Contacts no mint. |
 | `POST /api/v1/cashu/melt` | `{ "bolt11": string, "mint"?: string, "id"?: string }` → `CashuMeltResult`. |
 | `POST /api/v1/cashu/send` | `{ "amount": number, "mint"?: string, "id"?: string }` → `CashuSendResult`, a `cashuB` token. |
-| `POST /api/v1/cashu/receive` | `{ "token": string, "id"?: string }` → `CashuReceiveResult`. The token's mint must already be added. |
+| `POST /api/v1/cashu/receive` | `{ "token": string, "id"?: string }` → `CashuReceiveResult`. The token's mint must already be added. If someone else already spent part of the token, the rest is swapped and `spent` says how much was gone. |
 | `POST /api/v1/cashu/check` | `{ "mint"?: string, "id"?: string }` → `CashuCheckResult`, after settling open operations, dropping proofs the mint reports spent, and moving proofs off inactive keysets. |
 | `POST /api/v1/cashu/restore` | `{ "mint"?: string, "id"?: string }` → `CashuRestoreResult`, recovering proofs from the mnemonic. |
 | `POST /api/v1/cashu/sends` | `{ "sends": CashuSendRecord[] }`. Contacts no mint. |
 | `POST /api/v1/cashu/reclaim` | `{ "operationId": string, "id"?: string }` → `CashuReclaimResult`, taking back one unredeemed send: `{ amount, mint }`, plus `redeemed` and `pending` if the recipient redeemed part of it. A refused reclaim leaves the send outstanding. |
+| `POST /api/v1/cashu/send-to` | `{ "recipient": string, "amount": number, "memo"?: string, "locktime"?: number, "mint"?: string, "id"?: string }` → `CashuSendToResult`, locking the value to the recipient's key (NUT-11) and delivering it over DIDComm. `recipient` is a DID or alias; `locktime` is in seconds, three days by default and at most seven. Without `mint`, it uses one the recipient's `#cashu` service lists and the sender also uses. It refuses before moving any value if the mint lacks NUT-11 or there is no DIDComm route. `delivered: false` with `error` means the token is locked and outstanding but not yet delivered; `POST /cashu/check` sends it again. |
+| `POST /api/v1/cashu/messages` | `{ "id"?: string }` → `{ "messages": CashuMessage[] }`: token messages waiting in the DIDComm inbox, and whether each can be redeemed. Contacts no mint. |
+| `POST /api/v1/cashu/accept` | `{ "id"?: string }` → `CashuAcceptResult`, redeeming the token messages in the inbox. A message that cannot be redeemed stays in the inbox and is reported in `failed`, unless its token is already spent. |
 
 A mint's refusal and the other Cashu errors are 400. `CashuUnavailableError`, when
 a mint cannot be reached, is 503.

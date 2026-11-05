@@ -70,6 +70,24 @@ export function discoverFeaturesDisclose(thid: string, protocolIds: string[]): D
     };
 }
 
+// Archon's DID-locked ecash protocol, specified in archetech/didcomm. A minor
+// version only adds, and receivers accept higher minor versions.
+export const CASHU_PROTOCOL = 'https://archetech.com/didcomm/cashu/1.0';
+export const CASHU_TOKEN_TYPE = `${CASHU_PROTOCOL}/token`;
+
+export function isCashuTokenMessage(message: { type?: unknown } | null | undefined): boolean {
+    return typeof message?.type === 'string'
+        && /^https:\/\/archetech\.com\/didcomm\/cashu\/1\.\d+\/token$/.test(message.type);
+}
+
+export function cashuToken(token: string, options: { memo?: string; id?: string } = {}): DidCommPlaintext {
+    return {
+        type: CASHU_TOKEN_TYPE,
+        ...(options.id ? { id: options.id } : {}),
+        body: { token, ...(options.memo ? { memo: options.memo } : {}) },
+    };
+}
+
 export interface OutOfBandBody {
     goal_code?: string;
     goal?: string;

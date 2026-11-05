@@ -143,3 +143,63 @@ describe('cashu', () => {
         expect(stderr).toContain('positive whole number');
     });
 });
+
+describe('cashu locked to a DID', () => {
+    let bob: string;
+
+    beforeEach(async () => {
+        await freshWalletWithId('alice');
+        bob = parseDid(await archon('create-id', '-r', 'local', 'bob'));
+        for (const name of ['alice', 'bob']) {
+            await archon('publish-didcomm', '-n', name);
+            await archon('add-cashu', name);
+            await archon('publish-cashu', name);
+        }
+        await archon('use-id', 'alice');
+        await fund(100);
+    });
+
+    test('a token sent over DIDComm reaches the recipient and is redeemed once', async () => {
+        const sent = JSON.parse(await archon('cashu-send-to', bob, '30', 'lunch'));
+        expect(sent).toMatchObject({ amount: 30, recipient: bob, delivered: true, balance: { spendable: 70, outstanding: 30 } });
+
+        const messages = JSON.parse(await archon('cashu-messages', 'bob'));
+        expect(messages).toHaveLength(1);
+        expect(messages[0]).toMatchObject({ amount: 30, memo: 'lunch', redeemable: true });
+
+        const accepted = JSON.parse(await archon('cashu-accept', 'bob'));
+        expect(accepted.failed).toEqual([]);
+        expect(accepted).toMatchObject({ redeemed: [{ amount: 30, memo: 'lunch' }], balance: { spendable: 30 } });
+
+        expect(JSON.parse(await archon('cashu-messages', 'bob'))).toEqual([]);
+        expect(JSON.parse(await archon('cashu-accept', 'bob'))).toMatchObject({ redeemed: [], failed: [] });
+
+        const check = JSON.parse(await archon('cashu-check'));
+        expect(check.balance).toMatchObject({ spendable: 70, outstanding: 0 });
+    });
+
+    test('the general inbox leaves a token message for cashu-accept', async () => {
+        await archon('cashu-send-to', bob, '10');
+
+        await archon('receive-didcomm', '-n', 'bob');
+
+        expect(JSON.parse(await archon('cashu-messages', 'bob'))).toHaveLength(1);
+    });
+
+    test('the sender cannot take it back before the locktime, and can after', async () => {
+        const { operationId } = JSON.parse(await archon('cashu-send-to', bob, '10', '--locktime', '3'));
+
+        const { status, stderr } = await archonFails('cashu-reclaim', operationId);
+        expect(status).toBe(1);
+        expect(stderr).toContain('Cashu token locked');
+
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        const reclaimed = JSON.parse(await archon('cashu-reclaim', operationId));
+        expect(reclaimed).toMatchObject({ amount: 10, balance: { spendable: 100, outstanding: 0 } });
+
+        const accepted = JSON.parse(await archon('cashu-accept', 'bob'));
+        expect(accepted.redeemed).toEqual([]);
+        expect(accepted.failed[0]).toMatchObject({ acknowledged: true });
+    });
+});
+

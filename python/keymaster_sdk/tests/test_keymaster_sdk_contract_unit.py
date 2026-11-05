@@ -425,6 +425,9 @@ def test_cashu_wrappers_forward_expected_requests(monkeypatch):
         ("POST", "/cashu/restore"): {"restored": 1},
         ("POST", "/cashu/sends"): {"sends": [{"amount": 21}]},
         ("POST", "/cashu/reclaim"): {"amount": 21},
+        ("POST", "/cashu/send-to"): {"token": "cashuB", "delivered": True},
+        ("POST", "/cashu/messages"): {"messages": [{"id": "1"}]},
+        ("POST", "/cashu/accept"): {"redeemed": [], "failed": []},
     }
 
     def fake_proxy_request(method, url, **kwargs):
@@ -453,6 +456,9 @@ def test_cashu_wrappers_forward_expected_requests(monkeypatch):
     assert sdk.restore_cashu("m", "A") == {"restored": 1}
     assert sdk.list_cashu_sends("m", "A") == [{"amount": 21}]
     assert sdk.reclaim_cashu("op", "A") == {"amount": 21}
+    assert sdk.send_cashu_to("B", 21, "m", 60, "url", "A") == {"token": "cashuB", "delivered": True}
+    assert sdk.list_cashu_messages("A") == [{"id": "1"}]
+    assert sdk.receive_cashu_messages("A") == {"redeemed": [], "failed": []}
 
     assert calls == [
         ("POST", "/cashu", {"id": "A"}),
@@ -473,4 +479,23 @@ def test_cashu_wrappers_forward_expected_requests(monkeypatch):
         ("POST", "/cashu/restore", {"mint": "m", "id": "A"}),
         ("POST", "/cashu/sends", {"mint": "m", "id": "A"}),
         ("POST", "/cashu/reclaim", {"operationId": "op", "id": "A"}),
+        ("POST", "/cashu/send-to", {"recipient": "B", "amount": 21, "memo": "m", "locktime": 60, "mint": "url", "id": "A"}),
+        ("POST", "/cashu/messages", {"id": "A"}),
+        ("POST", "/cashu/accept", {"id": "A"}),
     ]
+
+
+def test_send_cashu_to_omits_what_was_not_given(monkeypatch):
+    calls: list[dict] = []
+
+    def fake_proxy_request(method, url, **kwargs):
+        calls.append(kwargs["json"])
+        return {"delivered": True}
+
+    monkeypatch.setattr(sdk, "proxy_request", fake_proxy_request)
+    monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
+
+    sdk.send_cashu_to("Bob", 21)
+    sdk.send_cashu_to("Bob", 21, locktime=60)
+
+    assert calls == [{"recipient": "Bob", "amount": 21}, {"recipient": "Bob", "amount": 21, "locktime": 60}]

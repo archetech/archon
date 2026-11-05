@@ -18,6 +18,7 @@ describe('help', () => {
             'cashu-balance',
             'cashu-mint',
             'cashu-send',
+            'cashu-send-to',
             'check-wallet',
             'create-id',
             'create-schema',

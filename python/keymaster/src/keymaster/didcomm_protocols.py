@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import json
 from typing import Any
+import re
 from urllib.parse import unquote
 
 TRUST_PING_TYPE = "https://didcomm.org/trust-ping/2.0/ping"
@@ -15,6 +16,12 @@ BASIC_MESSAGE_TYPE = "https://didcomm.org/basicmessage/2.0/message"
 DISCOVER_FEATURES_QUERIES_TYPE = "https://didcomm.org/discover-features/2.0/queries"
 DISCOVER_FEATURES_DISCLOSE_TYPE = "https://didcomm.org/discover-features/2.0/disclose"
 OUT_OF_BAND_INVITATION_TYPE = "https://didcomm.org/out-of-band/2.0/invitation"
+
+# Archon's DID-locked ecash protocol, specified in archetech/didcomm. A minor
+# version only adds, and receivers accept higher minor versions.
+CASHU_PROTOCOL = "https://archetech.com/didcomm/cashu/1.0"
+CASHU_TOKEN_TYPE = f"{CASHU_PROTOCOL}/token"
+_CASHU_TOKEN_PATTERN = re.compile(r"^https://archetech\.com/didcomm/cashu/1\.\d+/token$")
 
 ISSUE_CREDENTIAL_PROPOSE_TYPE = "https://didcomm.org/issue-credential/3.0/propose-credential"
 ISSUE_CREDENTIAL_OFFER_TYPE = "https://didcomm.org/issue-credential/3.0/offer-credential"
@@ -187,3 +194,17 @@ def keylist_query() -> dict[str, Any]:
 
 def keylist(recipient_dids: list[str], thid: str | None = None) -> dict[str, Any]:
     return _with_thid({"type": KEYLIST_TYPE, "body": {"keys": [{"recipient_did": did} for did in recipient_dids]}}, thid)
+
+
+def is_cashu_token_message(message: Any) -> bool:
+    kind = message.get("type") if isinstance(message, dict) else None
+    return isinstance(kind, str) and _CASHU_TOKEN_PATTERN.match(kind) is not None
+
+
+def cashu_token(token: str, memo: str | None = None, message_id: str | None = None) -> dict[str, Any]:
+    message: dict[str, Any] = {"type": CASHU_TOKEN_TYPE, "body": {"token": token}}
+    if memo:
+        message["body"]["memo"] = memo
+    if message_id:
+        message["id"] = message_id
+    return message

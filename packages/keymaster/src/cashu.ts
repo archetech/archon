@@ -1,5 +1,7 @@
 import {
+    Amount,
     OutputData,
+    blindMessage,
     deriveSecretAndBlindingFactor,
     getDecodedToken,
     getEncodedToken,
@@ -9,10 +11,12 @@ import {
     hasValidDleq,
     hashToCurve,
     signMintQuote,
+    signP2PKProofs,
 } from '@cashu/cashu-ts';
 import type { SerializedBlindedSignature, Proof as CtsProof } from '@cashu/cashu-ts';
 import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { fetchPublicHttps } from '@didcid/common/net';
+import { cashuToken, isCashuTokenMessage } from './didcomm-protocols.js';
 import {
     CashuInsufficientFundsError,
     CashuMintNotAddedError,
@@ -20,17 +24,20 @@ import {
     CashuNotConfiguredError,
     CashuQuoteUnpaidError,
     CashuStateError,
+    CashuTokenLockedError,
     CashuTokenSpentError,
     CashuUnavailableError,
     InvalidParameterError,
     KeymasterError,
 } from '@didcid/common/errors';
 import type {
+    CashuAcceptResult,
     CashuBalance,
     CashuCheckResult,
     CashuClaimResult,
     CashuCounters,
     CashuMeltResult,
+    CashuMessage,
     CashuMintEntry,
     CashuMintInfo,
     CashuMintQuote,
@@ -42,6 +49,9 @@ import type {
     CashuRestoreResult,
     CashuSendRecord,
     CashuSendResult,
+    CashuSendToOptions,
+    CashuSendToResult,
+    DidCommReceivedMessage,
     IDInfo,
     WalletFile,
 } from '@didcid/clients/keymaster-types';
@@ -56,6 +66,16 @@ const UNIT = 'sat';
 const REQUEST_TIMEOUT_MS = 30000;
 const RESTORE_BATCH = 100;
 const RESTORE_EMPTY_BATCHES = 3;
+
+// A locked send's default locktime, and its limit: what the DIDComm mailbox keeps
+// an unacknowledged message, so the value can be reclaimed before it could expire
+// unread.
+const LOCKTIME_DEFAULT_SECONDS = 3 * 24 * 60 * 60;
+const LOCKTIME_MAX_SECONDS = 7 * 24 * 60 * 60;
+
+// How long a processed token message is remembered, well past the mailbox's seven
+// days, since a sender resends only while it holds the message undelivered.
+const INBOX_MEMORY_MS = 30 * 24 * 60 * 60 * 1000;
 
 // Mints disagree on the code for outputs they have already signed: NUT-00 lists
 // 11003, while cdk-mintd answers a mint request with 20006. So that case is
@@ -76,6 +96,8 @@ interface SwapReport {
     redeemed: number;
     recovered: number;
     pending: number;
+    // What the mint refused of a received token's remainder.
+    refused: number;
 }
 
 interface MintKeyset {
@@ -247,6 +269,64 @@ function toHex(bytes: Uint8Array): string {
     return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+// The spending conditions of a NUT-11 secret. A secret that is not JSON is an
+// ordinary one, with none.
+interface P2PKLock {
+    keys: string[];
+    refund: string[];
+    locktime?: number;
+    signatures: number;
+    refundSignatures: number;
+    sigAll: boolean;
+}
+
+export function p2pkLock(secret: string): P2PKLock | undefined {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(secret);
+    }
+    catch {
+        return undefined;
+    }
+    if (!Array.isArray(parsed)) {
+        return undefined;
+    }
+    const [kind, data] = parsed as [unknown, { data?: unknown; tags?: unknown } | undefined];
+    if (kind !== 'P2PK' || typeof data?.data !== 'string') {
+        throw new CashuMintUnsupportedError(`spending condition ${String(kind)}`);
+    }
+    const malformed = new CashuMintUnsupportedError('a malformed spending condition');
+    if (data.tags !== undefined && data.tags !== null && !Array.isArray(data.tags)) {
+        throw malformed;
+    }
+    const tags = new Map<string, string[]>();
+    for (const tag of (data.tags ?? []) as unknown[]) {
+        if (!Array.isArray(tag) || tag.length === 0 || !tag.every(value => typeof value === 'string')) {
+            throw malformed;
+        }
+        tags.set(tag[0], tag.slice(1));
+    }
+    const integer = (name: string, fallback?: number): number | undefined => {
+        const value = tags.get(name)?.[0];
+        if (value === undefined) {
+            return fallback;
+        }
+        if (!/^[0-9]+$/.test(value)) {
+            throw malformed;
+        }
+        return Number(value);
+    };
+    const locktime = integer('locktime');
+    return {
+        keys: [data.data, ...(tags.get('pubkeys') ?? [])],
+        refund: tags.get('refund') ?? [],
+        ...(locktime !== undefined && { locktime }),
+        signatures: integer('n_sigs', 1)!,
+        refundSignatures: integer('n_sigs_refund', 1)!,
+        sigAll: tags.get('sigflag')?.[0] === 'SIG_ALL',
+    };
+}
+
 function plainProof(proof: CtsProof | CashuProof): CashuProof {
     return {
         id: proof.id,
@@ -269,8 +349,19 @@ export interface CashuHost {
     fetchIdInfo(name?: string, wallet?: WalletFile): Promise<IDInfo>;
     getSeed(wallet: WalletFile): Promise<Uint8Array>;
     getCapabilities(): Promise<Record<string, unknown> | null>;
-    resolveDID(did: string): Promise<any>;
+    resolveDID(did: string, options?: { confirm?: boolean }): Promise<any>;
     updateDID(did: string, doc: any): Promise<boolean>;
+    // The identity's compressed public key, and that of a DID document.
+    ownPublicKey(name?: string): Promise<string>;
+    documentPublicKey(doc: any): string;
+    // The private key, as hex, of whichever of these public keys any derivation of
+    // the identity holds: a token may be locked to one since rotated away.
+    findPrivateKey(publicKeys: string[], name?: string): Promise<string | undefined>;
+    // Refuses if a message could not be delivered, before value is locked for it.
+    requireDidCommRoute(recipient: string, name?: string): Promise<void>;
+    sendDidComm(message: Record<string, unknown>, to: string, options: { name?: string }): Promise<string[]>;
+    receiveDidComm(options: { name?: string; ack: false }): Promise<DidCommReceivedMessage[]>;
+    ackDidComm(ids: string[], options: { name?: string }): Promise<number>;
 }
 
 interface MintContext {
@@ -412,6 +503,13 @@ export class CashuWallet {
     private async outputData(op: Pick<CashuOperation, 'keyset' | 'outputs'>): Promise<{ data: OutputData[]; blinded: Blinded[] }> {
         const seed = await this.host.getSeed(await this.host.loadWallet());
         const data = op.outputs.map((output) => {
+            // A locked output's secret is random, so the record holds it.
+            if (output.secret !== undefined) {
+                const secret = new TextEncoder().encode(output.secret);
+                const r = BigInt(`0x${output.r}`);
+                const { B_ } = blindMessage(secret, r);
+                return new OutputData({ amount: Amount.from(output.amount), id: op.keyset, B_: B_.toHex(true) }, r, secret);
+            }
             if (output.counter === undefined) {
                 throw new KeymasterError('Cashu output has no counter');
             }
@@ -548,8 +646,10 @@ export class CashuWallet {
             });
             const entry = await this.entryOf(wallet, ctx);
             const stored = entry.operations!.find(item => item.id === id)!;
-            const fresh = this.reserve(wallet, stored.keyset, stored.outputs.length);
-            stored.outputs.forEach((output, i) => { output.counter = fresh[i]; });
+            // A locked output has no counter, and its random secret cannot be stale.
+            const derived = stored.outputs.filter(output => output.counter !== undefined);
+            const fresh = this.reserve(wallet, stored.keyset, derived.length);
+            derived.forEach((output, i) => { output.counter = fresh[i]; });
             this.credit(wallet, entry, await this.withoutReserved(wallet, spendable));
         });
     }
@@ -655,11 +755,15 @@ export class CashuWallet {
 
         // Settled and unable to sign: its unsigned counters are free again.
         const unsigned = op.outputs
-            .filter((_, i) => !recovered.has(blinded[i].B_))
+            .filter((output, i) => output.counter !== undefined && !recovered.has(blinded[i].B_))
             .map(output => output.counter!);
         const retire = async (wallet: WalletFile) => {
             const entry = await this.entryOf(wallet, ctx);
             this.release(wallet, op.keyset, unsigned);
+            // Refused, not spent: the message can be redeemed again.
+            if (!spent && op.message) {
+                delete (await this.host.fetchIdInfo(ctx.name, wallet)).cashuInbox?.[op.message];
+            }
             // The recipient may still hold a token's proofs, so a refusal leaves it
             // outstanding rather than making it balance.
             if (!spent && op.token) {
@@ -682,11 +786,13 @@ export class CashuWallet {
         if (report) {
             report.redeemed += sumProofs(op.inputs.filter((_, i) => inputStates[i] === 'SPENT'));
         }
-        const remainder = spent && op.kind !== 'receive'
+        // Spent only in part, the rest is still worth having: a token's other holder
+        // may be slower, and a received token's proofs are as good as they were.
+        const remainder = spent
             ? op.inputs.filter((_, i) => inputStates[i] === 'UNSPENT')
             : [];
         if (remainder.length > 0) {
-            await this.swapRemainder(ctx, remainder, retire, report, op.token);
+            await this.swapRemainder(ctx, remainder, retire, report, op);
         }
         else {
             await this.host.mutateWallet(async (wallet) => { await retire(wallet); });
@@ -706,7 +812,7 @@ export class CashuWallet {
         inputs: CashuProof[],
         retire: (wallet: WalletFile) => Promise<CashuMintEntry>,
         report?: SwapReport,
-        token?: boolean,
+        from?: Pick<CashuOperation, 'kind' | 'token' | 'message' | 'delivery'>,
     ): Promise<void> {
         const { keyset, keysets } = await this.activeKeyset(ctx);
         const value = sumProofs(inputs) - feeFor(inputs, keysets);
@@ -720,12 +826,26 @@ export class CashuWallet {
         try {
             outcome = await this.journaled(swapId, async (wallet) => {
                 const entry = await retire(wallet);
-                this.journalSwap(wallet, entry, swapId, 'swap', inputs, keyset.id, value, token);
+                // A received token stays one: a refusal must not make its proofs balance.
+                const received = from?.kind === 'receive';
+                this.journalSwap(wallet, entry, swapId, received ? 'receive' : 'swap', inputs, keyset.id, value, from?.token);
+                const journaled = entry.operations![entry.operations!.length - 1];
+                if (from?.message) {
+                    journaled.message = from.message;
+                }
+                // What a refusal leaves outstanding can still be delivered.
+                if (from?.token && from.delivery) {
+                    journaled.delivery = from.delivery;
+                }
             }, () => this.runSwap(ctx, swapId, false, report));
         }
         catch (error) {
             if (!(error instanceof CashuMintError || error instanceof CashuUnavailableError)) {
                 throw error;
+            }
+            if (report && from?.kind === 'receive' && error instanceof CashuMintError) {
+                report.refused += sumProofs(inputs);
+                return;
             }
         }
         if (report && outcome === 'done') {
@@ -1023,8 +1143,17 @@ export class CashuWallet {
             return this.runMint(ctx, op.id);
         case 'melt':
             return (await this.settleMelt(ctx, op.id)).outcome;
-        default:
-            return op.sent ? this.settleSent(ctx, op) : this.runSwap(ctx, op.id);
+        default: {
+            if (op.sent) {
+                await this.deliver(ctx, op.id);
+                return this.settleSent(ctx, op);
+            }
+            const outcome = await this.runSwap(ctx, op.id);
+            if (outcome === 'done') {
+                await this.deliver(ctx, op.id);
+            }
+            return outcome;
+        }
         }
     }
 
@@ -1283,7 +1412,21 @@ export class CashuWallet {
         return (await this.scopedEntries(mint, name)).flatMap(([url, entry]) =>
             (entry.operations ?? [])
                 .filter(op => op.sent)
-                .map(op => ({ operationId: op.id, mint: url, amount: sumProofs(op.sent!), created: op.created })));
+                .map((op) => {
+                    const locktime = op.sent!.length > 0 ? p2pkLock(op.sent![0].secret)?.locktime : undefined;
+                    return {
+                        operationId: op.id,
+                        mint: url,
+                        amount: sumProofs(op.sent!),
+                        created: op.created,
+                        ...(op.delivery && {
+                            recipient: op.delivery.recipient,
+                            delivered: op.delivery.delivered,
+                            ...(op.delivery.memo && { memo: op.delivery.memo }),
+                        }),
+                        ...(locktime !== undefined && { locktime }),
+                    };
+                }));
     }
 
     // ---- operations ----
@@ -1393,6 +1536,19 @@ export class CashuWallet {
         });
     }
 
+    // The recipient must net the amount after the fee on redeeming the sent proofs.
+    // That fee follows the number of parts, which does not grow with the value, so
+    // this finds the smallest gross that nets enough rather than solving for an
+    // exact one that may not exist.
+    private grossFor(amount: number, keyset: MintKeyset): number {
+        const ppk = keyset.input_fee_ppk ?? 0;
+        let gross = amount;
+        while (gross - Math.ceil(splitAmount(gross).length * ppk / 1000) < amount) {
+            gross += 1;
+        }
+        return gross;
+    }
+
     async sendCashu(amount: number, mint?: string, name?: string): Promise<CashuSendResult> {
         if (!Number.isSafeInteger(amount) || amount <= 0) {
             throw new InvalidParameterError('amount');
@@ -1401,15 +1557,7 @@ export class CashuWallet {
         await this.settle(ctx);
         const { keyset, keysets } = await this.activeKeyset(ctx);
 
-        // The recipient must net the amount after the fee on redeeming the sent
-        // proofs. That fee follows the number of parts, which does not grow with
-        // the value, so this finds the smallest gross that nets enough rather than
-        // solving for an exact one that may not exist.
-        const ppk = keyset.input_fee_ppk ?? 0;
-        let gross = amount;
-        while (gross - Math.ceil(splitAmount(gross).length * ppk / 1000) < amount) {
-            gross += 1;
-        }
+        const gross = this.grossFor(amount, keyset);
 
         const id = newId();
         const outcome = await this.journaled(id, async (wallet) => {
@@ -1442,17 +1590,65 @@ export class CashuWallet {
         return { token, amount, fee: gross - amount, operationId: id };
     }
 
-    async receiveCashu(token: string, name?: string): Promise<CashuReceiveResult> {
-        let tokenMint: string;
+    private tokenMint(token: string): string {
         try {
-            tokenMint = getTokenMetadata(token).mint;
+            return normalizeMintUrl(getTokenMetadata(token).mint);
         }
         catch {
             throw new InvalidParameterError('token');
         }
+    }
+
+    async receiveCashu(token: string, name?: string): Promise<CashuReceiveResult> {
         // Refused before any request: a token cannot point Keymaster at a host.
-        const ctx = await this.context(normalizeMintUrl(tokenMint), name);
+        const ctx = await this.context(this.tokenMint(token), name);
         await this.settle(ctx);
+        return this.redeem(ctx, token);
+    }
+
+    // The key this identity would sign a locked proof with now, if it holds one.
+    private async lockKey(lock: P2PKLock, expired: boolean, name?: string): Promise<string | undefined> {
+        const key = await this.host.findPrivateKey(lock.keys, name);
+        return key ?? (expired && lock.refundSignatures === 1
+            ? this.host.findPrivateKey(lock.refund, name)
+            : undefined);
+    }
+
+    // Locked proofs get their witnesses here, and the signed inputs are what the
+    // record keeps, so a resubmission sends exactly the same request.
+    private async signLocked(ctx: MintContext, proofs: CashuProof[]): Promise<CashuProof[]> {
+        const now = Math.floor(Date.now() / 1000);
+        const signed: CashuProof[] = [];
+        for (const proof of proofs) {
+            const lock = p2pkLock(proof.secret);
+            if (!lock) {
+                signed.push(proof);
+                continue;
+            }
+            if (lock.sigAll || lock.signatures !== 1) {
+                throw new CashuMintUnsupportedError('a token needing SIG_ALL or several signatures');
+            }
+            // NUT-11: past its locktime a proof with no refund key needs no signature,
+            // and one with a refund key can be spent by either that key or the main one.
+            const expired = lock.locktime !== undefined && lock.locktime <= now;
+            if (expired && lock.refund.length === 0) {
+                signed.push(proof);
+                continue;
+            }
+            const key = await this.lockKey(lock, expired, ctx.name);
+            if (!key) {
+                throw new CashuTokenLockedError(lock.locktime !== undefined && lock.refund.length > 0 && !expired
+                    ? `locked until ${new Date(lock.locktime * 1000).toISOString()}, and to a key this identity does not hold`
+                    : 'locked to a key this identity does not hold');
+            }
+            const [witnessed] = signP2PKProofs([{ ...proof, witness: undefined } as never], key);
+            const witness = witnessed.witness;
+            signed.push({ ...proof, witness: typeof witness === 'string' ? witness : JSON.stringify(witness) });
+        }
+        return signed;
+    }
+
+    private async redeem(ctx: MintContext, token: string, message?: string): Promise<CashuReceiveResult> {
         const { keyset, keysets } = await this.activeKeyset(ctx);
 
         let proofs: CashuProof[];
@@ -1480,23 +1676,338 @@ export class CashuWallet {
         if (amount <= 0) {
             throw new InvalidParameterError('token amount does not cover its fee');
         }
+        const inputs = await this.signLocked(ctx, proofs);
 
         const id = newId();
+        const report: SwapReport = { redeemed: 0, recovered: 0, pending: 0, refused: 0 };
         const outcome = await this.journaled(id, async (wallet) => {
             const entry = await this.entryOf(wallet, ctx);
             const held = new Set(entry.proofs.map(proof => proof.secret));
             if (proofs.some(proof => held.has(proof.secret))) {
                 throw new CashuTokenSpentError('this token is already in the wallet');
             }
-            this.journalSwap(wallet, entry, id, 'receive', proofs, keyset.id, amount);
-        }, () => this.runSwap(ctx, id));
+            this.journalSwap(wallet, entry, id, 'receive', inputs, keyset.id, amount);
+            if (message) {
+                entry.operations![entry.operations!.length - 1].message = message;
+                this.rememberMessage(await this.host.fetchIdInfo(ctx.name, wallet), message);
+            }
+        }, () => this.runSwap(ctx, id, false, report));
         if (outcome === 'spent') {
-            throw new CashuTokenSpentError();
+            if (report.refused > 0) {
+                throw new CashuUnavailableError(`${ctx.url} refused the part of this token still unspent`);
+            }
+            if (report.pending > 0) {
+                throw new CashuUnavailableError(`${ctx.url} has the token pending; run cashu-check`);
+            }
+            if (report.recovered === 0) {
+                throw new CashuTokenSpentError();
+            }
+            return { amount: report.recovered, mint: ctx.url, spent: report.redeemed };
         }
         if (outcome === 'open') {
             throw new CashuUnavailableError(`${ctx.url} has the token pending; run cashu-check`);
         }
         return { amount, mint: ctx.url };
+    }
+
+    // ---- DID-locked sends over DIDComm ----
+
+    private rememberMessage(idInfo: IDInfo, key: string): void {
+        const cutoff = Date.now() - INBOX_MEMORY_MS;
+        const inbox: Record<string, string> = idInfo.cashuInbox ?? {};
+        for (const [known, seen] of Object.entries(inbox)) {
+            if (Date.parse(seen) < cutoff) {
+                delete inbox[known];
+            }
+        }
+        inbox[key] = new Date().toISOString();
+        idInfo.cashuInbox = inbox;
+    }
+
+    // The mint given, else one the recipient lists and the sender uses, preferring
+    // the sender's node mint.
+    private async chooseMint(recipient: any, recipientDid: string, mint: string | undefined, name: string): Promise<MintContext> {
+        if (mint) {
+            return this.context(mint, name);
+        }
+        const service = (recipient.didDocument?.service ?? []).find((item: { id?: string; type?: string }) =>
+            item.type === 'Cashu' || item.id?.endsWith('#cashu'));
+        const endpoint: unknown = service?.serviceEndpoint;
+        const listed = (Array.isArray(endpoint) ? endpoint : endpoint ? [endpoint] : [])
+            .filter((url): url is string => typeof url === 'string')
+            .map(normalizeMintUrl);
+        if (listed.length === 0) {
+            throw new CashuNotConfiguredError(`${recipientDid} publishes no Cashu mints`);
+        }
+        const mints = this.mints(await this.host.fetchIdInfo(name, await this.host.loadWallet()));
+        const shared = listed.filter(url => mints[url]);
+        if (shared.length === 0) {
+            throw new CashuMintNotAddedError(`${recipientDid} accepts only ${listed.join(', ')}`);
+        }
+        const node = this.nodeUrl();
+        return this.context(shared.find(url => mints[url].node && mints[url].node === node) ?? shared[0], name);
+    }
+
+    async sendCashuTo(recipient: string, amount: number, options: CashuSendToOptions = {}): Promise<CashuSendToResult> {
+        // A JSON caller may send null for what it does not set.
+        const memo = options.memo ?? undefined;
+        const locktime = options.locktime ?? LOCKTIME_DEFAULT_SECONDS;
+        const { mint, name } = options;
+        if (!Number.isSafeInteger(amount) || amount <= 0) {
+            throw new InvalidParameterError('amount');
+        }
+        if (!Number.isSafeInteger(locktime) || locktime <= 0 || locktime > LOCKTIME_MAX_SECONDS) {
+            throw new InvalidParameterError(`locktime must be from 1 to ${LOCKTIME_MAX_SECONDS} seconds`);
+        }
+        if (memo !== undefined && typeof memo !== 'string') {
+            throw new InvalidParameterError('memo');
+        }
+        if (typeof recipient !== 'string' || !recipient) {
+            throw new InvalidParameterError('recipient');
+        }
+        const identity = await this.boundIdentity(name);
+        const doc = await this.host.resolveDID(recipient);
+        const recipientDid: string = doc.didDocument.id;
+        const ctx = await this.chooseMint(doc, recipientDid, mint, identity);
+
+        // A mint without NUT-11 may treat locked proofs as bearer tokens, so there is
+        // no falling back to an unlocked token.
+        const info = await ctx.client.info();
+        if (!info?.nuts?.['11']?.supported) {
+            throw new CashuMintUnsupportedError(`${ctx.url} does not support NUT-11`);
+        }
+        await this.host.requireDidCommRoute(recipientDid, identity);
+        await this.settle(ctx);
+
+        const { keyset, keysets } = await this.activeKeyset(ctx);
+        const gross = this.grossFor(amount, keyset);
+        const expiry = Math.floor(Date.now() / 1000) + locktime;
+        // The anchored key, as for encrypting to a DID, while the mints above come from
+        // the latest document: a service just published need not be anchored yet.
+        const pubkey = this.host.documentPublicKey(await this.host.resolveDID(recipientDid, { confirm: true }));
+        const refundKey = await this.host.ownPublicKey(identity);
+        const send = splitAmount(gross).map((part) => {
+            const data = OutputData.createSingleP2PKData(
+                { pubkey, locktime: expiry, refundKeys: [refundKey], sigFlag: 'SIG_INPUTS' },
+                part as never,
+                keyset.id,
+            );
+            return {
+                amount: part,
+                role: 'send' as const,
+                secret: new TextDecoder().decode(data.secret),
+                r: data.blindingFactor.toString(16).padStart(64, '0'),
+            };
+        });
+
+        const id = newId();
+        const messageId = newId();
+        let deliveryError: string | undefined;
+        const outcome = await this.journaled(id, async (wallet) => {
+            const entry = await this.entryOf(wallet, ctx);
+            const inputs = this.select(entry.proofs, gross, keysets);
+            this.removeFromEntry(entry, inputs);
+            const keep = splitAmount(sumProofs(inputs) - feeFor(inputs, keysets) - gross);
+            const counters = this.reserve(wallet, keyset.id, keep.length);
+            (entry.operations ??= []).push({
+                id,
+                kind: 'locked-send',
+                inputs,
+                keyset: keyset.id,
+                outputs: [
+                    ...send,
+                    ...keep.map((part, i) => ({ amount: part, role: 'keep' as const, counter: counters[i] })),
+                ],
+                delivery: { recipient: recipientDid, ...(memo && { memo }), messageId, delivered: false },
+                created: new Date().toISOString(),
+            });
+        }, async () => {
+            const swapped = await this.runSwap(ctx, id);
+            if (swapped === 'done') {
+                deliveryError = await this.deliver(ctx, id);
+            }
+            return swapped;
+        });
+        if (outcome === 'spent') {
+            throw new CashuTokenSpentError('some selected proofs were already spent; the rest were kept, so try again');
+        }
+        if (outcome !== 'done') {
+            throw new CashuUnavailableError(`${ctx.url} has the send pending; run cashu-check`);
+        }
+        const op = (await this.readOp(ctx, id))!;
+        return {
+            token: this.encodeSent(ctx, op),
+            amount,
+            fee: gross - amount,
+            operationId: id,
+            mint: ctx.url,
+            recipient: recipientDid,
+            messageId,
+            locktime: expiry,
+            delivered: op.delivery!.delivered,
+            ...(deliveryError && { error: deliveryError }),
+        };
+    }
+
+    private encodeSent(ctx: MintContext, op: CashuOperation): string {
+        const proofs = op.sent!.map(({ witness: _witness, ...proof }) => proof);
+        return getEncodedToken({ mint: ctx.url, unit: UNIT, proofs: proofs as never });
+    }
+
+    // Sends a locked token not yet delivered, with the same message id each time,
+    // which the recipient deduplicates. A failure leaves it for the next check, and
+    // says why.
+    private async deliver(ctx: MintContext, id: string): Promise<string | undefined> {
+        const op = await this.readOp(ctx, id);
+        if (!op?.delivery || op.delivery.delivered || !op.sent) {
+            return undefined;
+        }
+        const { recipient, memo, messageId } = op.delivery;
+        try {
+            const message = cashuToken(this.encodeSent(ctx, op), { memo, id: messageId });
+            await this.host.sendDidComm(message, recipient, { name: ctx.name });
+        }
+        catch (error: any) {
+            return error?.message ?? String(error);
+        }
+        await this.host.mutateWallet(async (wallet) => {
+            const stored = (await this.entryOf(wallet, ctx)).operations?.find(item => item.id === id);
+            if (stored?.delivery) {
+                stored.delivery.delivered = true;
+            }
+        });
+        return undefined;
+    }
+
+    private async tokenMessages(name?: string): Promise<DidCommReceivedMessage[]> {
+        const received = await this.host.receiveDidComm({ name, ack: false });
+        return received.filter(item => isCashuTokenMessage(item.message));
+    }
+
+    private static messageSender(item: DidCommReceivedMessage): string | undefined {
+        return item.metadata.authenticated ? item.metadata.sender?.split('#')[0] : undefined;
+    }
+
+    // A resend carries the same id. Keyed by sender too, so nobody can use a known
+    // id to get someone else's message skipped.
+    private static messageKey(item: DidCommReceivedMessage): string {
+        return `${CashuWallet.messageSender(item) ?? ''}|${item.message?.id ?? item.id}`;
+    }
+
+    async listCashuMessages(name?: string): Promise<CashuMessage[]> {
+        const identity = await this.boundIdentity(name);
+        const idInfo = await this.host.fetchIdInfo(identity, await this.host.loadWallet());
+        const mints = this.mints(idInfo);
+        const result: CashuMessage[] = [];
+        for (const item of await this.tokenMessages(identity)) {
+            if (idInfo.cashuInbox?.[CashuWallet.messageKey(item)]) {
+                continue;
+            }
+            const sender = CashuWallet.messageSender(item);
+            const memo = typeof item.message?.body?.memo === 'string' ? item.message.body.memo : undefined;
+            const base = { id: item.id, ...(sender && { sender }), ...(memo && { memo }) };
+            try {
+                const token = item.message?.body?.token;
+                const metadata = getTokenMetadata(token);
+                const mint = normalizeMintUrl(metadata.mint);
+                const amount = Number(metadata.amount);
+                const described = { ...base, amount, mint };
+                result.push(!mints[mint]
+                    ? { ...described, redeemable: false, reason: `the mint ${mint} is not added` }
+                    : { ...described, ...await this.redeemableBy(metadata.incompleteProofs, identity) });
+            }
+            catch {
+                result.push({ ...base, redeemable: false, reason: 'not a valid token' });
+            }
+        }
+        return result;
+    }
+
+    private async redeemableBy(proofs: { secret: string }[], identity: string): Promise<{ redeemable: boolean; reason?: string }> {
+        const now = Math.floor(Date.now() / 1000);
+        for (const { secret } of proofs) {
+            const lock = p2pkLock(secret);
+            if (!lock) {
+                continue;
+            }
+            if (lock.sigAll || lock.signatures !== 1) {
+                return { redeemable: false, reason: 'needs SIG_ALL or several signatures' };
+            }
+            const expired = lock.locktime !== undefined && lock.locktime <= now;
+            if (!(expired && lock.refund.length === 0) && !await this.lockKey(lock, expired, identity)) {
+                return { redeemable: false, reason: 'locked to a key this identity does not hold' };
+            }
+        }
+        return { redeemable: true };
+    }
+
+    async receiveCashuMessages(name?: string): Promise<CashuAcceptResult> {
+        const identity = await this.boundIdentity(name);
+        const result: CashuAcceptResult = { redeemed: [], failed: [] };
+        const acknowledge: string[] = [];
+        const settled = new Set<string>();
+        const settleOnce = async (ctx: MintContext) => {
+            if (!settled.has(ctx.url)) {
+                settled.add(ctx.url);
+                await this.settle(ctx);
+            }
+        };
+
+        for (const item of await this.tokenMessages(identity)) {
+            const sender = CashuWallet.messageSender(item);
+            const key = CashuWallet.messageKey(item);
+            const token = item.message?.body?.token;
+            const memo = typeof item.message?.body?.memo === 'string' ? item.message.body.memo : undefined;
+            const fail = (reason: string, mint?: string, acknowledged = false) => {
+                result.failed.push({ id: item.id, ...(sender && { sender }), ...(mint && { mint }), reason, acknowledged });
+                if (acknowledged) {
+                    acknowledge.push(item.id);
+                }
+            };
+            let mint: string | undefined;
+            try {
+                if (typeof token !== 'string') {
+                    throw new InvalidParameterError('token');
+                }
+                mint = this.tokenMint(token);
+                const ctx = await this.context(mint, identity);
+                await settleOnce(ctx);
+
+                // Seen before: a resend, or a redemption from an earlier call. Settling
+                // above has finished it if it can be, and otherwise its record holds it.
+                const idInfo = await this.host.fetchIdInfo(identity, await this.host.loadWallet());
+                if (idInfo.cashuInbox?.[key]) {
+                    const entry = await this.entryOf(await this.host.loadWallet(), ctx);
+                    if (entry.operations?.some(op => op.message === key)) {
+                        fail('still pending at the mint', mint);
+                    }
+                    else {
+                        acknowledge.push(item.id);
+                    }
+                    continue;
+                }
+
+                const { amount, spent } = await this.redeem(ctx, token, key);
+                result.redeemed.push({
+                    id: item.id,
+                    ...(sender && { sender }),
+                    amount,
+                    mint,
+                    ...(memo && { memo }),
+                    ...(spent !== undefined && { spent }),
+                });
+                acknowledge.push(item.id);
+            }
+            catch (error: any) {
+                fail(error?.message ?? String(error), mint, error instanceof CashuTokenSpentError);
+            }
+        }
+
+        if (acknowledge.length > 0) {
+            // A failure here only repeats the messages, which are then seen before.
+            await this.host.ackDidComm(acknowledge, { name: identity }).catch(() => undefined);
+        }
+        return result;
     }
 
     async checkCashu(mint?: string, name?: string): Promise<CashuCheckResult> {
@@ -1618,37 +2129,51 @@ export class CashuWallet {
             throw new CashuUnavailableError(`send ${operationId} is being settled; try again`);
         }
 
-        // The token becomes an ordinary swap's inputs, in one write, so the record
-        // can be finished after a crash and the value never appears twice. It keeps
-        // its id: a refusal puts the token back, to be reclaimed again.
-        const swapId = operationId;
-        let amount = 0;
-        const report: SwapReport = { redeemed: 0, recovered: 0, pending: 0 };
-        const outcome = await this.journaled(swapId, async (wallet) => {
-            const entry = await this.entryOf(wallet, ctx);
-            const op = entry.operations?.find(item => item.id === operationId && item.sent);
-            if (!op) {
-                throw new InvalidParameterError('operationId');
+        // Reserved before anything is awaited, and held through the mint request, so a
+        // concurrent call or settlement cannot get in, or clear the mark by failing.
+        return this.withActive(operationId, async () => {
+            // A locked token is signed before the record changes: a lock still in force
+            // refuses here and leaves the send outstanding.
+            const held = (await this.readOp(ctx, operationId))?.sent ?? [];
+            const signed = await this.signLocked(ctx, held);
+
+            // The token becomes an ordinary swap's inputs, in one write, so the record
+            // can be finished after a crash and the value never appears twice. It keeps
+            // its id: a refusal puts the token back, to be reclaimed again.
+            let amount = 0;
+            const report: SwapReport = { redeemed: 0, recovered: 0, pending: 0, refused: 0 };
+            await this.host.mutateWallet(async (wallet) => {
+                const entry = await this.entryOf(wallet, ctx);
+                const op = entry.operations?.find(item => item.id === operationId && item.sent);
+                if (!op) {
+                    throw new InvalidParameterError('operationId');
+                }
+                const inputs = signed;
+                amount = sumProofs(inputs) - feeFor(inputs, keysets);
+                const { delivery } = op;
+                this.retire(entry, operationId);
+                this.journalSwap(wallet, entry, operationId, 'swap', inputs, keyset.id, amount, true);
+                // A refusal puts the send back as it was, still to be delivered.
+                if (delivery) {
+                    entry.operations![entry.operations!.length - 1].delivery = delivery;
+                }
+            });
+            const outcome = await this.runSwap(ctx, operationId, false, report);
+            if (outcome === 'spent') {
+                if (report.recovered === 0 && report.pending === 0) {
+                    throw new CashuTokenSpentError('the recipient already redeemed this token');
+                }
+                return {
+                    amount: report.recovered,
+                    mint: ctx.url,
+                    redeemed: report.redeemed,
+                    ...(report.pending > 0 && { pending: report.pending }),
+                };
             }
-            const inputs = op.sent!;
-            amount = sumProofs(inputs) - feeFor(inputs, keysets);
-            this.retire(entry, operationId);
-            this.journalSwap(wallet, entry, swapId, 'swap', inputs, keyset.id, amount, true);
-        }, () => this.runSwap(ctx, swapId, false, report));
-        if (outcome === 'spent') {
-            if (report.recovered === 0 && report.pending === 0) {
-                throw new CashuTokenSpentError('the recipient already redeemed this token');
+            if (outcome !== 'done') {
+                throw new CashuUnavailableError(`${ctx.url} has the reclaim pending; run cashu-check`);
             }
-            return {
-                amount: report.recovered,
-                mint: ctx.url,
-                redeemed: report.redeemed,
-                ...(report.pending > 0 && { pending: report.pending }),
-            };
-        }
-        if (outcome !== 'done') {
-            throw new CashuUnavailableError(`${ctx.url} has the reclaim pending; run cashu-check`);
-        }
-        return { amount, mint: ctx.url };
+            return { amount, mint: ctx.url };
+        });
     }
 }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import secrets
 import time
@@ -10,6 +11,8 @@ import httpx
 
 from bolt11 import Bolt11, MilliSatoshi, Tags, encode as encode_bolt11
 from keymaster.cashu_crypto import (
+    p2pk_lock,
+    verify_p2pk_witness,
     blind_sign,
     create_dleq,
     hash_to_curve,
@@ -46,7 +49,7 @@ class FakeMint:
 
     def __init__(self, input_fee_ppk: int = 0, nuts: list[int] | None = None) -> None:
         self.input_fee_ppk = input_fee_ppk
-        self.nuts = nuts if nuts is not None else [4, 5, 7, 8, 9, 12, 20]
+        self.nuts = nuts if nuts is not None else [4, 5, 7, 8, 9, 11, 12, 20]
         # Every keyset the mint has had, by id: its private keys by amount.
         self.keysets: dict[str, dict[int, bytes]] = {}
         self.rotate()
@@ -116,7 +119,23 @@ class FakeMint:
                 raise MintRefusal(10003, "invalid proof")
             if proof_y(proof["secret"]) in self.spent:
                 raise MintRefusal(11001, "token already spent")
+            if not self._authorised(proof):
+                raise MintRefusal(20008, "witness missing or invalid")
         self.spent.update(proof_y(proof["secret"]) for proof in inputs)
+
+    # NUT-11, as cdk-mintd applies it: a main key always, and past the locktime a
+    # refund key too, or no signature at all if the proof names no refund key.
+    @staticmethod
+    def _authorised(proof: dict[str, Any]) -> bool:
+        lock = p2pk_lock(proof["secret"])
+        if lock is None:
+            return True
+        keys = list(lock["keys"])
+        if lock.get("locktime", float("inf")) <= time.time():
+            if not lock["refund"]:
+                return True
+            keys += lock["refund"]
+        return any(verify_p2pk_witness(proof["secret"], proof.get("witness"), key) for key in keys)
 
     def _fee(self, inputs: list[dict[str, Any]]) -> int:
         return -(-len(inputs) * self.input_fee_ppk // 1000)
@@ -213,3 +232,49 @@ class FakeMint:
         if result is None:
             return httpx.Response(404, json={"detail": "not found"})
         return httpx.Response(200, json=result)
+
+
+class FakeRelay:
+    """A DIDComm mailbox, standing in for httpx.AsyncClient in the Keymaster."""
+
+    def __init__(self) -> None:
+        self.mailbox: list[dict[str, str]] = []
+        self.down = False
+        self._next = 0
+
+    def client(self, **_: Any) -> "FakeRelay":
+        return self
+
+    async def __aenter__(self) -> "FakeRelay":
+        return self
+
+    async def __aexit__(self, *_: Any) -> None:
+        return None
+
+    def _answer(self, url: str, body: Any = None, content: Any = None) -> httpx.Response:
+        if self.down:
+            return httpx.Response(503, json={"error": "relay down"})
+        if url.endswith("/challenge"):
+            return httpx.Response(200, json={"challenge": "challenge"})
+        if url.endswith("/messages"):
+            envelope = content.decode() if isinstance(content, bytes) else content
+            ids = []
+            for recipient in json.loads(envelope)["recipients"]:
+                self._next += 1
+                ids.append(f"mail-{self._next}")
+                self.mailbox.append({"id": ids[-1], "to": recipient["header"]["kid"].split("#")[0], "message": envelope})
+            return httpx.Response(200, json={"ids": ids})
+        if url.endswith("/messages/fetch"):
+            messages = [{"id": item["id"], "message": item["message"]} for item in self.mailbox if item["to"] == body["did"]]
+            return httpx.Response(200, json={"messages": messages})
+        if url.endswith("/messages/remove"):
+            before = len(self.mailbox)
+            self.mailbox = [item for item in self.mailbox if item["to"] != body["did"] or item["id"] not in body["ids"]]
+            return httpx.Response(200, json={"removed": before - len(self.mailbox)})
+        return httpx.Response(404, json={})
+
+    async def get(self, url: str, **_: Any) -> httpx.Response:
+        return self._answer(url)
+
+    async def post(self, url: str, json: Any = None, content: Any = None, **_: Any) -> httpx.Response:
+        return self._answer(url, json, content)

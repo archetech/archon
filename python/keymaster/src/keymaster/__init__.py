@@ -6,6 +6,7 @@ from .cashu import (
     CashuNotConfiguredError,
     CashuQuoteUnpaidError,
     CashuStateError,
+    CashuTokenLockedError,
     CashuTokenSpentError,
     CashuUnavailableError,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "CashuNotConfiguredError",
     "CashuQuoteUnpaidError",
     "CashuStateError",
+    "CashuTokenLockedError",
     "CashuTokenSpentError",
     "CashuUnavailableError",
     "DmailTags",
