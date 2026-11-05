@@ -129,6 +129,13 @@ describe('enabling', () => {
             getCapabilities: async () => null,
             resolveDID: did => keymaster.resolveDID(did),
             updateDID: (did, doc) => keymaster.updateDID(did, doc),
+            ownPublicKey: async () => '',
+            documentPublicKey: () => '',
+            findPrivateKey: async () => undefined,
+            requireDidCommRoute: async () => undefined,
+            sendDidComm: async () => [],
+            receiveDidComm: async () => [],
+            ackDidComm: async () => 0,
         }, publicFetch);
 
         const info = await cashu.addCashuMint('https://outside.example/');

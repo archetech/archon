@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 from collections.abc import AsyncIterable
 from copy import deepcopy
 import json
@@ -753,6 +754,52 @@ class Keymaster:
         return config
 
     # Cashu, in cashu.py.
+
+    @staticmethod
+    def _compressed_key_hex(public_jwk: dict[str, str]) -> str:
+        x = base64.urlsafe_b64decode(public_jwk["x"] + "=" * (-len(public_jwk["x"]) % 4))
+        y = base64.urlsafe_b64decode(public_jwk["y"] + "=" * (-len(public_jwk["y"]) % 4))
+        return (b"\x03" if y[-1] % 2 else b"\x02").hex() + x.hex()
+
+    async def _own_public_key(self, name: str | None = None) -> str:
+        keypair = await self.fetch_key_pair(name)
+        if not keypair:
+            raise KeymasterError("unable to resolve signing key")
+        return self._compressed_key_hex(keypair["publicJwk"])
+
+    async def _document_public_key(self, doc: dict[str, Any]) -> str:
+        return self._compressed_key_hex(await self.get_public_key_jwk(doc))
+
+    # Every retained derivation, unlike fetch_key_pair, which finds only the key the
+    # DID document names now: a token may be locked to a key since rotated away.
+    async def _find_private_key(self, public_keys: list[str], name: str | None = None) -> str | None:
+        wallet = await self.load_wallet()
+        id_info = await self.fetch_id_info(name, wallet)
+        wanted = {key.lower() for key in public_keys}
+        for index in range(id_info.get("index", 0), -1, -1):
+            keypair = await self.derive_key_pair(id_info["account"], index, wallet)
+            if self._compressed_key_hex(keypair["publicJwk"]) in wanted:
+                d = keypair["privateJwk"]["d"]
+                return base64.urlsafe_b64decode(d + "=" * (-len(d) % 4)).hex()
+        return None
+
+    async def _require_didcomm_route(self, recipient: str, name: str | None = None) -> None:
+        self._didcomm_gateway_base()
+        await self._require_node_capability("didcomm", "DIDComm messaging")
+        if not await self._resolve_didcomm_endpoint(recipient):
+            raise KeymasterError(f"recipient {recipient} has no DIDCommMessaging endpoint")
+        self._resolve_key_agreement(await self._resolve_did_for_didcomm(recipient))
+        own = await self.fetch_id_info(name)
+        self._resolve_key_agreement(await self.resolve_did(own["did"]))
+
+    async def send_cashu_to(self, recipient: str, amount: int, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        return await self.cashu.send_cashu_to(recipient, amount, options)
+
+    async def list_cashu_messages(self, name: str | None = None) -> list[dict[str, Any]]:
+        return await self.cashu.list_cashu_messages(name)
+
+    async def receive_cashu_messages(self, name: str | None = None) -> dict[str, Any]:
+        return await self.cashu.receive_cashu_messages(name)
 
     async def add_cashu(self, name: str | None = None) -> dict[str, Any]:
         return await self.cashu.add_cashu(name)
@@ -4949,7 +4996,10 @@ class Keymaster:
                     unpacked = await self.unpack_didcomm(entry["message"], {"name": name})
                     unpacked["id"] = entry["id"]
                     results.append(unpacked)
-                    handled.append(entry["id"])
+                    # A token message stays until redeemed: it may be the only copy of
+                    # the value. Only an explicit ack_didcomm of its id removes it.
+                    if not dc_protocols.is_cashu_token_message(unpacked.get("message")):
+                        handled.append(entry["id"])
                 except Exception:
                     # Leave messages we can't unpack on the server for inspection/retry.
                     pass

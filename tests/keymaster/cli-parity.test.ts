@@ -137,7 +137,7 @@ describe('CLI parity across entry points', () => {
         };
         const commands = expected.filter(command => command.includes('cashu'));
 
-        expect(commands).toHaveLength(18);
+        expect(commands).toHaveLength(21);
         for (const command of commands) {
             const options = optionsFor(packageCli, command).map(option => option.split(' ')[0]);
             expect({ command, options: pythonOptions(command) }).toEqual({ command, options });

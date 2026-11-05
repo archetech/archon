@@ -483,7 +483,14 @@ reclaim the value before the message could expire unread:
    lost, and sends it with the same message id, which the recipient deduplicates.
 
 An intercepted token is unspendable, and an unclaimed one returns to the sender
-after the locktime through `reclaimCashu`.
+after the locktime through `reclaimCashu`. NUT-11 lets either side spend after the
+locktime: the refund key becomes valid and the recipient's stays valid, so the
+first to reach the mint gets the value. The refund key must always be present,
+because a proof past its locktime with no refund key is spendable by anyone.
+
+The mints come from the recipient's latest DID document, since a service just
+published need not be anchored yet, and the key from its anchored document, as for
+encrypting to a DID.
 
 ### Message
 
@@ -498,8 +505,9 @@ Archon's own DIDComm protocols live under `https://archetech.com/didcomm/`,
 published from a new `archetech/didcomm` repository through GitHub Pages, as
 `archetech.com/schemas/` is. The protocol URI `https://archetech.com/didcomm/cashu/1.0`
 resolves to the protocol's specification. Versions follow DIDComm v2: a minor
-version only adds, and receivers accept higher minor versions. Keymaster lists the
-protocol in its discover-features disclosures so a sender can check support first.
+version only adds, and receivers accept higher minor versions. `CASHU_PROTOCOL` in
+`didcomm-protocols` names the protocol for a discover-features disclosure, but
+Keymaster has no discover-features responder yet, so nothing answers that query.
 
 ### Receiving
 
@@ -510,14 +518,17 @@ it is redeemed; an explicit `ack-didcomm` of a token message's id still removes 
 
 `receiveCashuMessages(name?)` takes token messages from the DIDComm inbox, signs
 each locked proof with the matching private key and swaps it. The matching key
-may be an earlier derivation if the recipient has rotated keys; Keymaster already
-searches retained derivations. It journals each redemption as a `receive` and
-acknowledges the message only after the record is saved, so a crash cannot lose
-a token between the mailbox and the wallet. A message it cannot redeem — a mint
-the identity has not added, a token already spent, a mint unreachable — stays
-unacknowledged and is reported with the reason, so the user can add the mint and
-accept it again; a spent token's message is acknowledged once reported. Processed message ids are recorded so
-a resent message is not redeemed twice.
+may be an earlier derivation if the recipient has rotated keys, so it searches every
+retained derivation, where `fetchKeyPair` finds only the key the DID document names
+now. It journals each redemption as a `receive`, recording the message as processed
+in the same write, and acknowledges the message only once the redemption has settled,
+so neither a crash nor a mint's refusal can lose a token between the mailbox and the
+wallet. A refusal clears the processed mark, so the message can be accepted again. A
+message it cannot redeem — a mint the identity has not added, a mint unreachable, a
+redemption still pending — stays unacknowledged and is reported with the reason, so
+the user can add the mint and accept it again; a spent token's message is acknowledged
+once reported. Processed messages are remembered by sender and message id, so a resent
+message is not redeemed twice.
 
 The specification for DID-locked ecash is `cashu/1.0/README.md` in
 `archetech/didcomm`, with a JSON Schema for the message body: the key selection

@@ -4501,6 +4501,122 @@
         }
       }
     },
+    "/cashu/send-to": {
+      "post": {
+        "summary": "Send ecash locked to a DID's key, over DIDComm.",
+        "description": "Locks the value to the recipient's key with NUT-11 and delivers the token as a DIDComm message. A delivery that fails is retried by the identity's next check, and the result's `delivered` says which happened. The sender can reclaim the value after the locktime.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "recipient",
+                  "amount"
+                ],
+                "properties": {
+                  "recipient": {
+                    "type": "string",
+                    "description": "The recipient's DID or alias."
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "description": "The least the recipient nets, in sats."
+                  },
+                  "memo": {
+                    "type": "string"
+                  },
+                  "locktime": {
+                    "type": "integer",
+                    "description": "Seconds until the sender can reclaim, at most seven days. Three days by default."
+                  },
+                  "mint": {
+                    "type": "string",
+                    "description": "The mint to use. By default, one the recipient publishes and the sender uses."
+                  },
+                  "id": {
+                    "type": "string",
+                    "description": "The sending identity. Defaults to the current one."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The token, its operation id, and whether it was delivered."
+          },
+          "400": {
+            "description": "Invalid request, no mint both sides use, no DIDComm route, or the mint refused it."
+          },
+          "503": {
+            "description": "The mint is unavailable."
+          }
+        }
+      }
+    },
+    "/cashu/messages": {
+      "post": {
+        "summary": "List token messages waiting in the DIDComm inbox.",
+        "description": "Contacts no mint and redeems nothing.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The identity. Defaults to the current one."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The messages, each with whether it can be redeemed and why not."
+          },
+          "400": {
+            "description": "Invalid request."
+          }
+        }
+      }
+    },
+    "/cashu/accept": {
+      "post": {
+        "summary": "Redeem the token messages in the DIDComm inbox.",
+        "description": "A message that cannot be redeemed stays in the inbox and is reported with the reason, unless its token is already spent.\n",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The identity. Defaults to the current one."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What was redeemed, and what was not."
+          },
+          "400": {
+            "description": "Invalid request."
+          }
+        }
+      }
+    },
     "/challenge": {
       "get": {
         "summary": "Create a default challenge DID with no parameters.",

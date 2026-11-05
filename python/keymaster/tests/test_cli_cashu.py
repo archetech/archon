@@ -170,3 +170,43 @@ def test_remove_passes_force_only_when_asked(monkeypatch, tmp_path, capsys) -> N
     assert _run(monkeypatch, tmp_path, ["remove-cashu", "Alice", "--force"], stub) == 0
 
     assert stub.calls == [("remove_cashu", (False, None)), ("remove_cashu", (True, "Alice"))]
+
+
+@pytest.mark.parametrize("given,seconds", [("45", 45), ("30m", 1800), ("12h", 43200), ("7d", 604800)])
+def test_send_to_reads_the_locktime(monkeypatch, tmp_path, capsys, given: str, seconds: int) -> None:
+    stub = _keymaster(send_cashu_to={"token": "t", "mint": MINT, "delivered": True}, get_cashu_balance=BALANCE)
+
+    argv = ["cashu-send-to", "Bob", "21", "lunch", "Alice", "--locktime", given, "-m", MINT]
+    assert _run(monkeypatch, tmp_path, argv, stub) == 0
+
+    assert stub.calls[0] == ("send_cashu_to", ("Bob", 21, {"memo": "lunch", "locktime": seconds, "mint": MINT, "name": "Alice"}))
+    assert json.loads(capsys.readouterr().out)["balance"] == BALANCE
+
+
+@pytest.mark.parametrize("given", ["0", "1.5", "7w", "soon"])
+def test_send_to_refuses_a_bad_locktime(monkeypatch, tmp_path, capsys, given: str) -> None:
+    stub = _keymaster()
+
+    assert _run(monkeypatch, tmp_path, ["cashu-send-to", "Bob", "21", "--locktime", given], stub) == 1
+
+    assert "locktime" in capsys.readouterr().err
+    assert stub.calls == []
+
+
+def test_send_to_succeeds_and_says_so_when_not_delivered(monkeypatch, tmp_path, capsys) -> None:
+    stub = _keymaster(send_cashu_to={"token": "t", "mint": MINT, "delivered": False, "error": "relay down"}, get_cashu_balance=BALANCE)
+
+    assert _run(monkeypatch, tmp_path, ["cashu-send-to", "Bob", "21"], stub) == 0
+
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["token"] == "t"
+    assert "relay down" in captured.err
+
+
+def test_accept_reports_without_failing(monkeypatch, tmp_path, capsys) -> None:
+    body = {"redeemed": [], "failed": [{"id": "2", "reason": "no mint", "acknowledged": False}]}
+    stub = _keymaster(receive_cashu_messages=body, get_cashu_balance=BALANCE)
+
+    assert _run(monkeypatch, tmp_path, ["cashu-accept", "Alice"], stub) == 0
+
+    assert json.loads(capsys.readouterr().out) == {**body, "balance": BALANCE}

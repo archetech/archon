@@ -1,4 +1,4 @@
-import { attachedJson, issueCredentialMessage, type DidCommPlaintext } from './didcomm-protocols.js';
+import { attachedJson, isCashuTokenMessage, issueCredentialMessage, type DidCommPlaintext } from './didcomm-protocols.js';
 import { proofsOf } from '@didcid/common/utils';
 import { isPrivateHostname, fetchPublicHttps } from '@didcid/common/net';
 import { CashuWallet, hasCashuState } from './cashu.js';
@@ -88,6 +88,7 @@ import {
     WalletEncFile,
     Seed,
     StoredAddressInfo,
+    CashuSendToOptions,
 } from '@didcid/keymaster/types';
 import {
     isWalletEncFile,
@@ -313,8 +314,21 @@ export default class Keymaster implements KeymasterInterface {
             fetchIdInfo: (name, wallet) => this.fetchIdInfo(name, wallet),
             getSeed: wallet => this.getSeedFromCacheOrMnemonic(wallet),
             getCapabilities: async () => (await this.getNodeCapabilities()) as Record<string, unknown> | null,
-            resolveDID: did => this.resolveDID(did),
+            resolveDID: (did, options) => this.resolveDID(did, options),
             updateDID: (did, doc) => this.updateDID(did, doc),
+            ownPublicKey: async (name) => {
+                const keypair = await this.fetchKeyPair(name);
+                if (!keypair) {
+                    throw new KeymasterError('unable to resolve signing key');
+                }
+                return this.compressedKeyHex(keypair.publicJwk);
+            },
+            documentPublicKey: doc => this.compressedKeyHex(this.getPublicKeyJwk(doc)),
+            findPrivateKey: (publicKeys, name) => this.findPrivateKey(publicKeys, name),
+            requireDidCommRoute: (recipient, name) => this.requireDidCommRoute(recipient, name),
+            sendDidComm: (message, to, options) => this.sendDidComm(message, to, options),
+            receiveDidComm: options => this.receiveDidComm(options),
+            ackDidComm: (ids, options) => this.ackDidComm(ids, options),
         });
     }
 
@@ -3718,8 +3732,13 @@ export default class Keymaster implements KeymasterInterface {
             try {
                 // The id travels with the result so a caller that defers the ack
                 // can name the messages it has stored.
-                results.push({ ...await this.unpackDidComm(entry.message, { name }), id: entry.id });
-                handled.push(entry.id);
+                const unpacked = await this.unpackDidComm(entry.message, { name });
+                results.push({ ...unpacked, id: entry.id });
+                // A token message stays until redeemed: it may be the only copy of the
+                // value. Only an explicit ackDidComm of its id removes it.
+                if (!isCashuTokenMessage(unpacked.message)) {
+                    handled.push(entry.id);
+                }
             }
             catch {
                 // Leave messages we can't unpack on the server for inspection/retry.
@@ -4044,6 +4063,37 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     // Cashu methods (see cashu.ts)
+    private compressedKeyHex(publicJwk: EcdsaJwkPublic): string {
+        return Buffer.from(this.cipher.convertJwkToCompressedBytes(publicJwk)).toString('hex');
+    }
+
+    // Every retained derivation, unlike fetchKeyPair, which finds only the key the
+    // DID document names now: a token may be locked to a key since rotated away.
+    private async findPrivateKey(publicKeys: string[], name?: string): Promise<string | undefined> {
+        const wallet = await this.loadWallet();
+        const id = await this.fetchIdInfo(name, wallet);
+        const hdkey = await this.getHDKeyFromCacheOrMnemonic(wallet);
+        const wanted = new Set(publicKeys.map(key => key.toLowerCase()));
+        for (let i = id.index; i >= 0; i--) {
+            const didkey = hdkey.derive(`m/44'/0'/${id.account}'/0/${i}`);
+            if (wanted.has(Buffer.from(didkey.publicKey!).toString('hex'))) {
+                return Buffer.from(didkey.privateKey!).toString('hex');
+            }
+        }
+        return undefined;
+    }
+
+    private async requireDidCommRoute(recipient: string, name?: string): Promise<void> {
+        this.didcommGatewayBase();
+        await this.requireNodeCapability('didcomm', 'DIDComm messaging');
+        if (!await this.resolveDidCommEndpoint(recipient)) {
+            throw new KeymasterError(`recipient ${recipient} has no DIDCommMessaging endpoint`);
+        }
+        this.resolveKeyAgreement(await this.resolveDidForDidComm(recipient));
+        const own = await this.fetchIdInfo(name);
+        this.resolveKeyAgreement(await this.resolveDID(own.did));
+    }
+
 
     addCashu(name?: string) { return this.cashu.addCashu(name); }
     removeCashu(force?: boolean, name?: string) { return this.cashu.removeCashu(force, name); }
@@ -4063,6 +4113,9 @@ export default class Keymaster implements KeymasterInterface {
     restoreCashu(mint?: string, name?: string) { return this.cashu.restoreCashu(mint, name); }
     listCashuSends(mint?: string, name?: string) { return this.cashu.listCashuSends(mint, name); }
     reclaimCashu(operationId: string, name?: string) { return this.cashu.reclaimCashu(operationId, name); }
+    sendCashuTo(recipient: string, amount: number, options?: CashuSendToOptions) { return this.cashu.sendCashuTo(recipient, amount, options); }
+    listCashuMessages(name?: string) { return this.cashu.listCashuMessages(name); }
+    receiveCashuMessages(name?: string) { return this.cashu.receiveCashuMessages(name); }
 
     // Lightning methods
 

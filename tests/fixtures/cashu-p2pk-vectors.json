@@ -1,0 +1,54 @@
+{
+    "comment": "One NUT-11 secret with a witness signed by each port. Each port verifies both, and reads the conditions the same way.",
+    "privateKey": "1111111111111111111111111111111111111111111111111111111111111111",
+    "publicKey": "034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+    "refundKey": "02466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f27",
+    "secret": "[\"P2PK\",{\"nonce\":\"abababababababababababababababababababababababababababababababab\",\"data\":\"034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa\",\"tags\":[[\"sigflag\",\"SIG_INPUTS\"],[\"locktime\",\"1900000000\"],[\"refund\",\"02466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f27\"]]}]",
+    "typescriptWitness": "{\"signatures\":[\"7dc77c4b30d9ba46849d566eb4c7f326f3cb4a58b67717f76fe85a2dd623b05f54865d293c44520c6b2900d8192cdcb41a9c5a6d0e995eec044f6c30df7e625e\"]}",
+    "pythonWitness": "{\"signatures\":[\"f5d14a840d2c0cd45b306d4ecb8f88d75d7b6aa02d8d0ddf5ae491aa4b2b6d809bba0ced4c65ef1ffa3043edfece8eab51ef4eced1503d3468e4707729e2332c\"]}",
+    "conditions": {
+        "keys": [
+            "034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+        ],
+        "refund": [
+            "02466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f27"
+        ],
+        "locktime": 1900000000,
+        "signatures": 1,
+        "refundSignatures": 1,
+        "sigAll": false
+    },
+    "others": [
+        {
+            "secret": "[\"P2PK\",{\"nonce\":\"abababababababababababababababababababababababababababababababab\",\"data\":\"034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa\",\"tags\":[[\"sigflag\",\"SIG_ALL\"],[\"n_sigs\",\"2\"],[\"pubkeys\",\"02466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f27\"],[\"n_sigs_refund\",\"3\"]]}]",
+            "conditions": {
+                "keys": [
+                    "034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa",
+                    "02466d7fcae563e5cb09a0d1870bb580344804617879a14949cf22285f1bae3f27"
+                ],
+                "refund": [],
+                "signatures": 2,
+                "refundSignatures": 3,
+                "sigAll": true
+            }
+        },
+        {
+            "secret": "[\"P2PK\",{\"nonce\":\"abababababababababababababababababababababababababababababababab\",\"data\":\"034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa\",\"tags\":[]}]",
+            "conditions": {
+                "keys": [
+                    "034f355bdcb7cc0af728ef3cceb9615d90684bb5b2ca5f859ab0f0b704075871aa"
+                ],
+                "refund": [],
+                "signatures": 1,
+                "refundSignatures": 1,
+                "sigAll": false
+            }
+        }
+    ],
+    "plain": [
+        "407915bc212be61a77e3e6d2aeb4c727980bda51cd06a6afc29e2861768a7837",
+        "12e5",
+        "123"
+    ],
+    "unsupported": "[\"HTLC\",{\"nonce\":\"00\",\"data\":\"00\",\"tags\":[]}]"
+}

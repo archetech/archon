@@ -41,14 +41,19 @@ export ARCHON_CASHU_MINT_URL=http://cashu-mint:8085
 export ARCHON_DRAWBRIDGE_PUBLIC_HOST=https://mint.invalid
 export ARCHON_KEYMASTER_GATEKEEPER_URL=http://drawbridge:4222
 
+# Locked sends travel through the DIDComm relay. Both identities' mailboxes are on
+# this node, so nothing leaves it and no Tor proxy is needed.
+export ARCHON_DIDCOMM_URL=http://didcomm:4236
+export ARCHON_DIDCOMM_TOR_PROXY=
+
 docker compose down
 
 # These containers run as ARCHON_UID, which need not own the checkout.
 mkdir -p data/cashu-mint data/drawbridge
 chmod a+rwx data/cashu-mint data/drawbridge
 
-docker compose build cli gatekeeper keymaster ipfs redis mongodb drawbridge
-docker compose up -d cli drawbridge cashu-mint
+docker compose build cli gatekeeper keymaster ipfs redis mongodb drawbridge didcomm
+docker compose up -d cli drawbridge cashu-mint didcomm
 
 echo "Waiting for all services to be 'Up'..."
 

@@ -45,6 +45,7 @@ describe('mcp server CLI parity', () => {
             archon_remove_cashu_mint: { url: 'https://mint.example' },
             archon_cashu_melt: { bolt11: 'lnbc...' },
             archon_cashu_send: { amount: 1 },
+            archon_cashu_send_to: { recipient: 'did:cid:bob', amount: 1 },
             archon_cashu_reclaim: { operationId: 'op' },
         };
 

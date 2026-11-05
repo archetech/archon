@@ -3,7 +3,11 @@ import {
     ResolveDIDOptions,
 } from './gatekeeper-types.js';
 import {
+    CashuAcceptResult,
     CashuBalance,
+    CashuMessage,
+    CashuSendToOptions,
+    CashuSendToResult,
     CashuCheckResult,
     CashuClaimResult,
     CashuMeltResult,
@@ -1037,6 +1041,37 @@ export default class KeymasterClient implements KeymasterInterface {
         try {
             const response = await this.axios.post(`${this.API}/cashu/sends`, { mint, id: name });
             return response.data.sends;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async sendCashuTo(recipient: string, amount: number, options: CashuSendToOptions = {}): Promise<CashuSendToResult> {
+        const { memo, locktime, mint, name } = options;
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/send-to`, { recipient, amount, memo, locktime, mint, id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listCashuMessages(name?: string): Promise<CashuMessage[]> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/messages`, { id: name });
+            return response.data.messages;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async receiveCashuMessages(name?: string): Promise<CashuAcceptResult> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/accept`, { id: name });
+            return response.data;
         }
         catch (error) {
             throwError(error);

@@ -221,3 +221,61 @@ describe('commands that change ecash state', () => {
         expect(requests.map(request => request.body)).toEqual([{}, { force: true, id: 'Alice' }]);
     });
 });
+
+describe('cashu-send-to', () => {
+    beforeEach(() => {
+        routes['/cashu/send-to'] = () => ({ body: { token: 'cashuBtoken', amount: 21, mint: MINT, delivered: true } });
+    });
+
+    it.each([
+        ['45', 45],
+        ['30m', 1800],
+        ['12h', 43200],
+        ['7d', 604800],
+    ])('reads the locktime %s', async (locktime, seconds) => {
+        const { status, stdout } = await run('cashu-send-to', 'Bob', '21', 'lunch', 'Alice', '--locktime', locktime, '-m', MINT);
+
+        expect(status).toBe(0);
+        expect(JSON.parse(stdout)).toMatchObject({ delivered: true, balance: { spendable: 21 } });
+        expect(requests[0]).toEqual({
+            path: '/cashu/send-to',
+            body: { recipient: 'Bob', amount: 21, memo: 'lunch', locktime: seconds, mint: MINT, id: 'Alice' },
+        });
+    });
+
+    it.each(['0', '1.5', '7w', 'soon', '-3'])('refuses the locktime %s before calling the service', async (locktime) => {
+        const { status, stderr } = await run('cashu-send-to', 'Bob', '21', '--locktime', locktime);
+
+        expect(status).toBe(1);
+        expect(stderr).toContain('locktime');
+        expect(requests).toEqual([]);
+    });
+
+    it('leaves the locktime to the wallet when not given', async () => {
+        await run('cashu-send-to', 'Bob', '21');
+
+        expect(requests[0].body).toEqual({ recipient: 'Bob', amount: 21 });
+    });
+
+    it('succeeds and says so when the token is not delivered yet', async () => {
+        routes['/cashu/send-to'] = () => ({ body: { token: 'cashuBtoken', amount: 21, mint: MINT, delivered: false, error: 'relay down' } });
+
+        const { status, stdout, stderr } = await run('cashu-send-to', 'Bob', '21');
+
+        expect(status).toBe(0);
+        expect(JSON.parse(stdout).token).toBe('cashuBtoken');
+        expect(stderr).toContain('relay down');
+    });
+});
+
+describe('cashu-accept', () => {
+    it('reports what was redeemed and what was not, without failing', async () => {
+        const body = { redeemed: [{ id: '1', amount: 21, mint: MINT }], failed: [{ id: '2', reason: 'no mint', acknowledged: false }] };
+        routes['/cashu/accept'] = () => ({ body });
+
+        const { status, stdout } = await run('cashu-accept', 'Alice');
+
+        expect(status).toBe(0);
+        expect(JSON.parse(stdout)).toMatchObject(body);
+    });
+});

@@ -506,6 +506,22 @@ async def reclaim_cashu(body: CashuBody) -> dict[str, Any]:
     return await service.reclaim_cashu(body.get("operationId"), body.get("id"))
 
 
+@protected_api.post("/cashu/send-to")
+async def send_cashu_to(body: CashuBody) -> dict[str, Any]:
+    options = {"memo": body.get("memo"), "locktime": body.get("locktime"), "mint": body.get("mint"), "name": body.get("id")}
+    return await service.send_cashu_to(body.get("recipient"), body.get("amount"), options)
+
+
+@protected_api.post("/cashu/messages")
+async def list_cashu_messages(body: CashuBody) -> dict[str, Any]:
+    return {"messages": await service.list_cashu_messages(body.get("id"))}
+
+
+@protected_api.post("/cashu/accept")
+async def receive_cashu_messages(body: CashuBody) -> dict[str, Any]:
+    return await service.receive_cashu_messages(body.get("id"))
+
+
 @protected_api.post("/lightning")
 async def add_lightning(body: dict[str, Any]) -> dict[str, Any]:
     return await service.add_lightning(body.get("id"))

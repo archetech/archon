@@ -5314,6 +5314,9 @@ describe('Cashu', () => {
         ['restoreCashu', 'post', '/restore', k => k.restoreCashu(mint, 'Alice'), { mint, id: 'Alice' }, { restored: 1 }, { restored: 1 }],
         ['listCashuSends', 'post', '/sends', k => k.listCashuSends(mint, 'Alice'), { mint, id: 'Alice' }, { sends: [{ amount: 21 }] }, [{ amount: 21 }]],
         ['reclaimCashu', 'post', '/reclaim', k => k.reclaimCashu('op', 'Alice'), { operationId: 'op', id: 'Alice' }, { amount: 21 }, { amount: 21 }],
+        ['sendCashuTo', 'post', '/send-to', k => k.sendCashuTo('Bob', 21, { memo: 'm', locktime: 60, mint, name: 'Alice' }), { recipient: 'Bob', amount: 21, memo: 'm', locktime: 60, mint, id: 'Alice' }, { delivered: true }, { delivered: true }],
+        ['listCashuMessages', 'post', '/messages', k => k.listCashuMessages('Alice'), { id: 'Alice' }, { messages: [{ id: '1' }] }, [{ id: '1' }]],
+        ['receiveCashuMessages', 'post', '/accept', k => k.receiveCashuMessages('Alice'), { id: 'Alice' }, { redeemed: [], failed: [] }, { redeemed: [], failed: [] }],
     ];
 
     it.each(cases)('%s sends its arguments and unwraps the reply', async (_name, verb, path, call, body, reply, expected) => {

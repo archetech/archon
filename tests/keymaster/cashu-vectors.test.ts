@@ -15,8 +15,10 @@ import {
     hash_e,
     pointFromHex,
     verifyMintQuoteSignature,
+    hasP2PKSignedProof,
 } from '@cashu/cashu-ts';
-import { normalizeMintUrl, proofY } from '../../packages/keymaster/src/cashu.ts';
+import { normalizeMintUrl, p2pkLock, proofY } from '../../packages/keymaster/src/cashu.ts';
+import { CashuMintUnsupportedError } from '@didcid/common/errors';
 
 // The same two files drive python/keymaster/tests/test_cashu_vectors.py. The NUT
 // file is the published specification vectors; the generated file is cashu-ts's
@@ -137,4 +139,29 @@ describe.each(['v00', 'v01'])('generated %s vectors', (version) => {
 
 it('normalizes a token\'s mint URL the way the wallet does', () => {
     expect(normalizeMintUrl(getTokenMetadata(nut.nut00.tokenV3.encoded).mint)).toBe('https://8333.space:3338');
+});
+
+describe('NUT-11 vectors', () => {
+    const p2pk = JSON.parse(readFileSync('tests/fixtures/cashu-p2pk-vectors.json', 'utf-8'));
+    const proof = { id: '009a1f293253e41e', amount: 8, C: `02${'00'.repeat(32)}`, secret: p2pk.secret };
+
+    it.each(['typescriptWitness', 'pythonWitness'])('verifies the signature in %s', (field) => {
+        expect(hasP2PKSignedProof(p2pk.publicKey, { ...proof, witness: p2pk[field] } as never)).toBe(true);
+        expect(hasP2PKSignedProof(p2pk.refundKey, { ...proof, witness: p2pk[field] } as never)).toBe(false);
+    });
+
+    it('reads the spending conditions', () => {
+        expect(p2pkLock(p2pk.secret)).toEqual(p2pk.conditions);
+        for (const other of p2pk.others) {
+            expect(p2pkLock(other.secret)).toEqual(other.conditions);
+        }
+    });
+
+    it.each(['407915bc212be61a77e3e6d2aeb4c727980bda51cd06a6afc29e2861768a7837', '12e5', '123'])('treats %s as an ordinary secret', (secret) => {
+        expect(p2pkLock(secret)).toBeUndefined();
+    });
+
+    it('refuses a spending condition it does not implement', () => {
+        expect(() => p2pkLock(p2pk.unsupported)).toThrow(CashuMintUnsupportedError);
+    });
 });

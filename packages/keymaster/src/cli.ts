@@ -53,6 +53,16 @@ function parseSats(value: string): number {
     return amount;
 }
 
+// Seconds, or a count of minutes, hours or days.
+function parseDuration(value: string): number {
+    const match = /^([1-9][0-9]*)([mhd]?)$/.exec(value);
+    if (!match) {
+        throw new Error(`locktime must be seconds, or like 30m, 12h or 7d, not '${value}'`);
+    }
+    const unit = ({ '': 1, m: 60, h: 3600, d: 86400 } as Record<string, number>)[match[2]];
+    return Number(match[1]) * unit;
+}
+
 // By the time a balance is read the operation has happened, so failing to read it
 // must not report the operation as failed.
 async function readCashuBalance(mint?: string, id?: string) {
@@ -1648,6 +1658,54 @@ program
         try {
             const result = await keymaster.reclaimCashu(operationId, id);
             await printCashuResult(result, result.mint, id);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-send-to <recipient> <amount> [memo] [id]')
+    .description('Send ecash locked to a DID, over DIDComm')
+    .option('--locktime <duration>', 'when the sender can reclaim it: seconds, or 30m, 12h, 7d (default 3d)')
+    .option('-m, --mint <url>', 'mint to use')
+    .action(async (recipient, amount, memo, id, options) => {
+        try {
+            const result = await keymaster.sendCashuTo(recipient, parseSats(amount), {
+                memo,
+                locktime: options.locktime === undefined ? undefined : parseDuration(options.locktime),
+                mint: options.mint,
+                name: id,
+            });
+            if (!result.delivered) {
+                note(`Not delivered yet (${result.error}); cashu-check sends it again`);
+            }
+            await printCashuResult(result, result.mint, id);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-messages [id]')
+    .description('List token messages waiting in the DIDComm inbox')
+    .action(async (id) => {
+        try {
+            console.log(JSON.stringify(await keymaster.listCashuMessages(id), null, 4));
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
+    .command('cashu-accept [id]')
+    .description('Redeem the token messages in the DIDComm inbox')
+    .action(async (id) => {
+        try {
+            const result = await keymaster.receiveCashuMessages(id);
+            await printCashuResult(result, undefined, id);
         }
         catch (error: any) {
             fail(error.error || error.message || error);

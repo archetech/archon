@@ -225,6 +225,9 @@ const ROUTES: Array<[Method, string, number]> = [
     ['POST', '/keys/verify', 400],
     // cashu
     ['POST', '/cashu', 400],
+    ['POST', '/cashu/send-to', 400],
+    ['POST', '/cashu/messages', 400],
+    ['POST', '/cashu/accept', 400],
     ['DELETE', '/cashu', 400],
     ['POST', '/cashu/mints', 400],
     ['DELETE', '/cashu/mints', 400],
@@ -404,6 +407,9 @@ describe('keymaster cashu routes', () => {
         ['POST', '/cashu/send', { amount: 5, mint: 'https://m', id: 'Bob' }, 'sendCashu', [5, 'https://m', 'Bob']],
         ['POST', '/cashu/receive', { token: 't', id: 'Bob' }, 'receiveCashu', ['t', 'Bob']],
         ['POST', '/cashu/reclaim', { operationId: 'o', id: 'Bob' }, 'reclaimCashu', ['o', 'Bob']],
+        ['POST', '/cashu/send-to', { recipient: 'Carol', amount: 5, memo: 'm', locktime: 60, mint: 'https://m', id: 'Bob' }, 'sendCashuTo', ['Carol', 5, { memo: 'm', locktime: 60, mint: 'https://m', name: 'Bob' }]],
+        ['POST', '/cashu/messages', { id: 'Bob' }, 'listCashuMessages', ['Bob']],
+        ['POST', '/cashu/accept', { id: 'Bob' }, 'receiveCashuMessages', ['Bob']],
     ])('%s %s passes its body in the method\'s argument order', async (method, path, body, name, args) => {
         const { app, keymaster } = mount();
         const agent = request(app);

@@ -403,6 +403,9 @@ Pay a Lightning invoice:
 | `cashu-restore` | `archon_cashu_restore` |
 | `cashu-sends` | `archon_cashu_sends` |
 | `cashu-reclaim` | `archon_cashu_reclaim` |
+| `cashu-send-to` | `archon_cashu_send_to` |
+| `cashu-messages` | `archon_cashu_messages` |
+| `cashu-accept` | `archon_cashu_accept` |
 | `create-group` | `archon_create_group` |
 | `list-groups` | `archon_list_groups` |
 | `get-group` | `archon_get_group` |
