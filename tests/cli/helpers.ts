@@ -103,7 +103,7 @@ export async function dockerExec(...args: string[]): Promise<string> {
  * A signed mainnet BOLT11 invoice nobody will settle except a mint's fakewallet
  * backend. Fresh each call, since a mint remembers the hashes it has paid.
  */
-export function signedInvoice(sats: number): string {
+export function signedInvoice(sats?: number): string {
     const toWords = (bytes: Uint8Array): number[] => bech32.toWords(bytes);
     const tag = (type: number, words: number[]): number[] => [type, words.length >> 5, words.length & 31, ...words];
     const timestamp = Math.floor(Date.now() / 1000);
@@ -117,7 +117,7 @@ export function signedInvoice(sats: number): string {
         tag(5, [0b00001, 0b00000, 0b10000, 0b00000]),
     ].flat();
 
-    const hrp = `lnbc${sats * 10}n`;
+    const hrp = sats === undefined ? 'lnbc' : `lnbc${sats * 10}n`;
     const signed = Buffer.concat([Buffer.from(hrp), Buffer.from(bech32.fromWords(padWords(words)))]);
     const recovered = secp256k1.sign(signed, secp256k1.utils.randomSecretKey(), { format: 'recovered' });
     // noble puts the recovery id first; BOLT11 puts it last.

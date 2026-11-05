@@ -11,6 +11,7 @@ import {
     signMintQuote,
 } from '@cashu/cashu-ts';
 import type { SerializedBlindedSignature, Proof as CtsProof } from '@cashu/cashu-ts';
+import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { fetchPublicHttps } from '@didcid/common/net';
 import {
     CashuInsufficientFundsError,
@@ -276,6 +277,16 @@ interface MintContext {
     name?: string;
     url: string;
     client: CashuMintClient;
+}
+
+function invoiceMsat(request: string): bigint | undefined {
+    try {
+        const section = decodeBolt11(request).sections.find(item => item.name === 'amount');
+        return section ? BigInt(section.value as string) : undefined;
+    }
+    catch {
+        return undefined;
+    }
 }
 
 export class CashuWallet {
@@ -1290,6 +1301,11 @@ export class CashuWallet {
         const info = await ctx.client.info();
         const secret = info?.nuts?.['20']?.supported ? createRandomSecretKey() : undefined;
         const quote = await ctx.client.createMintQuote(amount, secret && toHex(getPubKeyFromPrivKey(secret)));
+        // The invoice is the mint's to choose, and paying it may be automatic.
+        // quote.amount proves nothing, since it only echoes the request.
+        if (invoiceMsat(quote.request) !== BigInt(amount) * 1000n) {
+            throw new CashuMintUnsupportedError(`the mint's invoice is not for the ${amount} sats requested`);
+        }
 
         await this.host.mutateWallet(async (wallet) => {
             const entry = await this.entryOf(wallet, ctx);

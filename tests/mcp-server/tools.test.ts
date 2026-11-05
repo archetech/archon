@@ -477,9 +477,21 @@ describe('mcp server tools', () => {
             const result = expectOk(await handler({ amount: 21, pay: true, confirmPayment: true, mint: 'https://mint.example', id: 'Alice' }));
 
             expect(result).toEqual({ quote: 'quote-1', amount: 21, mint: 'https://mint.example' });
-            expect(keymaster.payLightningInvoice).toHaveBeenCalledWith('lnbc...', 'Alice');
+            expect(keymaster.resolveDID).toHaveBeenCalledWith('Alice');
+            expect(keymaster.createCashuMintQuote).toHaveBeenCalledWith(21, 'https://mint.example', 'did:cid:alice');
+            expect(keymaster.payLightningInvoice).toHaveBeenCalledWith('lnbc...', 'did:cid:alice');
             expect(claim).toHaveBeenCalledTimes(2);
-            expect(claim).toHaveBeenLastCalledWith('quote-1', 'https://mint.example', 'Alice');
+            expect(claim).toHaveBeenLastCalledWith('quote-1', 'https://mint.example', 'did:cid:alice');
+        });
+
+        it('stays on the identity current when it started', async () => {
+            const { handler, keymaster } = setup();
+
+            expectOk(await handler({ amount: 21, pay: true, confirmPayment: true }));
+
+            expect(keymaster.getCurrentId).toHaveBeenCalledTimes(1);
+            expect(keymaster.resolveDID).toHaveBeenCalledWith('alice');
+            expect(keymaster.payLightningInvoice).toHaveBeenCalledWith('lnbc...', 'did:cid:alice');
         });
 
         it('names the quote when a failure leaves it unclaimed', async () => {

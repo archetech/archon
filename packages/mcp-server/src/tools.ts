@@ -359,18 +359,24 @@ async function mintCashu(
     if (pay && !confirmPayment) {
         throw new Error('pay requires confirmPayment: true');
     }
-
-    const quote = await keymaster.createCashuMintQuote(amount, mint, id);
     if (!pay) {
-        return quote;
+        return keymaster.createCashuMintQuote(amount, mint, id);
     }
+
+    // By DID, so every step stays on this identity if the current one changes.
+    const name = id ?? await keymaster.getCurrentId();
+    if (!name) {
+        throw new Error('No current ID');
+    }
+    const owner = (await keymaster.resolveDID(name)).didDocument!.id!;
+    const quote = await keymaster.createCashuMintQuote(amount, mint, owner);
 
     // Any failure from here names the quote, so archon_cashu_claim can finish it.
     try {
-        await keymaster.payLightningInvoice(quote.request, id);
+        await keymaster.payLightningInvoice(quote.request, owner);
         for (let attempt = 1; ; attempt++) {
             try {
-                return { quote: quote.quote, ...await keymaster.claimCashuMintQuote(quote.quote, mint, id) };
+                return { quote: quote.quote, ...await keymaster.claimCashuMintQuote(quote.quote, mint, owner) };
             }
             catch (error) {
                 // A Lightning payment can settle a moment before the mint sees it.

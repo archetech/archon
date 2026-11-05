@@ -15,6 +15,7 @@ type Handler = (body: any) => Reply;
 const SCRIPT = path.resolve('scripts/archon-cli.js');
 const QUOTE = { quote: 'quote-1', request: 'lnbc-invoice', amount: 21, state: 'UNPAID' };
 const MINT = 'https://mint.example';
+const DID = 'did:cid:alice';
 
 let server: http.Server;
 let url: string;
@@ -58,6 +59,9 @@ afterAll(async () => {
 beforeEach(() => {
     requests = [];
     routes = {
+        '/ids/current': () => ({ body: { current: 'alice' } }),
+        '/did/alice': () => ({ body: { docs: { didDocument: { id: DID } } } }),
+        '/did/Alice': () => ({ body: { docs: { didDocument: { id: DID } } } }),
         '/cashu/quote': () => ({ body: QUOTE }),
         '/lightning/pay': () => ({ body: { paymentHash: 'hash' } }),
         '/cashu/claim': () => ({ body: { amount: 21, mint: MINT } }),
@@ -94,10 +98,19 @@ describe('cashu-mint', () => {
         expect(status).toBe(0);
         expect(JSON.parse(stdout)).toEqual({ amount: 21, mint: MINT, balance: { spendable: 21, inFlight: 0, outstanding: 0 } });
         expect(stderr).toContain('quote-1');
-        expect(called()).toEqual(['/cashu/quote', '/lightning/pay', '/cashu/claim', '/cashu/balance']);
-        expect(requests[0].body).toEqual({ amount: 21, mint: MINT, id: 'Alice' });
-        expect(requests[1].body).toEqual({ bolt11: 'lnbc-invoice', id: 'Alice' });
-        expect(requests[2].body).toEqual({ quote: 'quote-1', mint: MINT, id: 'Alice' });
+        expect(called()).toEqual(['/did/Alice', '/cashu/quote', '/lightning/pay', '/cashu/claim', '/cashu/balance']);
+        expect(requests[1].body).toEqual({ amount: 21, mint: MINT, id: DID });
+        expect(requests[2].body).toEqual({ bolt11: 'lnbc-invoice', id: DID });
+        expect(requests[3].body).toEqual({ quote: 'quote-1', mint: MINT, id: DID });
+    });
+
+    it('with --pay stays on the identity current when it started', async () => {
+        const { status } = await run('cashu-mint', '21', '--pay');
+
+        expect(status).toBe(0);
+        expect(called().filter(path => path === '/ids/current')).toHaveLength(1);
+        const paid = requests.filter(request => ['/cashu/quote', '/lightning/pay', '/cashu/claim', '/cashu/balance'].includes(request.path));
+        expect(paid.map(request => request.body.id)).toEqual([DID, DID, DID, DID]);
     });
 
     it('retries a claim the mint has not yet seen paid', async () => {
@@ -121,7 +134,7 @@ describe('cashu-mint', () => {
         expect(stdout).toBe('');
         expect(stderr).toContain('quote-1');
         expect(stderr).toContain('no route to host');
-        expect(called()).toEqual(['/cashu/quote', '/lightning/pay']);
+        expect(called()).toEqual(['/ids/current', '/did/alice', '/cashu/quote', '/lightning/pay']);
     });
 
     it('does not retry a claim that failed for another reason', async () => {

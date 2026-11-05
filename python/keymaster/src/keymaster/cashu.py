@@ -16,6 +16,7 @@ import secrets
 from typing import Any, Awaitable, Callable, Protocol
 from urllib.parse import quote as url_quote, urlsplit
 
+from bolt11 import decode as decode_bolt11
 import httpx
 
 from . import cashu_crypto as cc
@@ -263,6 +264,14 @@ class CashuHost(Protocol):
     async def get_node_capabilities(self) -> dict[str, bool] | None: ...
     async def resolve_did(self, name: str, options: dict[str, Any] | None = None) -> dict[str, Any]: ...
     async def update_did(self, identifier: str, doc: dict[str, Any]) -> bool: ...
+
+
+def _invoice_msat(request: Any) -> int | None:
+    try:
+        amount = decode_bolt11(request).amount_msat
+    except Exception:
+        return None
+    return None if amount is None else int(amount)
 
 
 class CashuWallet:
@@ -1132,6 +1141,10 @@ class CashuWallet:
         supported = (((info or {}).get("nuts") or {}).get("20") or {}).get("supported")
         secret = cc.new_secret_key() if supported else None
         quote = await ctx.client.create_mint_quote(amount, cc.public_key_hex(secret) if secret else None)
+        # The invoice is the mint's to choose, and paying it may be automatic.
+        # quote["amount"] proves nothing, since it only echoes the request.
+        if _invoice_msat(quote.get("request")) != amount * 1000:
+            raise CashuMintUnsupportedError(f"the mint's invoice is not for the {amount} sats requested")
 
         async def mutator(wallet: dict[str, Any]) -> None:
             entry = await self._entry_of(wallet, ctx)

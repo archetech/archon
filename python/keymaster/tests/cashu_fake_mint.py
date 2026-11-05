@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import re
+import secrets
 import time
 from typing import Any
 
 import httpx
 
+from bolt11 import Bolt11, MilliSatoshi, Tags, encode as encode_bolt11
 from keymaster.cashu_crypto import (
     blind_sign,
     create_dleq,
@@ -21,6 +23,21 @@ class MintRefusal(Exception):
     def __init__(self, code: int, detail: str) -> None:
         super().__init__(detail)
         self.code = code
+
+
+def signed_invoice(sats: int | None = None) -> str:
+    """A signed mainnet invoice. Fresh each call, as a mint's own would be."""
+    tags = Tags.from_dict(
+        {
+            "payment_hash": secrets.token_hex(32),
+            "description": "cashu test",
+            "payment_secret": secrets.token_hex(32),
+            "features": {"var_onion_optin": "required", "payment_secret": "required"},
+        }
+    )
+    amount = None if sats is None else MilliSatoshi(sats * 1000)
+    invoice = Bolt11(currency="bc", date=int(time.time()), tags=tags, amount_msat=amount)
+    return encode_bolt11(invoice, secrets.token_hex(32))
 
 
 class FakeMint:
@@ -38,6 +55,8 @@ class FakeMint:
         self.mint_quotes: dict[str, dict[str, Any]] = {}
         self.melt_quotes: dict[str, dict[str, Any]] = {}
         self.requests: list[str] = []
+        # The invoice a mint quote carries; a test can make it dishonest.
+        self.invoice_for = signed_invoice
         self.melt_routing_fee = 1
         self.melt_outcome = "PAID"
         # Mints differ here: NUT-00 lists 11003, cdk-mintd sends 20006 on a mint.
@@ -120,7 +139,7 @@ class FakeMint:
             self._next += 1
             quote = f"mq{self._next}"
             self.mint_quotes[quote] = {"amount": body["amount"], "state": "UNPAID", "pubkey": body.get("pubkey"), "expiry": int(time.time()) + 600}
-            return {"quote": quote, "request": f"lnbc-{quote}", "unit": "sat", **self.mint_quotes[quote]}
+            return {"quote": quote, "request": self.invoice_for(body["amount"]), "unit": "sat", **self.mint_quotes[quote]}
         if method == "GET" and path.startswith("/v1/mint/quote/bolt11/"):
             quote = path.rsplit("/", 1)[1]
             return {"quote": quote, "request": "lnbc", "unit": "sat", **self.mint_quotes[quote]}

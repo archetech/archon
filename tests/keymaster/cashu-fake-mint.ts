@@ -10,6 +10,7 @@ import {
     verifyMintQuoteSignature,
     verifyUnblindedSignature,
 } from '@cashu/cashu-ts';
+import { signedInvoice } from '../cli/helpers.ts';
 
 // A mint that really signs: blind signatures from cashu-ts, spent and signed
 // sets, and quotes it settles when told to. Journal recovery can only be tested
@@ -60,6 +61,8 @@ export class FakeMint {
     mintQuotes = new Map<string, MintQuote>();
     meltQuotes = new Map<string, MeltQuote>();
     requests: string[] = [];
+    // The invoice a mint quote carries; a test can make it dishonest.
+    invoiceFor: (amount: number) => string = signedInvoice;
     // The fee the Lightning payment of a melt actually costs.
     meltRoutingFee = 1;
     meltOutcome: 'PAID' | 'PENDING' | 'UNPAID' = 'PAID';
@@ -213,7 +216,7 @@ export class FakeMint {
                 pubkey: body.pubkey,
                 expiry: Math.floor(Date.now() / 1000) + 600,
             });
-            return { quote, request: `lnbc-${quote}`, unit: 'sat', state: 'UNPAID', amount: body.amount, expiry: this.mintQuotes.get(quote)!.expiry };
+            return { quote, request: this.invoiceFor(body.amount), unit: 'sat', state: 'UNPAID', amount: body.amount, expiry: this.mintQuotes.get(quote)!.expiry };
         }
         if (method === 'GET' && path.startsWith('/v1/mint/quote/bolt11/')) {
             const quote = this.mintQuotes.get(path.split('/').pop()!)!;

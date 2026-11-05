@@ -56,6 +56,17 @@ async function printCashuResult(result, mint, id) {
     console.log(JSON.stringify(balance ? { ...result, balance } : result, null, 4));
 }
 
+// The DID of an identity, so a multi-step operation stays on it if the current
+// identity changes along the way.
+async function pinnedIdentity(id) {
+    const name = id ?? await keymaster.getCurrentId();
+    if (!name) {
+        throw new Error('No current ID');
+    }
+    const doc = await keymaster.resolveDID(name);
+    return doc.didDocument.id;
+}
+
 // A Lightning payment can settle a moment before the mint sees it.
 async function claimPaidCashuQuote(quote, mint, id) {
     for (let attempt = 1; ; attempt++) {
@@ -2216,17 +2227,19 @@ program
     .option('-m, --mint <url>', 'mint to use')
     .action(async (amount, id, options) => {
         try {
-            const quote = await keymaster.createCashuMintQuote(parseSats(amount), options.mint, id);
+            const sats = parseSats(amount);
             if (!options.pay) {
-                console.log(JSON.stringify(quote, null, 4));
+                console.log(JSON.stringify(await keymaster.createCashuMintQuote(sats, options.mint, id), null, 4));
                 return;
             }
 
+            const owner = await pinnedIdentity(id);
+            const quote = await keymaster.createCashuMintQuote(sats, options.mint, owner);
             // Named before paying, so cashu-claim can finish whatever fails below.
             note(`Paying Cashu quote ${quote.quote}`);
-            await keymaster.payLightningInvoice(quote.request, id);
-            const result = await claimPaidCashuQuote(quote.quote, options.mint, id);
-            await printCashuResult(result, result.mint, id);
+            await keymaster.payLightningInvoice(quote.request, owner);
+            const result = await claimPaidCashuQuote(quote.quote, options.mint, owner);
+            await printCashuResult(result, result.mint, owner);
         }
         catch (error) {
             fail(error.error || error.message || error);
