@@ -812,7 +812,7 @@ export class CashuWallet {
         inputs: CashuProof[],
         retire: (wallet: WalletFile) => Promise<CashuMintEntry>,
         report?: SwapReport,
-        from?: Pick<CashuOperation, 'kind' | 'token' | 'message'>,
+        from?: Pick<CashuOperation, 'kind' | 'token' | 'message' | 'delivery'>,
     ): Promise<void> {
         const { keyset, keysets } = await this.activeKeyset(ctx);
         const value = sumProofs(inputs) - feeFor(inputs, keysets);
@@ -829,8 +829,13 @@ export class CashuWallet {
                 // A received token stays one: a refusal must not make its proofs balance.
                 const received = from?.kind === 'receive';
                 this.journalSwap(wallet, entry, swapId, received ? 'receive' : 'swap', inputs, keyset.id, value, from?.token);
+                const journaled = entry.operations![entry.operations!.length - 1];
                 if (from?.message) {
-                    entry.operations![entry.operations!.length - 1].message = from.message;
+                    journaled.message = from.message;
+                }
+                // What a refusal leaves outstanding can still be delivered.
+                if (from?.token && from.delivery) {
+                    journaled.delivery = from.delivery;
                 }
             }, () => this.runSwap(ctx, swapId, false, report));
         }
@@ -1601,6 +1606,14 @@ export class CashuWallet {
         return this.redeem(ctx, token);
     }
 
+    // The key this identity would sign a locked proof with now, if it holds one.
+    private async lockKey(lock: P2PKLock, expired: boolean, name?: string): Promise<string | undefined> {
+        const key = await this.host.findPrivateKey(lock.keys, name);
+        return key ?? (expired && lock.refundSignatures === 1
+            ? this.host.findPrivateKey(lock.refund, name)
+            : undefined);
+    }
+
     // Locked proofs get their witnesses here, and the signed inputs are what the
     // record keeps, so a resubmission sends exactly the same request.
     private async signLocked(ctx: MintContext, proofs: CashuProof[]): Promise<CashuProof[]> {
@@ -1622,10 +1635,7 @@ export class CashuWallet {
                 signed.push(proof);
                 continue;
             }
-            let key = await this.host.findPrivateKey(lock.keys, ctx.name);
-            if (!key && expired && lock.refundSignatures === 1) {
-                key = await this.host.findPrivateKey(lock.refund, ctx.name);
-            }
+            const key = await this.lockKey(lock, expired, ctx.name);
             if (!key) {
                 throw new CashuTokenLockedError(lock.locktime !== undefined && lock.refund.length > 0 && !expired
                     ? `locked until ${new Date(lock.locktime * 1000).toISOString()}, and to a key this identity does not hold`
@@ -1924,8 +1934,7 @@ export class CashuWallet {
                 return { redeemable: false, reason: 'needs SIG_ALL or several signatures' };
             }
             const expired = lock.locktime !== undefined && lock.locktime <= now;
-            const key = await this.host.findPrivateKey(expired ? [...lock.keys, ...lock.refund] : lock.keys, identity);
-            if (!key && !(expired && lock.refund.length === 0)) {
+            if (!(expired && lock.refund.length === 0) && !await this.lockKey(lock, expired, identity)) {
                 return { redeemable: false, reason: 'locked to a key this identity does not hold' };
             }
         }

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 
 import pytest
@@ -14,7 +15,7 @@ from keymaster import (
     KeymasterError,
     core,
 )
-from keymaster.cashu_crypto import proof_y
+from keymaster.cashu_crypto import encode_token, proof_y
 from keymaster.didcomm_protocols import CASHU_TOKEN_TYPE, is_cashu_token_message
 
 from .cashu_fake_mint import FakeMint, FakeRelay
@@ -160,6 +161,37 @@ class TestSend:
         with pytest.raises(KeymasterError, match="DIDComm"):
             bed.send()
         assert bed.balance("Alice")["spendable"] == 100
+
+    def test_refuses_a_mediator_without_a_direct_endpoint_before_moving_anything(self, bed):
+        carol = run(bed.km.resolve_did("Carol"))["didDocument"]["id"]
+        run(bed.km.unpublish_didcomm("Carol"))
+        run(bed.km.publish_didcomm(carol, "Bob"))
+
+        with pytest.raises(KeymasterError, match="no direct DIDCommMessaging endpoint"):
+            bed.send()
+        assert bed.balance("Alice")["spendable"] == 100
+
+    def test_refuses_a_mediator_that_only_forwards_before_moving_anything(self, bed):
+        carol = run(bed.km.resolve_did("Carol"))["didDocument"]["id"]
+        run(bed.km.publish_didcomm(bed.bob, "Carol"))
+        run(bed.km.publish_didcomm(carol, "Bob"))
+
+        with pytest.raises(KeymasterError, match="no direct DIDCommMessaging endpoint"):
+            bed.send()
+        assert bed.balance("Alice")["spendable"] == 100
+
+    def test_refuses_an_unresolvable_routing_key_before_moving_anything(self, bed):
+        run(bed.km.publish_didcomm(f"{NODE}/didcomm", "Bob", ["did:cid:bagaaieranosuchroutingkey"]))
+
+        with pytest.raises(Exception):
+            bed.send()
+        assert bed.balance("Alice")["spendable"] == 100
+
+    def test_sends_when_the_mediated_route_is_sound(self, bed):
+        carol = run(bed.km.resolve_did("Carol"))["didDocument"]["id"]
+        run(bed.km.publish_didcomm(f"{NODE}/didcomm", "Bob", [carol]))
+
+        assert bed.send()["amount"] == 30
 
     def test_refuses_a_sender_who_cannot_authenticate_before_moving_anything(self, bed):
         run(bed.km.unpublish_didcomm("Alice"))
@@ -533,6 +565,20 @@ class TestListMessages:
         assert message["redeemable"] is False
         assert PUBLIC_URL in message["reason"]
 
+    def test_agrees_with_redemption_about_a_refund_needing_several_signatures(self, bed):
+        doc = run(bed.km.resolve_did(bed.bob))
+        bob_key = run(bed.km._document_public_key(doc))
+        secret = json.dumps(["P2PK", {"nonce": "00", "data": "02" + "11" * 32, "tags": [["locktime", "1000"], ["refund", bob_key], ["n_sigs_refund", "2"]]}])
+        proof = {"id": bed.mint.keyset_id, "amount": 1, "secret": secret, "C": "02" + "00" * 32}
+        token = encode_token(PUBLIC_URL, "sat", [proof])
+        run(bed.km.send_didcomm({"type": CASHU_TOKEN_TYPE, "body": {"token": token}}, "Bob", {"name": "Alice"}))
+
+        assert run(bed.km.list_cashu_messages("Bob"))[0]["redeemable"] is False
+
+        result = bed.accept()
+        assert result["redeemed"] == []
+        assert len(result["failed"]) == 1
+
     def test_does_not_list_what_was_redeemed(self, bed):
         bed.send()
         bed.accept()
@@ -626,6 +672,36 @@ class TestReclaim:
         assert len([request for request in bed.mint.requests if request == "POST /v1/swap"]) == 1
         balance = bed.balance("Alice")
         assert (balance["spendable"], balance["inFlight"], balance["outstanding"]) == (100, 0, 0)
+
+    def test_can_still_deliver_what_is_left_when_a_partial_reclaim_is_refused(self, bed):
+        bed.relay.down = True
+        sent = bed.send(locktime=60)
+        record = next(
+            op for op in run(bed.km.load_wallet())["ids"]["Alice"]["cashu"][PUBLIC_URL]["operations"] if op["id"] == sent["operationId"]
+        )
+        bed.mint.spent.add(proof_y(record["sent"][0]["secret"]))
+        bed.after(120)
+        bed.relay.down = False
+        swaps = []
+
+        async def hook(path: str) -> None:
+            if path == "/v1/swap":
+                swaps.append(path)
+                if len(swaps) == 2:
+                    bed.mint.refuse_next("/v1/swap", 12345, "temporarily refused")
+
+        bed.mint.on_request = hook
+
+        run(bed.km.reclaim_cashu(sent["operationId"], "Alice"))
+        bed.mint.on_request = None
+
+        listed = run(bed.km.list_cashu_sends(None, "Alice"))[0]
+        assert (listed["recipient"], listed["delivered"]) == (bed.bob, False)
+
+        run(bed.km.check_cashu(None, "Alice"))
+
+        message = run(bed.km.receive_didcomm({"name": "Bob", "ack": False}))[0]
+        assert message["message"]["id"] == sent["messageId"]
 
     def test_can_still_deliver_a_token_whose_reclaim_was_refused(self, bed):
         bed.relay.down = True

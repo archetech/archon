@@ -788,9 +788,14 @@ class Keymaster:
     async def _require_didcomm_route(self, recipient: str, name: str | None = None) -> None:
         self._didcomm_gateway_base()
         await self._require_node_capability("didcomm", "DIDComm messaging")
-        if not await self._resolve_didcomm_endpoint(recipient):
+        endpoint = await self._resolve_didcomm_endpoint(recipient)
+        if not endpoint:
             raise KeymasterError(f"recipient {recipient} has no DIDCommMessaging endpoint")
         self._resolve_key_agreement(await self._resolve_did_for_didcomm(recipient))
+        if endpoint["routingKeys"]:
+            await self._resolve_routing_key(endpoint["routingKeys"][0])
+        elif endpoint["uri"].startswith("did:"):
+            await self._resolve_mediator(endpoint["uri"], recipient)
         own = await self.fetch_id_info(name)
         self._resolve_key_agreement(await self.resolve_did(own["did"]))
 
@@ -4863,6 +4868,13 @@ class Keymaster:
         challenge = response.json()["challenge"]
         return {"challenge": challenge, "signature": sign_hash(hash_message(challenge), keypair["privateJwk"])}
 
+    # A mediator named by a recipient's service, which must be reachable directly.
+    async def _resolve_mediator(self, mediator_did: str, recipient_did: str) -> tuple[str, dict[str, Any]]:
+        endpoint = await self._resolve_didcomm_endpoint(mediator_did)
+        if not endpoint or endpoint["routingKeys"] or endpoint["uri"].startswith("did:"):
+            raise KeymasterError(f"mediator {mediator_did} for {recipient_did} has no direct DIDCommMessaging endpoint")
+        return endpoint["uri"], await self._resolve_routing_key(mediator_did)
+
     async def send_didcomm(self, message: dict[str, Any], to: str | list[str], options: dict[str, Any] | None = None) -> list[str]:
         # Pack + resolve + Forward-wrap here (crypto), then hand each sealed envelope
         # to the DIDComm service for delivery (egress + Tor). The egress is reached
@@ -4901,13 +4913,8 @@ class Keymaster:
                 # endpoint, in a Forward for its key-agreement key whose next is
                 # the recipient DID the mediator registered.
                 elif endpoint["uri"].startswith("did:"):
-                    mediator_did = endpoint["uri"]
-                    mediator_endpoint = await self._resolve_didcomm_endpoint(mediator_did)
-                    if not mediator_endpoint or mediator_endpoint["routingKeys"] or mediator_endpoint["uri"].startswith("did:"):
-                        raise KeymasterError(f"mediator {mediator_did} for {recipient_did} has no direct DIDCommMessaging endpoint")
-                    routing = await self._resolve_routing_key(mediator_did)
+                    delivery_uri, routing = await self._resolve_mediator(endpoint["uri"], recipient_did)
                     envelope = dc.wrap_forward(packed, recipient_did, {"kid": routing["kid"], "publicJwk": routing["publicJwk"]})
-                    delivery_uri = mediator_endpoint["uri"]
                     mediated = True
 
                 # A recipient whose mailbox is on this node needs no egress: deposit

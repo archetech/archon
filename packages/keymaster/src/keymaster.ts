@@ -3627,14 +3627,9 @@ export default class Keymaster implements KeymasterInterface {
             // endpoint, in a Forward for its key-agreement key whose `next` is
             // the recipient DID the mediator registered.
             else if (endpoint.uri.startsWith('did:')) {
-                const mediatorDid = endpoint.uri;
-                const mediatorEndpoint = await this.resolveDidCommEndpoint(mediatorDid);
-                if (!mediatorEndpoint || mediatorEndpoint.routingKeys.length > 0 || mediatorEndpoint.uri.startsWith('did:')) {
-                    throw new KeymasterError(`mediator ${mediatorDid} for ${recipientDid} has no direct DIDCommMessaging endpoint`);
-                }
-                const routing = await this.resolveRoutingKey(mediatorDid);
+                const { uri, routing } = await this.resolveMediator(endpoint.uri, recipientDid);
                 envelope = wrapForward(packed, recipientDid, { kid: routing.kid, publicJwk: routing.publicJwk });
-                deliveryUri = mediatorEndpoint.uri;
+                deliveryUri = uri;
                 mediated = true;
             }
 
@@ -3686,6 +3681,15 @@ export default class Keymaster implements KeymasterInterface {
             ids.push(...(data.ids || []));
         }
         return ids;
+    }
+
+    // A mediator named by a recipient's service, which must be reachable directly.
+    private async resolveMediator(mediatorDid: string, recipientDid: string): Promise<{ uri: string; routing: { kid: string; publicJwk: OkpJwkPublic } }> {
+        const endpoint = await this.resolveDidCommEndpoint(mediatorDid);
+        if (!endpoint || endpoint.routingKeys.length > 0 || endpoint.uri.startsWith('did:')) {
+            throw new KeymasterError(`mediator ${mediatorDid} for ${recipientDid} has no direct DIDCommMessaging endpoint`);
+        }
+        return { uri: endpoint.uri, routing: await this.resolveRoutingKey(mediatorDid) };
     }
 
     // Fetch queued messages from this identity's own mailbox (proving DID control
@@ -4089,10 +4093,17 @@ export default class Keymaster implements KeymasterInterface {
     private async requireDidCommRoute(recipient: string, name?: string): Promise<void> {
         this.didcommGatewayBase();
         await this.requireNodeCapability('didcomm', 'DIDComm messaging');
-        if (!await this.resolveDidCommEndpoint(recipient)) {
+        const endpoint = await this.resolveDidCommEndpoint(recipient);
+        if (!endpoint) {
             throw new KeymasterError(`recipient ${recipient} has no DIDCommMessaging endpoint`);
         }
         this.resolveKeyAgreement(await this.resolveDidForDidComm(recipient));
+        if (endpoint.routingKeys.length > 0) {
+            await this.resolveRoutingKey(endpoint.routingKeys[0]);
+        }
+        else if (endpoint.uri.startsWith('did:')) {
+            await this.resolveMediator(endpoint.uri, recipient);
+        }
         const own = await this.fetchIdInfo(name);
         this.resolveKeyAgreement(await this.resolveDID(own.did));
     }

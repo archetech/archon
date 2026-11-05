@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import { getEncodedToken } from '@cashu/cashu-ts';
 import Gatekeeper from '@didcid/gatekeeper';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
@@ -182,6 +183,42 @@ describe('sendCashuTo', () => {
 
         await expect(send()).rejects.toThrow(/DIDComm/);
         expect(await balance('Alice')).toMatchObject({ spendable: 100, inFlight: 0, outstanding: 0 });
+    });
+
+    describe('a recipient behind a mediator', () => {
+        const untouched = async () => expect(await balance('Alice')).toMatchObject({ spendable: 100, inFlight: 0, outstanding: 0 });
+
+        it('refuses before moving anything when the mediator has no direct endpoint', async () => {
+            const carol = (await keymaster.resolveDID('Carol')).didDocument!.id!;
+            await keymaster.unpublishDidComm('Carol');
+            await keymaster.publishDidComm(carol, 'Bob');
+
+            await expect(send()).rejects.toThrow(/no direct DIDCommMessaging endpoint/);
+            await untouched();
+        });
+
+        it('refuses before moving anything when the mediator only forwards too', async () => {
+            const carol = (await keymaster.resolveDID('Carol')).didDocument!.id!;
+            await keymaster.publishDidComm(bobDid, 'Carol');
+            await keymaster.publishDidComm(carol, 'Bob');
+
+            await expect(send()).rejects.toThrow(/no direct DIDCommMessaging endpoint/);
+            await untouched();
+        });
+
+        it('refuses before moving anything when a routing key cannot be resolved', async () => {
+            await keymaster.publishDidComm(`${node}/didcomm`, 'Bob', ['did:cid:bagaaieranosuchroutingkey']);
+
+            await expect(send()).rejects.toThrow();
+            await untouched();
+        });
+
+        it('sends when the route is sound', async () => {
+            const carol = (await keymaster.resolveDID('Carol')).didDocument!.id!;
+            await keymaster.publishDidComm(`${node}/didcomm`, 'Bob', [carol]);
+
+            await expect(send()).resolves.toMatchObject({ amount: 30 });
+        });
     });
 
     it('refuses before moving anything when the sender cannot authenticate a message', async () => {
@@ -598,6 +635,30 @@ describe('listCashuMessages', () => {
         expect(message.reason).toContain(PUBLIC_URL);
     });
 
+    it('agrees with redemption about a refund needing several signatures', async () => {
+        const doc = await keymaster.resolveDID(bobDid);
+        const bobKey = (keymaster as any).cashu.host.documentPublicKey(doc);
+        const stranger = `02${'11'.repeat(32)}`;
+        const secret = JSON.stringify(['P2PK', {
+            nonce: '00',
+            data: stranger,
+            tags: [['locktime', '1000'], ['refund', bobKey], ['n_sigs_refund', '2']],
+        }]);
+        const token = getEncodedToken({
+            mint: PUBLIC_URL,
+            unit: 'sat',
+            proofs: [{ id: mint.keysetId, amount: 1, secret, C: `02${'00'.repeat(32)}` }] as never,
+        });
+        await keymaster.sendDidComm({ type: CASHU_TOKEN_TYPE, body: { token } }, 'Bob', { name: 'Alice' });
+
+        const [message] = await keymaster.listCashuMessages('Bob');
+        expect(message.redeemable).toBe(false);
+
+        const { redeemed, failed } = await keymaster.receiveCashuMessages('Bob');
+        expect(redeemed).toEqual([]);
+        expect(failed).toHaveLength(1);
+    });
+
     it('does not list what was redeemed', async () => {
         await send();
         await keymaster.receiveCashuMessages('Bob');
@@ -717,6 +778,33 @@ describe('reclaiming a locked send', () => {
         const { spendable, inFlight, outstanding } = await balance('Alice');
         expect(inFlight).toBe(0);
         expect(spendable + outstanding).toBe(100);
+    });
+
+    it('can still deliver what is left when the reclaim of a partly spent token is refused', async () => {
+        mint.relayDown = true;
+        const { operationId, messageId } = await send(30, { locktime: 60 });
+        const stored = await keymaster.loadWallet();
+        const { sent } = stored.ids.Alice.cashu[PUBLIC_URL].operations.find((op: { id: string }) => op.id === operationId);
+        mint.spent.add(proofY(sent[0].secret));
+        after(120);
+        mint.relayDown = false;
+        let swaps = 0;
+        mint.onRequest = async (path) => {
+            if (path === '/v1/swap' && ++swaps === 2) {
+                mint.refuseNext('/v1/swap', 12345, 'temporarily refused');
+            }
+        };
+
+        await keymaster.reclaimCashu(operationId, 'Alice');
+        mint.onRequest = undefined;
+
+        const [listed] = await keymaster.listCashuSends(undefined, 'Alice');
+        expect(listed).toMatchObject({ recipient: bobDid, delivered: false });
+
+        await keymaster.checkCashu(undefined, 'Alice');
+
+        const [message] = await keymaster.receiveDidComm({ name: 'Bob', ack: false });
+        expect(message.message.id).toBe(messageId);
     });
 
     it('can still deliver a token whose reclaim was refused', async () => {

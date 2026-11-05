@@ -695,6 +695,9 @@ class CashuWallet:
             self._journal_swap(wallet, entry, swap_id, kind, inputs, keyset["id"], value, bool((origin or {}).get("token")))
             if (origin or {}).get("message"):
                 entry["operations"][-1]["message"] = origin["message"]
+            # What a refusal leaves outstanding can still be delivered.
+            if (origin or {}).get("token") and origin.get("delivery"):
+                entry["operations"][-1]["delivery"] = origin["delivery"]
 
         async def work(_: Any) -> str:
             return await self._run_swap(ctx, swap_id, False, report)
@@ -1368,6 +1371,13 @@ class CashuWallet:
         await self._settle(ctx)
         return await self._redeem(ctx, token)
 
+    # The key this identity would sign a locked proof with now, if it holds one.
+    async def _lock_key(self, lock: dict[str, Any], expired: bool, name: str | None) -> str | None:
+        key = await self.host._find_private_key(lock["keys"], name)
+        if key is None and expired and lock["refundSignatures"] == 1:
+            key = await self.host._find_private_key(lock["refund"], name)
+        return key
+
     # Locked proofs get their witnesses here, and the signed inputs are what the
     # record keeps, so a resubmission sends exactly the same request.
     async def _sign_locked(self, ctx: _MintContext, proofs: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1386,9 +1396,7 @@ class CashuWallet:
             if expired and not lock["refund"]:
                 signed.append(proof)
                 continue
-            key = await self.host._find_private_key(lock["keys"], ctx.name)
-            if key is None and expired and lock["refundSignatures"] == 1:
-                key = await self.host._find_private_key(lock["refund"], ctx.name)
+            key = await self._lock_key(lock, expired, ctx.name)
             if key is None:
                 if "locktime" in lock and lock["refund"] and not expired:
                     until = datetime.fromtimestamp(lock["locktime"], timezone.utc).isoformat().replace("+00:00", "Z")
@@ -1672,8 +1680,7 @@ class CashuWallet:
             if lock["sigAll"] or lock["signatures"] != 1:
                 return {"redeemable": False, "reason": "needs SIG_ALL or several signatures"}
             expired = "locktime" in lock and lock["locktime"] <= now
-            key = await self.host._find_private_key([*lock["keys"], *lock["refund"]] if expired else lock["keys"], identity)
-            if key is None and not (expired and not lock["refund"]):
+            if not (expired and not lock["refund"]) and await self._lock_key(lock, expired, identity) is None:
                 return {"redeemable": False, "reason": "locked to a key this identity does not hold"}
         return {"redeemable": True}
 
