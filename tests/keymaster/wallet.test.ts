@@ -399,6 +399,44 @@ describe('changePassphrase', () => {
         expect((await fresh.loadWallet()).ids.Alice.index).toBe(before + 1);
     });
 
+    it('encrypts a wallet replaced during the change under the new passphrase', async () => {
+        const change = keymaster.changePassphrase('rotated');
+        const replaced = keymaster.newWallet(undefined, true);
+        await Promise.all([change, replaced]);
+
+        const fresh = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'rotated' });
+        expect(await fresh.decryptMnemonic()).toBe(await keymaster.decryptMnemonic());
+        expect((await fresh.loadWallet()).ids).toEqual({});
+    });
+
+    it('encrypts a wallet recovered during the change under the new passphrase', async () => {
+        await keymaster.createId('Alice');
+        const backup = await keymaster.backupWallet();
+        await keymaster.createId('Bob');
+
+        // Rotate once recovery has read the backup, and keep the save pending long
+        // enough for recovery to reach the passphrase while it is still the old one.
+        const resolveAsset = keymaster.resolveAsset.bind(keymaster);
+        const save = wallet.saveWallet.bind(wallet);
+        let change: Promise<boolean> | undefined;
+        keymaster.resolveAsset = async (...args: Parameters<typeof resolveAsset>) => {
+            const asset = await resolveAsset(...args);
+            wallet.saveWallet = async (...saved: Parameters<typeof save>) => {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                return save(...saved);
+            };
+            change = keymaster.changePassphrase('rotated');
+            return asset;
+        };
+
+        await keymaster.recoverWallet(backup);
+        await change;
+
+        const fresh = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'rotated' });
+        expect(await fresh.decryptMnemonic()).toBe(await keymaster.decryptMnemonic());
+        expect(Object.keys((await fresh.loadWallet()).ids)).toEqual(['Alice']);
+    });
+
     it('changes nothing when the new passphrase cannot be saved', async () => {
         await keymaster.loadOrCreateWallet();
         await keymaster.createId('Alice');

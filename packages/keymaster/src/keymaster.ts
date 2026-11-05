@@ -415,52 +415,58 @@ export default class Keymaster implements KeymasterInterface {
         wallet: StoredWallet,
         overwrite = true
     ): Promise<boolean> {
-        return this.enqueue(async () => {
-            // Decrypt if encrypted to verify passphrase and get decrypted form
-            const decrypted = await this.decryptWallet(wallet);
-            const upgraded: WalletFile = await this.upgradeWallet(decrypted);
-            let toStore: WalletEncFile = await this.encryptWalletForStorage(upgraded);
+        return this.enqueue(() => this.storeWallet(wallet, overwrite));
+    }
 
-            const ok = await this.db.saveWallet(toStore, overwrite);
-            if (ok) {
-                this._walletCache = upgraded;
-            }
-            return ok;
-        });
+    private async storeWallet(
+        wallet: StoredWallet,
+        overwrite: boolean
+    ): Promise<boolean> {
+        // Decrypt if encrypted to verify passphrase and get decrypted form
+        const decrypted = await this.decryptWallet(wallet);
+        const upgraded: WalletFile = await this.upgradeWallet(decrypted);
+        let toStore: WalletEncFile = await this.encryptWalletForStorage(upgraded);
+
+        const ok = await this.db.saveWallet(toStore, overwrite);
+        if (ok) {
+            this._walletCache = upgraded;
+        }
+        return ok;
     }
 
     async newWallet(
         mnemonic?: string,
         overwrite = false
     ): Promise<WalletFile> {
+        let phrase: string;
         let hdkey: any;
 
         try {
-            if (!mnemonic) {
-                mnemonic = this.cipher.generateMnemonic();
-            }
-
-            hdkey = this.cipher.generateHDKey(mnemonic);
+            phrase = mnemonic || this.cipher.generateMnemonic();
+            hdkey = this.cipher.generateHDKey(phrase);
         } catch (error) {
             throw new InvalidParameterError('mnemonic');
         }
 
-        const mnemonicEnc = await encryptWithPassphrase(mnemonic, this.passphrase);
-        const wallet: WalletFile = {
-            version: 2,
-            seed: { mnemonicEnc },
-            counter: 0,
-            ids: {}
-        };
-        // Warm for the save below, which would otherwise re-derive this key.
-        this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(mnemonic), id: this.hdkeyCacheId(wallet.seed) };
+        // Encrypted in its turn, so the passphrase is the one current when it is saved.
+        return this.enqueue(async () => {
+            const mnemonicEnc = await encryptWithPassphrase(phrase, this.passphrase);
+            const wallet: WalletFile = {
+                version: 2,
+                seed: { mnemonicEnc },
+                counter: 0,
+                ids: {}
+            };
+            // Warm for the save below, which would otherwise re-derive this key.
+            this._hdkeyCache = { hdkey, seed: this.cipher.mnemonicToSeed(phrase), id: this.hdkeyCacheId(wallet.seed) };
 
-        const ok = await this.saveWallet(wallet, overwrite)
-        if (!ok) {
-            throw new KeymasterError('save wallet failed');
-        }
+            const ok = await this.storeWallet(wallet, overwrite);
+            if (!ok) {
+                throw new KeymasterError('save wallet failed');
+            }
 
-        return wallet;
+            return wallet;
+        });
     }
 
     async decryptMnemonic(): Promise<string> {
@@ -810,13 +816,13 @@ export default class Keymaster implements KeymasterInterface {
             const backup = this.cipher.decryptMessage(keypair.privateJwk, castData.backup, keypair.publicJwk);
             let wallet = JSON.parse(backup);
 
-            if (isWalletFile(wallet)) {
-                const mnemonic = await this.decryptMnemonic();
-                // Backup might have a different mnemonic passphase so re-encrypt
-                wallet.seed.mnemonicEnc = await encryptWithPassphrase(mnemonic, this.passphrase);
-            }
-
             await this.mutateWallet(async (current) => {
+                if (isWalletFile(wallet)) {
+                    const mnemonic = await this.decryptMnemonic();
+                    // Backup might have a different mnemonic passphase so re-encrypt
+                    wallet.seed.mnemonicEnc = await encryptWithPassphrase(mnemonic, this.passphrase);
+                }
+
                 // Clear all existing properties from the current wallet
                 // This ensures a clean slate before restoring the recovered wallet
                 for (const k in current) {

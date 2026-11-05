@@ -301,21 +301,23 @@ class Keymaster:
         except Exception as exc:
             raise KeymasterError("Invalid parameter: mnemonic") from exc
 
-        wallet = {
-            "version": 2,
-            "seed": {"mnemonicEnc": encrypt_with_passphrase(mnemonic, self.passphrase)},
-            "counter": 0,
-            "ids": {},
-            "aliases": {},
-        }
-        # Warm for the save below, which would otherwise re-derive this root.
-        self._root_cache = _RootCache(root, bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
-        ok = await self.save_wallet(wallet, overwrite=overwrite)
-        if not ok:
-            raise KeymasterError("save wallet failed")
-        # save_wallet installed an upgraded copy as the cache; hand back that
-        # object, so a caller's edits are the ones load_wallet then sees.
-        return self._wallet_cache if self._wallet_cache is not None else wallet
+        # Encrypted in its turn, so the passphrase is the one current when it is saved.
+        async with self._lock:
+            wallet = {
+                "version": 2,
+                "seed": {"mnemonicEnc": encrypt_with_passphrase(mnemonic, self.passphrase)},
+                "counter": 0,
+                "ids": {},
+                "aliases": {},
+            }
+            # Warm for the save below, which would otherwise re-derive this root.
+            self._root_cache = _RootCache(root, bip39_seed_from_mnemonic(mnemonic), self._root_cache_identity(wallet["seed"]))
+            ok = await self._save_loaded_wallet(self._upgrade_wallet(wallet), overwrite=overwrite)
+            if not ok:
+                raise KeymasterError("save wallet failed")
+            # The save installed an upgraded copy as the cache; hand back that
+            # object, so a caller's edits are the ones load_wallet then sees.
+            return self._wallet_cache if self._wallet_cache is not None else wallet
 
     async def decrypt_wallet(self, stored: dict[str, Any]) -> dict[str, Any]:
         if "enc" not in stored:
@@ -2744,11 +2746,12 @@ class Keymaster:
             return current_wallet
 
         wallet = json.loads(decrypt_message(keypair["privateJwk"], backup))
-        if isinstance(wallet, dict) and wallet.get("seed", {}).get("mnemonicEnc"):
-            mnemonic = await self.decrypt_mnemonic()
-            wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, self.passphrase)
 
         async with self._lock:
+            if isinstance(wallet, dict) and wallet.get("seed", {}).get("mnemonicEnc"):
+                mnemonic = await self.decrypt_mnemonic()
+                wallet["seed"]["mnemonicEnc"] = encrypt_with_passphrase(mnemonic, self.passphrase)
+
             upgraded = self._upgrade_wallet(wallet)
             await self._save_loaded_wallet(upgraded, overwrite=True)
         return upgraded
