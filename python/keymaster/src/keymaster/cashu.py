@@ -472,15 +472,24 @@ class CashuWallet:
     def _select(proofs: list[dict[str, Any]], target: int, keysets: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """As little as covers the target and its own input fee, because a request that
         goes pending locks what it selected for as long as the mint keeps it pending:
-        at each step the smallest proof that finishes the job, else the largest."""
+        at each step the smallest proof that finishes the job, else the largest. It runs
+        under the wallet lock, so totals are kept rather than recomputed."""
+        rates = {keyset["id"]: keyset.get("input_fee_ppk") or 0 for keyset in keysets}
         pool = sorted(proofs, key=lambda proof: proof["amount"])
         selected: list[dict[str, Any]] = []
+        value = 0
+        ppk = 0
         while pool:
-            for proof in pool:
-                candidate = [*selected, proof]
-                if _sum_proofs(candidate) - _fee_for(candidate, keysets) >= target:
-                    return candidate
-            selected.append(pool.pop())
+            # Fees only grow, so if the largest cannot finish even before its own fee,
+            # none can, and the scan is skipped.
+            if value + pool[-1]["amount"] - math.ceil(ppk / 1000) >= target:
+                for proof in pool:
+                    if value + proof["amount"] - math.ceil((ppk + rates.get(proof["id"], 0)) / 1000) >= target:
+                        return [*selected, proof]
+            largest = pool.pop()
+            selected.append(largest)
+            value += largest["amount"]
+            ppk += rates.get(largest["id"], 0)
         raise CashuInsufficientFundsError(f"need {target} {UNIT} plus fees, have {_sum_proofs(proofs)}")
 
     @staticmethod

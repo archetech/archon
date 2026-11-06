@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 
 import pytest
 
@@ -17,7 +18,7 @@ from keymaster import (
     Keymaster,
     KeymasterError,
 )
-from keymaster.cashu import normalize_mint_url, split_amount
+from keymaster.cashu import CashuWallet, normalize_mint_url, split_amount
 from keymaster.cashu_crypto import decode_token, encode_token, proof_y, resolve_keyset_ids
 
 from .cashu_fake_mint import FakeMint, signed_invoice
@@ -192,6 +193,41 @@ class TestChoosingProofs:
         with pytest.raises(CashuInsufficientFundsError):
             run(rich.keymaster.melt_cashu(signed_invoice(16000)))
         assert rich.balance()["inFlight"] == 0
+
+
+class TestSelectingFromAFragmentedBalance:
+    KEYSETS = [{"id": "free", "unit": "sat", "active": True}, {"id": "paid", "unit": "sat", "active": True, "input_fee_ppk": 600}]
+
+    @staticmethod
+    def proof(index, keyset="free", amount=1):
+        return {"id": keyset, "amount": amount, "secret": f"s{index}", "C": "c"}
+
+    def select(self, proofs, target):
+        return CashuWallet._select(proofs, target, self.KEYSETS)
+
+    # Selection runs under the wallet lock, so it must stay quick with many proofs.
+    def test_stays_quick_across_thousands_of_proofs(self):
+        proofs = [self.proof(i) for i in range(4000)]
+        start = time.monotonic()
+
+        assert len(self.select(proofs, 3999)) == 3999
+        with pytest.raises(CashuInsufficientFundsError):
+            self.select(proofs, 4001)
+
+        assert time.monotonic() - start < 5
+
+    def test_rounds_the_fee_on_the_total_not_on_each_input(self):
+        # Two inputs at 600 ppk owe 2 sats; each alone would round to 1.
+        assert sum(p["amount"] for p in self.select([self.proof(1, "paid", 4), self.proof(2, "paid", 4)], 6)) == 8
+
+    def test_counts_the_fee_of_the_proof_that_would_finish_the_job(self):
+        # 3 at 600 ppk nets 2, so the 3 does not cover 3, and the 4 does.
+        assert [p["amount"] for p in self.select([self.proof(1, "paid", 3), self.proof(2, "paid", 4)], 3)] == [4]
+
+    def test_prefers_the_smallest_proof_that_finishes_the_job_at_each_step(self):
+        proofs = [self.proof(i, "free", amount) for i, amount in enumerate([1, 2, 4, 8, 16])]
+
+        assert [p["amount"] for p in self.select(proofs, 18)] == [16, 2]
 
 
 class TestMeltQuoteAmount:

@@ -117,6 +117,43 @@ describe('choosing proofs', () => {
     });
 });
 
+describe('selecting from a fragmented balance', () => {
+    const keysets = [{ id: 'free', unit: 'sat', active: true }, { id: 'paid', unit: 'sat', active: true, input_fee_ppk: 600 }];
+    const proof = (i: number, id = 'free', amount = 1) => ({ id, amount, secret: `s${i}`, C: 'c' });
+    const select = (proofs: unknown[], target: number) =>
+        (new CashuWallet({} as never) as any).select(proofs, target, keysets) as { amount: number; id: string }[];
+    const value = (some: { amount: number }[]) => some.reduce((total, item) => total + item.amount, 0);
+
+    // Selection runs inside the wallet's write, so it must stay quick with many proofs.
+    it('stays quick across thousands of proofs', () => {
+        const proofs = Array.from({ length: 4000 }, (_, i) => proof(i));
+        const start = Date.now();
+
+        expect(select(proofs, 3999)).toHaveLength(3999);
+        expect(() => select(proofs, 4001)).toThrow(CashuInsufficientFundsError);
+
+        expect(Date.now() - start).toBeLessThan(5000);
+    });
+
+    it('rounds the fee on the total, not on each input', () => {
+        // Two inputs at 600 ppk owe 2 sats; each alone would round to 1.
+        const chosen = select([proof(1, 'paid', 4), proof(2, 'paid', 4)], 6);
+
+        expect(value(chosen)).toBe(8);
+    });
+
+    it('counts the fee of the proof that would finish the job', () => {
+        // 3 at 600 ppk nets 2, so the 3 does not cover 3, and the 4 does.
+        expect(select([proof(1, 'paid', 3), proof(2, 'paid', 4)], 3)).toEqual([expect.objectContaining({ amount: 4 })]);
+    });
+
+    it('prefers the smallest proof that finishes the job at each step', () => {
+        const chosen = select([1, 2, 4, 8, 16].map((amount, i) => proof(i, 'free', amount)), 18);
+
+        expect(chosen.map(item => item.amount)).toEqual([16, 2]);
+    });
+});
+
 describe('a melt quote', () => {
     beforeEach(async () => {
         await setup();

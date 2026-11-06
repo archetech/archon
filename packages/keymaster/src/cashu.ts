@@ -580,16 +580,29 @@ export class CashuWallet {
     // As little as covers the target and its own input fee, because a request that
     // goes pending locks what it selected for as long as the mint keeps it pending:
     // at each step the smallest proof that finishes the job, else the largest.
+    // It runs inside the wallet's write, so totals are kept rather than recomputed.
     private select(proofs: CashuProof[], target: number, keysets: MintKeyset[]): CashuProof[] {
-        const covers = (some: CashuProof[]) => sumProofs(some) - feeFor(some, keysets) >= target;
+        const rates = new Map(keysets.map(keyset => [keyset.id, keyset.input_fee_ppk ?? 0]));
+        const rate = (proof: CashuProof) => rates.get(proof.id) ?? 0;
         const pool = [...proofs].sort((a, b) => a.amount - b.amount);
         const selected: CashuProof[] = [];
+        let value = 0;
+        let ppk = 0;
+        const finishes = (proof: CashuProof) =>
+            value + proof.amount - Math.ceil((ppk + rate(proof)) / 1000) >= target;
         while (pool.length > 0) {
-            const finishing = pool.find(proof => covers([...selected, proof]));
+            // Fees only grow, so if the largest cannot finish even before its own fee,
+            // none can, and the scan is skipped.
+            const finishing = value + pool[pool.length - 1].amount - Math.ceil(ppk / 1000) >= target
+                ? pool.find(finishes)
+                : undefined;
             if (finishing) {
                 return [...selected, finishing];
             }
-            selected.push(pool.pop()!);
+            const largest = pool.pop()!;
+            selected.push(largest);
+            value += largest.amount;
+            ppk += rate(largest);
         }
         throw new CashuInsufficientFundsError(
             `need ${target} ${UNIT} plus fees, have ${sumProofs(proofs)}`);
