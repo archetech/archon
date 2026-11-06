@@ -1,6 +1,6 @@
 import type express from 'express';
 import { resolveUpstreamUrl } from './upstream-url.js';
-import { isForwardedResponseHeader } from './response-headers.js';
+import { isForwardedRequestHeader, isForwardedResponseHeader } from './response-headers.js';
 
 // Forwarding to Herald, kept apart from the app so the proxy itself can be
 // exercised end to end against a running Herald in tests.
@@ -46,7 +46,7 @@ export async function proxyHeraldRequest(req: express.Request, res: express.Resp
 
     const headers = new Headers();
     for (const [name, value] of Object.entries(req.headers)) {
-        if (!value || name === 'host' || name === 'content-length') {
+        if (!value || !isForwardedRequestHeader(name)) {
             continue;
         }
 

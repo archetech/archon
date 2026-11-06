@@ -70,6 +70,12 @@ beforeAll(async () => {
                 res.end(JSON.stringify(INFO));
                 return;
             }
+            // As cdk-mintd does for a browser over HTTPS. Node's fetch cannot decode it.
+            if (req.url === '/v1/keysets' && /zstd/.test(String(req.headers['accept-encoding']))) {
+                res.setHeader('Content-Encoding', 'zstd');
+                res.end(Buffer.from([0x28, 0xb5, 0x2f, 0xfd, 0x00]));
+                return;
+            }
             if (req.url === '/v1/compressed' && /gzip/.test(String(req.headers['accept-encoding']))) {
                 res.setHeader('Content-Encoding', 'gzip');
                 res.end(gzipSync(JSON.stringify({ ok: true })));
@@ -151,6 +157,14 @@ describe('the /cashu mint proxy', () => {
 
         expect(response.status).toBe(200);
         expect(response.headers['content-encoding']).toBeUndefined();
+        expect(response.body).toEqual({ ok: true });
+    });
+
+    it('does not ask the mint for an encoding it could not read', async () => {
+        const response = await request(drawbridge()).get('/cashu/v1/keysets').set('Accept-Encoding', 'gzip, deflate, br, zstd');
+
+        expect(response.status).toBe(200);
+        expect(received[0].headers['accept-encoding']).not.toMatch(/zstd/);
         expect(response.body).toEqual({ ok: true });
     });
 

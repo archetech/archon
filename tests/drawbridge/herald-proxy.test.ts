@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import express from 'express';
+import http from 'http';
 import type { AddressInfo } from 'net';
 import type { Server } from 'http';
 import request from 'supertest';
@@ -153,6 +154,24 @@ describe('Poppy through the Drawbridge Herald proxy', () => {
 
         const renamed = await api('put', '/account/name', signIn.body.access_token, { name: 'alicia' });
         expect(renamed.status).toBe(200);
+    });
+
+    it('does not pass on the client\'s Accept-Encoding, since fetch has to decode the answer', async () => {
+        let seen: string | undefined;
+        const upstream = http.createServer((req, res) => {
+            seen = req.headers['accept-encoding'];
+            res.end('{}');
+        }).listen(0, '127.0.0.1');
+        await new Promise(resolve => upstream.once('listening', resolve));
+        const url = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`;
+        const app = express();
+        app.use('/names', (req, res) => { void proxyHeraldRequest(req, res, url); });
+        try {
+            await request(app).get('/names/x').set('Accept-Encoding', 'gzip, deflate, br, zstd');
+        } finally {
+            await new Promise(resolve => upstream.close(resolve));
+        }
+        expect(seen).not.toMatch(/zstd/);
     });
 
     it('passes the 303 error redirect from /authorize through unchanged', async () => {
