@@ -11,8 +11,6 @@ export default function CashuPanel({ keymaster, identity, hasCashu, hasDidComm, 
         addCashuMint: (url, name) => keymaster.addCashuMint(url, name),
         removeCashuMint: (url, force, name) => keymaster.removeCashuMint(url, force, name),
         listCashuMints: name => keymaster.listCashuMints(name),
-        publishCashu: name => keymaster.publishCashu(name),
-        unpublishCashu: name => keymaster.unpublishCashu(name),
         getCashuBalance: (mint, name) => keymaster.getCashuBalance(mint, name),
         createCashuMintQuote: (amount, mint, name) => keymaster.createCashuMintQuote(amount, mint, name),
         claimCashuMintQuote: (quote, mint, name) => keymaster.claimCashuMintQuote(quote, mint, name),
@@ -30,7 +28,6 @@ export default function CashuPanel({ keymaster, identity, hasCashu, hasDidComm, 
         getLightningBalance: name => keymaster.getLightningBalance(name),
         payLightningInvoice: (bolt11, name) => keymaster.payLightningInvoice(bolt11, name),
         decodeLightningInvoice: bolt11 => keymaster.decodeLightningInvoice(bolt11),
-        resolveDID: (did, options) => keymaster.resolveDID(did, options),
     }), [keymaster]);
 
     return (

@@ -42,8 +42,12 @@ reputation credentials (Sigil). Both are recorded in #1058 as later work.
   in other units.
 - **Cashu is enabled like Lightning.** `add-cashu [id]` enables Cashu for an
   identity on its node's mint, as `add-lightning [id]` creates its Lightning
-  wallet on the node, and `publish-cashu [id]` advertises it in the DID document
-  as `publish-lightning` does. Outside mints are added per identity.
+  wallet on the node. Outside mints are added per identity.
+- **The sender chooses the mint.** Nothing is published about which mints an
+  identity accepts: the recipient of a locked send sees which mint a token is at,
+  and adds that mint to claim it. It was first a `#cashu` service in the DID
+  document, removed because a list of mints added a public link and an anchored
+  update, and did not limit what a recipient could do with the value.
 
 ## Phase 1: Keymaster wallet
 
@@ -231,10 +235,6 @@ delete the whole `IDInfo`. `removeId` refuses to remove an identity holding Cash
 proofs or journal records. `fixWallet`, which removes identities whose DIDs are
 deactivated or fail to resolve, keeps such identities and reports them instead.
 
-`publishCashu` adds a `#cashu` service to the identity's DID document, of type
-`Cashu`, whose `serviceEndpoint` lists its mint URLs. `unpublishCashu` removes it.
-Senders use it to pick a mint the recipient accepts (Phase 2).
-
 ### Network access
 
 Keymaster reaches mints in two ways.
@@ -266,8 +266,6 @@ so a token cannot point Keymaster at an arbitrary host.
 | `addCashuMint(url, name?)` | Add an outside mint |
 | `removeCashuMint(url, force?, name?)` | Remove one mint |
 | `listCashuMints(name?)` | The identity's mints with NUT-06 info |
-| `publishCashu(name?)` | Add the `#cashu` service listing the identity's mints |
-| `unpublishCashu(name?)` | Remove the `#cashu` service |
 | `getCashuBalance(mint?, name?)` | Spendable, in-flight and outstanding-sent totals for an identity |
 | `createCashuMintQuote(amount, mint?, name?)` | NUT-04 quote: a BOLT11 invoice to pay |
 | `claimCashuMintQuote(quoteId, mint?, name?)` | Mint proofs once the quote is paid |
@@ -363,7 +361,6 @@ not received until the mint confirms its proofs are unspent.
   | `POST /cashu`, `DELETE /cashu` | `addCashu`, `removeCashu` (`force`) |
   | `POST /cashu/mints`, `DELETE /cashu/mints` | `addCashuMint`, `removeCashuMint` (`url`, `force`) |
   | `POST /cashu/mints/list` | `listCashuMints` |
-  | `POST /cashu/publish`, `POST /cashu/unpublish` | `publishCashu`, `unpublishCashu` |
   | `POST /cashu/balance` | `getCashuBalance` |
   | `POST /cashu/quote`, `POST /cashu/claim`, `POST /cashu/quotes` | `createCashuMintQuote`, `claimCashuMintQuote`, `listCashuQuotes` |
   | `POST /cashu/melt`, `POST /cashu/send`, `POST /cashu/receive` | `meltCashu`, `sendCashu`, `receiveCashu` |
@@ -392,19 +389,12 @@ not received until the mint confirms its proofs are unspent.
 ### CLI
 
 All Cashu commands, including those Phases 2 and 3 add. They mirror the
-Lightning commands: `add-cashu`, `remove-cashu`, `publish-cashu` and
-`unpublish-cashu` correspond to their `-lightning` counterparts, operations take
+Lightning commands: `add-cashu` and `remove-cashu` correspond to their `-lightning`
+counterparts, operations take
 a `cashu-` prefix as the Lightning ones take `lightning-`, and the identity is
 the optional trailing `[id]`, defaulting to the current one. `-m, --mint <url>`
 selects the mint; it defaults to the node's mint when the identity has it, else
 to the identity's only mint, and is required otherwise.
-
-Enabling Cashu for an identity is the same two steps as Lightning:
-
-```
-archon add-cashu          # archon add-lightning
-archon publish-cashu      # archon publish-lightning
-```
 
 | Command | Method | Phase | Writes |
 |---|---|---|---|
@@ -413,8 +403,6 @@ archon publish-cashu      # archon publish-lightning
 | `add-cashu-mint <url> [id]` | `addCashuMint` | 1 | yes |
 | `remove-cashu-mint <url> [id] [--force]` | `removeCashuMint` | 1 | yes |
 | `list-cashu-mints [id]` | `listCashuMints` | 1 | no |
-| `publish-cashu [id]` | `publishCashu` | 1 | yes |
-| `unpublish-cashu [id]` | `unpublishCashu` | 1 | yes |
 | `cashu-balance [id] [-m]` | `getCashuBalance` | 1 | no |
 | `cashu-mint <amount> [id] [--pay] [-m]` | `createCashuMintQuote`, then `payLightningInvoice` and `claimCashuMintQuote` with `--pay` | 1 | yes |
 | `cashu-claim <quoteId> [id] [-m]` | `claimCashuMintQuote` | 1 | yes |
@@ -465,10 +453,7 @@ also accepts `30m`, `12h` or `7d`), default three days, and never more than the
 DIDComm mailbox keeps an unacknowledged message (seven days), so the sender can
 reclaim the value before the message could expire unread:
 
-1. Choose the mint: the one given, else a mint listed in the recipient's `#cashu`
-   service that the sender also uses, preferring the sender's node mint. With
-   neither, the send fails and names the recipient's mints, or reports that the
-   recipient publishes none.
+1. Choose the mint: the one given, else the default every Cashu command uses.
 2. Require the mint to advertise NUT-11 in its NUT-06 info. A mint without it may
    treat locked proofs as bearer tokens, so the send is refused rather than
    falling back to an unlocked token.
@@ -497,9 +482,7 @@ locktime: the refund key becomes valid and the recipient's stays valid, so the
 first to reach the mint gets the value. The refund key must always be present,
 because a proof past its locktime with no refund key is spendable by anyone.
 
-The mints come from the recipient's latest DID document, since a service just
-published need not be anchored yet, and the key from its anchored document, as for
-encrypting to a DID.
+The key comes from the recipient's anchored document, as for encrypting to a DID.
 
 ### Message
 
@@ -642,7 +625,7 @@ Both `packages/wallet-ui` and `packages/keymaster-ui` get a Cashu view, always
 available so a wallet on a node without a mint can add an outside one. The `cashu`
 capability only offers the node's own mint as a one-step choice. The view has:
 
-- enable and remove Cashu, and publish or unpublish it, as the Lightning view does
+- enable and remove Cashu, as the Lightning view does
 - the identity's mints, with add and remove
 - balance per mint for the current identity
 - mint: show the quote invoice, or pay it from Lightning

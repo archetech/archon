@@ -277,8 +277,6 @@ It then uses `ARCHON_NODE_URL` and `ARCHON_PASSPHRASE` during setup, creates the
 | Cashu | `add-cashu-mint <url> [id]` | Add an outside Cashu mint to a DID |
 | Cashu | `remove-cashu-mint <url> [id] [--force]` | Remove one Cashu mint from a DID |
 | Cashu | `list-cashu-mints [id]` | List a DID's Cashu mints |
-| Cashu | `publish-cashu [id]` | Publish a DID's Cashu mints as a service endpoint |
-| Cashu | `unpublish-cashu [id]` | Remove the Cashu service endpoint from a DID |
 | Cashu | `cashu-balance [id] [-m <url>]` | Show spendable, in-flight and outstanding ecash |
 | Cashu | `cashu-mint <amount> [id] [--pay] [-m <url>]` | Get a mint quote for ecash, or with `--pay` also pay and claim it |
 | Cashu | `cashu-claim <quoteId> [id] [-m <url>]` | Mint the ecash of a paid quote |

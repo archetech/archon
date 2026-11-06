@@ -9,7 +9,6 @@ import pytest
 from keymaster import (
     CashuMintNotAddedError,
     CashuMintUnsupportedError,
-    CashuNotConfiguredError,
     CashuTokenLockedError,
     CashuTokenSpentError,
     KeymasterError,
@@ -56,7 +55,6 @@ class Bed:
             run(self.km.publish_didcomm(f"{NODE}/didcomm", name))
         run(self.km.add_cashu("Alice"))
         run(self.km.add_cashu("Bob"))
-        run(self.km.publish_cashu("Bob"))
         self.fund(100)
 
     def fund(self, amount: int, name: str = "Alice") -> None:
@@ -125,26 +123,26 @@ class TestSend:
         # The smallest gross that nets enough can net a little more.
         assert bed.accept()["redeemed"][0]["amount"] >= 30
 
-    def test_reports_a_recipient_publishing_no_mints(self, bed):
-        run(bed.km.unpublish_cashu("Bob"))
-
-        with pytest.raises(CashuNotConfiguredError, match=bed.bob):
-            bed.send()
-
-    def test_names_the_mints_the_recipient_accepts(self, bed):
-        doc = run(bed.km.resolve_did(bed.bob))
-        services = [item for item in doc["didDocument"]["service"] if item["type"] != "Cashu"]
-        doc["didDocument"]["service"] = [*services, {"id": f"{bed.bob}#cashu", "type": "Cashu", "serviceEndpoint": [OTHER_URL]}]
-        run(bed.km.update_did(bed.bob, doc))
-
-        with pytest.raises(CashuMintNotAddedError, match=OTHER_URL):
-            bed.send()
-        assert bed.balance("Alice")["spendable"] == 100
+    def test_uses_the_senders_mint_whether_or_not_the_recipient_has_heard_of_it(self, bed):
+        assert bed.send(5)["mint"] == PUBLIC_URL
 
     def test_uses_the_mint_given(self, bed):
-        run(bed.km.unpublish_cashu("Bob"))
-
         assert bed.send(5, mint=PUBLIC_URL)["mint"] == PUBLIC_URL
+
+    def test_refuses_a_mint_the_sender_has_not_added_before_moving_anything(self, bed):
+        with pytest.raises(CashuMintNotAddedError):
+            bed.send(5, mint=OTHER_URL)
+        assert bed.balance("Alice")["spendable"] == 100
+
+    def test_leaves_a_token_for_a_recipient_to_claim_once_it_adds_the_mint(self, bed):
+        run(bed.km.send_cashu_to("Carol", 5, {"name": "Alice"}))
+
+        [waiting] = run(bed.km.list_cashu_messages("Carol"))
+        assert waiting["mint"] == PUBLIC_URL and not waiting["redeemable"]
+        assert "not added" in waiting["reason"]
+
+        run(bed.km.add_cashu("Carol"))
+        assert run(bed.km.receive_cashu_messages("Carol"))["redeemed"][0]["amount"] >= 5
 
     def test_refuses_a_mint_without_nut_11_before_moving_anything(self, monkeypatch):
         monkeypatch.setenv("PBKDF2_ITERATIONS", "1")

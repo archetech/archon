@@ -1118,31 +1118,6 @@ class CashuWallet:
                 described.append({"url": url, "nuts": {}, "keysets": [], "isNodeMint": is_node_mint, "error": str(exc)})
         return described
 
-    async def publish_cashu(self, name: str | None = None) -> bool:
-        id_info = await self.host.fetch_id_info(name, await self.host.load_wallet())
-        urls = list(_mints(id_info))
-        if not urls:
-            raise CashuNotConfiguredError(f"No Cashu mints configured for {id_info['did']}")
-        doc = await self.host.resolve_did(id_info["did"])
-        service_id = f"{id_info['did']}#cashu"
-        services = [service for service in doc["didDocument"].get("service") or [] if service.get("id") != service_id]
-        services.append({"id": service_id, "type": "Cashu", "serviceEndpoint": urls})
-        doc["didDocument"]["service"] = services
-        await self.host.update_did(id_info["did"], doc)
-        return True
-
-    async def unpublish_cashu(self, name: str | None = None) -> bool:
-        id_info = await self.host.fetch_id_info(name, await self.host.load_wallet())
-        doc = await self.host.resolve_did(id_info["did"])
-        service_id = f"{id_info['did']}#cashu"
-        services = [service for service in doc["didDocument"].get("service") or [] if service.get("id") != service_id]
-        if services:
-            doc["didDocument"]["service"] = services
-        else:
-            doc["didDocument"].pop("service", None)
-        await self.host.update_did(id_info["did"], doc)
-        return True
-
     # ---- read methods: never settle or send anything ----
 
     @staticmethod
@@ -1506,26 +1481,6 @@ class CashuWallet:
                 del inbox[known]
         inbox[key] = _now()
 
-    # The mint given, else one the recipient lists and the sender uses, preferring
-    # the sender's node mint.
-    async def _choose_mint(self, recipient: dict[str, Any], recipient_did: str, mint: str | None, name: str) -> _MintContext:
-        if mint:
-            return await self._context(mint, name)
-        services = (recipient.get("didDocument") or {}).get("service") or []
-        service = next((item for item in services if item.get("type") == "Cashu" or str(item.get("id", "")).endswith("#cashu")), None)
-        endpoint = (service or {}).get("serviceEndpoint")
-        candidates = endpoint if isinstance(endpoint, list) else [endpoint] if endpoint else []
-        listed = [normalize_mint_url(url) for url in candidates if isinstance(url, str)]
-        if not listed:
-            raise CashuNotConfiguredError(f"{recipient_did} publishes no Cashu mints")
-        mints = _mints(await self.host.fetch_id_info(name, await self.host.load_wallet()))
-        shared = [url for url in listed if url in mints]
-        if not shared:
-            raise CashuMintNotAddedError(f"{recipient_did} accepts only {', '.join(listed)}")
-        node = self._node_url()
-        own = next((url for url in shared if mints[url].get("node") and mints[url]["node"] == node), None)
-        return await self._context(own or shared[0], name)
-
     async def send_cashu_to(self, recipient: str, amount: int, options: dict[str, Any] | None = None) -> dict[str, Any]:
         options = options or {}
         memo = options.get("memo")
@@ -1541,7 +1496,7 @@ class CashuWallet:
         identity = await self._bound_identity(options.get("name"))
         doc = await self.host.resolve_did(recipient)
         recipient_did = doc["didDocument"]["id"]
-        ctx = await self._choose_mint(doc, recipient_did, options.get("mint"), identity)
+        ctx = await self._context(options.get("mint"), identity)
 
         # A mint without NUT-11 may treat locked proofs as bearer tokens, so there is
         # no falling back to an unlocked token.

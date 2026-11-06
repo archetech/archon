@@ -390,8 +390,6 @@ Pay a Lightning invoice:
 | `add-cashu-mint` | `archon_add_cashu_mint` |
 | `remove-cashu-mint` | `archon_remove_cashu_mint` |
 | `list-cashu-mints` | `archon_list_cashu_mints` |
-| `publish-cashu` | `archon_publish_cashu` |
-| `unpublish-cashu` | `archon_unpublish_cashu` |
 | `cashu-balance` | `archon_cashu_balance` |
 | `cashu-mint` | `archon_cashu_mint` |
 | `cashu-claim` | `archon_cashu_claim` |

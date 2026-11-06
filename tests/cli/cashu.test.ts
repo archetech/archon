@@ -112,18 +112,6 @@ describe('cashu', () => {
         expect(result).toMatchObject({ open: 0, balance: { spendable: 50 } });
     });
 
-    test('publish-cashu lists the mint on the DID and unpublish-cashu removes it', async () => {
-        const did = parseDid(await archon('resolve-id'));
-
-        await archon('publish-cashu');
-        const published = JSON.parse(await archon('resolve-did', did));
-        expect(JSON.stringify(published.didDocument.service)).toContain('#cashu');
-
-        await archon('unpublish-cashu');
-        const unpublished = JSON.parse(await archon('resolve-did', did));
-        expect(JSON.stringify(unpublished.didDocument.service ?? [])).not.toContain('#cashu');
-    });
-
     test('remove-cashu refuses to discard ecash without --force', async () => {
         await fund(10);
 
@@ -153,7 +141,6 @@ describe('cashu locked to a DID', () => {
         for (const name of ['alice', 'bob']) {
             await archon('publish-didcomm', '-n', name);
             await archon('add-cashu', name);
-            await archon('publish-cashu', name);
         }
         await archon('use-id', 'alice');
         await fund(100);

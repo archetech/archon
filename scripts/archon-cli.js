@@ -2192,32 +2192,6 @@ program
     });
 
 program
-    .command('publish-cashu [id]')
-    .description("Publish a DID's Cashu mints as a service endpoint")
-    .action(async (id) => {
-        try {
-            await keymaster.publishCashu(id);
-            console.log(UPDATE_OK);
-        }
-        catch (error) {
-            fail(error.error || error.message || error);
-        }
-    });
-
-program
-    .command('unpublish-cashu [id]')
-    .description('Remove the Cashu service endpoint from a DID')
-    .action(async (id) => {
-        try {
-            await keymaster.unpublishCashu(id);
-            console.log(UPDATE_OK);
-        }
-        catch (error) {
-            fail(error.error || error.message || error);
-        }
-    });
-
-program
     .command('cashu-balance [id]')
     .description('Show spendable, in-flight and outstanding ecash')
     .option('-m, --mint <url>', 'mint to use')

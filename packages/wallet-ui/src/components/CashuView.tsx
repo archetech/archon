@@ -38,11 +38,11 @@ import EmptyState from "./layout/EmptyState";
 
 export type CashuKeymaster = Pick<KeymasterInterface,
     | "addCashu" | "removeCashu" | "addCashuMint" | "removeCashuMint" | "listCashuMints"
-    | "publishCashu" | "unpublishCashu" | "getCashuBalance"
+    | "getCashuBalance"
     | "createCashuMintQuote" | "claimCashuMintQuote" | "listCashuQuotes"
     | "meltCashu" | "sendCashu" | "receiveCashu" | "checkCashu" | "restoreCashu"
     | "listCashuSends" | "reclaimCashu" | "sendCashuTo" | "listCashuMessages" | "receiveCashuMessages"
-    | "getLightningBalance" | "payLightningInvoice" | "decodeLightningInvoice" | "resolveDID"
+    | "getLightningBalance" | "payLightningInvoice" | "decodeLightningInvoice"
 >;
 
 type Props = {
@@ -92,11 +92,6 @@ function errorText(error: any): string {
 function parseAmount(value: string): number | null {
     const amount = Number(value);
     return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
-}
-
-function sameMints(published: string[], mints: CashuMintInfo[]): boolean {
-    const urls = new Set(mints.map(mint => mint.url));
-    return published.length === urls.size && published.every(url => urls.has(url));
 }
 
 function Stack({ children }: { children: ReactNode }) {
@@ -174,13 +169,9 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
 
     const [mints, setMints] = useState<CashuMintInfo[] | null>(null);
     const [balance, setBalance] = useState<CashuBalance | null>(null);
-    // The mints in the DID document, null if it lists none, undefined until that is known.
-    const [published, setPublished] = useState<string[] | null | undefined>(undefined);
-    const [publicationError, setPublicationError] = useState("");
     const [quotes, setQuotes] = useState<CashuQuoteRecord[]>([]);
     const [sends, setSends] = useState<CashuSendRecord[]>([]);
     const [chosenMint, setChosenMint] = useState("");
-    const [lockedMint, setLockedMint] = useState("");
     const [newMint, setNewMint] = useState("");
     const [confirmRemoval, setConfirmRemoval] = useState<{ url?: string } | null>(null);
 
@@ -216,46 +207,25 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
 
     const reload = useCallback(async () => {
         const read = ++latestRead.current;
-        const readWallet = async () => {
-            try {
-                const list = await keymaster.listCashuMints(identity);
-                const [totals, open, outstanding] = list.length === 0 ? [null, [], []] : await Promise.all([
-                    keymaster.getCashuBalance(undefined, identity),
-                    keymaster.listCashuQuotes(undefined, identity),
-                    keymaster.listCashuSends(undefined, identity),
-                ]);
-                if (read === latestRead.current) {
-                    setLoadError("");
-                    setMints(list);
-                    setBalance(totals);
-                    setQuotes(open);
-                    setSends(outstanding);
-                }
-            } catch (error) {
-                if (read === latestRead.current) {
-                    setLoadError(errorText(error));
-                }
+        try {
+            const list = await keymaster.listCashuMints(identity);
+            const [totals, open, outstanding] = list.length === 0 ? [null, [], []] : await Promise.all([
+                keymaster.getCashuBalance(undefined, identity),
+                keymaster.listCashuQuotes(undefined, identity),
+                keymaster.listCashuSends(undefined, identity),
+            ]);
+            if (read === latestRead.current) {
+                setLoadError("");
+                setMints(list);
+                setBalance(totals);
+                setQuotes(open);
+                setSends(outstanding);
             }
-        };
-        // Apart from the wallet, whose funds do not depend on it, and whatever the mints
-        // are, since removing every mint leaves the #cashu service published.
-        const readPublication = async () => {
-            try {
-                const document = await keymaster.resolveDID(identity);
-                if (read === latestRead.current) {
-                    const service = document?.didDocument?.service?.find((item: { id?: string }) => item.id?.endsWith("#cashu"));
-                    const endpoint = service?.serviceEndpoint as unknown;
-                    setPublicationError("");
-                    setPublished(service ? (Array.isArray(endpoint) ? endpoint as string[] : [String(endpoint)]) : null);
-                }
-            } catch (error) {
-                if (read === latestRead.current) {
-                    setPublicationError(errorText(error));
-                    setPublished(undefined);
-                }
+        } catch (error) {
+            if (read === latestRead.current) {
+                setLoadError(errorText(error));
             }
-        };
-        await Promise.all([readWallet(), readPublication()]);
+        }
     }, [keymaster, identity]);
 
     // A quiet read is one nobody asked for, which says nothing if it fails.
@@ -412,20 +382,6 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         });
     }
 
-    function handlePublish() {
-        run("publish", async () => {
-            await keymaster.publishCashu(identity);
-            notify.success("Your mints are published in your DID document");
-        });
-    }
-
-    function handleUnpublish() {
-        run("publish", async () => {
-            await keymaster.unpublishCashu(identity);
-            notify.success("Your mints are no longer published");
-        });
-    }
-
     function handleQuote() {
         const amount = parseAmount(mintAmount);
         if (!amount) {
@@ -553,8 +509,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
             const result = await keymaster.sendCashuTo(recipient.trim(), amount, {
                 ...(memo.trim() && { memo: memo.trim() }),
                 ...(hours !== undefined && { locktime: Math.round(hours * HOUR_SECONDS) }),
-                // Left out, Keymaster picks a mint the recipient publishes.
-                ...(mints?.some(item => item.url === lockedMint) && { mint: lockedMint }),
+                ...(mint && { mint }),
                 name: identity,
             });
             setDelivery(result);
@@ -651,14 +606,6 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                             </Typography>
                         </>
                     )}
-                    {published && (
-                        <>
-                            <Alert severity="warning">Your DID document still lists mints you no longer use.</Alert>
-                            <Box>
-                                <ActionButton label="Unpublish Cashu" color="warning" onClick={handleUnpublish} busy={busy.publish} />
-                            </Box>
-                        </>
-                    )}
                 </Stack>
             </Box>
         );
@@ -718,18 +665,8 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                         <ActionButton label="Refresh" onClick={() => run("refresh", async () => undefined)} busy={busy.refresh} />
                         <ActionButton label="Check" onClick={handleCheck} busy={busy.check} />
                         <ActionButton label="Restore From Seed" onClick={handleRestore} busy={busy.restore} />
-                        {published && <ActionButton label="Unpublish Cashu" color="warning" onClick={handleUnpublish} busy={busy.publish} />}
-                        {published === null && <ActionButton label="Publish Cashu" color="success" onClick={handlePublish} busy={busy.publish} />}
-                        {published && !sameMints(published, mints) && (
-                            <ActionButton label="Update Published Mints" color="success" onClick={handlePublish} busy={busy.publish} />
-                        )}
                         <ActionButton label="Remove Cashu" color="error" onClick={() => run("remove", () => removeMint())} busy={busy.remove} />
                     </Row>
-                    {publicationError && (
-                        <Alert severity="warning">
-                            Whether your mints are published is unknown, because your DID document could not be read: {publicationError}
-                        </Alert>
-                    )}
                     <Typography variant="subtitle1">Mints</Typography>
                     {mints.map(item => {
                         const totals = perMint(item.url);
@@ -900,19 +837,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
             {section === "didcomm" && (
                 <Stack>
                     <Typography variant="subtitle1">Send to a DID</Typography>
-                    {mints.length > 1 && (
-                        <TextField
-                            select
-                            label="Mint"
-                            value={mints.some(item => item.url === lockedMint) ? lockedMint : ""}
-                            onChange={event => setLockedMint(event.target.value)}
-                            size="small"
-                            slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
-                        >
-                            <MenuItem value="">Automatic: one the recipient accepts</MenuItem>
-                            {mints.map(item => <MenuItem key={item.url} value={item.url}>{item.name || item.url}</MenuItem>)}
-                        </TextField>
-                    )}
+                    {mintChoice}
                     <Autocomplete
                         freeSolo
                         options={recipients}
@@ -933,6 +858,9 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                         <ActionButton label="Send" variant="contained" busy={busy.sendTo}
                             disabled={!recipient.trim() || !lockedAmount.trim()} onClick={handleSendTo} />
                     </Box>
+                    <Typography variant="body2" color="text.secondary">
+                        The recipient has to accept this mint to claim it. If they do not, you can reclaim it after that time.
+                    </Typography>
                     {delivery?.delivered && (
                         <Typography variant="body2">
                             Locked to the recipient. You can reclaim it after {when(delivery.locktime)} if they have not redeemed it.

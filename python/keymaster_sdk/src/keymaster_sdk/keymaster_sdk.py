@@ -1437,24 +1437,6 @@ def list_cashu_mints(id=None):
     return response["mints"]
 
 
-def publish_cashu(id=None):
-    response = proxy_request(
-        "POST",
-        f"{_keymaster_api}/cashu/publish",
-        json={"id": id},
-    )
-    return response["ok"]
-
-
-def unpublish_cashu(id=None):
-    response = proxy_request(
-        "POST",
-        f"{_keymaster_api}/cashu/unpublish",
-        json={"id": id},
-    )
-    return response["ok"]
-
-
 def get_cashu_balance(mint=None, id=None):
     response = proxy_request(
         "POST",

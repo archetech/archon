@@ -454,16 +454,6 @@ async def list_cashu_mints(body: CashuBody) -> dict[str, Any]:
     return {"mints": await service.list_cashu_mints(body.get("id"))}
 
 
-@protected_api.post("/cashu/publish")
-async def publish_cashu(body: CashuBody) -> dict[str, bool]:
-    return {"ok": await service.publish_cashu(body.get("id"))}
-
-
-@protected_api.post("/cashu/unpublish")
-async def unpublish_cashu(body: CashuBody) -> dict[str, bool]:
-    return {"ok": await service.unpublish_cashu(body.get("id"))}
-
-
 @protected_api.post("/cashu/balance")
 async def get_cashu_balance(body: CashuBody) -> dict[str, Any]:
     return await service.get_cashu_balance(body.get("mint"), body.get("id"))

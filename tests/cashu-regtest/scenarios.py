@@ -188,7 +188,6 @@ def new_wallet(service, sats):
     wallet.cli("create-id", "-r", "local", name)
     wallet.cli("publish-didcomm", "-n", name)
     wallet.cli("add-cashu", name)
-    wallet.cli("publish-cashu", name)
     quote = wallet.json("cashu-mint", str(sats), name)
     ln("cln-user", "pay", quote["request"])
     claim(wallet, quote)

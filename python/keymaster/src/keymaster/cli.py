@@ -1002,16 +1002,6 @@ async def cmd_list_cashu_mints(km: Keymaster, args: argparse.Namespace) -> None:
     _print_json(await km.list_cashu_mints(args.id))
 
 
-async def cmd_publish_cashu(km: Keymaster, args: argparse.Namespace) -> None:
-    await km.publish_cashu(args.id)
-    print(UPDATE_OK)
-
-
-async def cmd_unpublish_cashu(km: Keymaster, args: argparse.Namespace) -> None:
-    await km.unpublish_cashu(args.id)
-    print(UPDATE_OK)
-
-
 async def cmd_cashu_balance(km: Keymaster, args: argparse.Namespace) -> None:
     _print_json(await km.get_cashu_balance(args.mint, args.id))
 
@@ -1777,10 +1767,6 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("id", nargs="?")
     sp.add_argument("--force", action="store_true", help=force_help)
     sp = add("list-cashu-mints", "List a DID's Cashu mints", cmd_list_cashu_mints)
-    sp.add_argument("id", nargs="?")
-    sp = add("publish-cashu", "Publish a DID's Cashu mints as a service endpoint", cmd_publish_cashu)
-    sp.add_argument("id", nargs="?")
-    sp = add("unpublish-cashu", "Remove the Cashu service endpoint from a DID", cmd_unpublish_cashu)
     sp.add_argument("id", nargs="?")
     sp = add("cashu-balance", "Show spendable, in-flight and outstanding ecash", cmd_cashu_balance)
     sp.add_argument("id", nargs="?")

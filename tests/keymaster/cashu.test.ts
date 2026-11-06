@@ -311,18 +311,6 @@ describe('enabling', () => {
         await expect(keymaster.sendCashu(1)).rejects.toThrow(CashuNotConfiguredError);
     });
 
-    it('publishes and unpublishes the mints in the DID document', async () => {
-        await keymaster.addCashu();
-        const { did } = await keymaster.fetchIdInfo();
-
-        await keymaster.publishCashu();
-        let doc = await keymaster.resolveDID(did);
-        expect(doc.didDocument?.service).toEqual([{ id: `${did}#cashu`, type: 'Cashu', serviceEndpoint: [PUBLIC_URL] }]);
-
-        await keymaster.unpublishCashu();
-        doc = await keymaster.resolveDID(did);
-        expect(doc.didDocument?.service).toBeUndefined();
-    });
 });
 
 describe('minting', () => {

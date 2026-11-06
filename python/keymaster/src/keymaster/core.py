@@ -823,12 +823,6 @@ class Keymaster:
     async def list_cashu_mints(self, name: str | None = None) -> list[dict[str, Any]]:
         return await self.cashu.list_cashu_mints(name)
 
-    async def publish_cashu(self, name: str | None = None) -> bool:
-        return await self.cashu.publish_cashu(name)
-
-    async def unpublish_cashu(self, name: str | None = None) -> bool:
-        return await self.cashu.unpublish_cashu(name)
-
     async def get_cashu_balance(self, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
         return await self.cashu.get_cashu_balance(mint, name)
 

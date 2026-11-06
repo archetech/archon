@@ -232,8 +232,6 @@ const ROUTES: Array<[Method, string, number]> = [
     ['POST', '/cashu/mints', 400],
     ['DELETE', '/cashu/mints', 400],
     ['POST', '/cashu/mints/list', 400],
-    ['POST', '/cashu/publish', 400],
-    ['POST', '/cashu/unpublish', 400],
     ['POST', '/cashu/balance', 400],
     ['POST', '/cashu/quote', 400],
     ['POST', '/cashu/claim', 400],
