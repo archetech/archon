@@ -927,26 +927,6 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async publishCashu(name?: string): Promise<boolean> {
-        try {
-            const response = await this.axios.post(`${this.API}/cashu/publish`, { id: name });
-            return response.data.ok;
-        }
-        catch (error) {
-            throwError(error);
-        }
-    }
-
-    async unpublishCashu(name?: string): Promise<boolean> {
-        try {
-            const response = await this.axios.post(`${this.API}/cashu/unpublish`, { id: name });
-            return response.data.ok;
-        }
-        catch (error) {
-            throwError(error);
-        }
-    }
-
     async getCashuBalance(mint?: string, name?: string): Promise<CashuBalance> {
         try {
             const response = await this.axios.post(`${this.API}/cashu/balance`, { mint, id: name });

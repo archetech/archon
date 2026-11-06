@@ -10,11 +10,11 @@ const mintInfo = (url: string, isNodeMint = false) => ({ url, nuts: {}, keysets:
 
 const keymaster = {
     addCashu: vi.fn(), removeCashu: vi.fn(), addCashuMint: vi.fn(), removeCashuMint: vi.fn(), listCashuMints: vi.fn(),
-    publishCashu: vi.fn(), unpublishCashu: vi.fn(), getCashuBalance: vi.fn(),
+    getCashuBalance: vi.fn(),
     createCashuMintQuote: vi.fn(), claimCashuMintQuote: vi.fn(), listCashuQuotes: vi.fn(),
     meltCashu: vi.fn(), sendCashu: vi.fn(), receiveCashu: vi.fn(), checkCashu: vi.fn(), restoreCashu: vi.fn(),
     listCashuSends: vi.fn(), reclaimCashu: vi.fn(), sendCashuTo: vi.fn(), listCashuMessages: vi.fn(), receiveCashuMessages: vi.fn(),
-    getLightningBalance: vi.fn(), payLightningInvoice: vi.fn(), decodeLightningInvoice: vi.fn(), resolveDID: vi.fn(),
+    getLightningBalance: vi.fn(), payLightningInvoice: vi.fn(), decodeLightningInvoice: vi.fn(),
 };
 const notify = { error: vi.fn(), success: vi.fn(), warning: vi.fn() };
 
@@ -47,7 +47,6 @@ beforeEach(() => {
     keymaster.listCashuSends.mockResolvedValue([]);
     keymaster.listCashuMessages.mockResolvedValue([]);
     keymaster.getLightningBalance.mockRejectedValue(new Error('Lightning not configured'));
-    keymaster.resolveDID.mockResolvedValue({ didDocument: { service: [] } });
 });
 
 describe('Cashu view: enabling', () => {
@@ -120,20 +119,6 @@ describe('Cashu view: enabling', () => {
         expect(keymaster.listCashuMessages).not.toHaveBeenCalled();
     });
 
-    it('shows the wallet when the DID document cannot be read, and does not guess whether it is published', async () => {
-        holding(mintInfo(NODE, true));
-        keymaster.resolveDID.mockRejectedValueOnce(new Error('gatekeeper down'));
-        view();
-        await screen.findByRole('heading', { name: 'Balance: 1,000 sats' });
-        expect(await screen.findByText(/published is unknown.*gatekeeper down/)).toBeTruthy();
-        expect(screen.queryByRole('button', { name: 'Publish Cashu' })).toBeNull();
-        expect(screen.queryByRole('button', { name: 'Unpublish Cashu' })).toBeNull();
-        const user = userEvent.setup();
-        await user.click(screen.getByRole('button', { name: 'Refresh' }));
-        expect(await screen.findByRole('button', { name: 'Publish Cashu' })).toBeTruthy();
-        expect(screen.queryByText(/published is unknown/)).toBeNull();
-    });
-
     it('offers a retry when the first read fails', async () => {
         keymaster.listCashuMints.mockRejectedValueOnce(new Error('wallet locked'));
         keymaster.listCashuMints.mockResolvedValue([mintInfo(NODE, true)]);
@@ -155,17 +140,6 @@ describe('Cashu view: enabling', () => {
         expect(screen.getAllByText(/Not answering right now/)).toHaveLength(1);
     });
 
-    it('can still unpublish after the last mint is gone', async () => {
-        holding();
-        keymaster.resolveDID.mockResolvedValue({ didDocument: { service: [{ id: 'did:cid:a#cashu', type: 'Cashu', serviceEndpoint: [NODE] }] } });
-        keymaster.unpublishCashu.mockResolvedValue(true);
-        view();
-        const user = userEvent.setup();
-        await user.click(await screen.findByRole('button', { name: 'Unpublish Cashu' }));
-        await waitFor(() => expect(keymaster.unpublishCashu).toHaveBeenCalledWith('Alice'));
-        expect(keymaster.getCashuBalance).not.toHaveBeenCalled();
-    });
-
     it('does not let a slow read put older figures back', async () => {
         holding(mintInfo(NODE, true));
         const finishSlowRead = deferred();
@@ -184,13 +158,6 @@ describe('Cashu view: enabling', () => {
         expect(screen.getByRole('heading', { name: 'Balance: 700 sats' })).toBeTruthy();
     });
 
-    it('offers to update a published list that no longer matches the mints', async () => {
-        holding(mintInfo(NODE, true), mintInfo(OTHER));
-        keymaster.getCashuBalance.mockResolvedValue({ spendable: 0, inFlight: 0, outstanding: 0, mints: {} });
-        keymaster.resolveDID.mockResolvedValue({ didDocument: { service: [{ id: 'did:cid:a#cashu', type: 'Cashu', serviceEndpoint: [NODE] }] } });
-        view();
-        expect(await screen.findByRole('button', { name: 'Update Published Mints' })).toBeTruthy();
-    });
 });
 
 describe('Cashu view: several mints', () => {
@@ -238,14 +205,14 @@ describe('Cashu view: several mints', () => {
 
     const lockedResult = { token: 't', amount: 50, fee: 0, operationId: 'o', mint: OTHER, recipient: 'did:cid:b', messageId: 'm', locktime: 1, delivered: true };
 
-    it('leaves the choice of mint for a locked send to Keymaster unless one is chosen', async () => {
+    it('sends a locked token at the default mint unless another is chosen', async () => {
         keymaster.sendCashuTo.mockResolvedValue(lockedResult);
         view();
         const user = await open('DIDComm');
         await user.type(screen.getByLabelText(/^Recipient/), 'Bob');
         await user.type(screen.getByLabelText(/^Amount/), '50');
         await user.click(screen.getByRole('button', { name: 'Send' }));
-        await waitFor(() => expect(keymaster.sendCashuTo).toHaveBeenCalledWith('Bob', 50, { name: 'Alice' }));
+        await waitFor(() => expect(keymaster.sendCashuTo).toHaveBeenCalledWith('Bob', 50, { mint: NODE, name: 'Alice' }));
     });
 
     it('sends a locked token at a mint chosen for it', async () => {
@@ -545,7 +512,7 @@ describe('Cashu view: DIDComm', () => {
         await user.type(screen.getByLabelText(/^Memo/), 'lunch');
         await user.type(screen.getByLabelText(/^Hours/), '2');
         await user.click(screen.getByRole('button', { name: 'Send' }));
-        await waitFor(() => expect(keymaster.sendCashuTo).toHaveBeenCalledWith('Bob', 50, { memo: 'lunch', locktime: 7200, name: 'Alice' }));
+        await waitFor(() => expect(keymaster.sendCashuTo).toHaveBeenCalledWith('Bob', 50, { memo: 'lunch', locktime: 7200, mint: NODE, name: 'Alice' }));
     });
 
     it('does not call an undelivered send sent', async () => {

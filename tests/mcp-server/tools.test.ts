@@ -229,8 +229,6 @@ function mockRuntime(overrides: Record<string, unknown> = {}) {
         addCashuMint: jest.fn<any>().mockResolvedValue({ url: 'https://mint.example' }),
         removeCashuMint: jest.fn<any>().mockResolvedValue(true),
         listCashuMints: jest.fn<any>().mockResolvedValue([]),
-        publishCashu: jest.fn<any>().mockResolvedValue(true),
-        unpublishCashu: jest.fn<any>().mockResolvedValue(true),
         getCashuBalance: jest.fn<any>().mockResolvedValue({ spendable: 0, inFlight: 0, outstanding: 0 }),
         createCashuMintQuote: jest.fn<any>().mockResolvedValue({ quote: 'quote-1', request: 'lnbc...', amount: 21, state: 'UNPAID' }),
         claimCashuMintQuote: jest.fn<any>().mockResolvedValue({ amount: 21, mint: 'https://mint.example' }),

@@ -4114,8 +4114,6 @@ export default class Keymaster implements KeymasterInterface {
     addCashuMint(url: string, name?: string) { return this.cashu.addCashuMint(url, name); }
     removeCashuMint(url: string, force?: boolean, name?: string) { return this.cashu.removeCashuMint(url, force, name); }
     listCashuMints(name?: string) { return this.cashu.listCashuMints(name); }
-    publishCashu(name?: string) { return this.cashu.publishCashu(name); }
-    unpublishCashu(name?: string) { return this.cashu.unpublishCashu(name); }
     getCashuBalance(mint?: string, name?: string) { return this.cashu.getCashuBalance(mint, name); }
     createCashuMintQuote(amount: number, mint?: string, name?: string) { return this.cashu.createCashuMintQuote(amount, mint, name); }
     claimCashuMintQuote(quoteId: string, mint?: string, name?: string) { return this.cashu.claimCashuMintQuote(quoteId, mint, name); }

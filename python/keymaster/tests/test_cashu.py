@@ -184,18 +184,6 @@ class TestEnabling:
         with pytest.raises(CashuNotConfiguredError):
             run(bed.keymaster.send_cashu(1))
 
-    def test_publishes_and_unpublishes(self, bed):
-        run(bed.keymaster.add_cashu())
-        did = run(bed.keymaster.fetch_id_info())["did"]
-
-        run(bed.keymaster.publish_cashu())
-        service = run(bed.keymaster.resolve_did(did))["didDocument"]["service"]
-        assert service == [{"id": f"{did}#cashu", "type": "Cashu", "serviceEndpoint": [PUBLIC_URL]}]
-
-        run(bed.keymaster.unpublish_cashu())
-        assert "service" not in run(bed.keymaster.resolve_did(did))["didDocument"]
-
-
 class TestChoosingProofs:
     @pytest.fixture
     def rich(self, bed):

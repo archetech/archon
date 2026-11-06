@@ -1329,36 +1329,6 @@ export class CashuWallet {
         }));
     }
 
-    async publishCashu(name?: string): Promise<boolean> {
-        const idInfo = await this.host.fetchIdInfo(name, await this.host.loadWallet());
-        const urls = Object.keys(this.mints(idInfo));
-        if (urls.length === 0) {
-            throw new CashuNotConfiguredError(`No Cashu mints configured for ${idInfo.did}`);
-        }
-        const doc = await this.host.resolveDID(idInfo.did);
-        const serviceId = `${idInfo.did}#cashu`;
-        const services = (doc.didDocument?.service ?? []).filter((service: { id: string }) => service.id !== serviceId);
-        services.push({ id: serviceId, type: 'Cashu', serviceEndpoint: urls });
-        doc.didDocument.service = services;
-        await this.host.updateDID(idInfo.did, doc);
-        return true;
-    }
-
-    async unpublishCashu(name?: string): Promise<boolean> {
-        const idInfo = await this.host.fetchIdInfo(name, await this.host.loadWallet());
-        const doc = await this.host.resolveDID(idInfo.did);
-        const serviceId = `${idInfo.did}#cashu`;
-        const services = (doc.didDocument?.service ?? []).filter((service: { id: string }) => service.id !== serviceId);
-        if (services.length > 0) {
-            doc.didDocument.service = services;
-        }
-        else {
-            delete doc.didDocument.service;
-        }
-        await this.host.updateDID(idInfo.did, doc);
-        return true;
-    }
-
     // ---- read methods: never settle or send anything ----
 
     private entryTotals(entry: CashuMintEntry) {
@@ -1759,30 +1729,6 @@ export class CashuWallet {
         idInfo.cashuInbox = inbox;
     }
 
-    // The mint given, else one the recipient lists and the sender uses, preferring
-    // the sender's node mint.
-    private async chooseMint(recipient: any, recipientDid: string, mint: string | undefined, name: string): Promise<MintContext> {
-        if (mint) {
-            return this.context(mint, name);
-        }
-        const service = (recipient.didDocument?.service ?? []).find((item: { id?: string; type?: string }) =>
-            item.type === 'Cashu' || item.id?.endsWith('#cashu'));
-        const endpoint: unknown = service?.serviceEndpoint;
-        const listed = (Array.isArray(endpoint) ? endpoint : endpoint ? [endpoint] : [])
-            .filter((url): url is string => typeof url === 'string')
-            .map(normalizeMintUrl);
-        if (listed.length === 0) {
-            throw new CashuNotConfiguredError(`${recipientDid} publishes no Cashu mints`);
-        }
-        const mints = this.mints(await this.host.fetchIdInfo(name, await this.host.loadWallet()));
-        const shared = listed.filter(url => mints[url]);
-        if (shared.length === 0) {
-            throw new CashuMintNotAddedError(`${recipientDid} accepts only ${listed.join(', ')}`);
-        }
-        const node = this.nodeUrl();
-        return this.context(shared.find(url => mints[url].node && mints[url].node === node) ?? shared[0], name);
-    }
-
     async sendCashuTo(recipient: string, amount: number, options: CashuSendToOptions = {}): Promise<CashuSendToResult> {
         // A JSON caller may send null for what it does not set.
         const memo = options.memo ?? undefined;
@@ -1803,7 +1749,7 @@ export class CashuWallet {
         const identity = await this.boundIdentity(name);
         const doc = await this.host.resolveDID(recipient);
         const recipientDid: string = doc.didDocument.id;
-        const ctx = await this.chooseMint(doc, recipientDid, mint, identity);
+        const ctx = await this.context(mint, identity);
 
         // A mint without NUT-11 may treat locked proofs as bearer tokens, so there is
         // no falling back to an unlocked token.

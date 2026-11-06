@@ -9,7 +9,6 @@ import MemoryClient from '@didcid/ipfs/memory';
 import {
     CashuMintNotAddedError,
     CashuMintUnsupportedError,
-    CashuNotConfiguredError,
     CashuTokenLockedError,
     CashuTokenSpentError,
     InvalidParameterError,
@@ -52,7 +51,6 @@ async function setup(options: FakeMintOptions = {}): Promise<void> {
     }
     await keymaster.addCashu('Alice');
     await keymaster.addCashu('Bob');
-    await keymaster.publishCashu('Bob');
     await fund(100);
 }
 
@@ -68,7 +66,6 @@ async function anchoredIdentity(name: string, cashu = true): Promise<string> {
     await keymaster.publishDidComm(`${node}/didcomm`, name);
     if (cashu) {
         await keymaster.addCashu(name);
-        await keymaster.publishCashu(name);
     }
     return did;
 }
@@ -142,30 +139,29 @@ describe('sendCashuTo', () => {
     });
 
     describe('choosing a mint', () => {
-        it('reports a recipient that publishes none', async () => {
-            await keymaster.unpublishCashu('Bob');
-
-            await expect(send()).rejects.toThrow(CashuNotConfiguredError);
-            await expect(send()).rejects.toThrow(bobDid);
+        it('uses the sender\'s mint, whether or not the recipient has heard of it', async () => {
+            await expect(send(5)).resolves.toMatchObject({ mint: PUBLIC_URL });
         });
 
-        it('names the mints the recipient accepts when none is shared', async () => {
-            const doc = await keymaster.resolveDID(bobDid);
-            doc.didDocument!.service = [
-                ...doc.didDocument!.service!.filter(item => item.type !== 'Cashu'),
-                { id: `${bobDid}#cashu`, type: 'Cashu', serviceEndpoint: [OTHER_URL] as never },
-            ];
-            await keymaster.updateDID(bobDid, doc);
+        it('uses the mint given', async () => {
+            await expect(send(5, { mint: PUBLIC_URL })).resolves.toMatchObject({ mint: PUBLIC_URL });
+        });
 
-            await expect(send()).rejects.toThrow(CashuMintNotAddedError);
-            await expect(send()).rejects.toThrow(OTHER_URL);
+        it('refuses a mint the sender has not added, before moving anything', async () => {
+            await expect(send(5, { mint: OTHER_URL })).rejects.toThrow(CashuMintNotAddedError);
             expect(await balance('Alice')).toMatchObject({ spendable: 100, inFlight: 0 });
         });
 
-        it('uses the mint given rather than asking the recipient', async () => {
-            await keymaster.unpublishCashu('Bob');
+        it('leaves a token for a recipient to claim once it adds the mint', async () => {
+            await keymaster.sendCashuTo('Carol', 5, { name: 'Alice' });
 
-            await expect(send(5, { mint: PUBLIC_URL })).resolves.toMatchObject({ mint: PUBLIC_URL });
+            const [waiting] = await keymaster.listCashuMessages('Carol');
+            expect(waiting).toMatchObject({ mint: PUBLIC_URL, redeemable: false });
+            expect(waiting.reason).toContain('not added');
+
+            await keymaster.addCashu('Carol');
+            const { redeemed } = await keymaster.receiveCashuMessages('Carol');
+            expect(redeemed[0].amount).toBeGreaterThanOrEqual(5);
         });
     });
 

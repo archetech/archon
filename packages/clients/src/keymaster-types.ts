@@ -749,8 +749,6 @@ export interface KeymasterInterface {
     addCashuMint(url: string, name?: string): Promise<CashuMintInfo>;
     removeCashuMint(url: string, force?: boolean, name?: string): Promise<boolean>;
     listCashuMints(name?: string): Promise<CashuMintInfo[]>;
-    publishCashu(name?: string): Promise<boolean>;
-    unpublishCashu(name?: string): Promise<boolean>;
     getCashuBalance(mint?: string, name?: string): Promise<CashuBalance>;
     createCashuMintQuote(amount: number, mint?: string, name?: string): Promise<CashuMintQuote>;
     claimCashuMintQuote(quoteId: string, mint?: string, name?: string): Promise<CashuClaimResult>;

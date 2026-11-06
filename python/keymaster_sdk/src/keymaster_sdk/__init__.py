@@ -170,8 +170,6 @@ from .keymaster_sdk import (
     add_cashu_mint,
     remove_cashu_mint,
     list_cashu_mints,
-    publish_cashu,
-    unpublish_cashu,
     get_cashu_balance,
     create_cashu_mint_quote,
     claim_cashu_mint_quote,

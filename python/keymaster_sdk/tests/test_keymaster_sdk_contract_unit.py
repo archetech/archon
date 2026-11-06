@@ -412,8 +412,6 @@ def test_cashu_wrappers_forward_expected_requests(monkeypatch):
         ("POST", "/cashu/mints"): {"url": "m"},
         ("DELETE", "/cashu/mints"): {"ok": True},
         ("POST", "/cashu/mints/list"): {"mints": [{"url": "m"}]},
-        ("POST", "/cashu/publish"): {"ok": True},
-        ("POST", "/cashu/unpublish"): {"ok": True},
         ("POST", "/cashu/balance"): {"spendable": 1},
         ("POST", "/cashu/quote"): {"quote": "q"},
         ("POST", "/cashu/claim"): {"amount": 21},
@@ -443,8 +441,6 @@ def test_cashu_wrappers_forward_expected_requests(monkeypatch):
     assert sdk.add_cashu_mint("m", "A") == {"url": "m"}
     assert sdk.remove_cashu_mint("m", True, "A") is True
     assert sdk.list_cashu_mints("A") == [{"url": "m"}]
-    assert sdk.publish_cashu("A") is True
-    assert sdk.unpublish_cashu("A") is True
     assert sdk.get_cashu_balance("m", "A") == {"spendable": 1}
     assert sdk.create_cashu_mint_quote(21, "m", "A") == {"quote": "q"}
     assert sdk.claim_cashu_mint_quote("q", "m", "A") == {"amount": 21}
@@ -466,8 +462,6 @@ def test_cashu_wrappers_forward_expected_requests(monkeypatch):
         ("POST", "/cashu/mints", {"url": "m", "id": "A"}),
         ("DELETE", "/cashu/mints", {"url": "m", "force": True, "id": "A"}),
         ("POST", "/cashu/mints/list", {"id": "A"}),
-        ("POST", "/cashu/publish", {"id": "A"}),
-        ("POST", "/cashu/unpublish", {"id": "A"}),
         ("POST", "/cashu/balance", {"mint": "m", "id": "A"}),
         ("POST", "/cashu/quote", {"amount": 21, "mint": "m", "id": "A"}),
         ("POST", "/cashu/claim", {"quote": "q", "mint": "m", "id": "A"}),
