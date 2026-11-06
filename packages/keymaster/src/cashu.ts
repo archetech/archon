@@ -169,6 +169,9 @@ export class CashuMintClient {
             json = undefined;
         }
         if (response.ok) {
+            if (json === undefined) {
+                throw new CashuUnavailableError(`${this.base}: the answer to ${path} is not JSON`);
+            }
             return json;
         }
         if (typeof json?.code === 'number' || typeof json?.detail === 'string') {
@@ -1266,12 +1269,14 @@ export class CashuWallet {
         const normalized = normalizeMintUrl(url);
         const client = new CashuMintClient(normalized, this.publicFetch);
         await this.requireNuts(client, normalized);
+        // Read before saving, so that a mint this wallet cannot use is not left behind.
+        const described = await this.describe(normalized, client, false);
         await this.host.mutateWallet(async (wallet) => {
             const idInfo = await this.host.fetchIdInfo(identity, wallet);
             const mints = (idInfo.cashu ??= {}) as Record<string, CashuMintEntry>;
             mints[normalized] ??= { added: new Date().toISOString(), proofs: [] };
         });
-        return this.describe(normalized, client, false);
+        return described;
     }
 
     private async describe(url: string, client: CashuMintClient, isNodeMint: boolean): Promise<CashuMintInfo> {
@@ -1318,8 +1323,8 @@ export class CashuWallet {
             try {
                 return await this.describe(url, this.clientFor(url, mints[url]), isNodeMint);
             }
-            catch {
-                return { url, nuts: {}, keysets: [], isNodeMint };
+            catch (error: any) {
+                return { url, nuts: {}, keysets: [], isNodeMint, error: error?.message ?? String(error) };
             }
         }));
     }

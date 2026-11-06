@@ -144,6 +144,17 @@ describe('Cashu view: enabling', () => {
         expect(await screen.findByRole('heading', { name: 'Balance: 1,000 sats' })).toBeTruthy();
     });
 
+    it('says why a mint is not answering, and says nothing of a mint that is', async () => {
+        holding(
+            { url: OTHER, nuts: {}, keysets: [], isNodeMint: false, error: 'Cashu mint unavailable: HTTP 502' } as any,
+            mintInfo(NODE, true),
+        );
+        keymaster.getCashuBalance.mockResolvedValue({ spendable: 0, inFlight: 0, outstanding: 0, mints: {} });
+        view();
+        expect(await screen.findByText(/Not answering right now: Cashu mint unavailable: HTTP 502/)).toBeTruthy();
+        expect(screen.getAllByText(/Not answering right now/)).toHaveLength(1);
+    });
+
     it('can still unpublish after the last mint is gone', async () => {
         holding();
         keymaster.resolveDID.mockResolvedValue({ didDocument: { service: [{ id: 'did:cid:a#cashu', type: 'Cashu', serviceEndpoint: [NODE] }] } });
