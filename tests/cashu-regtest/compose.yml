@@ -1,0 +1,236 @@
+# A regtest Lightning network and the real Archon services, isolated from anything else
+# on the host: its own project, network and named volumes, private image tags, and no
+# published ports. Channels are opened in this order, from the left:
+#
+#   cln-user (LNbits, Keymaster wallets) <-> cln-mint (the Cashu mint) -> cln-hop -> cln-payee
+name: cashu-regtest
+
+x-cln: &cln
+  image: cashu-regtest/cln:local
+  pull_policy: never
+x-cln-env: &cln-env
+  NETWORK: regtest
+  BITCOIN_RPCHOST: bitcoind
+  BITCOIN_RPCPORT: "18443"
+  BITCOIN_RPCUSER: u
+  BITCOIN_RPCPASSWORD: p
+  NETWORK_MODE: clearnet
+  LIGHTNING_PORT: "9736"
+  MIN_CAPACITY_SAT: "10000"
+x-admin: &admin "0000000000000000000000000000000000000000000000000000000000000000"
+x-svc-env: &svc-env
+  ARCHON_ADMIN_API_KEY: *admin
+  ARCHON_BIND_ADDRESS: 0.0.0.0
+  ARCHON_REDIS_URL: redis://redis:6379
+x-keymaster-env: &keymaster-env
+  <<: *svc-env
+  ARCHON_KEYMASTER_PORT: "4226"
+  ARCHON_GATEKEEPER_URL: http://drawbridge:4222
+  ARCHON_GATEKEEPER_API_KEY: *admin
+  ARCHON_DISABLE_SEARCH: "true"
+  ARCHON_NODE_ID: cashu-regtest
+  ARCHON_KEYMASTER_DB: json
+  ARCHON_PASSPHRASE: passphrase
+  ARCHON_WALLET_CACHE: "false"
+  ARCHON_DEFAULT_REGISTRY: local
+
+services:
+  bitcoind:
+    image: ghcr.io/archetech/bitcoin-core:v28.0-multiarch
+    command: bitcoind -regtest -server -rpcuser=u -rpcpassword=p -rpcbind=0.0.0.0 -rpcallowip=0.0.0.0/0 -fallbackfee=0.0002 -printtoconsole=0
+
+  cln-user:
+    <<: *cln
+    environment:
+      <<: *cln-env
+      ALIAS: user
+    volumes:
+      - cln-user:/data/lightning
+    networks:
+      default:
+        # The name in the node's TLS certificate, which LNbits verifies.
+        aliases:
+          - cln
+  cln-mint:
+    <<: *cln
+    environment:
+      <<: *cln-env
+      ALIAS: mint
+      RPC_SHARE: "true"
+      RPC_SHARE_GID: "1000"
+    volumes:
+      - cln-mint:/data/lightning
+  cln-hop:
+    <<: *cln
+    environment:
+      <<: *cln-env
+      ALIAS: hop
+    volumes:
+      - cln-hop:/data/lightning
+  cln-payee:
+    <<: *cln
+    command: ["--plugin=/plugins/hold.sh"]
+    environment:
+      <<: *cln-env
+      ALIAS: payee
+    volumes:
+      - cln-payee:/data/lightning
+      - ./hold.sh:/plugins/hold.sh:ro
+
+  redis:
+    image: redis:8.0.4-alpine
+  ipfs:
+    image: ipfs/kubo:v0.43.1
+    volumes:
+      - ipfs:/data/ipfs
+
+  gatekeeper:
+    image: cashu-regtest/gatekeeper-ts:local
+    pull_policy: never
+    environment:
+      <<: *svc-env
+      ARCHON_GATEKEEPER_PORT: "4224"
+      ARCHON_GATEKEEPER_DB: redis
+      ARCHON_GATEKEEPER_DID_PREFIX: did:cid
+      ARCHON_GATEKEEPER_REGISTRIES: local
+      ARCHON_GATEKEEPER_FALLBACK_URL: ""
+      ARCHON_IPFS_URL: http://ipfs:5001/api/v0
+    depends_on: [redis, ipfs]
+
+  didcomm:
+    image: cashu-regtest/didcomm:local
+    pull_policy: never
+    environment:
+      <<: *svc-env
+      ARCHON_DIDCOMM_PORT: "4236"
+      ARCHON_GATEKEEPER_URL: http://gatekeeper:4224
+      ARCHON_DIDCOMM_DB: memory
+      ARCHON_DIDCOMM_TOR_PROXY: ""
+    depends_on: [gatekeeper]
+
+  lnbits:
+    image: ghcr.io/archetech/lnbits:1.5.3-archetech.1
+    entrypoint: ["/bin/sh", "/scripts/lnbits-entrypoint.sh"]
+    environment:
+      LNBITS_HOST: 0.0.0.0
+      LNBITS_PORT: "5000"
+      LNBITS_ADMIN_UI: "true"
+      LNBITS_BACKEND_WALLET_CLASS: CLNRestWallet
+      CLNREST_URL: https://cln:3001
+      CLNREST_CA: /data/lightning/lnbits/ca.pem
+      LNBITS_CLNREST_WAIT_TIMEOUT: "600"
+      LNBITS_DATA_FOLDER: /data/lnbits
+      FORWARDED_ALLOW_IPS: "*"
+    volumes:
+      - ../../scripts/lnbits-entrypoint.sh:/scripts/lnbits-entrypoint.sh:ro
+      - cln-user:/data/lightning:ro
+      - lnbits:/data/lnbits
+
+  lightning-mediator:
+    image: cashu-regtest/lightning-mediator:local
+    pull_policy: never
+    entrypoint: ["/bin/sh", "/scripts/lightning-mediator-entrypoint.sh"]
+    environment:
+      <<: *svc-env
+      ARCHON_LIGHTNING_MEDIATOR_PORT: "4235"
+      ARCHON_DRAWBRIDGE_PORT: "4222"
+      ARCHON_DRAWBRIDGE_PUBLIC_HOST: https://mint.invalid
+      ARCHON_LIGHTNING_MEDIATOR_REDIS_URL: redis://redis:6379
+      ARCHON_GATEKEEPER_URL: http://gatekeeper:4224
+      ARCHON_LIGHTNING_MEDIATOR_CLN_REST_URL: https://cln:3001
+      ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL: http://lnbits:5000
+      ARCHON_LIGHTNING_MEDIATOR_TOR_PROXY: ""
+    volumes:
+      - ../../scripts/lightning-mediator-entrypoint.sh:/scripts/lightning-mediator-entrypoint.sh:ro
+      - cln-user:/data/lightning:ro
+
+  # A new named volume belongs to root, and the mint runs as a user, as under Compose.
+  cashu-mint-init:
+    image: cashubtc/mintd:0.18.3
+    user: root
+    entrypoint: ["/bin/sh", "-c", "chown -R 1000:1000 /data"]
+    restart: "no"
+    volumes:
+      - mint-data:/data
+  cashu-mint:
+    image: cashubtc/mintd:0.18.3
+    entrypoint: ["/bin/sh", "/scripts/cashu-mint-entrypoint.sh"]
+    user: "1000:1000"
+    environment:
+      CDK_MINTD_WORK_DIR: /data
+      BACKEND: cln
+      MINT_URL: https://mint.invalid/cashu
+      MINT_NAME: cashu-regtest
+      MIN_MINT: "1"
+      MAX_MINT: "100000"
+      MIN_MELT: "1"
+      MAX_MELT: "100000"
+      LN_FEE_PERCENT: "0.02"
+      LN_RESERVE_FEE_MIN: "2"
+    volumes:
+      - ../../scripts/cashu-mint-entrypoint.sh:/scripts/cashu-mint-entrypoint.sh:ro
+      - mint-data:/data
+      - type: volume
+        source: cln-mint
+        target: /cln
+        read_only: true
+        volume:
+          subpath: rpc-share
+    depends_on:
+      cashu-mint-init:
+        condition: service_completed_successfully
+
+  drawbridge:
+    image: cashu-regtest/drawbridge:local
+    pull_policy: never
+    entrypoint: ["/bin/sh", "/scripts/drawbridge-entrypoint.sh"]
+    environment:
+      <<: *svc-env
+      ARCHON_DRAWBRIDGE_PORT: "4222"
+      ARCHON_GATEKEEPER_URL: http://gatekeeper:4224
+      ARCHON_LIGHTNING_MEDIATOR_URL: http://lightning-mediator:4235
+      ARCHON_DIDCOMM_URL: http://didcomm:4236
+      ARCHON_CASHU_MINT_URL: http://cashu-mint:8085
+      ARCHON_DRAWBRIDGE_PUBLIC_HOST: https://mint.invalid
+      ARCHON_DRAWBRIDGE_TOR_PROXY: ""
+      ARCHON_DRAWBRIDGE_L402_ENABLED: "false"
+      ARCHON_DRAWBRIDGE_MACAROON_SECRET: cashu-regtest-cashu-regtest-cashu-regtest
+      ARCHON_HERALD_URL: ""
+      ARCHON_EXPLORER_URL: ""
+    volumes:
+      - ../../scripts/drawbridge-entrypoint.sh:/scripts/drawbridge-entrypoint.sh:ro
+      - tor-hostname:/data/tor:ro
+
+  keymaster-ts:
+    image: cashu-regtest/keymaster-ts:local
+    pull_policy: never
+    user: root
+    environment: *keymaster-env
+    volumes:
+      - keymaster-ts:/app/keymaster/data
+  keymaster-py:
+    image: cashu-regtest/keymaster-py:local
+    pull_policy: never
+    user: root
+    environment: *keymaster-env
+    volumes:
+      - keymaster-py:/app/keymaster/data
+
+  cli:
+    image: cashu-regtest/cli:local
+    pull_policy: never
+    entrypoint: ["/bin/sh", "-c", "sleep infinity"]
+    environment:
+      ARCHON_ADMIN_API_KEY: *admin
+
+volumes:
+  cln-user:
+  cln-mint:
+  cln-hop:
+  cln-payee:
+  ipfs:
+  lnbits:
+  mint-data:
+  tor-hostname:
+  keymaster-ts:
+  keymaster-py:

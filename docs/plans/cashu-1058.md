@@ -451,6 +451,9 @@ placeholder for the advertised URL, and
 is Drawbridge. L402 stays off, its default. The new tests and that script are
 inputs of `scripts/ci-affected.sh`.
 
+`tests/cashu-regtest` runs the wallet against real regtest Lightning, with the mint on
+its `cln` backend. It takes about half an hour, so it is run by hand rather than in CI.
+
 ## Phase 2: DID-locked ecash over DIDComm
 
 ### Locking
