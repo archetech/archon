@@ -10,7 +10,7 @@ import time
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-COMPOSE = ["docker", "compose", "-f", "compose.yml"]
+COMPOSE = ["docker", "compose", "-p", "cashu-regtest", "-f", "compose.yml"]
 RPC = "/data/lightning/regtest/regtest/lightning-rpc"
 FLAVORS = ("keymaster-py", "keymaster-ts")
 
@@ -84,16 +84,6 @@ class Wallet:
         melts = [quote for quote in self.json("cashu-quotes", self.name) if quote["kind"] == "melt"]
         return melts[0]["quote"] if melts else None
 
-    def mint_says(self):
-        """The mint's own state for this wallet's open melt. It may not answer at all
-        while a payment is in flight, so the wait is bounded."""
-        quote = self.open_quote()
-        if not quote:
-            return None
-        lookup = (f"fetch('http://cashu-mint:8085/v1/melt/quote/bolt11/{quote}', {{ signal: AbortSignal.timeout(8000) }})"
-                  ".then(r => r.json()).then(j => console.log(j.state)).catch(() => console.log('NO ANSWER'))")
-        return compose("exec", "-T", "cli", "node", "-e", lookup).stdout.strip()
-
     def settle(self, seconds):
         deadline = time.time() + seconds
         while time.time() < deadline:
@@ -103,6 +93,16 @@ class Wallet:
                 return balance
             time.sleep(1)
         return None
+
+
+def mint_says(quote):
+    """The mint's own state for a melt quote. It may not answer at all while a payment
+    is in flight, so the wait is bounded."""
+    if not quote:
+        return None
+    lookup = (f"fetch('http://cashu-mint:8085/v1/melt/quote/bolt11/{quote}', {{ signal: AbortSignal.timeout(8000) }})"
+              ".then(r => r.json()).then(j => console.log(j.state)).catch(() => console.log('NO ANSWER'))")
+    return compose("exec", "-T", "cli", "node", "-e", lookup).stdout.strip()
 
 
 def invoice(node, sats, tag):
@@ -121,6 +121,16 @@ def node_says(bolt):
     return None
 
 
+def check_routing_fee(bolt, fee):
+    """Against what the mint's node paid. The wallet works out its fee from the change
+    it got back, so its own figure counts missing change as fee. The mint charges whole
+    sats, rounded up."""
+    payment = next(item for item in ln("cln-mint", "listpays")["pays"]
+                   if item["payment_hash"] == bolt["payment_hash"] and item["status"] == "complete")
+    routing = payment["amount_sent_msat"] - payment["amount_msat"]
+    check(fee == (routing + 999) // 1000, f"the fee of {fee} is what the route cost: {routing} msat")
+
+
 def payee_shell(command):
     compose("exec", "-T", "cln-payee", "sh", "-c", command)
 
@@ -135,6 +145,19 @@ def release():
 
 def stop_holding():
     payee_shell("rm -f /tmp/hold /tmp/hold-fail")
+
+
+def wait_for_payee(bolt):
+    """The wallet records its proofs as in flight before it submits the melt, so that
+    says nothing about the payment having left."""
+    arrived = f"/tmp/htlc-{bolt['payment_hash']}"
+    if not until(lambda: compose("exec", "-T", "cln-payee", "test", "-e", arrived).returncode == 0):
+        sys.exit(f"the payment {bolt['payment_hash']} never reached the payee")
+
+
+def start_melt(wallet, bolt):
+    return subprocess.Popen(wallet.command("cashu-melt", bolt["bolt11"], wallet.name),
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def forget_routes():
@@ -232,7 +255,7 @@ def melt_over_a_route(service):
     melted = wallet.json("cashu-melt", bolt["bolt11"], wallet.name)
     check(melted["paid"] is True and paid("cln-payee", label), "paid, and the payee node agrees")
     check(hashlib.sha256(bytes.fromhex(melted["preimage"])).hexdigest() == bolt["payment_hash"], "the preimage hashes to the payment hash")
-    check(melted["fee"] > 0, f"the routing fee is real: {melted['fee']} sat")
+    check_routing_fee(bolt, melted["fee"])
     check(16000 - melted["balance"]["spendable"] == 2000 + melted["fee"], "spent exactly the amount plus the fee")
     check(melted["balance"]["inFlight"] == 0, "nothing left in flight")
 
@@ -242,13 +265,11 @@ def held_melt_survives_a_crash(service):
     wallet = new_wallet(service, 16000)
     bolt, label = invoice("cln-payee", 1500, "pending")
     hold()
-    melt = subprocess.Popen(wallet.command("cashu-melt", bolt["bolt11"], wallet.name),
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    melt = start_melt(wallet, bolt)
     try:
-        held = until(lambda: (lambda balance: balance if balance["inFlight"] else None)(wallet.balance()))
-        check(bool(held), f"held: {held and held['inFlight']} sats in flight")
+        wait_for_payee(bolt)
         # 1500 plus the reserve fits one 2048 proof of the 16000 balance.
-        check(bool(held) and held["inFlight"] == 2048, "it locks only the proof that covers it")
+        check(wallet.balance()["inFlight"] == 2048, "held at the payee, locking only the proof that covers it")
         compose("kill", service)
         compose("start", service)
         until(lambda: wallet.cli("cashu-balance", wallet.name, check_exit=False).returncode == 0, 120)
@@ -260,25 +281,32 @@ def held_melt_survives_a_crash(service):
         check(bool(settled), "settled by cashu-check")
         if settled:
             spent = 16000 - settled["spendable"]
-            check(1500 < spent <= 1530, f"spent {spent}: the amount and a real fee, with the change returned")
+            check(spent > 1500, f"spent {spent}: the amount and a fee, with the change returned")
+            check_routing_fee(bolt, spent - 1500)
         check(wallet.json("cashu-quotes", wallet.name) == [], "nothing left open")
     finally:
         melt.kill()
         stop_holding()
 
 
-def expect_stuck(wallet, bolt, description, sats):
-    """cdk#2836: the mint keeps a payment that failed after being attempted PENDING."""
-    says, state = node_says(bolt), wallet.mint_says()
-    print(f"   the mint's node says {says}, and the mint says {state}", flush=True)
+def expect_stuck(wallet, bolt, quote, description, sats):
+    """cdk#2836: the mint keeps a payment that failed after being attempted PENDING.
+    Nothing short of that is excused, and the wallet's word is not taken for a fix."""
+    attempted = until(lambda: node_says(bolt) == "failed", 30)
+    check(bool(attempted), "the mint's node tried the payment and it failed")
     settled = wallet.settle(60)
+    state = mint_says(quote)
+    print(f"   the mint says {state}", flush=True)
     balance = settled or wallet.balance()
     check(balance["spendable"] + balance["inFlight"] == sats, f"no value vanished: {balance}")
     if settled:
+        check(state == "UNPAID", "the mint itself says the quote is released")
         print(f"   NOTE: the mint released this. cdk#2836 may be fixed: {description}", flush=True)
-    else:
+    elif attempted and state == "PENDING":
         known.append(f"cdk#2836: {description}")
         print(f"   KNOWN ISSUE cdk#2836: still in flight ({description})", flush=True)
+    else:
+        check(False, f"still in flight, and not as cdk#2836 leaves it: {description}")
     return bool(settled)
 
 
@@ -287,18 +315,16 @@ def payee_rejects_a_held_melt(service):
     wallet = new_wallet(service, 16000)
     bolt, _ = invoice("cln-payee", 700, "rejected")
     hold(fail=True)
-    melt = subprocess.Popen(wallet.command("cashu-melt", bolt["bolt11"], wallet.name),
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    melt = start_melt(wallet, bolt)
     try:
-        held = until(lambda: (lambda balance: balance if balance["inFlight"] else None)(wallet.balance()))
-        check(bool(held), "held")
-        check(bool(held) and held["inFlight"] == 1024, "it locks only the proof that covers it")
+        wait_for_payee(bolt)
+        check(wallet.balance()["inFlight"] == 1024, "held at the payee, locking only the proof that covers it")
+        quote = wallet.open_quote()
         release()
-        time.sleep(8)
-        if not expect_stuck(wallet, bolt, "a rejected payment", 16000):
+        if not expect_stuck(wallet, bolt, quote, "a rejected payment", 16000):
             compose("restart", "cashu-mint")
             time.sleep(6)
-            expect_stuck(wallet, bolt, "a rejected payment, after a mint restart", 16000)
+            expect_stuck(wallet, bolt, quote, "a rejected payment, after a mint restart", 16000)
     finally:
         melt.kill()
         stop_holding()
@@ -309,10 +335,14 @@ def payee_offline(service):
     wallet = new_wallet(service, 16000)
     bolt, _ = invoice("cln-payee", 500, "offline")
     compose("stop", "cln-payee")
+    melt = start_melt(wallet, bolt)
     try:
-        wallet.cli("cashu-melt", bolt["bolt11"], wallet.name, check_exit=False)
-        expect_stuck(wallet, bolt, "an offline payee", 16000)
+        # Read while the melt runs, since a mint that released it would leave none open.
+        quote = until(wallet.open_quote, 30)
+        until(lambda: melt.poll() is not None, 120)
+        expect_stuck(wallet, bolt, quote, "an offline payee", 16000)
     finally:
+        melt.kill()
         compose("start", "cln-payee")
         until(lambda: compose("exec", "-T", "cln-payee", "lightning-cli", f"--rpc-file={RPC}", "getinfo").returncode == 0, 60)
         ln("cln-hop", "connect", ln("cln-payee", "getinfo")["id"] + "@cln-payee:9736")

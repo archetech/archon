@@ -22,8 +22,10 @@ Remove the images with
 `scenarios.py` exits non-zero if any check fails. It reports
 [cdk#2836](https://github.com/cashubtc/cdk/issues/2836) as a known issue rather than a
 failure: on this mint, a payment that fails after being attempted stays `PENDING`, with
-its proofs reserved. It checks that no value is lost there, and says so if a newer mint
-has started releasing them.
+its proofs reserved. The exemption needs the mint's node to report a failed attempt and
+the mint to report `PENDING`. It checks that no value is lost there, and says so if a
+newer mint has started releasing them, which needs the mint to report the quote `UNPAID`.
 
 `hold.sh` is a CLN plugin on the payee node that holds or fails incoming payments on
-demand, which is how a melt stays really `PENDING`.
+demand, which is how a melt stays really `PENDING`. It records each payment it sees, so
+a scenario can wait for the payment to arrive before acting on it.

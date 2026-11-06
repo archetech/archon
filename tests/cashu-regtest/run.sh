@@ -8,7 +8,9 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
 cd "$here"
 
-dc() { docker compose -f compose.yml "$@"; }
+# Named here because an inherited COMPOSE_PROJECT_NAME beats compose.yml's own name, and
+# this script runs `down -v`: from a shell set up for a live node, that would be its stack.
+dc() { docker compose -p cashu-regtest -f compose.yml "$@"; }
 rpc=/data/lightning/regtest/regtest/lightning-rpc
 ln() { local node=$1; shift; dc exec -T "$node" lightning-cli --rpc-file="$rpc" "$@"; }
 btc() { dc exec -T bitcoind bitcoin-cli -regtest -rpcuser=u -rpcpassword=p "$@"; }
