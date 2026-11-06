@@ -740,6 +740,8 @@ Three one-shot init containers automatically create CLN runes:
 
 These run once and exit. If a rune file already exists, they skip creation; a failed rune request stops the container rather than leaving a partial file. The bundled LNbits service now runs from the published image `ghcr.io/archetech/lnbits:1.5.3-archetech.1`.
 
+**First start of LNbits.** With its admin UI on, as the bundled stack has it, a new LNbits sends every request to its first-install page until an administrator has been created. Until then `add-lightning` fails, so open LNbits (`ARCHON_LNBITS_PORT`) and complete that step once.
+
 ### Important: Back Up Lightning Data
 
 The `./data/cln-mainnet/` directory contains your Lightning wallet, channels, and keys. **Back this up regularly.** Losing this data means losing funds.
@@ -796,6 +798,8 @@ ARCHON_CASHU_MINT_URL=http://cashu-mint:8085
 | `ARCHON_CASHU_MINT_INPUT_FEE_PPK` | `0` | Fee per input, in thousandths of a sat (NUT-02) |
 | `ARCHON_CASHU_MINT_LN_FEE_PERCENT` / `_LN_RESERVE_FEE_MIN` | `0.02` / `2` | Lightning fee reserve on melts |
 | `ARCHON_DRAWBRIDGE_CASHU_PER_SOURCE` / `_GLOBAL` / `_RATE_LIMIT_WINDOW` | `120` / `1200` / `60` | Drawbridge's limits on `/cashu`; requests with the admin key are not limited |
+
+**Stuck melts on the `cln` backend.** cdk-mintd 0.18.3 releases a melt's proofs only when the node's `xpay` returns an error it treats as final (203, 205, 206 or 207). A payment that was attempted and then failed, for example because the payee went offline, can return the generic 209 instead. The mint then keeps the melt `PENDING` and its proofs reserved, even though `listpays` on the node says `failed`, and neither a mint restart nor the payee returning clears it. We found no supported way to release them, so that ecash is unavailable to its holder ([cdk#2836](https://github.com/cashubtc/cdk/issues/2836)). Keep melt limits low, and do not offer this mint for value you cannot afford to have locked.
 
 After that, the configuration lives in the mint's database and changing these variables has no effect. To change a running mint, edit `./data/cashu-mint/mint.toml` (written on the first start) and apply it while the mint is stopped:
 

@@ -7,6 +7,7 @@ import logging
 import time
 from typing import Annotated, Any
 
+import httpx
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -158,6 +159,18 @@ async def gatekeeper_unavailable_handler(request: Request, exc: GatekeeperUnavai
 
 # Starlette re-raises after this handler responds so the server logs the
 # traceback; logging it here as well wrote every traceback twice.
+# An upstream refusal, reported by what it said rather than by the HTTP library's
+# description of the request.
+@app.exception_handler(httpx.HTTPStatusError)
+async def upstream_error_handler(_: Request, exc: httpx.HTTPStatusError):
+    try:
+        reply = exc.response.json()
+        detail = reply.get("error") or reply.get("message") if isinstance(reply, dict) else None
+    except ValueError:
+        detail = None
+    return JSONResponse(status_code=500, content={"error": detail or f"upstream service returned {exc.response.status_code}"})
+
+
 @app.exception_handler(Exception)
 async def generic_error_handler(_: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"error": str(exc)})

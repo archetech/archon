@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 import type express from 'express';
-import { sendNotFound, statusForError } from '../../services/keymaster/server/src/keymaster-error-status.ts';
+import { sendError, sendNotFound, statusForError } from '../../services/keymaster/server/src/keymaster-error-status.ts';
 import { GatekeeperTimeoutError, GatekeeperUnavailableError } from '@didcid/clients/gatekeeper';
 import {
     InvalidDIDError,
@@ -75,5 +75,26 @@ describe('sendNotFound', () => {
         sendNotFound(res as unknown as express.Response, error, { error: 'DID not found' });
         expect(res.status).toHaveBeenCalledWith(status);
         expect(res.send).toHaveBeenCalledWith({ error: error.toString() });
+    });
+});
+
+// A client rethrows an upstream reply as the plain object it was, so String() would
+// turn the reason into [object Object].
+describe('sendError', () => {
+    function sent(error: unknown) {
+        const send = jest.fn();
+        const res = { status: jest.fn(() => ({ send })) } as unknown as express.Response;
+        sendError(res, error);
+        return send.mock.calls[0][0] as { error: string };
+    }
+
+    it.each([
+        ['an Error', new KeymasterError('nope'), String(new KeymasterError('nope'))],
+        ['a reply with an error', { error: 'Lightning service unavailable' }, 'Lightning service unavailable'],
+        ['a reply with a message', { message: 'Upstream gatekeeper error' }, 'Upstream gatekeeper error'],
+        ['a string', 'plain', 'plain'],
+        ['any other object', { code: 7 }, '{"code":7}'],
+    ])('keeps the reason from %s', (_name, error, text) => {
+        expect(sent(error)).toEqual({ error: text });
     });
 });

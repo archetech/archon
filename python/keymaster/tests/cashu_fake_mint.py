@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 import secrets
 import time
@@ -9,7 +10,7 @@ from typing import Any
 
 import httpx
 
-from bolt11 import Bolt11, MilliSatoshi, Tags, encode as encode_bolt11
+from bolt11 import Bolt11, MilliSatoshi, Tags, decode as decode_bolt11, encode as encode_bolt11
 from keymaster.cashu_crypto import (
     p2pk_lock,
     verify_p2pk_witness,
@@ -60,6 +61,8 @@ class FakeMint:
         self.requests: list[str] = []
         # The invoice a mint quote carries; a test can make it dishonest.
         self.invoice_for = signed_invoice
+        # What a melt quote says the invoice costs; a test can make it dishonest.
+        self.melt_amount_override = None
         self.melt_routing_fee = 1
         self.melt_outcome = "PAID"
         # Mints differ here: NUT-00 lists 11003, cdk-mintd sends 20006 on a mint.
@@ -183,8 +186,8 @@ class FakeMint:
         if method == "POST" and path == "/v1/melt/quote/bolt11":
             self._next += 1
             quote = f"xq{self._next}"
-            match = re.search(r"amount=(\d+)", body["request"])
-            amount = int(match.group(1)) if match else 100
+            msat = decode_bolt11(body["request"]).amount_msat
+            amount = self.melt_amount_override if self.melt_amount_override is not None else math.ceil(int(msat or 0) / 1000)
             self.melt_quotes[quote] = {"amount": amount, "fee_reserve": 10, "state": "UNPAID", "request": body["request"]}
             return {"quote": quote, "unit": "sat", "expiry": int(time.time()) + 600, **self.melt_quotes[quote]}
         if method == "GET" and path.startswith("/v1/melt/quote/bolt11/"):

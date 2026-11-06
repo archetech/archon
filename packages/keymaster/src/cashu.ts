@@ -577,20 +577,35 @@ export class CashuWallet {
         return { keyset, keysets };
     }
 
-    // Largest first until the proofs cover the target and their own input fee.
+    // As little as covers the target and its own input fee, because a request that
+    // goes pending locks what it selected for as long as the mint keeps it pending:
+    // at each step the smallest proof that finishes the job, else the largest.
+    // It runs inside the wallet's write, so totals are kept rather than recomputed.
     private select(proofs: CashuProof[], target: number, keysets: MintKeyset[]): CashuProof[] {
+        const rates = new Map(keysets.map(keyset => [keyset.id, keyset.input_fee_ppk ?? 0]));
+        const rate = (proof: CashuProof) => rates.get(proof.id) ?? 0;
+        const pool = [...proofs].sort((a, b) => a.amount - b.amount);
         const selected: CashuProof[] = [];
-        for (const proof of [...proofs].sort((a, b) => b.amount - a.amount)) {
-            if (sumProofs(selected) - feeFor(selected, keysets) >= target) {
-                break;
+        let value = 0;
+        let ppk = 0;
+        const finishes = (proof: CashuProof) =>
+            value + proof.amount - Math.ceil((ppk + rate(proof)) / 1000) >= target;
+        while (pool.length > 0) {
+            // Fees only grow, so if the largest cannot finish even before its own fee,
+            // none can, and the scan is skipped.
+            const finishing = value + pool[pool.length - 1].amount - Math.ceil(ppk / 1000) >= target
+                ? pool.find(finishes)
+                : undefined;
+            if (finishing) {
+                return [...selected, finishing];
             }
-            selected.push(proof);
+            const largest = pool.pop()!;
+            selected.push(largest);
+            value += largest.amount;
+            ppk += rate(largest);
         }
-        if (sumProofs(selected) - feeFor(selected, keysets) < target) {
-            throw new CashuInsufficientFundsError(
-                `need ${target} ${UNIT} plus fees, have ${sumProofs(proofs)}`);
-        }
-        return selected;
+        throw new CashuInsufficientFundsError(
+            `need ${target} ${UNIT} plus fees, have ${sumProofs(proofs)}`);
     }
 
     private removeFromEntry(entry: CashuMintEntry, proofs: CashuProof[]): void {
@@ -1490,9 +1505,18 @@ export class CashuWallet {
         if (typeof bolt11 !== 'string' || !bolt11) {
             throw new InvalidParameterError('bolt11');
         }
+        // The wallet never sends the amountless option, so an invoice must say what it
+        // costs, and the mint's own figure is checked against that.
+        const msat = invoiceMsat(bolt11);
+        if (msat === undefined) {
+            throw new InvalidParameterError('bolt11 must be an invoice with an amount');
+        }
         const ctx = await this.context(mint, name);
         await this.settle(ctx);
         const quote = await ctx.client.createMeltQuote(bolt11);
+        if (BigInt(quote.amount) !== (msat + 999n) / 1000n) {
+            throw new CashuMintUnsupportedError(`the mint quoted ${quote.amount} sats for an invoice of ${msat} msat`);
+        }
         const { keyset, keysets } = await this.activeKeyset(ctx);
         const target = quote.amount + quote.fee_reserve;
         const id = newId();
@@ -1686,10 +1710,16 @@ export class CashuWallet {
             if (proofs.some(proof => held.has(proof.secret))) {
                 throw new CashuTokenSpentError('this token is already in the wallet');
             }
+            // Checked in the same write that claims it, so a concurrent accept of the
+            // same message waits rather than submitting its proofs a second time.
+            const idInfo = await this.host.fetchIdInfo(ctx.name, wallet);
+            if (message && idInfo.cashuInbox?.[message]) {
+                throw new CashuUnavailableError('this message is already being redeemed');
+            }
             this.journalSwap(wallet, entry, id, 'receive', inputs, keyset.id, amount);
             if (message) {
                 entry.operations![entry.operations!.length - 1].message = message;
-                this.rememberMessage(await this.host.fetchIdInfo(ctx.name, wallet), message);
+                this.rememberMessage(idInfo, message);
             }
         }, () => this.runSwap(ctx, id, false, report));
         if (outcome === 'spent') {
@@ -1900,7 +1930,9 @@ export class CashuWallet {
         const mints = this.mints(idInfo);
         const result: CashuMessage[] = [];
         for (const item of await this.tokenMessages(identity)) {
-            if (idInfo.cashuInbox?.[CashuWallet.messageKey(item)]) {
+            const key = CashuWallet.messageKey(item);
+            const pending = Object.values(mints).some(entry => entry.operations?.some(op => op.message === key));
+            if (idInfo.cashuInbox?.[key] && !pending) {
                 continue;
             }
             const sender = CashuWallet.messageSender(item);
@@ -1910,8 +1942,16 @@ export class CashuWallet {
                 const token = item.message?.body?.token;
                 const metadata = getTokenMetadata(token);
                 const mint = normalizeMintUrl(metadata.mint);
+                if (metadata.unit && metadata.unit !== UNIT) {
+                    result.push({ ...base, mint, redeemable: false, reason: `a token in ${metadata.unit}, and this wallet holds only ${UNIT}` });
+                    continue;
+                }
                 const amount = Number(metadata.amount);
                 const described = { ...base, amount, mint };
+                if (pending) {
+                    result.push({ ...described, redeemable: false, reason: 'its redemption is still pending at the mint' });
+                    continue;
+                }
                 result.push(!mints[mint]
                     ? { ...described, redeemable: false, reason: `the mint ${mint} is not added` }
                     : { ...described, ...await this.redeemableBy(metadata.incompleteProofs, identity) });

@@ -37,8 +37,22 @@ export function statusForError(error: unknown): number {
     return 500;
 }
 
+// A client rethrows an upstream reply as the plain object it was, so String() would
+// turn the reason into [object Object].
+function errorText(error: unknown): string {
+    if (error instanceof Error) {
+        return error.toString();
+    }
+    if (error && typeof error === 'object') {
+        const { error: detail, message } = error as { error?: unknown; message?: unknown };
+        const text = detail ?? message;
+        return typeof text === 'string' ? text : JSON.stringify(error);
+    }
+    return String(error);
+}
+
 export function sendError(res: express.Response, error: unknown): void {
-    res.status(statusForError(error)).send({ error: error instanceof Error ? error.toString() : String(error) });
+    res.status(statusForError(error)).send({ error: errorText(error) });
 }
 
 // Resolve-style routes answer 404 for any failed resolution, but a Gatekeeper

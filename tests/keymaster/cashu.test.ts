@@ -68,6 +68,130 @@ async function entry(km = keymaster, id = 'Alice') {
     return stored.ids[id].cashu[PUBLIC_URL];
 }
 
+describe('choosing proofs', () => {
+    beforeEach(async () => {
+        await setup();
+        await keymaster.addCashu();
+        await fund(16000);
+    });
+
+    const inFlight = async () => (await keymaster.getCashuBalance()).inFlight;
+
+    // A melt that goes pending locks what it selected, for as long as the mint keeps
+    // it pending, so it must not take more than it needs.
+    it('locks the smallest proof that covers a melt, not the largest', async () => {
+        mint.meltOutcome = 'PENDING';
+
+        await keymaster.meltCashu(signedInvoice(700));
+
+        expect(await inFlight()).toBe(1024);
+    });
+
+    it('combines proofs only when no single one covers it, without any to spare', async () => {
+        mint.meltOutcome = 'PENDING';
+
+        await keymaster.meltCashu(signedInvoice(9000));
+
+        // 8192 + 2048 covers 9010; 4096 + 8192 would hold more than it needs to.
+        expect(await inFlight()).toBeLessThan(12288);
+        expect(await inFlight()).toBeGreaterThanOrEqual(9010);
+    });
+
+    it('still reports too little across everything', async () => {
+        await expect(keymaster.meltCashu(signedInvoice(16000))).rejects.toThrow(CashuInsufficientFundsError);
+        expect(await inFlight()).toBe(0);
+    });
+
+    it('counts each input fee when choosing', async () => {
+        await mint.stop();
+        await setup({ inputFeePpk: 1000 });
+        await keymaster.addCashu();
+        await fund(16000);
+
+        const { amount } = await keymaster.sendCashu(1000);
+
+        expect(amount).toBe(1000);
+        const balance = await keymaster.getCashuBalance();
+        expect(balance.spendable + balance.outstanding).toBeLessThanOrEqual(16000);
+        expect(balance.inFlight).toBe(0);
+    });
+});
+
+describe('selecting from a fragmented balance', () => {
+    const keysets = [{ id: 'free', unit: 'sat', active: true }, { id: 'paid', unit: 'sat', active: true, input_fee_ppk: 600 }];
+    const proof = (i: number, id = 'free', amount = 1) => ({ id, amount, secret: `s${i}`, C: 'c' });
+    const select = (proofs: unknown[], target: number) =>
+        (new CashuWallet({} as never) as any).select(proofs, target, keysets) as { amount: number; id: string }[];
+    const value = (some: { amount: number }[]) => some.reduce((total, item) => total + item.amount, 0);
+
+    // Selection runs inside the wallet's write, so it must stay quick with many proofs.
+    it('stays quick across thousands of proofs', () => {
+        const proofs = Array.from({ length: 4000 }, (_, i) => proof(i));
+        const start = Date.now();
+
+        expect(select(proofs, 3999)).toHaveLength(3999);
+        expect(() => select(proofs, 4001)).toThrow(CashuInsufficientFundsError);
+
+        expect(Date.now() - start).toBeLessThan(5000);
+    });
+
+    it('rounds the fee on the total, not on each input', () => {
+        // Two inputs at 600 ppk owe 2 sats; each alone would round to 1.
+        const chosen = select([proof(1, 'paid', 4), proof(2, 'paid', 4)], 6);
+
+        expect(value(chosen)).toBe(8);
+    });
+
+    it('counts the fee of the proof that would finish the job', () => {
+        // 3 at 600 ppk nets 2, so the 3 does not cover 3, and the 4 does.
+        expect(select([proof(1, 'paid', 3), proof(2, 'paid', 4)], 3)).toEqual([expect.objectContaining({ amount: 4 })]);
+    });
+
+    it('prefers the smallest proof that finishes the job at each step', () => {
+        const chosen = select([1, 2, 4, 8, 16].map((amount, i) => proof(i, 'free', amount)), 18);
+
+        expect(chosen.map(item => item.amount)).toEqual([16, 2]);
+    });
+});
+
+describe('a melt quote', () => {
+    beforeEach(async () => {
+        await setup();
+        await keymaster.addCashu();
+        await fund(1000);
+    });
+
+    it('is refused when it asks for more than the invoice is for', async () => {
+        mint.meltAmountOverride = 900;
+
+        await expect(keymaster.meltCashu(signedInvoice(100))).rejects.toThrow(CashuMintUnsupportedError);
+
+        expect(await keymaster.getCashuBalance()).toMatchObject({ spendable: 1000, inFlight: 0 });
+    });
+
+    it('is refused when it asks for less', async () => {
+        mint.meltAmountOverride = 50;
+
+        await expect(keymaster.meltCashu(signedInvoice(100))).rejects.toThrow(CashuMintUnsupportedError);
+    });
+
+    it('is not requested for an invoice with no amount', async () => {
+        mint.requests = [];
+
+        await expect(keymaster.meltCashu(signedInvoice())).rejects.toThrow(/amount/);
+
+        expect(mint.requests).toEqual([]);
+    });
+
+    it('is not requested for something that is not an invoice', async () => {
+        mint.requests = [];
+
+        await expect(keymaster.meltCashu('lnbc-garbage')).rejects.toThrow(/bolt11/);
+
+        expect(mint.requests).toEqual([]);
+    });
+});
+
 describe('helpers', () => {
     it.each([
         ['HTTPS://Mint.Example:443/Cashu/', 'https://mint.example/Cashu'],
@@ -398,10 +522,11 @@ describe('sending and receiving', () => {
         const backup = newKeymaster(copy);
         await keymaster.sendCashu(30);
 
-        // The 64 it selects is spent, and the original signed the same counters.
-        await expect(backup.sendCashu(60)).rejects.toThrow(CashuTokenSpentError);
+        // The 32 it selects is spent, and the original signed the same counters for
+        // other amounts, so this is not its own response to recover.
+        await expect(backup.sendCashu(20)).rejects.toThrow(CashuTokenSpentError);
 
-        expect(await backup.getCashuBalance()).toEqual({ spendable: 36, inFlight: 0, outstanding: 0 });
+        expect(await backup.getCashuBalance()).toEqual({ spendable: 68, inFlight: 0, outstanding: 0 });
         expect(await backup.listCashuSends()).toEqual([]);
     });
 
@@ -414,7 +539,7 @@ describe('sending and receiving', () => {
 
         await expect(backup.sendCashu(90)).rejects.toThrow(CashuTokenSpentError);
 
-        expect(await backup.getCashuBalance()).toMatchObject({ spendable: 36, inFlight: 0, outstanding: 0 });
+        expect(await backup.getCashuBalance()).toMatchObject({ spendable: 68, inFlight: 0, outstanding: 0 });
     });
 
     it('drops proofs the mint reports spent when checking, and reports their value', async () => {
@@ -439,7 +564,7 @@ describe('sending and receiving', () => {
         mint.statesLimit = 0;
 
         await expect(keymaster.sendCashu(30)).rejects.toThrow(CashuUnavailableError);
-        expect((await keymaster.getCashuBalance()).inFlight).toBe(64);
+        expect((await keymaster.getCashuBalance()).inFlight).toBe(32);
 
         mint.statesLimit = undefined;
         await keymaster.checkCashu();
@@ -596,8 +721,8 @@ describe('sending and receiving', () => {
         mint.loseResponse('/v1/swap');
 
         await expect(keymaster.sendCashu(30)).rejects.toThrow(CashuUnavailableError);
-        // The 64 proof covers it; the rest of the funding (4 + 32) stays spendable.
-        expect(await keymaster.getCashuBalance()).toMatchObject({ spendable: 36, inFlight: 64 });
+        // The 32 proof covers it; the rest of the funding (4 + 64) stays spendable.
+        expect(await keymaster.getCashuBalance()).toMatchObject({ spendable: 68, inFlight: 32 });
 
         await keymaster.checkCashu();
 
@@ -674,7 +799,7 @@ describe('sending and receiving', () => {
 
         await expect(keymaster.sendCashu(30)).rejects.toThrow(CashuUnavailableError);
 
-        expect((await keymaster.getCashuBalance()).inFlight).toBe(64);
+        expect((await keymaster.getCashuBalance()).inFlight).toBe(32);
         await keymaster.checkCashu();
         expect(await keymaster.getCashuBalance()).toEqual({ spendable: 70, inFlight: 0, outstanding: 30 });
     });
@@ -733,7 +858,7 @@ describe('melting', () => {
     });
 
     it('pays an invoice and keeps the change from the fee reserve', async () => {
-        const result = await keymaster.meltCashu('lnbc-amount=100');
+        const result = await keymaster.meltCashu(signedInvoice(100));
 
         expect(result).toMatchObject({ paid: true, fee: 1, preimage: 'ab'.repeat(32) });
         expect((await keymaster.getCashuBalance()).spendable).toBe(99);
@@ -741,7 +866,7 @@ describe('melting', () => {
     });
 
     it('frees the counters of change outputs the mint did not sign', async () => {
-        await keymaster.meltCashu('lnbc-amount=100');
+        await keymaster.meltCashu(signedInvoice(100));
 
         const { free } = (await keymaster.loadWallet()).cashu.counters[mint.keysetId];
         expect(free.length).toBeGreaterThan(0);
@@ -749,7 +874,7 @@ describe('melting', () => {
 
     it('leaves a pending melt open, then settles it when paid', async () => {
         mint.meltOutcome = 'PENDING';
-        const result = await keymaster.meltCashu('lnbc-amount=100');
+        const result = await keymaster.meltCashu(signedInvoice(100));
 
         expect(result).toMatchObject({ paid: false, pending: true, change: 0 });
         expect((await keymaster.getCashuBalance()).inFlight).toBeGreaterThan(0);
@@ -765,7 +890,7 @@ describe('melting', () => {
     it('returns the inputs of an unpaid melt', async () => {
         mint.meltOutcome = 'UNPAID';
 
-        const result = await keymaster.meltCashu('lnbc-amount=100');
+        const result = await keymaster.meltCashu(signedInvoice(100));
 
         expect(result).toMatchObject({ paid: false, change: 0 });
         expect(await keymaster.getCashuBalance()).toEqual({ spendable: 200, inFlight: 0, outstanding: 0 });
@@ -774,7 +899,7 @@ describe('melting', () => {
     it('keeps the change when the response was lost', async () => {
         mint.loseResponse('/v1/melt/bolt11');
 
-        await expect(keymaster.meltCashu('lnbc-amount=100')).rejects.toThrow(CashuUnavailableError);
+        await expect(keymaster.meltCashu(signedInvoice(100))).rejects.toThrow(CashuUnavailableError);
         await keymaster.checkCashu();
 
         expect(await keymaster.getCashuBalance()).toEqual({ spendable: 99, inFlight: 0, outstanding: 0 });
@@ -794,7 +919,7 @@ describe('melting', () => {
     it('frees the other inputs of a melt whose input was spent elsewhere', async () => {
         await spendElsewhere(64);
 
-        await expect(keymaster.meltCashu('lnbc-amount=150')).rejects.toThrow('token already spent');
+        await expect(keymaster.meltCashu(signedInvoice(150))).rejects.toThrow('token already spent');
 
         // 8 + 128, the 128 swapped to new proofs since another copy may hold it.
         expect(await keymaster.getCashuBalance()).toEqual({ spendable: 136, inFlight: 0, outstanding: 0 });
@@ -803,7 +928,7 @@ describe('melting', () => {
 
     it('settles a melt as paid when the quote becomes paid between the two reads', async () => {
         mint.meltOutcome = 'PENDING';
-        await keymaster.meltCashu('lnbc-amount=100');
+        await keymaster.meltCashu(signedInvoice(100));
         const quote = [...mint.meltQuotes.values()][0];
         quote.state = 'UNPAID';
         mint.onRequest = async (path) => {
@@ -819,7 +944,7 @@ describe('melting', () => {
 
     it('stays open when a re-read quote is neither paid nor unpaid', async () => {
         mint.meltOutcome = 'PENDING';
-        await keymaster.meltCashu('lnbc-amount=100');
+        await keymaster.meltCashu(signedInvoice(100));
         const quote = [...mint.meltQuotes.values()][0];
         quote.state = 'UNPAID';
         mint.onRequest = async (path) => {
@@ -832,7 +957,7 @@ describe('melting', () => {
     });
 
     it('fails a melt it cannot cover', async () => {
-        await expect(keymaster.meltCashu('lnbc-amount=500')).rejects.toThrow(CashuInsufficientFundsError);
+        await expect(keymaster.meltCashu(signedInvoice(500))).rejects.toThrow(CashuInsufficientFundsError);
     });
 });
 
@@ -864,7 +989,7 @@ describe('recovery', () => {
     });
 
     it('does not restore spent proofs', async () => {
-        await keymaster.meltCashu('lnbc-amount=90');
+        await keymaster.meltCashu(signedInvoice(90));
         const balance = (await keymaster.getCashuBalance()).spendable;
         const other = await recovered();
 
@@ -904,7 +1029,7 @@ describe('recovery', () => {
     it('repairs stale counters on a melt', async () => {
         const other = await withStaleCounters();
 
-        await expect(other.meltCashu('lnbc-amount=50')).resolves.toMatchObject({ paid: true });
+        await expect(other.meltCashu(signedInvoice(50))).resolves.toMatchObject({ paid: true });
 
         expect((await other.getCashuBalance()).spendable).toBe(49);
     });
