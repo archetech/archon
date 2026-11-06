@@ -280,7 +280,7 @@ describe('delivery', () => {
         mint.loseResponse('/v1/swap');
 
         await expect(send()).rejects.toThrow();
-        expect(await balance('Alice')).toMatchObject({ spendable: 36, inFlight: 64 });
+        expect(await balance('Alice')).toMatchObject({ spendable: 68, inFlight: 32 });
         expect(mint.mailbox).toHaveLength(0);
 
         await keymaster.checkCashu(undefined, 'Alice');
@@ -462,6 +462,22 @@ describe('receiveCashuMessages', () => {
         const second = await keymaster.receiveCashuMessages('Bob');
 
         expect(second).toEqual({ redeemed: [], failed: [] });
+        expect(await balance('Bob')).toMatchObject({ spendable: 30, inFlight: 0 });
+        expect(mint.mailbox).toHaveLength(0);
+    });
+
+    it('redeems a message once when accepted twice at the same moment', async () => {
+        await send();
+        mint.requests.length = 0;
+
+        const results = await Promise.all([
+            keymaster.receiveCashuMessages('Bob'),
+            keymaster.receiveCashuMessages('Bob'),
+        ]);
+
+        expect(results.flatMap(result => result.redeemed)).toHaveLength(1);
+        expect(results.flatMap(result => result.failed).filter(item => item.acknowledged)).toEqual([]);
+        expect(mint.requests.filter(request => request === 'POST /v1/swap')).toHaveLength(1);
         expect(await balance('Bob')).toMatchObject({ spendable: 30, inFlight: 0 });
         expect(mint.mailbox).toHaveLength(0);
     });
@@ -657,6 +673,35 @@ describe('listCashuMessages', () => {
         const { redeemed, failed } = await keymaster.receiveCashuMessages('Bob');
         expect(redeemed).toEqual([]);
         expect(failed).toHaveLength(1);
+    });
+
+    it('lists a redemption still unresolved, without contacting the mint', async () => {
+        await send();
+        mint.loseResponse('/v1/swap');
+        await keymaster.receiveCashuMessages('Bob');
+        mint.requests.length = 0;
+
+        const messages = await keymaster.listCashuMessages('Bob');
+
+        expect(messages).toHaveLength(1);
+        expect(messages[0]).toMatchObject({ redeemable: false, sender: aliceDid, amount: 30 });
+        expect(messages[0].reason).toMatch(/pending/);
+        expect(mint.requests).toEqual([]);
+    });
+
+    it('calls a token in another unit not redeemable', async () => {
+        const token = getEncodedToken({
+            mint: PUBLIC_URL,
+            unit: 'usd',
+            proofs: [{ id: mint.keysetId, amount: 1, secret: 'a'.repeat(64), C: `02${'00'.repeat(32)}` }] as never,
+        });
+        await keymaster.sendDidComm({ type: CASHU_TOKEN_TYPE, body: { token } }, 'Bob', { name: 'Alice' });
+
+        const [message] = await keymaster.listCashuMessages('Bob');
+
+        expect(message.redeemable).toBe(false);
+        expect(message.reason).toMatch(/usd/);
+        expect((await keymaster.receiveCashuMessages('Bob')).redeemed).toEqual([]);
     });
 
     it('does not list what was redeemed', async () => {

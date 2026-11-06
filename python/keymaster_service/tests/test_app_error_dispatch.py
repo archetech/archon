@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT.parent / "keymaster" / "src"))
 
+import httpx  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -64,7 +65,33 @@ def _client() -> TestClient:
     async def _gatekeeper_unavailable():
         raise GatekeeperUnavailableError("Gatekeeper unavailable: ConnectError")
 
+    def _upstream(status: int, **reply):
+        request = httpx.Request("POST", "http://drawbridge:4222/api/v1/lightning/pay")
+        return httpx.HTTPStatusError("raw", request=request, response=httpx.Response(status, request=request, **reply))
+
+    @app.get("/upstream-error")
+    async def _upstream_error():
+        raise _upstream(502, json={"error": "Lightning service unavailable"})
+
+    @app.get("/upstream-text")
+    async def _upstream_text():
+        raise _upstream(502, text="<html>bad gateway</html>")
+
     return TestClient(app, raise_server_exceptions=False)
+
+
+def test_upstream_error_reports_what_the_service_said():
+    response = _client().get("/upstream-error")
+
+    assert response.status_code == 500
+    assert response.json() == {"error": "Lightning service unavailable"}
+
+
+def test_upstream_error_without_a_reason_names_the_status_only():
+    response = _client().get("/upstream-text")
+
+    assert response.status_code == 500
+    assert response.json() == {"error": "upstream service returned 502"}
 
 
 def test_operation_error_dispatches_to_400():

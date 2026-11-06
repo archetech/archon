@@ -165,6 +165,62 @@ class TestEnabling:
         assert "service" not in run(bed.keymaster.resolve_did(did))["didDocument"]
 
 
+class TestChoosingProofs:
+    @pytest.fixture
+    def rich(self, bed):
+        run(bed.keymaster.add_cashu())
+        bed.fund(16000)
+        return bed
+
+    # A melt that goes pending locks what it selected, for as long as the mint keeps
+    # it pending, so it must not take more than it needs.
+    def test_locks_the_smallest_proof_that_covers_a_melt(self, rich):
+        rich.mint.melt_outcome = "PENDING"
+
+        run(rich.keymaster.melt_cashu(signed_invoice(700)))
+
+        assert rich.balance()["inFlight"] == 1024
+
+    def test_combines_proofs_without_any_to_spare(self, rich):
+        rich.mint.melt_outcome = "PENDING"
+
+        run(rich.keymaster.melt_cashu(signed_invoice(9000)))
+
+        assert 9010 <= rich.balance()["inFlight"] < 12288
+
+    def test_still_reports_too_little_across_everything(self, rich):
+        with pytest.raises(CashuInsufficientFundsError):
+            run(rich.keymaster.melt_cashu(signed_invoice(16000)))
+        assert rich.balance()["inFlight"] == 0
+
+
+class TestMeltQuoteAmount:
+    @pytest.fixture
+    def funded_small(self, bed):
+        run(bed.keymaster.add_cashu())
+        bed.fund(1000)
+        return bed
+
+    @pytest.mark.parametrize("quoted", [900, 50])
+    def test_refuses_a_quote_that_differs_from_the_invoice(self, funded_small, quoted):
+        funded_small.mint.melt_amount_override = quoted
+
+        with pytest.raises(CashuMintUnsupportedError):
+            run(funded_small.keymaster.melt_cashu(signed_invoice(100)))
+
+        balance = funded_small.balance()
+        assert (balance["spendable"], balance["inFlight"]) == (1000, 0)
+
+    @pytest.mark.parametrize("invoice", [lambda: signed_invoice(), lambda: "lnbc-garbage"], ids=["no amount", "not an invoice"])
+    def test_requests_no_quote_for_an_invoice_it_cannot_price(self, funded_small, invoice):
+        funded_small.mint.requests.clear()
+
+        with pytest.raises(KeymasterError, match="bolt11"):
+            run(funded_small.keymaster.melt_cashu(invoice()))
+
+        assert funded_small.mint.requests == []
+
+
 class TestMinting:
     # A quote's invoice comes from the mint and may be paid automatically, so an
     # outside mint must not be able to ask for more than the wallet asked for.
@@ -373,11 +429,12 @@ class TestSendingAndReceiving:
         backup = self.backup_of(funded)
         run(funded.keymaster.send_cashu(30))
 
-        # The 64 it selects is spent, and the original signed the same counters.
+        # The 32 it selects is spent, and the original signed the same counters for
+        # other amounts, so this is not its own response to recover.
         with pytest.raises(CashuTokenSpentError):
-            run(backup.send_cashu(60))
+            run(backup.send_cashu(20))
 
-        assert run(backup.get_cashu_balance()) == {"spendable": 36, "inFlight": 0, "outstanding": 0}
+        assert run(backup.get_cashu_balance()) == {"spendable": 68, "inFlight": 0, "outstanding": 0}
         assert run(backup.list_cashu_sends()) == []
 
     def test_keeps_what_a_backup_had_not_spent_when_a_send_selects_both(self, funded):
@@ -387,7 +444,7 @@ class TestSendingAndReceiving:
         with pytest.raises(CashuTokenSpentError):
             run(backup.send_cashu(90))
 
-        assert run(backup.get_cashu_balance()) == {"spendable": 36, "inFlight": 0, "outstanding": 0}
+        assert run(backup.get_cashu_balance()) == {"spendable": 68, "inFlight": 0, "outstanding": 0}
 
     def test_drops_proofs_the_mint_reports_spent_when_checking(self, funded):
         four = next(proof for proof in funded.entry()["proofs"] if proof["amount"] == 4)
@@ -408,7 +465,7 @@ class TestSendingAndReceiving:
 
         with pytest.raises(CashuUnavailableError):
             run(funded.keymaster.send_cashu(30))
-        assert funded.balance()["inFlight"] == 64
+        assert funded.balance()["inFlight"] == 32
 
         funded.mint.states_limit = None
         run(funded.keymaster.check_cashu())
@@ -586,7 +643,7 @@ class TestSendingAndReceiving:
         with pytest.raises(CashuUnavailableError):
             run(funded.keymaster.send_cashu(30))
         # The 64 proof covers it; the rest of the funding (4 + 32) stays spendable.
-        assert funded.balance()["spendable"] == 36 and funded.balance()["inFlight"] == 64
+        assert funded.balance()["spendable"] == 68 and funded.balance()["inFlight"] == 32
 
         run(funded.keymaster.check_cashu())
         assert funded.balance() == {"spendable": 70, "inFlight": 0, "outstanding": 30}
@@ -642,7 +699,7 @@ class TestSendingAndReceiving:
 
         with pytest.raises(CashuUnavailableError):
             run(funded.keymaster.send_cashu(30))
-        assert funded.balance()["inFlight"] == 64
+        assert funded.balance()["inFlight"] == 32
 
         run(funded.keymaster.check_cashu())
         assert funded.balance() == {"spendable": 70, "inFlight": 0, "outstanding": 30}
@@ -688,17 +745,17 @@ class TestMelting:
         bed.fund(200)
 
     def test_pays_and_keeps_the_change(self, bed):
-        result = run(bed.keymaster.melt_cashu("lnbc-amount=100"))
+        result = run(bed.keymaster.melt_cashu(signed_invoice(100)))
         assert result["paid"] and result["fee"] == 1 and result["preimage"] == "ab" * 32 and result["change"] > 0
         assert bed.balance()["spendable"] == 99
 
     def test_frees_counters_of_unsigned_change(self, bed):
-        run(bed.keymaster.melt_cashu("lnbc-amount=100"))
+        run(bed.keymaster.melt_cashu(signed_invoice(100)))
         assert bed.counters()["free"]
 
     def test_leaves_a_pending_melt_open_then_settles_it(self, bed):
         bed.mint.melt_outcome = "PENDING"
-        result = run(bed.keymaster.melt_cashu("lnbc-amount=100"))
+        result = run(bed.keymaster.melt_cashu(signed_invoice(100)))
         assert not result["paid"] and result["pending"] and result["change"] == 0
         assert bed.balance()["inFlight"] > 0
 
@@ -710,14 +767,14 @@ class TestMelting:
 
     def test_returns_the_inputs_of_an_unpaid_melt(self, bed):
         bed.mint.melt_outcome = "UNPAID"
-        result = run(bed.keymaster.melt_cashu("lnbc-amount=100"))
+        result = run(bed.keymaster.melt_cashu(signed_invoice(100)))
         assert not result["paid"]
         assert bed.balance() == {"spendable": 200, "inFlight": 0, "outstanding": 0}
 
     def test_keeps_the_change_when_the_response_was_lost(self, bed):
         bed.mint.lose_response("/v1/melt/bolt11")
         with pytest.raises(CashuUnavailableError):
-            run(bed.keymaster.melt_cashu("lnbc-amount=100"))
+            run(bed.keymaster.melt_cashu(signed_invoice(100)))
 
         run(bed.keymaster.check_cashu())
         assert bed.balance() == {"spendable": 99, "inFlight": 0, "outstanding": 0}
@@ -731,7 +788,7 @@ class TestMelting:
         bed.mint.spent.add(proof_y(sixty_four["secret"]))
 
         with pytest.raises(KeymasterError, match="token already spent"):
-            run(bed.keymaster.melt_cashu("lnbc-amount=150"))
+            run(bed.keymaster.melt_cashu(signed_invoice(150)))
 
         # 8 + 128, the 128 swapped to new proofs since another copy may hold it.
         assert bed.balance() == {"spendable": 136, "inFlight": 0, "outstanding": 0}
@@ -739,7 +796,7 @@ class TestMelting:
 
     def pending_melt_turning(self, bed, state):
         bed.mint.melt_outcome = "PENDING"
-        run(bed.keymaster.melt_cashu("lnbc-amount=100"))
+        run(bed.keymaster.melt_cashu(signed_invoice(100)))
         quote = next(iter(bed.mint.melt_quotes.values()))
         quote["state"] = "UNPAID"
 
@@ -766,7 +823,7 @@ class TestMelting:
 
     def test_fails_a_melt_it_cannot_cover(self, bed):
         with pytest.raises(CashuInsufficientFundsError):
-            run(bed.keymaster.melt_cashu("lnbc-amount=500"))
+            run(bed.keymaster.melt_cashu(signed_invoice(500)))
 
 
 class TestRecovery:
@@ -795,7 +852,7 @@ class TestRecovery:
         assert run(other.load_wallet())["cashu"]["counters"][bed.mint.keyset_id]["next"] > 0
 
     def test_does_not_restore_spent_proofs(self, bed):
-        run(bed.keymaster.melt_cashu("lnbc-amount=90"))
+        run(bed.keymaster.melt_cashu(signed_invoice(90)))
         balance = bed.balance()["spendable"]
         other = self.recovered(bed)
 
@@ -831,7 +888,7 @@ class TestRecovery:
     def test_repairs_stale_counters_on_a_melt(self, bed):
         other = self.with_stale_counters(bed)
 
-        assert run(other.melt_cashu("lnbc-amount=50"))["paid"]
+        assert run(other.melt_cashu(signed_invoice(50)))["paid"]
         assert run(other.get_cashu_balance())["spendable"] == 49
 
     def test_fails_a_refused_request_whose_outputs_were_not_signed(self, bed):

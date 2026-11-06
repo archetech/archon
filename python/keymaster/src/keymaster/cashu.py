@@ -470,15 +470,18 @@ class CashuWallet:
 
     @staticmethod
     def _select(proofs: list[dict[str, Any]], target: int, keysets: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Largest first until the proofs cover the target and their own input fee."""
+        """As little as covers the target and its own input fee, because a request that
+        goes pending locks what it selected for as long as the mint keeps it pending:
+        at each step the smallest proof that finishes the job, else the largest."""
+        pool = sorted(proofs, key=lambda proof: proof["amount"])
         selected: list[dict[str, Any]] = []
-        for proof in sorted(proofs, key=lambda item: item["amount"], reverse=True):
-            if _sum_proofs(selected) - _fee_for(selected, keysets) >= target:
-                break
-            selected.append(proof)
-        if _sum_proofs(selected) - _fee_for(selected, keysets) < target:
-            raise CashuInsufficientFundsError(f"need {target} {UNIT} plus fees, have {_sum_proofs(proofs)}")
-        return selected
+        while pool:
+            for proof in pool:
+                candidate = [*selected, proof]
+                if _sum_proofs(candidate) - _fee_for(candidate, keysets) >= target:
+                    return candidate
+            selected.append(pool.pop())
+        raise CashuInsufficientFundsError(f"need {target} {UNIT} plus fees, have {_sum_proofs(proofs)}")
 
     @staticmethod
     def _remove_from_entry(entry: dict[str, Any], proofs: list[dict[str, Any]]) -> None:
@@ -1259,9 +1262,16 @@ class CashuWallet:
     async def melt_cashu(self, bolt11: str, mint: str | None = None, name: str | None = None) -> dict[str, Any]:
         if not isinstance(bolt11, str) or not bolt11:
             raise _invalid("bolt11")
+        # The wallet never sends the amountless option, so an invoice must say what it
+        # costs, and the mint's own figure is checked against that.
+        msat = _invoice_msat(bolt11)
+        if msat is None:
+            raise _invalid("bolt11 must be an invoice with an amount")
         ctx = await self._context(mint, name)
         await self._settle(ctx)
         quote = await ctx.client.create_melt_quote(bolt11)
+        if quote["amount"] != (msat + 999) // 1000:
+            raise CashuMintUnsupportedError(f"the mint quoted {quote['amount']} sats for an invoice of {msat} msat")
         keyset, keysets = await self._active_keyset(ctx)
         target = quote["amount"] + quote["fee_reserve"]
         op_id = secrets.token_hex(16)
@@ -1446,10 +1456,15 @@ class CashuWallet:
             held = {proof["secret"] for proof in entry["proofs"]}
             if any(proof["secret"] in held for proof in proofs):
                 raise CashuTokenSpentError("this token is already in the wallet")
+            # Checked in the same write that claims it, so a concurrent accept of the
+            # same message waits rather than submitting its proofs a second time.
+            id_info = await self.host.fetch_id_info(ctx.name, wallet)
+            if message and (id_info.get("cashuInbox") or {}).get(message):
+                raise CashuUnavailableError("this message is already being redeemed")
             self._journal_swap(wallet, entry, op_id, "receive", inputs, keyset["id"], amount)
             if message:
                 entry["operations"][-1]["message"] = message
-                self._remember_message(await self.host.fetch_id_info(ctx.name, wallet), message)
+                self._remember_message(id_info, message)
 
         async def run(_: Any) -> str:
             return await self._run_swap(ctx, op_id, False, report)
@@ -1650,7 +1665,9 @@ class CashuWallet:
         mints = _mints(id_info)
         result: list[dict[str, Any]] = []
         for item in await self._token_messages(identity):
-            if (id_info.get("cashuInbox") or {}).get(self._message_key(item)):
+            key = self._message_key(item)
+            pending = any(op.get("message") == key for entry in mints.values() for op in entry.get("operations") or [])
+            if (id_info.get("cashuInbox") or {}).get(key) and not pending:
                 continue
             base: dict[str, Any] = {"id": item["id"]}
             sender = self._message_sender(item)
@@ -1662,8 +1679,13 @@ class CashuWallet:
             try:
                 decoded = cc.decode_token(body.get("token"))
                 mint = normalize_mint_url(decoded["mint"])
+                if decoded["unit"] != UNIT:
+                    result.append({**base, "mint": mint, "redeemable": False, "reason": f"a token in {decoded['unit']}, and this wallet holds only {UNIT}"})
+                    continue
                 described = {**base, "amount": _sum_proofs(decoded["proofs"]), "mint": mint}
-                if mint not in mints:
+                if pending:
+                    result.append({**described, "redeemable": False, "reason": "its redemption is still pending at the mint"})
+                elif mint not in mints:
                     result.append({**described, "redeemable": False, "reason": f"the mint {mint} is not added"})
                 else:
                     result.append({**described, **await self._redeemable_by(decoded["proofs"], identity)})

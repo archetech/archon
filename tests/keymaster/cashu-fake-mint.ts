@@ -11,6 +11,7 @@ import {
     verifyMintQuoteSignature,
     verifyUnblindedSignature,
 } from '@cashu/cashu-ts';
+import { decode as decodeBolt11 } from 'light-bolt11-decoder';
 import { signedInvoice } from '../cli/helpers.ts';
 
 // A mint that really signs: blind signatures from cashu-ts, spent and signed
@@ -64,6 +65,8 @@ export class FakeMint {
     requests: string[] = [];
     // The invoice a mint quote carries; a test can make it dishonest.
     invoiceFor: (amount: number) => string = signedInvoice;
+    // What a melt quote says the invoice costs; a test can make it dishonest.
+    meltAmountOverride?: number;
     // The fee the Lightning payment of a melt actually costs.
     meltRoutingFee = 1;
     meltOutcome: 'PAID' | 'PENDING' | 'UNPAID' = 'PAID';
@@ -253,7 +256,8 @@ export class FakeMint {
         }
         if (method === 'POST' && path === '/v1/melt/quote/bolt11') {
             const quote = `xq${++this.next}`;
-            const amount = Number(/amount=(\d+)/.exec(body.request)?.[1] ?? 100);
+            const section = decodeBolt11(body.request).sections.find(item => item.name === 'amount');
+            const amount = this.meltAmountOverride ?? Math.ceil(Number(section?.value ?? 0) / 1000);
             this.meltQuotes.set(quote, { amount, fee_reserve: 10, state: 'UNPAID', request: body.request });
             return { quote, amount, unit: 'sat', fee_reserve: 10, state: 'UNPAID', expiry: Math.floor(Date.now() / 1000) + 600 };
         }

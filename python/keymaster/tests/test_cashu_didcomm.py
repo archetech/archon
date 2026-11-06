@@ -247,7 +247,7 @@ class TestDelivery:
 
         with pytest.raises(KeymasterError):
             bed.send()
-        assert bed.balance("Alice")["inFlight"] == 64
+        assert bed.balance("Alice")["inFlight"] == 32
         assert bed.relay.mailbox == []
 
         run(bed.km.check_cashu(None, "Alice"))
@@ -397,6 +397,21 @@ class TestAccept:
         assert len(bed.relay.mailbox) == 1
 
         assert bed.accept() == {"redeemed": [], "failed": []}
+        assert bed.balance("Bob")["spendable"] == 30
+        assert bed.relay.mailbox == []
+
+    def test_redeems_a_message_once_when_accepted_twice_at_the_same_moment(self, bed):
+        bed.send()
+        bed.mint.requests.clear()
+
+        async def both():
+            return await asyncio.gather(bed.km.receive_cashu_messages("Bob"), bed.km.receive_cashu_messages("Bob"))
+
+        results = run(both())
+
+        assert sum(len(result["redeemed"]) for result in results) == 1
+        assert not [item for result in results for item in result["failed"] if item["acknowledged"]]
+        assert len([request for request in bed.mint.requests if request == "POST /v1/swap"]) == 1
         assert bed.balance("Bob")["spendable"] == 30
         assert bed.relay.mailbox == []
 
@@ -578,6 +593,31 @@ class TestListMessages:
         result = bed.accept()
         assert result["redeemed"] == []
         assert len(result["failed"]) == 1
+
+    def test_lists_a_redemption_still_unresolved_without_contacting_the_mint(self, bed):
+        bed.send()
+        bed.mint.lose_response("/v1/swap")
+        bed.accept()
+        bed.mint.requests.clear()
+
+        messages = run(bed.km.list_cashu_messages("Bob"))
+
+        assert len(messages) == 1
+        assert messages[0]["redeemable"] is False
+        assert (messages[0]["sender"], messages[0]["amount"]) == (bed.alice, 30)
+        assert "pending" in messages[0]["reason"]
+        assert bed.mint.requests == []
+
+    def test_calls_a_token_in_another_unit_not_redeemable(self, bed):
+        proof = {"id": bed.mint.keyset_id, "amount": 1, "secret": "a" * 64, "C": "02" + "00" * 32}
+        token = encode_token(PUBLIC_URL, "usd", [proof])
+        run(bed.km.send_didcomm({"type": CASHU_TOKEN_TYPE, "body": {"token": token}}, "Bob", {"name": "Alice"}))
+
+        message = run(bed.km.list_cashu_messages("Bob"))[0]
+
+        assert message["redeemable"] is False
+        assert "usd" in message["reason"]
+        assert bed.accept()["redeemed"] == []
 
     def test_does_not_list_what_was_redeemed(self, bed):
         bed.send()

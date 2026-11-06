@@ -292,6 +292,10 @@ a per-mint breakdown instead of failing.
 requested, since the mint chooses the invoice and the quote's own amount only echoes
 the request.
 
+`meltCashu` refuses an invoice with no amount, and a quote whose amount is not the
+invoice's. Selection takes as little as covers an operation, because a melt the mint
+keeps `PENDING` locks what it selected.
+
 A wallet with Lightning funds the quote with `payLightningInvoice`; the CLI and UI
 offer that in one step. `receiveCashu` always swaps at the mint, since a token is
 not received until the mint confirms its proofs are unspent.
