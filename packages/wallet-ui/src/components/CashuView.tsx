@@ -740,8 +740,10 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                                         {item.name ? `${item.name} (${item.url})` : item.url}
                                         {item.isNodeMint && <Chip label="this node" size="small" sx={{ ml: 1 }} />}
                                     </Typography>
-                                    {item.keysets.length === 0 && (
-                                        <Typography variant="body2" color="warning.main">Not answering right now</Typography>
+                                    {item.error && (
+                                        <Typography variant="body2" color="warning.main" sx={{ wordBreak: "break-word" }}>
+                                            Not answering right now: {item.error}
+                                        </Typography>
                                     )}
                                     {totals && (
                                         <Typography variant="body2" color="text.secondary">{sats(totals.spendable)}</Typography>

@@ -4,6 +4,7 @@ import asyncio
 import json
 import time
 
+import httpx
 import pytest
 
 from keymaster import (
@@ -139,6 +140,35 @@ class TestEnabling:
         info = run(bed.keymaster.add_cashu_mint("https://outside.example/"))
         assert info["url"] == "https://outside.example" and not info["isNodeMint"]
         assert all(url.startswith("https://outside.example/v1/") for url in requested)
+
+    @staticmethod
+    def _outside_mint(bed):
+        """What a browser read through a proxy that had lost a compressed response's encoding."""
+        state = {"garbled": False}
+        fetch = bed.mint.fetch
+
+        async def public(method, url, *args):
+            if state["garbled"] and url.endswith("/v1/keysets"):
+                return httpx.Response(200, content=b"\x28\xb5\x2f\xfd")
+            return await fetch(method, url.replace("https://outside.example", "http://x"), *args)
+
+        bed.keymaster.cashu.public_fetch = public
+        return state
+
+    def test_does_not_save_a_mint_whose_keysets_cannot_be_read(self, bed):
+        self._outside_mint(bed)["garbled"] = True
+        with pytest.raises(CashuUnavailableError, match="/v1/keysets is not JSON"):
+            run(bed.keymaster.add_cashu_mint("https://outside.example"))
+        assert run(bed.keymaster.list_cashu_mints()) == []
+
+    def test_says_why_listing_could_not_read_a_mint(self, bed):
+        state = self._outside_mint(bed)
+        run(bed.keymaster.add_cashu_mint("https://outside.example"))
+        state["garbled"] = True
+        [listed] = run(bed.keymaster.list_cashu_mints())
+        assert listed["url"] == "https://outside.example"
+        assert listed["keysets"] == [] and not listed["isNodeMint"]
+        assert "the answer to /v1/keysets is not JSON" in listed["error"]
 
     def test_the_real_public_fetch_refuses_http_and_private_addresses(self, bed):
         from keymaster.net import fetch_public_https

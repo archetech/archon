@@ -167,6 +167,8 @@ class CashuMintClient:
         except ValueError:
             payload = None
         if response.is_success:
+            if payload is None:
+                raise CashuUnavailableError(f"{self.base}: the answer to {path} is not JSON")
             return payload
         if isinstance(payload, dict):
             code = payload.get("code")
@@ -1058,13 +1060,15 @@ class CashuWallet:
         normalized = normalize_mint_url(url)
         client = CashuMintClient(normalized, self.public_fetch)
         await self._require_nuts(client, normalized)
+        # Read before saving, so that a mint this wallet cannot use is not left behind.
+        described = await self._describe(normalized, client, False)
 
         async def mutator(wallet: dict[str, Any]) -> None:
             id_info = await self.host.fetch_id_info(identity, wallet)
             id_info.setdefault("cashu", {}).setdefault(normalized, {"added": _now(), "proofs": []})
 
         await self._mutate(mutator)
-        return await self._describe(normalized, client, False)
+        return described
 
     @staticmethod
     async def _describe(url: str, client: CashuMintClient, is_node_mint: bool) -> dict[str, Any]:
@@ -1110,8 +1114,8 @@ class CashuWallet:
             is_node_mint = bool(entry.get("node")) and entry["node"] == node
             try:
                 described.append(await self._describe(url, self._client_for(url, entry), is_node_mint))
-            except (CashuMintError, CashuUnavailableError):
-                described.append({"url": url, "nuts": {}, "keysets": [], "isNodeMint": is_node_mint})
+            except (CashuMintError, CashuUnavailableError) as exc:
+                described.append({"url": url, "nuts": {}, "keysets": [], "isNodeMint": is_node_mint, "error": str(exc)})
         return described
 
     async def publish_cashu(self, name: str | None = None) -> bool:

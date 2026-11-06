@@ -372,7 +372,8 @@ not received until the mint confirms its proofs are unspent.
   | `POST /cashu/send-to`, `POST /cashu/messages`, `POST /cashu/accept` | `sendCashuTo`, `listCashuMessages`, `receiveCashuMessages` (Phase 2) |
 
 - Result types in `packages/clients/src/keymaster-types.ts`, mirrored in Python:
-  `CashuMintInfo` (`url`, `name`, `nuts`, `keysets`, `isNodeMint`),
+  `CashuMintInfo` (`url`, `name`, `nuts`, `keysets`, `isNodeMint`, and `error` when
+  listing could not read the mint),
   `CashuBalance` (`spendable`, `inFlight`, `outstanding`, and `mints` when
   totalled across several), `CashuMintQuote` (`quote`, `request`, `amount`,
   `state`, `expiry`), `CashuMeltResult` (`paid`, `preimage`, `fee`, `change` as an amount, never

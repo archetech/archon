@@ -383,6 +383,8 @@ export interface CashuMintInfo {
     nuts: Record<string, unknown>;
     keysets: { id: string; unit: string; active: boolean; input_fee_ppk?: number }[];
     isNodeMint: boolean;
+    // Why listing could not read the mint. Its name, NUTs and keysets are then unknown.
+    error?: string;
 }
 
 export interface CashuBalance {

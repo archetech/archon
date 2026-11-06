@@ -207,6 +207,26 @@ describe('helpers', () => {
     });
 });
 
+function walletWith(publicFetch: typeof fetch): CashuWallet {
+    return new CashuWallet({
+        gatekeeper,
+        mutateWallet: (keymaster as any).mutateWallet.bind(keymaster),
+        loadWallet: () => keymaster.loadWallet(),
+        fetchIdInfo: (name, stored) => keymaster.fetchIdInfo(name, stored),
+        getSeed: stored => (keymaster as any).getSeedFromCacheOrMnemonic(stored),
+        getCapabilities: async () => null,
+        resolveDID: did => keymaster.resolveDID(did),
+        updateDID: (did, doc) => keymaster.updateDID(did, doc),
+        ownPublicKey: async () => '',
+        documentPublicKey: () => '',
+        findPrivateKey: async () => undefined,
+        requireDidCommRoute: async () => undefined,
+        sendDidComm: async () => [],
+        receiveDidComm: async () => [],
+        ackDidComm: async () => 0,
+    }, publicFetch);
+}
+
 describe('enabling', () => {
     beforeEach(() => setup());
 
@@ -244,28 +264,46 @@ describe('enabling', () => {
             requested.push(url);
             return fetch(url.replace('https://outside.example', `${node}/cashu`), init);
         }) as typeof fetch;
-        const cashu = new CashuWallet({
-            gatekeeper,
-            mutateWallet: (keymaster as any).mutateWallet.bind(keymaster),
-            loadWallet: () => keymaster.loadWallet(),
-            fetchIdInfo: (name, stored) => keymaster.fetchIdInfo(name, stored),
-            getSeed: stored => (keymaster as any).getSeedFromCacheOrMnemonic(stored),
-            getCapabilities: async () => null,
-            resolveDID: did => keymaster.resolveDID(did),
-            updateDID: (did, doc) => keymaster.updateDID(did, doc),
-            ownPublicKey: async () => '',
-            documentPublicKey: () => '',
-            findPrivateKey: async () => undefined,
-            requireDidCommRoute: async () => undefined,
-            sendDidComm: async () => [],
-            receiveDidComm: async () => [],
-            ackDidComm: async () => 0,
-        }, publicFetch);
+        const cashu = walletWith(publicFetch);
 
         const info = await cashu.addCashuMint('https://outside.example/');
 
         expect(info).toMatchObject({ url: 'https://outside.example', isNodeMint: false });
         expect(requested.every(url => url.startsWith('https://outside.example/v1/'))).toBe(true);
+    });
+
+    // What a browser read through a proxy that had lost a compressed response's encoding.
+    function outsideMint() {
+        const state = { garbled: false };
+        const publicFetch = (async (url: string, init?: RequestInit) => {
+            if (state.garbled && url.endsWith('/v1/keysets')) {
+                return new Response(new Uint8Array([0x28, 0xb5, 0x2f, 0xfd]), { status: 200 });
+            }
+            return fetch(url.replace('https://outside.example', `${node}/cashu`), init);
+        }) as typeof fetch;
+        return { state, cashu: walletWith(publicFetch) };
+    }
+
+    it('does not save a mint whose keysets cannot be read, and says why', async () => {
+        const { state, cashu } = outsideMint();
+        state.garbled = true;
+
+        await expect(cashu.addCashuMint('https://outside.example')).rejects.toThrow(/\/v1\/keysets is not JSON/);
+        expect(await cashu.listCashuMints()).toEqual([]);
+    });
+
+    it('says why listing could not read a mint, and still lists it', async () => {
+        const { state, cashu } = outsideMint();
+        await cashu.addCashuMint('https://outside.example');
+        state.garbled = true;
+
+        expect(await cashu.listCashuMints()).toEqual([{
+            url: 'https://outside.example',
+            nuts: {},
+            keysets: [],
+            isNodeMint: false,
+            error: expect.stringMatching(/outside\.example: the answer to \/v1\/keysets is not JSON/),
+        }]);
     });
 
     it('requires a mint before anything else', async () => {
