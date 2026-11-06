@@ -637,7 +637,7 @@ export function createCashuRouter(options: CreateKeymasterRouterOptions): expres
      *                 description: Seconds until the sender can reclaim, at most seven days. Three days by default.
      *               mint:
      *                 type: string
-     *                 description: The mint to use. By default, one the recipient publishes and the sender uses.
+     *                 description: The mint to use. By default, the node's mint when the identity has it, else its only mint. The recipient adds that mint to claim the token.
      *               id:
      *                 type: string
      *                 description: The sending identity. Defaults to the current one.
