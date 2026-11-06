@@ -24,6 +24,12 @@ function view(props: Partial<React.ComponentProps<typeof CashuView>> = {}) {
     );
 }
 
+function deferred() {
+    let finish!: (value: unknown) => void;
+    const promise = new Promise(settle => { finish = settle; });
+    return { promise, finish };
+}
+
 function holding(...mints: ReturnType<typeof mintInfo>[]) {
     keymaster.listCashuMints.mockResolvedValue(mints);
 }
@@ -71,9 +77,9 @@ describe('Cashu view: enabling', () => {
         await user.click(await screen.findByRole('button', { name: 'Remove Cashu' }));
         await screen.findByText('Discard ecash?');
         expect(keymaster.removeCashu).toHaveBeenCalledTimes(1);
-        expect(keymaster.removeCashu).toHaveBeenLastCalledWith(false);
+        expect(keymaster.removeCashu).toHaveBeenLastCalledWith(false, 'Alice');
         await user.click(screen.getByRole('button', { name: 'Discard' }));
-        await waitFor(() => expect(keymaster.removeCashu).toHaveBeenLastCalledWith(true));
+        await waitFor(() => expect(keymaster.removeCashu).toHaveBeenLastCalledWith(true, 'Alice'));
     });
 
     it('leaves the ecash alone when the discard is declined', async () => {
@@ -84,6 +90,35 @@ describe('Cashu view: enabling', () => {
         await user.click(await screen.findByRole('button', { name: 'Remove Cashu' }));
         await user.click(await screen.findByRole('button', { name: 'Keep It' }));
         expect(keymaster.removeCashu).toHaveBeenCalledTimes(1);
+    });
+
+    it('can still unpublish after the last mint is gone', async () => {
+        holding();
+        keymaster.resolveDID.mockResolvedValue({ didDocument: { service: [{ id: 'did:cid:a#cashu', type: 'Cashu', serviceEndpoint: [NODE] }] } });
+        keymaster.unpublishCashu.mockResolvedValue(true);
+        view();
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: 'Unpublish Cashu' }));
+        await waitFor(() => expect(keymaster.unpublishCashu).toHaveBeenCalledWith('Alice'));
+        expect(keymaster.getCashuBalance).not.toHaveBeenCalled();
+    });
+
+    it('does not let a slow read put older figures back', async () => {
+        holding(mintInfo(NODE, true));
+        const finishSlowRead = deferred();
+        keymaster.getCashuBalance.mockResolvedValueOnce({ spendable: 100, inFlight: 0, outstanding: 0 });
+        keymaster.getCashuBalance.mockReturnValueOnce(finishSlowRead.promise);
+        keymaster.getCashuBalance.mockResolvedValue({ spendable: 700, inFlight: 0, outstanding: 0 });
+        keymaster.checkCashu.mockResolvedValue({ settled: 1, open: 0 });
+        view();
+        const user = userEvent.setup();
+        await screen.findByRole('heading', { name: 'Balance: 100 sats' });
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        await waitFor(() => expect(keymaster.getCashuBalance).toHaveBeenCalledTimes(2));
+        await user.click(screen.getByRole('button', { name: 'Check' }));
+        await screen.findByRole('heading', { name: 'Balance: 700 sats' });
+        await act(async () => { finishSlowRead.finish({ spendable: 100, inFlight: 0, outstanding: 0 }); });
+        expect(screen.getByRole('heading', { name: 'Balance: 700 sats' })).toBeTruthy();
     });
 
     it('offers to update a published list that no longer matches the mints', async () => {
@@ -130,11 +165,50 @@ describe('Cashu view: several mints', () => {
         await user.type(screen.getByLabelText(/^Amount/), '50');
         await user.click(screen.getByRole('button', { name: 'Create Invoice' }));
         await screen.findByLabelText(/^Invoice to pay/);
-        expect(keymaster.createCashuMintQuote).toHaveBeenCalledWith(50, NODE);
+        expect(keymaster.createCashuMintQuote).toHaveBeenCalledWith(50, NODE, 'Alice');
         await user.click(screen.getByRole('combobox', { name: 'Mint' }));
         await user.click(await screen.findByRole('option', { name: OTHER }));
         await user.click(screen.getByRole('button', { name: 'Claim Once Paid' }));
-        await waitFor(() => expect(keymaster.claimCashuMintQuote).toHaveBeenCalledWith('q1', NODE));
+        await waitFor(() => expect(keymaster.claimCashuMintQuote).toHaveBeenCalledWith('q1', NODE, 'Alice'));
+    });
+});
+
+describe('Cashu view: the identity a call belongs to', () => {
+    const moveToBob = (rerender: (ui: React.ReactNode) => void) => rerender(
+        <CashuView key="Bob" keymaster={keymaster as any} identity="Bob" hasNodeMint={false} hasDidComm recipients={[]} notify={notify} />,
+    );
+
+    it('finishes a payment under the identity that started it, after the view has moved on', async () => {
+        holding(mintInfo(NODE, true));
+        keymaster.getLightningBalance.mockResolvedValue({ balance: 5000 });
+        keymaster.createCashuMintQuote.mockResolvedValue({ quote: 'q1', request: 'lnbc1', amount: 50, state: 'UNPAID' });
+        const finishPayment = deferred();
+        keymaster.payLightningInvoice.mockReturnValue(finishPayment.promise);
+        keymaster.claimCashuMintQuote.mockResolvedValue({ amount: 50, mint: NODE });
+        const { rerender } = view();
+        const user = await open('Mint');
+        await user.type(screen.getByLabelText(/^Amount/), '50');
+        await user.click(screen.getByRole('button', { name: 'Create Invoice' }));
+        await user.click(await screen.findByRole('button', { name: /^Pay From Lightning/ }));
+        moveToBob(rerender);
+        await act(async () => { finishPayment.finish({ paymentHash: 'h' }); });
+        await waitFor(() => expect(keymaster.claimCashuMintQuote).toHaveBeenCalledWith('q1', NODE, 'Alice'));
+        expect(keymaster.payLightningInvoice).toHaveBeenCalledWith('lnbc1', 'Alice');
+    });
+
+    it('checks every mint under the identity that started it, after the view has moved on', async () => {
+        holding(mintInfo(NODE, true), mintInfo(OTHER));
+        keymaster.getCashuBalance.mockResolvedValue({ spendable: 0, inFlight: 0, outstanding: 0, mints: {} });
+        const finishFirst = deferred();
+        keymaster.checkCashu.mockReturnValueOnce(finishFirst.promise);
+        keymaster.checkCashu.mockResolvedValue({ settled: 0, open: 0 });
+        const { rerender } = view();
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: 'Check' }));
+        moveToBob(rerender);
+        await act(async () => { finishFirst.finish({ settled: 0, open: 0 }); });
+        await waitFor(() => expect(keymaster.checkCashu).toHaveBeenCalledTimes(2));
+        expect(keymaster.checkCashu.mock.calls).toEqual([[NODE, 'Alice'], [OTHER, 'Alice']]);
     });
 });
 
@@ -196,11 +270,39 @@ describe('Cashu view: paying', () => {
         return user;
     }
 
+    it('does not offer to pay an invoice other than the one decoded', async () => {
+        const finishDecode = deferred();
+        keymaster.decodeLightningInvoice.mockReturnValue(finishDecode.promise);
+        view();
+        const user = await open('Pay');
+        const field = screen.getByLabelText(/^BOLT11 Invoice/);
+        await user.type(field, 'lnbcA');
+        await user.click(screen.getByRole('button', { name: 'Decode' }));
+        await user.clear(field);
+        await user.type(field, 'lnbcB');
+        await act(async () => { finishDecode.finish({ amount: '700 sats' }); });
+        expect(screen.queryByText('700 sats')).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Pay' })).toBeNull();
+    });
+
+    it('pays the invoice that was reviewed and keeps one typed since', async () => {
+        const finishMelt = deferred();
+        keymaster.meltCashu.mockReturnValue(finishMelt.promise);
+        const user = await pay();
+        const field = screen.getByLabelText<HTMLTextAreaElement>(/^BOLT11 Invoice/);
+        await user.clear(field);
+        await user.type(field, 'lnbcNEXT');
+        await act(async () => { finishMelt.finish({ paid: true, fee: 1, change: 0 }); });
+        expect(keymaster.meltCashu).toHaveBeenCalledWith('lnbc1', NODE, 'Alice');
+        await waitFor(() => expect(notify.success).toHaveBeenCalled());
+        expect(field.value).toBe('lnbcNEXT');
+    });
+
     it('reports a paid invoice with its fee', async () => {
         keymaster.meltCashu.mockResolvedValue({ paid: true, fee: 1, change: 323, preimage: 'abc' });
         await pay();
         await waitFor(() => expect(notify.success).toHaveBeenCalledWith('Paid, with a fee of 1 sat'));
-        expect(keymaster.meltCashu).toHaveBeenCalledWith('lnbc1', NODE);
+        expect(keymaster.meltCashu).toHaveBeenCalledWith('lnbc1', NODE, 'Alice');
     });
 
     it('does not call a payment still in flight paid', async () => {
@@ -247,7 +349,7 @@ describe('Cashu view: sending', () => {
         const user = await open('Receive');
         await user.type(screen.getByLabelText(/^Token/), ' cashuB1 ');
         await user.click(screen.getByRole('button', { name: 'Receive' }));
-        await waitFor(() => expect(keymaster.receiveCashu).toHaveBeenCalledWith('cashuB1'));
+        await waitFor(() => expect(keymaster.receiveCashu).toHaveBeenCalledWith('cashuB1', 'Alice'));
         await waitFor(() => expect(notify.warning).toHaveBeenCalledWith(expect.stringContaining('20 sats')));
     });
 
@@ -265,7 +367,7 @@ describe('Cashu view: sending', () => {
         expect(buttons.map(button => button.disabled)).toEqual([false, false, true]);
         expect(screen.getByText(/Not delivered yet/)).toBeTruthy();
         await user.click(buttons[1]);
-        await waitFor(() => expect(keymaster.reclaimCashu).toHaveBeenCalledWith('expired'));
+        await waitFor(() => expect(keymaster.reclaimCashu).toHaveBeenCalledWith('expired', 'Alice'));
     });
 });
 
@@ -287,7 +389,7 @@ describe('Cashu view: DIDComm', () => {
         await user.type(screen.getByLabelText(/^Memo/), 'lunch');
         await user.type(screen.getByLabelText(/^Hours/), '2');
         await user.click(screen.getByRole('button', { name: 'Send' }));
-        await waitFor(() => expect(keymaster.sendCashuTo).toHaveBeenCalledWith('Bob', 50, { memo: 'lunch', locktime: 7200, mint: NODE }));
+        await waitFor(() => expect(keymaster.sendCashuTo).toHaveBeenCalledWith('Bob', 50, { memo: 'lunch', locktime: 7200, mint: NODE, name: 'Alice' }));
     });
 
     it('does not call an undelivered send sent', async () => {

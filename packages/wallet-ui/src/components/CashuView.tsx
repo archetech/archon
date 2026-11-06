@@ -47,8 +47,9 @@ export type CashuKeymaster = Pick<KeymasterInterface,
 
 type Props = {
     keymaster: CashuKeymaster;
-    // The identity shown. Hosts key this component by it, so nothing held here,
-    // such as a token, outlives a change of identity.
+    // The identity shown. Hosts key this component by it, so nothing held here, such as
+    // a token, outlives a change of identity. Keying does not stop a call under way, so
+    // each call names this identity rather than whichever is current when it runs.
     identity: string;
     // Whether this node runs a mint, which only offers it as a one-step choice.
     hasNodeMint: boolean;
@@ -178,7 +179,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
     const [lightningBalance, setLightningBalance] = useState<number | null>(null);
 
     const [invoice, setInvoice] = useState("");
-    const [decoded, setDecoded] = useState<DecodedLightningInvoice | null>(null);
+    const [decoded, setDecoded] = useState<{ invoice: string; info: DecodedLightningInvoice } | null>(null);
     const [melted, setMelted] = useState<CashuMeltResult | null>(null);
 
     const [sendAmount, setSendAmount] = useState("");
@@ -193,27 +194,35 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
     const [messages, setMessages] = useState<CashuMessage[] | null>(null);
     const [accepted, setAccepted] = useState<CashuAcceptResult | null>(null);
 
+    // Only the invoice on screen counts as reviewed: a slow decode must not put another
+    // invoice's amount beside it, or enable paying it.
+    const reviewed = decoded?.invoice === invoice.trim() ? decoded : null;
     const nodeMint = mints?.find(item => item.isNodeMint)?.url;
     const mint = mints?.some(item => item.url === chosenMint) ? chosenMint : nodeMint ?? mints?.[0]?.url;
 
+    // A read that an action's own reload has overtaken must not put older figures back.
+    const latestRead = useRef(0);
+    const latestMessages = useRef(0);
+
     const reload = useCallback(async () => {
-        setLoadError("");
+        const read = ++latestRead.current;
         try {
-            const list = await keymaster.listCashuMints();
-            setMints(list);
-            if (list.length === 0) {
-                setBalance(null);
-                setQuotes([]);
-                setSends([]);
-                setPublished(null);
-                return;
-            }
-            const [totals, open, outstanding, document] = await Promise.all([
-                keymaster.getCashuBalance(),
-                keymaster.listCashuQuotes(),
-                keymaster.listCashuSends(),
+            // Removing every mint leaves the #cashu service published, so this is read
+            // whatever the mints are.
+            const [list, document] = await Promise.all([
+                keymaster.listCashuMints(identity),
                 keymaster.resolveDID(identity),
             ]);
+            const [totals, open, outstanding] = list.length === 0 ? [null, [], []] : await Promise.all([
+                keymaster.getCashuBalance(undefined, identity),
+                keymaster.listCashuQuotes(undefined, identity),
+                keymaster.listCashuSends(undefined, identity),
+            ]);
+            if (read !== latestRead.current) {
+                return;
+            }
+            setLoadError("");
+            setMints(list);
             setBalance(totals);
             setQuotes(open);
             setSends(outstanding);
@@ -221,17 +230,23 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
             const endpoint = service?.serviceEndpoint as unknown;
             setPublished(service ? (Array.isArray(endpoint) ? endpoint as string[] : [String(endpoint)]) : null);
         } catch (error: any) {
-            setLoadError(error?.error || error?.message || String(error));
+            if (read === latestRead.current) {
+                setLoadError(error?.error || error?.message || String(error));
+            }
         }
     }, [keymaster, identity]);
 
     const reloadMessages = useCallback(async () => {
+        const read = ++latestMessages.current;
         try {
-            setMessages(await keymaster.listCashuMessages());
+            const waiting = await keymaster.listCashuMessages(identity);
+            if (read === latestMessages.current) {
+                setMessages(waiting);
+            }
         } catch (error) {
             notify.error(error);
         }
-    }, [keymaster, notify]);
+    }, [keymaster, notify, identity]);
 
     useEffect(() => { reload(); }, [reload]);
 
@@ -241,11 +256,11 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         }
         if (section === "mint") {
             // Offered only to an identity that has a Lightning wallet to pay from.
-            keymaster.getLightningBalance()
+            keymaster.getLightningBalance(identity)
                 .then(result => setLightningBalance(result.balance))
                 .catch(() => setLightningBalance(null));
         }
-    }, [section, keymaster, reloadMessages]);
+    }, [section, keymaster, identity, reloadMessages]);
 
     // One action at a time per button, not per view: a melt has no timeout and can
     // stay in flight for days, and the rest of the wallet must stay usable meanwhile.
@@ -268,9 +283,9 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
     async function removeMint(url?: string, force = false) {
         try {
             if (url) {
-                await keymaster.removeCashuMint(url, force);
+                await keymaster.removeCashuMint(url, force, identity);
             } else {
-                await keymaster.removeCashu(force);
+                await keymaster.removeCashu(force, identity);
             }
             notify.success(url ? "Mint removed" : "Cashu removed from this identity");
         } catch (error: any) {
@@ -285,7 +300,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
     function handleAddMint() {
         const url = newMint.trim();
         run("addMint", async () => {
-            const added = await keymaster.addCashuMint(url);
+            const added = await keymaster.addCashuMint(url, identity);
             setNewMint("");
             notify.success(`Added ${added.name || added.url}`);
         });
@@ -293,7 +308,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
 
     function handleAddNodeMint() {
         run("addNode", async () => {
-            const added = await keymaster.addCashu();
+            const added = await keymaster.addCashu(identity);
             notify.success(`Added ${added.name || added.url}`);
         });
     }
@@ -302,7 +317,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         run("check", async () => {
             const total = { settled: 0, open: 0, dropped: 0, rotated: 0 };
             for (const item of mints ?? []) {
-                const result = await keymaster.checkCashu(item.url);
+                const result = await keymaster.checkCashu(item.url, identity);
                 total.settled += result.settled;
                 total.open += result.open;
                 total.dropped += result.dropped ?? 0;
@@ -323,7 +338,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         run("restore", async () => {
             let amount = 0;
             for (const item of mints ?? []) {
-                amount += (await keymaster.restoreCashu(item.url)).amount;
+                amount += (await keymaster.restoreCashu(item.url, identity)).amount;
             }
             notify.success(amount ? `Recovered ${sats(amount)}` : "Nothing further to recover");
         });
@@ -331,14 +346,14 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
 
     function handlePublish() {
         run("publish", async () => {
-            await keymaster.publishCashu();
+            await keymaster.publishCashu(identity);
             notify.success("Your mints are published in your DID document");
         });
     }
 
     function handleUnpublish() {
         run("publish", async () => {
-            await keymaster.unpublishCashu();
+            await keymaster.unpublishCashu(identity);
             notify.success("Your mints are no longer published");
         });
     }
@@ -351,12 +366,12 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         }
         run("quote", async () => {
             setQuote(null);
-            setQuote({ ...await keymaster.createCashuMintQuote(amount, mint), mint });
+            setQuote({ ...await keymaster.createCashuMintQuote(amount, mint, identity), mint });
         });
     }
 
     async function claim(quoteId: string, quoteMint?: string) {
-        const claimed = await keymaster.claimCashuMintQuote(quoteId, quoteMint);
+        const claimed = await keymaster.claimCashuMintQuote(quoteId, quoteMint, identity);
         notify.success(`Minted ${sats(claimed.amount)}`);
         setQuote(current => (current?.quote === quoteId ? null : current));
     }
@@ -376,7 +391,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
 
     function handlePayQuote(open: CashuMintQuote & { mint?: string }) {
         run("payQuote", async () => {
-            await keymaster.payLightningInvoice(open.request);
+            await keymaster.payLightningInvoice(open.request, identity);
             // The mint hears of the payment shortly after it completes.
             for (let attempt = 1; ; attempt++) {
                 try {
@@ -394,18 +409,18 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
 
     function handleDecode() {
         run("decode", async () => {
-            setDecoded(await keymaster.decodeLightningInvoice(invoice.trim()));
+            const reading = invoice.trim();
+            setDecoded({ invoice: reading, info: await keymaster.decodeLightningInvoice(reading) });
         });
     }
 
-    function handleMelt() {
+    function handleMelt(reviewedInvoice: string) {
         run("melt", async () => {
-            const result = await keymaster.meltCashu(invoice.trim(), mint);
+            const result = await keymaster.meltCashu(reviewedInvoice, mint, identity);
             setMelted(result);
             if (result.paid) {
                 notify.success(`Paid, with a fee of ${sats(result.fee ?? 0)}`);
-                setInvoice("");
-                setDecoded(null);
+                setInvoice(current => (current.trim() === reviewedInvoice ? "" : current));
             } else if (result.pending) {
                 notify.warning("The payment is still in flight. Use Check on the Wallet tab to settle it.");
             } else {
@@ -422,14 +437,14 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         }
         run("send", async () => {
             setSent(null);
-            setSent(await keymaster.sendCashu(amount, mint));
+            setSent(await keymaster.sendCashu(amount, mint, identity));
             setSendAmount("");
         });
     }
 
     function handleReceive() {
         run("receive", async () => {
-            const received = await keymaster.receiveCashu(token.trim());
+            const received = await keymaster.receiveCashu(token.trim(), identity);
             setToken("");
             if (received.spent) {
                 notify.warning(`Received ${sats(received.amount)}. Someone had already spent another ${sats(received.spent)} of that token.`);
@@ -441,7 +456,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
 
     function handleReclaim(operationId: string) {
         run(`reclaim:${operationId}`, async () => {
-            const result = await keymaster.reclaimCashu(operationId);
+            const result = await keymaster.reclaimCashu(operationId, identity);
             const parts = [`Reclaimed ${sats(result.amount)}`];
             if (result.redeemed) {
                 parts.push(`the recipient had taken ${sats(result.redeemed)}`);
@@ -470,6 +485,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                 ...(memo.trim() && { memo: memo.trim() }),
                 ...(hours !== undefined && { locktime: Math.round(hours * HOUR_SECONDS) }),
                 ...(mint && { mint }),
+                name: identity,
             });
             setDelivery(result);
             if (result.delivered) {
@@ -485,7 +501,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
 
     function handleAccept() {
         run("accept", async () => {
-            const result = await keymaster.receiveCashuMessages();
+            const result = await keymaster.receiveCashuMessages(identity);
             setAccepted(result);
             const total = result.redeemed.reduce((sum, item) => sum + item.amount, 0);
             if (result.redeemed.length > 0) {
@@ -546,7 +562,17 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                         : "Add a mint you trust. A mint holds the funds behind its ecash."}
                     action={nodeMintButton || undefined}
                 />
-                <Stack>{addMintForm}</Stack>
+                <Stack>
+                    {addMintForm}
+                    {published && (
+                        <>
+                            <Alert severity="warning">Your DID document still lists mints you no longer use.</Alert>
+                            <Box>
+                                <ActionButton label="Unpublish Cashu" color="warning" onClick={handleUnpublish} busy={busy.publish} />
+                            </Box>
+                        </>
+                    )}
+                </Stack>
             </Box>
         );
     }
@@ -652,7 +678,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                     </Box>
                     {quote && (
                         <>
-                            <CopyAndQr label="Invoice to pay" value={quote.request} onCopy={copied("Invoice")} onCopyFailed={notify.error} />
+                            <CopyAndQr label={`Invoice to pay for ${sats(quote.amount)}`} value={quote.request} onCopy={copied("Invoice")} onCopyFailed={notify.error} />
                             <Row>
                                 {lightningBalance !== null && (
                                     <ActionButton
@@ -689,16 +715,16 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                         }} />
                     <Row>
                         <ActionButton label="Decode" busy={busy.decode} disabled={!invoice.trim()} onClick={handleDecode} />
-                        {decoded && (
-                            <ActionButton label="Pay" variant="contained" busy={busy.melt} onClick={handleMelt} />
+                        {reviewed && (
+                            <ActionButton label="Pay" variant="contained" busy={busy.melt} onClick={() => handleMelt(reviewed.invoice)} />
                         )}
                     </Row>
-                    {decoded && (
+                    {reviewed && (
                         <Box>
-                            {decoded.amount !== undefined && <Typography variant="body2"><strong>Amount:</strong> {decoded.amount}</Typography>}
-                            {decoded.description && <Typography variant="body2"><strong>Description:</strong> {decoded.description}</Typography>}
-                            {decoded.network && <Typography variant="body2"><strong>Network:</strong> {decoded.network}</Typography>}
-                            {decoded.expires && <Typography variant="body2"><strong>Expires:</strong> {decoded.expires}</Typography>}
+                            {reviewed.info.amount !== undefined && <Typography variant="body2"><strong>Amount:</strong> {reviewed.info.amount}</Typography>}
+                            {reviewed.info.description && <Typography variant="body2"><strong>Description:</strong> {reviewed.info.description}</Typography>}
+                            {reviewed.info.network && <Typography variant="body2"><strong>Network:</strong> {reviewed.info.network}</Typography>}
+                            {reviewed.info.expires && <Typography variant="body2"><strong>Expires:</strong> {reviewed.info.expires}</Typography>}
                         </Box>
                     )}
                     {melted?.paid && (
