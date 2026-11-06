@@ -7971,8 +7971,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                 multiline
                                                 rows={3}
                                                 InputProps={{ readOnly: true }}
+                                                inputProps={{ onClick: (e) => e.currentTarget.select() }}
                                                 size="small"
-                                                onClick={(e) => e.target.select()}
                                             />
                                             <Box>
                                                 <Button variant="outlined" size="small" onClick={() => {

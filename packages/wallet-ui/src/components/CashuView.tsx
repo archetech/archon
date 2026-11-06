@@ -1,4 +1,4 @@
-import { ComponentProps, ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { ComponentProps, MouseEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
     Alert,
     Autocomplete,
@@ -109,7 +109,8 @@ function Row({ children }: { children: ReactNode }) {
 
 function ActionButton({ busy, label, ...props }: { busy?: boolean; label: string } & ComponentProps<typeof Button>) {
     return (
-        <Button variant="outlined" {...props} disabled={busy || props.disabled}>
+        // The spinner replaces the label, and a melt can stay busy for days.
+        <Button variant="outlined" aria-label={label} aria-busy={!!busy} {...props} disabled={busy || props.disabled}>
             {busy ? <CircularProgress size={20} /> : label}
         </Button>
     );
@@ -129,8 +130,10 @@ function CopyAndQr({ label, value, onCopy, onCopyFailed }: {
                 multiline
                 rows={3}
                 size="small"
-                slotProps={{ input: { readOnly: true } }}
-                onClick={event => (event.target as HTMLInputElement).select()}
+                slotProps={{
+                    input: { readOnly: true },
+                    htmlInput: { onClick: (event: MouseEvent<HTMLTextAreaElement>) => event.currentTarget.select() },
+                }}
             />
             <Box>
                 <Button size="small" variant="outlined"
@@ -289,6 +292,22 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         }
     }, [section, noMints, hasDidComm, keymaster, identity, reloadMessages]);
 
+    // A locked send becomes reclaimable with nothing else happening to render the view.
+    const [unlocked, setUnlocked] = useState(0);
+    useEffect(() => {
+        if (section !== "sends") {
+            return;
+        }
+        const now = Date.now();
+        const next = Math.min(...sends.map(item => (item.locktime ?? 0) * 1000).filter(time => time > now));
+        if (!Number.isFinite(next)) {
+            return;
+        }
+        // setTimeout takes no more than 2^31 - 1 ms, and fires at once beyond it.
+        const timer = setTimeout(() => setUnlocked(count => count + 1), Math.min(next - now, 2 ** 31 - 1));
+        return () => clearTimeout(timer);
+    }, [section, sends, unlocked]);
+
     // One action at a time per button, not per view: a melt has no timeout and can
     // stay in flight for days, and the rest of the wallet must stay usable meanwhile.
     async function run(name: string, action: () => Promise<void>) {
@@ -328,7 +347,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         const url = newMint.trim();
         run("addMint", async () => {
             const added = await keymaster.addCashuMint(url, identity);
-            setNewMint("");
+            setNewMint(current => (current.trim() === url ? "" : current));
             notify.success(`Added ${added.name || added.url}`);
         });
     }
@@ -487,14 +506,15 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         run("send", async () => {
             setSent(null);
             setSent(await keymaster.sendCashu(amount, mint, identity));
-            setSendAmount("");
+            setSendAmount(current => (current === sendAmount ? "" : current));
         });
     }
 
     function handleReceive() {
+        const submitted = token.trim();
         run("receive", async () => {
-            const received = await keymaster.receiveCashu(token.trim(), identity);
-            setToken("");
+            const received = await keymaster.receiveCashu(submitted, identity);
+            setToken(current => (current.trim() === submitted ? "" : current));
             if (received.spent) {
                 notify.warning(`Received ${sats(received.amount)}. Someone had already spent another ${sats(received.spent)} of that token.`);
             } else {
@@ -540,8 +560,8 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
             setDelivery(result);
             if (result.delivered) {
                 notify.success(`Sent ${sats(result.amount)} to ${recipient.trim()}`);
-                setLockedAmount("");
-                setMemo("");
+                setLockedAmount(current => (current === lockedAmount ? "" : current));
+                setMemo(current => (current === memo ? "" : current));
             } else {
                 const reason = result.error ? `: ${result.error}` : "";
                 notify.warning(`Not delivered yet${reason}. Check on the Wallet tab sends it again.`);

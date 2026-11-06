@@ -430,6 +430,20 @@ describe('Cashu view: sending', () => {
         expect(screen.queryByText(/Too long for a QR code/)).toBeNull();
     });
 
+    it('selects the token when it is clicked, and copes with a click on its label', async () => {
+        await createToken('cashuBshort');
+        const errors: unknown[] = [];
+        const onError = (event: ErrorEvent) => { errors.push(event.error); };
+        window.addEventListener('error', onError);
+        const user = userEvent.setup();
+        const field = screen.getByLabelText<HTMLTextAreaElement>(/^Token for 50 sats/);
+        await user.click(document.querySelector(`label[for="${field.id}"]`) as HTMLElement);
+        await user.click(field);
+        window.removeEventListener('error', onError);
+        expect(errors).toEqual([]);
+        expect(field.value.slice(field.selectionStart, field.selectionEnd)).toBe('cashuBshort');
+    });
+
     it('offers a token too long for a QR code as text, rather than crashing', async () => {
         await createToken(`cashuB${'a'.repeat(5000)}`);
         expect(screen.getByText(/Too long for a QR code/)).toBeTruthy();
@@ -443,6 +457,45 @@ describe('Cashu view: sending', () => {
         await user.click(screen.getByRole('button', { name: 'Receive' }));
         await waitFor(() => expect(keymaster.receiveCashu).toHaveBeenCalledWith('cashuB1', 'Alice'));
         await waitFor(() => expect(notify.warning).toHaveBeenCalledWith(expect.stringContaining('20 sats')));
+    });
+
+    it('keeps a token pasted while another is being received, and names the busy button', async () => {
+        const receiving = deferred();
+        keymaster.receiveCashu.mockReturnValue(receiving.promise);
+        view();
+        const user = await open('Receive');
+        const field = screen.getByLabelText<HTMLTextAreaElement>(/^Token/);
+        await user.type(field, 'cashuBfirst');
+        await user.click(screen.getByRole('button', { name: 'Receive' }));
+        const busy = await screen.findByRole<HTMLButtonElement>('button', { name: 'Receive' });
+        await waitFor(() => expect(busy.disabled).toBe(true));
+        await user.clear(field);
+        await user.type(field, 'cashuBsecond');
+        await act(async () => { receiving.finish({ amount: 1, mint: NODE }); });
+        await waitFor(() => expect(notify.success).toHaveBeenCalled());
+        expect(keymaster.receiveCashu).toHaveBeenCalledWith('cashuBfirst', 'Alice');
+        expect(field.value).toBe('cashuBsecond');
+    });
+
+    it('clears the token once it is received, when nothing else has been typed', async () => {
+        keymaster.receiveCashu.mockResolvedValue({ amount: 1, mint: NODE });
+        view();
+        const user = await open('Receive');
+        const field = screen.getByLabelText<HTMLTextAreaElement>(/^Token/);
+        await user.type(field, 'cashuBfirst');
+        await user.click(screen.getByRole('button', { name: 'Receive' }));
+        await waitFor(() => expect(field.value).toBe(''));
+    });
+
+    it('enables a reclaim when the locktime passes with the view left open', async () => {
+        keymaster.listCashuSends.mockResolvedValue([
+            { operationId: 'soon', mint: NODE, amount: 2, created: '2026-01-01T00:00:00Z', recipient: 'did:cid:b', locktime: Math.floor(Date.now() / 1000) + 2, delivered: true },
+        ]);
+        view();
+        await open('Outstanding');
+        const reclaim = await screen.findByRole<HTMLButtonElement>('button', { name: 'Reclaim' });
+        expect(reclaim.disabled).toBe(true);
+        await waitFor(() => expect(reclaim.disabled).toBe(false), { timeout: 4000 });
     });
 
     it('offers a reclaim only once it can be reclaimed', async () => {
