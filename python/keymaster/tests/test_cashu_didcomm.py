@@ -403,9 +403,26 @@ class TestAccept:
     def test_redeems_a_message_once_when_accepted_twice_at_the_same_moment(self, bed):
         bed.send()
         bed.mint.requests.clear()
+        journaled = bed.km.cashu._journaled
 
         async def both():
-            return await asyncio.gather(bed.km.receive_cashu_messages("Bob"), bed.km.receive_cashu_messages("Bob"))
+            # Neither call journals until both have passed the check on entry, which
+            # the fake mint and relay would otherwise let the first finish before the
+            # second reaches.
+            arrived = []
+            together = asyncio.Event()
+
+            async def gate(*args):
+                arrived.append(args[0])
+                if len(arrived) == 2:
+                    together.set()
+                await asyncio.wait_for(together.wait(), 5)
+                return await journaled(*args)
+
+            bed.monkeypatch.setattr(bed.km.cashu, "_journaled", gate)
+            results = await asyncio.gather(bed.km.receive_cashu_messages("Bob"), bed.km.receive_cashu_messages("Bob"))
+            assert len(arrived) == 2
+            return results
 
         results = run(both())
 
