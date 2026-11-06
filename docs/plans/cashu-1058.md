@@ -1,6 +1,6 @@
 # Cashu ecash (#1058)
 
-Status: plan; not implemented.
+Status: implemented in full, in five PRs. A real Lightning mint and melt on mainnet is still to be done before real funds go in.
 
 Archon agents get Cashu ecash: a seed-recoverable wallet in Keymaster, tokens
 sent over DIDComm and locked to the recipient's DID key, and an optional mint a

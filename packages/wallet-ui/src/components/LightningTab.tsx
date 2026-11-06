@@ -436,9 +436,11 @@ const LightningTab: React.FC = () => {
                                 value={invoice}
                                 multiline
                                 rows={3}
-                                slotProps={{ input: { readOnly: true } }}
+                                slotProps={{
+                                    input: { readOnly: true },
+                                    htmlInput: { onClick: (e: React.MouseEvent<HTMLTextAreaElement>) => e.currentTarget.select() },
+                                }}
                                 size="small"
-                                onClick={(e) => (e.target as HTMLInputElement).select()}
                             />
                             <Button
                                 variant="outlined"

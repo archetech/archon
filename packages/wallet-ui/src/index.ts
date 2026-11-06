@@ -35,6 +35,7 @@ export { default as IssueTab } from './components/IssueTab';
 export { default as CloneAssetTab } from './components/CloneAssetTab';
 export { default as SchemaTab } from './components/SchemaTab';
 export { default as LightningTab } from './components/LightningTab';
+export { default as CashuTab } from './components/CashuTab';
 export { default as IssuedTab } from './components/IssuedTab';
 export { default as GroupsTab } from './components/GroupsTab';
 export { default as JsonViewer } from './components/JsonViewer';
