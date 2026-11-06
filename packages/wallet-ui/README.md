@@ -72,6 +72,13 @@ is invisible to tooling and check both sides by hand.
 Anything importing `@capacitor/*`, `chrome.*`, or an app's own context. Those
 are host concerns; a shared component receives their results as props.
 
+## Shared Cashu view
+
+`@didcid/wallet-ui/cashu` exports `CashuView`, used by `CashuTab` in the wallets and
+by `CashuPanel` in `@didcid/keymaster-ui`. Like the repair dialog, it imports only
+React/MUI, `qrcode.react` and type-only client contracts. The host supplies the
+Keymaster methods and its own notifications, and keys the view by identity.
+
 ## Shared DID repair dialog
 
 `@didcid/wallet-ui/did-repair` exports the standalone `DIDRepairDialog` used by

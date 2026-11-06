@@ -38,6 +38,7 @@ interface WalletContextValue {
     keymaster: Keymaster | null;
     hasLightning: boolean;
     hasDidComm: boolean;
+    hasCashu: boolean;
     // Extension-only host mode; false in a wallet that has no full-page view.
     isBrowser: boolean;
     reloadBrowserWallet: () => Promise<void>;
@@ -93,6 +94,7 @@ export function WalletProvider(
     // the gate inside Keymaster: show the surface and let the operation fail late
     // rather than hiding it against every older node.
     const [hasDidComm, setHasDidComm] = useState<boolean>(true);
+    const [hasCashu, setHasCashu] = useState<boolean>(false);
     const [gatekeeperUrl, setGatekeeperUrl] = useState<string>("");
 
     const keymasterRef = useRef<Keymaster | null>(null);
@@ -185,6 +187,7 @@ export function WalletProvider(
         try {
             const capabilities = await instance.getNodeCapabilities();
             setHasDidComm(capabilities?.didcomm !== false);
+            setHasCashu(capabilities?.cashu === true);
         } catch (error) {
             console.error('Failed to read node capabilities:', error);
         }
@@ -378,6 +381,7 @@ export function WalletProvider(
         keymaster: keymasterRef.current,
         hasLightning,
         hasDidComm,
+        hasCashu,
         isBrowser,
         reloadBrowserWallet,
         gatekeeperUrl,

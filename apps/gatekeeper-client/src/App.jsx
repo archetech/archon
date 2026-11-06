@@ -41,6 +41,7 @@ function App() {
     // gate inside Keymaster: show the surface rather than hide it against an
     // older node, and let the operation fail late if the service really is absent.
     const [hasDidComm, setHasDidComm] = useState(true);
+    const [hasCashu, setHasCashu] = useState(false);
     const [kmEpoch, setKmEpoch] = useState(0);
     const [uploadAction, setUploadAction] = useState(null);
     const [pendingWallet, setPendingWallet] = useState(null);
@@ -98,6 +99,7 @@ function App() {
         try {
             const capabilities = await instance.getNodeCapabilities();
             setHasDidComm(capabilities?.didcomm !== false);
+            setHasCashu(capabilities?.cashu === true);
         } catch {
             // Capability manifest unreadable — leave DIDComm visible.
         }
@@ -321,6 +323,7 @@ function App() {
                     onWalletUpload={handleWalletUploadFile}
                     hasLightning={hasLightning}
                     hasDidComm={hasDidComm}
+                    hasCashu={hasCashu}
                     serverUrl={gatekeeperUrl}
                     onServerUrlChange={handleServerUrlChange}
                 />

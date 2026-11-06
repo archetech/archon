@@ -15,6 +15,7 @@ function App() {
     // gate inside Keymaster: show the surface rather than hide it against an
     // older node, and let the operation fail late if the service really is absent.
     const [hasDidComm, setHasDidComm] = useState(true);
+    const [hasCashu, setHasCashu] = useState(false);
     const [showLogin, setShowLogin] = useState(true);
     const [loginError, setLoginError] = useState('');
 
@@ -44,6 +45,7 @@ function App() {
             try {
                 const capabilities = await km.getNodeCapabilities();
                 setHasDidComm(capabilities?.didcomm !== false);
+                setHasCashu(capabilities?.cashu === true);
             } catch {
                 // Capability manifest unreadable — leave DIDComm visible.
             }
@@ -74,6 +76,7 @@ function App() {
                     keymaster={keymaster}
                     title={'Keymaster Server Wallet Demo'}
                     hasDidComm={hasDidComm}
+                    hasCashu={hasCashu}
                     serverUrl={keymasterUrl}
                     onServerUrlChange={handleServerUrlChange}
                 />

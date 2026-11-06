@@ -1,4 +1,5 @@
 import DIDRepairDialog from '@didcid/wallet-ui/did-repair';
+import CashuPanel from './CashuPanel.jsx';
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import {
     Alert,
@@ -47,6 +48,7 @@ import {
     BarChart,
     Block,
     Bolt,
+    Toll,
     Clear,
     ContentCopy,
     Create,
@@ -182,7 +184,7 @@ function formatAddedDate(value) {
     return value.slice(0, 10);
 }
 
-function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning, hasDidComm, serverUrl, onServerUrlChange }) {
+function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightning, hasDidComm, hasCashu, serverUrl, onServerUrlChange }) {
     const [repairTarget, setRepairTarget] = useState(null);
     const checkDID = useCallback(did => keymaster.checkDID(did), [keymaster]);
     const repairDID = useCallback(did => keymaster.repairDID(did), [keymaster]);
@@ -5043,6 +5045,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                         {currentId && !widget && hasLightning &&
                             <Tab key="lightning" value="lightning" label={'Lightning'} icon={<Bolt />} />
                         }
+                        {currentId && !widget &&
+                            <Tab key="cashu" value="cashu" label={'Cashu'} icon={<Toll />} />
+                        }
                         {currentId && !widget && hasDidComm &&
                             <Tab key="didcomm" value="didcomm" label={'DIDComm'} icon={<Forum />} />
                         }
@@ -7793,6 +7798,20 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                 value={authString}
                                 readOnly
                                 style={{ width: '800px', height: '600px', overflow: 'auto' }}
+                            />
+                        </Box>
+                    }
+                    {tab === 'cashu' &&
+                        <Box sx={{ mt: 2 }}>
+                            <CashuPanel
+                                keymaster={keymaster}
+                                identity={currentId}
+                                hasCashu={hasCashu}
+                                hasDidComm={hasDidComm}
+                                recipients={agentList || []}
+                                showError={showError}
+                                showSuccess={showSuccess}
+                                showAlert={showAlert}
                             />
                         </Box>
                     }

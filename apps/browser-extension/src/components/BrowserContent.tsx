@@ -5,6 +5,7 @@ import {
     AccountBalanceWallet,
     Badge,
     Bolt,
+    Toll,
     DarkMode,
     Forum,
     LightMode,
@@ -32,6 +33,7 @@ import { AliasedDIDs } from "@didcid/wallet-ui";
 import { AssetsTab } from "@didcid/wallet-ui";
 import { DmailTab } from "@didcid/wallet-ui";
 import { LightningTab } from "@didcid/wallet-ui";
+import { CashuTab } from "@didcid/wallet-ui";
 import { DidCommTab } from "@didcid/wallet-ui";
 import { PollTab } from "@didcid/wallet-ui";
 import { AuthTab } from "@didcid/wallet-ui";
@@ -312,6 +314,17 @@ function BrowserContent() {
 
                             {displayComponent && (
                                 <Tab
+                                    icon={<Toll />}
+                                    label={menuOpen ? "Cashu" : ""}
+                                    value="cashu"
+                                    iconPosition="start"
+                                    className="sidebarTab"
+                                    sx={{ gap: 0.25 }}
+                                />
+                            )}
+
+                            {displayComponent && (
+                                <Tab
                                     icon={<Token />}
                                     label={menuOpen ? "Assets" : ""}
                                     value="assets"
@@ -400,6 +413,12 @@ function BrowserContent() {
                         {displayComponent && hasLightning && (
                             <TabPanel value="lightning" sx={{ p: 0 }}>
                                 <LightningTab />
+                            </TabPanel>
+                        )}
+
+                        {displayComponent && (
+                            <TabPanel value="cashu" sx={{ p: 0 }}>
+                                <CashuTab />
                             </TabPanel>
                         )}
 

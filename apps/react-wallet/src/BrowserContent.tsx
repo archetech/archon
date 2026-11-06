@@ -19,6 +19,7 @@ import {
     AccountBalanceWallet,
     Badge,
     Bolt,
+    Toll,
     Email,
     Forum,
     Key,
@@ -48,6 +49,7 @@ import { AliasedDIDs } from "@didcid/wallet-ui";
 import { AssetsTab } from "@didcid/wallet-ui";
 import { DmailTab } from "@didcid/wallet-ui";
 import { LightningTab } from "@didcid/wallet-ui";
+import { CashuTab } from "@didcid/wallet-ui";
 import { DidCommTab } from "@didcid/wallet-ui";
 import { PollTab } from "@didcid/wallet-ui";
 import { AuthTab } from "@didcid/wallet-ui";
@@ -206,6 +208,12 @@ function BrowserContent() {
             {displayComponent && hasLightning && (
                 <TabPanel value="lightning" sx={{ p: 0 }}>
                     <LightningTab />
+                </TabPanel>
+            )}
+
+            {displayComponent && (
+                <TabPanel value="cashu" sx={{ p: 0 }}>
+                    <CashuTab />
                 </TabPanel>
             )}
 
@@ -397,6 +405,17 @@ function BrowserContent() {
                                                 menuOpen ? "Lightning" : ""
                                             }
                                             value="lightning"
+                                            iconPosition="start"
+                                        />
+                                    )}
+
+                                    {displayComponent && (
+                                        <Tab
+                                            icon={<Toll />}
+                                            label={
+                                                menuOpen ? "Cashu" : ""
+                                            }
+                                            value="cashu"
                                             iconPosition="start"
                                         />
                                     )}
@@ -644,6 +663,15 @@ function BrowserContent() {
                                     <ListItemText primary="Lightning" />
                                 </ListItemButton>
                             )}
+
+                            <ListItemButton
+                                onClick={() => selectFromMore("cashu")}
+                            >
+                                <ListItemIcon>
+                                    <Toll />
+                                </ListItemIcon>
+                                <ListItemText primary="Cashu" />
+                            </ListItemButton>
 
                             {hasDidComm && (
                                 <ListItemButton
