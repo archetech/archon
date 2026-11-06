@@ -92,6 +92,58 @@ describe('Cashu view: enabling', () => {
         expect(keymaster.removeCashu).toHaveBeenCalledTimes(1);
     });
 
+    it('shows a first token and the mint it needs before any mint is added, without offering to claim it', async () => {
+        holding();
+        keymaster.listCashuMessages.mockResolvedValue([
+            { id: 'm1', sender: 'did:cid:bob', amount: 30, mint: NODE, redeemable: false, reason: `the mint ${NODE} is not added` },
+        ]);
+        view();
+        expect(await screen.findByText(/from did:cid:bob/)).toBeTruthy();
+        expect(screen.getByText(`the mint ${NODE} is not added`)).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Claim All' })).toBeNull();
+        expect(keymaster.listCashuMessages).toHaveBeenCalledWith('Alice');
+    });
+
+    it('says nothing when an inbox nobody asked to read cannot be read', async () => {
+        holding();
+        keymaster.listCashuMessages.mockRejectedValue(new Error('no route'));
+        view();
+        await waitFor(() => expect(keymaster.listCashuMessages).toHaveBeenCalled());
+        await screen.findByLabelText(/^Mint URL/);
+        expect(notify.error).not.toHaveBeenCalled();
+    });
+
+    it('does not read the inbox on a node without DIDComm', async () => {
+        holding();
+        view({ hasDidComm: false });
+        await screen.findByLabelText(/^Mint URL/);
+        expect(keymaster.listCashuMessages).not.toHaveBeenCalled();
+    });
+
+    it('shows the wallet when the DID document cannot be read, and does not guess whether it is published', async () => {
+        holding(mintInfo(NODE, true));
+        keymaster.resolveDID.mockRejectedValueOnce(new Error('gatekeeper down'));
+        view();
+        await screen.findByRole('heading', { name: 'Balance: 1,000 sats' });
+        expect(await screen.findByText(/published is unknown.*gatekeeper down/)).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Publish Cashu' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Unpublish Cashu' })).toBeNull();
+        const user = userEvent.setup();
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+        expect(await screen.findByRole('button', { name: 'Publish Cashu' })).toBeTruthy();
+        expect(screen.queryByText(/published is unknown/)).toBeNull();
+    });
+
+    it('offers a retry when the first read fails', async () => {
+        keymaster.listCashuMints.mockRejectedValueOnce(new Error('wallet locked'));
+        keymaster.listCashuMints.mockResolvedValue([mintInfo(NODE, true)]);
+        view();
+        expect(await screen.findByText('wallet locked')).toBeTruthy();
+        const user = userEvent.setup();
+        await user.click(screen.getByRole('button', { name: 'Retry' }));
+        expect(await screen.findByRole('heading', { name: 'Balance: 1,000 sats' })).toBeTruthy();
+    });
+
     it('can still unpublish after the last mint is gone', async () => {
         holding();
         keymaster.resolveDID.mockResolvedValue({ didDocument: { service: [{ id: 'did:cid:a#cashu', type: 'Cashu', serviceEndpoint: [NODE] }] } });
@@ -155,6 +207,46 @@ describe('Cashu view: several mints', () => {
         expect(keymaster.checkCashu.mock.calls.map(call => call[0])).toEqual([NODE, OTHER]);
         await user.click(screen.getByRole('button', { name: 'Restore From Seed' }));
         await waitFor(() => expect(notify.success).toHaveBeenCalledWith('Recovered 20 sats'));
+    });
+
+    it('goes on to the other mints when one cannot answer, and says which', async () => {
+        keymaster.restoreCashu.mockRejectedValueOnce(new Error('mint down'));
+        keymaster.restoreCashu.mockResolvedValue({ restored: 1, amount: 10 });
+        keymaster.checkCashu.mockRejectedValueOnce(new Error('mint down'));
+        keymaster.checkCashu.mockResolvedValue({ settled: 1, open: 0 });
+        view();
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: 'Restore From Seed' }));
+        await waitFor(() => expect(notify.warning).toHaveBeenCalledWith(`Recovered 10 sats. Not done at ${NODE}: mint down`));
+        expect(keymaster.restoreCashu.mock.calls).toEqual([[NODE, 'Alice'], [OTHER, 'Alice']]);
+        await user.click(screen.getByRole('button', { name: 'Check' }));
+        await waitFor(() => expect(notify.warning).toHaveBeenCalledWith(`1 settled, 0 still open. Not done at ${NODE}: mint down`));
+        expect(keymaster.checkCashu.mock.calls).toEqual([[NODE, 'Alice'], [OTHER, 'Alice']]);
+        expect(notify.error).not.toHaveBeenCalled();
+    });
+
+    const lockedResult = { token: 't', amount: 50, fee: 0, operationId: 'o', mint: OTHER, recipient: 'did:cid:b', messageId: 'm', locktime: 1, delivered: true };
+
+    it('leaves the choice of mint for a locked send to Keymaster unless one is chosen', async () => {
+        keymaster.sendCashuTo.mockResolvedValue(lockedResult);
+        view();
+        const user = await open('DIDComm');
+        await user.type(screen.getByLabelText(/^Recipient/), 'Bob');
+        await user.type(screen.getByLabelText(/^Amount/), '50');
+        await user.click(screen.getByRole('button', { name: 'Send' }));
+        await waitFor(() => expect(keymaster.sendCashuTo).toHaveBeenCalledWith('Bob', 50, { name: 'Alice' }));
+    });
+
+    it('sends a locked token at a mint chosen for it', async () => {
+        keymaster.sendCashuTo.mockResolvedValue(lockedResult);
+        view();
+        const user = await open('DIDComm');
+        await user.click(screen.getByRole('combobox', { name: 'Mint' }));
+        await user.click(await screen.findByRole('option', { name: OTHER }));
+        await user.type(screen.getByLabelText(/^Recipient/), 'Bob');
+        await user.type(screen.getByLabelText(/^Amount/), '50');
+        await user.click(screen.getByRole('button', { name: 'Send' }));
+        await waitFor(() => expect(keymaster.sendCashuTo).toHaveBeenCalledWith('Bob', 50, { mint: OTHER, name: 'Alice' }));
     });
 
     it('claims a quote at the mint that issued it, whatever is chosen afterwards', async () => {
@@ -389,7 +481,7 @@ describe('Cashu view: DIDComm', () => {
         await user.type(screen.getByLabelText(/^Memo/), 'lunch');
         await user.type(screen.getByLabelText(/^Hours/), '2');
         await user.click(screen.getByRole('button', { name: 'Send' }));
-        await waitFor(() => expect(keymaster.sendCashuTo).toHaveBeenCalledWith('Bob', 50, { memo: 'lunch', locktime: 7200, mint: NODE, name: 'Alice' }));
+        await waitFor(() => expect(keymaster.sendCashuTo).toHaveBeenCalledWith('Bob', 50, { memo: 'lunch', locktime: 7200, name: 'Alice' }));
     });
 
     it('does not call an undelivered send sent', async () => {

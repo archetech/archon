@@ -85,6 +85,10 @@ function isError(error: any, type: string): boolean {
     return [error?.type, error?.error, error?.message, error].some(part => typeof part === "string" && part.includes(type));
 }
 
+function errorText(error: any): string {
+    return error?.error || error?.message || String(error);
+}
+
 function parseAmount(value: string): number | null {
     const amount = Number(value);
     return Number.isSafeInteger(amount) && amount > 0 ? amount : null;
@@ -167,10 +171,13 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
 
     const [mints, setMints] = useState<CashuMintInfo[] | null>(null);
     const [balance, setBalance] = useState<CashuBalance | null>(null);
-    const [published, setPublished] = useState<string[] | null>(null);
+    // The mints in the DID document, null if it lists none, undefined until that is known.
+    const [published, setPublished] = useState<string[] | null | undefined>(undefined);
+    const [publicationError, setPublicationError] = useState("");
     const [quotes, setQuotes] = useState<CashuQuoteRecord[]>([]);
     const [sends, setSends] = useState<CashuSendRecord[]>([]);
     const [chosenMint, setChosenMint] = useState("");
+    const [lockedMint, setLockedMint] = useState("");
     const [newMint, setNewMint] = useState("");
     const [confirmRemoval, setConfirmRemoval] = useState<{ url?: string } | null>(null);
 
@@ -206,37 +213,50 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
 
     const reload = useCallback(async () => {
         const read = ++latestRead.current;
-        try {
-            // Removing every mint leaves the #cashu service published, so this is read
-            // whatever the mints are.
-            const [list, document] = await Promise.all([
-                keymaster.listCashuMints(identity),
-                keymaster.resolveDID(identity),
-            ]);
-            const [totals, open, outstanding] = list.length === 0 ? [null, [], []] : await Promise.all([
-                keymaster.getCashuBalance(undefined, identity),
-                keymaster.listCashuQuotes(undefined, identity),
-                keymaster.listCashuSends(undefined, identity),
-            ]);
-            if (read !== latestRead.current) {
-                return;
+        const readWallet = async () => {
+            try {
+                const list = await keymaster.listCashuMints(identity);
+                const [totals, open, outstanding] = list.length === 0 ? [null, [], []] : await Promise.all([
+                    keymaster.getCashuBalance(undefined, identity),
+                    keymaster.listCashuQuotes(undefined, identity),
+                    keymaster.listCashuSends(undefined, identity),
+                ]);
+                if (read === latestRead.current) {
+                    setLoadError("");
+                    setMints(list);
+                    setBalance(totals);
+                    setQuotes(open);
+                    setSends(outstanding);
+                }
+            } catch (error) {
+                if (read === latestRead.current) {
+                    setLoadError(errorText(error));
+                }
             }
-            setLoadError("");
-            setMints(list);
-            setBalance(totals);
-            setQuotes(open);
-            setSends(outstanding);
-            const service = document?.didDocument?.service?.find((item: { id?: string }) => item.id?.endsWith("#cashu"));
-            const endpoint = service?.serviceEndpoint as unknown;
-            setPublished(service ? (Array.isArray(endpoint) ? endpoint as string[] : [String(endpoint)]) : null);
-        } catch (error: any) {
-            if (read === latestRead.current) {
-                setLoadError(error?.error || error?.message || String(error));
+        };
+        // Apart from the wallet, whose funds do not depend on it, and whatever the mints
+        // are, since removing every mint leaves the #cashu service published.
+        const readPublication = async () => {
+            try {
+                const document = await keymaster.resolveDID(identity);
+                if (read === latestRead.current) {
+                    const service = document?.didDocument?.service?.find((item: { id?: string }) => item.id?.endsWith("#cashu"));
+                    const endpoint = service?.serviceEndpoint as unknown;
+                    setPublicationError("");
+                    setPublished(service ? (Array.isArray(endpoint) ? endpoint as string[] : [String(endpoint)]) : null);
+                }
+            } catch (error) {
+                if (read === latestRead.current) {
+                    setPublicationError(errorText(error));
+                    setPublished(undefined);
+                }
             }
-        }
+        };
+        await Promise.all([readWallet(), readPublication()]);
     }, [keymaster, identity]);
 
-    const reloadMessages = useCallback(async () => {
+    // A quiet read is one nobody asked for, which says nothing if it fails.
+    const reloadMessages = useCallback(async (quiet = false) => {
         const read = ++latestMessages.current;
         try {
             const waiting = await keymaster.listCashuMessages(identity);
@@ -244,15 +264,22 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                 setMessages(waiting);
             }
         } catch (error) {
-            notify.error(error);
+            if (!quiet) {
+                notify.error(error);
+            }
         }
     }, [keymaster, notify, identity]);
+
+    const noMints = mints?.length === 0;
 
     useEffect(() => { reload(); }, [reload]);
 
     useEffect(() => {
         if (section === "didcomm") {
             reloadMessages();
+        } else if (noMints && hasDidComm) {
+            // A first token can be waiting, and it says which mint it needs.
+            reloadMessages(true);
         }
         if (section === "mint") {
             // Offered only to an identity that has a Lightning wallet to pay from.
@@ -260,7 +287,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                 .then(result => setLightningBalance(result.balance))
                 .catch(() => setLightningBalance(null));
         }
-    }, [section, keymaster, identity, reloadMessages]);
+    }, [section, noMints, hasDidComm, keymaster, identity, reloadMessages]);
 
     // One action at a time per button, not per view: a melt has no timeout and can
     // stay in flight for days, and the rest of the wallet must stay usable meanwhile.
@@ -313,16 +340,38 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         });
     }
 
+    // One mint that cannot answer must not keep the others from being settled or restored,
+    // and the Wallet tab has no way to name them one by one.
+    async function eachMint(action: (url: string) => Promise<void>): Promise<string[]> {
+        const failed: string[] = [];
+        for (const item of mints ?? []) {
+            try {
+                await action(item.url);
+            } catch (error) {
+                failed.push(`${item.name || item.url}: ${errorText(error)}`);
+            }
+        }
+        return failed;
+    }
+
+    function report(summary: string, failed: string[]) {
+        if (failed.length > 0) {
+            notify.warning(`${summary}. Not done at ${failed.join("; ")}`);
+        } else {
+            notify.success(summary);
+        }
+    }
+
     function handleCheck() {
         run("check", async () => {
             const total = { settled: 0, open: 0, dropped: 0, rotated: 0 };
-            for (const item of mints ?? []) {
-                const result = await keymaster.checkCashu(item.url, identity);
+            const failed = await eachMint(async url => {
+                const result = await keymaster.checkCashu(url, identity);
                 total.settled += result.settled;
                 total.open += result.open;
                 total.dropped += result.dropped ?? 0;
                 total.rotated += result.rotated ?? 0;
-            }
+            });
             const parts = [`${total.settled} settled`, `${total.open} still open`];
             if (total.dropped) {
                 parts.push(`${sats(total.dropped)} found spent elsewhere`);
@@ -330,17 +379,17 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
             if (total.rotated) {
                 parts.push(`${sats(total.rotated)} moved to the mint's new keyset`);
             }
-            notify.success(parts.join(", "));
+            report(parts.join(", "), failed);
         });
     }
 
     function handleRestore() {
         run("restore", async () => {
             let amount = 0;
-            for (const item of mints ?? []) {
-                amount += (await keymaster.restoreCashu(item.url, identity)).amount;
-            }
-            notify.success(amount ? `Recovered ${sats(amount)}` : "Nothing further to recover");
+            const failed = await eachMint(async url => {
+                amount += (await keymaster.restoreCashu(url, identity)).amount;
+            });
+            report(amount ? `Recovered ${sats(amount)}` : "Nothing further to recover", failed);
         });
     }
 
@@ -484,7 +533,8 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
             const result = await keymaster.sendCashuTo(recipient.trim(), amount, {
                 ...(memo.trim() && { memo: memo.trim() }),
                 ...(hours !== undefined && { locktime: Math.round(hours * HOUR_SECONDS) }),
-                ...(mint && { mint }),
+                // Left out, Keymaster picks a mint the recipient publishes.
+                ...(mints?.some(item => item.url === lockedMint) && { mint: lockedMint }),
                 name: identity,
             });
             setDelivery(result);
@@ -521,13 +571,21 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         />
     );
 
+    const loadAlert = loadError && (
+        <Alert
+            severity="error"
+            sx={{ mb: 2 }}
+            action={<Button color="inherit" size="small" onClick={() => reload()}>Retry</Button>}
+        >
+            {loadError}
+        </Alert>
+    );
+
     if (mints === null) {
         return (
             <Box>
                 {header}
-                {loadError
-                    ? <Alert severity="error">{loadError}</Alert>
-                    : <CircularProgress size={24} />}
+                {loadAlert || <CircularProgress size={24} />}
             </Box>
         );
     }
@@ -553,7 +611,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         return (
             <Box>
                 {header}
-                {loadError && <Alert severity="error" sx={{ mb: 2 }}>{loadError}</Alert>}
+                {loadAlert}
                 <EmptyState
                     icon={<Toll />}
                     title="No mints yet"
@@ -564,6 +622,15 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                 />
                 <Stack>
                     {addMintForm}
+                    {!!messages?.length && (
+                        <>
+                            <Typography variant="subtitle1">Incoming</Typography>
+                            <IncomingMessages messages={messages} />
+                            <Typography variant="body2" color="text.secondary">
+                                Add a mint you trust to claim what it holds.
+                            </Typography>
+                        </>
+                    )}
                     {published && (
                         <>
                             <Alert severity="warning">Your DID document still lists mints you no longer use.</Alert>
@@ -580,7 +647,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
     const perMint = (url: string) =>
         balance?.mints?.[url] ?? (mints.length === 1 ? balance : null);
 
-    const mintChoice = mints.length > 1 && section !== "wallet" && section !== "receive" && section !== "sends" && (
+    const mintChoice = mints.length > 1 && (
         <TextField
             select
             label="Mint"
@@ -595,7 +662,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
     return (
         <Box>
             {header}
-            {loadError && <Alert severity="error" sx={{ mb: 2 }}>{loadError}</Alert>}
+            {loadAlert}
             <Tabs
                 value={section}
                 onChange={(_, value) => setSection(value)}
@@ -631,14 +698,18 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                         <ActionButton label="Refresh" onClick={() => run("refresh", async () => undefined)} busy={busy.refresh} />
                         <ActionButton label="Check" onClick={handleCheck} busy={busy.check} />
                         <ActionButton label="Restore From Seed" onClick={handleRestore} busy={busy.restore} />
-                        {published
-                            ? <ActionButton label="Unpublish Cashu" color="warning" onClick={handleUnpublish} busy={busy.publish} />
-                            : <ActionButton label="Publish Cashu" color="success" onClick={handlePublish} busy={busy.publish} />}
+                        {published && <ActionButton label="Unpublish Cashu" color="warning" onClick={handleUnpublish} busy={busy.publish} />}
+                        {published === null && <ActionButton label="Publish Cashu" color="success" onClick={handlePublish} busy={busy.publish} />}
                         {published && !sameMints(published, mints) && (
                             <ActionButton label="Update Published Mints" color="success" onClick={handlePublish} busy={busy.publish} />
                         )}
                         <ActionButton label="Remove Cashu" color="error" onClick={() => run("remove", () => removeMint())} busy={busy.remove} />
                     </Row>
+                    {publicationError && (
+                        <Alert severity="warning">
+                            Whether your mints are published is unknown, because your DID document could not be read: {publicationError}
+                        </Alert>
+                    )}
                     <Typography variant="subtitle1">Mints</Typography>
                     {mints.map(item => {
                         const totals = perMint(item.url);
@@ -807,7 +878,19 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
             {section === "didcomm" && (
                 <Stack>
                     <Typography variant="subtitle1">Send to a DID</Typography>
-                    {mintChoice}
+                    {mints.length > 1 && (
+                        <TextField
+                            select
+                            label="Mint"
+                            value={mints.some(item => item.url === lockedMint) ? lockedMint : ""}
+                            onChange={event => setLockedMint(event.target.value)}
+                            size="small"
+                            slotProps={{ select: { displayEmpty: true }, inputLabel: { shrink: true } }}
+                        >
+                            <MenuItem value="">Automatic: one the recipient accepts</MenuItem>
+                            {mints.map(item => <MenuItem key={item.url} value={item.url}>{item.name || item.url}</MenuItem>)}
+                        </TextField>
+                    )}
                     <Autocomplete
                         freeSolo
                         options={recipients}
@@ -837,19 +920,9 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                     <Typography variant="subtitle1">Incoming</Typography>
                     {messages === null && <CircularProgress size={24} />}
                     {messages?.length === 0 && <Typography>No token messages waiting.</Typography>}
-                    {messages?.map(item => (
-                        <Box key={item.id}>
-                            <Typography variant="body2">
-                                <strong>{item.amount !== undefined ? sats(item.amount) : "Unknown amount"}</strong>
-                                {` from ${item.sender ?? "an unverified sender"}`}
-                            </Typography>
-                            {item.mint && <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-all" }}>{item.mint}</Typography>}
-                            {item.memo && <Typography variant="body2" color="text.secondary">{item.memo}</Typography>}
-                            {!item.redeemable && <Typography variant="body2" color="warning.main">{item.reason}</Typography>}
-                        </Box>
-                    ))}
+                    {messages && <IncomingMessages messages={messages} />}
                     <Row>
-                        <ActionButton label="Refresh" onClick={reloadMessages} />
+                        <ActionButton label="Refresh" onClick={() => reloadMessages()} />
                         <ActionButton label="Claim All" variant="contained" busy={busy.accept}
                             disabled={!messages?.some(item => item.redeemable)} onClick={handleAccept} />
                     </Row>
@@ -880,6 +953,24 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                 </DialogActions>
             </Dialog>
         </Box>
+    );
+}
+
+function IncomingMessages({ messages }: { messages: CashuMessage[] }) {
+    return (
+        <>
+            {messages.map(item => (
+                <Box key={item.id}>
+                    <Typography variant="body2">
+                        <strong>{item.amount !== undefined ? sats(item.amount) : "Unknown amount"}</strong>
+                        {` from ${item.sender ?? "an unverified sender"}`}
+                    </Typography>
+                    {item.mint && <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-all" }}>{item.mint}</Typography>}
+                    {item.memo && <Typography variant="body2" color="text.secondary">{item.memo}</Typography>}
+                    {!item.redeemable && <Typography variant="body2" color="warning.main">{item.reason}</Typography>}
+                </Box>
+            ))}
+        </>
     );
 }
 
