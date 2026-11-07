@@ -21,7 +21,7 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from keymaster.cashu import CashuStateError, CashuUnavailableError  # noqa: E402
-from keymaster.core import KeymasterError, UnknownIDError, WalletNotFoundError  # noqa: E402
+from keymaster.core import KeymasterError, LightningNotConfiguredError, UnknownIDError, WalletNotFoundError  # noqa: E402
 from keymaster.gatekeeper_client import (  # noqa: E402
     GatekeeperTimeoutError,
     GatekeeperUnavailableError,
@@ -44,6 +44,10 @@ def _client() -> TestClient:
     @app.get("/cashu-state")
     async def _cashu_state():
         raise CashuStateError("holds ecash")
+
+    @app.get("/lightning-not-configured")
+    async def _lightning_not_configured():
+        raise LightningNotConfiguredError("No Lightning wallet configured for did:cid:bob")
 
     @app.get("/operation-error")
     async def _op():
@@ -92,6 +96,15 @@ def test_upstream_error_without_a_reason_names_the_status_only():
 
     assert response.status_code == 500
     assert response.json() == {"error": "upstream service returned 502"}
+
+
+def test_lightning_not_configured_reply_names_its_type():
+    # The Lightning panel offers wallet setup when this reply names the type, and
+    # shows a dead-end error otherwise.
+    response = _client().get("/lightning-not-configured")
+
+    assert response.status_code == 400
+    assert response.json() == {"error": "Lightning not configured: No Lightning wallet configured for did:cid:bob"}
 
 
 def test_operation_error_dispatches_to_400():
