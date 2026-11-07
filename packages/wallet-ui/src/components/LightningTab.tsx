@@ -70,6 +70,8 @@ const LightningView: React.FC<{ identity: string }> = ({ identity }) => {
     // Publish state
     const [isPublished, setIsPublished] = useState<boolean>(false);
     const [loadingPublishToggle, setLoadingPublishToggle] = useState<boolean>(false);
+    const [loadingSetup, setLoadingSetup] = useState<boolean>(false);
+    const [loadingDisconnect, setLoadingDisconnect] = useState<boolean>(false);
 
     // Only the invoice on screen counts as reviewed: a slow decode must not put another
     // invoice's amount beside it, or enable paying it.
@@ -139,17 +141,21 @@ const LightningView: React.FC<{ identity: string }> = ({ identity }) => {
 
     async function handleSetupLightning() {
         if (!keymaster) return;
+        setLoadingSetup(true);
         try {
             await keymaster.addLightning(identity);
             setSuccess("Lightning wallet set up successfully");
             await fetchBalance();
         } catch (err: any) {
             setError(err);
+        } finally {
+            setLoadingSetup(false);
         }
     }
 
     async function handleDisconnectLightning() {
         if (!keymaster) return;
+        setLoadingDisconnect(true);
         try {
             await keymaster.removeLightning(identity);
             setBalance(null);
@@ -157,6 +163,8 @@ const LightningView: React.FC<{ identity: string }> = ({ identity }) => {
             setSuccess("Lightning wallet disconnected");
         } catch (err: any) {
             setError(err);
+        } finally {
+            setLoadingDisconnect(false);
         }
     }
 
@@ -319,7 +327,7 @@ const LightningView: React.FC<{ identity: string }> = ({ identity }) => {
                             title="No Lightning wallet"
                             description="Set one up to receive and send sats from this identity."
                             action={
-                                <Button variant="contained" onClick={handleSetupLightning}>
+                                <Button variant="contained" onClick={handleSetupLightning} disabled={loadingSetup}>
                                 Set Up Lightning
                                 </Button>
                             }
@@ -355,6 +363,7 @@ const LightningView: React.FC<{ identity: string }> = ({ identity }) => {
                                     variant="outlined"
                                     color="error"
                                     onClick={handleDisconnectLightning}
+                                    disabled={loadingDisconnect}
                                 >
                                     Disconnect Wallet
                                 </Button>

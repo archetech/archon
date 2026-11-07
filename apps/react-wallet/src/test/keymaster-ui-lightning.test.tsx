@@ -279,6 +279,39 @@ describe('KeymasterUI Lightning: one identity at a time', () => {
     });
 });
 
+describe('KeymasterUI Lightning: a change of identity under way', () => {
+    it("keeps showing the identity whose panel is on screen until the change is done", async () => {
+        const switching = deferred();
+        fns.createLightningInvoice = vi.fn(async () => ({ paymentRequest: 'lnbcAlice' }));
+        fns.setCurrentId = vi.fn(async (id: string) => { await switching.promise; current = id; return true; });
+        const user = await mount();
+        await user.click(screen.getByRole('tab', { name: 'Receive' }));
+        fireEvent.change(screen.getByLabelText(/^Amount/), { target: { value: '50' } });
+        await user.click(screen.getByRole('button', { name: 'Create Invoice' }));
+        await screen.findByDisplayValue('lnbcAlice');
+
+        fireEvent.mouseDown(screen.getAllByRole('combobox').find(box => box.textContent === 'Alice')!);
+        await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Bob' }));
+        await waitFor(() => expect(fns.setCurrentId).toHaveBeenCalledWith('Bob'));
+        expect(screen.getAllByRole('combobox').some(box => box.textContent === 'Alice')).toBe(true);
+        expect(screen.getAllByRole('combobox').some(box => box.textContent === 'Bob')).toBe(false);
+
+        await act(async () => { switching.finish(undefined); });
+        await waitFor(() => expect(screen.getAllByRole('combobox').some(box => box.textContent === 'Bob')).toBe(true));
+        expect(screen.queryByDisplayValue('lnbcAlice')).toBeNull();
+    });
+
+    it('keeps showing the current identity when the change fails', async () => {
+        fns.setCurrentId = vi.fn(async () => { throw new Error('wallet locked'); });
+        const user = await mount();
+        fireEvent.mouseDown(screen.getAllByRole('combobox').find(box => box.textContent === 'Alice')!);
+        await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Bob' }));
+
+        await screen.findByText('wallet locked');
+        expect(screen.getAllByRole('combobox').some(box => box.textContent === 'Alice')).toBe(true);
+    });
+});
+
 describe('KeymasterUI Lightning: away from an identity and back', () => {
     async function awayAndBack(user: ReturnType<typeof userEvent.setup>) {
         await move(user, 'Bob');

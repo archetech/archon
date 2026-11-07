@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { LightningNotConfiguredError } from '@didcid/common/errors';
 import LightningTab from '../../../../packages/wallet-ui/src/components/LightningTab';
 
 const { keymaster, identity, notify } = vi.hoisted(() => ({
@@ -249,6 +250,46 @@ describe('Lightning view: one identity at a time', () => {
         moveTo('Bob', rerender);
         expect(await screen.findByText('Balance: 7 sats')).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Publish Lightning' })).toBeTruthy();
+    });
+});
+
+describe('Lightning view: one call at a time', () => {
+    it('sets up once on a double click, and offers the button again after a failure', async () => {
+        const adding = deferred();
+        keymaster.getLightningBalance.mockRejectedValue(new LightningNotConfiguredError());
+        keymaster.addLightning.mockReturnValue(adding.promise);
+        render(<LightningTab />);
+        const user = userEvent.setup();
+        const button = await screen.findByRole<HTMLButtonElement>('button', { name: 'Set Up Lightning' });
+        await user.dblClick(button);
+
+        expect(keymaster.addLightning).toHaveBeenCalledTimes(1);
+        expect(keymaster.addLightning).toHaveBeenCalledWith('Alice');
+        await act(async () => { adding.fail(new Error('no gateway')); });
+        expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Set Up Lightning' }).disabled).toBe(false);
+    });
+
+    it('disconnects once on a double click, and offers the button again after a failure', async () => {
+        const removing = deferred();
+        keymaster.removeLightning.mockReturnValue(removing.promise);
+        render(<LightningTab />);
+        const user = userEvent.setup();
+        await user.dblClick(await screen.findByRole('button', { name: 'Disconnect Wallet' }));
+
+        expect(keymaster.removeLightning).toHaveBeenCalledTimes(1);
+        await act(async () => { removing.fail(new Error('no gateway')); });
+        expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Disconnect Wallet' }).disabled).toBe(false);
+    });
+
+    it('pays once on a double click', async () => {
+        keymaster.payLightningInvoice.mockReturnValue(deferred().promise);
+        render(<LightningTab />);
+        const user = await openTab('Send');
+        enterInvoice(INVOICE_A);
+        await user.click(screen.getByRole('button', { name: 'Decode' }));
+        await user.dblClick(await screen.findByRole('button', { name: 'Pay' }));
+
+        expect(keymaster.payLightningInvoice).toHaveBeenCalledTimes(1);
     });
 });
 

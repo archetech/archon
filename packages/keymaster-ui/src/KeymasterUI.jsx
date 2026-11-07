@@ -1191,7 +1191,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function selectId(id) {
         try {
-            setSelectedId(id);
             await keymaster.setCurrentId(id);
             await refreshAll();
         } catch (error) {
