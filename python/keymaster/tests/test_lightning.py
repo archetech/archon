@@ -196,6 +196,26 @@ def test_remove_lightning_keeps_the_keys_when_it_cannot_unpublish(testbed):
     assert _keys(testbed) is None
 
 
+def test_a_refused_unpublish_reply_is_a_failure(testbed):
+    did = _published(testbed)
+    _empty_wallet(testbed)
+
+    async def refused(_suffix):
+        return False
+
+    testbed.gatekeeper.unpublish_lightning = refused
+
+    with pytest.raises(KeymasterError, match="Drawbridge did not unpublish the DID"):
+        run(testbed.keymaster.unpublish_lightning())
+    with pytest.raises(LightningStateError, match="could not be unpublished"):
+        run(testbed.keymaster.remove_lightning())
+    assert _keys(testbed)
+    assert len(_services(testbed, did)) == 1
+
+    assert run(testbed.keymaster.remove_lightning(None, True)) is True
+    assert _keys(testbed) is None
+
+
 def test_remove_lightning_keeps_a_wallet_added_during_an_overlapping_removal(testbed):
     run(testbed.keymaster.create_id("Bob"))
     run(testbed.keymaster.add_lightning())

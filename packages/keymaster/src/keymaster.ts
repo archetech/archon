@@ -4372,7 +4372,9 @@ export default class Keymaster implements KeymasterInterface {
 
         // Unregister from Drawbridge using DID suffix as key
         const didSuffix = did.split(':').pop()!;
-        await drawbridge.unpublishLightning(didSuffix);
+        if (!await drawbridge.unpublishLightning(didSuffix)) {
+            throw new KeymasterError('Drawbridge did not unpublish the DID');
+        }
 
         // Remove service endpoint from DID document
         const doc = await this.resolveDID(did);

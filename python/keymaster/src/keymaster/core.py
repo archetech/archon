@@ -1058,7 +1058,8 @@ class Keymaster:
     async def _withdraw_lightning(self, did: str) -> None:
         drawbridge = self.require_drawbridge()
         did_suffix = did.split(":")[-1]
-        await drawbridge.unpublish_lightning(did_suffix)
+        if not await drawbridge.unpublish_lightning(did_suffix):
+            raise KeymasterError("Drawbridge did not unpublish the DID")
 
         doc = await self.resolve_did(did)
         did_document = dict(doc.get("didDocument") or {})
