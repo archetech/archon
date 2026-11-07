@@ -25,6 +25,9 @@ services:
       - BITCOIN_RPCPORT=${ARCHON_BTC_PORT:-8332}
       - BITCOIN_RPCUSER=${ARCHON_BTC_USER}
       - BITCOIN_RPCPASSWORD=${ARCHON_BTC_PASS}
+      # Empty keeps lightningd's default of 60 seconds. A request that outlasts it
+      # stops the node.
+      - BITCOIN_RPCCLIENTTIMEOUT=${ARCHON_CLN_BITCOIN_RPC_TIMEOUT:-}
       - LIGHTNING_PORT=${ARCHON_CLN_PORT:-9736}
       - NETWORK_MODE=${ARCHON_CLN_NETWORK_MODE:-tor}
       - ANNOUNCE_ADDR=${ARCHON_CLN_ANNOUNCE_ADDR:-}
