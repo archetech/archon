@@ -476,6 +476,78 @@ describe('Cashu view: sending', () => {
         await waitFor(() => expect(reclaim.disabled).toBe(false), { timeout: 4000 });
     });
 
+    describe('a token at a mint not added', () => {
+        const notAdded = { error: `Cashu mint not added: ${OTHER}` };
+
+        async function paste(token = 'cashuBoutside') {
+            view();
+            const user = await open('Receive');
+            await user.type(screen.getByLabelText(/^Token/), token);
+            await user.click(screen.getByRole('button', { name: 'Receive' }));
+            await screen.findByText(new RegExp(`mint you have not added: ${OTHER}`));
+            return user;
+        }
+
+        it('names the mint and adds nothing until asked', async () => {
+            keymaster.receiveCashu.mockRejectedValue(notAdded);
+            await paste();
+            expect(keymaster.addCashuMint).not.toHaveBeenCalled();
+            expect(notify.error).not.toHaveBeenCalled();
+        });
+
+        it('adds the mint and receives the same token when asked', async () => {
+            keymaster.receiveCashu.mockRejectedValueOnce(notAdded);
+            keymaster.receiveCashu.mockResolvedValue({ amount: 21, mint: OTHER });
+            keymaster.addCashuMint.mockResolvedValue(mintInfo(OTHER));
+            const user = await paste();
+            await user.click(screen.getByRole('button', { name: 'Add Mint and Receive' }));
+            await waitFor(() => expect(notify.success).toHaveBeenCalledWith('Received 21 sats'));
+            expect(keymaster.addCashuMint).toHaveBeenCalledWith(OTHER, 'Alice');
+            expect(keymaster.receiveCashu).toHaveBeenLastCalledWith('cashuBoutside', 'Alice');
+            expect(screen.queryByRole('button', { name: 'Add Mint and Receive' })).toBeNull();
+        });
+
+        it('withdraws the offer when the token changes, so it cannot add one mint for another token', async () => {
+            keymaster.receiveCashu.mockRejectedValue(notAdded);
+            const user = await paste();
+            await user.type(screen.getByLabelText(/^Token/), 'x');
+            expect(screen.queryByRole('button', { name: 'Add Mint and Receive' })).toBeNull();
+        });
+
+        it('reports a mint that cannot be added, and does not try to receive', async () => {
+            keymaster.receiveCashu.mockRejectedValue(notAdded);
+            keymaster.addCashuMint.mockRejectedValue(new Error('Cashu mint unsupported: no NUT-09'));
+            const user = await paste();
+            await user.click(screen.getByRole('button', { name: 'Add Mint and Receive' }));
+            await waitFor(() => expect(notify.error).toHaveBeenCalled());
+            expect(keymaster.receiveCashu).toHaveBeenCalledTimes(1);
+        });
+
+        it('reports any other refusal as it is', async () => {
+            keymaster.receiveCashu.mockRejectedValue(new Error('Cashu token already spent'));
+            view();
+            const user = await open('Receive');
+            await user.type(screen.getByLabelText(/^Token/), 'cashuBspent');
+            await user.click(screen.getByRole('button', { name: 'Receive' }));
+            await waitFor(() => expect(notify.error).toHaveBeenCalled());
+            expect(screen.queryByRole('button', { name: 'Add Mint and Receive' })).toBeNull();
+        });
+
+        it('can receive a first token before the identity has any mint', async () => {
+            holding();
+            keymaster.receiveCashu.mockRejectedValueOnce(notAdded);
+            keymaster.receiveCashu.mockResolvedValue({ amount: 21, mint: OTHER });
+            keymaster.addCashuMint.mockResolvedValue(mintInfo(OTHER));
+            view();
+            const user = userEvent.setup();
+            await user.type(await screen.findByLabelText(/^Token/), 'cashuBfirst');
+            await user.click(screen.getByRole('button', { name: 'Receive' }));
+            holding(mintInfo(OTHER));
+            await user.click(await screen.findByRole('button', { name: 'Add Mint and Receive' }));
+            await waitFor(() => expect(notify.success).toHaveBeenCalledWith('Received 21 sats'));
+        });
+    });
+
     it('offers a reclaim only once it can be reclaimed', async () => {
         const inSeconds = (seconds: number) => Math.floor(Date.now() / 1000) + seconds;
         keymaster.listCashuSends.mockResolvedValue([

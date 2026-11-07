@@ -186,6 +186,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
     const [sendAmount, setSendAmount] = useState("");
     const [sent, setSent] = useState<CashuSendResult | null>(null);
     const [token, setToken] = useState("");
+    const [missingMint, setMissingMint] = useState<{ url: string; token: string } | null>(null);
 
     const [recipient, setRecipient] = useState("");
     const [lockedAmount, setLockedAmount] = useState("");
@@ -466,16 +467,39 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         });
     }
 
+    async function receive(submitted: string) {
+        const received = await keymaster.receiveCashu(submitted, identity);
+        setMissingMint(null);
+        setToken(current => (current.trim() === submitted ? "" : current));
+        if (received.spent) {
+            notify.warning(`Received ${sats(received.amount)}. Someone had already spent another ${sats(received.spent)} of that token.`);
+        } else {
+            notify.success(`Received ${sats(received.amount)}`);
+        }
+    }
+
     function handleReceive() {
         const submitted = token.trim();
         run("receive", async () => {
-            const received = await keymaster.receiveCashu(submitted, identity);
-            setToken(current => (current.trim() === submitted ? "" : current));
-            if (received.spent) {
-                notify.warning(`Received ${sats(received.amount)}. Someone had already spent another ${sats(received.spent)} of that token.`);
-            } else {
-                notify.success(`Received ${sats(received.amount)}`);
+            try {
+                await receive(submitted);
+            } catch (error) {
+                // The mint comes from the token, so adding it stays the person's decision.
+                const url = isError(error, "Cashu mint not added") && errorText(error).match(/https?:\/\/\S+/)?.[0];
+                if (!url) {
+                    throw error;
+                }
+                setMissingMint({ url, token: submitted });
             }
+        });
+    }
+
+    function handleAddAndReceive(mintToAdd: { url: string; token: string }) {
+        run("addAndReceive", async () => {
+            await keymaster.addCashuMint(mintToAdd.url, identity);
+            setMissingMint(null);
+            setSection("receive");
+            await receive(mintToAdd.token);
         });
     }
 
@@ -578,6 +602,24 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
             <ActionButton label="Add Mint" busy={busy.addMint} disabled={!newMint.trim()} onClick={handleAddMint} />
         </Row>
     );
+    const offeredMint = missingMint?.token === token.trim() ? missingMint : null;
+    const receiveForm = (
+        <>
+            <TextField label="Token" placeholder="cashuB..." value={token} multiline rows={4} size="small"
+                onChange={event => setToken(event.target.value)} />
+            <Box>
+                <ActionButton label="Receive" variant="contained" busy={busy.receive} disabled={!token.trim()} onClick={handleReceive} />
+            </Box>
+            {offeredMint && (
+                <Alert severity="warning">
+                    <Box sx={{ wordBreak: "break-all" }}>This token is at a mint you have not added: {offeredMint.url}</Box>
+                    <Box sx={{ my: 1 }}>Adding it means trusting that mint with the value it holds for you.</Box>
+                    <ActionButton label="Add Mint and Receive" color="warning" busy={busy.addAndReceive}
+                        onClick={() => handleAddAndReceive(offeredMint)} />
+                </Alert>
+            )}
+        </>
+    );
     const nodeMintButton = hasNodeMint && !nodeMint && (
         <ActionButton label="Use This Node's Mint" variant="contained" busy={busy.addNode} onClick={handleAddNodeMint} />
     );
@@ -597,6 +639,8 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                 />
                 <Stack>
                     {addMintForm}
+                    <Typography variant="subtitle1">Have a token?</Typography>
+                    {receiveForm}
                     {!!messages?.length && (
                         <>
                             <Typography variant="subtitle1">Incoming</Typography>
@@ -792,15 +836,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                 </Stack>
             )}
 
-            {section === "receive" && (
-                <Stack>
-                    <TextField label="Token" placeholder="cashuB..." value={token} multiline rows={4} size="small"
-                        onChange={event => setToken(event.target.value)} />
-                    <Box>
-                        <ActionButton label="Receive" variant="contained" busy={busy.receive} disabled={!token.trim()} onClick={handleReceive} />
-                    </Box>
-                </Stack>
-            )}
+            {section === "receive" && <Stack>{receiveForm}</Stack>}
 
             {section === "sends" && (
                 <Stack>

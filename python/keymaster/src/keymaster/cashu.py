@@ -335,7 +335,8 @@ class CashuWallet:
     async def _context(self, mint: str | None, name: str | None) -> _MintContext:
         id_info = await self.host.fetch_id_info(name, await self.host.load_wallet())
         mints = _mints(id_info)
-        if not mints:
+        # A mint named here is reported by name, so a first token says which mint it needs.
+        if not mints and not mint:
             raise CashuNotConfiguredError(f"No Cashu mints configured for {id_info['did']}")
 
         if mint:

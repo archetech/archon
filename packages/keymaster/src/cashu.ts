@@ -411,7 +411,8 @@ export class CashuWallet {
         const idInfo = await this.host.fetchIdInfo(name, await this.host.loadWallet());
         const mints = this.mints(idInfo);
         const urls = Object.keys(mints);
-        if (urls.length === 0) {
+        // A mint named here is reported by name, so a first token says which mint it needs.
+        if (urls.length === 0 && !mint) {
             throw new CashuNotConfiguredError(`No Cashu mints configured for ${idInfo.did}`);
         }
 

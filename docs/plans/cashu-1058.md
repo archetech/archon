@@ -630,7 +630,8 @@ capability only offers the node's own mint as a one-step choice. The view has:
 - balance per mint for the current identity
 - mint: show the quote invoice, or pay it from Lightning
 - melt: pay an invoice
-- send a token (copy and QR), receive a token (paste)
+- send a token (copy and QR), receive a token (paste), offering to add its mint once
+  the person has seen which mint it is
 - outstanding sends, each with a reclaim action once it can be reclaimed
 - send to a DID, list incoming token messages and claim them
 
