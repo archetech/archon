@@ -869,6 +869,84 @@ def test_get_node_capabilities_is_public_and_memoized(monkeypatch):
     assert calls == ["http://node.test/api/v1/capabilities"]  # memoized, fetched once
 
 
+def _capabilities_client(replies, calls):
+    class _Response:
+        def __init__(self, status_code, body):
+            self.status_code = status_code
+            self.is_success = 200 <= status_code < 300
+            self._body = body
+
+        def json(self):
+            return self._body
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def get(self, url):
+            calls.append(url)
+            reply = replies[len(calls) - 1]
+            if isinstance(reply, Exception):
+                raise reply
+            return _Response(*reply)
+
+    return _Client
+
+
+def test_get_node_capabilities_retries_after_failed_read(monkeypatch):
+    # A timeout, network error or non-2xx reply is not remembered; the next call
+    # tries again. Mirrors the JS Keymaster.getNodeCapabilities.
+    import asyncio
+    import httpx
+    from keymaster.core import Keymaster
+
+    class _Gw:
+        url = "http://node.test"
+
+    calls: list[str] = []
+    replies = [
+        httpx.ConnectError("refused"),
+        (502, {"error": "bad gateway"}),
+        (200, {"didcomm": True, "lightning": True}),
+    ]
+    monkeypatch.setattr(httpx, "AsyncClient", _capabilities_client(replies, calls))
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+
+    async def run():
+        return [await km.get_node_capabilities() for _ in range(4)]
+
+    results = asyncio.run(run())
+    assert results[:2] == [None, None]
+    assert results[2] == {"didcomm": True, "lightning": True}
+    assert results[3] == results[2]
+    assert len(calls) == 3
+
+
+def test_get_node_capabilities_remembers_missing_manifest(monkeypatch):
+    import asyncio
+    import httpx
+    from keymaster.core import Keymaster
+
+    class _Gw:
+        url = "http://node.test"
+
+    calls: list[str] = []
+    monkeypatch.setattr(httpx, "AsyncClient", _capabilities_client([(404, {"error": "not found"})], calls))
+    km = Keymaster(gatekeeper=_Gw(), wallet_store=object(), passphrase="pass")
+
+    async def run():
+        return [await km.get_node_capabilities() for _ in range(2)]
+
+    assert asyncio.run(run()) == [None, None]
+    assert len(calls) == 1
+
+
 def test_get_node_capabilities_none_without_node_url():
     import asyncio
     from keymaster.core import Keymaster

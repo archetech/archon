@@ -275,9 +275,10 @@ export default class Keymaster implements KeymasterInterface {
     private readonly maxDataLength: number;
     private readonly cashu: CashuWallet;
     private _mutations: Promise<unknown> = Promise.resolve();
-    // Node capability manifest (`<nodeURL>/api/v1/capabilities`), fetched once and
-    // memoized. `undefined` = not yet fetched; `null` = node has no manifest
+    // Node capability manifest (`<nodeURL>/api/v1/capabilities`), memoized once a
+    // read settles it. `undefined` = not yet settled; `null` = node has no manifest
     // (older node / not a gateway) → callers proceed lazily rather than regress.
+    // A failed read (timeout, network error, other non-2xx) is not memoized.
     private _nodeCapabilities?: NodeCapabilities | null;
     // This node's own public DIDComm endpoint, fetched once and memoized.
     // `undefined` = not yet fetched; `null` = the node advertises none.
@@ -3514,11 +3515,12 @@ export default class Keymaster implements KeymasterInterface {
         return this.resolveKeyAgreement(doc);
     }
 
-    // Fetch (once, memoized) the node's capability manifest. Returns null when the
-    // node exposes no manifest (older node, or the node URL is a bare gatekeeper) —
+    // Fetch the node's capability manifest. Returns null when the node exposes no
+    // manifest (older node, or the node URL is a bare gatekeeper) or the read fails —
     // callers then proceed lazily so we never regress against existing nodes. Public
     // so clients (wallet UIs) can gate optional-feature surfaces on the same signal
     // the gated operations use; null means "unknown", which callers treat as allowed.
+    // A manifest or a 404 is memoized; a failed read is not, so the next call retries.
     async getNodeCapabilities(): Promise<NodeCapabilities | null> {
         if (this._nodeCapabilities !== undefined) {
             return this._nodeCapabilities;
@@ -3539,10 +3541,15 @@ export default class Keymaster implements KeymasterInterface {
             const response = await fetch(`${nodeUrl}/api/v1/capabilities`, {
                 signal: controller.signal,
             });
-            this._nodeCapabilities = response.ok ? await response.json() : null;
+            if (response.ok) {
+                this._nodeCapabilities = await response.json();
+            }
+            else if (response.status === 404) {
+                this._nodeCapabilities = null;
+            }
         }
         catch {
-            this._nodeCapabilities = null;
+            // Unknown for now; leave unmemoized so a later call retries.
         }
         finally {
             clearTimeout(timer);

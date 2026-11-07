@@ -1215,6 +1215,39 @@ describe('node capability gating', () => {
         await expect(keymaster.getNodeCapabilities()).resolves.toBeNull();
     });
 
+    it('retries after a failed read instead of remembering it', async () => {
+        const nodeURL = 'https://node.example';
+        (gatekeeper as any).url = nodeURL;
+
+        const replies: Array<() => Promise<Response>> = [
+            async () => { throw new TypeError('fetch failed'); },
+            async () => jsonResponse({ error: 'bad gateway' }, 502),
+            async () => jsonResponse({ didcomm: true, lightning: true }),
+        ];
+        const requests: string[] = [];
+        jest.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+            requests.push(String(input));
+            return replies[requests.length - 1]();
+        });
+
+        await expect(keymaster.getNodeCapabilities()).resolves.toBeNull();
+        await expect(keymaster.getNodeCapabilities()).resolves.toBeNull();
+        await expect(keymaster.getNodeCapabilities()).resolves.toEqual({ didcomm: true, lightning: true });
+        await keymaster.getNodeCapabilities();
+
+        expect(requests).toHaveLength(3);
+    });
+
+    it('remembers a node that serves no manifest', async () => {
+        (gatekeeper as any).url = 'https://node.example';
+        const fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async () => jsonResponse({ error: 'not found' }, 404));
+
+        await expect(keymaster.getNodeCapabilities()).resolves.toBeNull();
+        await expect(keymaster.getNodeCapabilities()).resolves.toBeNull();
+
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
     it('reports null when no node URL is configured', async () => {
         (gatekeeper as any).url = undefined;
         await expect(keymaster.getNodeCapabilities()).resolves.toBeNull();
