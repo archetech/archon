@@ -320,3 +320,5 @@ These rules apply to coding agents working in this repository.
 - Drawbridge proxies must not forward the client's `Accept-Encoding`: fetch has to decode the upstream body, and Node 22's fetch cannot read zstd, which browsers offer only over HTTPS. Run browser checks through a real https host as well, since an http test stack cannot show this; `curl -H 'Accept-Encoding: zstd'` reproduces it.
 
 - In one Compose file, only one service may build a given image tag. Compose labels an image with the service that built it, so sharing a `build:` block leaves the tag with a varying ID and restarts every container on it, including the live CLN node. Other services use `image:` with `pull_policy: never`.
+
+- Grafana 10.4 exits at startup if a provisioned email contact point has an empty recipient, and its default policy logs an SMTP error for every firing alert when SMTP is off. Keep optional alert delivery in a file that compose selects from the recipient setting, with a muted route in the unset case, and run provisioning changes in a real throwaway Grafana because a bad file stops the service. Grafana sends SMTP login only over TLS, so a test catcher needs STARTTLS.

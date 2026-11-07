@@ -48,6 +48,8 @@ The reference contract is in [`services/mediators/ethereum/contracts/ArchonRegis
 | `ARCHON_ETH_DB_NAME` | chain derived | Persister file/key name, derived from the registry chain by default |
 | `ARCHON_ETH_METRICS_PORT` | `4239` | Metrics server port |
 
+`ethereum_wallet_insufficient_funds` is 1 while the last balance check found the wallet below `ARCHON_ETH_MIN_GAS_BALANCE_WEI`, which is when the mediator skips anchoring. `ethereum_wallet_unreachable` is 1 while the last balance check could not reach the wallet service; the funds gauge keeps its last reading in that case. Grafana alerts on the funds gauge; see [Alerts](../../../deployment.md#alerts).
+
 
 ### Batch completion and pending events
 

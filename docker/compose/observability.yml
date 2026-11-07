@@ -22,12 +22,22 @@ services:
     user: "${ARCHON_UID}:${ARCHON_GID}"
     volumes:
       - ../../observability/grafana/provisioning:/etc/grafana/provisioning
+      # Where alerts are delivered: by email once a recipient is set, otherwise
+      # nowhere, leaving them visible only inside Grafana.
+      - ../../observability/grafana/provisioning/alerting/${ARCHON_ALERT_EMAIL_TO:+../../alert-email/}delivery.yaml:/etc/grafana/provisioning/alerting/delivery.yaml:ro
       - ../../data/grafana:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_USERS_DEFAULT_THEME=dark
+      # Grafana ignores an empty GF_ variable, so unset settings keep its defaults.
+      - ARCHON_ALERT_EMAIL_TO=${ARCHON_ALERT_EMAIL_TO:-}
+      - GF_SMTP_ENABLED=${ARCHON_ALERT_EMAIL_TO:+true}
+      - GF_SMTP_HOST=${ARCHON_ALERT_SMTP_HOST:-}
+      - GF_SMTP_USER=${ARCHON_ALERT_SMTP_USER:-}
+      - GF_SMTP_PASSWORD=${ARCHON_ALERT_SMTP_PASSWORD:-}
+      - GF_SMTP_FROM_ADDRESS=${ARCHON_ALERT_SMTP_FROM:-}
     ports:
       # Loopback by default: an admin UI, and Docker publishes ports ahead of
       # the host firewall, so a public bind is invisible to UFW. Set

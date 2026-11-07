@@ -230,8 +230,8 @@ describe('Lightning view: one identity at a time', () => {
         await waitFor(() => expect(keymaster.publishLightning).toHaveBeenCalledWith('Alice'));
         await user.click(await screen.findByRole('button', { name: 'Unpublish Lightning' }));
         await waitFor(() => expect(keymaster.unpublishLightning).toHaveBeenCalledWith('Alice'));
-        await user.click(screen.getByRole('button', { name: 'Disconnect Wallet' }));
-        await waitFor(() => expect(keymaster.removeLightning).toHaveBeenCalledWith('Alice'));
+        await user.click(screen.getByRole('button', { name: 'Remove Wallet' }));
+        await waitFor(() => expect(keymaster.removeLightning).toHaveBeenCalledWith('Alice', false));
         await user.click(screen.getByRole('tab', { name: 'Payments' }));
         await waitFor(() => expect(keymaster.getLightningPayments).toHaveBeenCalledWith('Alice'));
 
@@ -274,11 +274,11 @@ describe('Lightning view: one call at a time', () => {
         keymaster.removeLightning.mockReturnValue(removing.promise);
         render(<LightningTab />);
         const user = userEvent.setup();
-        await user.dblClick(await screen.findByRole('button', { name: 'Disconnect Wallet' }));
+        await user.dblClick(await screen.findByRole('button', { name: 'Remove Wallet' }));
 
         expect(keymaster.removeLightning).toHaveBeenCalledTimes(1);
         await act(async () => { removing.fail(new Error('no gateway')); });
-        expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Disconnect Wallet' }).disabled).toBe(false);
+        expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Remove Wallet' }).disabled).toBe(false);
     });
 
     it('pays once on a double click', async () => {

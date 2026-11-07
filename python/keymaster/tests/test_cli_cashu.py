@@ -172,6 +172,15 @@ def test_remove_passes_force_only_when_asked(monkeypatch, tmp_path, capsys) -> N
     assert stub.calls == [("remove_cashu", (False, None)), ("remove_cashu", (True, "Alice"))]
 
 
+def test_remove_lightning_passes_force_only_when_asked(monkeypatch, tmp_path, capsys) -> None:
+    stub = _keymaster(remove_lightning=True)
+
+    assert _run(monkeypatch, tmp_path, ["remove-lightning"], stub) == 0
+    assert _run(monkeypatch, tmp_path, ["remove-lightning", "Alice", "--force"], stub) == 0
+
+    assert stub.calls == [("remove_lightning", (None, False)), ("remove_lightning", ("Alice", True))]
+
+
 @pytest.mark.parametrize("given,seconds", [("45", 45), ("30m", 1800), ("12h", 43200), ("7d", 604800)])
 def test_send_to_reads_the_locktime(monkeypatch, tmp_path, capsys, given: str, seconds: int) -> None:
     stub = _keymaster(send_cashu_to={"token": "t", "mint": MINT, "delivered": True}, get_cashu_balance=BALANCE)

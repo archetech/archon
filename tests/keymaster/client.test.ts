@@ -4983,6 +4983,16 @@ describe('removeLightning', () => {
         expect(ok).toBe(true);
     });
 
+    it('should send the identity and force', async () => {
+        nock(KeymasterURL)
+            .delete(Endpoints.lightning, { id: 'Alice', force: true })
+            .reply(200, { ok: true });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        expect(await keymaster.removeLightning('Alice', true)).toBe(true);
+    });
+
     it('should throw exception on removeLightning server error', async () => {
         nock(KeymasterURL)
             .delete(Endpoints.lightning)

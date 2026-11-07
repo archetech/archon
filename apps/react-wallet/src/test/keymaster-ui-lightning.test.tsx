@@ -237,7 +237,7 @@ describe('KeymasterUI Lightning: one identity at a time', () => {
         const removing = deferred();
         fns.removeLightning = vi.fn(() => removing.promise);
         const user = await mount();
-        await user.click(await screen.findByRole('button', { name: 'Disconnect Wallet' }));
+        await user.click(await screen.findByRole('button', { name: 'Remove Wallet' }));
         expect(fns.removeLightning).toHaveBeenCalledWith('Alice');
         await move(user, 'Bob');
         await act(async () => { removing.finish(true); });
@@ -456,7 +456,7 @@ describe('KeymasterUI Lightning: one call at a time', () => {
         fns.removeLightning = vi.fn(() => deferred().promise);
         await mount();
         const user = userEvent.setup();
-        await user.dblClick(await screen.findByRole('button', { name: 'Disconnect Wallet' }));
+        await user.dblClick(await screen.findByRole('button', { name: 'Remove Wallet' }));
 
         expect(fns.removeLightning).toHaveBeenCalledTimes(1);
     });
@@ -469,7 +469,7 @@ describe('KeymasterUI Lightning: one call at a time', () => {
         fns.publishLightning = vi.fn(() => deferred().promise);
         const user = await mount();
         await user.click(await screen.findByRole('button', { name: 'Publish Lightning' }));
-        await user.click(screen.getByRole('button', { name: 'Disconnect Wallet' }));
+        await user.click(screen.getByRole('button', { name: 'Remove Wallet' }));
         await openInvoiceForm(user);
         await user.click(screen.getByRole('button', { name: 'Create Invoice' }));
         await openPayButton(user);
@@ -480,7 +480,7 @@ describe('KeymasterUI Lightning: one call at a time', () => {
 
         const enabled = (name: string) => expect(screen.getByRole<HTMLButtonElement>('button', { name }).disabled).toBe(false);
         enabled('Publish Lightning');
-        enabled('Disconnect Wallet');
+        enabled('Remove Wallet');
         await openInvoiceForm(user);
         enabled('Create Invoice');
         await openPayButton(user);

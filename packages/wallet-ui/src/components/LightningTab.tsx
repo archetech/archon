@@ -5,6 +5,11 @@ import {
     Button,
     Checkbox,
     CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
     FormControlLabel,
     Tab,
     Tabs,
@@ -25,6 +30,12 @@ const LIGHTNING_PAYMENT_STATUS_CHECKS = 3;
 const LIGHTNING_PAYMENT_STATUS_DELAY_MS = 1000;
 
 type ReviewedInvoice = { invoice: string; info: DecodedLightningInvoice };
+
+// Why Keymaster refused to remove the wallet unforced, or null if it failed some other way.
+function removalRefusal(error: any): string | null {
+    const text = String(error?.error || error?.message || error);
+    return text.match(/Lightning state present: ([\s\S]*?)(?:; use force[\s\S]*)?$/)?.[1] ?? null;
+}
 
 // LightningTab keys this view by the identity it shows, so nothing held here, such as
 // an invoice, outlives a change of identity. Keying does not stop a call under way, so
@@ -80,6 +91,9 @@ const LightningView: React.FC<{ identity: string }> = ({ identity }) => {
     // A read that a newer one has overtaken must not put older figures back.
     const latestBalance = useRef(0);
     const latestPayments = useRef(0);
+
+    // Why the last unforced removal was refused, while asking whether to discard
+    const [confirmRemoval, setConfirmRemoval] = useState<string | null>(null);
 
     const fetchBalance = useCallback(async () => {
         if (!keymaster) return;
@@ -153,16 +167,21 @@ const LightningView: React.FC<{ identity: string }> = ({ identity }) => {
         }
     }
 
-    async function handleDisconnectLightning() {
+    async function handleRemoveLightning(force = false) {
         if (!keymaster) return;
         setLoadingDisconnect(true);
         try {
-            await keymaster.removeLightning(identity);
+            await keymaster.removeLightning(identity, force);
             setBalance(null);
             setIsConfigured(false);
-            setSuccess("Lightning wallet disconnected");
+            setSuccess("Lightning wallet removed");
         } catch (err: any) {
-            setError(err);
+            const reason = force ? null : removalRefusal(err);
+            if (reason) {
+                setConfirmRemoval(reason);
+            } else {
+                setError(err);
+            }
         } finally {
             setLoadingDisconnect(false);
         }
@@ -362,10 +381,10 @@ const LightningView: React.FC<{ identity: string }> = ({ identity }) => {
                                 <Button
                                     variant="outlined"
                                     color="error"
-                                    onClick={handleDisconnectLightning}
+                                    onClick={() => handleRemoveLightning()}
                                     disabled={loadingDisconnect}
                                 >
-                                    Disconnect Wallet
+                                    Remove Wallet
                                 </Button>
                             </Box>
                         </Box>
@@ -634,6 +653,28 @@ const LightningView: React.FC<{ identity: string }> = ({ identity }) => {
                     )}
                 </Box>
             )}
+
+            <Dialog open={!!confirmRemoval} onClose={() => setConfirmRemoval(null)}>
+                <DialogTitle>Discard Lightning wallet?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        This wallet could not be removed safely: {confirmRemoval}.
+                        Its keys are the only way to reach its funds, and the recovery phrase cannot recreate them.
+                        Discarding removes every Lightning wallet this identity holds, on any node. If the node
+                        cannot be reached, the wallet stays published and can still be paid until it is unpublished
+                        with the unpublish-lightning command.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setConfirmRemoval(null)}>Keep It</Button>
+                    <Button color="error" onClick={() => {
+                        setConfirmRemoval(null);
+                        handleRemoveLightning(true);
+                    }}>
+                        Discard
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

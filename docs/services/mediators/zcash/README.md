@@ -437,6 +437,8 @@ Gauges (refreshed on every `/metrics` scrape from the persisted DB):
 | `zcash_import_loop_running` | 0 / 1 |
 | `zcash_export_loop_running` | 0 / 1 |
 
+`zcash_wallet_insufficient_funds` is 1 while the last balance check found the wallet below `ARCHON_ZEC_FEE_MAX`, which is when the mediator skips anchoring. `zcash_wallet_unreachable` is 1 while the last balance check could not reach the wallet service; the funds gauge keeps its last reading in that case. Both are set when the balance is checked, at startup and on each export pass, rather than on scrape, and stay 0 on a read-only mediator. Grafana alerts on the funds gauge; see [Alerts](../../../deployment.md#alerts).
+
 Counters:
 
 | Metric | Notes |

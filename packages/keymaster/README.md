@@ -262,7 +262,7 @@ It then uses `ARCHON_NODE_URL` and `ARCHON_PASSPHRASE` during setup, creates the
 | Vaults | `remove-vault-item <id> <item>` | Remove item |
 | Vaults | `get-vault-item <id> <item> <file>` | Download item |
 | Lightning | `add-lightning [id]` | Create a Lightning wallet for a DID |
-| Lightning | `remove-lightning [id]` | Remove Lightning wallet from a DID |
+| Lightning | `remove-lightning [id] [--force]` | Remove Lightning wallet from a DID; refused while it holds funds, or its balance can't be read. `--force` discards every wallet the DID holds |
 | Lightning | `lightning-balance [id]` | Check Lightning wallet balance |
 | Lightning | `lightning-invoice <amount> <memo> [id]` | Create invoice to receive sats |
 | Lightning | `lightning-pay <bolt11> [id]` | Pay a Lightning invoice |

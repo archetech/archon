@@ -47,6 +47,16 @@ scrape_configs:
       - targets: ['btc-signet-mediator:4236']
     metrics_path: '/metrics'
 
+  - job_name: 'btc-t4-mediator'
+    static_configs:
+      - targets: ['btc-t4-mediator:4234']
+    metrics_path: '/metrics'
+
+  - job_name: 'btc-t4-hosted-mediator'
+    static_configs:
+      - targets: ['btc-t4-hosted-mediator:4234']
+    metrics_path: '/metrics'
+
   - job_name: 'zcash-mainnet-wallet'
     static_configs:
       - targets: ['zcash-mainnet-wallet:4251']

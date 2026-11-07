@@ -66,6 +66,14 @@ export class LightningUnavailableError extends ArchonError {
     }
 }
 
+export class LightningStateError extends ArchonError {
+    static type = 'Lightning state present';
+
+    constructor(detail?: string) {
+        super(LightningStateError.type, detail);
+    }
+}
+
 export class CashuNotConfiguredError extends ArchonError {
     static type = 'Cashu not configured';
 

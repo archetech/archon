@@ -1,0 +1,67 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: mediator-wallet-funds
+    folder: Archon Alerts
+    interval: 1m
+    rules:
+      - uid: mediator-wallet-insufficient-funds
+        title: Mediator wallet cannot fund anchoring
+        condition: LOW
+        data:
+          - refId: FLAG
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: prometheus
+            model:
+              refId: FLAG
+              instant: true
+              range: false
+              intervalMs: 60000
+              maxDataPoints: 43200
+              # One series per mediator the node actually runs, so a chain it
+              # does not run contributes nothing. The mediator compares against
+              # its own configured floor; a threshold written here would be
+              # wrong on any node configured differently. last_over_time carries
+              # the reading across a mediator restart, which would otherwise
+              # resolve the alert and raise it again.
+              expr: >-
+                last_over_time(satoshi_wallet_insufficient_funds[5m])
+                or last_over_time(zcash_wallet_insufficient_funds[5m])
+                or last_over_time(ethereum_wallet_insufficient_funds[5m])
+                or last_over_time(solana_wallet_insufficient_funds[5m])
+          - refId: LOW
+            datasourceUid: __expr__
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              refId: LOW
+              type: threshold
+              expression: FLAG
+              intervalMs: 60000
+              maxDataPoints: 43200
+              conditions:
+                - type: query
+                  evaluator:
+                    type: gt
+                    params: [0]
+        # A node running no chain mediator has no series, which is healthy.
+        noDataState: OK
+        # Prometheus being down is not a funding problem and would otherwise
+        # raise an alert of its own.
+        execErrState: OK
+        # Long enough to ride out a reading taken mid top-up, short enough that
+        # an empty wallet is reported well before a user notices.
+        for: 5m
+        labels:
+          archon_alert: mediator-wallet-funds
+        annotations:
+          summary: "{{ $labels.job }} has stopped anchoring: its wallet is below the configured floor"
+          description: >-
+            {{ $labels.job }} found its wallet balance below the level its
+            configuration requires and skipped anchoring. Operations queue until
+            the wallet is funded. The mediator's log names the balance and the
+            address to send funds to.

@@ -22,7 +22,14 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from keymaster.cashu import CashuStateError, CashuUnavailableError  # noqa: E402
-from keymaster.core import Keymaster, KeymasterError, LightningNotConfiguredError, UnknownIDError, WalletNotFoundError  # noqa: E402
+from keymaster.core import (  # noqa: E402
+    Keymaster,
+    KeymasterError,
+    LightningNotConfiguredError,
+    LightningStateError,
+    UnknownIDError,
+    WalletNotFoundError,
+)
 from keymaster.gatekeeper_client import (  # noqa: E402
     GatekeeperTimeoutError,
     GatekeeperUnavailableError,
@@ -49,6 +56,10 @@ def _client() -> TestClient:
     @app.get("/lightning-not-configured")
     async def _lightning_not_configured():
         raise LightningNotConfiguredError("No Lightning wallet configured for did:cid:bob")
+
+    @app.get("/lightning-state")
+    async def _lightning_state():
+        raise LightningStateError("the wallet holds 5 sats")
 
     @app.get("/operation-error")
     async def _op():
@@ -167,6 +178,7 @@ def test_cashu_errors_dispatch_like_the_typescript_service():
     client = _client()
     assert client.get("/cashu-unavailable").status_code == 503
     assert client.get("/cashu-state").status_code == 400
+    assert client.get("/lightning-state").status_code == 400
 
 
 def _cashu_client() -> TestClient:
@@ -228,7 +240,9 @@ def test_lightning_routes_accept_a_request_with_no_body(monkeypatch):
     calls = []
 
     def stub(name, result):
-        async def method(identifier):
+        # remove_lightning also takes force, absent here like the identity.
+        async def method(identifier, *absent):
+            assert not any(absent)
             calls.append((name, identifier))
             return result
 

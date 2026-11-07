@@ -775,9 +775,9 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async removeLightning(id?: string): Promise<boolean> {
+    async removeLightning(id?: string, force?: boolean): Promise<boolean> {
         try {
-            const response = await this.axios.delete(`${this.API}/lightning`, { data: { id } });
+            const response = await this.axios.delete(`${this.API}/lightning`, { data: { id, force } });
             return response.data.ok;
         }
         catch (error) {

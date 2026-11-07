@@ -1,0 +1,21 @@
+# Alert delivery once ARCHON_ALERT_EMAIL_TO is set; compose mounts this over
+# provisioning/alerting/delivery.yaml.
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: archon-alert-email
+    receivers:
+      - uid: archon-alert-email
+        type: email
+        settings:
+          addresses: $ARCHON_ALERT_EMAIL_TO
+
+policies:
+  - orgId: 1
+    receiver: archon-alert-email
+    group_by: [alertname, job]
+
+deleteMuteTimes:
+  - orgId: 1
+    name: archon-no-alert-destination

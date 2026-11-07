@@ -5,7 +5,7 @@ import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
 import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
-import { UnknownIDError, InvalidParameterError, LightningNotConfiguredError, LightningUnavailableError } from '@didcid/common/errors';
+import { UnknownIDError, InvalidParameterError, LightningNotConfiguredError, LightningStateError, LightningUnavailableError } from '@didcid/common/errors';
 import MemoryClient from '@didcid/ipfs/memory';
 import { createLightningRouter } from '../../services/keymaster/server/src/keymaster-lightning-router.ts';
 
@@ -273,8 +273,15 @@ describe('addLightning', () => {
 });
 
 describe('removeLightning', () => {
+    const keysOf = async (name = 'Bob') => (await keymaster.loadWallet()).ids[name].lightning;
+
+    function emptyWallet() {
+        gatekeeper.getLightningBalance = () => Promise.resolve({ balance: 0 });
+    }
+
     it('should remove Lightning config for current URL', async () => {
         await keymaster.createId('Bob');
+        emptyWallet();
 
         await keymaster.addLightning();
 
@@ -288,6 +295,7 @@ describe('removeLightning', () => {
 
     it('should only remove config for current URL, preserving others', async () => {
         await keymaster.createId('Bob');
+        emptyWallet();
 
         // Add lightning on two URLs
         await keymaster.addLightning();
@@ -313,6 +321,7 @@ describe('removeLightning', () => {
 
     it('should handle old flat format removal', async () => {
         await keymaster.createId('Bob');
+        emptyWallet();
 
         // Manually inject old flat format
         const walletData = await keymaster.loadWallet();
@@ -345,6 +354,272 @@ describe('removeLightning', () => {
         catch (error: any) {
             expect(error.type).toBe(UnknownIDError.type);
         }
+    });
+
+    it('refuses while the wallet holds funds, changing nothing', async () => {
+        const did = await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.publishLightning();
+        calls = [];
+
+        await expect(keymaster.removeLightning()).rejects.toThrow(LightningStateError);
+        await expect(keymaster.removeLightning()).rejects.toThrow('holds 1000 sats');
+
+        expect(await keysOf()).toBeDefined();
+        expect(calls.some(call => call.method === 'unpublishLightning')).toBe(false);
+        expect((await keymaster.resolveDID(did)).didDocument!.service).toHaveLength(1);
+    });
+
+    it('treats an unreadable balance as a refusal, not as zero', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+
+        gatekeeper.getLightningBalance = () => Promise.reject(new Error('LNbits is down'));
+        await expect(keymaster.removeLightning()).rejects.toThrow(LightningStateError);
+        await expect(keymaster.removeLightning()).rejects.toThrow('LNbits is down');
+
+        gatekeeper.getLightningBalance = () => Promise.resolve({});
+        await expect(keymaster.removeLightning()).rejects.toThrow(LightningStateError);
+
+        expect(await keysOf()).toBeDefined();
+    });
+
+    it('refuses when the wallet is on another node, whose balance it cannot read', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        emptyWallet();
+        gatekeeper.url = 'http://other-drawbridge';
+
+        await expect(keymaster.removeLightning()).rejects.toThrow(LightningStateError);
+
+        expect(Object.keys((await keysOf())!)).toStrictEqual(['http://test-drawbridge']);
+    });
+
+    it('unpublishes an empty wallet before removing it, keeping other services', async () => {
+        const did = await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.publishLightning();
+        const doc = await keymaster.resolveDID(did);
+        const other = { id: `${did}#other`, type: 'Other', serviceEndpoint: 'https://example.com' };
+        doc.didDocument!.service!.push(other);
+        await keymaster.updateDID(did, doc);
+        emptyWallet();
+        calls = [];
+
+        expect(await keymaster.removeLightning()).toBe(true);
+
+        expect(calls).toContainEqual({ method: 'unpublishLightning', args: [did.split(':').pop()] });
+        expect((await keymaster.resolveDID(did)).didDocument!.service).toStrictEqual([other]);
+        expect(await keysOf()).toBeUndefined();
+    });
+
+    it('writes no DID update when the wallet was never published', async () => {
+        const did = await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        emptyWallet();
+        const before = (await keymaster.resolveDID(did)).didDocumentMetadata!.versionId;
+
+        await keymaster.removeLightning();
+
+        expect((await keymaster.resolveDID(did)).didDocumentMetadata!.versionId).toBe(before);
+        expect(await keysOf()).toBeUndefined();
+    });
+
+    it('keeps the keys when the wallet cannot be unpublished', async () => {
+        const did = await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.publishLightning();
+        emptyWallet();
+
+        gatekeeper.unpublishLightning = () => Promise.reject(new Error('directory is down'));
+        await expect(keymaster.removeLightning()).rejects.toThrow('could not be unpublished (directory is down)');
+        expect(await keysOf()).toBeDefined();
+
+        gatekeeper.unpublishLightning = () => Promise.resolve(true);
+        const updateDID = gatekeeper.updateDID;
+        gatekeeper.updateDID = () => Promise.reject(new Error('gatekeeper is down'));
+        await expect(keymaster.removeLightning()).rejects.toThrow(LightningStateError);
+        expect(await keysOf()).toBeDefined();
+
+        gatekeeper.updateDID = () => Promise.resolve(false);
+        await expect(keymaster.removeLightning()).rejects.toThrow('the DID update was rejected');
+        await expect(keymaster.unpublishLightning()).rejects.toThrow('the DID update was rejected');
+        await expect(keymaster.publishLightning()).rejects.toThrow('the DID update was rejected');
+        expect(await keysOf()).toBeDefined();
+
+        gatekeeper.updateDID = updateDID;
+        expect(await keymaster.removeLightning()).toBe(true);
+        expect((await keymaster.resolveDID(did)).didDocument!.service).toBeUndefined();
+        expect(await keysOf()).toBeUndefined();
+    });
+
+    it('keeps a wallet added while an overlapping removal was in progress', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        emptyWallet();
+        const unpublish = gatekeeper.unpublishLightning;
+        gatekeeper.createLightningWallet = () =>
+            Promise.resolve({ walletId: 'w2', adminKey: 'admin2', invoiceKey: 'invoice2' });
+        gatekeeper.unpublishLightning = async () => {
+            gatekeeper.unpublishLightning = unpublish;
+            await keymaster.removeLightning();
+            await keymaster.addLightning();
+            return true;
+        };
+
+        await expect(keymaster.removeLightning()).rejects.toThrow('replaced during removal');
+
+        expect(await keysOf()).toStrictEqual({
+            'http://test-drawbridge': { walletId: 'w2', adminKey: 'admin2', invoiceKey: 'invoice2' },
+        });
+    });
+
+    it('succeeds when an overlapping removal took the wallet first', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        emptyWallet();
+        const unpublish = gatekeeper.unpublishLightning;
+        gatekeeper.unpublishLightning = async () => {
+            gatekeeper.unpublishLightning = unpublish;
+            await keymaster.removeLightning();
+            return true;
+        };
+
+        expect(await keymaster.removeLightning()).toBe(true);
+
+        expect(await keysOf()).toBeUndefined();
+    });
+
+    it('force discards a funded wallet and unpublishes it', async () => {
+        const did = await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.publishLightning();
+        calls = [];
+
+        expect(await keymaster.removeLightning(undefined, true)).toBe(true);
+
+        expect(calls.some(call => call.method === 'getLightningBalance')).toBe(false);
+        expect(calls.some(call => call.method === 'unpublishLightning')).toBe(true);
+        expect((await keymaster.resolveDID(did)).didDocument!.service).toBeUndefined();
+        expect(await keysOf()).toBeUndefined();
+    });
+
+    it('force discards the keys even if the DID update is rejected', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.publishLightning();
+        gatekeeper.updateDID = () => Promise.resolve(false);
+
+        expect(await keymaster.removeLightning(undefined, true)).toBe(true);
+
+        expect(await keysOf()).toBeUndefined();
+    });
+
+    it('force works with the node unreachable, and unpublishing can follow without the keys', async () => {
+        const did = await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.publishLightning();
+
+        const down = () => Promise.reject(new Error('node is down'));
+        gatekeeper.getLightningBalance = down;
+        gatekeeper.unpublishLightning = down;
+
+        expect(await keymaster.removeLightning(undefined, true)).toBe(true);
+        expect(await keysOf()).toBeUndefined();
+        expect((await keymaster.resolveDID(did)).didDocument!.service).toHaveLength(1);
+
+        gatekeeper.unpublishLightning = () => Promise.resolve(true);
+        expect(await keymaster.unpublishLightning()).toBe(true);
+        expect((await keymaster.resolveDID(did)).didDocument!.service).toBeUndefined();
+    });
+
+    it('force discards the wallets on every node, the old flat format, and without a Drawbridge', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        gatekeeper.url = 'http://other-drawbridge';
+        await keymaster.addLightning();
+
+        await keymaster.removeLightning(undefined, true);
+        expect(await keysOf()).toBeUndefined();
+
+        const walletData = await keymaster.loadWallet();
+        walletData.ids.Bob.lightning = { walletId: 'w1', adminKey: 'admin1', invoiceKey: 'invoice1' };
+        await keymaster.saveWallet(walletData, true);
+        gatekeeper.createLightningWallet = undefined;
+
+        await keymaster.removeLightning(undefined, true);
+        expect(await keysOf()).toBeUndefined();
+    });
+
+    it.each(['true', 1, {}])('does not take %p for force', async (force) => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+
+        await expect(keymaster.removeLightning(undefined, force as never)).rejects.toThrow(LightningStateError);
+
+        expect(await keysOf()).toBeDefined();
+    });
+
+    it('acts on the named identity, not the current one', async () => {
+        await keymaster.createId('Alice');
+        await keymaster.addLightning();
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        emptyWallet();
+
+        await keymaster.removeLightning('Alice');
+
+        expect(await keysOf('Alice')).toBeUndefined();
+        expect(await keysOf('Bob')).toBeDefined();
+    });
+
+    it('removes an empty wallet from a revoked identity with no DID update', async () => {
+        const did = await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        emptyWallet();
+        await keymaster.revokeDID(did);
+
+        expect(await keymaster.removeLightning()).toBe(true);
+        expect(await keysOf()).toBeUndefined();
+    });
+});
+
+describe('removing an identity holding Lightning keys', () => {
+    it('removeId refuses, whichever node the keys are for, until they are removed', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        gatekeeper.url = 'http://other-drawbridge';
+
+        await expect(keymaster.removeId('Bob')).rejects.toThrow(LightningStateError);
+        expect((await keymaster.loadWallet()).ids.Bob).toBeDefined();
+
+        await keymaster.removeLightning('Bob', true);
+
+        expect(await keymaster.removeId('Bob')).toBe(true);
+    });
+
+    it('fixWallet keeps a revoked identity holding keys, and reports it', async () => {
+        const did = await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        const dave = await keymaster.createId('Dave');
+        await keymaster.revokeDID(did);
+        await keymaster.revokeDID(dave);
+
+        const result = await keymaster.fixWallet();
+
+        expect(result).toMatchObject({ idsRemoved: 1, idsKept: ['Bob'] });
+        const { ids } = await keymaster.loadWallet();
+        expect(ids.Bob.lightning).toBeDefined();
+        expect(ids.Dave).toBeUndefined();
+    });
+
+    it('an identity whose wallet entry is empty has no keys to protect', async () => {
+        await keymaster.createId('Bob');
+        const walletData = await keymaster.loadWallet();
+        walletData.ids.Bob.lightning = {};
+        await keymaster.saveWallet(walletData, true);
+
+        expect(await keymaster.removeId('Bob')).toBe(true);
     });
 });
 
