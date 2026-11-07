@@ -97,7 +97,7 @@ Upstream has **split** these into independent profiles, each named after what it
 | `herald` | `herald`, `herald-client` |
 | `tor` | `tor` |
 
-Capabilities follow the **URLs, not the profiles**: Drawbridge advertises and proxies an upstream whenever its `ARCHON_*_URL` is non-empty. Enabling a profile without its URL, or a URL without its profile, produces a connection error rather than the intended 501. Any stage that enables one must set the other:
+Capabilities follow the **URLs, not the profiles**: Drawbridge advertises and proxies an upstream whenever its `ARCHON_*_URL` is non-empty, and Compose leaves each one empty unless `.env` sets it. A profile without its URL is never offered; a URL without its profile produces a connection error rather than the intended 501. Any stage that enables one must set the other:
 
 | Profile | Must also set |
 |---------|---------------|
