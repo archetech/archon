@@ -32,7 +32,7 @@ const LIGHTNING_PAYMENT_STATUS_DELAY_MS = 1000;
 // Why Keymaster refused to remove the wallet unforced, or null if it failed some other way.
 function removalRefusal(error: any): string | null {
     const text = String(error?.error || error?.message || error);
-    return text.match(/Lightning state present: (.*?)(?:; use force.*)?$/s)?.[1] ?? null;
+    return text.match(/Lightning state present: ([\s\S]*?)(?:; use force[\s\S]*)?$/)?.[1] ?? null;
 }
 
 const LightningTab: React.FC = () => {

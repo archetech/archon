@@ -869,7 +869,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             } catch (error) {
                 // Why Keymaster refused to remove the wallet unforced
                 const text = String(error?.error || error?.message || error);
-                const reason = text.match(/Lightning state present: (.*?)(?:; use force.*)?$/s)?.[1];
+                const reason = text.match(/Lightning state present: ([\s\S]*?)(?:; use force[\s\S]*)?$/)?.[1];
                 if (!reason) {
                     throw error;
                 }
