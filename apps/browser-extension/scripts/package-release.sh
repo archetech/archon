@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds the Chrome and Firefox extensions and zips each into release/, named for
+# Builds the Chrome and Firefox extensions and zips each into build/, named for
 # the version: the zips a GitHub release carries. Takes the release tag (v1.2.3) or,
 # with none, the version in package.json. Run from anywhere, after the shared
 # packages are built and the extension's dependencies are installed.
@@ -20,8 +20,8 @@ for file in package.json src/static/manifest.json src/static/manifest.firefox.js
     [[ "$found" == "$version" ]] || die "$file is at $found, not $version"
 done
 
-rm -rf release
-mkdir release
+rm -rf build
+mkdir build
 
 package() {
     local browser=$1
@@ -29,7 +29,7 @@ package() {
     [[ "$(version_of dist/manifest.json)" == "$version" ]] || die "dist/manifest.json is not at $version"
     # At the root of the zip, where browsers look for the manifest. The build copies
     # both source manifests, and manifest.json is the one for this browser.
-    (cd dist && zip -qr "../release/archon-wallet-$browser-$tag.zip" . -x manifest.firefox.json)
+    (cd dist && zip -qr "../build/archon-wallet-$browser-$tag.zip" . -x manifest.firefox.json)
 }
 
 package chrome
@@ -39,4 +39,4 @@ package firefox
 node -e "if (!require('./dist/manifest.json').browser_specific_settings?.gecko) process.exit(1)" \
     || die "the Firefox build has no gecko settings"
 
-ls -l release
+ls -l build

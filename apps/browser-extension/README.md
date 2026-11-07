@@ -36,4 +36,4 @@ into the `dist` folder.
 3. Publish the Zip on the Chrome Web Store
 
 `scripts/package-release.sh` builds both browsers and writes the zips a release carries
-to `release/`. It refuses a version that differs from `package.json` or either manifest.
+to `build/`. It refuses a version that differs from `package.json` or either manifest.
