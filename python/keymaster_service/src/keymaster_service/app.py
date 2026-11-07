@@ -9,6 +9,7 @@ from typing import Annotated, Any
 
 import httpx
 from fastapi import APIRouter, Body, Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -104,6 +105,16 @@ class _PrometheusMiddleware(BaseHTTPMiddleware):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(_PrometheusMiddleware)
+# The settings of the TypeScript service's `app.use(cors())`: any origin, the
+# `cors` package's default methods, the request's own headers allowed on a
+# preflight, and no credentials. Added last so it is outermost and answers a
+# preflight to any path before routing.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
+    allow_headers=["*"],
+)
 public_api = APIRouter(prefix="/api/v1")
 
 
