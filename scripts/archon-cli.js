@@ -1965,9 +1965,10 @@ program
 program
     .command('remove-lightning [id]')
     .description('Remove Lightning wallet from a DID')
-    .action(async (id) => {
+    .option('--force', 'discard every wallet the DID holds, even if funds would be lost or the node cannot be reached')
+    .action(async (id, options) => {
         try {
-            await keymaster.removeLightning(id);
+            await keymaster.removeLightning(id, options.force);
             console.log(UPDATE_OK);
         }
         catch (error) {

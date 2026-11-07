@@ -9,6 +9,7 @@ import {
     KeymasterError,
     CashuInsufficientFundsError,
     CashuStateError,
+    LightningStateError,
     CashuUnavailableError,
     LightningNotConfiguredError,
     LightningUnavailableError,
@@ -41,6 +42,7 @@ describe('statusForError', () => {
         expect(statusForError(new KeymasterError('x'))).toBe(400);
         expect(statusForError(new LightningNotConfiguredError('x'))).toBe(400);
         expect(statusForError(new CashuStateError('x'))).toBe(400);
+        expect(statusForError(new LightningStateError('x'))).toBe(400);
         expect(statusForError(new CashuInsufficientFundsError('x'))).toBe(400);
     });
 

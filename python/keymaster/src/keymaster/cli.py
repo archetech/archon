@@ -853,7 +853,7 @@ async def cmd_add_lightning(km: Keymaster, args: argparse.Namespace) -> None:
 
 
 async def cmd_remove_lightning(km: Keymaster, args: argparse.Namespace) -> None:
-    await km.remove_lightning(args.id)
+    await km.remove_lightning(args.id, args.force)
     print(UPDATE_OK)
 
 
@@ -1726,6 +1726,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("id", nargs="?")
     sp = add("remove-lightning", "Remove Lightning wallet from a DID", cmd_remove_lightning)
     sp.add_argument("id", nargs="?")
+    sp.add_argument(
+        "--force",
+        action="store_true",
+        help="discard every wallet the DID holds, even if funds would be lost or the node cannot be reached",
+    )
     sp = add("lightning-balance", "Check Lightning wallet balance", cmd_lightning_balance)
     sp.add_argument("id", nargs="?")
     sp = add("lightning-decode", "Decode a Lightning BOLT11 invoice", cmd_lightning_decode)

@@ -51,6 +51,10 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
      * /lightning:
      *   delete:
      *     summary: Remove Lightning wallet from the current identity.
+     *     description: >
+     *       Without force, removes the wallet on this node once its balance reads
+     *       zero and it has been unpublished. Force discards every Lightning wallet
+     *       the identity holds, unpublishing if the node can be reached.
      *     requestBody:
      *       required: false
      *       content:
@@ -61,16 +65,19 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
      *               id:
      *                 type: string
      *                 description: Optional identity name or DID.
+     *               force:
+     *                 type: boolean
+     *                 description: Discard the keys whatever the balance, even if the node cannot be reached.
      *     responses:
      *       200:
      *         description: Success.
      *       400:
-     *         description: Error removing Lightning wallet.
+     *         description: Error removing Lightning wallet, or refused because it holds funds, or its balance or publication could not be settled.
      */
     router.delete('/lightning', async (req, res) => {
         try {
-            const { id } = req.body;
-            const ok = await getKeymaster().removeLightning(id);
+            const { id, force } = req.body;
+            const ok = await getKeymaster().removeLightning(id, force);
             res.json({ ok });
         } catch (error: any) {
             sendError(res, error);

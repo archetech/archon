@@ -863,12 +863,34 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
     }
 
-    async function disconnectLightning() {
+    async function removeLightning() {
+        const did = currentDID;
         try {
-            await keymaster.removeLightning();
+            try {
+                await keymaster.removeLightning(did);
+            } catch (error) {
+                // Why Keymaster refused to remove the wallet unforced
+                const text = String(error?.error || error?.message || error);
+                const reason = text.match(/Lightning state present: ([\s\S]*?)(?:; use force[\s\S]*)?$/)?.[1];
+                if (!reason) {
+                    throw error;
+                }
+                const discard = await showConfirm(
+                    `This wallet could not be removed safely: ${reason}. `
+                    + 'Its keys are the only way to reach its funds, and the recovery phrase cannot recreate them. '
+                    + 'Discarding removes every Lightning wallet this identity holds, on any node. If the node '
+                    + 'cannot be reached, the wallet stays published and can still be paid until it is unpublished '
+                    + 'with the unpublish-lightning command. '
+                    + 'Discard it?'
+                );
+                if (!discard) {
+                    return;
+                }
+                await keymaster.removeLightning(did, true);
+            }
             setLightningBalance(null);
             setLightningIsConfigured(false);
-            showSuccess('Lightning wallet disconnected');
+            showSuccess('Lightning wallet removed');
         } catch (error) {
             showError(error);
         }
@@ -7872,8 +7894,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                         ? (isPublished ? 'Unpublishing...' : 'Publishing...')
                                                         : isPublished ? 'Unpublish Lightning' : 'Publish Lightning'}
                                                 </Button>
-                                                <Button variant="outlined" color="error" onClick={disconnectLightning}>
-                                                    Disconnect Wallet
+                                                <Button variant="outlined" color="error" onClick={removeLightning}>
+                                                    Remove Wallet
                                                 </Button>
                                             </Box>
                                         </Box>

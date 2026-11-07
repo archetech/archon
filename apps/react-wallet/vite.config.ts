@@ -18,6 +18,8 @@ export default defineConfig({
         // from the repo root. Two MUI instances means two emotion caches.
         dedupe: ["@mui/lab", "qrcode.react", "@uiw/react-json-view", "@mui/material", "@mui/icons-material", "@emotion/react", "@emotion/styled", "react", "react-dom"],
         alias: {
+            // For the render test of the demo client UI, which imports this subpath.
+            "@didcid/wallet-ui/did-repair": path.resolve(__dirname, "../../packages/wallet-ui/src/components/DIDRepairDialog.tsx"),
             "@didcid/wallet-ui": path.resolve(__dirname, "../../packages/wallet-ui/src/index.ts"),
             "@didcid/cipher/passphrase": path.resolve(__dirname, "../../packages/cipher/dist/esm/passphrase.js"),
             "@didcid/cipher/web": path.resolve(__dirname, "../../packages/cipher/dist/esm/cipher-web.js"),

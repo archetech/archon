@@ -335,7 +335,7 @@ decrement the counter — account numbers are never reused.
 | `POST /api/v1/wallet/backup` | Encrypts the wallet to a new backup asset DID, records that DID on the seed bank document (see §3.5), and returns `{ "ok": "<backup DID>" }`. |
 | `POST /api/v1/wallet/recover` | Restores the wallet from the seed bank using the current passphrase. Returns `{ "wallet": WalletFile }`. |
 | `POST /api/v1/wallet/check` | Walks every DID owned/held/aliased and verifies it resolves. Returns `{ "check": { checked, invalid, deleted } }`. |
-| `POST /api/v1/wallet/fix` | Removes invalid/deleted entries identified by `check`. Returns `{ "fix": { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved, idsKept? } }`; `idsKept` names identities it would have removed but kept because they hold Cashu state. |
+| `POST /api/v1/wallet/fix` | Removes invalid/deleted entries identified by `check`. Returns `{ "fix": { idsRemoved, ownedRemoved, heldRemoved, aliasesRemoved, idsKept? } }`; `idsKept` names identities it would have removed but kept because they hold Cashu state or Lightning keys. |
 | `GET /api/v1/wallet/mnemonic` | Returns the decrypted BIP39 mnemonic as `{ "mnemonic": string }`. |
 | `POST /api/v1/wallet/passphrase` | Body: `{ "passphrase": "<new>" }`. Re-encrypts `mnemonicEnc` and the wallet body with a new passphrase. Returns `{ "ok": boolean }`. |
 | `GET /api/v1/export/wallet/encrypted` | Returns the on-disk `WalletEncFile` (no decryption). Useful for manual backup. |
@@ -468,7 +468,7 @@ identity for asset-creating operations that don't take an explicit owner.
 | `GET /api/v1/ids` | `{ "ids": string[] }` — list of names, alphabetically. |
 | `POST /api/v1/ids` | Body: `{ "name": string, "options"?: { "registry"?: string } }`. Derives a new keypair, creates an `agent` DID via Gatekeeper, stores `IDInfo`. Returns `{ "did": string }`. Increments `counter`. Sets `current` if the wallet had none. |
 | `GET /api/v1/ids/:id` | Resolves the supplied ID name or DID through the same lookup path as `GET /api/v1/did/:id` and returns `{ "docs": DidCidDocument }`. |
-| `DELETE /api/v1/ids/:id` | Removes the ID from the wallet (does NOT deactivate the DID on the gatekeeper). Returns `{ "ok": boolean }`. |
+| `DELETE /api/v1/ids/:id` | Removes the ID from the wallet (does NOT deactivate the DID on the gatekeeper). Refused (400) while the ID holds ecash, open Cashu operations or Lightning keys; remove those first. Returns `{ "ok": boolean }`. |
 | `POST /api/v1/ids/:id/rename` | Body: `{ "name": string }`. Returns `{ "ok": boolean }`. |
 | `POST /api/v1/ids/:id/change-registry` | Body: `{ "registry": string }`. Submits an `update` op moving the DID to the new registry. Returns `{ "ok": boolean }`. |
 | `POST /api/v1/ids/:id/backup` | Anchors a JWE backup of the ID's owned-asset list to its DID document. Returns `{ "ok": boolean }`. |
@@ -1196,7 +1196,7 @@ reach Lightning functionality via the same `DrawbridgeClient`.
 | Route | Behavior |
 | --- | --- |
 | `POST /api/v1/lightning` | `{ "id"?: string }`. Provisions an LNbits wallet for the ID, stores `LightningConfig` in `IDInfo`. |
-| `DELETE /api/v1/lightning` | Decommissions the Lightning wallet. |
+| `DELETE /api/v1/lightning` | `{ "id"?: string, "force"?: boolean }`. Without `force`, removes the wallet on this node once its balance reads zero and it has been unpublished (as `POST /lightning/unpublish`); otherwise 400 `Lightning state present`, keeping the keys, including when the balance can't be read or the unpublish fails. `force: true` discards every Lightning wallet the identity holds and tries to unpublish, so it works with the node unreachable; if that attempt fails the service stays published until `POST /lightning/unpublish` is retried. |
 | `POST /api/v1/lightning/balance` | Returns `LightningBalance` (flat object). |
 | `POST /api/v1/lightning/invoice` | `{ "amount": number, "memo"?: string, "id"?: string }` → `LightningInvoice` (flat object). |
 | `POST /api/v1/lightning/pay` | `{ "bolt11": string, "id"?: string }` → `LightningPayment` (flat object). |

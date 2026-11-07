@@ -5,6 +5,11 @@ import {
     Button,
     Checkbox,
     CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
     FormControlLabel,
     Tab,
     Tabs,
@@ -23,6 +28,12 @@ import EmptyState from "./layout/EmptyState";
 
 const LIGHTNING_PAYMENT_STATUS_CHECKS = 3;
 const LIGHTNING_PAYMENT_STATUS_DELAY_MS = 1000;
+
+// Why Keymaster refused to remove the wallet unforced, or null if it failed some other way.
+function removalRefusal(error: any): string | null {
+    const text = String(error?.error || error?.message || error);
+    return text.match(/Lightning state present: ([\s\S]*?)(?:; use force[\s\S]*)?$/)?.[1] ?? null;
+}
 
 const LightningTab: React.FC = () => {
     const { keymaster } = useWalletContext();
@@ -65,6 +76,9 @@ const LightningTab: React.FC = () => {
     // Publish state
     const [isPublished, setIsPublished] = useState<boolean>(false);
     const [loadingPublishToggle, setLoadingPublishToggle] = useState<boolean>(false);
+
+    // The refusal being asked about, and the identity it is about
+    const [confirmRemoval, setConfirmRemoval] = useState<{ did: string; reason: string } | null>(null);
 
     const fetchBalance = useCallback(async () => {
         if (!keymaster) return;
@@ -126,15 +140,22 @@ const LightningTab: React.FC = () => {
         }
     }
 
-    async function handleDisconnectLightning() {
+    async function handleRemoveLightning(did = currentDID, force = false) {
         if (!keymaster) return;
         try {
-            await keymaster.removeLightning();
-            setBalance(null);
-            setIsConfigured(false);
-            setSuccess("Lightning wallet disconnected");
+            await keymaster.removeLightning(did, force);
+            if (did === currentDID) {
+                setBalance(null);
+                setIsConfigured(false);
+            }
+            setSuccess("Lightning wallet removed");
         } catch (err: any) {
-            setError(err);
+            const reason = force ? null : removalRefusal(err);
+            if (reason) {
+                setConfirmRemoval({ did, reason });
+            } else {
+                setError(err);
+            }
         }
     }
 
@@ -331,9 +352,9 @@ const LightningTab: React.FC = () => {
                                 <Button
                                     variant="outlined"
                                     color="error"
-                                    onClick={handleDisconnectLightning}
+                                    onClick={() => handleRemoveLightning()}
                                 >
-                                    Disconnect Wallet
+                                    Remove Wallet
                                 </Button>
                             </Box>
                         </Box>
@@ -602,6 +623,29 @@ const LightningTab: React.FC = () => {
                     )}
                 </Box>
             )}
+
+            <Dialog open={!!confirmRemoval} onClose={() => setConfirmRemoval(null)}>
+                <DialogTitle>Discard Lightning wallet?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        This wallet could not be removed safely: {confirmRemoval?.reason}.
+                        Its keys are the only way to reach its funds, and the recovery phrase cannot recreate them.
+                        Discarding removes every Lightning wallet this identity holds, on any node. If the node
+                        cannot be reached, the wallet stays published and can still be paid until it is unpublished
+                        with the unpublish-lightning command.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setConfirmRemoval(null)}>Keep It</Button>
+                    <Button color="error" onClick={() => {
+                        const target = confirmRemoval;
+                        setConfirmRemoval(null);
+                        if (target) handleRemoveLightning(target.did, true);
+                    }}>
+                        Discard
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

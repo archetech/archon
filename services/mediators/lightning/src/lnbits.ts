@@ -36,7 +36,12 @@ export async function getBalance(
         const response = await axios.get(`${url}/api/v1/wallet`, {
             headers: { 'X-Api-Key': invoiceKey },
         });
-        const msats = response.data.balance ?? response.data.balance_msat ?? 0;
+        // A reply without a balance is not an empty wallet: Keymaster relies on
+        // this to tell whether removing the wallet would lose funds.
+        const msats = response.data?.balance ?? response.data?.balance_msat;
+        if (typeof msats !== 'number' || !Number.isFinite(msats)) {
+            throw new Error('LNbits returned no wallet balance');
+        }
         return Math.floor(msats / 1000);
     } catch (error: any) {
         throwLnbitsError(error);
