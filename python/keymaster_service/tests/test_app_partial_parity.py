@@ -23,7 +23,8 @@ sys.path.insert(0, str(ROOT.parent / "keymaster" / "src"))
 # so a later test file that reinstalls the real modules does not disturb it --
 # see test_app_error_dispatch.py, which does the mirror image for real fastapi.
 _STUBBED = (
-    "fastapi", "fastapi.responses", "prometheus_client",
+    "fastapi", "fastapi.responses", "fastapi.middleware", "fastapi.middleware.cors",
+    "prometheus_client",
     "starlette", "starlette.middleware", "starlette.middleware.base",
     "keymaster_service.app", "keymaster_service.service",
 )
@@ -35,6 +36,8 @@ def _install_fastapi_stubs() -> None:
 
     fastapi: Any = types.ModuleType("fastapi")
     responses: Any = types.ModuleType("fastapi.responses")
+    fastapi_middleware: Any = types.ModuleType("fastapi.middleware")
+    fastapi_cors: Any = types.ModuleType("fastapi.middleware.cors")
     prometheus: Any = types.ModuleType("prometheus_client")
     starlette: Any = types.ModuleType("starlette")
     starlette_middleware: Any = types.ModuleType("starlette.middleware")
@@ -160,9 +163,16 @@ def _install_fastapi_stubs() -> None:
             self.dispatch = dispatch
 
     starlette_base.BaseHTTPMiddleware = BaseHTTPMiddleware
+    class CORSMiddleware:
+        def __init__(self, app, **kwargs):
+            self.app = app
+
+    fastapi_cors.CORSMiddleware = CORSMiddleware
 
     sys.modules["fastapi"] = fastapi
     sys.modules["fastapi.responses"] = responses
+    sys.modules["fastapi.middleware"] = fastapi_middleware
+    sys.modules["fastapi.middleware.cors"] = fastapi_cors
     sys.modules["prometheus_client"] = prometheus
     sys.modules["starlette"] = starlette
     sys.modules["starlette.middleware"] = starlette_middleware
