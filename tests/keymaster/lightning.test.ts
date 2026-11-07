@@ -453,6 +453,22 @@ describe('removeLightning', () => {
         expect(await keysOf()).toBeUndefined();
     });
 
+    it('treats a refused unpublish reply as a failure', async () => {
+        const did = await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.publishLightning();
+        emptyWallet();
+        gatekeeper.unpublishLightning = () => Promise.resolve(false);
+
+        await expect(keymaster.unpublishLightning()).rejects.toThrow('Drawbridge did not unpublish the DID');
+        await expect(keymaster.removeLightning()).rejects.toThrow(LightningStateError);
+        expect(await keysOf()).toBeDefined();
+        expect((await keymaster.resolveDID(did)).didDocument!.service).toHaveLength(1);
+
+        expect(await keymaster.removeLightning(undefined, true)).toBe(true);
+        expect(await keysOf()).toBeUndefined();
+    });
+
     it('keeps a wallet added while an overlapping removal was in progress', async () => {
         await keymaster.createId('Bob');
         await keymaster.addLightning();
