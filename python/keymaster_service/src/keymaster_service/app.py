@@ -105,16 +105,6 @@ class _PrometheusMiddleware(BaseHTTPMiddleware):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(_PrometheusMiddleware)
-# The settings of the TypeScript service's `app.use(cors())`: any origin, the
-# `cors` package's default methods, the request's own headers allowed on a
-# preflight, and no credentials. Added last so it is outermost and answers a
-# preflight to any path before routing.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
-    allow_headers=["*"],
-)
 public_api = APIRouter(prefix="/api/v1")
 
 
@@ -1203,3 +1193,18 @@ app.include_router(protected_api)
 async def unknown_api(path: str) -> JSONResponse:
     _ = path
     return JSONResponse(status_code=404, content={"message": "Endpoint not found"})
+
+
+# What uvicorn serves: the app inside CORS, with the settings of the TypeScript
+# service's `app.use(cors())` -- any origin, the `cors` package's default
+# methods, the preflight's requested headers allowed, no credentials. It wraps
+# the app rather than going through add_middleware because Starlette puts user
+# middleware inside ServerErrorMiddleware, so a 500 from an unhandled exception
+# would leave without the header; Express's cors() sets it on every response.
+# Being outermost also answers a preflight to any path before routing.
+asgi_app = CORSMiddleware(
+    app,
+    allow_origins=["*"],
+    allow_methods=["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE"],
+    allow_headers=["*"],
+)

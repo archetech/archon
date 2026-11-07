@@ -163,7 +163,11 @@ def _install_fastapi_stubs() -> None:
             self.dispatch = dispatch
 
     starlette_base.BaseHTTPMiddleware = BaseHTTPMiddleware
-    fastapi_cors.CORSMiddleware = object
+    class CORSMiddleware:
+        def __init__(self, app, **kwargs):
+            self.app = app
+
+    fastapi_cors.CORSMiddleware = CORSMiddleware
 
     sys.modules["fastapi"] = fastapi
     sys.modules["fastapi.responses"] = responses

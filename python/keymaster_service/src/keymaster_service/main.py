@@ -32,7 +32,7 @@ def main() -> None:
         if check.warning:
             LOGGER.warning(check.warning)
 
-    uvicorn.run("keymaster_service.app:app", host=settings.bind_address, port=settings.keymaster_port)
+    uvicorn.run("keymaster_service.app:asgi_app", host=settings.bind_address, port=settings.keymaster_port)
 
 
 if __name__ == "__main__":

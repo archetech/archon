@@ -29,9 +29,10 @@ ORIGIN = "http://localhost:4227"
 
 @pytest.fixture
 def client() -> TestClient:
-    # Not entered as a context manager, so the gatekeeper-connecting lifespan
-    # does not run; the routes used here do not need it.
-    return TestClient(app_module.app)
+    # The ASGI app uvicorn serves. Not entered as a context manager, so the
+    # gatekeeper-connecting lifespan does not run; the routes used here do not
+    # need it.
+    return TestClient(app_module.asgi_app, raise_server_exceptions=False)
 
 
 def _preflight(client: TestClient, path: str, method: str, headers: str):
@@ -90,4 +91,19 @@ def test_error_response_allows_any_origin(client, monkeypatch):
     response = client.get("/api/v1/ids", headers={"Origin": ORIGIN})
 
     assert response.status_code == 401
+    assert response.headers["access-control-allow-origin"] == "*"
+
+
+def test_unhandled_exception_response_allows_any_origin(client, monkeypatch):
+    # A body without "wallet" raises KeyError, which only the generic handler
+    # catches. Starlette runs that handler outside all user middleware, so this
+    # 500 is the one response CORS added through add_middleware would miss.
+    monkeypatch.setattr(app_module.settings, "admin_api_key", "a" * 32)
+    response = client.put(
+        "/api/v1/wallet",
+        json={},
+        headers={"Origin": ORIGIN, "X-Archon-Admin-Key": "a" * 32},
+    )
+
+    assert response.status_code == 500
     assert response.headers["access-control-allow-origin"] == "*"
