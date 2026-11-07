@@ -901,7 +901,7 @@ export default class Keymaster implements KeymasterInterface {
         let idInfo = null;
 
         if (id) {
-            if (id.startsWith('did')) {
+            if (id.startsWith('did:')) {
                 for (const name of Object.keys(wallet.ids)) {
                     const info = wallet.ids[name];
 

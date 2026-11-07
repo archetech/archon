@@ -54,6 +54,14 @@ def test_set_current_id_rejects_unknown_name(testbed):
         run(testbed.keymaster.set_current_id("missing"))
 
 
+def test_fetch_id_info_finds_name_starting_with_did(testbed):
+    did = run(testbed.keymaster.create_id("didier"))
+    run(testbed.keymaster.create_id("Bob"))
+
+    assert run(testbed.keymaster.fetch_id_info("didier"))["did"] == did
+    assert run(testbed.keymaster.fetch_id_info(did))["did"] == did
+
+
 def test_alias_crud_and_lookup(testbed):
     did = run(testbed.keymaster.create_id("Bob"))
 
