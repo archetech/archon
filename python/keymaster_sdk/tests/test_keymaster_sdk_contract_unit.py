@@ -404,6 +404,26 @@ def test_did_repair_endpoints(monkeypatch):
     ]
 
 
+
+def test_remove_lightning_sends_the_identity_and_force(monkeypatch):
+    calls = []
+
+    def fake_proxy_request(method, url, **kwargs):
+        calls.append((method, url, kwargs["json"]))
+        return {"ok": True}
+
+    monkeypatch.setattr(sdk, "proxy_request", fake_proxy_request)
+    monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
+
+    assert sdk.remove_lightning("A") is True
+    assert sdk.remove_lightning("A", True) is True
+
+    assert calls == [
+        ("DELETE", "http://unit.test/api/v1/lightning", {"id": "A", "force": False}),
+        ("DELETE", "http://unit.test/api/v1/lightning", {"id": "A", "force": True}),
+    ]
+
+
 def test_cashu_wrappers_forward_expected_requests(monkeypatch):
     calls: list[tuple[str, str, dict]] = []
     replies = {

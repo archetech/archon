@@ -156,6 +156,19 @@ class UnknownIDError(KeymasterError):
     pass
 
 
+class LightningStateError(KeymasterError):
+    type = "Lightning state present"
+
+    def __init__(self, detail: str | None = None) -> None:
+        super().__init__(f"{self.type}: {detail}" if detail else self.type)
+
+
+# The keys are the only way to reach the funds, and come from LNbits, so the
+# recovery phrase cannot recreate them.
+def has_lightning_keys(id_info: dict[str, Any]) -> bool:
+    return bool(id_info.get("lightning"))
+
+
 class GatekeeperProtocol(Protocol):
     url: str
 
@@ -570,6 +583,8 @@ class Keymaster:
                 raise UnknownIDError("Unknown ID")
             if has_cashu_state(wallet["ids"][name]):
                 raise CashuStateError(f"{name} holds ecash or open operations; use removeCashu with force first")
+            if has_lightning_keys(wallet["ids"][name]):
+                raise LightningStateError(f"{name} holds Lightning keys; remove its Lightning wallet first")
             del wallet["ids"][name]
             if wallet.get("current") == name:
                 wallet["current"] = next(iter(wallet["ids"].keys()), "")
@@ -891,30 +906,46 @@ class Keymaster:
 
         return result
 
-    async def remove_lightning(self, name: str | None = None) -> bool:
-        try:
-            await self.get_lightning_config(name)
-        except Exception:
-            pass
+    # Without force, removes the wallet on this node, once it is known to be empty
+    # and unpublished. Force discards every wallet the identity holds and only
+    # tries to unpublish, so that removal still works when the node is unreachable.
+    async def remove_lightning(self, name: str | None = None, force: bool = False) -> bool:
+        # Every step below acts on this DID, whichever identity becomes current.
+        id_info = await self.fetch_id_info(name)
+        did = id_info["did"]
 
-        url = getattr(self.gatekeeper, "url", None)
+        if not has_lightning_keys(id_info):
+            return True
+
+        forced = force is True
+
+        if not forced:
+            try:
+                balance = (await self.get_lightning_balance(did)).get("balance")
+                if isinstance(balance, bool) or not isinstance(balance, (int, float)):
+                    raise KeymasterError("no balance in the reply")
+            except Exception as exc:
+                raise LightningStateError(f"the balance could not be read ({exc}); use force to discard the wallet") from exc
+            if balance != 0:
+                raise LightningStateError(f"the wallet holds {balance} sats; use force to discard it")
+
+        # Before the keys go, or payers would be sent to a wallet nobody can spend from.
+        try:
+            await self._withdraw_lightning(did)
+        except Exception as exc:
+            if not forced:
+                raise LightningStateError(f"the wallet could not be unpublished ({exc}); use force to discard it") from exc
+
+        url = None if forced else self.require_drawbridge().url
+
         async with self._lock:
             wallet = await self.load_wallet()
-            id_info = await self.fetch_id_info(name, wallet)
-            lightning = id_info.get("lightning")
-            if not isinstance(lightning, dict):
-                return True
-
-            if url:
-                lightning_store = dict(lightning)
-                lightning_store.pop(url, None)
-                if lightning_store:
-                    id_info["lightning"] = lightning_store
-                else:
-                    id_info.pop("lightning", None)
-            else:
-                id_info.pop("lightning", None)
-
+            current = await self.fetch_id_info(did, wallet)
+            store = current.get("lightning")
+            if url and isinstance(store, dict):
+                store.pop(url, None)
+            if not url or not store:
+                current.pop("lightning", None)
             await self._save_loaded_wallet(wallet, overwrite=True)
         return True
 
@@ -1002,22 +1033,29 @@ class Keymaster:
         return True
 
     async def unpublish_lightning(self, name: str | None = None) -> bool:
-        drawbridge = self.require_drawbridge()
         id_info = await self.fetch_id_info(name)
-        did = id_info["did"]
+        await self._withdraw_lightning(id_info["did"])
+        return True
+
+    # Takes the DID out of the node's directory and its #lightning service out of
+    # the DID document. Needs no Lightning keys, so it can be retried after they go.
+    async def _withdraw_lightning(self, did: str) -> None:
+        drawbridge = self.require_drawbridge()
         did_suffix = did.split(":")[-1]
         await drawbridge.unpublish_lightning(did_suffix)
 
         doc = await self.resolve_did(did)
         did_document = dict(doc.get("didDocument") or {})
-        services = [service for service in did_document.get("service", []) if service.get("id") != f"{did}#lightning"]
+        existing = did_document.get("service", [])
+        services = [service for service in existing if service.get("id") != f"{did}#lightning"]
+        if len(services) == len(existing):
+            return
         if services:
             did_document["service"] = services
         else:
             did_document.pop("service", None)
         doc["didDocument"] = did_document
         await self.update_did(did, doc)
-        return True
 
     async def zap_lightning(self, identifier: str, amount: int, memo: str | None = None, name: str | None = None) -> dict[str, Any]:
         if not identifier:
@@ -2659,8 +2697,8 @@ class Keymaster:
                     if doc.get("didDocumentMetadata", {}).get("deactivated"):
                         raise KeymasterError("deactivated")
                 except Exception:
-                    # Ecash is value that does not depend on the DID resolving.
-                    if has_cashu_state(wallet["ids"][name]):
+                    # Ecash and Lightning funds do not depend on the DID resolving.
+                    if has_cashu_state(wallet["ids"][name]) or has_lightning_keys(wallet["ids"][name]):
                         ids_kept.append(name)
                         continue
                     del wallet["ids"][name]

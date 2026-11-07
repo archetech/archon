@@ -435,6 +435,18 @@ describe('mcp server tools', () => {
         expect(runtime.keymaster.repairDID).toHaveBeenCalledWith('Alice');
     });
 
+    it('passes force to removeLightning in its argument order', async () => {
+        const server = new FakeServer();
+        const runtime = mockRuntime();
+        registerArchonTools(server, runtime as any, baseConfig);
+
+        expectOk(await server.tools.get('archon_remove_lightning')!.handler({ id: 'Alice', force: true, confirm: true }));
+        expect(runtime.keymaster.removeLightning).toHaveBeenLastCalledWith('Alice', true);
+
+        expectOk(await server.tools.get('archon_remove_lightning')!.handler({ id: 'Alice', confirm: true }));
+        expect(runtime.keymaster.removeLightning).toHaveBeenLastCalledWith('Alice', undefined);
+    });
+
     it('requires explicit confirmation for destructive tools', async () => {
         const server = new FakeServer();
         const runtime = mockRuntime();

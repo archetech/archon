@@ -373,8 +373,8 @@ class StubService:
         self.calls.append(("add_lightning", identifier))
         return {"walletId": "wallet-1", "adminKey": "admin-1", "invoiceKey": "invoice-1"}
 
-    async def remove_lightning(self, identifier: str | None = None) -> bool:
-        self.calls.append(("remove_lightning", identifier))
+    async def remove_lightning(self, identifier: str | None = None, force: bool | None = None) -> bool:
+        self.calls.append(("remove_lightning", identifier, force))
         return True
 
     async def get_lightning_balance(self, identifier: str | None = None):
@@ -1257,7 +1257,7 @@ def test_nostr_handlers(stub_service: StubService):
 
 def test_lightning_handlers(stub_service: StubService):
     added = run(app_module.add_lightning({"id": "Alice"}))
-    removed = run(app_module.remove_lightning({"id": "Alice"}))
+    removed = run(app_module.remove_lightning({"id": "Alice", "force": True}))
     balance = run(app_module.get_lightning_balance({"id": "Alice"}))
     invoice = run(app_module.create_lightning_invoice({"amount": 100, "memo": "coffee", "id": "Alice"}))
     payment = run(app_module.pay_lightning_invoice({"bolt11": "lnbc100...", "id": "Alice"}))
@@ -1281,7 +1281,7 @@ def test_lightning_handlers(stub_service: StubService):
     assert payments == {"payments": [{"paymentHash": "hash1", "amount": 100, "fee": 0, "memo": "received", "pending": False}]}
     assert stub_service.calls == [
         ("add_lightning", "Alice"),
-        ("remove_lightning", "Alice"),
+        ("remove_lightning", "Alice", True),
         ("get_lightning_balance", "Alice"),
         ("create_lightning_invoice", 100, "coffee", "Alice"),
         ("pay_lightning_invoice", "lnbc100...", "Alice"),

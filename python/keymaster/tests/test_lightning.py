@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from keymaster import Keymaster, KeymasterError, UnknownIDError
+from keymaster import Keymaster, KeymasterError, LightningStateError, UnknownIDError
 
 from .helpers import FakeWalletStore, run, make_testbed
 
@@ -49,10 +49,250 @@ def test_add_and_remove_lightning_support_multiple_urls(testbed):
         "http://other-drawbridge": config2,
     }
 
+    _empty_wallet(testbed)
     assert run(testbed.keymaster.remove_lightning()) is True
     assert run(testbed.keymaster.load_wallet())["ids"]["Bob"]["lightning"] == {
         "http://test-drawbridge": config1,
     }
+
+
+def _empty_wallet(testbed):
+    async def balance(_invoice_key):
+        return {"balance": 0}
+
+    testbed.gatekeeper.get_lightning_balance = balance
+
+
+def _fails(message):
+    async def fail(*_args, **_kwargs):
+        raise RuntimeError(message)
+
+    return fail
+
+
+def _keys(testbed, name="Bob"):
+    return run(testbed.keymaster.load_wallet())["ids"][name].get("lightning")
+
+
+def _services(testbed, did):
+    return run(testbed.keymaster.resolve_did(did))["didDocument"].get("service")
+
+
+def _published(testbed, name="Bob"):
+    did = run(testbed.keymaster.create_id(name))
+    run(testbed.keymaster.add_lightning())
+    run(testbed.keymaster.publish_lightning())
+    return did
+
+
+def test_remove_lightning_refuses_while_the_wallet_holds_funds(testbed):
+    did = _published(testbed)
+    testbed.gatekeeper.unpublish_lightning = _fails("must not be called")
+
+    with pytest.raises(LightningStateError, match="holds 1000 sats"):
+        run(testbed.keymaster.remove_lightning())
+
+    assert _keys(testbed)
+    assert len(_services(testbed, did)) == 1
+
+
+@pytest.mark.parametrize("reply", [None, {}, {"balance": True}])
+def test_remove_lightning_treats_an_unreadable_balance_as_a_refusal(testbed, reply):
+    run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.add_lightning())
+
+    async def malformed(_invoice_key):
+        return reply
+
+    testbed.gatekeeper.get_lightning_balance = _fails("LNbits is down") if reply is None else malformed
+
+    with pytest.raises(LightningStateError, match="balance could not be read"):
+        run(testbed.keymaster.remove_lightning())
+
+    assert _keys(testbed)
+
+
+def test_remove_lightning_refuses_a_wallet_on_another_node(testbed):
+    run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.add_lightning())
+    _empty_wallet(testbed)
+    testbed.gatekeeper.url = "http://other-drawbridge"
+
+    with pytest.raises(LightningStateError):
+        run(testbed.keymaster.remove_lightning())
+
+    assert list(_keys(testbed)) == ["http://test-drawbridge"]
+
+
+def test_remove_lightning_unpublishes_an_empty_wallet_keeping_other_services(testbed):
+    did = _published(testbed)
+    doc = run(testbed.keymaster.resolve_did(did))
+    other = {"id": f"{did}#other", "type": "Other", "serviceEndpoint": "https://example.com"}
+    doc["didDocument"]["service"].append(other)
+    run(testbed.keymaster.update_did(did, doc))
+    _empty_wallet(testbed)
+
+    unpublished = []
+    real = testbed.gatekeeper.unpublish_lightning
+
+    async def unpublish(suffix):
+        unpublished.append(suffix)
+        return await real(suffix)
+
+    testbed.gatekeeper.unpublish_lightning = unpublish
+
+    assert run(testbed.keymaster.remove_lightning()) is True
+
+    assert unpublished == [did.split(":")[-1]]
+    assert _services(testbed, did) == [other]
+    assert _keys(testbed) is None
+
+
+def test_remove_lightning_writes_no_did_update_when_never_published(testbed):
+    did = run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.add_lightning())
+    _empty_wallet(testbed)
+    before = run(testbed.keymaster.resolve_did(did))["didDocumentMetadata"].get("versionId")
+
+    assert run(testbed.keymaster.remove_lightning()) is True
+
+    assert run(testbed.keymaster.resolve_did(did))["didDocumentMetadata"].get("versionId") == before
+    assert _keys(testbed) is None
+
+
+def test_remove_lightning_keeps_the_keys_when_it_cannot_unpublish(testbed):
+    did = _published(testbed)
+    _empty_wallet(testbed)
+
+    real_unpublish = testbed.gatekeeper.unpublish_lightning
+    testbed.gatekeeper.unpublish_lightning = _fails("directory is down")
+    with pytest.raises(LightningStateError, match=r"could not be unpublished \(directory is down\)"):
+        run(testbed.keymaster.remove_lightning())
+    assert _keys(testbed)
+
+    testbed.gatekeeper.unpublish_lightning = real_unpublish
+    real_update = testbed.gatekeeper.update_did
+    testbed.gatekeeper.update_did = _fails("gatekeeper is down")
+    with pytest.raises(LightningStateError):
+        run(testbed.keymaster.remove_lightning())
+    assert _keys(testbed)
+
+    testbed.gatekeeper.update_did = real_update
+    assert run(testbed.keymaster.remove_lightning()) is True
+    assert _services(testbed, did) is None
+    assert _keys(testbed) is None
+
+
+def test_force_discards_a_funded_wallet_and_unpublishes_it(testbed):
+    did = _published(testbed)
+    testbed.gatekeeper.get_lightning_balance = _fails("must not be called")
+
+    assert run(testbed.keymaster.remove_lightning(None, True)) is True
+
+    assert _services(testbed, did) is None
+    assert _keys(testbed) is None
+
+
+def test_force_works_with_the_node_unreachable_and_unpublishing_can_follow(testbed):
+    did = _published(testbed)
+    real_unpublish = testbed.gatekeeper.unpublish_lightning
+    testbed.gatekeeper.get_lightning_balance = _fails("node is down")
+    testbed.gatekeeper.unpublish_lightning = _fails("node is down")
+
+    assert run(testbed.keymaster.remove_lightning(None, True)) is True
+    assert _keys(testbed) is None
+    assert len(_services(testbed, did)) == 1
+
+    testbed.gatekeeper.unpublish_lightning = real_unpublish
+    assert run(testbed.keymaster.unpublish_lightning()) is True
+    assert _services(testbed, did) is None
+
+
+def test_force_discards_every_node_the_flat_format_and_without_a_drawbridge(testbed):
+    run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.add_lightning())
+    testbed.gatekeeper.url = "http://other-drawbridge"
+    run(testbed.keymaster.add_lightning())
+
+    run(testbed.keymaster.remove_lightning(None, True))
+    assert _keys(testbed) is None
+
+    wallet = run(testbed.keymaster.load_wallet())
+    wallet["ids"]["Bob"]["lightning"] = {"walletId": "w1", "adminKey": "admin1", "invoiceKey": "invoice1"}
+    run(testbed.keymaster.save_wallet(wallet, True))
+    testbed.gatekeeper.create_lightning_wallet = None
+
+    run(testbed.keymaster.remove_lightning(None, True))
+    assert _keys(testbed) is None
+
+
+@pytest.mark.parametrize("force", ["true", 1, {}])
+def test_remove_lightning_does_not_take_a_truthy_value_for_force(testbed, force):
+    run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.add_lightning())
+
+    with pytest.raises(LightningStateError):
+        run(testbed.keymaster.remove_lightning(None, force))
+
+    assert _keys(testbed)
+
+
+def test_remove_lightning_acts_on_the_named_identity(testbed):
+    run(testbed.keymaster.create_id("Alice"))
+    run(testbed.keymaster.add_lightning())
+    run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.add_lightning())
+    _empty_wallet(testbed)
+
+    run(testbed.keymaster.remove_lightning("Alice"))
+
+    assert _keys(testbed, "Alice") is None
+    assert _keys(testbed, "Bob")
+
+
+def test_remove_lightning_succeeds_with_nothing_configured(testbed):
+    run(testbed.keymaster.create_id("Bob"))
+
+    assert run(testbed.keymaster.remove_lightning()) is True
+
+
+def test_remove_id_refuses_lightning_keys_on_any_node_until_they_are_removed(testbed):
+    run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.add_lightning())
+    testbed.gatekeeper.url = "http://other-drawbridge"
+
+    with pytest.raises(LightningStateError):
+        run(testbed.keymaster.remove_id("Bob"))
+    assert "Bob" in run(testbed.keymaster.load_wallet())["ids"]
+
+    run(testbed.keymaster.remove_lightning("Bob", True))
+
+    assert run(testbed.keymaster.remove_id("Bob")) is True
+
+
+def test_fix_wallet_keeps_a_revoked_identity_holding_keys(testbed):
+    bob = run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.add_lightning())
+    dave = run(testbed.keymaster.create_id("Dave"))
+    run(testbed.keymaster.revoke_did(bob))
+    run(testbed.keymaster.revoke_did(dave))
+
+    result = run(testbed.keymaster.fix_wallet())
+
+    assert result["idsRemoved"] == 1
+    assert result["idsKept"] == ["Bob"]
+    ids = run(testbed.keymaster.load_wallet())["ids"]
+    assert ids["Bob"]["lightning"]
+    assert "Dave" not in ids
+
+
+def test_remove_id_allows_an_empty_lightning_entry(testbed):
+    run(testbed.keymaster.create_id("Bob"))
+    wallet = run(testbed.keymaster.load_wallet())
+    wallet["ids"]["Bob"]["lightning"] = {}
+    run(testbed.keymaster.save_wallet(wallet, True))
+
+    assert run(testbed.keymaster.remove_id("Bob")) is True
 
 
 def test_get_lightning_config_migrates_old_flat_format(testbed):
