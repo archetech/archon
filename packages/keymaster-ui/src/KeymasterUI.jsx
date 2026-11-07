@@ -414,6 +414,22 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     const [lightningStatusFilter, setLightningStatusFilter] = useState({ settled: true, pending: true, failed: true, expired: true });
     const [isPublished, setIsPublished] = useState(false);
     const [loadingPublishToggle, setLoadingPublishToggle] = useState(false);
+    const [loadingLightningSetup, setLoadingLightningSetup] = useState(false);
+    const [loadingLightningDisconnect, setLoadingLightningDisconnect] = useState(false);
+    const [loadingLightningInvoice, setLoadingLightningInvoice] = useState(false);
+    const [loadingLightningPay, setLoadingLightningPay] = useState(false);
+    // Only the invoice on screen counts as reviewed: a slow decode must not put another
+    // invoice's amount beside it, or enable paying it.
+    const reviewedInvoice = decodedInvoice?.invoice === bolt11Input.trim() ? decodedInvoice : null;
+    // Each Lightning handler keeps the currentId of the render that made it, and names
+    // that identity in its calls. It also notes this generation when it starts, and
+    // leaves the panel alone if the generation has moved on: comparing names would let
+    // a result through after a change of identity and back.
+    const lightningGeneration = useRef(0);
+    // A read that a newer one has overtaken must not put older figures back.
+    const latestLightningBalance = useRef(0);
+    const latestLightningPayments = useRef(0);
+    const latestLightningDecode = useRef(0);
     // Inlined rather than imported from @didcid/keymaster: this file is shared with
     // the server-wallet demo, which deliberately depends only on the thin client
     // package. These are stable DIDComm protocol URIs.
@@ -478,6 +494,43 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         }
         // eslint-disable-next-line
     }, [tab]);
+
+    useEffect(() => {
+        // This component holds every identity's panel in one set of state, so what one
+        // identity had on screen, such as an invoice that pays it, is dropped here.
+        lightningGeneration.current++;
+        latestLightningBalance.current++;
+        latestLightningPayments.current++;
+        latestLightningDecode.current++;
+        setLightningTab('wallet');
+        setLightningBalance(null);
+        setLightningIsConfigured(null);
+        setLightningWalletError(null);
+        setLightningReceiveAmount('');
+        setLightningReceiveMemo('');
+        setLightningInvoice('');
+        setBolt11Input('');
+        setDecodedInvoice(null);
+        setLightningPaymentResult(null);
+        setZapDid('');
+        setZapAmount('');
+        setZapMemo('');
+        setLoadingZap(false);
+        setZapResult(null);
+        setLightningPayments([]);
+        setLoadingPayments(false);
+        setLightningStatusFilter({ settled: true, pending: true, failed: true, expired: true });
+        setIsPublished(false);
+        setLoadingPublishToggle(false);
+        setLoadingLightningSetup(false);
+        setLoadingLightningDisconnect(false);
+        setLoadingLightningInvoice(false);
+        setLoadingLightningPay(false);
+        if (currentId && tab === 'lightning') {
+            fetchLightningBalance();
+        }
+        // eslint-disable-next-line
+    }, [currentId]);
 
     useEffect(() => {
         // An invitation names the identity that made it, so it must not survive a
@@ -816,20 +869,22 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     async function fetchLightningBalance() {
+        const read = ++latestLightningBalance.current;
         setLightningWalletError(null);
         try {
-            const result = await keymaster.getLightningBalance();
+            const result = await keymaster.getLightningBalance(currentId);
+            if (read !== latestLightningBalance.current) return;
             setLightningBalance(result.balance);
             setLightningIsConfigured(true);
             // Check publish state
-            if (currentDID) {
-                try {
-                    const doc = await keymaster.resolveDID(currentDID);
-                    const services = doc?.didDocument?.service || [];
-                    setIsPublished(services.some(s => s.id?.endsWith('#lightning')));
-                } catch { /* ignore resolve errors */ }
-            }
+            try {
+                const doc = await keymaster.resolveDID(currentId);
+                if (read !== latestLightningBalance.current) return;
+                const services = doc?.didDocument?.service || [];
+                setIsPublished(services.some(s => s.id?.endsWith('#lightning')));
+            } catch { /* ignore resolve errors */ }
         } catch (error) {
+            if (read !== latestLightningBalance.current) return;
             // KeymasterClient rethrows a REST failure as the reply body, { error }.
             if (error?.type === 'Lightning not configured' || error?.message?.includes('not configured')
                 || error?.error?.includes('Lightning not configured')) {
@@ -842,32 +897,47 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     async function fetchLightningPayments() {
+        const read = ++latestLightningPayments.current;
         setLoadingPayments(true);
         try {
-            const result = await keymaster.getLightningPayments();
-            setLightningPayments(result);
+            const result = await keymaster.getLightningPayments(currentId);
+            if (read === latestLightningPayments.current) {
+                setLightningPayments(result);
+            }
         } catch (error) {
             showError(error);
         } finally {
-            setLoadingPayments(false);
+            if (read === latestLightningPayments.current) {
+                setLoadingPayments(false);
+            }
         }
     }
 
     async function setupLightning() {
+        const generation = lightningGeneration.current;
+        setLoadingLightningSetup(true);
         try {
-            await keymaster.addLightning();
+            await keymaster.addLightning(currentId);
             showSuccess('Lightning wallet set up successfully');
-            await fetchLightningBalance();
+            if (lightningGeneration.current === generation) {
+                await fetchLightningBalance();
+            }
         } catch (error) {
             showError(error);
+        } finally {
+            if (lightningGeneration.current === generation) {
+                setLoadingLightningSetup(false);
+            }
         }
     }
 
     async function removeLightning() {
-        const did = currentDID;
+        const id = currentId;
+        const generation = lightningGeneration.current;
+        setLoadingLightningDisconnect(true);
         try {
             try {
-                await keymaster.removeLightning(did);
+                await keymaster.removeLightning(id);
             } catch (error) {
                 // Why Keymaster refused to remove the wallet unforced
                 const text = String(error?.error || error?.message || error);
@@ -886,13 +956,19 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 if (!discard) {
                     return;
                 }
-                await keymaster.removeLightning(did, true);
+                await keymaster.removeLightning(id, true);
             }
-            setLightningBalance(null);
-            setLightningIsConfigured(false);
+            if (lightningGeneration.current === generation) {
+                setLightningBalance(null);
+                setLightningIsConfigured(false);
+            }
             showSuccess('Lightning wallet removed');
         } catch (error) {
             showError(error);
+        } finally {
+            if (lightningGeneration.current === generation) {
+                setLoadingLightningDisconnect(false);
+            }
         }
     }
 
@@ -902,76 +978,104 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             showAlert('Enter a valid amount in satoshis');
             return;
         }
+        const generation = lightningGeneration.current;
+        setLoadingLightningInvoice(true);
         try {
-            const result = await keymaster.createLightningInvoice(amount, lightningReceiveMemo);
-            setLightningInvoice(result.paymentRequest);
+            const result = await keymaster.createLightningInvoice(amount, lightningReceiveMemo, currentId);
+            if (lightningGeneration.current === generation) {
+                setLightningInvoice(result.paymentRequest);
+            }
         } catch (error) {
             showError(error);
+        } finally {
+            if (lightningGeneration.current === generation) {
+                setLoadingLightningInvoice(false);
+            }
         }
     }
 
     async function decodeLightningInvoice() {
-        if (!bolt11Input.trim()) return;
+        const reading = bolt11Input.trim();
+        if (!reading) return;
+        const read = ++latestLightningDecode.current;
         try {
-            const result = await keymaster.decodeLightningInvoice(bolt11Input.trim());
-            setDecodedInvoice(result);
+            const info = await keymaster.decodeLightningInvoice(reading);
+            if (read === latestLightningDecode.current) {
+                setDecodedInvoice({ invoice: reading, info });
+            }
         } catch (error) {
             showError(error);
         }
     }
 
     async function checkLightningPaymentWithRetry(paymentHash) {
-        let status = await keymaster.checkLightningPayment(paymentHash);
+        let status = await keymaster.checkLightningPayment(paymentHash, currentId);
 
         for (let attempt = 1; attempt < 3 && !status.paid; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 1000));
-            status = await keymaster.checkLightningPayment(paymentHash);
+            status = await keymaster.checkLightningPayment(paymentHash, currentId);
         }
 
         return status;
     }
 
-    async function payLightningInvoice() {
-        if (!bolt11Input.trim()) return;
+    async function payLightningInvoice({ invoice, info }) {
+        const generation = lightningGeneration.current;
+        setLoadingLightningPay(true);
         setLightningPaymentResult(null);
         try {
-            const payment = await keymaster.payLightningInvoice(bolt11Input.trim());
-            const status = await keymaster.checkLightningPayment(payment.paymentHash);
-            setLightningPaymentResult(status);
+            const payment = await keymaster.payLightningInvoice(invoice, currentId);
+            const status = await keymaster.checkLightningPayment(payment.paymentHash, currentId);
             showSuccess('Payment sent successfully');
-            setBolt11Input('');
-            setDecodedInvoice(null);
+            if (lightningGeneration.current === generation) {
+                setLightningPaymentResult(status);
+                setBolt11Input(current => (current.trim() === invoice ? '' : current));
+                setDecodedInvoice(current => (current?.invoice === invoice ? null : current));
+            }
         } catch (error) {
-            if (decodedInvoice?.payment_hash) {
+            if (info.payment_hash) {
                 try {
-                    const status = await keymaster.checkLightningPayment(decodedInvoice.payment_hash);
+                    const status = await keymaster.checkLightningPayment(info.payment_hash, currentId);
                     if (status.paid) {
-                        setLightningPaymentResult(status);
+                        if (lightningGeneration.current === generation) {
+                            setLightningPaymentResult(status);
+                        }
                         showSuccess('Invoice was already paid');
                         return;
                     }
                 } catch { /* fall through to original error */ }
             }
             showError(error);
+        } finally {
+            if (lightningGeneration.current === generation) {
+                setLoadingLightningPay(false);
+            }
         }
     }
 
     async function togglePublishLightning() {
+        const generation = lightningGeneration.current;
         setLoadingPublishToggle(true);
         try {
             if (isPublished) {
-                await keymaster.unpublishLightning();
-                setIsPublished(false);
+                await keymaster.unpublishLightning(currentId);
+                if (lightningGeneration.current === generation) {
+                    setIsPublished(false);
+                }
                 showSuccess('Lightning unpublished — your DID is no longer zappable');
             } else {
-                await keymaster.publishLightning();
-                setIsPublished(true);
+                await keymaster.publishLightning(currentId);
+                if (lightningGeneration.current === generation) {
+                    setIsPublished(true);
+                }
                 showSuccess('Lightning published — your DID is now zappable');
             }
         } catch (error) {
             showError(error);
         } finally {
-            setLoadingPublishToggle(false);
+            if (lightningGeneration.current === generation) {
+                setLoadingPublishToggle(false);
+            }
         }
     }
 
@@ -985,16 +1089,17 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             showAlert('Enter a valid amount in satoshis');
             return;
         }
+        const generation = lightningGeneration.current;
         setLoadingZap(true);
         setZapResult(null);
         try {
             const payment = await keymaster.zapLightning(
                 zapDid.trim(),
                 amount,
-                zapMemo.trim() || undefined
+                zapMemo.trim() || undefined,
+                currentId
             );
             const status = await checkLightningPaymentWithRetry(payment.paymentHash);
-            setZapResult(status);
             if (status.paid) {
                 showSuccess('Zap sent successfully');
             } else if (status.status === 'failed') {
@@ -1002,13 +1107,18 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             } else {
                 showAlert('Zap submitted, but settlement is still pending');
             }
-            setZapDid('');
-            setZapAmount('');
-            setZapMemo('');
+            if (lightningGeneration.current === generation) {
+                setZapResult(status);
+                setZapDid('');
+                setZapAmount('');
+                setZapMemo('');
+            }
         } catch (error) {
             showError(error);
         } finally {
-            setLoadingZap(false);
+            if (lightningGeneration.current === generation) {
+                setLoadingZap(false);
+            }
         }
     }
 
@@ -1103,7 +1213,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
 
     async function selectId(id) {
         try {
-            setSelectedId(id);
             await keymaster.setCurrentId(id);
             await refreshAll();
         } catch (error) {
@@ -7865,7 +7974,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         <Box>
                                             <Typography>No Lightning wallet configured for this identity.</Typography>
                                             <p />
-                                            <Button variant="contained" color="primary" onClick={setupLightning}>
+                                            <Button variant="contained" color="primary" onClick={setupLightning} disabled={loadingLightningSetup}>
                                                 Set Up Lightning
                                             </Button>
                                         </Box>
@@ -7894,7 +8003,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                                         ? (isPublished ? 'Unpublishing...' : 'Publishing...')
                                                         : isPublished ? 'Unpublish Lightning' : 'Publish Lightning'}
                                                 </Button>
-                                                <Button variant="outlined" color="error" onClick={removeLightning}>
+                                                <Button variant="outlined" color="error" onClick={removeLightning} disabled={loadingLightningDisconnect}>
                                                     Remove Wallet
                                                 </Button>
                                             </Box>
@@ -7983,8 +8092,8 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         size="small"
                                     />
                                     <Box>
-                                        <Button variant="contained" color="primary" onClick={createLightningInvoice}>
-                                            Create Invoice
+                                        <Button variant="contained" color="primary" onClick={createLightningInvoice} disabled={loadingLightningInvoice}>
+                                            {loadingLightningInvoice ? 'Creating...' : 'Create Invoice'}
                                         </Button>
                                     </Box>
                                     {lightningInvoice &&
@@ -8032,28 +8141,28 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                                         <Button variant="outlined" onClick={decodeLightningInvoice} disabled={!bolt11Input.trim()}>
                                             Decode
                                         </Button>
-                                        {decodedInvoice &&
-                                            <Button variant="contained" color="primary" onClick={payLightningInvoice}>
-                                                Pay
+                                        {reviewedInvoice &&
+                                            <Button variant="contained" color="primary" onClick={() => payLightningInvoice(reviewedInvoice)} disabled={loadingLightningPay}>
+                                                {loadingLightningPay ? 'Paying...' : 'Pay'}
                                             </Button>
                                         }
                                     </Box>
-                                    {decodedInvoice &&
+                                    {reviewedInvoice &&
                                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                                            {decodedInvoice.amount !== undefined &&
-                                                <Typography variant="body2"><strong>Amount:</strong> {decodedInvoice.amount}</Typography>
+                                            {reviewedInvoice.info.amount !== undefined &&
+                                                <Typography variant="body2"><strong>Amount:</strong> {reviewedInvoice.info.amount}</Typography>
                                             }
-                                            {decodedInvoice.description &&
-                                                <Typography variant="body2"><strong>Description:</strong> {decodedInvoice.description}</Typography>
+                                            {reviewedInvoice.info.description &&
+                                                <Typography variant="body2"><strong>Description:</strong> {reviewedInvoice.info.description}</Typography>
                                             }
-                                            {decodedInvoice.network &&
-                                                <Typography variant="body2"><strong>Network:</strong> {decodedInvoice.network}</Typography>
+                                            {reviewedInvoice.info.network &&
+                                                <Typography variant="body2"><strong>Network:</strong> {reviewedInvoice.info.network}</Typography>
                                             }
-                                            {decodedInvoice.created &&
-                                                <Typography variant="body2"><strong>Created:</strong> {decodedInvoice.created}</Typography>
+                                            {reviewedInvoice.info.created &&
+                                                <Typography variant="body2"><strong>Created:</strong> {reviewedInvoice.info.created}</Typography>
                                             }
-                                            {decodedInvoice.expires &&
-                                                <Typography variant="body2"><strong>Expires:</strong> {decodedInvoice.expires}</Typography>
+                                            {reviewedInvoice.info.expires &&
+                                                <Typography variant="body2"><strong>Expires:</strong> {reviewedInvoice.info.expires}</Typography>
                                             }
                                         </Box>
                                     }

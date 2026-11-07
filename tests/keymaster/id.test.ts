@@ -475,6 +475,19 @@ describe('setCurrentId', () => {
     });
 });
 
+describe('fetchIdInfo', () => {
+    it('should find an ID whose name starts with did', async () => {
+        const did = await keymaster.createId('didier');
+        await keymaster.createId('Bob');
+
+        const byName = await keymaster.fetchIdInfo('didier');
+        const byDid = await keymaster.fetchIdInfo(did);
+
+        expect(byName.did).toBe(did);
+        expect(byDid.did).toBe(did);
+    });
+});
+
 describe('backupId', () => {
     it('should backup a new ID', async () => {
         const name = 'Bob';

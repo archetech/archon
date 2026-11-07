@@ -12,7 +12,7 @@ const { keymaster } = vi.hoisted(() => ({
 }));
 vi.mock('../../../../packages/wallet-ui/src/contexts/WalletProvider', () => ({ useWalletContext: () => ({ keymaster }) }));
 vi.mock('../../../../packages/wallet-ui/src/contexts/VariablesProvider', () => ({
-    useVariablesContext: () => ({ currentDID: 'did:cid:alice', agentList: [] }),
+    useVariablesContext: () => ({ currentId: 'Alice', currentDID: 'did:cid:alice', agentList: [] }),
 }));
 vi.mock('../../../../packages/wallet-ui/src/contexts/SnackbarProvider', () => ({
     useSnackbar: () => ({ setError: vi.fn(), setSuccess: vi.fn(), setWarning: vi.fn() }),

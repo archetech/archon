@@ -50,7 +50,7 @@ describe('removing a Lightning wallet from the demo client', () => {
 
         await user.click(screen.getByRole('button', { name: 'OK' }));
 
-        await waitFor(() => expect(removeLightning).toHaveBeenLastCalledWith(DID, true));
+        await waitFor(() => expect(removeLightning).toHaveBeenLastCalledWith('Alice', true));
         expect(await screen.findByText('Lightning wallet removed')).toBeTruthy();
     });
 

@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LightningTab from '../../../../packages/wallet-ui/src/components/LightningTab';
 
-const DID = 'did:cid:alice';
+const ID = 'Alice';
 
 const { keymaster, snackbar } = vi.hoisted(() => ({
     keymaster: {
@@ -15,7 +15,7 @@ const { keymaster, snackbar } = vi.hoisted(() => ({
 }));
 vi.mock('../../../../packages/wallet-ui/src/contexts/WalletProvider', () => ({ useWalletContext: () => ({ keymaster }) }));
 vi.mock('../../../../packages/wallet-ui/src/contexts/VariablesProvider', () => ({
-    useVariablesContext: () => ({ currentDID: 'did:cid:alice', agentList: [] }),
+    useVariablesContext: () => ({ currentId: ID, agentList: [] }),
 }));
 vi.mock('../../../../packages/wallet-ui/src/contexts/SnackbarProvider', () => ({ useSnackbar: () => snackbar }));
 
@@ -43,7 +43,7 @@ describe('removing a Lightning wallet', () => {
 
         await waitFor(() => expect(snackbar.setSuccess).toHaveBeenCalledWith('Lightning wallet removed'));
         expect(keymaster.removeLightning).toHaveBeenCalledTimes(1);
-        expect(keymaster.removeLightning).toHaveBeenCalledWith(DID, false);
+        expect(keymaster.removeLightning).toHaveBeenCalledWith(ID, false);
         expect(screen.queryByRole('dialog')).toBeNull();
         expect(await screen.findByRole('button', { name: /set up|create|add/i })).toBeTruthy();
     });
@@ -61,7 +61,7 @@ describe('removing a Lightning wallet', () => {
 
         await user.click(screen.getByRole('button', { name: 'Discard' }));
 
-        await waitFor(() => expect(keymaster.removeLightning).toHaveBeenLastCalledWith(DID, true));
+        await waitFor(() => expect(keymaster.removeLightning).toHaveBeenLastCalledWith(ID, true));
         await waitFor(() => expect(snackbar.setSuccess).toHaveBeenCalledWith('Lightning wallet removed'));
     });
 

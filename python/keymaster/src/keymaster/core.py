@@ -473,7 +473,7 @@ class Keymaster:
 
         id_info = None
         if identifier:
-            if identifier.startswith("did"):
+            if identifier.startswith("did:"):
                 for info in wallet["ids"].values():
                     if self.did_match(identifier, info["did"]):
                         id_info = info
