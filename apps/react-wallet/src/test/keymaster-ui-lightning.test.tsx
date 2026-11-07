@@ -336,3 +336,150 @@ describe('KeymasterUI Lightning: away from an identity and back', () => {
         expect(screen.queryByText('hashZ')).toBeNull();
     });
 });
+
+describe('KeymasterUI Lightning: one call at a time', () => {
+    async function openInvoiceForm(user: ReturnType<typeof userEvent.setup>) {
+        await user.click(screen.getByRole('tab', { name: 'Receive' }));
+        fireEvent.change(screen.getByLabelText(/^Amount/), { target: { value: '50' } });
+    }
+
+    async function openZapForm(user: ReturnType<typeof userEvent.setup>) {
+        await user.click(screen.getByRole('tab', { name: 'Zap' }));
+        fireEvent.change(screen.getByLabelText(/^Recipient/), { target: { value: 'Carol' } });
+        fireEvent.change(screen.getByLabelText(/^Amount/), { target: { value: '21' } });
+    }
+
+    async function openPayButton(user: ReturnType<typeof userEvent.setup>) {
+        await user.click(screen.getByRole('tab', { name: 'Send' }));
+        enterInvoice('lnbcA');
+        await user.click(screen.getByRole('button', { name: 'Decode' }));
+        await screen.findByRole('button', { name: 'Pay' });
+    }
+
+    it('pays once on a double click', async () => {
+        const paying = deferred();
+        fns.payLightningInvoice = vi.fn(() => paying.promise);
+        const user = await mount();
+        await openPayButton(user);
+        await user.dblClick(screen.getByRole('button', { name: 'Pay' }));
+
+        expect(fns.payLightningInvoice).toHaveBeenCalledTimes(1);
+        await act(async () => { paying.finish({ paymentHash: 'hashA' }); });
+        await screen.findByText('Payment sent successfully');
+        expect(fns.payLightningInvoice).toHaveBeenCalledTimes(1);
+    });
+
+    it('offers Pay again after a payment that failed', async () => {
+        fns.payLightningInvoice = vi.fn(async () => { throw new Error('no route'); });
+        fns.checkLightningPayment = vi.fn(async () => ({ paid: false }));
+        const user = await mount();
+        await openPayButton(user);
+        await user.click(screen.getByRole('button', { name: 'Pay' }));
+
+        await waitFor(() => expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Pay' }).disabled).toBe(false));
+    });
+
+    it('creates one invoice on a double click, and offers the button again afterwards', async () => {
+        const creating = deferred();
+        fns.createLightningInvoice = vi.fn(() => creating.promise);
+        const user = await mount();
+        await openInvoiceForm(user);
+        await user.dblClick(screen.getByRole('button', { name: 'Create Invoice' }));
+
+        expect(fns.createLightningInvoice).toHaveBeenCalledTimes(1);
+        await act(async () => { creating.finish({ paymentRequest: 'lnbcAlice' }); });
+        expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Create Invoice' }).disabled).toBe(false);
+    });
+
+    it('zaps once on a double click', async () => {
+        fns.zapLightning = vi.fn(() => deferred().promise);
+        const user = await mount();
+        await openZapForm(user);
+        await user.dblClick(screen.getByRole('button', { name: 'Zap' }));
+
+        expect(fns.zapLightning).toHaveBeenCalledTimes(1);
+    });
+
+    it('sets up once on a double click', async () => {
+        fns.addLightning = vi.fn(() => deferred().promise);
+        fns.getLightningBalance.mockRejectedValue(new Error('Lightning not configured'));
+        await mount();
+        const user = userEvent.setup();
+        await user.dblClick(await screen.findByRole('button', { name: 'Set Up Lightning' }));
+
+        expect(fns.addLightning).toHaveBeenCalledTimes(1);
+    });
+
+    it('publishes once on a double click', async () => {
+        fns.publishLightning = vi.fn(() => deferred().promise);
+        await mount();
+        const user = userEvent.setup();
+        await user.dblClick(await screen.findByRole('button', { name: 'Publish Lightning' }));
+
+        expect(fns.publishLightning).toHaveBeenCalledTimes(1);
+    });
+
+    it('disconnects once on a double click', async () => {
+        fns.removeLightning = vi.fn(() => deferred().promise);
+        await mount();
+        const user = userEvent.setup();
+        await user.dblClick(await screen.findByRole('button', { name: 'Disconnect Wallet' }));
+
+        expect(fns.removeLightning).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves the next identity's buttons usable while the last one's calls run", async () => {
+        fns.createLightningInvoice = vi.fn(() => deferred().promise);
+        fns.payLightningInvoice = vi.fn(() => deferred().promise);
+        fns.zapLightning = vi.fn(() => deferred().promise);
+        fns.removeLightning = vi.fn(() => deferred().promise);
+        fns.publishLightning = vi.fn(() => deferred().promise);
+        const user = await mount();
+        await user.click(await screen.findByRole('button', { name: 'Publish Lightning' }));
+        await user.click(screen.getByRole('button', { name: 'Disconnect Wallet' }));
+        await openInvoiceForm(user);
+        await user.click(screen.getByRole('button', { name: 'Create Invoice' }));
+        await openPayButton(user);
+        await user.click(screen.getByRole('button', { name: 'Pay' }));
+        await openZapForm(user);
+        await user.click(screen.getByRole('button', { name: 'Zap' }));
+        await move(user, 'Bob');
+
+        const enabled = (name: string) => expect(screen.getByRole<HTMLButtonElement>('button', { name }).disabled).toBe(false);
+        enabled('Publish Lightning');
+        enabled('Disconnect Wallet');
+        await openInvoiceForm(user);
+        enabled('Create Invoice');
+        await openPayButton(user);
+        enabled('Pay');
+        await openZapForm(user);
+        enabled('Zap');
+    });
+
+    it("leaves the next identity's Set Up button usable while the last one's setup runs", async () => {
+        fns.addLightning = vi.fn(() => deferred().promise);
+        fns.getLightningBalance.mockRejectedValue(new Error('Lightning not configured'));
+        const user = await mount();
+        await user.click(await screen.findByRole('button', { name: 'Set Up Lightning' }));
+        fireEvent.mouseDown(screen.getAllByRole('combobox').find(box => box.textContent === 'Alice')!);
+        await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Bob' }));
+        await waitFor(() => expect(screen.getByRole('tab', { name: 'Lightning' }).getAttribute('aria-selected')).toBe('false'));
+        await user.click(screen.getByRole('tab', { name: 'Lightning' }));
+
+        expect((await screen.findByRole<HTMLButtonElement>('button', { name: 'Set Up Lightning' })).disabled).toBe(false);
+    });
+
+    it("keeps the next identity's call marked busy when the last one's finishes", async () => {
+        const alice = deferred();
+        fns.createLightningInvoice = vi.fn((_amount: number, _memo: string, id: string) => (id === 'Alice' ? alice.promise : deferred().promise));
+        const user = await mount();
+        await openInvoiceForm(user);
+        await user.click(screen.getByRole('button', { name: 'Create Invoice' }));
+        await move(user, 'Bob');
+        await openInvoiceForm(user);
+        await user.click(screen.getByRole('button', { name: 'Create Invoice' }));
+        await act(async () => { alice.finish({ paymentRequest: 'lnbcAlice' }); });
+
+        expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Creating...' }).disabled).toBe(true);
+    });
+});
