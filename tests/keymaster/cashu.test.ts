@@ -450,6 +450,26 @@ describe('sending and receiving', () => {
         expect((await entry(keymaster, 'Carol')).operations).toBeUndefined();
     });
 
+    it('names a token\'s mint for an identity with no mints, before any request', async () => {
+        await keymaster.createId('Erin');
+        const token = getEncodedToken({
+            mint: 'https://other.example',
+            unit: 'sat',
+            proofs: [{ id: mint.keysetId, amount: 1 as never, secret: 'aa', C: `02${'ab'.repeat(32)}` }],
+        });
+        mint.requests = [];
+
+        await expect(keymaster.receiveCashu(token, 'Erin')).rejects.toThrow(CashuMintNotAddedError);
+        await expect(keymaster.receiveCashu(token, 'Erin')).rejects.toThrow('https://other.example');
+        expect(mint.requests).toEqual([]);
+    });
+
+    it('still reports no mints for an operation that names none', async () => {
+        await keymaster.createId('Erin');
+
+        await expect(keymaster.sendCashu(1, undefined, 'Erin')).rejects.toThrow(CashuNotConfiguredError);
+    });
+
     it('rejects a token from a mint the identity has not added, before any request', async () => {
         const { token } = await keymaster.sendCashu(10);
         await keymaster.createId('Dave');

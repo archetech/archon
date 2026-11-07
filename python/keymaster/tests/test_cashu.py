@@ -399,6 +399,20 @@ class TestSendingAndReceiving:
         assert funded.balance("Carol")["spendable"] == 0
         assert "operations" not in funded.entry("Carol")
 
+    def test_names_a_tokens_mint_for_an_identity_with_no_mints(self, funded):
+        token = encode_token("https://other.example", "sat", [{"id": funded.mint.keyset_id, "amount": 1, "secret": "aa", "C": "02" + "ab" * 32}])
+        run(funded.keymaster.create_id("Erin"))
+        funded.mint.requests.clear()
+
+        with pytest.raises(CashuMintNotAddedError, match="https://other.example"):
+            run(funded.keymaster.receive_cashu(token, "Erin"))
+        assert funded.mint.requests == []
+
+    def test_still_reports_no_mints_for_an_operation_that_names_none(self, funded):
+        run(funded.keymaster.create_id("Erin"))
+        with pytest.raises(CashuNotConfiguredError):
+            run(funded.keymaster.send_cashu(1, None, "Erin"))
+
     def test_rejects_a_token_from_an_unadded_mint_before_any_request(self, funded):
         token = encode_token("https://other.example", "sat", [{"id": funded.mint.keyset_id, "amount": 1, "secret": "aa", "C": "02" + "ab" * 32}])
         funded.mint.requests.clear()
