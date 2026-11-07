@@ -16,6 +16,10 @@ function App() {
     // older node, and let the operation fail late if the service really is absent.
     const [hasDidComm, setHasDidComm] = useState(true);
     const [hasCashu, setHasCashu] = useState(false);
+    // Lightning needs a positive answer. The service reaches it through Drawbridge
+    // but points at a bare Gatekeeper by default, which serves neither a manifest nor
+    // Lightning routes, so showing the tab there offers a setup that cannot succeed.
+    const [hasLightning, setHasLightning] = useState(false);
     const [showLogin, setShowLogin] = useState(true);
     const [loginError, setLoginError] = useState('');
 
@@ -46,6 +50,7 @@ function App() {
                 const capabilities = await km.getNodeCapabilities();
                 setHasDidComm(capabilities?.didcomm !== false);
                 setHasCashu(capabilities?.cashu === true);
+                setHasLightning(capabilities?.lightning === true);
             } catch {
                 // Capability manifest unreadable — leave DIDComm visible.
             }
@@ -75,6 +80,7 @@ function App() {
                 <KeymasterUI
                     keymaster={keymaster}
                     title={'Keymaster Server Wallet Demo'}
+                    hasLightning={hasLightning}
                     hasDidComm={hasDidComm}
                     hasCashu={hasCashu}
                     serverUrl={keymasterUrl}

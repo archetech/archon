@@ -156,6 +156,13 @@ class UnknownIDError(KeymasterError):
     pass
 
 
+class LightningNotConfiguredError(KeymasterError):
+    type = "Lightning not configured"
+
+    def __init__(self, detail: str | None = None) -> None:
+        super().__init__(f"{self.type}: {detail}" if detail else self.type)
+
+
 class GatekeeperProtocol(Protocol):
     url: str
 
@@ -734,7 +741,7 @@ class Keymaster:
         lightning = id_info.get("lightning")
 
         if not isinstance(lightning, dict) or not lightning:
-            raise KeymasterError(f"No Lightning wallet configured for {id_info['did']}")
+            raise LightningNotConfiguredError(f"No Lightning wallet configured for {id_info['did']}")
 
         if {"walletId", "adminKey", "invoiceKey"}.issubset(lightning):
             async with self._lock:
@@ -750,7 +757,7 @@ class Keymaster:
 
         config = lightning.get(url) if isinstance(lightning, dict) else None
         if not isinstance(config, dict):
-            raise KeymasterError(f"No Lightning wallet configured for {id_info['did']} on {url}")
+            raise LightningNotConfiguredError(f"No Lightning wallet configured for {id_info['did']} on {url}")
         return config
 
     # Cashu, in cashu.py.
@@ -859,9 +866,8 @@ class Keymaster:
     async def add_lightning(self, name: str | None = None) -> dict[str, Any]:
         try:
             return await self.get_lightning_config(name)
-        except KeymasterError as exc:
-            if not str(exc).startswith("No Lightning wallet configured"):
-                raise
+        except LightningNotConfiguredError:
+            pass
 
         drawbridge = self.require_drawbridge()
         url = drawbridge.url

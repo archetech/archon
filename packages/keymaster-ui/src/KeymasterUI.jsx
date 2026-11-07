@@ -877,7 +877,9 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             } catch { /* ignore resolve errors */ }
         } catch (error) {
             if (read !== latestLightningBalance.current) return;
-            if (error?.type === 'Lightning not configured' || error?.message?.includes('not configured')) {
+            // KeymasterClient rethrows a REST failure as the reply body, { error }.
+            if (error?.type === 'Lightning not configured' || error?.message?.includes('not configured')
+                || error?.error?.includes('Lightning not configured')) {
                 setLightningIsConfigured(false);
             } else {
                 setLightningIsConfigured(true);
