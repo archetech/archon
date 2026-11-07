@@ -318,3 +318,5 @@ These rules apply to coding agents working in this repository.
 - Pushing a release tag runs the Android workflow, whose `softprops/action-gh-release` step uploads the APK to that tag's release and publishes any draft it finds (`draft` defaults to false). Draft GitHub release notes only after that run has finished, or the maintainer loses the chance to review them before they go public.
 
 - Drawbridge proxies must not forward the client's `Accept-Encoding`: fetch has to decode the upstream body, and Node 22's fetch cannot read zstd, which browsers offer only over HTTPS. Run browser checks through a real https host as well, since an http test stack cannot show this; `curl -H 'Accept-Encoding: zstd'` reproduces it.
+
+- In one Compose file, only one service may build a given image tag. Compose labels an image with the service that built it, so sharing a `build:` block leaves the tag with a varying ID and restarts every container on it, including the live CLN node. Other services use `image:` with `pull_policy: never`.

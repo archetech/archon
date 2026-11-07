@@ -1,18 +1,22 @@
 # Shared CLN image. The node and its one-shot rune-init containers (drawbridge-init,
 # rtl-init, lnbits-init) MUST run the same image so the init `lightning-cli` always
 # matches the running lightningd. The CLN version is the base image in
-# docker/Dockerfile.cln; each service can build it, so a node running from a
-# checkout builds the image rather than failing to pull an unpublished one.
-x-cln: &cln
+# docker/Dockerfile.cln. Only the node builds it: Compose labels an image with the
+# service that built it, so several services building one tag leave it with a
+# different ID from build to build, and `up` would restart the node with nothing
+# changed. The init containers never pull, since a node running from a checkout has
+# no published image to pull; they run what the node's build tagged.
+x-cln-init: &cln-init
   image: ghcr.io/archetech/cln
-  build:
-    context: ../..
-    dockerfile: docker/Dockerfile.cln
+  pull_policy: never
 
 services:
   cln-mainnet-node:
     profiles: ["lightning"]
-    <<: *cln
+    image: ghcr.io/archetech/cln
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.cln
     environment:
       - NETWORK=bitcoin
       - ALIAS=${ARCHON_CLN_ALIAS:-archon}
@@ -60,7 +64,7 @@ services:
 
   drawbridge-init:
     profiles: ["lightning"]
-    <<: *cln
+    <<: *cln-init
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -101,7 +105,7 @@ services:
 
   rtl-init:
     profiles: ["lightning"]
-    <<: *cln
+    <<: *cln-init
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
@@ -165,7 +169,7 @@ services:
 
   lnbits-init:
     profiles: ["lightning"]
-    <<: *cln
+    <<: *cln-init
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
