@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
-import { InvalidParameterError, UnknownIDError } from '@didcid/common/errors';
+import { InvalidParameterError, LightningNotConfiguredError, UnknownIDError } from '@didcid/common/errors';
 
 import { createAddressRouter } from '../../services/keymaster/server/src/keymaster-address-router.ts';
 import { createAgentRouter } from '../../services/keymaster/server/src/keymaster-agent-router.ts';
@@ -390,6 +390,18 @@ describe('keymaster server routers', () => {
 
         keymaster.createId.mockRejectedValueOnce(new Error('boom'));
         expect((await send(app, 'POST', '/ids')).status).toBe(500);
+    });
+
+    // A browser client sees only this body, and the Lightning panel offers wallet
+    // setup when it names the type.
+    it('names the type in a Lightning not configured reply', async () => {
+        const { app, keymaster } = mount();
+
+        keymaster.getLightningBalance.mockRejectedValueOnce(new LightningNotConfiguredError('No Lightning wallet configured for did:cid:bob'));
+        const response = await send(app, 'POST', '/lightning/balance');
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain('Lightning not configured');
     });
 });
 

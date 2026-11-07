@@ -189,6 +189,59 @@ function implementedMethods(): Set<string> {
     return found;
 }
 
+function parse(file: string): ts.SourceFile {
+    return ts.createSourceFile(
+        file,
+        readFileSync(file, 'utf-8'),
+        ts.ScriptTarget.Latest,
+        true,
+        scriptKind(file),
+    );
+}
+
+// The has* props KeymasterUI takes. Each one gates a tab, so a client that does not
+// pass it leaves that whole capability unreachable, however many call sites the scan
+// above finds behind it (#1540).
+function keymasterUIGates(): string[] {
+    const gates: string[] = [];
+
+    function visit(node: ts.Node): void {
+        if (ts.isFunctionDeclaration(node) && node.name?.text === 'KeymasterUI') {
+            const props = node.parameters[0].name;
+            if (ts.isObjectBindingPattern(props)) {
+                gates.push(...props.elements.map(element => element.name.getText()).filter(name => /^has[A-Z]/.test(name)));
+            }
+        }
+
+        ts.forEachChild(node, visit);
+    }
+
+    visit(parse('packages/keymaster-ui/src/KeymasterUI.jsx'));
+
+    return gates;
+}
+
+function propsPassedToKeymasterUI(file: string): string[] {
+    const props: string[] = [];
+
+    function visit(node: ts.Node): void {
+        if (
+            (ts.isJsxSelfClosingElement(node) || ts.isJsxOpeningElement(node))
+            && node.tagName.getText() === 'KeymasterUI'
+        ) {
+            props.push(...node.attributes.properties.flatMap(attribute => (
+                ts.isJsxAttribute(attribute) ? [attribute.name.getText()] : []
+            )));
+        }
+
+        ts.forEachChild(node, visit);
+    }
+
+    visit(parse(file));
+
+    return props;
+}
+
 const wallets = capabilities('wallets');
 const clients = capabilities('clients');
 const union = new Set([...wallets, ...clients]);
@@ -247,6 +300,19 @@ describe('UI capability parity', () => {
         const absent = [...union].filter(name => !clients.has(name)).sort();
 
         expect(absent).toStrictEqual(Object.keys(ABSENT_FROM_CLIENTS).sort());
+    });
+
+    it.each([
+        'apps/keymaster-client/src/App.jsx',
+        'apps/gatekeeper-client/src/App.jsx',
+    ])('%s passes every gate KeymasterUI takes', (file) => {
+        const gates = keymasterUIGates();
+        const passed = propsPassedToKeymasterUI(file);
+
+        // Guard the guard: a renamed prop or component would otherwise empty the
+        // list and pass.
+        expect(gates).toContain('hasLightning');
+        expect(gates.filter(gate => !passed.includes(gate))).toStrictEqual([]);
     });
 
     it('gives a reason for every recorded omission', () => {
