@@ -4880,11 +4880,12 @@ class Keymaster:
         return base.rstrip("/")
 
     async def get_node_capabilities(self) -> dict[str, bool] | None:
-        # Fetch (once, memoized) the node's capability manifest. None when the node
-        # exposes no manifest (older node, or node URL is a bare gatekeeper) — callers
+        # Fetch the node's capability manifest. None when the node exposes no manifest
+        # (older node, or node URL is a bare gatekeeper) or the read fails — callers
         # then proceed lazily so we never regress against existing nodes. Public so
         # clients (wallet UIs) can gate optional-feature surfaces on the same signal
         # the gated operations use; None means "unknown", which callers treat as allowed.
+        # A manifest or a 404 is memoized; a failed read is not, so the next call retries.
         if self._node_capabilities is not _UNFETCHED:
             return self._node_capabilities
         node_url = getattr(self.gatekeeper, "url", None)
@@ -4895,10 +4896,13 @@ class Keymaster:
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:  # fail-fast, matches the JS client
                 response = await client.get(f"{node_url}/api/v1/capabilities")
-            self._node_capabilities = response.json() if response.is_success else None
+            if response.is_success:
+                self._node_capabilities = response.json()
+            elif response.status_code == 404:
+                self._node_capabilities = None
         except Exception:
-            self._node_capabilities = None
-        return self._node_capabilities
+            pass  # unknown for now; leave unmemoized so a later call retries
+        return None if self._node_capabilities is _UNFETCHED else self._node_capabilities
 
     async def _require_node_capability(self, capability: str, human_name: str) -> None:
         # Throw clearly when the node explicitly does not offer a capability. Unknown
