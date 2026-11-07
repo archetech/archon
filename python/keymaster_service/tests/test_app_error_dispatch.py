@@ -220,7 +220,9 @@ def test_lightning_routes_accept_a_request_with_no_body(monkeypatch):
     calls = []
 
     def stub(name, result):
-        async def method(identifier):
+        # remove_lightning also takes force, absent here like the identity.
+        async def method(identifier, *absent):
+            assert not any(absent)
             calls.append((name, identifier))
             return result
 

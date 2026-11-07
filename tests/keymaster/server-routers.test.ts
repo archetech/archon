@@ -468,7 +468,9 @@ describe('keymaster lightning routes', () => {
 
         await (method === 'POST' ? agent.post(path) : agent.delete(path)).expect(200);
 
-        expect(keymaster[name]).toHaveBeenCalledWith(undefined);
+        // removeLightning also takes force, absent here like the identity.
+        expect(keymaster[name].mock.calls[0].every((arg: unknown) => arg === undefined)).toBe(true);
+        expect(keymaster[name]).toHaveBeenCalledTimes(1);
     });
 });
 

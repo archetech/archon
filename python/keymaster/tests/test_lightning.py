@@ -177,6 +177,19 @@ def test_remove_lightning_keeps_the_keys_when_it_cannot_unpublish(testbed):
         run(testbed.keymaster.remove_lightning())
     assert _keys(testbed)
 
+    async def rejected(_operation):
+        return False
+
+    testbed.gatekeeper.update_did = rejected
+    for call in (
+        testbed.keymaster.remove_lightning,
+        testbed.keymaster.unpublish_lightning,
+        testbed.keymaster.publish_lightning,
+    ):
+        with pytest.raises(KeymasterError, match="the DID update was rejected"):
+            run(call())
+    assert _keys(testbed)
+
     testbed.gatekeeper.update_did = real_update
     assert run(testbed.keymaster.remove_lightning()) is True
     assert _services(testbed, did) is None
@@ -190,6 +203,18 @@ def test_force_discards_a_funded_wallet_and_unpublishes_it(testbed):
     assert run(testbed.keymaster.remove_lightning(None, True)) is True
 
     assert _services(testbed, did) is None
+    assert _keys(testbed) is None
+
+
+def test_force_discards_the_keys_even_if_the_did_update_is_rejected(testbed):
+    _published(testbed)
+
+    async def rejected(_operation):
+        return False
+
+    testbed.gatekeeper.update_did = rejected
+
+    assert run(testbed.keymaster.remove_lightning(None, True)) is True
     assert _keys(testbed) is None
 
 

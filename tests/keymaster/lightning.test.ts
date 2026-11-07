@@ -441,6 +441,12 @@ describe('removeLightning', () => {
         await expect(keymaster.removeLightning()).rejects.toThrow(LightningStateError);
         expect(await keysOf()).toBeDefined();
 
+        gatekeeper.updateDID = () => Promise.resolve(false);
+        await expect(keymaster.removeLightning()).rejects.toThrow('the DID update was rejected');
+        await expect(keymaster.unpublishLightning()).rejects.toThrow('the DID update was rejected');
+        await expect(keymaster.publishLightning()).rejects.toThrow('the DID update was rejected');
+        expect(await keysOf()).toBeDefined();
+
         gatekeeper.updateDID = updateDID;
         expect(await keymaster.removeLightning()).toBe(true);
         expect((await keymaster.resolveDID(did)).didDocument!.service).toBeUndefined();
@@ -458,6 +464,17 @@ describe('removeLightning', () => {
         expect(calls.some(call => call.method === 'getLightningBalance')).toBe(false);
         expect(calls.some(call => call.method === 'unpublishLightning')).toBe(true);
         expect((await keymaster.resolveDID(did)).didDocument!.service).toBeUndefined();
+        expect(await keysOf()).toBeUndefined();
+    });
+
+    it('force discards the keys even if the DID update is rejected', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        await keymaster.publishLightning();
+        gatekeeper.updateDID = () => Promise.resolve(false);
+
+        expect(await keymaster.removeLightning(undefined, true)).toBe(true);
+
         expect(await keysOf()).toBeUndefined();
     });
 

@@ -1029,7 +1029,8 @@ class Keymaster:
         )
         did_document["service"] = services
         doc["didDocument"] = did_document
-        await self.update_did(did, doc)
+        if not await self.update_did(did, doc):
+            raise KeymasterError("the DID update was rejected")
         return True
 
     async def unpublish_lightning(self, name: str | None = None) -> bool:
@@ -1055,7 +1056,8 @@ class Keymaster:
         else:
             did_document.pop("service", None)
         doc["didDocument"] = did_document
-        await self.update_did(did, doc)
+        if not await self.update_did(did, doc):
+            raise KeymasterError("the DID update was rejected")
 
     async def zap_lightning(self, identifier: str, amount: int, memo: str | None = None, name: str | None = None) -> dict[str, Any]:
         if not identifier:

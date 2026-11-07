@@ -4333,7 +4333,9 @@ export default class Keymaster implements KeymasterInterface {
         });
 
         doc.didDocument!.service = filtered;
-        await this.updateDID(did, doc);
+        if (!await this.updateDID(did, doc)) {
+            throw new KeymasterError('the DID update was rejected');
+        }
 
         return true;
     }
@@ -4369,7 +4371,9 @@ export default class Keymaster implements KeymasterInterface {
             delete doc.didDocument!.service;
         }
 
-        await this.updateDID(did, doc);
+        if (!await this.updateDID(did, doc)) {
+            throw new KeymasterError('the DID update was rejected');
+        }
     }
 
     async zapLightning(id: string, amount: number, memo?: string, name?: string): Promise<LightningPayment> {
