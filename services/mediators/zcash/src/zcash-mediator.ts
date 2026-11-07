@@ -19,6 +19,7 @@ import promClient from 'prom-client';
 import axios from 'axios';
 import { planScanStart, type ChainReader } from './reorg.js';
 import { waitForWallet } from './wallet-wait.js';
+import { readWalletFunding } from './wallet-funding.js';
 
 const REGISTRY = config.chain;
 
@@ -126,6 +127,16 @@ const zcashImportLoopRunning = new promClient.Gauge({
 const zcashExportLoopRunning = new promClient.Gauge({
     name: 'zcash_export_loop_running',
     help: '1 if export loop is currently executing',
+});
+
+const zcashWalletInsufficientFunds = new promClient.Gauge({
+    name: 'zcash_wallet_insufficient_funds',
+    help: '1 if the last balance check found the wallet below the level needed to anchor',
+});
+
+const zcashWalletUnreachable = new promClient.Gauge({
+    name: 'zcash_wallet_unreachable',
+    help: '1 if the last balance check could not reach the wallet service',
 });
 
 // Counters
@@ -666,6 +677,13 @@ async function replaceByFee(): Promise<boolean> {
     return true;
 }
 
+function readFunding() {
+    return readWalletFunding(walletGetBalance, ({ balance }) => balance < config.feeMax, {
+        insufficientFunds: zcashWalletInsufficientFunds,
+        unreachable: zcashWalletUnreachable,
+    });
+}
+
 async function checkExportInterval(): Promise<boolean> {
     const db = await loadDb();
 
@@ -699,9 +717,9 @@ async function anchorBatch(): Promise<void> {
 
     try {
         try {
-            const { balance } = await walletGetBalance();
+            const { wallet: { balance }, belowFloor } = await readFunding();
 
-            if (balance < config.feeMax) {
+            if (belowFloor) {
                 const address = await walletGetAddress();
                 console.log(`Wallet has insufficient funds (${balance}). Send ${config.chain} to ${address}`);
                 return;
@@ -913,6 +931,20 @@ async function waitForChain() {
     );
 
     console.log(`Wallet balance: ${balance}, funding address: ${address}`);
+
+    // Metrics are served after this returns, so without a reading here a restart
+    // would report the wallet as funded until the first export pass. Skipped while
+    // an anchor is unconfirmed: its change is not yet in the confirmed balance, and
+    // the export pass does not read the balance again until it confirms.
+    try {
+        const db = await loadDb();
+
+        if (!db.pending?.txids) {
+            await readFunding();
+        }
+    } catch {
+        console.log(`${config.chain} wallet funding could not be read at startup`);
+    }
 
     return true;
 }

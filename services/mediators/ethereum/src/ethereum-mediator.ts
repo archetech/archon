@@ -12,6 +12,7 @@ import { planAnchor } from './batch.js';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem } from './types.js';
 import { waitForWallet } from './wallet-wait.js';
+import { readWalletFunding } from './wallet-funding.js';
 import express from 'express';
 import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
@@ -162,6 +163,16 @@ const ethereumImportLoopRunning = new promClient.Gauge({
 const ethereumExportLoopRunning = new promClient.Gauge({
     name: 'ethereum_export_loop_running',
     help: '1 if export loop is currently executing',
+});
+
+const ethereumWalletInsufficientFunds = new promClient.Gauge({
+    name: 'ethereum_wallet_insufficient_funds',
+    help: '1 if the last balance check found the wallet below the level needed to anchor',
+});
+
+const ethereumWalletUnreachable = new promClient.Gauge({
+    name: 'ethereum_wallet_unreachable',
+    help: '1 if the last balance check could not reach the wallet service',
 });
 
 const ethereumImportErrors = new promClient.Counter({
@@ -717,6 +728,13 @@ async function checkPendingTransactions(pending: NonNullable<MediatorDb['pending
     return txids.length > 0;
 }
 
+function readFunding() {
+    return readWalletFunding(walletGetBalance, ({ balanceWei }) => BigInt(balanceWei) < config.minGasBalanceWei, {
+        insufficientFunds: ethereumWalletInsufficientFunds,
+        unreachable: ethereumWalletUnreachable,
+    });
+}
+
 async function checkExportInterval(): Promise<boolean> {
     const db = await loadDb();
 
@@ -745,8 +763,8 @@ async function anchorBatch(): Promise<void> {
 
     try {
         try {
-            const { balance, balanceWei } = await walletGetBalance();
-            if (BigInt(balanceWei) < config.minGasBalanceWei) {
+            const { wallet: { balance }, belowFloor } = await readFunding();
+            if (belowFloor) {
                 const address = await walletGetAddress();
                 console.log(`Wallet has ${balance} ETH, below gas floor ${config.minGasBalanceWei} wei. Send ${config.chain} gas funds to ${address}`);
                 return;
@@ -967,6 +985,14 @@ async function waitForChain() {
     );
 
     console.log(`Wallet balance: ${balance}, funding address: ${address}`);
+
+    // Metrics are served after this returns, so without a reading here a restart
+    // would report the wallet as funded until the first export pass.
+    try {
+        await readFunding();
+    } catch {
+        console.log(`${config.chain} wallet funding could not be read at startup`);
+    }
 
     return true;
 }

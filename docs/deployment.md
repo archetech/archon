@@ -868,6 +868,32 @@ GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=your-secure-password
 ```
 
+### Alerts
+
+Grafana is also pre-provisioned with one alert rule, **Mediator wallet cannot fund anchoring**. Each chain mediator (Bitcoin, Zcash, Ethereum, Solana) exports `<chain>_wallet_insufficient_funds`, set to 1 while its wallet is below the level that node requires to anchor (`ARCHON_*_FEE_MAX`, `ARCHON_ETH_MIN_GAS_BALANCE_WEI`, `ARCHON_SOL_MIN_BALANCE_LAMPORTS`). The rule fires after 5 minutes in that state, with one alert for each affected mediator. Email goes out when it fires, every 4 hours while it continues, and once when it clears. A mediator that the node does not run reports nothing and does not alert. A wallet service the mediator cannot reach is reported separately as `<chain>_wallet_unreachable` and is not treated as low funds. The mediator dashboards show both.
+
+By default the alert is visible only under **Alerting > Alert rules** in Grafana, and nothing is sent. To receive it by email, add these to `.env` and recreate Grafana with `docker compose up -d grafana`:
+
+| Setting | Required | Value |
+|---------|----------|-------|
+| `ARCHON_ALERT_EMAIL_TO` | Yes; turns email on | Recipient, or several separated by `;` |
+| `ARCHON_ALERT_SMTP_HOST` | Yes | Mail server as `host:port` |
+| `ARCHON_ALERT_SMTP_FROM` | Yes | Address the email is sent from |
+| `ARCHON_ALERT_SMTP_USER` | If the server requires login | Login name |
+| `ARCHON_ALERT_SMTP_PASSWORD` | If the server requires login | Login password; single-quote it if it contains `$` |
+
+```env
+ARCHON_ALERT_EMAIL_TO=operator@example.com
+ARCHON_ALERT_SMTP_HOST=smtp.example.com:587
+ARCHON_ALERT_SMTP_USER=alerts@example.com
+ARCHON_ALERT_SMTP_PASSWORD=your-smtp-password
+ARCHON_ALERT_SMTP_FROM=alerts@example.com
+```
+
+Grafana sends a login only over an encrypted connection, so a server that requires one must offer STARTTLS or TLS. Keep the password in `.env`, which git ignores, like the other secrets. Removing `ARCHON_ALERT_EMAIL_TO` and recreating Grafana stops the email and removes the contact point.
+
+The repo provisions Grafana's notification policy, so Grafana shows it as read-only and replaces any policy tree created in its UI.
+
 ---
 
 ## 11. Port Reference

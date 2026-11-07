@@ -1,0 +1,29 @@
+# Alert delivery while ARCHON_ALERT_EMAIL_TO is unset; compose mounts
+# alert-email/delivery.yaml over this file once it is set.
+#
+# Grafana's default policy would try to mail the alert and log an SMTP error each
+# time. Provisioning an email contact point with an empty recipient is no answer
+# either: Grafana refuses to start. So the alert is muted, which leaves it visible
+# under Alerting in Grafana with nothing sent.
+apiVersion: 1
+
+muteTimes:
+  - orgId: 1
+    name: archon-no-alert-destination
+    time_intervals:
+      - weekdays: ['sunday:saturday']
+
+policies:
+  - orgId: 1
+    receiver: grafana-default-email
+    routes:
+      - receiver: grafana-default-email
+        object_matchers:
+          - ['archon_alert', '=', 'mediator-wallet-funds']
+        mute_time_intervals:
+          - archon-no-alert-destination
+
+# Removes the recipient's address from Grafana's database when email is turned off.
+deleteContactPoints:
+  - orgId: 1
+    uid: archon-alert-email
