@@ -147,6 +147,43 @@ describe('Lightning view: one identity at a time', () => {
         expect(screen.queryByDisplayValue('lnbcAlice')).toBeNull();
     });
 
+    it('keeps a slow invoice from the first visit out of a later one by the same identity', async () => {
+        const creating = deferred<{ paymentRequest: string }>();
+        keymaster.createLightningInvoice.mockReturnValueOnce(creating.promise);
+        keymaster.createLightningInvoice.mockResolvedValue({ paymentRequest: 'lnbcNewer' });
+        const { rerender } = render(<LightningTab />);
+        let user = await openTab('Receive');
+        fireEvent.change(screen.getByLabelText(/^Amount/), { target: { value: '50' } });
+        await user.click(screen.getByRole('button', { name: 'Create Invoice' }));
+
+        moveTo('Bob', rerender);
+        moveTo('Alice', rerender);
+        user = await openTab('Receive');
+        fireEvent.change(screen.getByLabelText(/^Amount/), { target: { value: '60' } });
+        await user.click(screen.getByRole('button', { name: 'Create Invoice' }));
+        expect(await screen.findByDisplayValue('lnbcNewer')).toBeTruthy();
+
+        await act(async () => { creating.finish({ paymentRequest: 'lnbcOlder' }); });
+        expect(screen.getByDisplayValue('lnbcNewer')).toBeTruthy();
+        expect(screen.queryByDisplayValue('lnbcOlder')).toBeNull();
+    });
+
+    it('does not offer Pay to the next identity on the strength of a decode the last one started', async () => {
+        const slow = deferred();
+        keymaster.decodeLightningInvoice.mockReturnValue(slow.promise);
+        const { rerender } = render(<LightningTab />);
+        const user = await openTab('Send');
+        enterInvoice(INVOICE_A);
+        await user.click(screen.getByRole('button', { name: 'Decode' }));
+
+        moveTo('Bob', rerender);
+        await openTab('Send');
+        enterInvoice(INVOICE_A);
+        await act(async () => { slow.finish(details); });
+        expect(screen.queryByText('5 sats')).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Pay' })).toBeNull();
+    });
+
     it('checks a finished payment under the identity that paid, after the view moves on', async () => {
         const paying = deferred<{ paymentHash: string }>();
         keymaster.payLightningInvoice.mockReturnValue(paying.promise);

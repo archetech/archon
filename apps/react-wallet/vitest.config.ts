@@ -1,3 +1,4 @@
+import path from 'path';
 import { defineConfig, mergeConfig } from 'vitest/config';
 import viteConfig from './vite.config';
 
@@ -14,14 +15,20 @@ export default mergeConfig(viteConfig, defineConfig({
     // keeps the test path from depending on that.
     esbuild: { jsx: 'automatic' },
     resolve: {
-        alias: {
+        // A list, because merging one goes ahead of the app's aliases, where a
+        // merged object would leave `@didcid/wallet-ui` to match first.
+        alias: [
             // The app aliases `buffer` to the browser polyfill, whose Buffer is
             // not the Uint8Array that @noble/hashes accepts once bip39 hands a
             // seed to the HD key derivation -- it fails with "Uint8Array
             // expected" before a wallet can be created. Under Node the native
             // Buffer already is one, so the polyfill is only in the way here.
-            buffer: 'node:buffer',
-        },
+            { find: 'buffer', replacement: 'node:buffer' },
+            // The app imports the shared UI whole. KeymasterUI, which a test mounts
+            // here, imports these entry points of it.
+            { find: '@didcid/wallet-ui/did-repair', replacement: path.resolve(__dirname, '../../packages/wallet-ui/src/components/DIDRepairDialog.tsx') },
+            { find: '@didcid/wallet-ui/cashu', replacement: path.resolve(__dirname, '../../packages/wallet-ui/src/components/CashuView.tsx') },
+        ],
     },
     test: {
         environment: 'jsdom',

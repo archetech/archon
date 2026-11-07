@@ -418,10 +418,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     // invoice's amount beside it, or enable paying it.
     const reviewedInvoice = decodedInvoice?.invoice === bolt11Input.trim() ? decodedInvoice : null;
     // Each Lightning handler keeps the currentId of the render that made it, and names
-    // that identity in its calls. This ref is the identity on screen now, so that a
-    // result arriving after a change of identity stays out of the new one's panel.
-    const lightningIdentityRef = useRef(currentId);
-    lightningIdentityRef.current = currentId;
+    // that identity in its calls. It also notes this generation when it starts, and
+    // leaves the panel alone if the generation has moved on: comparing names would let
+    // a result through after a change of identity and back.
+    const lightningGeneration = useRef(0);
     // A read that a newer one has overtaken must not put older figures back.
     const latestLightningBalance = useRef(0);
     const latestLightningPayments = useRef(0);
@@ -494,8 +494,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     useEffect(() => {
         // This component holds every identity's panel in one set of state, so what one
         // identity had on screen, such as an invoice that pays it, is dropped here.
+        lightningGeneration.current++;
         latestLightningBalance.current++;
         latestLightningPayments.current++;
+        latestLightningDecode.current++;
         setLightningTab('wallet');
         setLightningBalance(null);
         setLightningIsConfigured(null);
@@ -859,7 +861,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     async function fetchLightningBalance() {
-        if (lightningIdentityRef.current !== currentId) return;
         const read = ++latestLightningBalance.current;
         setLightningWalletError(null);
         try {
@@ -886,7 +887,6 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     async function fetchLightningPayments() {
-        if (lightningIdentityRef.current !== currentId) return;
         const read = ++latestLightningPayments.current;
         setLoadingPayments(true);
         try {
@@ -904,20 +904,26 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     async function setupLightning() {
+        const generation = lightningGeneration.current;
         try {
             await keymaster.addLightning(currentId);
             showSuccess('Lightning wallet set up successfully');
-            await fetchLightningBalance();
+            if (lightningGeneration.current === generation) {
+                await fetchLightningBalance();
+            }
         } catch (error) {
             showError(error);
         }
     }
 
     async function disconnectLightning() {
+        const generation = lightningGeneration.current;
         try {
             await keymaster.removeLightning(currentId);
-            setLightningBalance(null);
-            setLightningIsConfigured(false);
+            if (lightningGeneration.current === generation) {
+                setLightningBalance(null);
+                setLightningIsConfigured(false);
+            }
             showSuccess('Lightning wallet disconnected');
         } catch (error) {
             showError(error);
@@ -930,9 +936,10 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             showAlert('Enter a valid amount in satoshis');
             return;
         }
+        const generation = lightningGeneration.current;
         try {
             const result = await keymaster.createLightningInvoice(amount, lightningReceiveMemo, currentId);
-            if (lightningIdentityRef.current === currentId) {
+            if (lightningGeneration.current === generation) {
                 setLightningInvoice(result.paymentRequest);
             }
         } catch (error) {
@@ -966,12 +973,13 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     async function payLightningInvoice({ invoice, info }) {
+        const generation = lightningGeneration.current;
         setLightningPaymentResult(null);
         try {
             const payment = await keymaster.payLightningInvoice(invoice, currentId);
             const status = await keymaster.checkLightningPayment(payment.paymentHash, currentId);
             showSuccess('Payment sent successfully');
-            if (lightningIdentityRef.current === currentId) {
+            if (lightningGeneration.current === generation) {
                 setLightningPaymentResult(status);
                 setBolt11Input(current => (current.trim() === invoice ? '' : current));
                 setDecodedInvoice(current => (current?.invoice === invoice ? null : current));
@@ -981,7 +989,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
                 try {
                     const status = await keymaster.checkLightningPayment(info.payment_hash, currentId);
                     if (status.paid) {
-                        if (lightningIdentityRef.current === currentId) {
+                        if (lightningGeneration.current === generation) {
                             setLightningPaymentResult(status);
                         }
                         showSuccess('Invoice was already paid');
@@ -994,17 +1002,18 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
     }
 
     async function togglePublishLightning() {
+        const generation = lightningGeneration.current;
         setLoadingPublishToggle(true);
         try {
             if (isPublished) {
                 await keymaster.unpublishLightning(currentId);
-                if (lightningIdentityRef.current === currentId) {
+                if (lightningGeneration.current === generation) {
                     setIsPublished(false);
                 }
                 showSuccess('Lightning unpublished — your DID is no longer zappable');
             } else {
                 await keymaster.publishLightning(currentId);
-                if (lightningIdentityRef.current === currentId) {
+                if (lightningGeneration.current === generation) {
                     setIsPublished(true);
                 }
                 showSuccess('Lightning published — your DID is now zappable');
@@ -1012,7 +1021,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         } catch (error) {
             showError(error);
         } finally {
-            if (lightningIdentityRef.current === currentId) {
+            if (lightningGeneration.current === generation) {
                 setLoadingPublishToggle(false);
             }
         }
@@ -1028,6 +1037,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             showAlert('Enter a valid amount in satoshis');
             return;
         }
+        const generation = lightningGeneration.current;
         setLoadingZap(true);
         setZapResult(null);
         try {
@@ -1045,7 +1055,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
             } else {
                 showAlert('Zap submitted, but settlement is still pending');
             }
-            if (lightningIdentityRef.current === currentId) {
+            if (lightningGeneration.current === generation) {
                 setZapResult(status);
                 setZapDid('');
                 setZapAmount('');
@@ -1054,7 +1064,7 @@ function KeymasterUI({ keymaster, title, challengeDID, onWalletUpload, hasLightn
         } catch (error) {
             showError(error);
         } finally {
-            if (lightningIdentityRef.current === currentId) {
+            if (lightningGeneration.current === generation) {
                 setLoadingZap(false);
             }
         }
