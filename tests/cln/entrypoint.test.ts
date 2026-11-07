@@ -150,6 +150,22 @@ describe('config', () => {
         expect(config()).not.toMatch(/dual-fund|funder/);
     });
 
+    it('leaves the Bitcoin RPC timeout to lightningd by default', () => {
+        expect(run({}).status).toBe(0);
+        expect(config()).not.toContain('bitcoin-rpcclienttimeout');
+    });
+
+    it('sets the Bitcoin RPC timeout from BITCOIN_RPCCLIENTTIMEOUT', () => {
+        expect(run({ BITCOIN_RPCCLIENTTIMEOUT: '300' }).status).toBe(0);
+        expect(lines()).toContain('bitcoin-rpcclienttimeout=300');
+    });
+
+    it.each(['0', '5m', '-1'])('refuses a Bitcoin RPC timeout of %s', (value) => {
+        const result = run({ BITCOIN_RPCCLIENTTIMEOUT: value });
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('BITCOIN_RPCCLIENTTIMEOUT');
+    });
+
     it('reads the RPC password from BITCOIN_RPCPASSWORD_FILE', () => {
         const secret = join(root, 'password');
         writeFileSync(secret, 'from-file\n');

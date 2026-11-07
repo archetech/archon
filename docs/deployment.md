@@ -711,6 +711,7 @@ ARCHON_BTC_PASS=bitcoin
 | `ARCHON_CLN_P2P_BIND` | `127.0.0.1` | Interface the P2P port publishes on. Set `0.0.0.0` in `clearnet` and `hybrid` modes; `tor` mode refuses anything but loopback |
 | `ARCHON_CLN_MIN_CAPACITY_SAT` | `50000` | Smallest channel the node accepts |
 | `ARCHON_CLN_LOG_LEVEL` | `info` | CLN log level |
+| `ARCHON_CLN_BITCOIN_RPC_TIMEOUT` | *(empty)* | Seconds `lightningd` waits on a Bitcoin RPC request before stopping; empty keeps its default of 60. With a pruned `bitcoind`, old blocks come from peers and can take longer, so raise this (300, say) if the node crashes with `getblock ... timed out` |
 | `ARCHON_RTL_PASSWORD` | `changeme` | **Change this.** RTL web UI password |
 | `ARCHON_RTL_PORT` | `3002` | RTL web UI port |
 | `ARCHON_LNBITS_PORT` | `5000` | LNbits web UI port |

@@ -35,6 +35,7 @@ BITCOIN_RPCHOST=${BITCOIN_RPCHOST:-127.0.0.1}
 BITCOIN_RPCPORT=${BITCOIN_RPCPORT:-8332}
 BITCOIN_RPCUSER=${BITCOIN_RPCUSER:-}
 BITCOIN_RPCPASSWORD=${BITCOIN_RPCPASSWORD:-}
+BITCOIN_RPCCLIENTTIMEOUT=${BITCOIN_RPCCLIENTTIMEOUT:-}
 ANNOUNCE_ADDR=${ANNOUNCE_ADDR:-}
 P2P_BIND=${P2P_BIND:-}
 LIGHTNING_ROOT=${LIGHTNING_ROOT:-/data/lightning}
@@ -63,6 +64,8 @@ case "$RPC_SHARE" in
 esac
 [[ -n "$BITCOIN_RPCUSER" ]] || die "BITCOIN_RPCUSER is required"
 [[ -n "$BITCOIN_RPCPASSWORD" ]] || die "BITCOIN_RPCPASSWORD is required"
+[[ -z "$BITCOIN_RPCCLIENTTIMEOUT" || "$BITCOIN_RPCCLIENTTIMEOUT" =~ ^[1-9][0-9]*$ ]] \
+    || die "BITCOIN_RPCCLIENTTIMEOUT must be a number of seconds, not '$BITCOIN_RPCCLIENTTIMEOUT'"
 
 # The lightning dir holds the config and the wallet; lightningd keeps the
 # rest (hsm_secret, the RPC socket, TLS certificates) in its network
@@ -159,6 +162,7 @@ fi
     echo "bitcoin-rpcport=$BITCOIN_RPCPORT"
     echo "bitcoin-rpcuser=$BITCOIN_RPCUSER"
     echo "bitcoin-rpcpassword=$BITCOIN_RPCPASSWORD"
+    [[ -z "$BITCOIN_RPCCLIENTTIMEOUT" ]] || echo "bitcoin-rpcclienttimeout=$BITCOIN_RPCCLIENTTIMEOUT"
     echo "wallet=sqlite3://$wallet"
     echo "log-level=$LOG_LEVEL"
     echo "log-file=$dir/lightningd.log"
