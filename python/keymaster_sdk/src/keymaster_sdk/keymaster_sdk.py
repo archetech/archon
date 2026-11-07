@@ -1300,11 +1300,11 @@ def add_lightning(id=None):
     return response
 
 
-def remove_lightning(id=None):
+def remove_lightning(id=None, force=False):
     response = proxy_request(
         "DELETE",
         f"{_keymaster_api}/lightning",
-        json={"id": id},
+        json={"id": id, "force": force},
     )
     return response["ok"]
 

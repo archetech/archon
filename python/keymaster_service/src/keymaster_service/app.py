@@ -532,7 +532,7 @@ async def add_lightning(body: dict[str, Any]) -> dict[str, Any]:
 
 @protected_api.delete("/lightning")
 async def remove_lightning(body: dict[str, Any]) -> dict[str, bool]:
-    return {"ok": await service.remove_lightning(body.get("id"))}
+    return {"ok": await service.remove_lightning(body.get("id"), body.get("force"))}
 
 
 @protected_api.post("/lightning/balance")

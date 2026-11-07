@@ -17,6 +17,7 @@ import {
     KeymasterError,
     UnknownIDError,
     LightningNotConfiguredError,
+    LightningStateError,
     CashuStateError,
     LightningUnavailableError,
     WalletNotFoundError,
@@ -117,6 +118,12 @@ import {
     type DidCommEnc,
 } from '@didcid/cipher/didcomm';
 import { decryptWithPassphrase, encryptWithPassphrase } from '@didcid/cipher/passphrase';
+
+// The keys are the only way to reach the funds, and come from LNbits, so the
+// recovery phrase cannot recreate them.
+function hasLightningKeys(idInfo: IDInfo): boolean {
+    return Object.keys(idInfo.lightning ?? {}).length > 0;
+}
 
 function hexToBase64url(hex: string): string {
     const bytes = Buffer.from(hex, 'hex');
@@ -626,7 +633,7 @@ export default class Keymaster implements KeymasterInterface {
                 }
 
                 if (remove) {
-                    if (hasCashuState(wallet.ids[name])) {
+                    if (hasCashuState(wallet.ids[name]) || hasLightningKeys(wallet.ids[name])) {
                         idsKept.push(name);
                         continue;
                     }
@@ -2323,6 +2330,9 @@ export default class Keymaster implements KeymasterInterface {
             // record of paid quotes and outstanding tokens.
             if (hasCashuState(wallet.ids[name])) {
                 throw new CashuStateError(`${name} holds ecash or open Cashu operations`);
+            }
+            if (hasLightningKeys(wallet.ids[name])) {
+                throw new LightningStateError(`${name} holds Lightning keys; remove its Lightning wallet first`);
             }
             delete wallet.ids[name];
             if (wallet.current === name) {
@@ -4163,28 +4173,55 @@ export default class Keymaster implements KeymasterInterface {
         return result;
     }
 
-    async removeLightning(name?: string): Promise<boolean> {
-        // Migrate old format if possible (ignore errors)
-        try { await this.getLightningConfig(name); } catch { /* ok */ }
+    // Without force, removes the wallet on this node, once it is known to be empty
+    // and unpublished. Force discards every wallet the identity holds and only
+    // tries to unpublish, so that removal still works when the node is unreachable.
+    async removeLightning(name?: string, force = false): Promise<boolean> {
+        // Every step below acts on this DID, whichever identity becomes current.
+        const idInfo = await this.fetchIdInfo(name);
+        const did = idInfo.did;
 
-        // Try to get URL for targeted removal; fall back to removing all
-        const gk = this.gatekeeper as { url?: string };
-        const url = gk.url ? new URL(gk.url).origin : null;
+        if (!hasLightningKeys(idInfo)) {
+            return true;
+        }
+
+        const forced = force === true;
+
+        if (!forced) {
+            let balance: unknown;
+            try {
+                ({ balance } = await this.getLightningBalance(did));
+                if (typeof balance !== 'number') {
+                    throw new Error('no balance in the reply');
+                }
+            } catch (error: any) {
+                throw new LightningStateError(`the balance could not be read (${error?.error || error?.message || error}); use force to discard the wallet`);
+            }
+            if (balance !== 0) {
+                throw new LightningStateError(`the wallet holds ${balance} sats; use force to discard it`);
+            }
+        }
+
+        // Before the keys go, or payers would be sent to a wallet nobody can spend from.
+        try {
+            await this.withdrawLightning(did);
+        } catch (error: any) {
+            if (!forced) {
+                throw new LightningStateError(`the wallet could not be unpublished (${error?.error || error?.message || error}); use force to discard it`);
+            }
+        }
+
+        const url = forced ? undefined : this.requireDrawbridge().url;
 
         await this.mutateWallet(async (wallet) => {
-            const idInfo = await this.fetchIdInfo(name, wallet);
-
-            if (!idInfo.lightning) return;
+            const current = await this.fetchIdInfo(did, wallet);
+            const store = (current.lightning || {}) as Record<string, LightningConfig>;
 
             if (url) {
-                const store = idInfo.lightning as Record<string, LightningConfig>;
                 delete store[url];
-
-                if (Object.keys(store).length === 0) {
-                    delete idInfo.lightning;
-                }
-            } else {
-                delete idInfo.lightning;
+            }
+            if (!url || Object.keys(store).length === 0) {
+                delete current.lightning;
             }
         });
         return true;
@@ -4302,9 +4339,15 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async unpublishLightning(name?: string): Promise<boolean> {
-        const drawbridge = this.requireDrawbridge();
         const id = await this.fetchIdInfo(name);
-        const did = id.did;
+        await this.withdrawLightning(id.did);
+        return true;
+    }
+
+    // Takes the DID out of the node's directory and its #lightning service out of
+    // the DID document. Needs no Lightning keys, so it can be retried after they go.
+    private async withdrawLightning(did: string): Promise<void> {
+        const drawbridge = this.requireDrawbridge();
 
         // Unregister from Drawbridge using DID suffix as key
         const didSuffix = did.split(':').pop()!;
@@ -4316,6 +4359,10 @@ export default class Keymaster implements KeymasterInterface {
         const serviceId = `${did}#lightning`;
         const filtered = services.filter(s => s.id !== serviceId);
 
+        if (filtered.length === services.length) {
+            return;
+        }
+
         if (filtered.length > 0) {
             doc.didDocument!.service = filtered;
         } else {
@@ -4323,8 +4370,6 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         await this.updateDID(did, doc);
-
-        return true;
     }
 
     async zapLightning(id: string, amount: number, memo?: string, name?: string): Promise<LightningPayment> {

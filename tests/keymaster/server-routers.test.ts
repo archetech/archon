@@ -1,7 +1,7 @@
 import { jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
-import { InvalidParameterError, UnknownIDError } from '@didcid/common/errors';
+import { InvalidParameterError, LightningStateError, UnknownIDError } from '@didcid/common/errors';
 
 import { createAddressRouter } from '../../services/keymaster/server/src/keymaster-address-router.ts';
 import { createAgentRouter } from '../../services/keymaster/server/src/keymaster-agent-router.ts';
@@ -390,6 +390,19 @@ describe('keymaster server routers', () => {
 
         keymaster.createId.mockRejectedValueOnce(new Error('boom'));
         expect((await send(app, 'POST', '/ids')).status).toBe(500);
+    });
+});
+
+describe('keymaster lightning removal route', () => {
+    it('passes the identity and force, and answers a refusal with 400', async () => {
+        const { app, keymaster } = mount();
+
+        await request(app).delete('/lightning').send({ id: 'Bob', force: true }).expect(200);
+        expect(keymaster.removeLightning).toHaveBeenCalledWith('Bob', true);
+
+        keymaster.removeLightning.mockRejectedValueOnce(new LightningStateError('the wallet holds 5 sats'));
+        const refused = await request(app).delete('/lightning').send({ id: 'Bob' }).expect(400);
+        expect(refused.body.error).toContain('Lightning state present');
     });
 });
 

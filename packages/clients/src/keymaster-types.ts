@@ -109,7 +109,8 @@ export interface FixWalletResult {
     heldRemoved: number;
     aliasesRemoved: number;
     // Identities that would have been removed but hold Cashu proofs or journal
-    // records, which are the funds themselves.
+    // records, which are the funds themselves, or Lightning keys, the only way to
+    // reach theirs.
     idsKept?: string[];
 }
 
@@ -732,7 +733,7 @@ export interface KeymasterInterface {
 
     // Lightning
     addLightning(id?: string): Promise<LightningConfig>;
-    removeLightning(id?: string): Promise<boolean>;
+    removeLightning(id?: string, force?: boolean): Promise<boolean>;
     getLightningBalance(id?: string): Promise<LightningBalance>;
     createLightningInvoice(amount: number, memo: string, id?: string): Promise<LightningInvoice>;
     payLightningInvoice(bolt11: string, id?: string): Promise<LightningPayment>;

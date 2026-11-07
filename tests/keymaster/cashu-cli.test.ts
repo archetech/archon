@@ -222,6 +222,17 @@ describe('commands that change ecash state', () => {
     });
 });
 
+describe('remove-lightning', () => {
+    it('sends --force only when asked', async () => {
+        routes['/lightning'] = () => ({ body: { ok: true } });
+
+        await run('remove-lightning');
+        await run('remove-lightning', 'Alice', '--force');
+
+        expect(requests.map(request => request.body)).toEqual([{}, { id: 'Alice', force: true }]);
+    });
+});
+
 describe('cashu-send-to', () => {
     beforeEach(() => {
         routes['/cashu/send-to'] = () => ({ body: { token: 'cashuBtoken', amount: 21, mint: MINT, delivered: true } });
