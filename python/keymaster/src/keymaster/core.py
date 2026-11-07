@@ -1027,7 +1027,7 @@ class Keymaster:
 
     async def zap_lightning(self, identifier: str, amount: int, memo: str | None = None, name: str | None = None) -> dict[str, Any]:
         if not identifier:
-            raise UnknownIDError("Unknown ID")
+            raise KeymasterError("Invalid parameter: did")
         if not amount or amount <= 0:
             raise KeymasterError("Invalid parameter: amount")
 

@@ -174,8 +174,11 @@ def test_lightning_validation_and_unavailable_gateway(testbed):
     with pytest.raises(KeymasterError, match="Invalid parameter: bolt11"):
         run(testbed.keymaster.pay_lightning_invoice(""))
 
-    with pytest.raises(UnknownIDError, match="Unknown ID"):
+    with pytest.raises(KeymasterError, match="Invalid parameter: did"):
         run(testbed.keymaster.zap_lightning("", 100))
+
+    with pytest.raises(KeymasterError, match="Invalid parameter: amount"):
+        run(testbed.keymaster.zap_lightning("NotAKnownAlias", 0))
 
     with pytest.raises(KeymasterError, match="^Lightning not configured: No Lightning wallet configured"):
         run(testbed.keymaster.get_lightning_payments())
