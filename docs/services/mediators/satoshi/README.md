@@ -408,6 +408,8 @@ Gauges (refreshed on every `/metrics` scrape):
 | `satoshi_import_loop_running` | 0 / 1 |
 | `satoshi_export_loop_running` | 0 / 1 |
 
+`satoshi_wallet_insufficient_funds` is 1 while the last balance check found the wallet below `ARCHON_SAT_FEE_MAX`, which is when the mediator skips anchoring. `satoshi_wallet_unreachable` is 1 while the last balance check could not reach the wallet service; the funds gauge keeps its last reading in that case. Both are set when the balance is checked, at startup and on each export pass, rather than on scrape, and stay 0 on a read-only mediator. Grafana alerts on the funds gauge; see [Alerts](../../../deployment.md#alerts).
+
 Counters:
 
 | Metric | Notes |

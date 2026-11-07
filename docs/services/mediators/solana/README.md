@@ -24,6 +24,7 @@ Mediator metrics distinguish slot scan state from produced block heights:
 - `solana_slot_cursor`, `solana_current_slot`, `solana_slot_lag`, and `solana_slots_scanned` describe slot-based import scanning.
 - `solana_checkpoint_block_height` and `solana_current_block_height` describe produced block heights.
 - The older `solana_block_height`, `solana_block_count`, `solana_blocks_pending`, and `solana_blocks_scanned` names remain as compatibility aliases for the slot metrics.
+- `solana_wallet_insufficient_funds` is 1 while the last balance check found the wallet below `ARCHON_SOL_MIN_BALANCE_LAMPORTS`, which is when the mediator skips anchoring. `solana_wallet_unreachable` is 1 while the last balance check could not reach the wallet service; the funds gauge keeps its last reading in that case. Grafana alerts on the funds gauge; see [Alerts](../../../deployment.md#alerts).
 
 ## Canonical memo format
 

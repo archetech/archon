@@ -11,6 +11,7 @@ import { planAnchor } from './batch.js';
 import { isValidDID } from '@didcid/ipfs/utils';
 import { MediatorDb, MediatorDbInterface, DiscoveredItem } from './types.js';
 import { waitForWallet } from './wallet-wait.js';
+import { readWalletFunding } from './wallet-funding.js';
 import express from 'express';
 import { readFile } from 'fs/promises';
 import promClient from 'prom-client';
@@ -199,6 +200,16 @@ const solanaImportLoopRunning = new promClient.Gauge({
 const solanaExportLoopRunning = new promClient.Gauge({
     name: 'solana_export_loop_running',
     help: '1 if export loop is currently executing',
+});
+
+const solanaWalletInsufficientFunds = new promClient.Gauge({
+    name: 'solana_wallet_insufficient_funds',
+    help: '1 if the last balance check found the wallet below the level needed to anchor',
+});
+
+const solanaWalletUnreachable = new promClient.Gauge({
+    name: 'solana_wallet_unreachable',
+    help: '1 if the last balance check could not reach the wallet service',
 });
 
 const solanaImportErrors = new promClient.Counter({
@@ -926,6 +937,13 @@ async function checkPendingTransactions(pending: NonNullable<MediatorDb['pending
     return txids.length > 0;
 }
 
+function readFunding() {
+    return readWalletFunding(walletGetBalance, ({ balanceLamports }) => BigInt(balanceLamports) < config.minSolBalanceLamports, {
+        insufficientFunds: solanaWalletInsufficientFunds,
+        unreachable: solanaWalletUnreachable,
+    });
+}
+
 async function checkExportInterval(): Promise<boolean> {
     const db = await loadDb();
 
@@ -954,8 +972,8 @@ async function anchorBatch(): Promise<void> {
 
     try {
         try {
-            const { balance, balanceLamports } = await walletGetBalance();
-            if (BigInt(balanceLamports) < config.minSolBalanceLamports) {
+            const { wallet: { balance }, belowFloor } = await readFunding();
+            if (belowFloor) {
                 const address = await walletGetAddress();
                 console.log(`Wallet has ${balance} SOL, below gas floor ${config.minSolBalanceLamports} lamports. Send ${config.chain} funds to ${address}`);
                 return;
@@ -1165,6 +1183,14 @@ async function waitForChain() {
     );
 
     console.log(`Wallet balance: ${balance}, funding address: ${address}`);
+
+    // Metrics are served after this returns, so without a reading here a restart
+    // would report the wallet as funded until the first export pass.
+    try {
+        await readFunding();
+    } catch {
+        console.log(`${config.chain} wallet funding could not be read at startup`);
+    }
 
     return true;
 }
