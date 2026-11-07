@@ -17,11 +17,12 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT.parent / "keymaster" / "src"))
 
 import httpx  # noqa: E402
+import pytest  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from keymaster.cashu import CashuStateError, CashuUnavailableError  # noqa: E402
-from keymaster.core import KeymasterError, LightningStateError, UnknownIDError, WalletNotFoundError  # noqa: E402
+from keymaster.core import Keymaster, KeymasterError, LightningStateError, UnknownIDError, WalletNotFoundError  # noqa: E402
 from keymaster.gatekeeper_client import (  # noqa: E402
     GatekeeperTimeoutError,
     GatekeeperUnavailableError,
@@ -205,3 +206,74 @@ def test_cashu_routes_leave_a_missing_field_to_the_wallet(monkeypatch):
 
     assert response.status_code == 400
     assert response.json() == {"error": "Invalid parameter: amount None"}
+
+
+def test_lightning_routes_accept_a_request_with_no_body(monkeypatch):
+    routes = [
+        ("POST", "/api/v1/lightning", "add_lightning", {"url": "https://drawbridge.example"}),
+        ("DELETE", "/api/v1/lightning", "remove_lightning", True),
+        ("POST", "/api/v1/lightning/balance", "get_lightning_balance", {"balance": 0}),
+        ("POST", "/api/v1/lightning/publish", "publish_lightning", True),
+        ("POST", "/api/v1/lightning/unpublish", "unpublish_lightning", True),
+        ("POST", "/api/v1/lightning/payments", "get_lightning_payments", []),
+    ]
+    calls = []
+
+    def stub(name, result):
+        async def method(identifier):
+            calls.append((name, identifier))
+            return result
+
+        return method
+
+    for _, _, name, result in routes:
+        monkeypatch.setattr(app_module.service, name, stub(name, result))
+    client = _cashu_client()
+
+    for method, path, _, _ in routes:
+        assert client.request(method, path).status_code == 200, path
+
+    assert calls == [(name, None) for _, _, name, _ in routes]
+
+
+# The real Keymaster, whose validation runs before it touches the wallet or
+# Gatekeeper, so that this checks the status the service actually gives.
+def _lightning_validation_client(monkeypatch) -> TestClient:
+    keymaster = Keymaster(gatekeeper=object(), wallet_store=object(), passphrase="passphrase")
+    monkeypatch.setattr(app_module.service, "keymaster", keymaster)
+    return _cashu_client()
+
+
+@pytest.mark.parametrize(
+    ("path", "body", "field"),
+    [
+        ("/lightning/invoice", {"memo": "coffee"}, "amount"),
+        ("/lightning/pay", {"id": "Bob"}, "bolt11"),
+        ("/lightning/payment", {"id": "Bob"}, "paymentHash"),
+        ("/lightning/decode", {}, "bolt11"),
+        ("/lightning/zap", {"amount": 100}, "did"),
+        ("/lightning/zap", {"did": "NotAKnownAlias"}, "amount"),
+    ],
+)
+def test_lightning_routes_answer_400_for_a_missing_field(monkeypatch, path, body, field):
+    response = _lightning_validation_client(monkeypatch).post(f"/api/v1{path}", json=body)
+
+    assert response.status_code == 400
+    assert response.json() == {"error": f"Invalid parameter: {field}"}
+
+
+@pytest.mark.parametrize(
+    ("path", "field"),
+    [
+        ("/lightning/invoice", "amount"),
+        ("/lightning/pay", "bolt11"),
+        ("/lightning/payment", "paymentHash"),
+        ("/lightning/decode", "bolt11"),
+        ("/lightning/zap", "did"),
+    ],
+)
+def test_lightning_routes_answer_400_with_no_body(monkeypatch, path, field):
+    response = _lightning_validation_client(monkeypatch).post(f"/api/v1{path}")
+
+    assert response.status_code == 400
+    assert response.json() == {"error": f"Invalid parameter: {field}"}

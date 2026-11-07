@@ -6,6 +6,13 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
     const { getKeymaster } = options;
     const router = express.Router();
 
+    // Express 5 leaves the body undefined on a request without one. Required
+    // fields are validated by Keymaster, so a missing one is reported as bad input.
+    router.use('/lightning', (req, _res, next) => {
+        req.body ??= {};
+        next();
+    });
+
     // Lightning routes
 
     /**
@@ -121,7 +128,6 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
      *             type: object
      *             required:
      *               - amount
-     *               - memo
      *             properties:
      *               amount:
      *                 type: number
@@ -231,6 +237,8 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
      *         application/json:
      *           schema:
      *             type: object
+     *             required:
+     *               - bolt11
      *             properties:
      *               bolt11:
      *                 type: string
@@ -272,7 +280,7 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
      */
     router.post('/lightning/publish', async (req, res) => {
         try {
-            const id = req.body?.id;
+            const { id } = req.body;
             const ok = await getKeymaster().publishLightning(id);
             res.json({ ok });
         } catch (error: any) {
@@ -302,7 +310,7 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
      */
     router.post('/lightning/unpublish', async (req, res) => {
         try {
-            const id = req.body?.id;
+            const { id } = req.body;
             const ok = await getKeymaster().unpublishLightning(id);
             res.json({ ok });
         } catch (error: any) {
@@ -321,6 +329,9 @@ export function createLightningRouter(options: CreateKeymasterRouterOptions): ex
      *         application/json:
      *           schema:
      *             type: object
+     *             required:
+     *               - did
+     *               - amount
      *             properties:
      *               did:
      *                 type: string

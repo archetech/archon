@@ -525,58 +525,63 @@ async def receive_cashu_messages(body: CashuBody) -> dict[str, Any]:
     return await service.receive_cashu_messages(body.get("id"))
 
 
+# As for Cashu: a request may omit the body, and Keymaster reports a missing
+# required field as bad input.
+LightningBody = Annotated[dict[str, Any], Body(default_factory=dict)]
+
+
 @protected_api.post("/lightning")
-async def add_lightning(body: dict[str, Any]) -> dict[str, Any]:
+async def add_lightning(body: LightningBody) -> dict[str, Any]:
     return await service.add_lightning(body.get("id"))
 
 
 @protected_api.delete("/lightning")
-async def remove_lightning(body: dict[str, Any]) -> dict[str, bool]:
+async def remove_lightning(body: LightningBody) -> dict[str, bool]:
     return {"ok": await service.remove_lightning(body.get("id"), body.get("force"))}
 
 
 @protected_api.post("/lightning/balance")
-async def get_lightning_balance(body: dict[str, Any]) -> dict[str, Any]:
+async def get_lightning_balance(body: LightningBody) -> dict[str, Any]:
     return await service.get_lightning_balance(body.get("id"))
 
 
 @protected_api.post("/lightning/invoice")
-async def create_lightning_invoice(body: dict[str, Any]) -> dict[str, Any]:
-    return await service.create_lightning_invoice(body["amount"], body.get("memo", ""), body.get("id"))
+async def create_lightning_invoice(body: LightningBody) -> dict[str, Any]:
+    return await service.create_lightning_invoice(body.get("amount"), body.get("memo", ""), body.get("id"))
 
 
 @protected_api.post("/lightning/pay")
-async def pay_lightning_invoice(body: dict[str, Any]) -> dict[str, Any]:
-    return await service.pay_lightning_invoice(body["bolt11"], body.get("id"))
+async def pay_lightning_invoice(body: LightningBody) -> dict[str, Any]:
+    return await service.pay_lightning_invoice(body.get("bolt11"), body.get("id"))
 
 
 @protected_api.post("/lightning/payment")
-async def check_lightning_payment(body: dict[str, Any]) -> dict[str, Any]:
-    return await service.check_lightning_payment(body["paymentHash"], body.get("id"))
+async def check_lightning_payment(body: LightningBody) -> dict[str, Any]:
+    return await service.check_lightning_payment(body.get("paymentHash"), body.get("id"))
 
 
 @protected_api.post("/lightning/decode")
-async def decode_lightning_invoice(body: dict[str, Any]) -> dict[str, Any]:
-    return await service.decode_lightning_invoice(body["bolt11"])
+async def decode_lightning_invoice(body: LightningBody) -> dict[str, Any]:
+    return await service.decode_lightning_invoice(body.get("bolt11"))
 
 
 @protected_api.post("/lightning/publish")
-async def publish_lightning(body: dict[str, Any]) -> dict[str, bool]:
+async def publish_lightning(body: LightningBody) -> dict[str, bool]:
     return {"ok": await service.publish_lightning(body.get("id"))}
 
 
 @protected_api.post("/lightning/unpublish")
-async def unpublish_lightning(body: dict[str, Any]) -> dict[str, bool]:
+async def unpublish_lightning(body: LightningBody) -> dict[str, bool]:
     return {"ok": await service.unpublish_lightning(body.get("id"))}
 
 
 @protected_api.post("/lightning/zap")
-async def zap_lightning(body: dict[str, Any]) -> dict[str, Any]:
-    return await service.zap_lightning(body["did"], body["amount"], body.get("memo"), body.get("id"))
+async def zap_lightning(body: LightningBody) -> dict[str, Any]:
+    return await service.zap_lightning(body.get("did"), body.get("amount"), body.get("memo"), body.get("id"))
 
 
 @protected_api.post("/lightning/payments")
-async def get_lightning_payments(body: dict[str, Any]) -> dict[str, Any]:
+async def get_lightning_payments(body: LightningBody) -> dict[str, Any]:
     return {"payments": await service.get_lightning_payments(body.get("id"))}
 
 

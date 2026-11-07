@@ -1,3 +1,5 @@
+import express from 'express';
+import request from 'supertest';
 import Gatekeeper from '@didcid/gatekeeper';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
@@ -5,6 +7,7 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import { UnknownIDError, InvalidParameterError, LightningNotConfiguredError, LightningStateError, LightningUnavailableError } from '@didcid/common/errors';
 import MemoryClient from '@didcid/ipfs/memory';
+import { createLightningRouter } from '../../services/keymaster/server/src/keymaster-lightning-router.ts';
 
 let ipfs: MemoryClient;
 let gatekeeper: any;
@@ -876,6 +879,44 @@ describe('unpublishLightning', () => {
     });
 });
 
+describe('lightning routes with a missing required field', () => {
+    function app() {
+        const server = express();
+        server.use(express.json());
+        server.use(createLightningRouter({ getKeymaster: () => keymaster } as any));
+        return server;
+    }
+
+    const REQUIRED: Array<[string, object, string]> = [
+        ['/lightning/invoice', { memo: 'coffee' }, 'amount'],
+        ['/lightning/pay', { id: 'Bob' }, 'bolt11'],
+        ['/lightning/payment', { id: 'Bob' }, 'paymentHash'],
+        ['/lightning/decode', {}, 'bolt11'],
+        ['/lightning/zap', { amount: 100 }, 'did'],
+        ['/lightning/zap', { did: 'NotAKnownAlias' }, 'amount'],
+    ];
+
+    it.each(REQUIRED)('%s answers 400 for %j', async (path, body, field) => {
+        const response = await request(app()).post(path).send(body);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain(`Invalid parameter: ${field}`);
+    });
+
+    it.each([
+        ['/lightning/invoice', 'amount'],
+        ['/lightning/pay', 'bolt11'],
+        ['/lightning/payment', 'paymentHash'],
+        ['/lightning/decode', 'bolt11'],
+        ['/lightning/zap', 'did'],
+    ])('%s answers 400 with no body, naming %s', async (path, field) => {
+        const response = await request(app()).post(path);
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toContain(`Invalid parameter: ${field}`);
+    });
+});
+
 describe('zapLightning', () => {
     it('should throw for missing did', async () => {
         await keymaster.createId('Bob');
@@ -885,7 +926,21 @@ describe('zapLightning', () => {
             throw new Error('Expected exception');
         }
         catch (error: any) {
-            expect(error.type).toBe(UnknownIDError.type);
+            expect(error.type).toBe(InvalidParameterError.type);
+            expect(error.detail).toBe('did');
+        }
+    });
+
+    it('should report a missing amount before looking up the did', async () => {
+        await keymaster.createId('Bob');
+
+        try {
+            await keymaster.zapLightning('NotAKnownAlias', 0);
+            throw new Error('Expected exception');
+        }
+        catch (error: any) {
+            expect(error.type).toBe(InvalidParameterError.type);
+            expect(error.detail).toBe('amount');
         }
     });
 

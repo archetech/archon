@@ -1198,7 +1198,7 @@ reach Lightning functionality via the same `DrawbridgeClient`.
 | `POST /api/v1/lightning` | `{ "id"?: string }`. Provisions an LNbits wallet for the ID, stores `LightningConfig` in `IDInfo`. |
 | `DELETE /api/v1/lightning` | `{ "id"?: string, "force"?: boolean }`. Without `force`, removes the wallet on this node once its balance reads zero and it has been unpublished (as `POST /lightning/unpublish`); otherwise 400 `Lightning state present`, keeping the keys, including when the balance can't be read or the unpublish fails. `force: true` discards every Lightning wallet the identity holds and tries to unpublish, so it works with the node unreachable; if that attempt fails the service stays published until `POST /lightning/unpublish` is retried. |
 | `POST /api/v1/lightning/balance` | Returns `LightningBalance` (flat object). |
-| `POST /api/v1/lightning/invoice` | `{ "amount": number, "memo": string, "id"?: string }` → `LightningInvoice` (flat object). |
+| `POST /api/v1/lightning/invoice` | `{ "amount": number, "memo"?: string, "id"?: string }` → `LightningInvoice` (flat object). |
 | `POST /api/v1/lightning/pay` | `{ "bolt11": string, "id"?: string }` → `LightningPayment` (flat object). |
 | `POST /api/v1/lightning/payment` | `{ "paymentHash": string, "id"?: string }` → `LightningPaymentStatus` (flat object). |
 | `POST /api/v1/lightning/decode` | `{ "bolt11": string }` → `DecodedLightningInvoice` (flat object). |
