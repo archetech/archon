@@ -441,6 +441,24 @@ describe('keymaster cashu routes', () => {
     });
 });
 
+describe('keymaster lightning routes', () => {
+    it.each([
+        ['POST', '/lightning', 'addLightning'],
+        ['DELETE', '/lightning', 'removeLightning'],
+        ['POST', '/lightning/balance', 'getLightningBalance'],
+        ['POST', '/lightning/publish', 'publishLightning'],
+        ['POST', '/lightning/unpublish', 'unpublishLightning'],
+        ['POST', '/lightning/payments', 'getLightningPayments'],
+    ])('%s %s accepts a request with no body', async (method, path, name) => {
+        const { app, keymaster } = mount();
+        const agent = request(app);
+
+        await (method === 'POST' ? agent.post(path) : agent.delete(path)).expect(200);
+
+        expect(keymaster[name]).toHaveBeenCalledWith(undefined);
+    });
+});
+
 describe('keymaster binary asset downloads', () => {
     const octet = 'application/octet-stream';
 
