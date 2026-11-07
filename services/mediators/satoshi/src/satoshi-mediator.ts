@@ -1259,11 +1259,12 @@ async function waitForChain() {
     // Metrics are served after this returns, so without a reading here a restart
     // would report the wallet as funded until the first export pass. Skipped while
     // an anchor is unconfirmed: its change is not yet in the confirmed balance, and
-    // the export pass does not read the balance again until it confirms.
+    // the export pass does not read the balance again until it confirms. One saved
+    // as pending may have confirmed while the mediator was down, so that is checked.
     try {
         const db = await loadDb();
 
-        if (!db.pending?.txids) {
+        if (!db.pending?.txids || !(await checkPendingTransactions(db.pending.txids))) {
             await readFunding();
         }
     } catch {

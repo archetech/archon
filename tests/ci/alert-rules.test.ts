@@ -46,6 +46,12 @@ describe('mediator wallet funds alert', () => {
         expect(source).not.toMatch(/= await walletGetBalance\(\)/);
     });
 
+    it.each(['satoshi', 'zcash'])('has the %s mediator take a startup reading once a saved anchor has confirmed', (prefix) => {
+        const source = readFileSync(MEDIATORS[prefix], 'utf-8');
+
+        expect(source).toMatch(/if \(!db\.pending\?\.txids \|\| !\(await checkPendingTransactions\(db\.pending\.txids\)\)\) \{\s+await readFunding\(\);/);
+    });
+
     it('reads no metric beyond the mediators', () => {
         const known = Object.keys(MEDIATORS).map(prefix => `${prefix}_wallet_insufficient_funds`);
 
