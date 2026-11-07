@@ -4328,6 +4328,14 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async zapLightning(id: string, amount: number, memo?: string, name?: string): Promise<LightningPayment> {
+        if (!id) {
+            throw new InvalidParameterError('did');
+        }
+
+        if (!amount || amount <= 0) {
+            throw new InvalidParameterError('amount');
+        }
+
         const isLud16 = id.includes('@') && !id.startsWith('did:');
         let recipient: string;
 
@@ -4339,10 +4347,6 @@ export default class Keymaster implements KeymasterInterface {
                 throw new InvalidParameterError('did');
             }
             recipient = did;
-        }
-
-        if (!amount || amount <= 0) {
-            throw new InvalidParameterError('amount');
         }
 
         const drawbridge = this.requireDrawbridge();
