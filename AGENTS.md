@@ -315,7 +315,7 @@ These rules apply to coding agents working in this repository.
 
 - Validate Cashu wallet changes against a real `cashubtc/mintd` with its fakewallet backend, in a throwaway container, as well as the in-process fake mints. Stale NUT-13 counters are detected from NUT-09, not an error code: cdk-mintd sends 20006 on mint and melt and 11008 on swap where NUT-00 lists 11003. Keep `packages/keymaster/src/cashu.ts` and `python/keymaster/src/keymaster/cashu.py` in step; both run on `tests/fixtures/cashu-*-vectors.json`.
 
-- Pushing a release tag runs the Android workflow, whose `softprops/action-gh-release` step uploads the APK to that tag's release and publishes any draft it finds (`draft` defaults to false). Draft GitHub release notes only after that run has finished, or the maintainer loses the chance to review them before they go public.
+- Pushing a release tag runs the release assets workflow, whose `softprops/action-gh-release` steps upload the APK and, for `v*` tags, the browser extensions to that tag's release and publish any draft they find (`draft` defaults to false). Draft GitHub release notes only after that run has finished, or the maintainer loses the chance to review them before they go public.
 
 - Drawbridge proxies must not forward the client's `Accept-Encoding`: fetch has to decode the upstream body, and Node 22's fetch cannot read zstd, which browsers offer only over HTTPS. Run browser checks through a real https host as well, since an http test stack cannot show this; `curl -H 'Accept-Encoding: zstd'` reproduces it.
 

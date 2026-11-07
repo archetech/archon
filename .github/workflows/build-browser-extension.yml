@@ -53,12 +53,6 @@ jobs:
           cd ./apps/browser-extension
           npm test
 
-      - name: Build Chrome extension
-        run: |
-          cd ./apps/browser-extension
-          npm run build:chrome
-
-      - name: Build Firefox extension
-        run: |
-          cd ./apps/browser-extension
-          npm run build:firefox
+      # The packaging a release runs, so a fault in it shows up before a tag does.
+      - name: Build and package the extensions
+        run: ./apps/browser-extension/scripts/package-release.sh

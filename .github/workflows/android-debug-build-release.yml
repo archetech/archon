@@ -1,4 +1,4 @@
-name: Android Debug APK Attach to Release
+name: Attach Release Assets
 
 # Superseding pushes make earlier runs irrelevant: only the head commit's checks
 # gate a merge. Cancelling them on branches keeps a rapidly-iterated PR from
@@ -88,6 +88,61 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
         with:
           files: app-debug.apk
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-browser-extensions:
+    runs-on: ubuntu-latest
+    # Tags also mark npm packages (@didcid/cipher@0.6.0), which don't version these.
+    if: startsWith(github.ref_name, 'v')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Use Node 22.23.4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: "22.23.4"
+
+      - name: Pin npm 10.9.2
+        run: npm install --global npm@10.9.2
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Build shared packages
+        run: npm run build
+
+      - name: Install extension dependencies
+        working-directory: ./apps/browser-extension
+        run: npm ci
+
+      - name: Build and package the extensions
+        run: ./apps/browser-extension/scripts/package-release.sh "$GITHUB_REF_NAME"
+
+      - name: Upload the packaged extensions
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: browser-extensions
+          path: apps/browser-extension/release/*.zip
+          if-no-files-found: error
+
+  # After create-release, so the two don't race to create the release, and apart from
+  # it, so a failed extension build doesn't cost the release its APK.
+  attach-browser-extensions:
+    runs-on: ubuntu-latest
+    needs: [create-release, build-browser-extensions]
+    steps:
+      - name: Download the packaged extensions
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: browser-extensions
+
+      - name: Upload the extensions to the release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
+        with:
+          files: archon-wallet-*.zip
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
