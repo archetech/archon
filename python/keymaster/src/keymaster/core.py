@@ -924,10 +924,15 @@ class Keymaster:
             return True
 
         forced = force is True
+        url = ""
+        checked: dict[str, Any] | None = None
 
         if not forced:
             try:
-                balance = (await self.get_lightning_balance(did)).get("balance")
+                drawbridge = self.require_drawbridge()
+                url = drawbridge.url
+                checked = await self.get_lightning_config(did)
+                balance = (await drawbridge.get_lightning_balance(checked["invoiceKey"])).get("balance")
                 if isinstance(balance, bool) or not isinstance(balance, (int, float)):
                     raise KeymasterError("no balance in the reply")
             except Exception as exc:
@@ -942,16 +947,20 @@ class Keymaster:
             if not forced:
                 raise LightningStateError(f"the wallet could not be unpublished ({exc}); use force to discard it") from exc
 
-        url = None if forced else self.require_drawbridge().url
-
         async with self._lock:
             wallet = await self.load_wallet()
             current = await self.fetch_id_info(did, wallet)
             store = current.get("lightning")
-            if url and isinstance(store, dict):
-                store.pop(url, None)
-            if not url or not store:
+            if checked is None:
                 current.pop("lightning", None)
+            elif isinstance(store, dict):
+                # A wallet added since the check is not the one found to be empty.
+                stored = store.get(url)
+                if stored and stored.get("adminKey") != checked.get("adminKey"):
+                    raise LightningStateError("the wallet was replaced during removal; try again")
+                store.pop(url, None)
+                if not store:
+                    current.pop("lightning", None)
             await self._save_loaded_wallet(wallet, overwrite=True)
         return True
 

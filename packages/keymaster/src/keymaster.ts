@@ -4186,11 +4186,16 @@ export default class Keymaster implements KeymasterInterface {
         }
 
         const forced = force === true;
+        let url = '';
+        let checked: LightningConfig | undefined;
 
         if (!forced) {
             let balance: unknown;
             try {
-                ({ balance } = await this.getLightningBalance(did));
+                const drawbridge = this.requireDrawbridge();
+                url = drawbridge.url;
+                checked = await this.getLightningConfig(did);
+                ({ balance } = await drawbridge.getLightningBalance(checked.invoiceKey));
                 if (typeof balance !== 'number') {
                     throw new Error('no balance in the reply');
                 }
@@ -4211,16 +4216,23 @@ export default class Keymaster implements KeymasterInterface {
             }
         }
 
-        const url = forced ? undefined : this.requireDrawbridge().url;
-
         await this.mutateWallet(async (wallet) => {
             const current = await this.fetchIdInfo(did, wallet);
+
+            if (!checked) {
+                delete current.lightning;
+                return;
+            }
+
             const store = (current.lightning || {}) as Record<string, LightningConfig>;
 
-            if (url) {
-                delete store[url];
+            // A wallet added since the check is not the one found to be empty.
+            if (store[url] && store[url].adminKey !== checked.adminKey) {
+                throw new LightningStateError('the wallet was replaced during removal; try again');
             }
-            if (!url || Object.keys(store).length === 0) {
+
+            delete store[url];
+            if (Object.keys(store).length === 0) {
                 delete current.lightning;
             }
         });

@@ -453,6 +453,43 @@ describe('removeLightning', () => {
         expect(await keysOf()).toBeUndefined();
     });
 
+    it('keeps a wallet added while an overlapping removal was in progress', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        emptyWallet();
+        const unpublish = gatekeeper.unpublishLightning;
+        gatekeeper.createLightningWallet = () =>
+            Promise.resolve({ walletId: 'w2', adminKey: 'admin2', invoiceKey: 'invoice2' });
+        gatekeeper.unpublishLightning = async () => {
+            gatekeeper.unpublishLightning = unpublish;
+            await keymaster.removeLightning();
+            await keymaster.addLightning();
+            return true;
+        };
+
+        await expect(keymaster.removeLightning()).rejects.toThrow('replaced during removal');
+
+        expect(await keysOf()).toStrictEqual({
+            'http://test-drawbridge': { walletId: 'w2', adminKey: 'admin2', invoiceKey: 'invoice2' },
+        });
+    });
+
+    it('succeeds when an overlapping removal took the wallet first', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.addLightning();
+        emptyWallet();
+        const unpublish = gatekeeper.unpublishLightning;
+        gatekeeper.unpublishLightning = async () => {
+            gatekeeper.unpublishLightning = unpublish;
+            await keymaster.removeLightning();
+            return true;
+        };
+
+        expect(await keymaster.removeLightning()).toBe(true);
+
+        expect(await keysOf()).toBeUndefined();
+    });
+
     it('force discards a funded wallet and unpublishes it', async () => {
         const did = await keymaster.createId('Bob');
         await keymaster.addLightning();

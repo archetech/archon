@@ -196,6 +196,49 @@ def test_remove_lightning_keeps_the_keys_when_it_cannot_unpublish(testbed):
     assert _keys(testbed) is None
 
 
+def test_remove_lightning_keeps_a_wallet_added_during_an_overlapping_removal(testbed):
+    run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.add_lightning())
+    _empty_wallet(testbed)
+    real = testbed.gatekeeper.unpublish_lightning
+    replacement = {}
+
+    async def create(_name):
+        return {"walletId": "w2", "adminKey": "admin2", "invoiceKey": "invoice2"}
+
+    async def overlap(suffix):
+        testbed.gatekeeper.unpublish_lightning = real
+        testbed.gatekeeper.create_lightning_wallet = create
+        await testbed.keymaster.remove_lightning()
+        replacement.update(await testbed.keymaster.add_lightning())
+        return True
+
+    testbed.gatekeeper.unpublish_lightning = overlap
+
+    with pytest.raises(LightningStateError, match="replaced during removal"):
+        run(testbed.keymaster.remove_lightning())
+
+    assert _keys(testbed) == {"http://test-drawbridge": replacement}
+    assert replacement["adminKey"] == "admin2"
+
+
+def test_remove_lightning_succeeds_when_an_overlapping_removal_went_first(testbed):
+    run(testbed.keymaster.create_id("Bob"))
+    run(testbed.keymaster.add_lightning())
+    _empty_wallet(testbed)
+    real = testbed.gatekeeper.unpublish_lightning
+
+    async def overlap(suffix):
+        testbed.gatekeeper.unpublish_lightning = real
+        await testbed.keymaster.remove_lightning()
+        return True
+
+    testbed.gatekeeper.unpublish_lightning = overlap
+
+    assert run(testbed.keymaster.remove_lightning()) is True
+    assert _keys(testbed) is None
+
+
 def test_force_discards_a_funded_wallet_and_unpublishes_it(testbed):
     did = _published(testbed)
     testbed.gatekeeper.get_lightning_balance = _fails("must not be called")
