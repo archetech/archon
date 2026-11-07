@@ -1198,7 +1198,7 @@ reach Lightning functionality via the same `DrawbridgeClient`.
 | `POST /api/v1/lightning` | `{ "id"?: string }`. Provisions an LNbits wallet for the ID, stores `LightningConfig` in `IDInfo`. |
 | `DELETE /api/v1/lightning` | Decommissions the Lightning wallet. |
 | `POST /api/v1/lightning/balance` | Returns `LightningBalance` (flat object). |
-| `POST /api/v1/lightning/invoice` | `{ "amount": number, "memo": string, "id"?: string }` → `LightningInvoice` (flat object). |
+| `POST /api/v1/lightning/invoice` | `{ "amount": number, "memo"?: string, "id"?: string }` → `LightningInvoice` (flat object). |
 | `POST /api/v1/lightning/pay` | `{ "bolt11": string, "id"?: string }` → `LightningPayment` (flat object). |
 | `POST /api/v1/lightning/payment` | `{ "paymentHash": string, "id"?: string }` → `LightningPaymentStatus` (flat object). |
 | `POST /api/v1/lightning/decode` | `{ "bolt11": string }` → `DecodedLightningInvoice` (flat object). |

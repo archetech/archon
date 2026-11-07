@@ -3577,8 +3577,7 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "amount",
-                  "memo"
+                  "amount"
                 ],
                 "properties": {
                   "amount": {
@@ -3689,6 +3688,9 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "bolt11"
+                ],
                 "properties": {
                   "bolt11": {
                     "type": "string"
@@ -3773,6 +3775,10 @@
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "did",
+                  "amount"
+                ],
                 "properties": {
                   "did": {
                     "type": "string"
