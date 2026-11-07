@@ -597,7 +597,9 @@ shared with the reference TypeScript service.
 > `ARCHON_HERALD_URL`) are read with `??`, not `||`: an **unset** var
 > falls back to the default (service on), while an **explicitly empty**
 > value disables the service. This is what drives `/capabilities` and
-> the 501 gating.
+> the 501 gating. The bundled compose defaults these, along with
+> `ARCHON_EXPLORER_URL` and `ARCHON_CASHU_MINT_URL`, to **empty**: each
+> service runs under its own profile, so its URL is set alongside it.
 
 ### 8.3 Shutdown
 

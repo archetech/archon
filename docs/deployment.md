@@ -576,6 +576,8 @@ The full stack — the same service set the single `drawbridge` profile used to 
 
 ```env
 COMPOSE_PROFILES=hyperswarm,drawbridge,lightning,herald,tor
+ARCHON_LIGHTNING_MEDIATOR_URL=http://lightning-mediator:4235
+ARCHON_HERALD_URL=http://herald:4230
 ```
 
 A lean, DIDComm-only gateway, with no Lightning or Tor weight:
@@ -589,7 +591,7 @@ ARCHON_EXPLORER_URL=
 ARCHON_DIDCOMM_TOR_PROXY=
 ```
 
-**Blanking the unused upstream URLs is required, not optional.** Drawbridge decides what it offers from the URLs, not from the profiles: `ARCHON_LIGHTNING_MEDIATOR_URL`, `ARCHON_HERALD_URL` or `ARCHON_EXPLORER_URL` left at its default makes `GET /api/v1/capabilities` advertise the service and the proxy routes attempt a connection to a container that is not running. Empty means the capability reports `false` and the route returns HTTP 501.
+**Set each upstream URL together with its profile.** Drawbridge decides what it offers from the URLs, not from the profiles, and Compose leaves every one of them empty unless `.env` sets it. Empty or unset means the capability reports `false` and the route returns HTTP 501. A URL left set without its profile — as `sample.env` sets `ARCHON_LIGHTNING_MEDIATOR_URL`, `ARCHON_HERALD_URL` and `ARCHON_EXPLORER_URL` for its full-stack default — makes `GET /api/v1/capabilities` advertise the service and the proxy routes attempt a connection to a container that is not running, so blank the ones whose profiles you drop.
 
 `ARCHON_EXPLORER_URL` has a further consequence: Herald links to `<public host>/explorer` by default, so leaving it set without the `explorer` profile gives every visitor a broken link from the identity pages. Either run the profile or set `ARCHON_HERALD_EXPLORER_URL` to a reachable explorer — or empty, to hide the links.
 
@@ -641,7 +643,7 @@ Note that `drawbridge` alone no longer brings in Lightning. To paywall the API w
 | `ARCHON_DRAWBRIDGE_SUBSCRIPTIONS_ENABLED` | `false` | **Insecure dev stub (#121)** — when `true`, any request with an `X-Subscription-DID` header bypasses L402 payment verification with no credential check. Leave `false` in production |
 | `ARCHON_DRAWBRIDGE_DEFAULT_PRICE_SATS` | `10` | Default price per API call (sats) |
 | `ARCHON_DRAWBRIDGE_INVOICE_EXPIRY` | `3600` | Invoice expiry in seconds |
-| `ARCHON_LIGHTNING_MEDIATOR_URL` | `http://lightning-mediator:4235` | Drawbridge's upstream Lightning mediator |
+| `ARCHON_LIGHTNING_MEDIATOR_URL` | empty | Drawbridge's upstream Lightning mediator; set to `http://lightning-mediator:4235` with the `lightning` profile |
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_REST_URL` | `https://cln:3001` | CLN REST endpoint used by the mediator |
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE` | empty | CLN rune used by the mediator; auto-loaded from `./data/cln-mainnet/drawbridge/rune.txt` in the bundled stack |
 | `ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL` | `http://lnbits:5000` | LNbits base URL used by the mediator |
