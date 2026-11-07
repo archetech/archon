@@ -311,6 +311,18 @@ describe('Cashu view: minting', () => {
         expect(keymaster.payLightningInvoice).toHaveBeenCalledTimes(1);
     });
 
+    it('does not take a mint\'s refusal for an unpaid quote', async () => {
+        keymaster.listCashuQuotes.mockResolvedValue([
+            { operationId: 'o1', kind: 'mint', quote: 'q1', mint: NODE, amount: 50, request: 'lnbc1', created: '2026-01-01T00:00:00Z' },
+        ]);
+        keymaster.claimCashuMintQuote.mockRejectedValue(new Error('mint refused: Cashu quote not paid'));
+        view();
+        const user = await open('Mint');
+        await user.click(await screen.findByRole('button', { name: 'Claim' }));
+        await waitFor(() => expect(notify.error).toHaveBeenCalled());
+        expect(notify.warning).not.toHaveBeenCalled();
+    });
+
     it('says a claim is early rather than reporting a failure', async () => {
         keymaster.listCashuQuotes.mockResolvedValue([
             { operationId: 'o1', kind: 'mint', quote: 'q1', mint: NODE, amount: 50, request: 'lnbc1', created: '2026-01-01T00:00:00Z' },
@@ -521,6 +533,44 @@ describe('Cashu view: sending', () => {
             await user.click(screen.getByRole('button', { name: 'Add Mint and Receive' }));
             await waitFor(() => expect(notify.error).toHaveBeenCalled());
             expect(keymaster.receiveCashu).toHaveBeenCalledTimes(1);
+        });
+
+        it('recognizes the same refusal over REST', async () => {
+            keymaster.receiveCashu.mockRejectedValue({ error: `Error: Cashu mint not added: ${OTHER}` });
+            await paste();
+            expect(notify.error).not.toHaveBeenCalled();
+        });
+
+        it('does not take a URL from a mint\'s own refusal', async () => {
+            keymaster.receiveCashu.mockRejectedValue(new Error('mint refused: Cashu mint not added: https://evil.example'));
+            view();
+            const user = await open('Receive');
+            await user.type(screen.getByLabelText(/^Token/), 'cashuBspoof');
+            await user.click(screen.getByRole('button', { name: 'Receive' }));
+            await waitFor(() => expect(notify.error).toHaveBeenCalled());
+            expect(screen.queryByRole('button', { name: 'Add Mint and Receive' })).toBeNull();
+            expect(screen.queryByText(/evil\.example/)).toBeNull();
+        });
+
+        it('runs one receive at a time, so one cannot clear the other\'s offer', async () => {
+            const adding = deferred();
+            keymaster.receiveCashu.mockRejectedValue(notAdded);
+            keymaster.addCashuMint.mockReturnValue(adding.promise);
+            const user = await paste();
+            const receive = screen.getByRole<HTMLButtonElement>('button', { name: 'Receive' });
+            expect(receive.disabled).toBe(false);
+            await user.click(screen.getByRole('button', { name: 'Add Mint and Receive' }));
+            await waitFor(() => expect(receive.disabled).toBe(true));
+        });
+
+        it('holds the add while a receive is running', async () => {
+            const receiving = deferred();
+            keymaster.receiveCashu.mockRejectedValueOnce(notAdded);
+            keymaster.receiveCashu.mockReturnValue(receiving.promise);
+            const user = await paste();
+            const add = screen.getByRole<HTMLButtonElement>('button', { name: 'Add Mint and Receive' });
+            await user.click(screen.getByRole('button', { name: 'Receive' }));
+            await waitFor(() => expect(add.disabled).toBe(true));
         });
 
         it('reports any other refusal as it is', async () => {

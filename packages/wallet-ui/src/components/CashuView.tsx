@@ -79,10 +79,10 @@ function when(seconds: number): string {
     return new Date(seconds * 1000).toLocaleString();
 }
 
-// An error is a class in-process and a JSON body over REST, and carries its type
-// in the text either way.
+// An error is a class in-process and a JSON body over REST, and leads with its type
+// either way. It has to lead: a mint's refusal quotes text the mint chose.
 function isError(error: any, type: string): boolean {
-    return [error?.type, error?.error, error?.message, error].some(part => typeof part === "string" && part.includes(type));
+    return [error?.type, error?.error, error?.message, error].some(part => typeof part === "string" && part.replace(/^Error: /, "").startsWith(type));
 }
 
 function errorText(error: any): string {
@@ -485,7 +485,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                 await receive(submitted);
             } catch (error) {
                 // The mint comes from the token, so adding it stays the person's decision.
-                const url = isError(error, "Cashu mint not added") && errorText(error).match(/https?:\/\/\S+/)?.[0];
+                const url = /^(?:Error: )?Cashu mint not added: (https?:\/\/\S+)$/.exec(errorText(error))?.[1];
                 if (!url) {
                     throw error;
                 }
@@ -608,13 +608,13 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
             <TextField label="Token" placeholder="cashuB..." value={token} multiline rows={4} size="small"
                 onChange={event => setToken(event.target.value)} />
             <Box>
-                <ActionButton label="Receive" variant="contained" busy={busy.receive} disabled={!token.trim()} onClick={handleReceive} />
+                <ActionButton label="Receive" variant="contained" busy={busy.receive} disabled={!token.trim() || busy.addAndReceive} onClick={handleReceive} />
             </Box>
             {offeredMint && (
                 <Alert severity="warning">
                     <Box sx={{ wordBreak: "break-all" }}>This token is at a mint you have not added: {offeredMint.url}</Box>
                     <Box sx={{ my: 1 }}>Adding it means trusting that mint with the value it holds for you.</Box>
-                    <ActionButton label="Add Mint and Receive" color="warning" busy={busy.addAndReceive}
+                    <ActionButton label="Add Mint and Receive" color="warning" busy={busy.addAndReceive} disabled={busy.receive}
                         onClick={() => handleAddAndReceive(offeredMint)} />
                 </Alert>
             )}
