@@ -370,7 +370,7 @@ def test_lightning_config_is_scoped_to_current_url(testbed):
 
     testbed.gatekeeper.url = "http://other-drawbridge"
 
-    with pytest.raises(KeymasterError, match="No Lightning wallet configured"):
+    with pytest.raises(KeymasterError, match="^Lightning not configured: No Lightning wallet configured"):
         run(testbed.keymaster.get_lightning_balance())
 
 
@@ -445,7 +445,7 @@ def test_lightning_validation_and_unavailable_gateway(testbed):
     with pytest.raises(KeymasterError, match="Invalid parameter: amount"):
         run(testbed.keymaster.zap_lightning("NotAKnownAlias", 0))
 
-    with pytest.raises(KeymasterError, match="No Lightning wallet configured"):
+    with pytest.raises(KeymasterError, match="^Lightning not configured: No Lightning wallet configured"):
         run(testbed.keymaster.get_lightning_payments())
 
     class PlainGatekeeper:
