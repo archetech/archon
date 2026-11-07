@@ -608,7 +608,7 @@
   const FAILS = [
     ['A crash mid-request', 'Every request is journaled first. A retry sends the same outputs, and NUT-09 recovers what the mint already signed.', C.cobalt, .6],
     ['A lost wallet', 'The recovery phrase restores ecash in Archon or any NUT-13 wallet. Outstanding locked sends need the wallet file or a backup.', C.amber, 5.6],
-    ['A payment that stays PENDING', 'Its proofs stay in flight until the mint settles it, which cdk-mintd 0.18.3 may not do for a failed payment. Selection locks as little as covers it.', C.red, 11.6],
+    ['A payment that stays PENDING', 'Its proofs stay in flight until the mint settles it, neither spendable nor forgotten. Selection locks as little as covers the payment.', C.red, 11.6],
     ['Two copies of one wallet', 'They hold the same proofs, so the mint refuses the second spend. Check reconciles each copy with the mint.', C.green, 17.6]
   ];
   function s8(t) {
@@ -693,7 +693,7 @@
     [127, 132, 'After the locktime, either key can spend: Alice reclaims what Bob left, unless he gets to the mint first.'],
     [132, 137, 'If something fails midway, the journal has the request. A retry repeats it, and the mint’s records recover what it signed.'],
     [137, 143, 'A recovery phrase restores ecash, in Archon or any NUT-13 wallet. Outstanding locked sends also need the wallet file or a backup.'],
-    [143, 149, 'A payment stuck PENDING stays in flight until the mint settles it, which cdk-mintd 0.18.3 may not do for a failed payment.'],
+    [143, 149, 'A payment stuck PENDING stays in flight until the mint settles it, and selection locks as little as covers it.'],
     [149, 154, 'Two copies of one wallet hold the same proofs, so the mint refuses the second spend, and Check reconciles them.'],
     [154, 160, 'Ecash in Archon: a balance per identity, minted and melted over Lightning, at mints you choose to trust.'],
     [160, 166, 'Pass a token to anyone, or lock it to a DID. Cashu is still young, so keep the amounts small.']
