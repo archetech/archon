@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     Autocomplete,
     Box,
@@ -24,9 +24,14 @@ import EmptyState from "./layout/EmptyState";
 const LIGHTNING_PAYMENT_STATUS_CHECKS = 3;
 const LIGHTNING_PAYMENT_STATUS_DELAY_MS = 1000;
 
-const LightningTab: React.FC = () => {
+type ReviewedInvoice = { invoice: string; info: DecodedLightningInvoice };
+
+// LightningTab keys this view by the identity it shows, so nothing held here, such as
+// an invoice, outlives a change of identity. Keying does not stop a call under way, so
+// each call names this identity rather than whichever is current when it runs.
+const LightningView: React.FC<{ identity: string }> = ({ identity }) => {
     const { keymaster } = useWalletContext();
-    const { currentDID, agentList } = useVariablesContext();
+    const { agentList } = useVariablesContext();
     const { setError, setSuccess, setWarning } = useSnackbar();
 
     const [activeTab, setActiveTab] = useState<"wallet" | "payments" | "receive" | "send" | "zap">("wallet");
@@ -45,7 +50,7 @@ const LightningTab: React.FC = () => {
 
     // Send sub-tab
     const [bolt11Input, setBolt11Input] = useState<string>("");
-    const [decoded, setDecoded] = useState<DecodedLightningInvoice | null>(null);
+    const [decoded, setDecoded] = useState<ReviewedInvoice | null>(null);
     const [loadingDecode, setLoadingDecode] = useState<boolean>(false);
     const [loadingPay, setLoadingPay] = useState<boolean>(false);
     const [paymentResult, setPaymentResult] = useState<LightningPaymentStatus | null>(null);
@@ -66,23 +71,33 @@ const LightningTab: React.FC = () => {
     const [isPublished, setIsPublished] = useState<boolean>(false);
     const [loadingPublishToggle, setLoadingPublishToggle] = useState<boolean>(false);
 
+    // Only the invoice on screen counts as reviewed: a slow decode must not put another
+    // invoice's amount beside it, or enable paying it.
+    const reviewed = decoded?.invoice === bolt11Input.trim() ? decoded : null;
+
+    // A read that a newer one has overtaken must not put older figures back.
+    const latestBalance = useRef(0);
+    const latestPayments = useRef(0);
+
     const fetchBalance = useCallback(async () => {
         if (!keymaster) return;
+        const read = ++latestBalance.current;
         setLoadingBalance(true);
         setWalletError(null);
         try {
-            const result = await keymaster.getLightningBalance();
+            const result = await keymaster.getLightningBalance(identity);
+            if (read !== latestBalance.current) return;
             setBalance(result.balance);
             setIsConfigured(true);
             // Check publish state
-            if (currentDID) {
-                try {
-                    const doc = await keymaster.resolveDID(currentDID);
-                    const services = doc?.didDocument?.service || [];
-                    setIsPublished(services.some((s: any) => s.id?.endsWith('#lightning')));
-                } catch { /* ignore resolve errors */ }
-            }
+            try {
+                const doc = await keymaster.resolveDID(identity);
+                if (read !== latestBalance.current) return;
+                const services = doc?.didDocument?.service || [];
+                setIsPublished(services.some((s: any) => s.id?.endsWith('#lightning')));
+            } catch { /* ignore resolve errors */ }
         } catch (err: any) {
+            if (read !== latestBalance.current) return;
             if (err instanceof LightningNotConfiguredError) {
                 setIsConfigured(false);
             } else {
@@ -90,22 +105,29 @@ const LightningTab: React.FC = () => {
                 setWalletError(err.message || err.error || JSON.stringify(err));
             }
         } finally {
-            setLoadingBalance(false);
+            if (read === latestBalance.current) {
+                setLoadingBalance(false);
+            }
         }
-    }, [keymaster, currentDID]);
+    }, [keymaster, identity]);
 
     const fetchPayments = useCallback(async () => {
         if (!keymaster) return;
+        const read = ++latestPayments.current;
         setLoadingPayments(true);
         try {
-            const result = await keymaster.getLightningPayments();
-            setPayments(result);
+            const result = await keymaster.getLightningPayments(identity);
+            if (read === latestPayments.current) {
+                setPayments(result);
+            }
         } catch (err: any) {
             setError(err);
         } finally {
-            setLoadingPayments(false);
+            if (read === latestPayments.current) {
+                setLoadingPayments(false);
+            }
         }
-    }, [keymaster, setError]);
+    }, [keymaster, identity, setError]);
 
     useEffect(() => {
         if (activeTab === "wallet") {
@@ -118,7 +140,7 @@ const LightningTab: React.FC = () => {
     async function handleSetupLightning() {
         if (!keymaster) return;
         try {
-            await keymaster.addLightning();
+            await keymaster.addLightning(identity);
             setSuccess("Lightning wallet set up successfully");
             await fetchBalance();
         } catch (err: any) {
@@ -129,7 +151,7 @@ const LightningTab: React.FC = () => {
     async function handleDisconnectLightning() {
         if (!keymaster) return;
         try {
-            await keymaster.removeLightning();
+            await keymaster.removeLightning(identity);
             setBalance(null);
             setIsConfigured(false);
             setSuccess("Lightning wallet disconnected");
@@ -148,7 +170,7 @@ const LightningTab: React.FC = () => {
         setLoadingInvoice(true);
         setInvoice("");
         try {
-            const result = await keymaster.createLightningInvoice(amount, receiveMemo);
+            const result = await keymaster.createLightningInvoice(amount, receiveMemo, identity);
             setInvoice(result.paymentRequest);
         } catch (err: any) {
             setError(err);
@@ -159,11 +181,11 @@ const LightningTab: React.FC = () => {
 
     async function handleDecode() {
         if (!keymaster || !bolt11Input.trim()) return;
+        const reading = bolt11Input.trim();
         setLoadingDecode(true);
         setDecoded(null);
         try {
-            const result = await keymaster.decodeLightningInvoice(bolt11Input.trim());
-            setDecoded(result);
+            setDecoded({ invoice: reading, info: await keymaster.decodeLightningInvoice(reading) });
         } catch (err: any) {
             setError(err);
         } finally {
@@ -172,31 +194,31 @@ const LightningTab: React.FC = () => {
     }
 
     async function checkLightningPaymentWithRetry(paymentHash: string) {
-        let status = await keymaster!.checkLightningPayment(paymentHash);
+        let status = await keymaster!.checkLightningPayment(paymentHash, identity);
 
         for (let attempt = 1; attempt < LIGHTNING_PAYMENT_STATUS_CHECKS && !status.paid; attempt++) {
             await new Promise(resolve => setTimeout(resolve, LIGHTNING_PAYMENT_STATUS_DELAY_MS));
-            status = await keymaster!.checkLightningPayment(paymentHash);
+            status = await keymaster!.checkLightningPayment(paymentHash, identity);
         }
 
         return status;
     }
 
-    async function handlePay() {
-        if (!keymaster || !bolt11Input.trim()) return;
+    async function handlePay({ invoice: paying, info }: ReviewedInvoice) {
+        if (!keymaster) return;
         setLoadingPay(true);
         setPaymentResult(null);
         try {
-            const payment = await keymaster.payLightningInvoice(bolt11Input.trim());
-            const status = await keymaster.checkLightningPayment(payment.paymentHash);
+            const payment = await keymaster.payLightningInvoice(paying, identity);
+            const status = await keymaster.checkLightningPayment(payment.paymentHash, identity);
             setPaymentResult(status);
             setSuccess("Payment sent successfully");
-            setBolt11Input("");
-            setDecoded(null);
+            setBolt11Input(current => (current.trim() === paying ? "" : current));
+            setDecoded(current => (current?.invoice === paying ? null : current));
         } catch (err: any) {
-            if (decoded?.payment_hash) {
+            if (info.payment_hash) {
                 try {
-                    const status = await keymaster.checkLightningPayment(decoded.payment_hash);
+                    const status = await keymaster.checkLightningPayment(info.payment_hash, identity);
                     if (status.paid) {
                         setPaymentResult(status);
                         setSuccess("Invoice was already paid");
@@ -215,11 +237,11 @@ const LightningTab: React.FC = () => {
         setLoadingPublishToggle(true);
         try {
             if (isPublished) {
-                await keymaster.unpublishLightning();
+                await keymaster.unpublishLightning(identity);
                 setIsPublished(false);
                 setSuccess("Lightning unpublished — your DID is no longer zappable");
             } else {
-                await keymaster.publishLightning();
+                await keymaster.publishLightning(identity);
                 setIsPublished(true);
                 setSuccess("Lightning published — your DID is now zappable");
             }
@@ -247,7 +269,8 @@ const LightningTab: React.FC = () => {
             const payment = await keymaster.zapLightning(
                 zapDid.trim(),
                 amount,
-                zapMemo.trim() || undefined
+                zapMemo.trim() || undefined,
+                identity
             );
             const status = await checkLightningPaymentWithRetry(payment.paymentHash);
             setZapResult(status);
@@ -482,10 +505,10 @@ const LightningTab: React.FC = () => {
                         >
                             {loadingDecode ? <CircularProgress size={20} /> : "Decode"}
                         </Button>
-                        {decoded && (
+                        {reviewed && (
                             <Button
                                 variant="contained"
-                                onClick={handlePay}
+                                onClick={() => handlePay(reviewed)}
                                 disabled={loadingPay}
                             >
                                 {loadingPay ? <CircularProgress size={20} /> : "Pay"}
@@ -493,31 +516,31 @@ const LightningTab: React.FC = () => {
                         )}
                     </Box>
 
-                    {decoded && (
+                    {reviewed && (
                         <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                            {decoded.amount !== undefined && (
+                            {reviewed.info.amount !== undefined && (
                                 <Typography variant="body2">
-                                    <strong>Amount:</strong> {decoded.amount}
+                                    <strong>Amount:</strong> {reviewed.info.amount}
                                 </Typography>
                             )}
-                            {decoded.description && (
+                            {reviewed.info.description && (
                                 <Typography variant="body2">
-                                    <strong>Description:</strong> {decoded.description}
+                                    <strong>Description:</strong> {reviewed.info.description}
                                 </Typography>
                             )}
-                            {decoded.network && (
+                            {reviewed.info.network && (
                                 <Typography variant="body2">
-                                    <strong>Network:</strong> {decoded.network}
+                                    <strong>Network:</strong> {reviewed.info.network}
                                 </Typography>
                             )}
-                            {decoded.created && (
+                            {reviewed.info.created && (
                                 <Typography variant="body2">
-                                    <strong>Created:</strong> {decoded.created}
+                                    <strong>Created:</strong> {reviewed.info.created}
                                 </Typography>
                             )}
-                            {decoded.expires && (
+                            {reviewed.info.expires && (
                                 <Typography variant="body2">
-                                    <strong>Expires:</strong> {decoded.expires}
+                                    <strong>Expires:</strong> {reviewed.info.expires}
                                 </Typography>
                             )}
                         </Box>
@@ -604,6 +627,15 @@ const LightningTab: React.FC = () => {
             )}
         </Box>
     );
+};
+
+const LightningTab: React.FC = () => {
+    const { currentId } = useVariablesContext();
+
+    if (!currentId) {
+        return null;
+    }
+    return <LightningView key={currentId} identity={currentId} />;
 };
 
 export default LightningTab;
