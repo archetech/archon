@@ -300,7 +300,7 @@ export function createApp(deps: AppDependencies): express.Express {
                     res.status(409).json({ error: 'Another job is running' });
                     return;
                 }
-                const { title, work } = await nodeConfig.apply(draftOf(req.body), req.body?.confirmStateful === true);
+                const { title, work } = await nodeConfig.apply(draftOf(req.body), req.body?.confirmStateful === true, String(req.body?.reviewed ?? ''));
                 const { job } = await jobs.start(title, work);
                 res.status(202).json({ id: job.id });
             }
