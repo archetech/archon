@@ -36,6 +36,7 @@ export interface ContainerInspect {
         Status: string;
         Running: boolean;
         Restarting: boolean;
+        OOMKilled?: boolean;
         ExitCode: number;
         StartedAt: string;
         FinishedAt: string;

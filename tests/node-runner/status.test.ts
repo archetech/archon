@@ -65,6 +65,9 @@ describe('statusReport', () => {
         // A daemon with no restart policy that stopped cleanly is stopped, not completed.
         { service: 'btc-signet-node', inspect: { State: { Status: 'exited', Running: false, ExitCode: 0 }, HostConfig: { RestartPolicy: { Name: 'no' } } } },
         { service: 'react-wallet', inspect: { State: { Status: 'created', Running: false } } },
+        // Killed by `docker stop` after ignoring SIGTERM: stopped. Killed by the OOM killer: failed.
+        { service: 'grafana-sigkill', inspect: { State: { Status: 'exited', Running: false, ExitCode: 137 } } },
+        { service: 'prometheus-oom', inspect: { State: { Status: 'exited', Running: false, ExitCode: 137, OOMKilled: true } } },
     ]);
 
     it('reports each service\'s health from Docker', async () => {
@@ -83,6 +86,8 @@ describe('statusReport', () => {
             didcomm: 'stopped',
             'btc-signet-node': 'stopped',
             'react-wallet': 'stopped',
+            'grafana-sigkill': 'stopped',
+            'prometheus-oom': 'failed',
         });
     });
 
@@ -112,8 +117,9 @@ describe('statusReport', () => {
             'didcomm', 'tor',
             'grafana',
             'react-wallet',
+            'grafana-sigkill', 'prometheus-oom',
         ]);
-        expect(report.counts).toEqual({ healthy: 1, unhealthy: 1, starting: 1, running: 2, restarting: 1, completed: 1, failed: 1, stopped: 3 });
+        expect(report.counts).toEqual({ healthy: 1, unhealthy: 1, starting: 1, running: 2, restarting: 1, completed: 1, failed: 2, stopped: 4 });
     });
 
     it('sees only its own project', async () => {
