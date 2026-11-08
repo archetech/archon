@@ -236,6 +236,20 @@ describe('the whole node', () => {
         expect(preview.stateful).toEqual(['cln-mainnet-node', 'redis']);
     });
 
+    it('follows an optional dependency enabled by another restart target\'s profile', async () => {
+        // lightning is off, but cln-mainnet-node runs; up enables lightning
+        // for every target, so drawbridge's optional lightning-mediator starts.
+        const services = (compose as unknown as { services: Record<string, object> }).services;
+        services['cln-mainnet-node'] = { profiles: ['lightning'] };
+        services['lightning-mediator'] = { profiles: ['lightning'] };
+        services.drawbridge = { optionalDependsOn: ['lightning-mediator'] };
+        docker.containers.push({ service: 'drawbridge' });
+
+        const preview = await lifecycle.preview({ action: 'restart' });
+
+        expect(preview.services.map(s => s.service)).toContain('lightning-mediator');
+    });
+
     it('counts restarting and paused containers as active', async () => {
         docker.containers.find(c => c.service === 'gatekeeper')!.inspect = { State: { Status: 'restarting', Running: true, Restarting: true } };
         docker.containers.find(c => c.service === 'redis')!.inspect = { State: { Status: 'paused', Running: true } };

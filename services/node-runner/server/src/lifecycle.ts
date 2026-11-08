@@ -131,7 +131,13 @@ export class Lifecycle {
         // started even when its own profile is off; an optional one
         // (`required: false`) only when its profile is enabled.
         const all = await this.options.nodeConfig.composeConfig(true);
-        const enabled = new Set(Object.keys((await this.options.nodeConfig.composeConfig()).services));
+        // Enabled: the profiles in .env, plus every profile of the services
+        // `up` is given, which it enables for all of them together.
+        const targetProfiles = new Set(active.flatMap(name => all.services[name]?.profiles ?? []));
+        const enabled = new Set([
+            ...Object.keys((await this.options.nodeConfig.composeConfig()).services),
+            ...Object.entries(all.services).filter(([, def]) => (def.profiles ?? []).some(p => targetProfiles.has(p))).map(([name]) => name),
+        ]);
         const restarted = new Set(active);
         const queue = [...active];
         while (queue.length) {
