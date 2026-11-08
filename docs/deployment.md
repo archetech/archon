@@ -2,20 +2,23 @@
 
 This guide walks you through deploying an Archon node, from a core DID-only setup to a full registry, Drawbridge, and Lightning-enabled stack. Each section builds on the previous one — start with the core and add layers as needed.
 
+For the full stack (`docker-compose.yml` and its profiles), every `.env` change and every start, stop or update in this guide can also be made from a browser with [node-runner](#2-managing-the-node-with-node-runner), which shows what each change will do before it runs. The minimal stack in [§3](#3-core-node-did-only) is run from the shell.
+
 ## Table of Contents
 
 1. [Prerequisites](#1-prerequisites)
-2. [Core Node (DID Only)](#2-core-node-did-only)
-3. [Adding Bitcoin Registries](#3-adding-bitcoin-registries)
-4. [Adding Zcash Registry](#4-adding-zcash-registry)
-5. [Adding Ethereum Registry](#5-adding-ethereum-registry)
-6. [Adding Solana Registry](#6-adding-solana-registry)
-7. [Adding Generic IPFS Pinning](#7-adding-generic-ipfs-pinning)
-8. [Adding Drawbridge (API Gateway + Tor)](#8-adding-drawbridge-api-gateway--tor)
-9. [Bundled Lightning Stack (Optional)](#9-bundled-lightning-stack-optional)
-10. [Production Hardening](#10-production-hardening)
-11. [Port Reference](#11-port-reference)
-12. [Troubleshooting](#12-troubleshooting)
+2. [Managing the Node with node-runner](#2-managing-the-node-with-node-runner)
+3. [Core Node (DID Only)](#3-core-node-did-only)
+4. [Adding Bitcoin Registries](#4-adding-bitcoin-registries)
+5. [Adding Zcash Registry](#5-adding-zcash-registry)
+6. [Adding Ethereum Registry](#6-adding-ethereum-registry)
+7. [Adding Solana Registry](#7-adding-solana-registry)
+8. [Adding Generic IPFS Pinning](#8-adding-generic-ipfs-pinning)
+9. [Adding Drawbridge (API Gateway + Tor)](#9-adding-drawbridge-api-gateway--tor)
+10. [Bundled Lightning Stack (Optional)](#10-bundled-lightning-stack-optional)
+11. [Production Hardening](#11-production-hardening)
+12. [Port Reference](#12-port-reference)
+13. [Troubleshooting](#13-troubleshooting)
 
 ---
 
@@ -37,7 +40,7 @@ cp sample.env .env
 ```
 
 To try a node out before configuring the full stack, use the minimal compose
-file instead — see [§2](#2-core-node-did-only).
+file instead — see [§3](#3-core-node-did-only).
 
 Set your user/group IDs so containers run with the correct permissions:
 
@@ -66,7 +69,52 @@ mkdir -p data
 
 ---
 
-## 2. Core Node (DID Only)
+## 2. Managing the Node with node-runner
+
+node-runner is a web app for operating the node: container state and health,
+merged service logs, editing `.env`, starting, stopping and restarting
+services, and updating to a new release or to `main`. It runs as its own
+Compose project, so stopping the node does not stop it. It manages the full
+stack defined by `docker-compose.yml`; it does not use
+`docker/compose/minimal.yml`, so run the minimal stack from the shell.
+
+It needs the checkout and the `.env` from [Initial Setup](#initial-setup),
+with `ARCHON_UID`, `ARCHON_GID` and `ARCHON_ADMIN_API_KEY` set. node-runner
+edits the settings you change and keeps the rest of the file as it is; it does
+not create a complete `.env` from nothing. From the node directory:
+
+```bash
+./node-runner up -d --build
+```
+
+Open http://127.0.0.1:4280. On a remote host, tunnel the port first:
+
+```bash
+ssh -L 4280:127.0.0.1:4280 <host>
+```
+
+The first visit asks for a one-time setup code and then for an admin password.
+The code is in `data/node-runner/setup-code` and in node-runner's log
+(`./node-runner logs`).
+
+The rest of this guide still applies: its sections explain what each profile
+and setting does. Instead of editing `.env` and running `docker compose up -d`,
+make the same changes on node-runner's Configuration page, where the review
+shows which services each change rebuilds, recreates, starts or stops before
+it runs.
+
+node-runner holds the Docker socket, which is root-equivalent on the host, so
+it listens on loopback by default. Reach it through an SSH tunnel, a VPN, or
+your own reverse proxy with TLS, and do not expose it through Drawbridge or
+Tor. `ARCHON_NODE_RUNNER_HOST_BIND` and `ARCHON_NODE_RUNNER_PORT` in `.env`
+change the address.
+
+The [node-runner guide](https://github.com/archetech/archon/blob/main/services/node-runner/README.md)
+covers sign-in, configuration changes, starting and stopping, and updates.
+
+---
+
+## 3. Core Node (DID Only)
 
 ### Trying It Out: the Minimal Stack
 
@@ -161,7 +209,7 @@ COMPOSE_PROFILES=hyperswarm,cli,explorer,gatekeeper-client,keymaster-client,reac
 
 Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `lightning`, `drawbridge`, `herald`, `tor`, `didcomm`, `zcash-mainnet`, `eth-mainnet`, `eth-sepolia`, `sol-mainnet`, `sol-devnet`, `pinning`, and `filecoin`.
 
-`drawbridge`, `lightning`, `herald`, and `tor` are independent — each starts only what it is named after, and they compose freely. See [§8](#8-adding-drawbridge-api-gateway--tor).
+`drawbridge`, `lightning`, `herald`, and `tor` are independent — each starts only what it is named after, and they compose freely. See [§9](#9-adding-drawbridge-api-gateway--tor).
 
 ### Key Environment Variables
 
@@ -225,7 +273,7 @@ Optional UIs when their profiles are enabled:
 
 ---
 
-## 3. Adding Bitcoin Registries
+## 4. Adding Bitcoin Registries
 
 Bitcoin registries anchor DIDs on-chain via the Satoshi mediator. Each bundled network also includes a dedicated watch-only wallet service under `services/mediators/satoshi-wallet`. There are separate compose files per network:
 
@@ -280,7 +328,7 @@ curl http://localhost:4236/metrics
 
 ---
 
-## 4. Adding Zcash Registry
+## 5. Adding Zcash Registry
 
 Zcash support is optional. If enabled, the Zcash registry anchors DID batches in transparent Zcash transactions via the Zcash mediator. The bundled compose layer includes both `zcash-mainnet-mediator` and a companion `zcash-mainnet-wallet` service. It expects an external Zebra node with RPC access; Zebra provides chain, address-index, and broadcast RPCs while the wallet derives transparent keys from Keymaster and signs locally.
 
@@ -340,7 +388,7 @@ This fallback is only used for `confirm=true` requests when the local node can r
 
 ---
 
-## 5. Adding Ethereum Registry
+## 6. Adding Ethereum Registry
 
 Ethereum support is optional. If enabled, the Ethereum registry anchors DID batches by submitting transactions to a canonical `ArchonRegistry` smart contract and importing its `ArchonBatch` events. The bundled compose layers include mainnet (`eth-mainnet-mediator` plus `eth-mainnet-wallet`) and Sepolia (`eth-sepolia-mediator` plus `eth-sepolia-wallet`) variants. The wallet derives an EVM account from the Keymaster mnemonic and signs transactions; the mediator scans logs and imports batches.
 
@@ -421,7 +469,7 @@ The reference Solidity contract lives at `services/mediators/ethereum/contracts/
 
 ---
 
-## 6. Adding Solana Registry
+## 7. Adding Solana Registry
 
 Solana support is optional. If enabled, the Solana registry anchors DID batches by submitting Solana Memo transactions with an Archon-specific payload and importing matching memos back into Gatekeeper. The bundled compose layers include mainnet (`sol-mainnet-mediator` plus `sol-mainnet-wallet`) and devnet (`sol-devnet-mediator` plus `sol-devnet-wallet`) variants. The wallet derives a Solana account from the Keymaster mnemonic and signs transactions; the mediator scans an Archon registry address included in Memo transactions and imports batches.
 
@@ -493,7 +541,7 @@ curl http://localhost:4263/metrics
 
 ---
 
-## 7. Adding Generic IPFS Pinning
+## 8. Adding Generic IPFS Pinning
 
 Archon can back up selected operation CIDs to an external IPFS pinning service through the generic `pin` queue. This is cheaper than per-operation Filecoin storage for small DID operations and keeps the provider separate from canonical DID registries.
 
@@ -556,7 +604,7 @@ The mediator leaves operations queued while a provider reports `queued` or `pinn
 
 ---
 
-## 8. Adding Drawbridge (API Gateway + Tor)
+## 9. Adding Drawbridge (API Gateway + Tor)
 
 Drawbridge is the L402 API gateway that enables Lightning payments for API access and Lightning zaps between DIDs. It also acts as the node's front-door proxy, fronting the Gatekeeper, the DIDComm relay, Herald name resolution, and the Lightning mediator.
 
@@ -674,7 +722,7 @@ Optional UIs when Drawbridge is enabled:
 
 ---
 
-## 9. Bundled Lightning Stack (Optional)
+## 10. Bundled Lightning Stack (Optional)
 
 If you don't have an existing CLN node, the bundled Lightning stack provides a complete setup with CLN, RTL, and LNbits.
 
@@ -820,7 +868,7 @@ Not provided yet: cdk's management RPC, and with it live keyset rotation (`rotat
 
 ---
 
-## 10. Production Hardening
+## 11. Production Hardening
 
 ### Reverse Proxy
 
@@ -898,7 +946,7 @@ The repo provisions Grafana's notification policy, so Grafana shows it as read-o
 
 ---
 
-## 11. Port Reference
+## 12. Port Reference
 
 | Port | Service | Default | Env Var | Binding |
 |------|---------|---------|---------|---------|
@@ -953,10 +1001,11 @@ The repo provisions Grafana's notification policy, so Grafana shows it as read-o
 | 4001 | IPFS Swarm | 4001 | -- | public |
 | 9090 | Prometheus | 9090 | -- | localhost |
 | 3000 | Grafana | 127.0.0.1:3000 | `ARCHON_GRAFANA_BIND` / `ARCHON_GRAFANA_PORT` | localhost (admin UI; set `ARCHON_GRAFANA_BIND=0.0.0.0` to expose) |
+| 4280 | node-runner | 127.0.0.1:4280 | `ARCHON_NODE_RUNNER_HOST_BIND` / `ARCHON_NODE_RUNNER_PORT` | localhost |
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 For multi-step recovery after losing state — resyncing a reset gatekeeper
 database, a dead hidden service — see [Recovery Procedures](recovery.md).
@@ -1036,6 +1085,8 @@ ss -tlnp | grep :4224
 Either stop the conflicting process or change the port via the corresponding environment variable.
 
 ### Viewing Logs
+
+node-runner's Logs page merges service logs in time order and searches them. From a shell:
 
 ```bash
 # All services

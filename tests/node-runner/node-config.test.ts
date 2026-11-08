@@ -80,6 +80,9 @@ afterEach(() => {
     rmSync(nodeDir, { recursive: true, force: true });
 });
 
+// Apply as the page does: with the fingerprint of the review it showed.
+const reviewedApply = async (draft: Draft, confirm: boolean) => config.apply(draft, confirm, (await config.preview(draft)).reviewed);
+
 const plan = async (draft: Draft) => {
     const { plan: p, ...rest } = await config.preview(draft);
     const names = (items: { service: string }[]) => items.map(i => i.service);
@@ -299,7 +302,7 @@ describe('review fixes', () => {
     });
 
     it('refuses to apply when .env changed after the review', async () => {
-        const { work } = await config.apply({ settings: { ARCHON_NODE_NAME: 'beta' } }, false);
+        const { work } = await reviewedApply({ settings: { ARCHON_NODE_NAME: 'beta' } }, false);
         writeFileSync(join(nodeDir, '.env'), ENV.replace('alpha', 'edited by hand'));
 
         await expect(work(() => {})).rejects.toMatchObject({ status: 409, message: '.env changed since this change was reviewed; review it again' });
@@ -315,9 +318,45 @@ describe('review fixes', () => {
     });
 });
 
+describe('applying what was reviewed', () => {
+    it('refuses when .env changed since the review the operator saw', async () => {
+        const draft = { settings: { ARCHON_NODE_NAME: 'beta' } };
+        const { reviewed } = await config.preview(draft);
+        writeFileSync(join(nodeDir, '.env'), ENV.replace('alpha', 'edited by hand'));
+
+        await expect(config.apply(draft, false, reviewed)).rejects.toMatchObject({ status: 409, message: '.env changed since this change was reviewed; review it again' });
+        expect(readFileSync(join(nodeDir, '.env'), 'utf-8')).toContain('edited by hand');
+    });
+
+    it('reports an outside edit as a stale review even when it breaks the file for Compose', async () => {
+        const draft = { settings: { ARCHON_NODE_NAME: 'beta' } };
+        const { reviewed } = await config.preview(draft);
+        writeFileSync(join(nodeDir, '.env'), ENV + 'BROKEN=1\n');
+        compose.invalid = 'invalid interpolation format';
+
+        await expect(config.apply(draft, false, reviewed)).rejects.toMatchObject({ status: 409, message: '.env changed since this change was reviewed; review it again' });
+    });
+
+    it('refuses without a fingerprint, and accepts a fresh one', async () => {
+        const draft = { settings: { ARCHON_NODE_NAME: 'beta' } };
+        await expect(config.apply(draft, false, '')).rejects.toMatchObject({ status: 409 });
+        await expect(config.apply(draft, false, 'f'.repeat(64))).rejects.toMatchObject({ status: 409 });
+
+        await expect(config.apply(draft, false, (await config.preview(draft)).reviewed)).resolves.toMatchObject({ title: 'Apply 1 configuration change' });
+    });
+
+    it('gives a fingerprint that reveals nothing about the file', async () => {
+        const { reviewed } = await config.preview({});
+        const { createHash } = await import('crypto');
+
+        expect(reviewed).toMatch(/^[0-9a-f]{64}$/);
+        expect(reviewed).not.toBe(createHash('sha256').update(ENV).digest('hex'));
+    });
+});
+
 describe('apply', () => {
     async function run(draft: Draft, confirm = false) {
-        const { title, work } = await config.apply(draft, confirm);
+        const { title, work } = await reviewedApply(draft, confirm);
         const lines: string[] = [];
         await work(line => lines.push(line));
         return { title, lines };
@@ -352,12 +391,12 @@ describe('apply', () => {
     });
 
     it('needs confirmation before interrupting a stateful service', async () => {
-        await expect(config.apply({ profiles: ['react-wallet'] }, false)).rejects.toMatchObject({ status: 409, message: 'Confirm interrupting cln-mainnet-node first' });
+        await expect(reviewedApply({ profiles: ['react-wallet'] }, false)).rejects.toMatchObject({ status: 409, message: 'Confirm interrupting cln-mainnet-node first' });
         expect(readFileSync(join(nodeDir, '.env'), 'utf-8')).toBe(ENV);
     });
 
     it('refuses an empty change', async () => {
-        await expect(config.apply({}, false)).rejects.toMatchObject({ status: 409, message: 'Nothing to apply' });
+        await expect(reviewedApply({}, false)).rejects.toMatchObject({ status: 409, message: 'Nothing to apply' });
     });
 
     it('waits for the host to calm down before building', async () => {
@@ -370,7 +409,7 @@ describe('apply', () => {
 
     it('fails the job when a command fails, with .env already written and backed up', async () => {
         compose.failing = 'up';
-        const { work } = await config.apply({ settings: { ARCHON_NODE_NAME: 'beta' } }, false);
+        const { work } = await reviewedApply({ settings: { ARCHON_NODE_NAME: 'beta' } }, false);
 
         await expect(work(() => {})).rejects.toThrow('docker compose up exited with code 1');
         expect(readFileSync(join(nodeDir, '.env'), 'utf-8')).toContain('ARCHON_NODE_NAME=beta');
@@ -379,7 +418,7 @@ describe('apply', () => {
 
     it('fails the job when a touched service ends up unhealthy', async () => {
         docker.containers.find(c => c.service === 'gatekeeper')!.inspect = { State: { Health: { Status: 'unhealthy', FailingStreak: 3 } } };
-        const { work } = await config.apply({ settings: { ARCHON_NODE_NAME: 'beta' } }, false);
+        const { work } = await reviewedApply({ settings: { ARCHON_NODE_NAME: 'beta' } }, false);
         const lines: string[] = [];
 
         await expect(work(line => lines.push(line))).rejects.toThrow('Not healthy: gatekeeper');
@@ -390,7 +429,7 @@ describe('apply', () => {
         rmSync(join(nodeDir, '.env'));
 
         await expect(config.preview({ settings: { ARCHON_NODE_NAME: 'beta' } })).rejects.toMatchObject({ status: 409, message: 'This node has no .env yet; create it on the Configuration page first' });
-        await expect(config.apply({ settings: { ARCHON_NODE_NAME: 'beta' } }, true)).rejects.toMatchObject({ status: 409 });
+        await expect(config.apply({ settings: { ARCHON_NODE_NAME: 'beta' } }, true, '')).rejects.toMatchObject({ status: 409, message: 'This node has no .env yet; create it on the Configuration page first' });
         expect(existsSync(join(nodeDir, '.env'))).toBe(false);
     });
 

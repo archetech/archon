@@ -59,6 +59,7 @@ export class ComposeError extends Error {
 
 export interface ComposeService {
     profiles?: string[];
+    depends_on?: Record<string, { condition?: string, required?: boolean }>;
     build?: { context?: string, dockerfile?: string, args?: Record<string, string | null> };
     image?: string;
 }

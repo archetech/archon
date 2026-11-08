@@ -35,6 +35,7 @@ Three-minute animated explanations of how Archon works, each viewable in the bro
 ## Operations
 
 - [Deployment Guide](deployment.md) — Docker Compose setup from core node to full Lightning stack
+- [node-runner](https://github.com/archetech/archon/blob/main/services/node-runner/README.md) — web app for a node's status, logs, configuration, start/stop and updates
 - [Recovery Procedures](recovery.md) — getting a node back after losing state
 - [Runtime Docker Architecture](runtime-container-architecture.md) — Mermaid diagrams of the live container topology
 - [Nginx Reverse Proxy](nginx-proxy.conf.example) — example config for production

@@ -80,6 +80,7 @@ export interface PlanService {
 }
 
 export interface Preview {
+    reviewed: string;
     diff: { key: string, before: string | null, after: string | null, secret: boolean }[];
     warnings: Warning[];
     plan: { rebuild: PlanService[], create: PlanService[], recreate: PlanService[], start: PlanService[], stop: PlanService[], unchanged: number };
@@ -165,7 +166,7 @@ export const api = {
     config: () => call<ConfigView>('/config'),
     createEnv: (passphrase: string) => call<{ ok: true }>('/config/create', { passphrase }),
     preview: (draft: Draft) => call<Preview>('/config/preview', { draft }),
-    apply: (draft: Draft, confirmStateful: boolean) => call<{ id: string }>('/config/apply', { draft, confirmStateful }),
+    apply: (draft: Draft, confirmStateful: boolean, reviewed: string) => call<{ id: string }>('/config/apply', { draft, confirmStateful, reviewed }),
     jobs: () => call<{ jobs: JobSummary[] }>('/jobs'),
     updates: (fetchRemote: boolean) => call<UpdateStatus>(`/updates${fetchRemote ? '?fetch=1' : ''}`),
     setChannel: (channel: 'release' | 'main') => call<{ channel: string }>('/updates/channel', { channel }, 'PUT'),
