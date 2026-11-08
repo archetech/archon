@@ -13,9 +13,10 @@ This guide walks you through deploying an Archon node, from a core DID-only setu
 7. [Adding Generic IPFS Pinning](#7-adding-generic-ipfs-pinning)
 8. [Adding Drawbridge (API Gateway + Tor)](#8-adding-drawbridge-api-gateway--tor)
 9. [Bundled Lightning Stack (Optional)](#9-bundled-lightning-stack-optional)
-10. [Production Hardening](#10-production-hardening)
-11. [Port Reference](#11-port-reference)
-12. [Troubleshooting](#12-troubleshooting)
+10. [Managing the Node with node-runner](#10-managing-the-node-with-node-runner)
+11. [Production Hardening](#11-production-hardening)
+12. [Port Reference](#12-port-reference)
+13. [Troubleshooting](#13-troubleshooting)
 
 ---
 
@@ -820,7 +821,40 @@ Not provided yet: cdk's management RPC, and with it live keyset rotation (`rotat
 
 ---
 
-## 10. Production Hardening
+## 10. Managing the Node with node-runner
+
+node-runner is a web app for operating the node: container state and health,
+merged service logs, editing `.env`, starting, stopping and restarting
+services, and updating to a new release or to `main`. It runs as its own
+Compose project, so stopping the node does not stop it. From the node
+directory:
+
+```bash
+./node-runner up -d --build
+```
+
+Open http://127.0.0.1:4280. On a remote host, tunnel the port first:
+
+```bash
+ssh -L 4280:127.0.0.1:4280 <host>
+```
+
+The first visit asks for a one-time setup code and then for an admin password.
+The code is in `data/node-runner/setup-code` and in node-runner's log
+(`./node-runner logs`).
+
+node-runner holds the Docker socket, which is root-equivalent on the host, so
+it listens on loopback by default. Reach it through an SSH tunnel, a VPN, or
+your own reverse proxy with TLS, and do not expose it through Drawbridge or
+Tor. `ARCHON_NODE_RUNNER_HOST_BIND` and `ARCHON_NODE_RUNNER_PORT` in `.env`
+change the address.
+
+The [node-runner guide](https://github.com/archetech/archon/blob/main/services/node-runner/README.md)
+covers sign-in, configuration changes, starting and stopping, and updates.
+
+---
+
+## 11. Production Hardening
 
 ### Reverse Proxy
 
@@ -898,7 +932,7 @@ The repo provisions Grafana's notification policy, so Grafana shows it as read-o
 
 ---
 
-## 11. Port Reference
+## 12. Port Reference
 
 | Port | Service | Default | Env Var | Binding |
 |------|---------|---------|---------|---------|
@@ -953,10 +987,11 @@ The repo provisions Grafana's notification policy, so Grafana shows it as read-o
 | 4001 | IPFS Swarm | 4001 | -- | public |
 | 9090 | Prometheus | 9090 | -- | localhost |
 | 3000 | Grafana | 127.0.0.1:3000 | `ARCHON_GRAFANA_BIND` / `ARCHON_GRAFANA_PORT` | localhost (admin UI; set `ARCHON_GRAFANA_BIND=0.0.0.0` to expose) |
+| 4280 | node-runner | 127.0.0.1:4280 | `ARCHON_NODE_RUNNER_HOST_BIND` / `ARCHON_NODE_RUNNER_PORT` | localhost |
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 For multi-step recovery after losing state — resyncing a reset gatekeeper
 database, a dead hidden service — see [Recovery Procedures](recovery.md).
@@ -1036,6 +1071,8 @@ ss -tlnp | grep :4224
 Either stop the conflicting process or change the port via the corresponding environment variable.
 
 ### Viewing Logs
+
+node-runner's Logs page merges service logs in time order and searches them. From a shell:
 
 ```bash
 # All services
