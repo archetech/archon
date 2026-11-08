@@ -207,8 +207,8 @@ export class NodeConfig {
     }
 
     // The node's Compose configuration with its current .env.
-    composeConfig(): Promise<ComposeConfig> {
-        return this.options.compose.config();
+    composeConfig(allProfiles = false): Promise<ComposeConfig> {
+        return this.options.compose.config(undefined, allProfiles);
     }
 
     private draftChanges(draft: Draft, current: string[]): Record<string, string> {

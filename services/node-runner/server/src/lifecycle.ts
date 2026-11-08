@@ -126,12 +126,18 @@ export class Lifecycle {
 
         // `up` also starts any enabled dependency that is stopped, so those
         // are listed, checked and confirmed with the rest.
-        const config = await this.options.nodeConfig.composeConfig();
+        // The walk follows the rules `up` applies to the services it is given:
+        // targeting a service enables its profile, so a required dependency is
+        // started even when its own profile is off; an optional one
+        // (`required: false`) only when its profile is enabled.
+        const all = await this.options.nodeConfig.composeConfig(true);
+        const enabled = new Set(Object.keys((await this.options.nodeConfig.composeConfig()).services));
         const restarted = new Set(active);
         const queue = [...active];
         while (queue.length) {
-            for (const dependency of Object.keys(config.services[queue.shift()!]?.depends_on ?? {})) {
-                if (config.services[dependency] && !restarted.has(dependency)) {
+            for (const [dependency, edge] of Object.entries(all.services[queue.shift()!]?.depends_on ?? {})) {
+                const started = all.services[dependency] && (edge.required !== false || enabled.has(dependency));
+                if (started && !restarted.has(dependency)) {
                     restarted.add(dependency);
                     queue.push(dependency);
                 }

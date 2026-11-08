@@ -132,6 +132,8 @@ export interface FakeService {
     // Settings passed as build arguments.
     buildVars?: string[];
     dependsOn?: string[];
+    // Dependencies Compose may skip when their profile is off.
+    optionalDependsOn?: string[];
 }
 
 // Stands in for the Compose CLI. Like Compose, it reads the env file it is
@@ -190,7 +192,12 @@ export class FakeCompose implements ComposeApi {
             name: 'archon',
             services: Object.fromEntries(this.active(values, allProfiles).map(([name, s]) => [name, {
                 ...(s.profiles ? { profiles: s.profiles } : {}),
-                ...(s.dependsOn ? { depends_on: Object.fromEntries(s.dependsOn.map(d => [d, { condition: 'service_healthy', required: false }])) } : {}),
+                ...(s.dependsOn || s.optionalDependsOn ? {
+                    depends_on: Object.fromEntries([
+                        ...(s.dependsOn ?? []).map(d => [d, { condition: 'service_healthy', required: true }]),
+                        ...(s.optionalDependsOn ?? []).map(d => [d, { condition: 'service_healthy', required: false }]),
+                    ]),
+                } : {}),
                 ...(s.buildVars ? { build: { context: '.', args: Object.fromEntries(s.buildVars.map(v => [v, values.get(v) ?? ''])) } } : {}),
             }])),
         };
