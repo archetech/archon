@@ -79,8 +79,16 @@ describe('isSecret', () => {
         ['ARCHON_HERALD_IPNS_KEY_NAME', false],
         ['ARCHON_GATEKEEPER_URL', false],
         ['ARCHON_SECRET_FILE', false],
+        ['ARCHON_SIGNET_INS_PASS', true],
+        ['ARCHON_ETH_RPC_URL', true],
+        ['ARCHON_BTC_FALLBACK_RPC_URL', true],
     ])('%s → %s', (key, secret) => {
         expect(isSecret(key)).toBe(secret);
+    });
+
+    it('treats any URL carrying a user and password as a secret', () => {
+        expect(isSecret('ARCHON_SOME_URL', 'http://user:hunter2@host:8332')).toBe(true);
+        expect(isSecret('ARCHON_SOME_URL', 'http://host:8332')).toBe(false);
     });
 });
 
@@ -119,6 +127,17 @@ ARCHON_HERALD_URL=
             'herald is enabled without drawbridge, so nothing fronts it.',
             'ARCHON_GATEKEEPER_DB is set to mongodb, which needs the mongodb profile.',
         ]);
+    });
+
+    it('uses what Compose would: an absent key falls back to the fragment default, not the sample value', () => {
+        // lightning on, its URL absent: Drawbridge gets an empty value.
+        expect(messages(['lightning', 'drawbridge'], {}).map(w => w.message)).toContain(
+            'The lightning profile runs Lightning, but Drawbridge only offers it when ARCHON_LIGHTNING_MEDIATOR_URL is set.');
+        // Tor proxy absent: Compose defaults it to tor:9050.
+        expect(messages(['didcomm', 'drawbridge'], { ARCHON_DIDCOMM_URL: 'http://didcomm:4236' }).map(w => w.message)).toContain(
+            'The DIDComm relay still points at Tor, which is not enabled; .onion delivery would fail on connect.');
+        // Set empty: no proxy, nothing to warn about.
+        expect(messages(['didcomm', 'drawbridge'], { ARCHON_DIDCOMM_URL: 'http://didcomm:4236', ARCHON_DIDCOMM_TOR_PROXY: '' })).toEqual([]);
     });
 
     it('is quiet for a consistent configuration', () => {

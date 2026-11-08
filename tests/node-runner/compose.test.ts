@@ -44,6 +44,15 @@ describe('Compose', () => {
 });
 
 describe('exec', () => {
+    it('keeps no output in memory when only the line callback needs it', async () => {
+        const lines: string[] = [];
+        const result = await exec('sh', ['-c', 'echo out; echo err >&2'], { cwd: '/', env: { PATH: process.env.PATH }, onLine: l => lines.push(l), capture: false });
+
+        expect(lines.sort()).toEqual(['err', 'out']);
+        expect(result.stdout).toBe('');
+        expect(result.stderr).toBe('err\n');
+    });
+
     it('reports output line by line and the exit code', async () => {
         const lines: string[] = [];
         const result = await exec('sh', ['-c', 'printf "a\\nb"; printf "c\\n" >&2; exit 3'], { cwd: '/', env: { PATH: process.env.PATH }, onLine: l => lines.push(l) });

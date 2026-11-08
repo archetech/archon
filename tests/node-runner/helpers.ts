@@ -61,6 +61,10 @@ export function inspectOf(container: FakeContainer): ContainerInspect {
 export class FakeDocker implements DockerApi {
     readonly followed: PassThrough[] = [];
     readonly logCalls: { id: string, options: LogOptions }[] = [];
+    // What each image name currently refers to; every image exists unless
+    // listed in `missingImages`.
+    readonly images = new Map<string, string>();
+    readonly missingImages = new Set<string>();
 
     constructor(readonly containers: FakeContainer[], readonly project = 'archon') {}
 
@@ -81,6 +85,10 @@ export class FakeDocker implements DockerApi {
             },
             Ports: c.ports ?? [],
         }));
+    }
+
+    async imageId(name: string): Promise<string | null> {
+        return this.missingImages.has(name) ? null : this.images.get(name) ?? `sha:${name}`;
     }
 
     async inspect(id: string): Promise<ContainerInspect> {
@@ -128,6 +136,9 @@ export interface FakeService {
 export class FakeCompose implements ComposeApi {
     readonly commands: string[][] = [];
     invalid: string | null = null;
+    // Compose rejects the node's own .env, but a candidate file is judged on
+    // its contents.
+    currentInvalid: string | null = null;
     failing: string | null = null;
 
     constructor(private readonly nodeDir: string, private readonly services: Record<string, FakeService>) {}
@@ -165,6 +176,9 @@ export class FakeCompose implements ComposeApi {
     }
 
     async config(envFile?: string, allProfiles = false): Promise<ComposeConfig> {
+        if (!envFile && this.currentInvalid) {
+            throw new ComposeError(this.currentInvalid, 400);
+        }
         const values = this.values(envFile);
         return {
             name: 'archon',
