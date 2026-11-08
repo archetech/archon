@@ -37,8 +37,14 @@ shell on the host and knowledge of Docker Compose.
   - Node-runner binds to `127.0.0.1` by default. Operators reach it through an
     SSH tunnel, a VPN or their own reverse proxy, never through Drawbridge or
     Tor.
-  - It has a dedicated login credential in its own configuration, independent
+  - It has a dedicated admin password in its own configuration, independent
     of the node's `.env` and of every node service.
+  - The first run asks for that password, gated by a one-time setup code so
+    whoever reaches the page first cannot claim it. Node-runner generates the
+    code at first start, writes it to its data directory and its log, and
+    `deploy/install.sh` prints it. The code stops working once the password is
+    set, and only a hash of the password is stored. Deleting that hash on the
+    host resets the password and brings back the setup page with a new code.
   - Secret settings are write-only: once set, the UI and API never return them.
 - **Configuration preserves `.env`.**
   - Edits keep comments, ordering and unknown keys.
@@ -71,7 +77,7 @@ Each phase is one PR.
 
 | Phase | Delivers |
 |---|---|
-| 1 | Container, separate Compose project, login, loopback binding. Per-service state, Docker health and `/ready` probes, with services that have no healthcheck shown as such. Live, searchable logs per service and merged. A Grafana link when the `observability` profile is on. |
+| 1 | Container, separate Compose project, first-run password setup with a setup code, login, loopback binding. Per-service state, Docker health and `/ready` probes, with services that have no healthcheck shown as such. Live, searchable logs per service and merged. A Grafana link when the `observability` profile is on. |
 | 2 | Configuration: catalog view by section, editing with validation, a diff and a backup, then applying through the preview, including scoped rebuilds and stopping services whose profile was removed. |
 | 3 | Lifecycle: start, stop and restart a service; stop and start the whole node. A whole-node stop uses `stop`, not `down`, unless the operator asks for `down`. |
 | 4 | Updates on the release or `main` channel. Self-update through a short-lived helper container, since a container cannot recreate itself while serving the request. |
