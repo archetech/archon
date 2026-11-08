@@ -22,6 +22,8 @@ services:
       - HOME=/tmp
       - ARCHON_NODE_RUNNER_NODE_DIR=${NODE_RUNNER_NODE_DIR:?run node-runner with ./node-runner}
       - ARCHON_NODE_RUNNER_DATA_DIR=${NODE_RUNNER_NODE_DIR}/data/node-runner
+      # The image the self-update helper runs; matches `image:` above.
+      - ARCHON_NODE_RUNNER_IMAGE=ghcr.io/archetech/node-runner
     # Loopback by default: the Docker socket is root on the host. Reach it
     # through an SSH tunnel, a VPN or your own reverse proxy.
     ports:

@@ -6,6 +6,7 @@ import { createDockerApi } from './docker.js';
 import { JobRunner } from './jobs.js';
 import { Lifecycle } from './lifecycle.js';
 import { NodeConfig } from './node-config.js';
+import { Updates } from './updates.js';
 
 async function main(): Promise<void> {
     const config = loadConfig();
@@ -30,6 +31,7 @@ async function main(): Promise<void> {
         nodeConfig,
         jobs: new JobRunner(config.dataDir),
         lifecycle: new Lifecycle({ project: config.project, docker, nodeConfig }),
+        updates: new Updates({ nodeDir: config.nodeDir, dataDir: config.dataDir, nodeConfig, exec, selfImage: config.image }),
     });
 
     app.listen(config.port, () => {

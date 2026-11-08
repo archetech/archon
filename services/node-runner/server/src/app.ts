@@ -8,6 +8,7 @@ import { parseActionRequest, type Lifecycle } from './lifecycle.js';
 import { collectLogs, containerSignature, followLogs, parseTail, resolveTargets, timeKey } from './logs.js';
 import type { Draft, NodeConfig } from './node-config.js';
 import { statusReport } from './status.js';
+import type { Updates } from './updates.js';
 
 export const SESSION_COOKIE = 'node_runner_session';
 export const SESSION_RECHECK_MS = 10000;
@@ -21,6 +22,7 @@ export interface AppDependencies {
     nodeConfig?: NodeConfig;
     jobs?: JobRunner;
     lifecycle?: Lifecycle;
+    updates?: Updates;
     // How often a live log stream checks whether its containers changed.
     watchIntervalMs?: number;
 }
@@ -323,6 +325,43 @@ export function createApp(deps: AppDependencies): express.Express {
                         return;
                     }
                     const { title, work } = await lifecycle.run(parseActionRequest(req.body), req.body?.confirmStateful === true);
+                    const { job } = await jobs.start(title, work);
+                    res.status(202).json({ id: job.id });
+                }
+                catch (error) {
+                    sendError(res, error);
+                }
+            });
+        }
+
+        const { updates } = deps;
+        if (updates) {
+            api.get('/updates', async (req, res) => {
+                try {
+                    res.json(await updates.status(req.query.fetch === '1'));
+                }
+                catch (error) {
+                    sendError(res, error);
+                }
+            });
+
+            api.put('/updates/channel', async (req, res) => {
+                try {
+                    await updates.setChannel(req.body?.channel);
+                    res.json({ channel: req.body.channel });
+                }
+                catch (error) {
+                    sendError(res, error);
+                }
+            });
+
+            api.post('/updates/run', async (req, res) => {
+                try {
+                    if (await jobs.active()) {
+                        res.status(409).json({ error: 'Another job is running' });
+                        return;
+                    }
+                    const { title, work } = await updates.run(req.body?.confirmStateful === true);
                     const { job } = await jobs.start(title, work);
                     res.status(202).json({ id: job.id });
                 }

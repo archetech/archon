@@ -15,6 +15,7 @@ export interface ContainerSummary {
     Id: string;
     Names: string[];
     Image: string;
+    ImageID?: string;
     State: string;
     Status: string;
     Labels: Record<string, string>;
@@ -65,6 +66,8 @@ export interface LogOptions {
 
 export interface DockerApi {
     listContainers(project: string): Promise<ContainerSummary[]>;
+    // The ID an image name currently refers to, or null if there is none.
+    imageId(name: string): Promise<string | null>;
     inspect(id: string): Promise<ContainerInspect>;
     logs(id: string, options: LogOptions): Promise<Readable>;
 }
@@ -126,6 +129,17 @@ export function createDockerApi(
         },
         inspect(id) {
             return json<ContainerInspect>(`/containers/${encodeURIComponent(id)}/json`);
+        },
+        async imageId(name) {
+            try {
+                return (await json<{ Id: string }>(`/images/${encodeURIComponent(name)}/json`)).Id;
+            }
+            catch (error) {
+                if (error instanceof DockerError && error.status === 404) {
+                    return null;
+                }
+                throw error;
+            }
         },
         async logs(id, options) {
             const params = new URLSearchParams({ stdout: '1', stderr: '1', timestamps: '1' });

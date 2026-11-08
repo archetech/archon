@@ -9,12 +9,13 @@ import JobsPage from '../pages/JobsPage';
 import LogsPage from '../pages/LogsPage';
 import OverviewPage from '../pages/OverviewPage';
 import ReviewPage from '../pages/ReviewPage';
+import UpdatesPage from '../pages/UpdatesPage';
 
 const POLL_MS = 5000;
 
-type Page = 'overview' | 'logs' | 'config' | 'review' | 'action' | 'jobs';
+type Page = 'overview' | 'logs' | 'config' | 'review' | 'action' | 'updates' | 'jobs';
 
-const PATHS: Record<Page, string> = { overview: '/', logs: '/logs', config: '/config', review: '/review', action: '/action', jobs: '/jobs' };
+const PATHS: Record<Page, string> = { overview: '/', logs: '/logs', config: '/config', review: '/review', action: '/action', updates: '/updates', jobs: '/jobs' };
 
 interface Route {
     page: Page;
@@ -159,6 +160,7 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
                     <Tab value="overview" label="Overview" />
                     <Tab value="logs" label="Logs" />
                     <Tab value="config" label={<Badge color="primary" badgeContent={drafted} invisible={!drafted}>Configuration</Badge>} />
+                    <Tab value="updates" label="Updates" />
                     <Tab value="jobs" label="Jobs" />
                 </Tabs>
             </AppBar>
@@ -182,6 +184,7 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
                 {route.page === 'action' && (action
                     ? <ActionPage request={action} onRequest={setAction} onBack={() => navigate('overview')} onStarted={jobStarted} onUnauthorized={onSignedOut} />
                     : <OverviewPage report={report} error={statusError} onOpenLogs={service => navigate('logs', { services: [service] })} onAction={review} onUnauthorized={onSignedOut} />)}
+                {route.page === 'updates' && <UpdatesPage onStarted={jobStarted} onUnauthorized={onSignedOut} />}
                 {route.page === 'jobs' && <JobsPage jobs={jobs} selected={route.job} onSelect={id => navigate('jobs', { job: id })} />}
             </Box>
         </Box>

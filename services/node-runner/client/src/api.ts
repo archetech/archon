@@ -113,16 +113,28 @@ export interface ActionPreview {
     empty: boolean;
 }
 
+export interface UpdateStatus {
+    channel: 'release' | 'main';
+    current: { commit: string, describe: string, branch: string | null };
+    target: { ref: string, label: string, commit: string } | null;
+    commits: { sha: string, subject: string }[];
+    note: string | null;
+    dirty: string[];
+    statefulBuilt: string[];
+    load: { load1: number, cores: number };
+    fetchError: string | null;
+}
+
 export class ApiError extends Error {
     constructor(message: string, readonly status: number) {
         super(message);
     }
 }
 
-async function call<T>(path: string, body?: unknown): Promise<T> {
+async function call<T>(path: string, body?: unknown, method = 'POST'): Promise<T> {
     const res = await fetch(`/api${path}`, body === undefined
         ? { credentials: 'same-origin' }
-        : { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        : { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
         throw new ApiError(data.error ?? res.statusText, res.status);
@@ -151,6 +163,9 @@ export const api = {
     preview: (draft: Draft) => call<Preview>('/config/preview', { draft }),
     apply: (draft: Draft, confirmStateful: boolean) => call<{ id: string }>('/config/apply', { draft, confirmStateful }),
     jobs: () => call<{ jobs: JobSummary[] }>('/jobs'),
+    updates: (fetchRemote: boolean) => call<UpdateStatus>(`/updates${fetchRemote ? '?fetch=1' : ''}`),
+    setChannel: (channel: 'release' | 'main') => call<{ channel: string }>('/updates/channel', { channel }, 'PUT'),
+    runUpdate: (confirmStateful: boolean) => call<{ id: string }>('/updates/run', { confirmStateful }),
     previewAction: (request: ActionRequest) => call<ActionPreview>('/actions/preview', request),
     runAction: (request: ActionRequest, confirmStateful: boolean) => call<{ id: string }>('/actions/run', { ...request, confirmStateful }),
     jobStreamUrl: (id: string) => `/api/jobs/${encodeURIComponent(id)}/stream`,

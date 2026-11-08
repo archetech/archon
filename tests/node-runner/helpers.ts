@@ -29,6 +29,8 @@ export interface FakeContainer {
     tty?: boolean;
     // The com.docker.compose.config-hash label.
     hash?: string;
+    // The image the container was created from.
+    imageId?: string;
     // Opening its log stream fails, after a delay so others open first.
     failLogs?: boolean;
 }
@@ -61,6 +63,8 @@ export function inspectOf(container: FakeContainer): ContainerInspect {
 export class FakeDocker implements DockerApi {
     readonly followed: PassThrough[] = [];
     readonly logCalls: { id: string, options: LogOptions }[] = [];
+    // What each image name currently refers to.
+    readonly images = new Map<string, string>();
 
     constructor(readonly containers: FakeContainer[], readonly project = 'archon') {}
 
@@ -72,6 +76,7 @@ export class FakeDocker implements DockerApi {
             Id: `id-${c.service}`,
             Names: [`/archon-${c.service}-1`],
             Image: `ghcr.io/archetech/${c.service}`,
+            ...(c.imageId ? { ImageID: c.imageId } : {}),
             State: inspectOf(c).State.Status,
             Status: 'Up',
             Labels: {
@@ -81,6 +86,10 @@ export class FakeDocker implements DockerApi {
             },
             Ports: c.ports ?? [],
         }));
+    }
+
+    async imageId(name: string): Promise<string | null> {
+        return this.images.get(name) ?? null;
     }
 
     async inspect(id: string): Promise<ContainerInspect> {

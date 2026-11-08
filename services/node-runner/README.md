@@ -2,8 +2,9 @@
 
 node-runner is a web app for operating an Archon node. It shows every
 container's state and health and the node's logs, edits the node's
-configuration, and starts, stops and restarts services or the whole node.
-Updates come in a later phase of [the plan](../../docs/plans/node-runner-1554.md).
+configuration, starts, stops and restarts services or the whole node, and
+updates the node. [The plan](../../docs/plans/node-runner-1554.md) records the
+design decisions.
 
 ## Running it
 
@@ -70,6 +71,26 @@ Stopping the node runs `docker compose stop`, which keeps its containers.
 when you ask for it on the review page. Neither removes volumes or anything in
 `data/`. Starting the node runs `docker compose up -d` with the current
 configuration.
+
+## Updates
+
+The Updates page follows one of two channels: **Releases**, the newest `v*`
+tag, or **main**, the head of `origin/main`. It fetches, shows the commits an
+update brings and the host's load, and refuses to run while tracked files have
+local changes.
+
+An update checks out the target (a detached tag, or a fast-forward of `main`),
+runs `docker compose build` with `GIT_COMMIT` set (waiting while the host is
+busy), and recreates the containers whose image or configuration changed. A
+stateful service built from this repository, such as Core Lightning, is
+restarted only if its image changed and you confirmed it beforehand. Otherwise
+the update stops after building, and you finish it with **Start node**, which
+shows exactly what will be recreated.
+
+If the update changed node-runner itself, it starts a short-lived helper
+container (`archon-node-runner-updater`) that runs `./node-runner up -d
+--build` and replaces node-runner; the page reconnects when it is back.
+Sessions do not survive the restart, so you sign in again.
 
 ## What it reads
 
