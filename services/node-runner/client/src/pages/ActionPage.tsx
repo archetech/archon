@@ -25,11 +25,18 @@ export default function ActionPage({ request, onRequest, onBack, onStarted, onUn
         setError(e instanceof Error ? e.message : String(e));
     };
 
+    // Only the preview for the request on screen counts: a response to an
+    // earlier one (before the down box was toggled, say) is dropped, so the
+    // command reviewed is always the command that runs.
     useEffect(() => {
+        let current = true;
         setPreview(null);
         setError('');
         setConfirmed(false);
-        api.previewAction(request).then(setPreview, handle);
+        api.previewAction(request).then(p => current && setPreview(p), e => current && handle(e));
+        return () => {
+            current = false;
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [request]);
 

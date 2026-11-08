@@ -81,6 +81,11 @@ describe('one service', () => {
         await expect(lifecycle.run({ action: 'start', service: 'gatekeeper' }, false)).rejects.toMatchObject({ status: 409, message: 'Nothing to do' });
     });
 
+    it('restarts a stopped one, which starts it', async () => {
+        await run({ action: 'restart', service: 'grafana' });
+        expect(compose.commands).toEqual([['restart', 'grafana']]);
+    });
+
     it('marks an init container as one-shot', async () => {
         expect((await lifecycle.preview({ action: 'start', service: 'lnbits-init' })).services).toEqual([{ service: 'lnbits-init', stateful: false, oneShot: true }]);
     });
@@ -117,9 +122,23 @@ describe('the whole node', () => {
         expect(compose.commands).toEqual([['up', '-d']]);
     });
 
-    it('restarts what is running', async () => {
+    it('restarts only what is active, named, so stopped containers stay stopped', async () => {
+        const preview = await lifecycle.preview({ action: 'restart' });
+        expect(preview.command).toBe('docker compose restart cln-mainnet-node gatekeeper redis');
+
         await run({ action: 'restart' }, true);
-        expect(compose.commands).toEqual([['restart']]);
+        expect(compose.commands).toEqual([['restart', 'cln-mainnet-node', 'gatekeeper', 'redis']]);
+    });
+
+    it('counts restarting and paused containers as active', async () => {
+        docker.containers.find(c => c.service === 'gatekeeper')!.inspect = { State: { Status: 'restarting', Running: true, Restarting: true } };
+        docker.containers.find(c => c.service === 'redis')!.inspect = { State: { Status: 'paused', Running: true } };
+
+        const preview = await lifecycle.preview({ action: 'stop' });
+        expect(preview.services.map(s => s.service)).toEqual(['cln-mainnet-node', 'gatekeeper', 'redis']);
+        expect(preview.stateful).toEqual(['cln-mainnet-node', 'redis']);
+        expect((await lifecycle.preview({ action: 'stop', service: 'gatekeeper' })).empty).toBe(false);
+        expect((await lifecycle.preview({ action: 'start', service: 'gatekeeper' })).empty).toBe(true);
     });
 });
 

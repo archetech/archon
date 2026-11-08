@@ -24,6 +24,10 @@ export interface ActionPreview {
 
 const ACTIONS: Action[] = ['start', 'stop', 'restart'];
 
+// Containers a stop or restart acts on: running ones, and ones restarting
+// (a crash loop) or paused.
+export const ACTIVE_STATES = ['running', 'restarting', 'paused'];
+
 function item(service: string): PlanService {
     return { service, stateful: isStateful(service), ...(isOneShot(service) ? { oneShot: true } : {}) };
 }
@@ -56,18 +60,18 @@ export class Lifecycle {
 
     async preview(request: ActionRequest): Promise<ActionPreview> {
         const containers = await this.containers();
-        const running = [...containers.entries()].filter(([, c]) => c.State === 'running').map(([s]) => s);
+        const active = [...containers.entries()].filter(([, c]) => ACTIVE_STATES.includes(c.State)).map(([s]) => s).sort();
 
         if (request.service) {
             const container = containers.get(request.service);
             if (!container) {
                 throw new ConfigError(`No container for ${request.service}; enable its profile in Configuration`, 404);
             }
-            const isRunning = container.State === 'running';
-            const affected = request.action === 'start' ? (isRunning ? [] : [request.service]) : (isRunning ? [request.service] : []);
-            if (request.action === 'restart' && !isRunning) {
-                affected.push(request.service);
-            }
+            const isActive = ACTIVE_STATES.includes(container.State);
+            // Restart acts on a stopped container too: it starts it.
+            const affected = request.action === 'start' ? (isActive ? [] : [request.service])
+                : request.action === 'stop' ? (isActive ? [request.service] : [])
+                    : [request.service];
             const services = affected.map(item);
             return {
                 title: `${request.action[0].toUpperCase()}${request.action.slice(1)} ${request.service}`,
@@ -79,7 +83,7 @@ export class Lifecycle {
         }
 
         if (request.action === 'stop') {
-            const services = running.sort().map(item);
+            const services = active.map(item);
             return {
                 title: request.down ? 'Stop the node and remove its containers' : 'Stop the node',
                 command: request.down ? 'docker compose down' : 'docker compose stop',
@@ -103,10 +107,12 @@ export class Lifecycle {
             };
         }
 
-        const services = running.sort().map(item);
+        // Scoped to what is active now: an unscoped restart would also start
+        // stopped containers the review did not list.
+        const services = active.map(item);
         return {
             title: 'Restart the node',
-            command: 'docker compose restart',
+            command: `docker compose restart ${active.join(' ')}`,
             services,
             stateful: services.filter(s => s.stateful).map(s => s.service),
             empty: services.length === 0,
@@ -140,7 +146,7 @@ export class Lifecycle {
                     await nodeConfig.verify(services, log);
                 }
                 else {
-                    await nodeConfig.runCompose(['restart'], log);
+                    await nodeConfig.runCompose(['restart', ...services], log);
                     await nodeConfig.verify(services, log);
                 }
                 log('Done.');
