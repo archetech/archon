@@ -71,6 +71,35 @@ shell on the host and knowledge of Docker Compose.
   `v*` tag) or `main`. Either way node-runner fetches, lists the incoming
   commits, checks out, builds with `GIT_COMMIT` set, and runs `up -d`.
 
+## Interface
+
+React and MUI with the wallet's theme, usable at phone width. Status is shown
+with an icon and text, never color alone.
+
+- **Top bar:** node name, running version and update channel, overall health,
+  and a running-job indicator.
+- **Overview:** a one-line verdict (all healthy, or which service is unhealthy
+  and for how long), then service cards grouped by role: core, chains,
+  Lightning, gateway, storage, observability, apps. Each card shows state, the
+  health source (Docker healthcheck, `/ready` probe, or none), uptime and
+  restarts, and marks stateful services. Selecting a card opens its detail:
+  image, profile, ports, the settings that affect it, a log tail, and start,
+  stop and restart.
+- **Logs:** one service or several merged, with per-service colors, follow
+  mode, search, a time range and download.
+- **Configuration:** a Profiles tab with one switch per profile and inline
+  pairing warnings, each with a fix where there is an obvious one; and a
+  Settings tab grouped by the `sample.env` sections, with search and a
+  changed-from-default filter. Build settings are marked. Secrets show only
+  whether they are set and can be replaced. Edits stay a draft until reviewed.
+- **Review:** one page for configuration changes, updates and service
+  actions. It shows the `.env` diff (secrets masked) or the incoming commits,
+  then the plan grouped as Rebuild, Create, Recreate, Restart and Stop.
+  Touching a stateful service needs an explicit confirmation before Apply.
+- **Updates:** the channel switch, the running and available versions, host
+  load, and the incoming commits, leading to the review page.
+- **Jobs:** the running job's live output and the job history.
+
 ## Phases
 
 Each phase is one PR.
