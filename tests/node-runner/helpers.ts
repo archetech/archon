@@ -29,6 +29,8 @@ export interface FakeContainer {
     tty?: boolean;
     // The com.docker.compose.config-hash label.
     hash?: string;
+    // The image the container was created from.
+    imageId?: string;
     // Opening its log stream fails, after a delay so others open first.
     failLogs?: boolean;
 }
@@ -76,6 +78,7 @@ export class FakeDocker implements DockerApi {
             Id: `id-${c.service}`,
             Names: [`/archon-${c.service}-1`],
             Image: `ghcr.io/archetech/${c.service}`,
+            ...(c.imageId ? { ImageID: c.imageId } : {}),
             State: inspectOf(c).State.Status,
             Status: 'Up',
             Labels: {

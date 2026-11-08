@@ -161,6 +161,19 @@ export class JobRunner {
         return { job, done: this.execute(job, work) };
     }
 
+    // Takes up a job a previous node-runner process left running, such as a
+    // self-update that replaced that process, and carries on with `work`.
+    async adopt(id: string, work: JobWork): Promise<{ job: Job, done: Promise<void> } | null> {
+        await this.load();
+        const job = this.jobs.find(j => j.id === id);
+        if (!job) {
+            return null;
+        }
+        Object.assign(job, { status: 'running', error: null, finishedAt: null });
+        await this.save();
+        return { job, done: this.execute(job, work) };
+    }
+
     private execute(job: Job, work: JobWork): Promise<void> {
         const log: JobLog = text => {
             const line = { time: this.now().toISOString(), text };

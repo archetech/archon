@@ -206,6 +206,11 @@ export class NodeConfig {
         };
     }
 
+    // The node's Compose configuration with its current .env.
+    composeConfig(): Promise<ComposeConfig> {
+        return this.options.compose.config();
+    }
+
     private draftChanges(draft: Draft, current: string[]): Record<string, string> {
         const changes: Record<string, string> = {};
         for (const [key, value] of Object.entries(draft.settings ?? {})) {
@@ -306,12 +311,24 @@ export class NodeConfig {
         const start: string[] = [];
         let unchanged = 0;
 
+        // `up` also recreates a container whose image name now points at a
+        // different image, as it does after a build or a pull.
+        const imageChanged = async (service: string): Promise<boolean> => {
+            const container = byService.get(service)!;
+            const name = draftConfig.services[service]?.image ?? `${this.options.project}-${service}`;
+            const current = await this.options.docker.imageId(name);
+            return !!current && !!container.ImageID && current !== container.ImageID;
+        };
+        const changedImages = new Set((await Promise.all([...hashes.keys()]
+            .filter(service => byService.has(service))
+            .map(async service => (await imageChanged(service)) ? service : null))).filter(Boolean) as string[]);
+
         for (const [service, hash] of hashes) {
             const container = byService.get(service);
             if (!container) {
                 create.push(service);
             }
-            else if (container.Labels['com.docker.compose.config-hash'] !== hash) {
+            else if (container.Labels['com.docker.compose.config-hash'] !== hash || changedImages.has(service)) {
                 recreate.push(service);
             }
             else if (container.State !== 'running') {

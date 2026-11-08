@@ -51,6 +51,7 @@ describe('loadConfig', () => {
             dockerSocket: '/var/run/docker.sock',
             clientDir: null,
             gitCommit: 'unknown',
+            image: 'ghcr.io/archetech/node-runner',
         });
     });
 
@@ -62,6 +63,7 @@ describe('loadConfig', () => {
             ARCHON_NODE_RUNNER_PROJECT: 'archon',
             ARCHON_NODE_RUNNER_DOCKER_SOCKET: '/run/docker.sock',
             ARCHON_NODE_RUNNER_CLIENT_DIR: '/app/client',
+            ARCHON_NODE_RUNNER_IMAGE: 'example/node-runner:test',
             GIT_COMMIT: 'abc1234',
         })).toEqual({
             port: 5000,
@@ -71,6 +73,7 @@ describe('loadConfig', () => {
             dockerSocket: '/run/docker.sock',
             clientDir: '/app/client',
             gitCommit: 'abc1234',
+            image: 'example/node-runner:test',
         });
     });
 });

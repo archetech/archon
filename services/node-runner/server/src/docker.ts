@@ -15,6 +15,7 @@ export interface ContainerSummary {
     Id: string;
     Names: string[];
     Image: string;
+    ImageID?: string;
     State: string;
     Status: string;
     Labels: Record<string, string>;

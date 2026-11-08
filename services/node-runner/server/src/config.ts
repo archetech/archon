@@ -12,6 +12,8 @@ export interface NodeRunnerConfig {
     dockerSocket: string;
     clientDir: string | null;
     gitCommit: string;
+    // node-runner's own image, which its self-update helper runs.
+    image: string;
 }
 
 // Compose's own normalization of a project name: lower case, and only
@@ -55,5 +57,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): NodeRunnerConf
         dockerSocket: env.ARCHON_NODE_RUNNER_DOCKER_SOCKET || '/var/run/docker.sock',
         clientDir: env.ARCHON_NODE_RUNNER_CLIENT_DIR || null,
         gitCommit: env.GIT_COMMIT || 'unknown',
+        image: env.ARCHON_NODE_RUNNER_IMAGE || 'ghcr.io/archetech/node-runner',
     };
 }
