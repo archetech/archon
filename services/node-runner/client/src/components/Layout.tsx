@@ -1,8 +1,9 @@
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import { AppBar, Badge, Box, Button, Chip, CircularProgress, Link, Tab, Tabs, Toolbar, Typography } from '@mui/material';
 import { useCallback, useEffect, useState } from 'react';
-import { api, ApiError, type Draft, type Info, type JobSummary, type StatusReport } from '../api';
+import { api, ApiError, type ActionRequest, type Draft, type Info, type JobSummary, type StatusReport } from '../api';
 import { verdict } from '../format';
+import ActionPage from '../pages/ActionPage';
 import ConfigPage from '../pages/ConfigPage';
 import JobsPage from '../pages/JobsPage';
 import LogsPage from '../pages/LogsPage';
@@ -11,9 +12,9 @@ import ReviewPage from '../pages/ReviewPage';
 
 const POLL_MS = 5000;
 
-type Page = 'overview' | 'logs' | 'config' | 'review' | 'jobs';
+type Page = 'overview' | 'logs' | 'config' | 'review' | 'action' | 'jobs';
 
-const PATHS: Record<Page, string> = { overview: '/', logs: '/logs', config: '/config', review: '/review', jobs: '/jobs' };
+const PATHS: Record<Page, string> = { overview: '/', logs: '/logs', config: '/config', review: '/review', action: '/action', jobs: '/jobs' };
 
 interface Route {
     page: Page;
@@ -45,6 +46,8 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
     // The configuration draft lives here so it survives moving between the
     // Configuration and Review pages.
     const [draft, setDraft] = useState<Draft>({ settings: {} });
+    // The service or node action being reviewed.
+    const [action, setAction] = useState<ActionRequest | null>(null);
 
     const handle = useCallback((error: unknown) => {
         if (error instanceof ApiError && error.status === 401) {
@@ -96,8 +99,14 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
         setRoute({ page, services: extra.services ?? [], job: extra.job ?? null });
     }, []);
 
+    const review = useCallback((request: ActionRequest) => {
+        setAction(request);
+        navigate('action');
+    }, [navigate]);
+
     const jobStarted = useCallback((id: string) => {
         setDraft({ settings: {} });
+        setAction(null);
         api.jobs().then(r => setJobs(r.jobs), () => {});
         navigate('jobs', { job: id });
     }, [navigate]);
@@ -105,7 +114,7 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
     const summary = report ? verdict(report) : null;
     const running = jobs.find(j => j.status === 'running');
     const grafana = grafanaUrl(report);
-    const tab = route.page === 'review' ? 'config' : route.page;
+    const tab = route.page === 'review' ? 'config' : route.page === 'action' ? 'overview' : route.page;
     const drafted = Object.keys(draft.settings).length + (draft.profiles ? 1 : 0);
 
     return (
@@ -155,7 +164,13 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
             </AppBar>
             <Box component="main" sx={{ maxWidth: 1400, mx: 'auto', p: { xs: 2, md: 3 } }}>
                 {route.page === 'overview' && (
-                    <OverviewPage report={report} error={statusError} onOpenLogs={service => navigate('logs', { services: [service] })} onUnauthorized={onSignedOut} />
+                    <OverviewPage
+                        report={report}
+                        error={statusError}
+                        onOpenLogs={service => navigate('logs', { services: [service] })}
+                        onAction={review}
+                        onUnauthorized={onSignedOut}
+                    />
                 )}
                 {route.page === 'logs' && <LogsPage report={report} initialServices={route.services} onUnauthorized={onSignedOut} />}
                 {route.page === 'config' && (
@@ -164,6 +179,9 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
                 {route.page === 'review' && (
                     <ReviewPage draft={draft} onBack={() => navigate('config')} onStarted={jobStarted} onUnauthorized={onSignedOut} />
                 )}
+                {route.page === 'action' && (action
+                    ? <ActionPage request={action} onRequest={setAction} onBack={() => navigate('overview')} onStarted={jobStarted} onUnauthorized={onSignedOut} />
+                    : <OverviewPage report={report} error={statusError} onOpenLogs={service => navigate('logs', { services: [service] })} onAction={review} onUnauthorized={onSignedOut} />)}
                 {route.page === 'jobs' && <JobsPage jobs={jobs} selected={route.job} onSelect={id => navigate('jobs', { job: id })} />}
             </Box>
         </Box>

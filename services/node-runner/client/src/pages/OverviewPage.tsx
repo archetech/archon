@@ -1,6 +1,6 @@
 import { Alert, Box, Button, Card, CardActionArea, Chip, Skeleton, Typography } from '@mui/material';
 import { useMemo, useState } from 'react';
-import type { ServiceStatus, StatusReport } from '../api';
+import type { ActionRequest, ServiceStatus, StatusReport } from '../api';
 import ServiceDetail from '../components/ServiceDetail';
 import StatusBadge from '../components/StatusBadge';
 import { duration, PROBLEM, verdict } from '../format';
@@ -9,6 +9,7 @@ interface Props {
     report: StatusReport | null;
     error: string;
     onOpenLogs: (service: string) => void;
+    onAction: (request: ActionRequest) => void;
     onUnauthorized: () => void;
 }
 
@@ -38,7 +39,7 @@ function describe(report: StatusReport): string {
     return `${report.services.length} containers in project ${report.project}: ${parts.join(', ')}.`;
 }
 
-export default function OverviewPage({ report, error, onOpenLogs, onUnauthorized }: Props) {
+export default function OverviewPage({ report, error, onOpenLogs, onAction, onUnauthorized }: Props) {
     const [selected, setSelected] = useState<string | null>(null);
 
     const groups = useMemo(() => {
@@ -66,7 +67,14 @@ export default function OverviewPage({ report, error, onOpenLogs, onUnauthorized
                 {summary.text}
                 {report.services.length === 0 && '. The node is not running, or node-runner is looking at a different project.'}
             </Alert>
-            <Typography variant="body2" color="text.secondary">{describe(report)}</Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
+                <Typography variant="body2" color="text.secondary" sx={{ flex: '1 1 320px' }}>{describe(report)}</Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }} role="group" aria-label="Node">
+                    <Button size="small" variant="outlined" onClick={() => onAction({ action: 'start' })}>Start node</Button>
+                    <Button size="small" variant="outlined" onClick={() => onAction({ action: 'restart' })}>Restart node</Button>
+                    <Button size="small" variant="outlined" color="error" onClick={() => onAction({ action: 'stop' })}>Stop node</Button>
+                </Box>
+            </Box>
 
             {groups.map(([group, services]) => (
                 <Box component="section" key={group} sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
@@ -100,6 +108,7 @@ export default function OverviewPage({ report, error, onOpenLogs, onUnauthorized
                 service={selectedService}
                 onClose={() => setSelected(null)}
                 onOpenLogs={onOpenLogs}
+                onAction={onAction}
                 onUnauthorized={onUnauthorized}
             />
         </Box>

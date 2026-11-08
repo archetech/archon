@@ -99,6 +99,20 @@ export interface JobSummary {
     error: string | null;
 }
 
+export interface ActionRequest {
+    action: 'start' | 'stop' | 'restart';
+    service?: string;
+    down?: boolean;
+}
+
+export interface ActionPreview {
+    title: string;
+    command: string;
+    services: PlanService[];
+    stateful: string[];
+    empty: boolean;
+}
+
 export class ApiError extends Error {
     constructor(message: string, readonly status: number) {
         super(message);
@@ -137,6 +151,8 @@ export const api = {
     preview: (draft: Draft) => call<Preview>('/config/preview', { draft }),
     apply: (draft: Draft, confirmStateful: boolean) => call<{ id: string }>('/config/apply', { draft, confirmStateful }),
     jobs: () => call<{ jobs: JobSummary[] }>('/jobs'),
+    previewAction: (request: ActionRequest) => call<ActionPreview>('/actions/preview', request),
+    runAction: (request: ActionRequest, confirmStateful: boolean) => call<{ id: string }>('/actions/run', { ...request, confirmStateful }),
     jobStreamUrl: (id: string) => `/api/jobs/${encodeURIComponent(id)}/stream`,
     streamUrl: (services: string[], tail: number, since?: number) =>
         `/api/logs/stream?${logQuery(services, tail, since ? { since: String(since) } : {})}`,

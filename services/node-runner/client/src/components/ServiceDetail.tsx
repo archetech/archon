@@ -1,7 +1,7 @@
 import CloseIcon from '@mui/icons-material/Close';
 import { Alert, Box, Button, Drawer, IconButton, Typography } from '@mui/material';
 import { useEffect, useState, type ReactNode } from 'react';
-import { api, ApiError, type LogEntry, type ServiceStatus } from '../api';
+import { api, ApiError, type ActionRequest, type LogEntry, type ServiceStatus } from '../api';
 import { clockTime, duration } from '../format';
 import StatusBadge from './StatusBadge';
 
@@ -12,6 +12,7 @@ interface Props {
     service: ServiceStatus | null;
     onClose: () => void;
     onOpenLogs: (service: string) => void;
+    onAction: (request: ActionRequest) => void;
     onUnauthorized: () => void;
 }
 
@@ -24,7 +25,7 @@ function Row({ label, children }: { label: string, children: ReactNode }) {
     );
 }
 
-export default function ServiceDetail({ service, onClose, onOpenLogs, onUnauthorized }: Props) {
+export default function ServiceDetail({ service, onClose, onOpenLogs, onAction, onUnauthorized }: Props) {
     const name = service?.service ?? null;
     const [tail, setTail] = useState<LogEntry[]>([]);
     const [error, setError] = useState('');
@@ -107,7 +108,15 @@ export default function ServiceDetail({ service, onClose, onOpenLogs, onUnauthor
                         </Box>
                     </Box>
 
-                    <Box>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {service.state === 'running'
+                            ? (
+                                <>
+                                    <Button variant="outlined" onClick={() => onAction({ action: 'restart', service: service.service })}>Restart</Button>
+                                    <Button variant="outlined" color="error" onClick={() => onAction({ action: 'stop', service: service.service })}>Stop</Button>
+                                </>
+                            )
+                            : <Button variant="outlined" onClick={() => onAction({ action: 'start', service: service.service })}>Start</Button>}
                         <Button variant="outlined" onClick={() => onOpenLogs(service.service)}>Open in Logs</Button>
                     </Box>
                 </>

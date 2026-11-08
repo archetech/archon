@@ -1,9 +1,9 @@
 # node-runner
 
 node-runner is a web app for operating an Archon node. It shows every
-container's state and health and the node's logs, and it edits the node's
-configuration. Starting and stopping services and updates come in later phases
-of [the plan](../../docs/plans/node-runner-1554.md).
+container's state and health and the node's logs, edits the node's
+configuration, and starts, stops and restarts services or the whole node.
+Updates come in a later phase of [the plan](../../docs/plans/node-runner-1554.md).
 
 ## Running it
 
@@ -57,6 +57,19 @@ extra confirmation. Applying runs as a job: node-runner backs up `.env` to
 `up -d`, then waits for the touched services' health checks. Builds wait while
 the host's load is above its core count. One job runs at a time, and the Jobs
 page keeps the output of the last 20.
+
+## Starting and stopping
+
+A service's detail panel can start, stop or restart it, and Overview can do the
+same for the whole node. Each action is reviewed first, with the command it
+runs and the services it affects, and runs as a job. Stopping or restarting a
+stateful service needs an extra confirmation.
+
+Stopping the node runs `docker compose stop`, which keeps its containers.
+`docker compose down`, which removes the containers and the network, runs only
+when you ask for it on the review page. Neither removes volumes or anything in
+`data/`. Starting the node runs `docker compose up -d` with the current
+configuration.
 
 ## What it reads
 
