@@ -60,6 +60,15 @@ ends in `_RPC_URL` or its value is a URL with a user and password.
 `COMPOSE_PROJECT_NAME` cannot be changed here, since that would orphan every
 running container.
 
+On a node with no `.env` yet, the Configuration page offers to create one from
+`sample.env`: with your user and group as `ARCHON_UID` and `ARCHON_GID` (so
+containers do not run as root), a generated `ARCHON_ADMIN_API_KEY`, the wallet
+passphrase you choose as `ARCHON_PASSPHRASE`, and no profiles, so the node
+starts as a core node. Until `.env` exists, node-runner does not apply changes,
+start, restart or update the node. On an existing `.env`, it warns when
+`ARCHON_UID` or `ARCHON_GID` is unset, or when the admin key or passphrase is
+unset or still `CHANGE_ME`.
+
 If Compose rejects the current `.env`, the page still loads, shows Compose's
 error, and lets you repair the file.
 
@@ -71,11 +80,10 @@ what applying it will do, worked out the way Compose decides it:
 - **Create / Recreate / Start:** what `docker compose up -d` will do.
 - **Stop:** services of a profile you turned off, which `up` would leave running.
 
-Interrupting a stateful service needs an extra confirmation. Applying works
-out the plan again from `.env` as it is when you apply, so your edits go onto
-the current file: if `.env` was edited elsewhere while you were reviewing,
-review again to see what applying will now do. Applying then runs as a job:
-node-runner refuses if `.env` changes between Apply and the job writing it,
+Interrupting a stateful service needs an extra confirmation. Applying refuses
+if `.env` changed since the review you saw, for instance because it was edited
+elsewhere, and shows the new review instead. Applying then runs as a job:
+node-runner refuses if `.env` changes again before the job writes it,
 backs up `.env` to `data/node-runner/env-backups/` (keeping the last 20),
 writes the new file,
 builds the changed or missing images, stops the services of disabled profiles,

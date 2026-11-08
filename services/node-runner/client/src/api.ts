@@ -65,6 +65,7 @@ export interface ConfigView {
     sections: { name: string, settings: SettingView[] }[];
     warnings: Warning[];
     configError: string | null;
+    envMissing: boolean;
 }
 
 export interface Draft {
@@ -163,6 +164,7 @@ export const api = {
     logs: (services: string[], tail: number) => call<{ entries: LogEntry[] }>(`/logs?${logQuery(services, tail)}`),
     downloadUrl: (services: string[], tail: number) => `/api/logs?${logQuery(services, tail, { format: 'text' })}`,
     config: () => call<ConfigView>('/config'),
+    createEnv: (passphrase: string) => call<{ ok: true }>('/config/create', { passphrase }),
     preview: (draft: Draft) => call<Preview>('/config/preview', { draft }),
     apply: (draft: Draft, confirmStateful: boolean, reviewed: string) => call<{ id: string }>('/config/apply', { draft, confirmStateful, reviewed }),
     jobs: () => call<{ jobs: JobSummary[] }>('/jobs'),

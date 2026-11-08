@@ -8,6 +8,9 @@ const SAMPLE = `# General
 ARCHON_NODE_NAME=mynode
 # Protects admin routes.
 ARCHON_ADMIN_API_KEY=CHANGE_ME
+ARCHON_UID=1000
+ARCHON_GID=1000
+ARCHON_PASSPHRASE=CHANGE_ME
 
 # Drawbridge
 # ARCHON_HERALD_URL=http://herald:4230
@@ -21,6 +24,9 @@ COMPOSE_PROJECT_NAME=archon
 COMPOSE_PROFILES=lightning,react-wallet
 ARCHON_NODE_NAME=alpha
 ARCHON_ADMIN_API_KEY=super-secret
+ARCHON_UID=1000
+ARCHON_GID=1000
+ARCHON_PASSPHRASE=wallet-passphrase
 MY_OWN_SETTING=kept
 `;
 
@@ -65,7 +71,7 @@ beforeEach(() => {
     docker = new FakeDocker(running());
     load = 0.5;
     config = new NodeConfig({
-        nodeDir, dataDir, project: 'archon', compose, docker,
+        nodeDir, dataDir, project: 'archon', compose, docker, ids: { uid: 1000, gid: 1000 },
         loadAverage: () => load, cpuCount: () => 4, sleep: async () => { load = 0.5; }, healthTimeoutMs: 0,
     });
 });
@@ -178,6 +184,66 @@ describe('preview', () => {
         await config.preview({ settings: { ARCHON_NODE_NAME: 'beta' } });
 
         expect(readFileSync(join(nodeDir, '.env'), 'utf-8')).toBe(ENV);
+    });
+});
+
+describe('a node with no .env', () => {
+    beforeEach(() => {
+        rmSync(join(nodeDir, '.env'));
+    });
+
+    it('says so in the view, with no warnings to act on yet', async () => {
+        const view = await config.view();
+
+        expect(view.envMissing).toBe(true);
+        expect(view.warnings).toEqual([]);
+    });
+
+    it('creates .env from sample.env with the operator\'s ids, a new admin key, the passphrase and no profiles', async () => {
+        writeFileSync(join(nodeDir, 'sample.env'), SAMPLE.replace('# ARCHON_HERALD_URL=http://herald:4230', 'ARCHON_HERALD_URL=http://herald:4230') + 'COMPOSE_PROFILES=lightning,herald\n');
+
+        await config.createEnv('a long wallet passphrase');
+
+        const text = readFileSync(join(nodeDir, '.env'), 'utf-8');
+        const values = Object.fromEntries(text.split('\n').filter(l => /^[A-Z_]+=/.test(l)).map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
+        expect(values).toMatchObject({ ARCHON_UID: '1000', ARCHON_GID: '1000', ARCHON_PASSPHRASE: "'a long wallet passphrase'", COMPOSE_PROFILES: '', ARCHON_HERALD_URL: '' });
+        expect(values.ARCHON_ADMIN_API_KEY).toMatch(/^[0-9a-f]{64}$/);
+        expect(text).toContain('# Protects admin routes.');
+        expect(statSync(join(nodeDir, '.env')).mode & 0o777).toBe(0o600);
+
+        const view = await config.view();
+        expect(view.envMissing).toBe(false);
+        expect(view.warnings).toEqual([]);
+    });
+
+    it('refuses a short passphrase, the placeholder, or an existing .env', async () => {
+        await expect(config.createEnv('short')).rejects.toMatchObject({ status: 400 });
+        await expect(config.createEnv('CHANGE_ME')).rejects.toMatchObject({ status: 400 });
+        await config.createEnv('a long wallet passphrase');
+        await expect(config.createEnv('another long passphrase')).rejects.toMatchObject({ status: 409, message: '.env already exists' });
+    });
+});
+
+describe('required settings', () => {
+    it('warns when the ids are unset, offering the operator\'s, and when secrets are missing or placeholders', async () => {
+        writeFileSync(join(nodeDir, '.env'), 'ARCHON_ADMIN_API_KEY=CHANGE_ME\n');
+
+        const view = await config.view();
+
+        expect(view.warnings.map(w => [w.message.split(' ').slice(0, 4).join(' '), w.fix?.label])).toEqual([
+            ['ARCHON_UID is not set,', 'Set ARCHON_UID=1000'],
+            ['ARCHON_GID is not set,', 'Set ARCHON_GID=1000'],
+            ['ARCHON_ADMIN_API_KEY is still the', undefined],
+            ['ARCHON_PASSPHRASE is not set.', undefined],
+        ]);
+    });
+});
+
+describe('required settings, legacy passphrase', () => {
+    it('accepts the passphrase under its older name, as Keymaster does', async () => {
+        writeFileSync(join(nodeDir, '.env'), 'ARCHON_UID=1000\nARCHON_GID=1000\nARCHON_ADMIN_API_KEY=key\nARCHON_ENCRYPTED_PASSPHRASE=legacy-passphrase\n');
+
+        expect((await config.view()).warnings.filter(w => /PASSPHRASE/.test(w.message))).toEqual([]);
     });
 });
 
@@ -359,11 +425,12 @@ describe('apply', () => {
         expect(lines).toContain('  gatekeeper: unhealthy');
     });
 
-    it('creates .env when the node has none', async () => {
+    it('refuses to build a partial .env on a node that has none', async () => {
         rmSync(join(nodeDir, '.env'));
-        await run({ settings: { ARCHON_NODE_NAME: 'beta' } }, true);
 
-        expect(readFileSync(join(nodeDir, '.env'), 'utf-8')).toBe('ARCHON_NODE_NAME=beta\n');
+        await expect(config.preview({ settings: { ARCHON_NODE_NAME: 'beta' } })).rejects.toMatchObject({ status: 409, message: 'This node has no .env yet; create it on the Configuration page first' });
+        await expect(config.apply({ settings: { ARCHON_NODE_NAME: 'beta' } }, true, '')).rejects.toMatchObject({ status: 409, message: 'This node has no .env yet; create it on the Configuration page first' });
+        expect(existsSync(join(nodeDir, '.env'))).toBe(false);
     });
 
     it('keeps the last 20 backups', async () => {

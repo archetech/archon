@@ -174,6 +174,9 @@ export class Lifecycle {
     }
 
     async run(request: ActionRequest, confirmStateful: boolean): Promise<{ title: string, work: (log: JobLog) => Promise<void> }> {
+        if (request.action !== 'stop') {
+            await this.options.nodeConfig.requireEnv();
+        }
         const { preview, build, running = [] } = await this.plan(request);
         if (preview.empty) {
             throw new ConfigError('Nothing to do', 409);

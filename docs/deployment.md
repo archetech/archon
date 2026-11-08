@@ -78,10 +78,10 @@ Compose project, so stopping the node does not stop it. It manages the full
 stack defined by `docker-compose.yml`; it does not use
 `docker/compose/minimal.yml`, so run the minimal stack from the shell.
 
-It needs the checkout and the `.env` from [Initial Setup](#initial-setup),
-with `ARCHON_UID`, `ARCHON_GID` and `ARCHON_ADMIN_API_KEY` set. node-runner
-edits the settings you change and keeps the rest of the file as it is; it does
-not create a complete `.env` from nothing. From the node directory:
+It needs the checkout. If you have not created `.env` as in
+[Initial Setup](#initial-setup), node-runner's Configuration page creates it
+from `sample.env`, with your user and group, a generated admin key and a wallet
+passphrase you choose, and no profiles enabled. From the node directory:
 
 ```bash
 ./node-runner up -d --build
