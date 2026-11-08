@@ -1,19 +1,32 @@
 import { createApp } from './app.js';
 import { Auth } from './auth.js';
+import { Compose, exec } from './compose.js';
 import { loadConfig } from './config.js';
 import { createDockerApi } from './docker.js';
+import { JobRunner } from './jobs.js';
+import { NodeConfig } from './node-config.js';
 
 async function main(): Promise<void> {
     const config = loadConfig();
     const auth = new Auth({ dataDir: config.dataDir });
     await auth.ensureSetupCode(true);
 
+    // The node's current commit, which its image builds are labelled with.
+    const gitCommit = async () => {
+        const result = await exec('git', ['-C', config.nodeDir, 'rev-parse', '--short', 'HEAD'], { cwd: config.nodeDir, env: process.env }).catch(() => null);
+        return result?.code === 0 ? result.stdout.trim() : 'unknown';
+    };
+
+    const docker = createDockerApi(config.dockerSocket);
+    const compose = new Compose(config.nodeDir, gitCommit);
     const app = createApp({
         auth,
-        docker: createDockerApi(config.dockerSocket),
+        docker,
         project: config.project,
         gitCommit: config.gitCommit,
         clientDir: config.clientDir,
+        nodeConfig: new NodeConfig({ nodeDir: config.nodeDir, dataDir: config.dataDir, project: config.project, compose, docker }),
+        jobs: new JobRunner(config.dataDir),
     });
 
     app.listen(config.port, () => {

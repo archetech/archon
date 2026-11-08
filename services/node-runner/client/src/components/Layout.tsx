@@ -1,32 +1,49 @@
 import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
-import { AppBar, Box, Button, Chip, Link, Tab, Tabs, Toolbar, Typography } from '@mui/material';
+import { AppBar, Badge, Box, Button, Chip, CircularProgress, Link, Tab, Tabs, Toolbar, Typography } from '@mui/material';
 import { useCallback, useEffect, useState } from 'react';
-import { api, ApiError, type Info, type StatusReport } from '../api';
+import { api, ApiError, type Draft, type Info, type JobSummary, type StatusReport } from '../api';
 import { PROBLEM } from '../format';
+import ConfigPage from '../pages/ConfigPage';
+import JobsPage from '../pages/JobsPage';
 import LogsPage from '../pages/LogsPage';
 import OverviewPage from '../pages/OverviewPage';
+import ReviewPage from '../pages/ReviewPage';
 
 const POLL_MS = 5000;
 
-type Page = 'overview' | 'logs';
+type Page = 'overview' | 'logs' | 'config' | 'review' | 'jobs';
 
-function pageFromLocation(): Page {
-    return window.location.pathname.startsWith('/logs') ? 'logs' : 'overview';
+const PATHS: Record<Page, string> = { overview: '/', logs: '/logs', config: '/config', review: '/review', jobs: '/jobs' };
+
+interface Route {
+    page: Page;
+    services: string[];
+    job: string | null;
+}
+
+function routeFromLocation(): Route {
+    const path = window.location.pathname;
+    const page = (Object.entries(PATHS).find(([, p]) => p !== '/' && path.startsWith(p))?.[0] ?? 'overview') as Page;
+    const params = new URLSearchParams(window.location.search);
+    return { page, services: params.get('services')?.split(',').filter(Boolean) ?? [], job: params.get('job') };
 }
 
 // Grafana's published host port, when the observability profile runs it.
 function grafanaUrl(report: StatusReport | null): string | null {
     const grafana = report?.services.find(s => s.service === 'grafana' && s.state === 'running');
-    const port = grafana?.ports[0]?.match(/:(\d+)→/)?.[1] ?? grafana?.ports[0]?.match(/^(\d+)→/)?.[1];
+    const port = grafana?.ports[0]?.match(/(\d+)→/)?.[1];
     return port ? `${window.location.protocol}//${window.location.hostname}:${port}` : null;
 }
 
 export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
-    const [page, setPage] = useState<Page>(pageFromLocation);
-    const [logServices, setLogServices] = useState<string[]>(() => new URLSearchParams(window.location.search).get('services')?.split(',').filter(Boolean) ?? []);
+    const [route, setRoute] = useState<Route>(routeFromLocation);
     const [info, setInfo] = useState<Info | null>(null);
     const [report, setReport] = useState<StatusReport | null>(null);
+    const [jobs, setJobs] = useState<JobSummary[]>([]);
     const [statusError, setStatusError] = useState('');
+    // The configuration draft lives here so it survives moving between the
+    // Configuration and Review pages.
+    const [draft, setDraft] = useState<Draft>({ settings: {} });
 
     const handle = useCallback((error: unknown) => {
         if (error instanceof ApiError && error.status === 401) {
@@ -42,12 +59,15 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
 
     useEffect(() => {
         let cancelled = false;
-        const load = () => api.status().then(r => {
-            if (!cancelled) {
-                setReport(r);
-                setStatusError('');
-            }
-        }, e => !cancelled && handle(e));
+        const load = () => {
+            api.status().then(r => {
+                if (!cancelled) {
+                    setReport(r);
+                    setStatusError('');
+                }
+            }, e => !cancelled && handle(e));
+            api.jobs().then(r => !cancelled && setJobs(r.jobs), () => {});
+        };
         load();
         const timer = setInterval(load, POLL_MS);
         return () => {
@@ -57,20 +77,35 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
     }, [handle]);
 
     useEffect(() => {
-        const onPop = () => setPage(pageFromLocation());
+        const onPop = () => setRoute(routeFromLocation());
         window.addEventListener('popstate', onPop);
         return () => window.removeEventListener('popstate', onPop);
     }, []);
 
-    const navigate = useCallback((next: Page, services: string[] = []) => {
-        const query = next === 'logs' && services.length ? `?services=${services.join(',')}` : '';
-        window.history.pushState(null, '', `${next === 'logs' ? '/logs' : '/'}${query}`);
-        setLogServices(services);
-        setPage(next);
+    const navigate = useCallback((page: Page, extra: { services?: string[], job?: string } = {}) => {
+        const params = new URLSearchParams();
+        if (extra.services?.length) {
+            params.set('services', extra.services.join(','));
+        }
+        if (extra.job) {
+            params.set('job', extra.job);
+        }
+        const query = params.toString();
+        window.history.pushState(null, '', query ? `${PATHS[page]}?${query}` : PATHS[page]);
+        setRoute({ page, services: extra.services ?? [], job: extra.job ?? null });
     }, []);
 
+    const jobStarted = useCallback((id: string) => {
+        setDraft({ settings: {} });
+        api.jobs().then(r => setJobs(r.jobs), () => {});
+        navigate('jobs', { job: id });
+    }, [navigate]);
+
     const problems = report?.services.filter(s => PROBLEM.includes(s.health)).length ?? 0;
+    const running = jobs.find(j => j.status === 'running');
     const grafana = grafanaUrl(report);
+    const tab = route.page === 'review' ? 'config' : route.page;
+    const drafted = Object.keys(draft.settings).length + (draft.profiles ? 1 : 0);
 
     return (
         <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -84,11 +119,14 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
                         </Typography>
                     )}
                     {report && (
+                        <Chip size="small" color={problems ? 'error' : 'success'} variant="outlined" label={problems ? `${problems} need attention` : 'All healthy'} />
+                    )}
+                    {running && (
                         <Chip
                             size="small"
-                            color={problems ? 'error' : 'success'}
-                            variant="outlined"
-                            label={problems ? `${problems} need attention` : 'All healthy'}
+                            icon={<CircularProgress size={12} />}
+                            label={`Running: ${running.title}`}
+                            onClick={() => navigate('jobs', { job: running.id })}
                         />
                     )}
                     <Box sx={{ flex: 1 }} />
@@ -96,19 +134,31 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
                     <Button variant="outlined" size="small" onClick={() => api.logout().finally(onSignedOut)}>Sign out</Button>
                 </Toolbar>
                 <Tabs
-                    value={page}
+                    value={tab}
                     onChange={(_e, value: Page) => navigate(value)}
                     sx={{ px: 2 }}
+                    variant="scrollable"
+                    allowScrollButtonsMobile
                     aria-label="Sections"
                 >
                     <Tab value="overview" label="Overview" />
                     <Tab value="logs" label="Logs" />
+                    <Tab value="config" label={<Badge color="primary" badgeContent={drafted} invisible={!drafted}>Configuration</Badge>} />
+                    <Tab value="jobs" label="Jobs" />
                 </Tabs>
             </AppBar>
             <Box component="main" sx={{ maxWidth: 1400, mx: 'auto', p: { xs: 2, md: 3 } }}>
-                {page === 'overview'
-                    ? <OverviewPage report={report} error={statusError} onOpenLogs={service => navigate('logs', [service])} onUnauthorized={onSignedOut} />
-                    : <LogsPage report={report} initialServices={logServices} onUnauthorized={onSignedOut} />}
+                {route.page === 'overview' && (
+                    <OverviewPage report={report} error={statusError} onOpenLogs={service => navigate('logs', { services: [service] })} onUnauthorized={onSignedOut} />
+                )}
+                {route.page === 'logs' && <LogsPage report={report} initialServices={route.services} onUnauthorized={onSignedOut} />}
+                {route.page === 'config' && (
+                    <ConfigPage draft={draft} onDraft={setDraft} onReview={() => navigate('review')} onUnauthorized={onSignedOut} />
+                )}
+                {route.page === 'review' && (
+                    <ReviewPage draft={draft} onBack={() => navigate('config')} onStarted={jobStarted} onUnauthorized={onSignedOut} />
+                )}
+                {route.page === 'jobs' && <JobsPage jobs={jobs} selected={route.job} onSelect={id => navigate('jobs', { job: id })} />}
             </Box>
         </Box>
     );

@@ -1,6 +1,6 @@
 # Node-runner: manage a node from a web app (#1554)
 
-Status: phase 1 implemented.
+Status: phases 1 and 2 implemented.
 
 Node-runner is a web app for operating an Archon node: its configuration,
 starting, stopping and updating, logs and health. Today each of these needs a

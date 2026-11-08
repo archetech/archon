@@ -18,6 +18,8 @@ services:
     group_add:
       - "${NODE_RUNNER_DOCKER_GID:?run node-runner with ./node-runner}"
     environment:
+      # Compose and git write their caches under HOME.
+      - HOME=/tmp
       - ARCHON_NODE_RUNNER_NODE_DIR=${NODE_RUNNER_NODE_DIR:?run node-runner with ./node-runner}
       - ARCHON_NODE_RUNNER_DATA_DIR=${NODE_RUNNER_NODE_DIR}/data/node-runner
     # Loopback by default: the Docker socket is root on the host. Reach it
@@ -27,7 +29,5 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # The node directory at the path the host uses, so Compose resolves its
-      # relative paths the same way inside node-runner as in a shell. Read
-      # only, apart from node-runner's own data directory.
-      - ${NODE_RUNNER_NODE_DIR}:${NODE_RUNNER_NODE_DIR}:ro
-      - ${NODE_RUNNER_NODE_DIR}/data/node-runner:${NODE_RUNNER_NODE_DIR}/data/node-runner
+      # relative paths the same way inside node-runner as in a shell.
+      - ${NODE_RUNNER_NODE_DIR}:${NODE_RUNNER_NODE_DIR}
