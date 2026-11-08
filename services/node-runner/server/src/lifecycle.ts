@@ -60,7 +60,7 @@ export class Lifecycle {
 
     // The preview and, for a whole-node start, the services it builds first.
     // Kept per call: two previews in flight must not share build targets.
-    private async plan(request: ActionRequest): Promise<{ preview: ActionPreview, build: string[] }> {
+    private async plan(request: ActionRequest): Promise<{ preview: ActionPreview, build: string[], running?: string[] }> {
         const containers = await this.containers();
         const active = [...containers.entries()].filter(([, c]) => ACTIVE_STATES.includes(c.State)).map(([s]) => s).sort();
 
@@ -124,23 +124,57 @@ export class Lifecycle {
             };
         }
 
-        // Scoped to what is active now: an unscoped restart would also start
-        // stopped containers the review did not list.
-        const services = active.map(item);
+        // `up` also starts any enabled dependency that is stopped, so those
+        // are listed, checked and confirmed with the rest.
+        // The walk follows the rules `up` applies to the services it is given:
+        // targeting a service enables its profile, so a required dependency is
+        // started even when its own profile is off; an optional one
+        // (`required: false`) only when its profile is enabled.
+        const all = await this.options.nodeConfig.composeConfig(true);
+        // Enabled: the profiles in .env, plus every profile of the services
+        // `up` is given, which it enables for all of them together.
+        const targetProfiles = new Set(active.flatMap(name => all.services[name]?.profiles ?? []));
+        const enabled = new Set([
+            ...Object.keys((await this.options.nodeConfig.composeConfig()).services),
+            ...Object.entries(all.services).filter(([, def]) => (def.profiles ?? []).some(p => targetProfiles.has(p))).map(([name]) => name),
+        ]);
+        const restarted = new Set(active);
+        const queue = [...active];
+        while (queue.length) {
+            for (const [dependency, edge] of Object.entries(all.services[queue.shift()!]?.depends_on ?? {})) {
+                const started = all.services[dependency] && (edge.required !== false || enabled.has(dependency));
+                if (started && !restarted.has(dependency)) {
+                    restarted.add(dependency);
+                    queue.push(dependency);
+                }
+            }
+        }
+        const started = [...restarted].filter(name => !active.includes(name)).sort();
+
+        // Stopped, then started again in dependency order: `docker compose
+        // restart` brings every container back at once and ignores
+        // depends_on, so a service can come up before the database it waits
+        // for and exit. `up --no-recreate` waits for each dependency to be
+        // healthy and starts the existing containers as they are. Scoped to
+        // what is active now, so stopped containers the review did not list
+        // stay stopped.
+        const services = [...active, ...started].sort().map(item);
         return {
             preview: {
                 title: 'Restart the node',
-                command: `docker compose restart ${active.join(' ')}`,
+                command: `docker compose stop ${active.join(' ')} && docker compose up -d --no-build --no-recreate ${active.join(' ')}`
+                    + (started.length ? ` (also starts ${started.join(', ')}, which ${started.length === 1 ? 'is a dependency' : 'are dependencies'})` : ''),
                 services,
                 stateful: services.filter(s => s.stateful).map(s => s.service),
                 empty: services.length === 0,
             },
             build: [],
+            running: active,
         };
     }
 
     async run(request: ActionRequest, confirmStateful: boolean): Promise<{ title: string, work: (log: JobLog) => Promise<void> }> {
-        const { preview, build } = await this.plan(request);
+        const { preview, build, running = [] } = await this.plan(request);
         if (preview.empty) {
             throw new ConfigError('Nothing to do', 409);
         }
@@ -169,7 +203,8 @@ export class Lifecycle {
                     await nodeConfig.verify(services, log);
                 }
                 else {
-                    await nodeConfig.runCompose(['restart', ...services], log);
+                    await nodeConfig.runCompose(['stop', ...running], log);
+                    await nodeConfig.runCompose(['up', '-d', '--no-build', '--no-recreate', ...running], log);
                     await nodeConfig.verify(services, log);
                 }
                 log('Done.');

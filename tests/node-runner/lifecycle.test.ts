@@ -180,10 +180,74 @@ describe('the whole node', () => {
 
     it('restarts only what is active, named, so stopped containers stay stopped', async () => {
         const preview = await lifecycle.preview({ action: 'restart' });
-        expect(preview.command).toBe('docker compose restart cln-mainnet-node gatekeeper redis');
+        expect(preview.command).toBe('docker compose stop cln-mainnet-node gatekeeper redis && docker compose up -d --no-build --no-recreate cln-mainnet-node gatekeeper redis');
 
+        // Stop, then up, which starts them in dependency order: restart would
+        // bring them all back at once, ignoring depends_on.
         await run({ action: 'restart' }, true);
-        expect(compose.commands).toEqual([['restart', 'cln-mainnet-node', 'gatekeeper', 'redis']]);
+        expect(compose.commands).toEqual([
+            ['stop', 'cln-mainnet-node', 'gatekeeper', 'redis'],
+            ['up', '-d', '--no-build', '--no-recreate', 'cln-mainnet-node', 'gatekeeper', 'redis'],
+        ]);
+    });
+
+    it('lists, checks and confirms a stopped dependency that up would start', async () => {
+        // gatekeeper depends on mongodb, which is enabled but stopped.
+        const services = (compose as unknown as { services: Record<string, object> }).services;
+        services.gatekeeper = { dependsOn: ['redis'], optionalDependsOn: ['mongodb'] };
+        services.mongodb = {};
+        docker.containers.push({ service: 'mongodb', inspect: { State: { Status: 'exited', Running: false, ExitCode: 0 } } });
+        // Like Compose, up starts the dependencies of what it is given.
+        const startNamed = compose.onCommand!;
+        compose.onCommand = args => {
+            startNamed(args);
+            if (args[0] === 'up') {
+                docker.containers.find(c => c.service === 'mongodb')!.inspect = { State: { Status: 'running', Running: true } };
+            }
+        };
+
+        const preview = await lifecycle.preview({ action: 'restart' });
+        expect(preview.services.map(s => s.service)).toEqual(['cln-mainnet-node', 'gatekeeper', 'mongodb', 'redis']);
+        expect(preview.stateful).toEqual(['cln-mainnet-node', 'mongodb', 'redis']);
+        expect(preview.command).toMatch(/also starts mongodb, which is a dependency/);
+
+        const lines = await run({ action: 'restart' }, true);
+        expect(compose.commands).toEqual([
+            ['stop', 'cln-mainnet-node', 'gatekeeper', 'redis'],
+            ['up', '-d', '--no-build', '--no-recreate', 'cln-mainnet-node', 'gatekeeper', 'redis'],
+        ]);
+        expect(lines).toContain('  mongodb: running');
+    });
+
+    it('follows the dependencies up starts for a running service whose profile is off', async () => {
+        // rtl runs although lightning is off; up rtl would start its
+        // required dependency cln-mainnet-node, but not an optional one
+        // whose profile is off.
+        const services = (compose as unknown as { services: Record<string, object> }).services;
+        services.rtl = { profiles: ['lightning'], dependsOn: ['cln-mainnet-node'], optionalDependsOn: ['explorer'] };
+        services['cln-mainnet-node'] = { profiles: ['lightning'] };
+        services.explorer = { profiles: ['explorer'] };
+        docker.containers.find(c => c.service === 'cln-mainnet-node')!.inspect = { State: { Status: 'exited', Running: false, ExitCode: 0 } };
+        docker.containers.push({ service: 'rtl' });
+
+        const preview = await lifecycle.preview({ action: 'restart' });
+
+        expect(preview.services.map(s => s.service)).toEqual(['cln-mainnet-node', 'gatekeeper', 'redis', 'rtl']);
+        expect(preview.stateful).toEqual(['cln-mainnet-node', 'redis']);
+    });
+
+    it('follows an optional dependency enabled by another restart target\'s profile', async () => {
+        // lightning is off, but cln-mainnet-node runs; up enables lightning
+        // for every target, so drawbridge's optional lightning-mediator starts.
+        const services = (compose as unknown as { services: Record<string, object> }).services;
+        services['cln-mainnet-node'] = { profiles: ['lightning'] };
+        services['lightning-mediator'] = { profiles: ['lightning'] };
+        services.drawbridge = { optionalDependsOn: ['lightning-mediator'] };
+        docker.containers.push({ service: 'drawbridge' });
+
+        const preview = await lifecycle.preview({ action: 'restart' });
+
+        expect(preview.services.map(s => s.service)).toContain('lightning-mediator');
     });
 
     it('counts restarting and paused containers as active', async () => {
