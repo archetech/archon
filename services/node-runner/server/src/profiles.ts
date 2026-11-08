@@ -124,8 +124,12 @@ export function requiredWarnings(values: Map<string, string>, ids: { uid: number
         ['ARCHON_ADMIN_API_KEY', 'Gatekeeper will not start without it. Generate one with `openssl rand -hex 32`.'],
         ['ARCHON_PASSPHRASE', 'Keymaster will not start without it. It encrypts the wallet, so change it only on a node with no wallet yet.'],
     ];
+    // Keymaster still reads the older name when the new one is empty.
+    const effective = (key: string) => key === 'ARCHON_PASSPHRASE'
+        ? values.get(key) || values.get('ARCHON_ENCRYPTED_PASSPHRASE')
+        : values.get(key);
     for (const [key, why] of secrets) {
-        const value = values.get(key);
+        const value = effective(key);
         if (!value) {
             warnings.push({ message: `${key} is not set. ${why}` });
         }

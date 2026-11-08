@@ -1,5 +1,5 @@
 import { Alert, Box, Button, Chip, FormControlLabel, Paper, Skeleton, Switch, Tab, Tabs, TextField, Typography } from '@mui/material';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, ApiError, type ConfigView, type Draft, type SettingView, type Warning } from '../api';
 import CreateEnvCard from '../components/CreateEnvCard';
 
@@ -78,7 +78,11 @@ export default function ConfigPage({ draft, onDraft, onReview, onUnauthorized }:
     const [query, setQuery] = useState('');
     const [changedOnly, setChangedOnly] = useState(false);
 
-    useEffect(() => {
+    // Clears the view first, so a failed load shows its error rather than
+    // the page it replaced.
+    const reload = useCallback(() => {
+        setView(null);
+        setError('');
         api.config().then(setView, e => {
             if (e instanceof ApiError && e.status === 401) {
                 onUnauthorized();
@@ -86,6 +90,8 @@ export default function ConfigPage({ draft, onDraft, onReview, onUnauthorized }:
             setError(e instanceof Error ? e.message : String(e));
         });
     }, [onUnauthorized]);
+
+    useEffect(reload, [reload]);
 
     const enabled = useMemo(() => draft.profiles ?? view?.profiles.filter(p => p.enabled).map(p => p.name) ?? [], [draft.profiles, view]);
 
@@ -116,7 +122,7 @@ export default function ConfigPage({ draft, onDraft, onReview, onUnauthorized }:
         return (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <Typography variant="h2" component="h1">Configuration</Typography>
-                <CreateEnvCard onCreated={() => api.config().then(setView, e => setError(e instanceof Error ? e.message : String(e)))} onUnauthorized={onUnauthorized} />
+                <CreateEnvCard onCreated={reload} onUnauthorized={onUnauthorized} />
             </Box>
         );
     }

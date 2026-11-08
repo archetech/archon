@@ -236,6 +236,14 @@ describe('required settings', () => {
     });
 });
 
+describe('required settings, legacy passphrase', () => {
+    it('accepts the passphrase under its older name, as Keymaster does', async () => {
+        writeFileSync(join(nodeDir, '.env'), 'ARCHON_UID=1000\nARCHON_GID=1000\nARCHON_ADMIN_API_KEY=key\nARCHON_ENCRYPTED_PASSPHRASE=legacy-passphrase\n');
+
+        expect((await config.view()).warnings.filter(w => /PASSPHRASE/.test(w.message))).toEqual([]);
+    });
+});
+
 describe('review fixes', () => {
     it('treats setting an absent key to empty as a change', async () => {
         const p = await plan({ settings: { ARCHON_HERALD_TOR_PROXY: '' } });
