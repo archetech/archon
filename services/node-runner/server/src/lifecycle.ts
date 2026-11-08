@@ -145,10 +145,7 @@ export class Lifecycle {
                 else if (request.action === 'start') {
                     // Missing or changed images are built under the load
                     // check; up must not build anything on its own.
-                    if (build.length) {
-                        await nodeConfig.waitForLoad(log);
-                        await nodeConfig.runCompose(['build', ...build], log);
-                    }
+                    await nodeConfig.build(build, log);
                     await nodeConfig.runCompose(['up', '-d', '--no-build'], log);
                     await nodeConfig.verify(services, log);
                 }

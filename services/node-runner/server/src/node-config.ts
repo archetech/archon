@@ -91,6 +91,8 @@ export interface NodeConfigOptions {
 const MAX_BACKUPS = 20;
 // Profile names and their services from the last valid configuration.
 const PROFILES_CACHE = 'profiles.json';
+// Each service's build section as of its last successful build here.
+const BUILDS_FILE = 'builds.json';
 const LOAD_WAIT_MS = 10 * 60 * 1000;
 const POLL_MS = 5000;
 
@@ -341,6 +343,7 @@ export class NodeConfig {
             .filter(c => ACTIVE_STATES.includes(c.State) && !hashes.has(c.Labels['com.docker.compose.service']))
             .map(c => c.Labels['com.docker.compose.service']);
 
+        const built = await this.builtSections();
         // Built first, under the load check: services whose build changed, and
         // buildable services with no image yet, which `up` would otherwise
         // build on its own.
@@ -350,6 +353,12 @@ export class NodeConfig {
             }
             const was = nowConfig?.services[service]?.build;
             if (was && JSON.stringify(def.build) !== JSON.stringify(was)) {
+                return service;
+            }
+            // A service about to be created may have had its build changed
+            // while it was disabled. Unless node-runner built it from this
+            // exact build section, its image cannot be trusted to be current.
+            if (!byService.has(service) && built[service] !== JSON.stringify(def.build)) {
                 return service;
             }
             const image = def.image ?? `${this.options.project}-${service}`;
@@ -402,6 +411,30 @@ export class NodeConfig {
             await this.sleep(15000);
             load = this.loadAverage();
         }
+    }
+
+    private async builtSections(): Promise<Record<string, string>> {
+        return fs.readFile(join(this.options.dataDir, BUILDS_FILE), 'utf-8').then(JSON.parse, () => ({}));
+    }
+
+    // Builds services under the load check and records the build section each
+    // was built from, with the node's current .env.
+    async build(services: string[], log: JobLog): Promise<void> {
+        if (!services.length) {
+            return;
+        }
+        await this.waitForLoad(log);
+        await this.runCompose(['build', ...services], log);
+        const config = await this.options.compose.config(undefined, true);
+        const built = await this.builtSections();
+        for (const service of services) {
+            const build = config.services[service]?.build;
+            if (build) {
+                built[service] = JSON.stringify(build);
+            }
+        }
+        await fs.mkdir(this.options.dataDir, { recursive: true });
+        await fs.writeFile(join(this.options.dataDir, BUILDS_FILE), JSON.stringify(built), { mode: 0o600 });
     }
 
     async runCompose(args: string[], log: JobLog): Promise<void> {
@@ -465,10 +498,7 @@ export class NodeConfig {
                 await this.backup(current, log);
                 await this.writeEnv(preview.text);
                 log(`Wrote ${this.envPath}`);
-                if (plan.rebuild.length) {
-                    await this.waitForLoad(log);
-                    await this.runCompose(['build', ...plan.rebuild.map(s => s.service)], log);
-                }
+                await this.build(plan.rebuild.map(s => s.service), log);
                 if (plan.stop.length) {
                     await this.runCompose(['stop', ...plan.stop.map(s => s.service)], log);
                 }

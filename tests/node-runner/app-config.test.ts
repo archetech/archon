@@ -75,7 +75,9 @@ describe('configuration API', () => {
             .send({ draft: { settings: { ARCHON_ADMIN_API_KEY: 'new-secret-value' } } }).expect(200);
 
         expect(res.body.text).toBeUndefined();
+        expect(res.body.source).toBeUndefined();
         expect(res.text).not.toContain('secret-value');
+        expect(res.text).not.toContain('super-secret');
         expect(res.body.plan.recreate).toEqual([{ service: 'gatekeeper', stateful: false }]);
     });
 
