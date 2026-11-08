@@ -60,7 +60,7 @@ export class Lifecycle {
 
     // The preview and, for a whole-node start, the services it builds first.
     // Kept per call: two previews in flight must not share build targets.
-    private async plan(request: ActionRequest): Promise<{ preview: ActionPreview, build: string[] }> {
+    private async plan(request: ActionRequest): Promise<{ preview: ActionPreview, build: string[], running?: string[] }> {
         const containers = await this.containers();
         const active = [...containers.entries()].filter(([, c]) => ACTIVE_STATES.includes(c.State)).map(([s]) => s).sort();
 
@@ -124,6 +124,21 @@ export class Lifecycle {
             };
         }
 
+        // `up` also starts any enabled dependency that is stopped, so those
+        // are listed, checked and confirmed with the rest.
+        const config = await this.options.nodeConfig.composeConfig();
+        const restarted = new Set(active);
+        const queue = [...active];
+        while (queue.length) {
+            for (const dependency of Object.keys(config.services[queue.shift()!]?.depends_on ?? {})) {
+                if (config.services[dependency] && !restarted.has(dependency)) {
+                    restarted.add(dependency);
+                    queue.push(dependency);
+                }
+            }
+        }
+        const started = [...restarted].filter(name => !active.includes(name)).sort();
+
         // Stopped, then started again in dependency order: `docker compose
         // restart` brings every container back at once and ignores
         // depends_on, so a service can come up before the database it waits
@@ -131,21 +146,23 @@ export class Lifecycle {
         // healthy and starts the existing containers as they are. Scoped to
         // what is active now, so stopped containers the review did not list
         // stay stopped.
-        const services = active.map(item);
+        const services = [...active, ...started].sort().map(item);
         return {
             preview: {
                 title: 'Restart the node',
-                command: `docker compose stop ${active.join(' ')} && docker compose up -d --no-build --no-recreate ${active.join(' ')}`,
+                command: `docker compose stop ${active.join(' ')} && docker compose up -d --no-build --no-recreate ${active.join(' ')}`
+                    + (started.length ? ` (also starts ${started.join(', ')}, which ${started.length === 1 ? 'is a dependency' : 'are dependencies'})` : ''),
                 services,
                 stateful: services.filter(s => s.stateful).map(s => s.service),
                 empty: services.length === 0,
             },
             build: [],
+            running: active,
         };
     }
 
     async run(request: ActionRequest, confirmStateful: boolean): Promise<{ title: string, work: (log: JobLog) => Promise<void> }> {
-        const { preview, build } = await this.plan(request);
+        const { preview, build, running = [] } = await this.plan(request);
         if (preview.empty) {
             throw new ConfigError('Nothing to do', 409);
         }
@@ -174,8 +191,8 @@ export class Lifecycle {
                     await nodeConfig.verify(services, log);
                 }
                 else {
-                    await nodeConfig.runCompose(['stop', ...services], log);
-                    await nodeConfig.runCompose(['up', '-d', '--no-build', '--no-recreate', ...services], log);
+                    await nodeConfig.runCompose(['stop', ...running], log);
+                    await nodeConfig.runCompose(['up', '-d', '--no-build', '--no-recreate', ...running], log);
                     await nodeConfig.verify(services, log);
                 }
                 log('Done.');

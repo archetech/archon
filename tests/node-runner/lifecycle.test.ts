@@ -191,6 +191,34 @@ describe('the whole node', () => {
         ]);
     });
 
+    it('lists, checks and confirms a stopped dependency that up would start', async () => {
+        // gatekeeper depends on mongodb, which is enabled but stopped.
+        const services = (compose as unknown as { services: Record<string, object> }).services;
+        services.gatekeeper = { dependsOn: ['redis', 'mongodb'] };
+        services.mongodb = {};
+        docker.containers.push({ service: 'mongodb', inspect: { State: { Status: 'exited', Running: false, ExitCode: 0 } } });
+        // Like Compose, up starts the dependencies of what it is given.
+        const startNamed = compose.onCommand!;
+        compose.onCommand = args => {
+            startNamed(args);
+            if (args[0] === 'up') {
+                docker.containers.find(c => c.service === 'mongodb')!.inspect = { State: { Status: 'running', Running: true } };
+            }
+        };
+
+        const preview = await lifecycle.preview({ action: 'restart' });
+        expect(preview.services.map(s => s.service)).toEqual(['cln-mainnet-node', 'gatekeeper', 'mongodb', 'redis']);
+        expect(preview.stateful).toEqual(['cln-mainnet-node', 'mongodb', 'redis']);
+        expect(preview.command).toMatch(/also starts mongodb, which is a dependency/);
+
+        const lines = await run({ action: 'restart' }, true);
+        expect(compose.commands).toEqual([
+            ['stop', 'cln-mainnet-node', 'gatekeeper', 'redis'],
+            ['up', '-d', '--no-build', '--no-recreate', 'cln-mainnet-node', 'gatekeeper', 'redis'],
+        ]);
+        expect(lines).toContain('  mongodb: running');
+    });
+
     it('counts restarting and paused containers as active', async () => {
         docker.containers.find(c => c.service === 'gatekeeper')!.inspect = { State: { Status: 'restarting', Running: true, Restarting: true } };
         docker.containers.find(c => c.service === 'redis')!.inspect = { State: { Status: 'paused', Running: true } };
