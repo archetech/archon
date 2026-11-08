@@ -47,10 +47,18 @@ shell on the host and knowledge of Docker Compose.
     is parsed from `sample.env`; there is no second source of truth.
   - Validation checks the catalog, then the profile and URL pairing rules, and
     finally `docker compose config`.
-- **Preview before acting.** Applying a change first runs
-  `docker compose up -d --dry-run` and shows which containers would be
-  recreated, flagging stateful ones. No action runs `docker compose down`
-  first, as `./start-node` does.
+- **Preview before acting.** Applying a change first shows what it will do,
+  flagging stateful services, and runs only after confirmation. No action runs
+  `docker compose down` first, as `./start-node` does. The preview covers:
+  - containers that would be recreated, from `docker compose up -d --dry-run`;
+  - services to rebuild, because a changed setting is a build argument (for
+    example `ARCHON_REACT_WALLET_GATEKEEPER_URL`, which is compiled into the
+    wallet). `up -d` reuses an existing image, so these get a scoped
+    `docker compose build <service>` first;
+  - services to stop, because their profile is no longer enabled. `up -d`
+    leaves those containers running (see the Tor note in
+    `docs/deployment.md`), so they are stopped explicitly, without taking down
+    the rest of the node or touching their data.
 - **One long job at a time.** Builds and updates are serialised, check host
   load before starting, stream their output, and survive a browser disconnect.
 - **Two update channels.** The operator chooses to follow releases (the latest
@@ -64,7 +72,7 @@ Each phase is one PR.
 | Phase | Delivers |
 |---|---|
 | 1 | Container, separate Compose project, login, loopback binding. Per-service state, Docker health and `/ready` probes, with services that have no healthcheck shown as such. Live, searchable logs per service and merged. A Grafana link when the `observability` profile is on. |
-| 2 | Configuration: catalog view by section, editing with validation, a diff and a backup, then applying through the dry-run preview. |
+| 2 | Configuration: catalog view by section, editing with validation, a diff and a backup, then applying through the preview, including scoped rebuilds and stopping services whose profile was removed. |
 | 3 | Lifecycle: start, stop and restart a service; stop and start the whole node. A whole-node stop uses `stop`, not `down`, unless the operator asks for `down`. |
 | 4 | Updates on the release or `main` channel. Self-update through a short-lived helper container, since a container cannot recreate itself while serving the request. |
 
