@@ -54,8 +54,11 @@ shows whether one is set and lets you replace it, but never shows its value.
 These are names containing `API_KEY`, `SECRET`, `PASSPHRASE`, `PASSWORD`,
 `TOKEN`, `MNEMONIC`, `PRIVATE_KEY`, `MACAROON` or `SEED`, names ending in
 `_PASS`, `_RUNE` or `_RPC_URL`, and any value that is a URL with a user and
-password in it. `COMPOSE_PROJECT_NAME` cannot be changed here, since that
-would orphan every running container.
+password in it. A name ending in `_URL`, `_FILE`, `_PATH` or `_NAME` is shown
+even if it contains one of those words (`ARCHON_SECRET_FILE`, say), unless it
+ends in `_RPC_URL` or its value is a URL with a user and password.
+`COMPOSE_PROJECT_NAME` cannot be changed here, since that would orphan every
+running container.
 
 If Compose rejects the current `.env`, the page still loads, shows Compose's
 error, and lets you repair the file.
@@ -68,9 +71,13 @@ what applying it will do, worked out the way Compose decides it:
 - **Create / Recreate / Start:** what `docker compose up -d` will do.
 - **Stop:** services of a profile you turned off, which `up` would leave running.
 
-Interrupting a stateful service needs an extra confirmation. Applying runs as
-a job: node-runner refuses if `.env` changed since the review, backs up `.env`
-to `data/node-runner/env-backups/` (keeping the last 20), writes the new file,
+Interrupting a stateful service needs an extra confirmation. Applying works
+out the plan again from `.env` as it is when you apply, so your edits go onto
+the current file: if `.env` was edited elsewhere while you were reviewing,
+review again to see what applying will now do. Applying then runs as a job:
+node-runner refuses if `.env` changes between Apply and the job writing it,
+backs up `.env` to `data/node-runner/env-backups/` (keeping the last 20),
+writes the new file,
 builds the changed or missing images, stops the services of disabled profiles,
 runs `docker compose up -d --no-build`, then waits for the touched services'
 health checks. Builds wait while the host's load is above its core count, and
