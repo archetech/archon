@@ -1,6 +1,6 @@
 # Node-runner: manage a node from a web app (#1554)
 
-Status: planned.
+Status: phase 1 implemented.
 
 Node-runner is a web app for operating an Archon node: its configuration,
 starting, stopping and updating, logs and health. Today each of these needs a
@@ -81,7 +81,7 @@ with an icon and text, never color alone.
 - **Overview:** a one-line verdict (all healthy, or which service is unhealthy
   and for how long), then service cards grouped by role: core, chains,
   Lightning, gateway, storage, observability, apps. Each card shows state, the
-  health source (Docker healthcheck, `/ready` probe, or none), uptime and
+  health source (Docker healthcheck or none), uptime and
   restarts, and marks stateful services. Selecting a card opens its detail:
   image, profile, ports, the settings that affect it, a log tail, and start,
   stop and restart.
@@ -106,7 +106,7 @@ Each phase is one PR.
 
 | Phase | Delivers |
 |---|---|
-| 1 | Container, separate Compose project, first-run password setup with a setup code, login, loopback binding. Per-service state, Docker health and `/ready` probes, with services that have no healthcheck shown as such. Live, searchable logs per service and merged. A Grafana link when the `observability` profile is on. |
+| 1 | Container, separate Compose project, first-run password setup with a setup code, login, loopback binding. Per-service state and Docker health, with services that have no healthcheck shown as such. node-runner is on its own Docker network and cannot reach service endpoints, so it does not probe `/ready` itself; the services' healthchecks already do. Live, searchable logs per service and merged. A Grafana link when the `observability` profile is on. |
 | 2 | Configuration: catalog view by section, editing with validation, a diff and a backup, then applying through the preview, including scoped rebuilds and stopping services whose profile was removed. |
 | 3 | Lifecycle: start, stop and restart a service; stop and start the whole node. A whole-node stop uses `stop`, not `down`, unless the operator asks for `down`. |
 | 4 | Updates on the release or `main` channel. Self-update through a short-lived helper container, since a container cannot recreate itself while serving the request. |

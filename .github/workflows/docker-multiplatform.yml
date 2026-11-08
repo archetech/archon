@@ -97,6 +97,8 @@ jobs:
             image: filecoin-mediator
           - dockerfile: docker/Dockerfile.filecoin-wallet
             image: filecoin-wallet
+          - dockerfile: docker/Dockerfile.node-runner
+            image: node-runner
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5

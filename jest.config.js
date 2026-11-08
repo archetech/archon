@@ -69,6 +69,7 @@ const config = {
         'services/drawbridge/server/src/**/*.{ts,js}',
         'services/herald/server/src/**/*.{ts,js}',
         'services/didcomm/server/src/**/*.{ts,js}',
+        'services/node-runner/server/src/**/*.{ts,js}',
 
         '!**/*.d.ts',
         // Type-only modules and barrel re-exports: no meaningful runtime code.

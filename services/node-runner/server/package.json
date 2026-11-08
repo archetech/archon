@@ -1,0 +1,21 @@
+{
+  "name": "node-runner-server",
+  "version": "0.15.0",
+  "type": "module",
+  "description": "Archon node-runner: manage a node from a web app",
+  "main": "dist/index.js",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "author": "Archetech",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.18.11",
+    "typescript": "^5.8.2"
+  }
+}
