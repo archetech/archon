@@ -124,13 +124,18 @@ export class Lifecycle {
             };
         }
 
-        // Scoped to what is active now: an unscoped restart would also start
-        // stopped containers the review did not list.
+        // Stopped, then started again in dependency order: `docker compose
+        // restart` brings every container back at once and ignores
+        // depends_on, so a service can come up before the database it waits
+        // for and exit. `up --no-recreate` waits for each dependency to be
+        // healthy and starts the existing containers as they are. Scoped to
+        // what is active now, so stopped containers the review did not list
+        // stay stopped.
         const services = active.map(item);
         return {
             preview: {
                 title: 'Restart the node',
-                command: `docker compose restart ${active.join(' ')}`,
+                command: `docker compose stop ${active.join(' ')} && docker compose up -d --no-build --no-recreate ${active.join(' ')}`,
                 services,
                 stateful: services.filter(s => s.stateful).map(s => s.service),
                 empty: services.length === 0,
@@ -169,7 +174,8 @@ export class Lifecycle {
                     await nodeConfig.verify(services, log);
                 }
                 else {
-                    await nodeConfig.runCompose(['restart', ...services], log);
+                    await nodeConfig.runCompose(['stop', ...services], log);
+                    await nodeConfig.runCompose(['up', '-d', '--no-build', '--no-recreate', ...services], log);
                     await nodeConfig.verify(services, log);
                 }
                 log('Done.');

@@ -180,10 +180,15 @@ describe('the whole node', () => {
 
     it('restarts only what is active, named, so stopped containers stay stopped', async () => {
         const preview = await lifecycle.preview({ action: 'restart' });
-        expect(preview.command).toBe('docker compose restart cln-mainnet-node gatekeeper redis');
+        expect(preview.command).toBe('docker compose stop cln-mainnet-node gatekeeper redis && docker compose up -d --no-build --no-recreate cln-mainnet-node gatekeeper redis');
 
+        // Stop, then up, which starts them in dependency order: restart would
+        // bring them all back at once, ignoring depends_on.
         await run({ action: 'restart' }, true);
-        expect(compose.commands).toEqual([['restart', 'cln-mainnet-node', 'gatekeeper', 'redis']]);
+        expect(compose.commands).toEqual([
+            ['stop', 'cln-mainnet-node', 'gatekeeper', 'redis'],
+            ['up', '-d', '--no-build', '--no-recreate', 'cln-mainnet-node', 'gatekeeper', 'redis'],
+        ]);
     });
 
     it('counts restarting and paused containers as active', async () => {
