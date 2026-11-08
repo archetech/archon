@@ -1,9 +1,11 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { existsSync } from 'fs';
 import { join } from 'path';
-import { Auth, AuthError, MIN_PASSWORD_LENGTH, SESSION_TTL_MS } from './auth.js';
-import { DockerError, type DockerApi } from './docker.js';
+import { Auth, MIN_PASSWORD_LENGTH, SESSION_TTL_MS } from './auth.js';
+import type { DockerApi } from './docker.js';
+import type { JobRunner } from './jobs.js';
 import { collectLogs, containerSignature, followLogs, parseTail, resolveTargets, timeKey } from './logs.js';
+import type { Draft, NodeConfig } from './node-config.js';
 import { statusReport } from './status.js';
 
 export const SESSION_COOKIE = 'node_runner_session';
@@ -15,6 +17,8 @@ export interface AppDependencies {
     project: string;
     gitCommit: string;
     clientDir?: string | null;
+    nodeConfig?: NodeConfig;
+    jobs?: JobRunner;
     // How often a live log stream checks whether its containers changed.
     watchIntervalMs?: number;
 }
@@ -48,9 +52,11 @@ function clearSessionCookie(res: Response): void {
     res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`);
 }
 
+// Errors raised for the caller carry the HTTP status to answer with.
 function sendError(res: Response, error: unknown): void {
-    if (error instanceof AuthError || error instanceof DockerError) {
-        res.status(error.status).json({ error: error.message });
+    const status = (error as { status?: unknown })?.status;
+    if (error instanceof Error && typeof status === 'number' && status >= 400 && status < 600) {
+        res.status(status).json({ error: error.message });
         return;
     }
     console.error(error);
@@ -59,6 +65,24 @@ function sendError(res: Response, error: unknown): void {
 
 function serviceList(value: unknown): string[] {
     return typeof value === 'string' && value ? value.split(',').map(s => s.trim()).filter(Boolean) : [];
+}
+
+function draftOf(body: unknown): Draft {
+    const draft = (body as { draft?: Draft })?.draft ?? {};
+    return {
+        settings: draft.settings && typeof draft.settings === 'object' ? draft.settings : {},
+        ...(Array.isArray(draft.profiles) ? { profiles: draft.profiles.map(String) } : {}),
+    };
+}
+
+function sseHeaders(res: Response): void {
+    res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
+    });
+    res.write(': connected\n\n');
 }
 
 function sinceSeconds(value: unknown): number | undefined {
@@ -185,11 +209,12 @@ export function createApp(deps: AppDependencies): express.Express {
     });
 
     // Live logs as server-sent events, one `log` event per line.
-    api.get('/logs/stream', async (req, res) => {
+    // A long-lived response is authorized once, when it starts. This aborts it
+    // when the client goes away or the session ends, through logout, expiry or
+    // a password reset, without the stream itself keeping the session alive.
+    function streamLifetime(req: Request): AbortController {
         const controller = new AbortController();
         req.on('close', () => controller.abort());
-        // Access is checked once at the start; the stream ends as soon as the
-        // session does, through logout, expiry or a password reset.
         const token = readCookie(req.headers.cookie, SESSION_COOKIE);
         const stopRevoke = auth.onRevoke(revoked => {
             if (revoked === null || revoked === token) {
@@ -205,15 +230,14 @@ export function createApp(deps: AppDependencies): express.Express {
             stopRevoke();
             clearInterval(recheck);
         }, { once: true });
+        return controller;
+    }
+
+    api.get('/logs/stream', async (req, res) => {
+        const controller = streamLifetime(req);
         try {
             const targets = await resolveTargets(docker, project, serviceList(req.query.services));
-            res.writeHead(200, {
-                'Content-Type': 'text/event-stream',
-                'Cache-Control': 'no-cache, no-transform',
-                'Connection': 'keep-alive',
-                'X-Accel-Buffering': 'no',
-            });
-            res.write(': connected\n\n');
+            sseHeaders(res);
             const heartbeat = setInterval(() => res.write(': ping\n\n'), 25000);
             controller.signal.addEventListener('abort', () => clearInterval(heartbeat), { once: true });
             const services = serviceList(req.query.services);
@@ -242,6 +266,90 @@ export function createApp(deps: AppDependencies): express.Express {
             controller.abort();
         }
     });
+
+    const { nodeConfig, jobs } = deps;
+    if (nodeConfig && jobs) {
+        api.get('/config', async (_req, res) => {
+            try {
+                res.json(await nodeConfig.view());
+            }
+            catch (error) {
+                sendError(res, error);
+            }
+        });
+
+        api.post('/config/preview', async (req, res) => {
+            try {
+                // The candidate and the original .env stay on the server: both
+                // hold every secret in the file.
+                const { text: _text, source: _source, ...preview } = await nodeConfig.preview(draftOf(req.body));
+                res.json(preview);
+            }
+            catch (error) {
+                sendError(res, error);
+            }
+        });
+
+        api.post('/config/apply', async (req, res) => {
+            try {
+                if (await jobs.active()) {
+                    res.status(409).json({ error: 'Another job is running' });
+                    return;
+                }
+                const { title, work } = await nodeConfig.apply(draftOf(req.body), req.body?.confirmStateful === true);
+                const { job } = await jobs.start(title, work);
+                res.status(202).json({ id: job.id });
+            }
+            catch (error) {
+                sendError(res, error);
+            }
+        });
+
+        api.get('/jobs', async (_req, res) => {
+            res.json({ jobs: await jobs.list() });
+        });
+
+        api.get('/jobs/:id', async (req, res) => {
+            const job = await jobs.get(req.params.id);
+            if (!job) {
+                res.status(404).json({ error: 'No such job' });
+                return;
+            }
+            res.json(job);
+        });
+
+        // A job's output as server-sent events: everything so far, then each
+        // new line, then a final `end` event with the outcome.
+        api.get('/jobs/:id/stream', async (req, res) => {
+            const job = await jobs.get(req.params.id);
+            if (!job) {
+                res.status(404).json({ error: 'No such job' });
+                return;
+            }
+            sseHeaders(res);
+            const send = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+            job.lines.forEach(line => send('line', line));
+            if (job.status !== 'running') {
+                send('end', { ...job, lines: undefined });
+                res.end();
+                return;
+            }
+            const controller = streamLifetime(req);
+            const unsubscribe = jobs.subscribe(job.id, ({ line, job: summary }) => {
+                if (line) {
+                    send('line', line);
+                }
+                else if (summary.status !== 'running') {
+                    send('end', summary);
+                    controller.abort();
+                }
+            });
+            controller.signal.addEventListener('abort', () => {
+                unsubscribe();
+                res.end();
+            }, { once: true });
+        });
+    }
 
     api.use((_req, res) => {
         res.status(404).json({ error: 'Not found' });

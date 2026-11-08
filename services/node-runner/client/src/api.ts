@@ -44,6 +44,62 @@ export interface Info {
     gitCommit: string;
 }
 
+export interface Warning {
+    message: string;
+    fix?: { key: string, value: string, label: string };
+}
+
+export interface SettingView {
+    key: string;
+    description: string;
+    default: string;
+    example?: string;
+    secret: boolean;
+    value: string | null;
+    set: boolean;
+    inEnv: boolean;
+}
+
+export interface ConfigView {
+    profiles: { name: string, description: string, enabled: boolean, services: string[] }[];
+    sections: { name: string, settings: SettingView[] }[];
+    warnings: Warning[];
+    configError: string | null;
+}
+
+export interface Draft {
+    settings: Record<string, string>;
+    profiles?: string[];
+}
+
+export interface PlanService {
+    service: string;
+    stateful: boolean;
+    oneShot?: boolean;
+}
+
+export interface Preview {
+    diff: { key: string, before: string | null, after: string | null, secret: boolean }[];
+    warnings: Warning[];
+    plan: { rebuild: PlanService[], create: PlanService[], recreate: PlanService[], start: PlanService[], stop: PlanService[], unchanged: number };
+    stateful: string[];
+    empty: boolean;
+}
+
+export interface JobLine {
+    time: string;
+    text: string;
+}
+
+export interface JobSummary {
+    id: string;
+    title: string;
+    status: 'running' | 'succeeded' | 'failed';
+    startedAt: string;
+    finishedAt: string | null;
+    error: string | null;
+}
+
 export class ApiError extends Error {
     constructor(message: string, readonly status: number) {
         super(message);
@@ -78,6 +134,11 @@ export const api = {
     status: () => call<StatusReport>('/status'),
     logs: (services: string[], tail: number) => call<{ entries: LogEntry[] }>(`/logs?${logQuery(services, tail)}`),
     downloadUrl: (services: string[], tail: number) => `/api/logs?${logQuery(services, tail, { format: 'text' })}`,
+    config: () => call<ConfigView>('/config'),
+    preview: (draft: Draft) => call<Preview>('/config/preview', { draft }),
+    apply: (draft: Draft, confirmStateful: boolean) => call<{ id: string }>('/config/apply', { draft, confirmStateful }),
+    jobs: () => call<{ jobs: JobSummary[] }>('/jobs'),
+    jobStreamUrl: (id: string) => `/api/jobs/${encodeURIComponent(id)}/stream`,
     streamUrl: (services: string[], tail: number, since?: number) =>
         `/api/logs/stream?${logQuery(services, tail, since ? { since: String(since) } : {})}`,
 };

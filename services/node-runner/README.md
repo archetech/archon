@@ -1,9 +1,9 @@
 # node-runner
 
 node-runner is a web app for operating an Archon node. It shows every
-container's state and health, and the node's logs, live or downloaded.
-Configuration, starting and stopping, and updates come in later phases of
-[the plan](../../docs/plans/node-runner-1554.md).
+container's state and health and the node's logs, and it edits the node's
+configuration. Starting and stopping services and updates come in later phases
+of [the plan](../../docs/plans/node-runner-1554.md).
 
 ## Running it
 
@@ -35,6 +35,29 @@ the setup code stops working once the password is set.
 To reset a forgotten password, delete `data/node-runner/admin-password`. Every
 session ends, and the setup page returns with a new code.
 
+## Configuration
+
+The Configuration page edits `.env`. Profiles are switches; settings are
+grouped by the sections of `sample.env`, with its comments as their
+descriptions. Settings that look like credentials are write-only: the page
+shows whether one is set and lets you replace it, but never shows its value.
+`COMPOSE_PROJECT_NAME` cannot be changed here, since that would orphan every
+running container.
+
+Edits stay a draft until you review them. The review shows the `.env` diff and
+what applying it will do, worked out the way Compose decides it:
+
+- **Rebuild:** a build argument changed. `up` alone would reuse the old image.
+- **Create / Recreate / Start:** what `docker compose up -d` will do.
+- **Stop:** services of a profile you turned off, which `up` would leave running.
+
+Interrupting a stateful service (a database, IPFS, a Lightning node) needs an
+extra confirmation. Applying runs as a job: node-runner backs up `.env` to
+`data/node-runner/env-backups/`, writes the new file, builds, stops and runs
+`up -d`, then waits for the touched services' health checks. Builds wait while
+the host's load is above its core count. One job runs at a time, and the Jobs
+page keeps the output of the last 20.
+
 ## What it reads
 
 - **Containers** of the node's Compose project: the `COMPOSE_PROJECT_NAME` in
@@ -45,4 +68,7 @@ session ends, and the setup page returns with a new code.
   call service endpoints itself.
 - **Logs** from Docker, merged across services in time order.
 
-The node directory is mounted read-only, apart from `data/node-runner`.
+The node directory is mounted at the path the host uses, so `docker compose`
+inside node-runner resolves its relative paths as it does in a shell, and runs
+with only `PATH`, `HOME` and the node's commit in its environment so nothing
+of node-runner's own overrides the node's `.env`.
