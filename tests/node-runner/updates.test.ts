@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { exec, type Exec } from '../../services/node-runner/server/src/compose.ts';
+import { JobRunner } from '../../services/node-runner/server/src/jobs.ts';
 import { NodeConfig } from '../../services/node-runner/server/src/node-config.ts';
 import { Updates } from '../../services/node-runner/server/src/updates.ts';
 import { FakeCompose, FakeDocker } from './helpers.ts';
@@ -14,6 +15,9 @@ let compose: FakeCompose;
 let docker: FakeDocker;
 let dockerCalls: string[][];
 let updates: Updates;
+let dataDir: string;
+// What the self-update helper writes: its output and exit status.
+let helper: { log: string, status: string | null };
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf-8', env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' } }).trim();
 
@@ -35,6 +39,12 @@ const mixedExec: Exec = async (command, args, options) => {
         return exec(command, args, options);
     }
     dockerCalls.push(args);
+    if (args[0] === 'run') {
+        writeFileSync(join(dataDir, 'self-update.log'), helper.log);
+        if (helper.status !== null) {
+            writeFileSync(join(dataDir, 'self-update.status'), `${helper.status}\n`);
+        }
+    }
     return { code: 0, stdout: '', stderr: '' };
 };
 
@@ -61,19 +71,20 @@ beforeEach(() => {
         service, hash: compose.currentHash(service), imageId: `sha:${service}:old`,
     })));
     dockerCalls = [];
-    const dataDir = join(nodeDir, 'data', 'node-runner');
+    helper = { log: 'Building node-runner\nContainer recreated\n', status: '0' };
+    dataDir = join(nodeDir, 'data', 'node-runner');
     const nodeConfig = new NodeConfig({ nodeDir, dataDir, project: 'archon', compose, docker, healthTimeoutMs: 0, sleep: async () => {}, loadAverage: () => 0, cpuCount: () => 4 });
-    updates = new Updates({ nodeDir, dataDir, nodeConfig, exec: mixedExec, selfImage: 'ghcr.io/archetech/node-runner', loadAverage: () => 0.5, cpuCount: () => 4 });
+    updates = new Updates({ nodeDir, dataDir, nodeConfig, exec: mixedExec, selfImage: 'ghcr.io/archetech/node-runner', loadAverage: () => 0.5, cpuCount: () => 4, sleep: async () => {} });
 });
 
 afterEach(() => {
     rmSync(root, { recursive: true, force: true });
 });
 
-async function run(confirm = false): Promise<string[]> {
+async function run(confirm: string[] = []): Promise<string[]> {
     const { work } = await updates.run(confirm);
     const lines: string[] = [];
-    await work(line => lines.push(line));
+    await work(line => lines.push(line), 'job-1');
     return lines;
 }
 
@@ -97,7 +108,7 @@ describe('status', () => {
         expect(status.target).toMatchObject({ ref: 'v0.2.0', label: 'v0.2.0' });
         expect(status.commits.map(c => c.subject)).toEqual(['second release', 'fix one']);
         expect(status.current).toMatchObject({ describe: 'v0.1.0', branch: null });
-        expect(status.statefulBuilt).toEqual(['cln-mainnet-node']);
+        expect(status.statefulAtRisk).toEqual(['cln-mainnet-node']);
         expect(status.load).toEqual({ load1: 0.5, cores: 4 });
     });
 
@@ -162,30 +173,63 @@ describe('run', () => {
         upstreamCommit(upstream, 'a.txt', 'second release', 'v0.2.0');
         docker.images.set('archon-cln-mainnet-node', 'sha:cln:new');
 
-        const lines = await run(false);
+        const lines = await run([]);
 
         expect(compose.commands).toEqual([['build']]);
-        expect(lines).toContain('Built. cln-mainnet-node would be recreated, which needs your confirmation:');
+        expect(lines).toContain('Built. Recreating cln-mainnet-node needs your confirmation, so nothing was restarted.');
+
+        // The update is unfinished, and running it again with consent finishes it.
+        const status = await updates.status(false);
+        expect(status).toMatchObject({ unfinished: true, target: { label: 'v0.2.0' } });
+        await run(['cln-mainnet-node']);
+        expect(compose.commands).toEqual([['build'], ['build'], ['up', '-d']]);
+        expect((await updates.status(false)).unfinished).toBe(false);
     });
 
     it('restarts it when confirmed', async () => {
         upstreamCommit(upstream, 'a.txt', 'second release', 'v0.2.0');
         docker.images.set('archon-cln-mainnet-node', 'sha:cln:new');
 
-        await run(true);
+        await run(['cln-mainnet-node']);
 
         expect(compose.commands).toEqual([['build'], ['up', '-d']]);
     });
 
     it('refuses to run over local changes, or with nothing to update to', async () => {
-        await expect(updates.run(false)).rejects.toMatchObject({ status: 409 });
+        await expect(updates.run([])).rejects.toMatchObject({ status: 409 });
 
         upstreamCommit(upstream, 'a.txt', 'second release', 'v0.2.0');
         writeFileSync(join(nodeDir, 'README'), 'edited\n');
-        await expect(updates.run(false)).rejects.toMatchObject({ status: 409, message: expect.stringContaining('README') });
+        await expect(updates.run([])).rejects.toMatchObject({ status: 409, message: expect.stringContaining('README') });
     });
 
-    it('replaces node-runner from a helper when its own files changed', async () => {
+    it('only restarts the stateful services named in the consent', async () => {
+        upstreamCommit(upstream, 'a.txt', 'second release', 'v0.2.0');
+        docker.images.set('archon-cln-mainnet-node', 'sha:cln:new');
+        docker.images.set('archon-redis', 'sha:redis:new');
+
+        const lines = await run(['cln-mainnet-node', 'not-at-risk']);
+
+        expect(compose.commands).toEqual([['build']]);
+        expect(lines).toContain('Built. Recreating redis needs your confirmation, so nothing was restarted.');
+    });
+
+    it('can be finished after a failed build, at the same target', async () => {
+        upstreamCommit(upstream, 'a.txt', 'second release', 'v0.2.0');
+        compose.failing = 'build';
+        const { work } = await updates.run([]);
+        await expect(work(() => {}, 'job-1')).rejects.toThrow('docker compose build exited with code 1');
+
+        const status = await updates.status(false);
+        expect(status).toMatchObject({ unfinished: true, target: { label: 'v0.2.0' } });
+        expect((await updates.run([])).title).toBe('Finish the update to v0.2.0');
+
+        compose.failing = null;
+        await run();
+        expect((await updates.status(false))).toMatchObject({ unfinished: false, target: null });
+    });
+
+    it('replaces node-runner from a helper and settles on the helper\'s exit status', async () => {
         upstreamCommit(upstream, 'services/node-runner/server/src/x.ts', 'node-runner change', 'v0.2.0');
 
         const lines = await run();
@@ -194,8 +238,94 @@ describe('run', () => {
         const args = dockerCalls[0];
         expect(args.slice(0, 5)).toEqual(['run', '--rm', '--detach', '--name', 'archon-node-runner-updater']);
         expect(args).toContain(`${nodeDir}:${nodeDir}`);
-        expect(args.slice(-4)).toEqual(['ghcr.io/archetech/node-runner', 'up', '-d', '--build']);
-        expect(lines.at(-2)).toMatch(/rebuilding itself/);
-        expect(readFileSync(join(nodeDir, 'services/node-runner/server/src/x.ts'), 'utf-8')).toBe('node-runner change\n');
+        expect(args.at(-1)).toBe(dataDir);
+        expect(lines).toContain('│ Container recreated');
+        expect(lines.slice(-2)).toEqual(['node-runner replaced itself.', 'Done.']);
+        expect((await updates.status(false)).unfinished).toBe(false);
+    });
+
+    it('fails the job when the helper fails', async () => {
+        upstreamCommit(upstream, 'services/node-runner/server/src/x.ts', 'node-runner change', 'v0.2.0');
+        helper = { log: 'build failed\n', status: '1' };
+
+        const { work } = await updates.run([]);
+        const lines: string[] = [];
+
+        await expect(work(line => lines.push(line), 'job-1')).rejects.toThrow('Replacing node-runner failed (exit 1)');
+        expect(lines).toContain('│ build failed');
+    });
+
+    it('lets the replacement node-runner take the job over and finish it', async () => {
+        upstreamCommit(upstream, 'services/node-runner/server/src/x.ts', 'node-runner change', 'v0.2.0');
+        const jobs = new JobRunner(dataDir);
+        // The helper is still running when this process is replaced.
+        helper = { log: 'Building node-runner\n', status: null };
+        // The old process waits until it is replaced, which ends its wait.
+        let replace!: () => void;
+        const replaced = new Promise<void>(resolve => { replace = resolve; });
+        const old = new Updates({
+            nodeDir, dataDir, exec: mixedExec, selfImage: 'img',
+            nodeConfig: (updates as unknown as { options: { nodeConfig: NodeConfig } }).options.nodeConfig,
+            sleep: () => replaced.then(() => { throw new Error('process replaced'); }),
+        });
+        const { title, work } = await old.run([]);
+        const { job, done } = await jobs.start(title, work);
+        while (!(await jobs.get(job.id))!.lines.some(l => l.text === '│ Building node-runner')) {
+            await new Promise(resolve => setTimeout(resolve, 5));
+        }
+
+        replace();
+        await done;
+        // The replaced process never got to record anything, so its job is
+        // still marked running on disk.
+        const record = JSON.parse(readFileSync(join(dataDir, 'jobs.json'), 'utf-8'));
+        record[0] = { ...record[0], status: 'running', error: null, finishedAt: null };
+        writeFileSync(join(dataDir, 'jobs.json'), JSON.stringify(record));
+
+        // A new process finds the job left running and the helper's result.
+        writeFileSync(join(dataDir, 'self-update.log'), 'Building node-runner\nContainer recreated\n');
+        writeFileSync(join(dataDir, 'self-update.status'), '0\n');
+        const restarted = new JobRunner(dataDir);
+        await updates.resume(restarted);
+        let settled = await restarted.get(job.id);
+        while (settled!.status === 'running') {
+            await new Promise(resolve => setTimeout(resolve, 5));
+            settled = await restarted.get(job.id);
+        }
+
+        expect(settled!.status).toBe('succeeded');
+        expect(settled!.lines.filter(l => l.text.startsWith('│ ')).map(l => l.text)).toEqual(['│ Building node-runner', '│ Container recreated']);
+    });
+});
+
+describe('history and branches', () => {
+    it('unshallows the installer\'s depth-1 clone before judging ancestry', async () => {
+        upstreamCommit(upstream, 'a.txt', 'unreleased work');
+        const shallowDir = join(root, 'shallow');
+        git(root, 'clone', '-q', '--depth', '1', `file://${origin}`, shallowDir);
+        writeFileSync(join(shallowDir, 'sample.env'), '');
+        const shallow = new Updates({ nodeDir: shallowDir, dataDir: join(shallowDir, 'data'), nodeConfig: new NodeConfig({ nodeDir: shallowDir, dataDir: join(shallowDir, 'data'), project: 'archon', compose, docker }), exec: mixedExec, selfImage: 'img' });
+
+        expect((await shallow.status(false)).note).toMatch(/shallow/);
+        const status = await shallow.status(true);
+
+        expect(git(shallowDir, 'rev-parse', '--is-shallow-repository')).toBe('false');
+        expect(status.target).toBeNull();
+        expect(status.note).toMatch(/newer than the latest release v0\.1\.0/);
+    });
+
+    it('refuses main when the local main has commits origin/main does not', async () => {
+        await updates.setChannel('main');
+        upstreamCommit(upstream, 'a.txt', 'on main');
+        git(nodeDir, 'checkout', '-q', '-B', 'main', 'v0.1.0');
+        writeFileSync(join(nodeDir, 'local.txt'), 'local\n');
+        git(nodeDir, 'add', 'local.txt');
+        git(nodeDir, 'commit', '-qm', 'local work');
+        git(nodeDir, 'checkout', '-q', '--detach', 'v0.1.0');
+
+        const status = await updates.status(true);
+
+        expect(status.target).toBeNull();
+        expect(status.note).toMatch(/local branch main has commits/);
     });
 });

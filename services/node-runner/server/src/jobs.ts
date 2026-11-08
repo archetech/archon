@@ -28,6 +28,7 @@ export class JobConflictError extends Error {
 export class JobFailedError extends Error {}
 
 export type JobLog = (text: string) => void;
+export type JobWork = (log: JobLog, id: string) => Promise<void>;
 
 const MAX_LINES = 5000;
 const MAX_HISTORY = 20;
@@ -104,7 +105,7 @@ export class JobRunner {
     }
 
     // Starts `work` and returns the job at once; `done` settles when it ends.
-    async start(title: string, work: (log: JobLog) => Promise<void>): Promise<{ job: Job, done: Promise<void> }> {
+    async start(title: string, work: JobWork): Promise<{ job: Job, done: Promise<void> }> {
         await this.load();
         // Checked and claimed with no await in between, so two requests
         // arriving together cannot both start a job.
@@ -124,7 +125,23 @@ export class JobRunner {
         this.jobs.unshift(job);
         this.jobs = this.jobs.slice(0, MAX_HISTORY);
         await this.save();
+        return { job, done: this.execute(job, work) };
+    }
 
+    // Takes up a job a previous node-runner process left running, such as a
+    // self-update that replaced that process, and carries on with `work`.
+    async adopt(id: string, work: JobWork): Promise<{ job: Job, done: Promise<void> } | null> {
+        await this.load();
+        const job = this.jobs.find(j => j.id === id);
+        if (!job) {
+            return null;
+        }
+        Object.assign(job, { status: 'running', error: null, finishedAt: null });
+        await this.save();
+        return { job, done: this.execute(job, work) };
+    }
+
+    private execute(job: Job, work: JobWork): Promise<void> {
         const log: JobLog = text => {
             const line = { time: this.now().toISOString(), text };
             job.lines.push(line);
@@ -134,9 +151,9 @@ export class JobRunner {
             this.emit(job, line);
         };
 
-        const done = (async () => {
+        return (async () => {
             try {
-                await work(log);
+                await work(log, job.id);
                 job.status = 'succeeded';
             }
             catch (error) {
@@ -148,7 +165,5 @@ export class JobRunner {
             await this.save().catch(() => {});
             this.emit(job);
         })();
-
-        return { job, done };
     }
 }

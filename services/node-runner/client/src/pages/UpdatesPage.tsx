@@ -13,7 +13,7 @@ export default function UpdatesPage({ onStarted, onUnauthorized }: Props) {
     const [status, setStatus] = useState<UpdateStatus | null>(null);
     const [error, setError] = useState('');
     const [checking, setChecking] = useState(false);
-    const [confirmed, setConfirmed] = useState(false);
+    const [confirmed, setConfirmed] = useState<string[]>([]);
     const [busy, setBusy] = useState(false);
 
     const handle = useCallback((e: unknown) => {
@@ -56,7 +56,7 @@ export default function UpdatesPage({ onStarted, onUnauthorized }: Props) {
         setBusy(true);
         setError('');
         try {
-            const { id } = await api.runUpdate(confirmed);
+            const { id } = await api.runUpdate(confirmed.filter(name => status?.statefulAtRisk.includes(name)));
             onStarted(id);
         }
         catch (e) {
@@ -114,31 +114,49 @@ export default function UpdatesPage({ onStarted, onUnauthorized }: Props) {
 
             {status.target && (
                 <Paper variant="outlined" sx={{ p: 2.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                    <Typography variant="h3" component="h2">What {status.target.label} brings</Typography>
-                    <Box>
-                        {status.commits.map(commit => (
-                            <Box key={commit.sha} sx={{ display: 'flex', gap: 1.5, py: 0.75, borderTop: 1, borderColor: 'divider' }}>
-                                <Typography variant="body2" sx={{ ...MONO, color: 'primary.main', flex: 'none' }}>{commit.sha}</Typography>
-                                <Typography variant="body2">{commit.subject}</Typography>
+                    <Typography variant="h3" component="h2">
+                        {status.unfinished ? `Finish the update to ${status.target.label}` : `What ${status.target.label} brings`}
+                    </Typography>
+                    {status.unfinished
+                        ? <Alert severity="info">{status.note}</Alert>
+                        : (
+                            <Box>
+                                {status.commits.map(commit => (
+                                    <Box key={commit.sha} sx={{ display: 'flex', gap: 1.5, py: 0.75, borderTop: 1, borderColor: 'divider' }}>
+                                        <Typography variant="body2" sx={{ ...MONO, color: 'primary.main', flex: 'none' }}>{commit.sha}</Typography>
+                                        <Typography variant="body2">{commit.subject}</Typography>
+                                    </Box>
+                                ))}
                             </Box>
-                        ))}
-                    </Box>
+                        )}
                     <Typography variant="body2" color="text.secondary">
                         Updating checks out {status.target.label}, rebuilds the images (which waits while the host is busy), and recreates
                         the containers whose image or configuration changed. If node-runner itself changed, it replaces itself last.
                     </Typography>
-                    {status.statefulBuilt.length > 0 && (
+                    {status.statefulAtRisk.length > 0 && (
                         <Alert severity="warning" icon={false}>
-                            <FormControlLabel
-                                control={<Checkbox checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />}
-                                label={`Also restart ${status.statefulBuilt.join(', ')} if ${status.statefulBuilt.length === 1 ? 'its image changes' : 'their images change'}. Otherwise the update builds, then stops before restarting them, and you finish it with Start node.`}
-                            />
+                            <Typography variant="body2" sx={{ mb: 0.5 }}>
+                                These hold state and are restarted only if you allow it and their image or configuration changed.
+                                If one needs restarting without your permission, the update stops after building, and you finish it here.
+                            </Typography>
+                            {status.statefulAtRisk.map(name => (
+                                <FormControlLabel
+                                    key={name}
+                                    control={(
+                                        <Checkbox
+                                            checked={confirmed.includes(name)}
+                                            onChange={e => setConfirmed(current => e.target.checked ? [...current, name] : current.filter(n => n !== name))}
+                                        />
+                                    )}
+                                    label={<Box component="span" sx={MONO}>Allow restarting {name}</Box>}
+                                />
+                            ))}
                         </Alert>
                     )}
                     {error && <Alert severity="error">{error}</Alert>}
                     <Box>
                         <Button variant="contained" disabled={busy || status.dirty.length > 0} onClick={update}>
-                            Update to {status.target.label}
+                            {status.unfinished ? 'Finish the update' : `Update to ${status.target.label}`}
                         </Button>
                     </Box>
                 </Paper>

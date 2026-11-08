@@ -118,9 +118,10 @@ export interface UpdateStatus {
     current: { commit: string, describe: string, branch: string | null };
     target: { ref: string, label: string, commit: string } | null;
     commits: { sha: string, subject: string }[];
+    unfinished: boolean;
     note: string | null;
     dirty: string[];
-    statefulBuilt: string[];
+    statefulAtRisk: string[];
     load: { load1: number, cores: number };
     fetchError: string | null;
 }
@@ -165,7 +166,7 @@ export const api = {
     jobs: () => call<{ jobs: JobSummary[] }>('/jobs'),
     updates: (fetchRemote: boolean) => call<UpdateStatus>(`/updates${fetchRemote ? '?fetch=1' : ''}`),
     setChannel: (channel: 'release' | 'main') => call<{ channel: string }>('/updates/channel', { channel }, 'PUT'),
-    runUpdate: (confirmStateful: boolean) => call<{ id: string }>('/updates/run', { confirmStateful }),
+    runUpdate: (confirm: string[]) => call<{ id: string }>('/updates/run', { confirm }),
     previewAction: (request: ActionRequest) => call<ActionPreview>('/actions/preview', request),
     runAction: (request: ActionRequest, confirmStateful: boolean) => call<{ id: string }>('/actions/run', { ...request, confirmStateful }),
     jobStreamUrl: (id: string) => `/api/jobs/${encodeURIComponent(id)}/stream`,

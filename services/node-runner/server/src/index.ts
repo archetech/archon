@@ -22,6 +22,10 @@ async function main(): Promise<void> {
     const docker = createDockerApi(config.dockerSocket);
     const compose = new Compose(config.nodeDir, gitCommit);
     const nodeConfig = new NodeConfig({ nodeDir: config.nodeDir, dataDir: config.dataDir, project: config.project, compose, docker });
+    const jobs = new JobRunner(config.dataDir);
+    const updates = new Updates({ nodeDir: config.nodeDir, dataDir: config.dataDir, nodeConfig, exec, selfImage: config.image });
+    // A self-update that replaced the previous process is still running.
+    await updates.resume(jobs);
     const app = createApp({
         auth,
         docker,
@@ -29,9 +33,9 @@ async function main(): Promise<void> {
         gitCommit: config.gitCommit,
         clientDir: config.clientDir,
         nodeConfig,
-        jobs: new JobRunner(config.dataDir),
+        jobs,
         lifecycle: new Lifecycle({ project: config.project, docker, nodeConfig }),
-        updates: new Updates({ nodeDir: config.nodeDir, dataDir: config.dataDir, nodeConfig, exec, selfImage: config.image }),
+        updates,
     });
 
     app.listen(config.port, () => {
