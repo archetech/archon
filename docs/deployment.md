@@ -2,7 +2,7 @@
 
 This guide walks you through deploying an Archon node, from a core DID-only setup to a full registry, Drawbridge, and Lightning-enabled stack. Each section builds on the previous one — start with the core and add layers as needed.
 
-Every `.env` change and every start, stop or update in this guide can also be made from a browser with [node-runner](#2-managing-the-node-with-node-runner), which shows what each change will do before it runs.
+For the full stack (`docker-compose.yml` and its profiles), every `.env` change and every start, stop or update in this guide can also be made from a browser with [node-runner](#2-managing-the-node-with-node-runner), which shows what each change will do before it runs. The minimal stack in [§3](#3-core-node-did-only) is run from the shell.
 
 ## Table of Contents
 
@@ -74,7 +74,9 @@ mkdir -p data
 node-runner is a web app for operating the node: container state and health,
 merged service logs, editing `.env`, starting, stopping and restarting
 services, and updating to a new release or to `main`. It runs as its own
-Compose project, so stopping the node does not stop it.
+Compose project, so stopping the node does not stop it. It manages the full
+stack defined by `docker-compose.yml`; it does not use
+`docker/compose/minimal.yml`, so run the minimal stack from the shell.
 
 It needs the checkout and the `.env` from [Initial Setup](#initial-setup),
 with `ARCHON_UID`, `ARCHON_GID` and `ARCHON_ADMIN_API_KEY` set. node-runner
