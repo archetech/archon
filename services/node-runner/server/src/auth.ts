@@ -13,6 +13,7 @@ const SCRYPT = { N: 1 << 15, r: 8, p: 1, keylen: 32, maxmem: 64 * 1024 * 1024 };
 
 export const MIN_PASSWORD_LENGTH = 12;
 export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
+const MAX_FAILURE_DELAY_MS = 30 * 1000;
 
 export class AuthError extends Error {
     constructor(message: string, readonly status: number) {
@@ -91,6 +92,11 @@ export class Auth {
     private readonly failureDelayMs: number;
     private readonly sessions = new Map<string, number>();
     private readonly revocations = new EventEmitter();
+    // Password and setup-code checks run one at a time, each failure delaying
+    // the next check longer, so parallel guesses cannot outrun the delay or
+    // pile up scrypt work.
+    private gate: Promise<unknown> = Promise.resolve();
+    private failures = 0;
 
     constructor(options: AuthOptions) {
         this.dataDir = options.dataDir;
@@ -136,7 +142,22 @@ export class Auth {
         return code;
     }
 
-    async setup(code: string, password: string): Promise<string> {
+    private checked<T>(check: () => Promise<T>): Promise<T> {
+        const run = this.gate.then(check, check);
+        this.gate = run.catch(() => {});
+        return run;
+    }
+
+    private async failed(): Promise<void> {
+        this.failures += 1;
+        await sleep(Math.min(this.failureDelayMs * 2 ** (this.failures - 1), MAX_FAILURE_DELAY_MS));
+    }
+
+    setup(code: string, password: string): Promise<string> {
+        return this.checked(() => this.setupNow(code, password));
+    }
+
+    private async setupNow(code: string, password: string): Promise<string> {
         if (await this.isConfigured()) {
             throw new AuthError('node-runner is already set up', 409);
         }
@@ -144,9 +165,10 @@ export class Auth {
         const given = canonicalCode(code || '');
         const expected = stored ? canonicalCode(stored) : null;
         if (!expected || given.length !== expected.length || !timingSafeEqual(given, expected)) {
-            await sleep(this.failureDelayMs);
+            await this.failed();
             throw new AuthError('The setup code is not correct', 401);
         }
+        this.failures = 0;
         if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
             throw new AuthError(`The password must be at least ${MIN_PASSWORD_LENGTH} characters`, 400);
         }
@@ -165,15 +187,20 @@ export class Auth {
         return this.createSession();
     }
 
-    async login(password: string): Promise<string> {
+    login(password: string): Promise<string> {
+        return this.checked(() => this.loginNow(password));
+    }
+
+    private async loginNow(password: string): Promise<string> {
         const stored = await readOptional(this.passwordPath);
         if (stored === null) {
             throw new AuthError('node-runner is not set up yet', 409);
         }
         if (typeof password !== 'string' || !(await verifyPassword(password, stored))) {
-            await sleep(this.failureDelayMs);
+            await this.failed();
             throw new AuthError('The password is not correct', 401);
         }
+        this.failures = 0;
         return this.createSession();
     }
 

@@ -17,7 +17,7 @@ let auth: Auth;
 let docker: FakeDocker;
 
 function app(clientDir: string | null = null) {
-    return createApp({ auth, docker, project: 'archon', gitCommit: 'abc1234', clientDir });
+    return createApp({ auth, docker, project: 'archon', gitCommit: 'abc1234', clientDir, watchIntervalMs: 20 });
 }
 
 function cookieFrom(res: request.Response): string {
@@ -172,6 +172,7 @@ describe('live logs', () => {
     let server: Server;
 
     afterEach(async () => {
+        server?.closeAllConnections();
         await new Promise(resolve => server?.close(resolve));
     });
 
@@ -224,6 +225,45 @@ describe('live logs', () => {
 
         await stream.ended();
         expect(docker.followed.every(f => f.destroyed)).toBe(true);
+    });
+
+    it('reads a stopped container\'s tail once instead of following it, so it cannot end the stream', async () => {
+        docker.containers.push({
+            service: 'lnbits-init',
+            logs: ['2026-11-08T09:59:00Z init done'],
+            inspect: { State: { Status: 'exited', Running: false, ExitCode: 0 } },
+        });
+        const cookie = await signedIn();
+        const stream = await openStream(cookie, 'tail=5');
+
+        await stream.until('init done');
+        await stream.until('gk two');
+        expect(docker.logCalls.find(c => c.id === 'id-lnbits-init')!.options.follow).toBeUndefined();
+        expect(docker.followed).toHaveLength(2);
+
+        docker.followed[0].write(frame(1, '2026-11-08T10:00:05Z still live\n'));
+        await stream.until('still live');
+    });
+
+    it('ends the stream when the containers change, so the client resolves them again', async () => {
+        const cookie = await signedIn();
+        const stream = await openStream(cookie, 'tail=1');
+        await stream.until('km err');
+
+        docker.containers.push({ service: 'herald' });
+
+        await stream.ended();
+    });
+
+    it('waits on an empty project until a container appears', async () => {
+        docker.containers.splice(0);
+        const cookie = await signedIn();
+        const stream = await openStream(cookie, '');
+        await stream.until(': connected');
+
+        docker.containers.push({ service: 'gatekeeper' });
+
+        await stream.ended();
     });
 
     it('closes the streams it opened when another fails to open', async () => {
@@ -310,7 +350,7 @@ describe('timeKey', () => {
     });
 
     it('orders entries by it when collecting', async () => {
-        const entries = await collectLogs(docker, [{ service: 'keymaster', id: 'id-keymaster', tty: false }], { tail: 10 });
+        const entries = await collectLogs(docker, [{ service: 'keymaster', id: 'id-keymaster', tty: false, running: true }], { tail: 10 });
         expect(entries.map(e => e.text)).toEqual(['km err', 'km one']);
     });
 });
