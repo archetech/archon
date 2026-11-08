@@ -96,7 +96,11 @@ function healthOf(service: string, inspect: ContainerInspect): Health {
     }
     if (state.Status === 'exited') {
         if (state.ExitCode !== 0) {
-            return 'failed';
+            // 143 and 137 are SIGTERM and SIGKILL, what `docker stop` sends:
+            // unless the kernel's OOM killer sent it, the container was
+            // stopped, not failed.
+            const stoppedBySignal = (state.ExitCode === 137 || state.ExitCode === 143) && !state.OOMKilled;
+            return stoppedBySignal ? 'stopped' : 'failed';
         }
         return isOneShot(service) ? 'completed' : 'stopped';
     }
