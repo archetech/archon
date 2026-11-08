@@ -350,7 +350,7 @@ describe('timeKey', () => {
     });
 
     it('orders entries by it when collecting', async () => {
-        const entries = await collectLogs(docker, [{ service: 'keymaster', id: 'id-keymaster', tty: false }], { tail: 10 });
+        const entries = await collectLogs(docker, [{ service: 'keymaster', id: 'id-keymaster', tty: false, running: true }], { tail: 10 });
         expect(entries.map(e => e.text)).toEqual(['km err', 'km one']);
     });
 });
