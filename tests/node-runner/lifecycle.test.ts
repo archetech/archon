@@ -40,7 +40,7 @@ beforeEach(() => {
                 : { State: { Status: 'running', Running: true } };
         }
     };
-    const nodeConfig = new NodeConfig({ nodeDir, dataDir: join(nodeDir, 'data', 'node-runner'), project: 'archon', compose, docker, healthTimeoutMs: 0, sleep: async () => {} });
+    const nodeConfig = new NodeConfig({ nodeDir, dataDir: join(nodeDir, 'data', 'node-runner'), project: 'archon', compose, docker, healthTimeoutMs: 0, sleep: async () => {}, loadAverage: () => 0, cpuCount: () => 4 });
     lifecycle = new Lifecycle({ project: 'archon', docker, nodeConfig });
 });
 
@@ -203,7 +203,7 @@ describe('actions API', () => {
         const dataDir = join(nodeDir, 'data', 'node-runner');
         const auth = new Auth({ dataDir, log: () => {}, failureDelayMs: 0 });
         const jobs = new JobRunner(dataDir);
-        const app = createApp({ auth, docker, project: 'archon', gitCommit: 'x', jobs, lifecycle, nodeConfig: new NodeConfig({ nodeDir, dataDir, project: 'archon', compose, docker }) });
+        const app = createApp({ auth, docker, project: 'archon', gitCommit: 'x', jobs, lifecycle, nodeConfig: new NodeConfig({ nodeDir, dataDir, project: 'archon', compose, docker, loadAverage: () => 0, cpuCount: () => 4 }) });
         const code = await auth.ensureSetupCode();
         const setup = await request(app).post('/api/setup').send({ code, password: 'correct horse battery' });
         const cookie = (setup.headers['set-cookie'] as unknown as string[])[0].split(';')[0];
