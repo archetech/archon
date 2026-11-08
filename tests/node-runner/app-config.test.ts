@@ -33,7 +33,7 @@ beforeEach(async () => {
     ]);
     const auth = new Auth({ dataDir, log: () => {}, failureDelayMs: 0 });
     jobs = new JobRunner(dataDir);
-    const nodeConfig = new NodeConfig({ nodeDir, dataDir, project: 'archon', compose, docker, healthTimeoutMs: 0, sleep: async () => {} });
+    const nodeConfig = new NodeConfig({ nodeDir, dataDir, project: 'archon', compose, docker, healthTimeoutMs: 0, sleep: async () => {}, loadAverage: () => 0, cpuCount: () => 4 });
     app = createApp({ auth, docker, project: 'archon', gitCommit: 'abc', nodeConfig, jobs });
 
     const code = await auth.ensureSetupCode();

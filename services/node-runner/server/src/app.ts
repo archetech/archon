@@ -4,6 +4,7 @@ import { join } from 'path';
 import { Auth, MIN_PASSWORD_LENGTH, SESSION_TTL_MS } from './auth.js';
 import type { DockerApi } from './docker.js';
 import type { JobRunner } from './jobs.js';
+import { parseActionRequest, type Lifecycle } from './lifecycle.js';
 import { collectLogs, containerSignature, followLogs, parseTail, resolveTargets, timeKey } from './logs.js';
 import type { Draft, NodeConfig } from './node-config.js';
 import { statusReport } from './status.js';
@@ -19,6 +20,7 @@ export interface AppDependencies {
     clientDir?: string | null;
     nodeConfig?: NodeConfig;
     jobs?: JobRunner;
+    lifecycle?: Lifecycle;
     // How often a live log stream checks whether its containers changed.
     watchIntervalMs?: number;
 }
@@ -304,6 +306,33 @@ export function createApp(deps: AppDependencies): express.Express {
                 sendError(res, error);
             }
         });
+
+        const { lifecycle } = deps;
+        if (lifecycle) {
+            api.post('/actions/preview', async (req, res) => {
+                try {
+                    res.json(await lifecycle.preview(parseActionRequest(req.body)));
+                }
+                catch (error) {
+                    sendError(res, error);
+                }
+            });
+
+            api.post('/actions/run', async (req, res) => {
+                try {
+                    if (await jobs.active()) {
+                        res.status(409).json({ error: 'Another job is running' });
+                        return;
+                    }
+                    const { title, work } = await lifecycle.run(parseActionRequest(req.body), req.body?.confirmStateful === true);
+                    const { job } = await jobs.start(title, work);
+                    res.status(202).json({ id: job.id });
+                }
+                catch (error) {
+                    sendError(res, error);
+                }
+            });
+        }
 
         api.get('/jobs', async (_req, res) => {
             res.json({ jobs: await jobs.list() });

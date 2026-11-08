@@ -4,6 +4,7 @@ import { Compose, exec } from './compose.js';
 import { loadConfig } from './config.js';
 import { createDockerApi } from './docker.js';
 import { JobRunner } from './jobs.js';
+import { Lifecycle } from './lifecycle.js';
 import { NodeConfig } from './node-config.js';
 
 async function main(): Promise<void> {
@@ -18,15 +19,17 @@ async function main(): Promise<void> {
     };
 
     const docker = createDockerApi(config.dockerSocket);
-    const compose = new Compose(config.nodeDir, gitCommit);
+    const compose = new Compose(config.nodeDir, gitCommit, exec, config.project);
+    const nodeConfig = new NodeConfig({ nodeDir: config.nodeDir, dataDir: config.dataDir, project: config.project, compose, docker });
     const app = createApp({
         auth,
         docker,
         project: config.project,
         gitCommit: config.gitCommit,
         clientDir: config.clientDir,
-        nodeConfig: new NodeConfig({ nodeDir: config.nodeDir, dataDir: config.dataDir, project: config.project, compose, docker }),
+        nodeConfig,
         jobs: new JobRunner(config.dataDir),
+        lifecycle: new Lifecycle({ project: config.project, docker, nodeConfig }),
     });
 
     app.listen(config.port, () => {
