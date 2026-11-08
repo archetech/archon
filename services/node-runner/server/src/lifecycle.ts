@@ -1,7 +1,7 @@
 import type { DockerApi } from './docker.js';
 import type { JobLog } from './jobs.js';
 import { ConfigError, type NodeConfig, type PlanService } from './node-config.js';
-import { isOneShot, isStateful } from './status.js';
+import { ACTIVE_STATES, isOneShot, isStateful } from './status.js';
 
 export type Action = 'start' | 'stop' | 'restart';
 
@@ -24,10 +24,6 @@ export interface ActionPreview {
 
 const ACTIONS: Action[] = ['start', 'stop', 'restart'];
 
-// Containers a stop or restart acts on: running ones, and ones restarting
-// (a crash loop) or paused.
-export const ACTIVE_STATES = ['running', 'restarting', 'paused'];
-
 function item(service: string): PlanService {
     return { service, stateful: isStateful(service), ...(isOneShot(service) ? { oneShot: true } : {}) };
 }
@@ -49,6 +45,9 @@ export function parseActionRequest(body: unknown): ActionRequest {
 // Starting, stopping and restarting services or the whole node, each previewed
 // and then run as a job like a configuration change.
 export class Lifecycle {
+    // Services a whole-node start builds first, from its latest preview.
+    private build: string[] = [];
+
     constructor(
         private readonly options: { project: string, docker: DockerApi, nodeConfig: NodeConfig },
     ) {}
@@ -98,9 +97,10 @@ export class Lifecycle {
             // same plan a configuration change with no edits would run.
             const { plan } = await this.options.nodeConfig.preview({});
             const services = [...plan.create, ...plan.recreate, ...plan.start];
+            this.build = plan.rebuild.map(s => s.service);
             return {
                 title: 'Start the node',
-                command: 'docker compose up -d',
+                command: this.build.length ? `docker compose build ${this.build.join(' ')} && docker compose up -d --no-build` : 'docker compose up -d --no-build',
                 services,
                 stateful: plan.recreate.filter(s => s.stateful).map(s => s.service),
                 empty: services.length === 0,
@@ -129,6 +129,7 @@ export class Lifecycle {
         }
         const { nodeConfig } = this.options;
         const services = preview.services.map(s => s.service);
+        const build = request.action === 'start' && !request.service ? this.build : [];
         return {
             title: preview.title,
             work: async log => {
@@ -142,7 +143,13 @@ export class Lifecycle {
                     await nodeConfig.runCompose(request.down ? ['down'] : ['stop'], log);
                 }
                 else if (request.action === 'start') {
-                    await nodeConfig.runCompose(['up', '-d'], log);
+                    // Missing or changed images are built under the load
+                    // check; up must not build anything on its own.
+                    if (build.length) {
+                        await nodeConfig.waitForLoad(log);
+                        await nodeConfig.runCompose(['build', ...build], log);
+                    }
+                    await nodeConfig.runCompose(['up', '-d', '--no-build'], log);
                     await nodeConfig.verify(services, log);
                 }
                 else {

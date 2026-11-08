@@ -32,6 +32,7 @@ const SERVICES = {
     'lnbits-init': { profiles: ['lightning'] },
     'react-wallet': { profiles: ['react-wallet'], buildVars: ['ARCHON_REACT_WALLET_GATEKEEPER_URL'] },
     herald: { profiles: ['herald'], vars: ['ARCHON_HERALD_URL'] },
+    explorer: { profiles: ['explorer'], buildVars: ['ARCHON_EXPLORER_URL'] },
 };
 
 let nodeDir: string;
@@ -83,7 +84,9 @@ describe('view', () => {
     it('shows profiles with their services, catalog settings and unknown ones', async () => {
         const view = await config.view();
 
+        expect(view.configError).toBeNull();
         expect(view.profiles).toEqual([
+            { name: 'explorer', description: 'Public DID explorer.', enabled: false, services: ['explorer'] },
             { name: 'herald', description: 'Names and .well-known endpoints.', enabled: false, services: ['herald'] },
             { name: 'lightning', description: 'Core Lightning, LNbits, RTL and the Lightning mediator.', enabled: true, services: ['cln-mainnet-node', 'lightning-mediator', 'lnbits-init'] },
             { name: 'react-wallet', description: 'Browser wallet.', enabled: true, services: ['react-wallet'] },
@@ -175,6 +178,65 @@ describe('preview', () => {
     });
 });
 
+describe('review fixes', () => {
+    it('treats setting an absent key to empty as a change', async () => {
+        const p = await plan({ settings: { ARCHON_HERALD_TOR_PROXY: '' } });
+
+        expect(p.diff).toEqual([{ key: 'ARCHON_HERALD_TOR_PROXY', before: null, after: '', secret: false }]);
+        expect(p.empty).toBe(false);
+    });
+
+    it('loads and previews a repair when Compose rejects the current .env', async () => {
+        await config.view();
+        compose.currentInvalid = 'include docker/compose/gatekeeper-typo.yml: no such file';
+
+        const view = await config.view();
+        expect(view.configError).toBe(compose.currentInvalid);
+        expect(view.profiles.map(p => p.name)).toEqual(['explorer', 'herald', 'lightning', 'react-wallet']);
+
+        const p = await plan({ settings: { ARCHON_NODE_NAME: 'fixed' } });
+        expect(p.diff.map(d => d.key)).toEqual(['ARCHON_NODE_NAME']);
+    });
+
+    it('rebuilds a service whose profile this change enables, if its build changed', async () => {
+        const p = await plan({ profiles: ['lightning', 'react-wallet', 'explorer'], settings: { ARCHON_EXPLORER_URL: 'http://explorer:4000' } });
+
+        expect(p.rebuild).toEqual(['explorer']);
+    });
+
+    it('builds a buildable service with no image under the load check, rather than leaving it to up', async () => {
+        docker.missingImages.add('archon-react-wallet');
+
+        const p = await plan({ settings: { ARCHON_NODE_NAME: 'beta' } });
+
+        expect(p.rebuild).toEqual(['react-wallet']);
+    });
+
+    it('stops a crash-looping container whose profile was removed', async () => {
+        docker.containers.find(c => c.service === 'lightning-mediator')!.inspect = { State: { Status: 'restarting', Running: true, Restarting: true } };
+
+        const p = await plan({ profiles: ['react-wallet'] });
+
+        expect(p.stop).toEqual(['cln-mainnet-node', 'lightning-mediator']);
+    });
+
+    it('refuses to apply when .env changed after the review', async () => {
+        const { work } = await config.apply({ settings: { ARCHON_NODE_NAME: 'beta' } }, false);
+        writeFileSync(join(nodeDir, '.env'), ENV.replace('alpha', 'edited by hand'));
+
+        await expect(work(() => {})).rejects.toMatchObject({ status: 409, message: '.env changed since this change was reviewed; review it again' });
+        expect(readFileSync(join(nodeDir, '.env'), 'utf-8')).toContain('edited by hand');
+    });
+
+    it('fails verification for a touched service that is stopped or missing', async () => {
+        docker.containers.find(c => c.service === 'gatekeeper')!.inspect = { State: { Status: 'exited', Running: false, ExitCode: 0 } };
+        const lines: string[] = [];
+
+        await expect(config.verify(['gatekeeper', 'herald'], line => lines.push(line))).rejects.toThrow('Not healthy: gatekeeper, herald');
+        expect(lines).toContain('  herald: no container');
+    });
+});
+
 describe('apply', () => {
     async function run(draft: Draft, confirm = false) {
         const { title, work } = await config.apply(draft, confirm);
@@ -196,8 +258,8 @@ describe('apply', () => {
         expect(readFileSync(join(dataDir, 'env-backups', backups[0]), 'utf-8')).toBe(ENV);
         expect(statSync(join(dataDir, 'env-backups', backups[0])).mode & 0o777).toBe(0o600);
 
-        expect(compose.commands).toEqual([['up', '-d']]);
-        expect(lines).toContain('$ docker compose up -d');
+        expect(compose.commands).toEqual([['up', '-d', '--no-build']]);
+        expect(lines).toContain('$ docker compose up -d --no-build');
         expect(lines.at(-1)).toBe('Done.');
     });
 
@@ -207,7 +269,7 @@ describe('apply', () => {
         expect(compose.commands).toEqual([
             ['build', 'react-wallet'],
             ['stop', 'cln-mainnet-node', 'lightning-mediator'],
-            ['up', '-d'],
+            ['up', '-d', '--no-build'],
         ]);
     });
 

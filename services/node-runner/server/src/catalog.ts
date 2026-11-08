@@ -24,10 +24,18 @@ const SETTING = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/;
 const COMMENTED_SETTING = /^#\s?([A-Z_][A-Z0-9_]*)=(.*)$/;
 
 // Settings shown write-only: their value is never sent back to the browser.
-const SECRET = /(API_KEY|SECRET|PASSPHRASE|PASSWORD|_RUNE$|TOKEN|MNEMONIC|PRIVATE_KEY|MACAROON|SEED)/;
+const SECRET = /(API_KEY|SECRET|PASSPHRASE|PASSWORD|_PASS$|_RUNE$|TOKEN|MNEMONIC|PRIVATE_KEY|MACAROON|SEED)/;
+// RPC provider URLs carry API keys in their path or query (sample.env shows
+// `.../v2/<api-key>`), so they are treated as credentials too.
+const SECRET_URL = /_RPC_URL$/;
+// Any URL with a user and password in it.
+const URL_WITH_CREDENTIALS = /:\/\/[^/\s:@]+:[^/\s@]+@/;
 
-export function isSecret(key: string): boolean {
-    return SECRET.test(key) && !/_(URL|FILE|PATH|NAME)$/.test(key);
+export function isSecret(key: string, value?: string): boolean {
+    if (value !== undefined && URL_WITH_CREDENTIALS.test(value)) {
+        return true;
+    }
+    return SECRET_URL.test(key) || (SECRET.test(key) && !/_(URL|FILE|PATH|NAME)$/.test(key));
 }
 
 // Settings the operator does not edit as plain values. Profiles have their own

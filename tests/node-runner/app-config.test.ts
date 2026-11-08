@@ -92,7 +92,7 @@ describe('configuration API', () => {
 
         const job = await finished(res.body.id);
         expect(job).toMatchObject({ title: 'Apply 1 configuration change', status: 'succeeded' });
-        expect(job.lines.map((l: { text: string }) => l.text)).toContain('$ docker compose up -d');
+        expect(job.lines.map((l: { text: string }) => l.text)).toContain('$ docker compose up -d --no-build');
         expect(readFileSync(join(nodeDir, '.env'), 'utf-8')).toContain('ARCHON_NODE_NAME=beta');
 
         const list = await request(app).get('/api/jobs').set('Cookie', cookie).expect(200);

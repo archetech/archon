@@ -74,6 +74,39 @@ describe('JobRunner', () => {
         expect(events).toEqual(['line:hello', 'end:succeeded']);
     });
 
+    it('releases the slot when the job cannot be recorded', async () => {
+        const jobs = new JobRunner(join(dataDir, 'jobs.json', 'not-a-dir'));
+        writeFileSync(join(dataDir, 'jobs.json'), '[]');
+
+        await expect(jobs.start('Unrecordable', async () => {})).rejects.toThrow();
+        expect(await jobs.active()).toBeUndefined();
+    });
+
+    it('saves a running job\'s output, so a restart keeps it', async () => {
+        const jobs = new JobRunner(dataDir);
+        let release!: () => void;
+        const { job, done } = await jobs.start('Long', async log => {
+            log('backed up .env to somewhere');
+            await new Promise<void>(resolve => { release = resolve; });
+        });
+        await new Promise(resolve => setTimeout(resolve, 1300));
+
+        const saved = JSON.parse(readFileSync(join(dataDir, 'jobs.json'), 'utf-8'));
+        expect(saved.find((j: { id: string }) => j.id === job.id).lines.map((l: { text: string }) => l.text)).toEqual(['backed up .env to somewhere']);
+        release();
+        await done;
+    });
+
+    it('keeps the history file whole when saves overlap', async () => {
+        const jobs = new JobRunner(dataDir);
+        for (let i = 0; i < 5; i++) {
+            const { done } = await jobs.start(`Job ${i}`, async log => log(`line ${i}`));
+            await done;
+        }
+
+        expect(JSON.parse(readFileSync(join(dataDir, 'jobs.json'), 'utf-8')).map((j: { title: string }) => j.title)).toEqual(['Job 4', 'Job 3', 'Job 2', 'Job 1', 'Job 0']);
+    });
+
     it('marks a job cut short by a restart as failed, and keeps 20 jobs', async () => {
         writeFileSync(join(dataDir, 'jobs.json'), JSON.stringify(Array.from({ length: 20 }, (_, i) => ({
             id: `j${i}`, title: `Job ${i}`, status: i === 0 ? 'running' : 'succeeded', startedAt: '2026-11-08T10:00:00Z', finishedAt: null, error: null, lines: [],

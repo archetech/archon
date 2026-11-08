@@ -56,6 +56,9 @@ export function groupOf(service: string): Group {
 // store, and Lightning nodes with open channels.
 const STATEFUL = /^(redis|mongodb|ipfs|lnbits)$|^cln-|^(bitcoind|zebra)/;
 
+// Container states a stop acts on: running, a restart loop, or paused.
+export const ACTIVE_STATES = ['running', 'restarting', 'paused'];
+
 export function isStateful(service: string): boolean {
     return STATEFUL.test(service);
 }

@@ -8,7 +8,7 @@ import type { DockerApi } from './docker.js';
 import { applyChanges, envValues, parseEnv, VALID_KEY } from './envfile.js';
 import type { JobLog } from './jobs.js';
 import { PROFILE_DESCRIPTIONS, pairingWarnings, parseProfiles, type Warning } from './profiles.js';
-import { isOneShot, isStateful, statusReport } from './status.js';
+import { ACTIVE_STATES, isOneShot, isStateful, statusReport } from './status.js';
 
 export class ConfigError extends Error {
     constructor(message: string, readonly status = 400) {
@@ -37,6 +37,9 @@ export interface ConfigView {
     profiles: { name: string, description: string, enabled: boolean, services: string[] }[];
     sections: { name: string, settings: SettingView[] }[];
     warnings: Warning[];
+    // Compose's error when the current .env does not make a valid
+    // configuration. The page still loads, so the mistake can be repaired.
+    configError: string | null;
 }
 
 export interface DiffLine {
@@ -63,6 +66,8 @@ export interface Plan {
 }
 
 export interface Preview {
+    // The .env the preview was made from; applying refuses if it changed.
+    source: string;
     diff: DiffLine[];
     warnings: Warning[];
     plan: Plan;
@@ -84,13 +89,27 @@ export interface NodeConfigOptions {
 }
 
 const MAX_BACKUPS = 20;
+// Profile names and their services from the last valid configuration.
+const PROFILES_CACHE = 'profiles.json';
 const LOAD_WAIT_MS = 10 * 60 * 1000;
 const POLL_MS = 5000;
 
 const realSleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
+// An absent key and an empty one differ: `${KEY-default}` uses the default
+// only when the key is absent.
 function changedKeys(before: Map<string, string>, after: Map<string, string>): string[] {
-    return [...new Set([...before.keys(), ...after.keys()])].filter(key => (before.get(key) ?? '') !== (after.get(key) ?? ''));
+    return [...new Set([...before.keys(), ...after.keys()])].filter(key => before.has(key) !== after.has(key) || before.get(key) !== after.get(key));
+}
+
+function profileMap(config: ComposeConfig): Record<string, string[]> {
+    const map: Record<string, string[]> = {};
+    for (const [service, def] of Object.entries(config.services)) {
+        for (const profile of def.profiles ?? []) {
+            (map[profile] ??= []).push(service);
+        }
+    }
+    return map;
 }
 
 function plain(names: Iterable<string>): PlanService[] {
@@ -136,19 +155,26 @@ export class NodeConfig {
     async view(): Promise<ConfigView> {
         const values = envValues(parseEnv(await this.readEnv()));
         const { sections, byKey } = await this.catalog();
-        const all = await this.options.compose.config(undefined, true);
         const enabled = new Set(parseProfiles(values.get('COMPOSE_PROFILES')));
 
-        const servicesByProfile = new Map<string, string[]>();
-        for (const [service, def] of Object.entries(all.services)) {
-            for (const profile of def.profiles ?? []) {
-                servicesByProfile.set(profile, [...(servicesByProfile.get(profile) ?? []), service]);
+        let configError: string | null = null;
+        let profiles: Record<string, string[]>;
+        try {
+            profiles = profileMap(await this.options.compose.config(undefined, true));
+            await fs.mkdir(this.options.dataDir, { recursive: true });
+            await fs.writeFile(join(this.options.dataDir, PROFILES_CACHE), JSON.stringify(profiles), { mode: 0o600 });
+        }
+        catch (error) {
+            configError = error instanceof Error ? error.message : String(error);
+            profiles = await fs.readFile(join(this.options.dataDir, PROFILES_CACHE), 'utf-8').then(JSON.parse, () => ({}));
+            for (const name of enabled) {
+                profiles[name] ??= [];
             }
         }
 
         const view = (setting: CatalogSetting | null, key: string): SettingView => {
-            const secret = setting?.secret ?? isSecret(key);
             const value = values.get(key);
+            const secret = (setting?.secret ?? false) || isSecret(key, value);
             return {
                 key,
                 description: setting?.description ?? '',
@@ -163,17 +189,18 @@ export class NodeConfig {
 
         const unknown = [...values.keys()].filter(key => !byKey.has(key) && !MANAGED_KEYS.has(key));
         return {
-            profiles: [...servicesByProfile.keys()].sort().map(name => ({
+            profiles: Object.keys(profiles).sort().map(name => ({
                 name,
                 description: PROFILE_DESCRIPTIONS[name] ?? '',
                 enabled: enabled.has(name),
-                services: (servicesByProfile.get(name) ?? []).sort(),
+                services: [...profiles[name]].sort(),
             })),
             sections: [
                 ...sections.map(section => ({ name: section.name, settings: section.settings.map(s => view(s, s.key)) })),
                 ...(unknown.length ? [{ name: 'Other settings in .env', settings: unknown.map(key => view(null, key)) }] : []),
             ],
             warnings: pairingWarnings([...enabled], values, byKey),
+            configError,
         };
     }
 
@@ -182,7 +209,7 @@ export class NodeConfig {
         return this.options.compose.config();
     }
 
-    private draftChanges(draft: Draft, known: Set<string>, current: string[]): Record<string, string> {
+    private draftChanges(draft: Draft, current: string[]): Record<string, string> {
         const changes: Record<string, string> = {};
         for (const [key, value] of Object.entries(draft.settings ?? {})) {
             if (!VALID_KEY.test(key)) {
@@ -197,9 +224,8 @@ export class NodeConfig {
             changes[key] = value;
         }
         if (draft.profiles !== undefined) {
-            const unknown = draft.profiles.filter(p => !known.has(p));
-            if (unknown.length) {
-                throw new ConfigError(`Unknown profile: ${unknown.join(', ')}`);
+            if (draft.profiles.some(p => typeof p !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(p))) {
+                throw new ConfigError('Not a valid profile name');
             }
             // Profiles kept stay where the operator put them; new ones go last.
             const wanted = new Set(draft.profiles);
@@ -223,25 +249,34 @@ export class NodeConfig {
         }
     }
 
+    // Profiles are checked against the candidate configuration, not the
+    // current one, so a .env Compose rejects can still be repaired here.
     async preview(draft: Draft): Promise<Preview & { text: string }> {
         const current = await this.readEnv();
         const { byKey } = await this.catalog();
-        const all = await this.options.compose.config(undefined, true);
-        const known = new Set(Object.values(all.services).flatMap(s => s.profiles ?? []));
         const before = envValues(parseEnv(current));
-        const text = applyChanges(current, this.draftChanges(draft, known, parseProfiles(before.get('COMPOSE_PROFILES'))));
+        const text = applyChanges(current, this.draftChanges(draft, parseProfiles(before.get('COMPOSE_PROFILES'))));
 
         const after = envValues(parseEnv(text));
         const diff: DiffLine[] = changedKeys(before, after).map(key => {
-            const secret = byKey.get(key)?.secret ?? isSecret(key);
+            const secret = (byKey.get(key)?.secret ?? false) || isSecret(key, before.get(key)) || isSecret(key, after.get(key));
             return { key, before: secret ? null : before.get(key) ?? null, after: secret ? null : after.get(key) ?? null, secret };
         });
 
         const { hashes, nowConfig, draftConfig } = await this.withDraftFile(text, async path => {
             await this.options.compose.validate(path);
+            const candidate = await this.options.compose.config(path, true);
+            const known = new Set(Object.keys(profileMap(candidate)));
+            const unknown = (draft.profiles ?? []).filter(p => !known.has(p));
+            if (unknown.length) {
+                throw new ConfigError(`Unknown profile: ${unknown.join(', ')}`);
+            }
             return {
                 hashes: await this.options.compose.hashes(path),
-                nowConfig: await this.options.compose.config(),
+                // Every service's current build, enabled or not, so a service
+                // whose profile this change enables is compared too. Null when
+                // the current .env is invalid.
+                nowConfig: await this.options.compose.config(undefined, true).catch(() => null),
                 draftConfig: await this.options.compose.config(path),
             };
         });
@@ -253,6 +288,7 @@ export class NodeConfig {
         const empty = diff.length === 0;
         return {
             text,
+            source: current,
             diff,
             warnings: pairingWarnings(parseProfiles(after.get('COMPOSE_PROFILES')), after, byKey),
             plan,
@@ -265,7 +301,7 @@ export class NodeConfig {
     // Compose decides it: a container is recreated when its config-hash label
     // differs from the service's hash. Build arguments are not part of that
     // hash, so a service whose build changed is rebuilt first.
-    private async plan(hashes: Map<string, string>, nowConfig: ComposeConfig, draftConfig: ComposeConfig): Promise<Plan> {
+    private async plan(hashes: Map<string, string>, nowConfig: ComposeConfig | null, draftConfig: ComposeConfig): Promise<Plan> {
         const containers = await this.options.docker.listContainers(this.options.project);
         const byService = new Map(containers.map(c => [c.Labels['com.docker.compose.service'], c]));
         const create: string[] = [];
@@ -302,13 +338,23 @@ export class NodeConfig {
         }
 
         const stop = containers
-            .filter(c => c.State === 'running' && !hashes.has(c.Labels['com.docker.compose.service']))
+            .filter(c => ACTIVE_STATES.includes(c.State) && !hashes.has(c.Labels['com.docker.compose.service']))
             .map(c => c.Labels['com.docker.compose.service']);
 
-        const rebuild = Object.entries(draftConfig.services)
-            .filter(([service, def]) => def.build && nowConfig.services[service]?.build
-                && JSON.stringify(def.build) !== JSON.stringify(nowConfig.services[service].build))
-            .map(([service]) => service);
+        // Built first, under the load check: services whose build changed, and
+        // buildable services with no image yet, which `up` would otherwise
+        // build on its own.
+        const rebuild = (await Promise.all(Object.entries(draftConfig.services).map(async ([service, def]) => {
+            if (!def.build) {
+                return null;
+            }
+            const was = nowConfig?.services[service]?.build;
+            if (was && JSON.stringify(def.build) !== JSON.stringify(was)) {
+                return service;
+            }
+            const image = def.image ?? `${this.options.project}-${service}`;
+            return (await this.options.docker.imageId(image)) === null ? service : null;
+        }))).filter(Boolean) as string[];
 
         const starts = await Promise.all(plain(start).map(async item => {
             const inspect = await this.options.docker.inspect(byService.get(item.service)!.Id);
@@ -380,9 +426,15 @@ export class NodeConfig {
             const pending = touched.filter(s => s.health === 'starting' || s.health === 'restarting');
             if (!pending.length || Date.now() > deadline) {
                 touched.forEach(s => log(`  ${s.service}: ${s.health}`));
-                const bad = touched.filter(s => ['unhealthy', 'failed', 'restarting', 'starting'].includes(s.health));
+                // Healthy or running counts; completed only for an init
+                // container; a missing service counts as a failure.
+                const ok = (s: { service: string, health: string }) => s.health === 'healthy' || s.health === 'running'
+                    || (s.health === 'completed' && isOneShot(s.service));
+                const missing = services.filter(name => !touched.some(s => s.service === name));
+                missing.forEach(name => log(`  ${name}: no container`));
+                const bad = [...touched.filter(s => !ok(s)).map(s => s.service), ...missing];
                 if (bad.length) {
-                    throw new Error(`Not healthy: ${bad.map(s => s.service).join(', ')}`);
+                    throw new Error(`Not healthy: ${bad.join(', ')}`);
                 }
                 return;
             }
@@ -406,7 +458,11 @@ export class NodeConfig {
             title: `Apply ${count} configuration change${count === 1 ? '' : 's'}`,
             work: async log => {
                 const { plan } = preview;
-                await this.backup(await this.readEnv(), log);
+                const current = await this.readEnv();
+                if (current !== preview.source) {
+                    throw new ConfigError('.env changed since this change was reviewed; review it again', 409);
+                }
+                await this.backup(current, log);
                 await this.writeEnv(preview.text);
                 log(`Wrote ${this.envPath}`);
                 if (plan.rebuild.length) {
@@ -417,7 +473,8 @@ export class NodeConfig {
                     await this.runCompose(['stop', ...plan.stop.map(s => s.service)], log);
                 }
                 if (plan.create.length || plan.recreate.length || plan.start.length || plan.rebuild.length) {
-                    await this.runCompose(['up', '-d'], log);
+                    // Builds happened above, under the load check.
+                    await this.runCompose(['up', '-d', '--no-build'], log);
                 }
                 await this.verify([...plan.create, ...plan.recreate, ...plan.start, ...plan.rebuild].map(s => s.service), log);
                 log('Done.');

@@ -122,6 +122,12 @@ export default function ConfigPage({ draft, onDraft, onReview, onUnauthorized }:
                 </Typography>
             </Box>
 
+            {view.configError && (
+                <Alert severity="error">
+                    Compose rejects the current .env: {view.configError}. Fix the setting below and apply; the review checks the corrected file.
+                </Alert>
+            )}
+
             {view.warnings.map(w => (
                 <Alert key={w.message} severity="warning" action={w.fix && <Button color="inherit" size="small" onClick={() => fix(w)}>{w.fix.label}</Button>}>
                     {w.message}

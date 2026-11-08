@@ -70,6 +70,8 @@ beforeEach(() => {
     docker = new FakeDocker(['gatekeeper', 'cln-mainnet-node', 'redis'].map(service => ({
         service, hash: compose.currentHash(service), imageId: `sha:${service}:old`,
     })));
+    // Each container runs the image its name points at, until a build moves it.
+    ['gatekeeper', 'cln-mainnet-node', 'redis'].forEach(service => docker.images.set(`archon-${service}`, `sha:${service}:old`));
     dockerCalls = [];
     helper = { log: 'Building node-runner\nContainer recreated\n', status: '0' };
     dataDir = join(nodeDir, 'data', 'node-runner');
@@ -154,7 +156,7 @@ describe('run', () => {
         const lines = await run();
 
         expect(git(nodeDir, 'describe', '--tags')).toBe('v0.2.0');
-        expect(compose.commands).toEqual([['build'], ['up', '-d']]);
+        expect(compose.commands).toEqual([['build'], ['up', '-d', '--no-build']]);
         expect(lines).toContain('  gatekeeper: running');
         expect(dockerCalls).toEqual([]);
     });
@@ -182,7 +184,7 @@ describe('run', () => {
         const status = await updates.status(false);
         expect(status).toMatchObject({ unfinished: true, target: { label: 'v0.2.0' } });
         await run(['cln-mainnet-node']);
-        expect(compose.commands).toEqual([['build'], ['build'], ['up', '-d']]);
+        expect(compose.commands).toEqual([['build'], ['build'], ['up', '-d', '--no-build']]);
         expect((await updates.status(false)).unfinished).toBe(false);
     });
 
@@ -192,7 +194,7 @@ describe('run', () => {
 
         await run(['cln-mainnet-node']);
 
-        expect(compose.commands).toEqual([['build'], ['up', '-d']]);
+        expect(compose.commands).toEqual([['build'], ['up', '-d', '--no-build']]);
     });
 
     it('refuses to run over local changes, or with nothing to update to', async () => {

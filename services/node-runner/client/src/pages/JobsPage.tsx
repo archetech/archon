@@ -32,6 +32,9 @@ function JobOutput({ id }: { id: string }) {
         setLines([]);
         setEnd(null);
         const source = new EventSource(api.jobStreamUrl(id));
+        // Each connection, including an automatic reconnect, replays the
+        // job's output from the start.
+        source.onopen = () => setLines([]);
         source.addEventListener('line', e => setLines(current => [...current, JSON.parse((e as MessageEvent).data)]));
         source.addEventListener('end', e => {
             setEnd(JSON.parse((e as MessageEvent).data));

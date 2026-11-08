@@ -33,6 +33,9 @@ export type JobWork = (log: JobLog, id: string) => Promise<void>;
 const MAX_LINES = 5000;
 const MAX_HISTORY = 20;
 const HISTORY_FILE = 'jobs.json';
+// How long new output of a running job waits before it is saved, so a
+// restart mid-job keeps what it had printed.
+const OUTPUT_SAVE_MS = 1000;
 
 // Runs one job at a time, server-side, so it carries on when the browser
 // that started it goes away. Output is kept per job and the last jobs are
@@ -41,6 +44,8 @@ export class JobRunner {
     private jobs: Job[] = [];
     private readonly listeners = new Map<string, Set<(event: { line?: JobLine, job: JobSummary }) => void>>();
     private loading: Promise<void> | null = null;
+    private saving: Promise<void> = Promise.resolve();
+    private outputTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor(private readonly dataDir: string, private readonly now: () => Date = () => new Date()) {}
 
@@ -68,9 +73,30 @@ export class JobRunner {
         }
     }
 
-    private async save(): Promise<void> {
-        await fs.mkdir(this.dataDir, { recursive: true });
-        await fs.writeFile(this.historyPath, JSON.stringify(this.jobs.slice(0, MAX_HISTORY)), { mode: 0o600 });
+    // Saves run one after another, each replacing the file in one rename, so
+    // overlapping saves cannot interleave or leave half-written JSON.
+    private save(): Promise<void> {
+        const write = async () => {
+            await fs.mkdir(this.dataDir, { recursive: true });
+            const tmp = `${this.historyPath}.${randomBytes(4).toString('hex')}`;
+            await fs.writeFile(tmp, JSON.stringify(this.jobs.slice(0, MAX_HISTORY)), { mode: 0o600 });
+            await fs.rename(tmp, this.historyPath);
+        };
+        const next = this.saving.then(write, write);
+        this.saving = next.catch(() => {});
+        return next;
+    }
+
+    private saveOutputSoon(): void {
+        if (this.outputTimer) {
+            return;
+        }
+        this.outputTimer = setTimeout(() => {
+            this.outputTimer = null;
+            this.save().catch(() => {});
+        }, OUTPUT_SAVE_MS);
+        // A pending save must not keep the process alive on its own.
+        this.outputTimer.unref?.();
     }
 
     private summary(job: Job): JobSummary {
@@ -124,7 +150,14 @@ export class JobRunner {
         };
         this.jobs.unshift(job);
         this.jobs = this.jobs.slice(0, MAX_HISTORY);
-        await this.save();
+        try {
+            await this.save();
+        }
+        catch (error) {
+            // Not recorded, so not started: release the slot.
+            this.jobs = this.jobs.filter(j => j !== job);
+            throw error;
+        }
         return { job, done: this.execute(job, work) };
     }
 
@@ -149,6 +182,7 @@ export class JobRunner {
                 job.lines.splice(0, job.lines.length - MAX_LINES);
             }
             this.emit(job, line);
+            this.saveOutputSoon();
         };
 
         return (async () => {

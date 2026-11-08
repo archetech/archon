@@ -373,7 +373,8 @@ export class Updates {
                     return;
                 }
                 if (touched.length) {
-                    await nodeConfig.runCompose(['up', '-d'], log);
+                    // Everything was built above, under the load check.
+                    await nodeConfig.runCompose(['up', '-d', '--no-build'], log);
                     await nodeConfig.verify(touched.map(s => s.service), log);
                 }
                 else {

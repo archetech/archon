@@ -63,8 +63,10 @@ export function inspectOf(container: FakeContainer): ContainerInspect {
 export class FakeDocker implements DockerApi {
     readonly followed: PassThrough[] = [];
     readonly logCalls: { id: string, options: LogOptions }[] = [];
-    // What each image name currently refers to.
+    // What each image name currently refers to; every image exists unless
+    // listed in `missingImages`.
     readonly images = new Map<string, string>();
+    readonly missingImages = new Set<string>();
 
     constructor(readonly containers: FakeContainer[], readonly project = 'archon') {}
 
@@ -89,7 +91,7 @@ export class FakeDocker implements DockerApi {
     }
 
     async imageId(name: string): Promise<string | null> {
-        return this.images.get(name) ?? null;
+        return this.missingImages.has(name) ? null : this.images.get(name) ?? `sha:${name}`;
     }
 
     async inspect(id: string): Promise<ContainerInspect> {
@@ -137,7 +139,12 @@ export interface FakeService {
 export class FakeCompose implements ComposeApi {
     readonly commands: string[][] = [];
     invalid: string | null = null;
+    // Compose rejects the node's own .env, but a candidate file is judged on
+    // its contents.
+    currentInvalid: string | null = null;
     failing: string | null = null;
+    // Called with each command, so a test can make it take effect.
+    onCommand: ((args: string[]) => void) | null = null;
 
     constructor(private readonly nodeDir: string, private readonly services: Record<string, FakeService>) {}
 
@@ -174,6 +181,9 @@ export class FakeCompose implements ComposeApi {
     }
 
     async config(envFile?: string, allProfiles = false): Promise<ComposeConfig> {
+        if (!envFile && this.currentInvalid) {
+            throw new ComposeError(this.currentInvalid, 400);
+        }
         const values = this.values(envFile);
         return {
             name: 'archon',
@@ -191,6 +201,7 @@ export class FakeCompose implements ComposeApi {
 
     async command(args: string[], options: { onLine?: (line: string) => void } = {}): Promise<CommandResult> {
         this.commands.push(args);
+        this.onCommand?.(args);
         options.onLine?.(`fake: ${args.join(' ')}`);
         return { code: this.failing === args[0] ? 1 : 0, stdout: '', stderr: '' };
     }
