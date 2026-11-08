@@ -125,11 +125,11 @@ export class Updates {
     private async statefulAtRisk(): Promise<string[]> {
         const config = await this.options.nodeConfig.composeConfig();
         const built = Object.entries(config.services).filter(([name, def]) => def.build && isStateful(name)).map(([name]) => name);
-        // Without a .env there is no plan to read; status still reports.
-        const stale = await this.options.nodeConfig.preview({}).then(
-            ({ plan }) => plan.recreate.filter(s => s.stateful).map(s => s.service),
-            () => [] as string[],
-        );
+        // Without a .env there is no plan to read, and status still reports.
+        // Any other planning failure is real, and surfaces.
+        const stale = await this.options.nodeConfig.envExists()
+            ? (await this.options.nodeConfig.preview({})).plan.recreate.filter(s => s.stateful).map(s => s.service)
+            : [];
         return [...new Set([...built, ...stale])].sort();
     }
 

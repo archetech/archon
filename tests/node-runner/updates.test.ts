@@ -300,6 +300,17 @@ describe('run', () => {
     });
 });
 
+describe('status without a plan', () => {
+    it('reports on a node with no .env, but surfaces any other planning failure', async () => {
+        rmSync(join(nodeDir, '.env'));
+        await expect(updates.status(false)).resolves.toMatchObject({ statefulAtRisk: ['cln-mainnet-node'] });
+
+        writeFileSync(join(nodeDir, '.env'), 'X=1\n');
+        compose.invalid = 'invalid interpolation format';
+        await expect(updates.status(false)).rejects.toMatchObject({ status: 400, message: 'invalid interpolation format' });
+    });
+});
+
 describe('history and branches', () => {
     it('unshallows the installer\'s depth-1 clone before judging ancestry', async () => {
         upstreamCommit(upstream, 'a.txt', 'unreleased work');
