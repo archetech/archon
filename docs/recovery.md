@@ -2,7 +2,7 @@
 
 Multi-step operations for getting a node back after losing state. These are
 procedures rather than symptoms — for "X is not working", see
-[Troubleshooting](deployment.md#12-troubleshooting).
+[Troubleshooting](deployment.md#13-troubleshooting).
 
 ## Table of Contents
 
