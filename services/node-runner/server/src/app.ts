@@ -5,7 +5,7 @@ import { Auth, MIN_PASSWORD_LENGTH, SESSION_TTL_MS } from './auth.js';
 import type { DockerApi } from './docker.js';
 import type { JobRunner } from './jobs.js';
 import { parseActionRequest, type Lifecycle } from './lifecycle.js';
-import { collectLogs, followLogs, parseTail, resolveTargets, timeKey } from './logs.js';
+import { collectLogs, containerSignature, followLogs, parseTail, resolveTargets, timeKey } from './logs.js';
 import type { Draft, NodeConfig } from './node-config.js';
 import { statusReport } from './status.js';
 
@@ -21,6 +21,8 @@ export interface AppDependencies {
     nodeConfig?: NodeConfig;
     jobs?: JobRunner;
     lifecycle?: Lifecycle;
+    // How often a live log stream checks whether its containers changed.
+    watchIntervalMs?: number;
 }
 
 export function readCookie(header: string | undefined, name: string): string | undefined {
@@ -240,9 +242,10 @@ export function createApp(deps: AppDependencies): express.Express {
             sseHeaders(res);
             const heartbeat = setInterval(() => res.write(': ping\n\n'), 25000);
             controller.signal.addEventListener('abort', () => clearInterval(heartbeat), { once: true });
+            const services = serviceList(req.query.services);
             await followLogs(docker, targets, { tail: parseTail(req.query.tail, 200), since: sinceSeconds(req.query.since) }, entry => {
                 res.write(`event: log\ndata: ${JSON.stringify({ ...entry, key: timeKey(entry.time) })}\n\n`);
-            }, controller.signal);
+            }, controller.signal, { signature: () => containerSignature(docker, project, services), intervalMs: deps.watchIntervalMs ?? 5000 });
             res.end();
         }
         catch (error) {
