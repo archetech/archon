@@ -1,0 +1,33 @@
+# node-runner runs as its own Compose project, so `docker compose down` on the
+# node does not stop it. Start it with ./node-runner from the node directory,
+# which sets the variables marked required below.
+name: archon-node-runner
+
+services:
+  node-runner:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.node-runner
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/node-runner
+    restart: unless-stopped
+    # The invoking user, plus the Docker socket's group. Files node-runner
+    # writes in the node directory stay owned by the operator, not root.
+    user: "${NODE_RUNNER_UID:?run node-runner with ./node-runner}:${NODE_RUNNER_GID:?run node-runner with ./node-runner}"
+    group_add:
+      - "${NODE_RUNNER_DOCKER_GID:?run node-runner with ./node-runner}"
+    environment:
+      - ARCHON_NODE_RUNNER_NODE_DIR=${NODE_RUNNER_NODE_DIR:?run node-runner with ./node-runner}
+      - ARCHON_NODE_RUNNER_DATA_DIR=${NODE_RUNNER_NODE_DIR}/data/node-runner
+    # Loopback by default: the Docker socket is root on the host. Reach it
+    # through an SSH tunnel, a VPN or your own reverse proxy.
+    ports:
+      - "${ARCHON_NODE_RUNNER_HOST_BIND:-127.0.0.1}:${ARCHON_NODE_RUNNER_PORT:-4280}:4280"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # The node directory at the path the host uses, so Compose resolves its
+      # relative paths the same way inside node-runner as in a shell. Read
+      # only, apart from node-runner's own data directory.
+      - ${NODE_RUNNER_NODE_DIR}:${NODE_RUNNER_NODE_DIR}:ro
+      - ${NODE_RUNNER_NODE_DIR}/data/node-runner:${NODE_RUNNER_NODE_DIR}/data/node-runner

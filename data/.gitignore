@@ -12,3 +12,5 @@ drawbridge/*
 !drawbridge/.gitkeep
 cashu-mint/*
 !cashu-mint/.gitkeep
+node-runner/*
+!node-runner/.gitkeep

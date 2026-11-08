@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Runs node-runner's own Compose project for the node in this directory.
+#
+#   ./node-runner up -d --build     start or update it
+#   ./node-runner logs -f           follow its log (the setup code is printed there)
+#   ./node-runner down              stop it; the node keeps running
+set -euo pipefail
+
+cd "$(dirname "$(readlink -f "$0")")"
+
+socket=/var/run/docker.sock
+[ -S "$socket" ] || { echo "node-runner: no Docker socket at $socket" >&2; exit 1; }
+
+export NODE_RUNNER_NODE_DIR="$PWD"
+export NODE_RUNNER_UID="$(id -u)"
+export NODE_RUNNER_GID="$(id -g)"
+export NODE_RUNNER_DOCKER_GID="$(stat -c %g "$socket")"
+export GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+
+# Only node-runner's own settings come from the node's .env. Passing the whole
+# file would let its COMPOSE_PROJECT_NAME put node-runner in the node's project.
+setting() {
+    [ -f .env ] || return 0
+    sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" .env | tail -n 1 | sed "s/^[\"']//; s/[\"'][[:space:]]*$//; s/[[:space:]]*$//"
+}
+export ARCHON_NODE_RUNNER_HOST_BIND="${ARCHON_NODE_RUNNER_HOST_BIND:-$(setting ARCHON_NODE_RUNNER_HOST_BIND)}"
+export ARCHON_NODE_RUNNER_PORT="${ARCHON_NODE_RUNNER_PORT:-$(setting ARCHON_NODE_RUNNER_PORT)}"
+
+mkdir -p data/node-runner
+
+exec docker compose -p archon-node-runner -f docker/node-runner/compose.yml "$@"
