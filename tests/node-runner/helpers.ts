@@ -140,6 +140,8 @@ export class FakeCompose implements ComposeApi {
     // its contents.
     currentInvalid: string | null = null;
     failing: string | null = null;
+    // Called with each command, so a test can make it take effect.
+    onCommand: ((args: string[]) => void) | null = null;
 
     constructor(private readonly nodeDir: string, private readonly services: Record<string, FakeService>) {}
 
@@ -196,6 +198,7 @@ export class FakeCompose implements ComposeApi {
 
     async command(args: string[], options: { onLine?: (line: string) => void } = {}): Promise<CommandResult> {
         this.commands.push(args);
+        this.onCommand?.(args);
         options.onLine?.(`fake: ${args.join(' ')}`);
         return { code: this.failing === args[0] ? 1 : 0, stdout: '', stderr: '' };
     }

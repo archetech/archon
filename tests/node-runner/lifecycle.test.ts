@@ -27,6 +27,19 @@ beforeEach(() => {
         { service: 'lnbits-init', hash: compose.currentHash('lnbits-init'), inspect: { State: { Status: 'exited', Running: false, ExitCode: 0 } } },
         { service: 'grafana', hash: compose.currentHash('grafana'), inspect: { State: { Status: 'exited', Running: false, ExitCode: 0 } } },
     ]);
+    // start, restart and up leave the containers they act on running; an
+    // init container runs to completion.
+    compose.onCommand = args => {
+        if (!['start', 'restart', 'up'].includes(args[0])) {
+            return;
+        }
+        const named = args.slice(1).filter(a => !a.startsWith('-'));
+        for (const c of docker.containers.filter(c => !named.length || named.includes(c.service))) {
+            c.inspect = c.service.endsWith('-init')
+                ? { State: { Status: 'exited', Running: false, ExitCode: 0 } }
+                : { State: { Status: 'running', Running: true } };
+        }
+    };
     const nodeConfig = new NodeConfig({ nodeDir, dataDir: join(nodeDir, 'data', 'node-runner'), project: 'archon', compose, docker, healthTimeoutMs: 0, sleep: async () => {} });
     lifecycle = new Lifecycle({ project: 'archon', docker, nodeConfig });
 });
@@ -119,7 +132,15 @@ describe('the whole node', () => {
         expect(preview.services.map(s => s.service)).toEqual(['grafana', 'lnbits-init']);
 
         await run({ action: 'start' });
-        expect(compose.commands).toEqual([['up', '-d']]);
+        expect(compose.commands).toEqual([['up', '-d', '--no-build']]);
+    });
+
+    it('builds a missing image under the load check before starting', async () => {
+        docker.missingImages.add('archon-gatekeeper');
+        (compose as unknown as { services: Record<string, object> }).services.gatekeeper = { buildVars: [] };
+
+        await run({ action: 'start' });
+        expect(compose.commands).toEqual([['build', 'gatekeeper'], ['up', '-d', '--no-build']]);
     });
 
     it('restarts only what is active, named, so stopped containers stay stopped', async () => {
