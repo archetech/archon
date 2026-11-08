@@ -54,7 +54,9 @@ export function groupOf(service: string): Group {
 
 // Services whose restart interrupts something costly: databases, the IPFS
 // store, and Lightning nodes with open channels.
-const STATEFUL = /^(redis|mongodb|ipfs|lnbits)$|^cln-|^(bitcoind|zebra)/;
+// Blockchain nodes are named *-node (cln-mainnet-node, btc-signet-node,
+// btc-t4-node).
+const STATEFUL = /^(redis|mongodb|ipfs|lnbits)$|^cln-|-node$|^(bitcoind|zebra)/;
 
 // Container states a stop acts on: running, a restart loop, or paused.
 export const ACTIVE_STATES = ['running', 'restarting', 'paused'];

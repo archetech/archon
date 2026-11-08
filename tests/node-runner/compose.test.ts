@@ -24,6 +24,15 @@ describe('Compose', () => {
         expect(calls[0].env.GIT_COMMIT).toBe('abc1234');
     });
 
+    it('pins the project node-runner reads containers from', async () => {
+        const { run, calls } = fakeExec('');
+        const compose = new Compose('/srv/node', async () => 'x', run, 'archon-prod');
+
+        await compose.command(['stop']);
+
+        expect(calls[0].args).toEqual(['compose', '--project-directory', '/srv/node', '--project-name', 'archon-prod', 'stop']);
+    });
+
     it('parses config hashes', async () => {
         const { run } = fakeExec('gatekeeper 111\nredis 222\n');
         const compose = new Compose('/srv/node', async () => 'x', run);

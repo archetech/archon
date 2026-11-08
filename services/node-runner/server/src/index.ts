@@ -19,7 +19,7 @@ async function main(): Promise<void> {
     };
 
     const docker = createDockerApi(config.dockerSocket);
-    const compose = new Compose(config.nodeDir, gitCommit);
+    const compose = new Compose(config.nodeDir, gitCommit, exec, config.project);
     const nodeConfig = new NodeConfig({ nodeDir: config.nodeDir, dataDir: config.dataDir, project: config.project, compose, docker });
     const app = createApp({
         auth,

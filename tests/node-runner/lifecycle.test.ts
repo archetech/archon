@@ -79,6 +79,13 @@ describe('one service', () => {
         expect(lines).toContain('  gatekeeper: running');
     });
 
+    it('treats a Bitcoin node as stateful', async () => {
+        docker.containers.push({ service: 'btc-signet-node' });
+
+        expect((await lifecycle.preview({ action: 'stop', service: 'btc-signet-node' })).stateful).toEqual(['btc-signet-node']);
+        expect((await lifecycle.preview({ action: 'restart' })).stateful).toContain('btc-signet-node');
+    });
+
     it('needs confirmation to stop a stateful one', async () => {
         await expect(lifecycle.run({ action: 'stop', service: 'cln-mainnet-node' }, false)).rejects.toMatchObject({ status: 409 });
 
@@ -109,6 +116,34 @@ describe('one service', () => {
 });
 
 describe('the whole node', () => {
+    it('lists, checks and confirms a running service that only needs its image rebuilt', async () => {
+        docker.missingImages.add('archon-redis');
+        (compose as unknown as { services: Record<string, object> }).services.redis = { buildVars: [] };
+
+        const preview = await lifecycle.preview({ action: 'start' });
+        expect(preview.services.map(s => s.service)).toEqual(['grafana', 'lnbits-init', 'redis']);
+        expect(preview.stateful).toEqual(['redis']);
+        await expect(lifecycle.run({ action: 'start' }, false)).rejects.toMatchObject({ status: 409 });
+
+        const lines = await run({ action: 'start' }, true);
+        expect(compose.commands).toEqual([['build', 'redis'], ['up', '-d', '--no-build']]);
+        expect(lines).toContain('  redis: running');
+    });
+
+    it('keeps each start\'s build targets to itself when previews overlap', async () => {
+        (compose as unknown as { services: Record<string, object> }).services.gatekeeper = { buildVars: [] };
+        docker.missingImages.add('archon-gatekeeper');
+        const first = await lifecycle.run({ action: 'start' }, true);
+        // A second preview, made after the image appeared, plans no build.
+        docker.missingImages.delete('archon-gatekeeper');
+        const second = await lifecycle.run({ action: 'start' }, true);
+        await first.work(() => {});
+        expect(compose.commands[0]).toEqual(['build', 'gatekeeper']);
+        compose.commands.length = 0;
+        await second.work(() => {});
+        expect(compose.commands[0]).toEqual(['up', '-d', '--no-build']);
+    });
+
     it('stops with stop, keeping its containers, after confirmation for stateful services', async () => {
         const preview = await lifecycle.preview({ action: 'stop' });
         expect(preview.services.map(s => s.service)).toEqual(['cln-mainnet-node', 'gatekeeper', 'redis']);
