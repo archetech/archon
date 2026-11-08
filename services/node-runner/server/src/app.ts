@@ -280,7 +280,9 @@ export function createApp(deps: AppDependencies): express.Express {
 
         api.post('/config/preview', async (req, res) => {
             try {
-                const { text: _text, ...preview } = await nodeConfig.preview(draftOf(req.body));
+                // The candidate and the original .env stay on the server: both
+                // hold every secret in the file.
+                const { text: _text, source: _source, ...preview } = await nodeConfig.preview(draftOf(req.body));
                 res.json(preview);
             }
             catch (error) {

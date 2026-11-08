@@ -204,6 +204,18 @@ describe('review fixes', () => {
         expect(p.rebuild).toEqual(['explorer']);
     });
 
+    it('rebuilds a service being created unless node-runner built it from this build section', async () => {
+        // react-wallet has no container; its build changed while it was off.
+        docker.containers.splice(docker.containers.findIndex(c => c.service === 'react-wallet'), 1);
+        writeFileSync(join(nodeDir, '.env'), ENV.replace('COMPOSE_PROFILES=lightning,react-wallet', 'COMPOSE_PROFILES=lightning') + 'ARCHON_REACT_WALLET_GATEKEEPER_URL=https://new\n');
+
+        expect((await plan({ profiles: ['lightning', 'react-wallet'] })).rebuild).toEqual(['react-wallet']);
+
+        // Once built here from that section, enabling it again does not rebuild.
+        await config.build(['react-wallet'], () => {});
+        expect((await plan({ profiles: ['lightning', 'react-wallet'] })).rebuild).toEqual([]);
+    });
+
     it('builds a buildable service with no image under the load check, rather than leaving it to up', async () => {
         docker.missingImages.add('archon-react-wallet');
 
