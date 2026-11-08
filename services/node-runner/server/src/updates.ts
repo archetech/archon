@@ -361,8 +361,9 @@ export class Updates {
                     log(`Finishing the update to ${label}`);
                 }
 
-                await nodeConfig.waitForLoad(log);
-                await nodeConfig.runCompose(['build'], log);
+                // Every enabled service with a build, recorded as built.
+                const buildable = Object.entries((await nodeConfig.composeConfig()).services).filter(([, def]) => def.build).map(([name]) => name);
+                await nodeConfig.build(buildable, log);
 
                 const { plan } = await nodeConfig.preview({});
                 const touched = [...plan.create, ...plan.recreate, ...plan.start];

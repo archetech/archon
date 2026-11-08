@@ -156,7 +156,7 @@ describe('run', () => {
         const lines = await run();
 
         expect(git(nodeDir, 'describe', '--tags')).toBe('v0.2.0');
-        expect(compose.commands).toEqual([['build'], ['up', '-d', '--no-build']]);
+        expect(compose.commands).toEqual([['build', 'gatekeeper', 'cln-mainnet-node'], ['up', '-d', '--no-build']]);
         expect(lines).toContain('  gatekeeper: running');
         expect(dockerCalls).toEqual([]);
     });
@@ -177,14 +177,14 @@ describe('run', () => {
 
         const lines = await run([]);
 
-        expect(compose.commands).toEqual([['build']]);
+        expect(compose.commands).toEqual([['build', 'gatekeeper', 'cln-mainnet-node']]);
         expect(lines).toContain('Built. Recreating cln-mainnet-node needs your confirmation, so nothing was restarted.');
 
         // The update is unfinished, and running it again with consent finishes it.
         const status = await updates.status(false);
         expect(status).toMatchObject({ unfinished: true, target: { label: 'v0.2.0' } });
         await run(['cln-mainnet-node']);
-        expect(compose.commands).toEqual([['build'], ['build'], ['up', '-d', '--no-build']]);
+        expect(compose.commands).toEqual([['build', 'gatekeeper', 'cln-mainnet-node'], ['build', 'gatekeeper', 'cln-mainnet-node'], ['up', '-d', '--no-build']]);
         expect((await updates.status(false)).unfinished).toBe(false);
     });
 
@@ -194,7 +194,7 @@ describe('run', () => {
 
         await run(['cln-mainnet-node']);
 
-        expect(compose.commands).toEqual([['build'], ['up', '-d', '--no-build']]);
+        expect(compose.commands).toEqual([['build', 'gatekeeper', 'cln-mainnet-node'], ['up', '-d', '--no-build']]);
     });
 
     it('refuses to run over local changes, or with nothing to update to', async () => {
@@ -212,7 +212,7 @@ describe('run', () => {
 
         const lines = await run(['cln-mainnet-node', 'not-at-risk']);
 
-        expect(compose.commands).toEqual([['build']]);
+        expect(compose.commands).toEqual([['build', 'gatekeeper', 'cln-mainnet-node']]);
         expect(lines).toContain('Built. Recreating redis needs your confirmation, so nothing was restarted.');
     });
 
