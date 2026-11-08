@@ -118,6 +118,29 @@ describe('concurrent setup', () => {
     });
 });
 
+describe('guessing', () => {
+    it('checks one guess at a time, doubling the delay after each failure', async () => {
+        const auth = new Auth({ dataDir, log: () => {}, now: () => now, failureDelayMs: 300 });
+        const code = (await auth.ensureSetupCode())!;
+        await auth.setup(code, PASSWORD);
+
+        const started = Date.now();
+        const guesses = await Promise.allSettled(['guess one!!!', 'guess two!!!', 'guess three!'].map(p => auth.login(p)));
+        const elapsed = Date.now() - started;
+
+        expect(guesses.every(g => g.status === 'rejected')).toBe(true);
+        // 300 + 600 + 1200 ms if serialized; about 300 ms if they ran together.
+        expect(elapsed).toBeGreaterThanOrEqual(2000);
+
+        // A correct password resets the delay.
+        await auth.login(PASSWORD);
+        const again = Date.now();
+        await expect(auth.login('wrong again!')).rejects.toMatchObject({ status: 401 });
+        // One 300 ms delay plus scrypt; without the reset it would be 2400 ms.
+        expect(Date.now() - again).toBeLessThan(1200);
+    }, 15000);
+});
+
 describe('login and sessions', () => {
     async function configured(): Promise<Auth> {
         const auth = makeAuth();

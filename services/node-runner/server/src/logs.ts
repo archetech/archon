@@ -12,6 +12,7 @@ export interface LogTarget {
     service: string;
     id: string;
     tty: boolean;
+    running: boolean;
 }
 
 export const MAX_TAIL = 5000;
@@ -47,7 +48,7 @@ export async function resolveTargets(docker: DockerApi, project: string, service
     return Promise.all(wanted.map(async service => {
         const id = byService.get(service)!.Id;
         const inspect = await docker.inspect(id);
-        return { service, id, tty: inspect.Config.Tty };
+        return { service, id, tty: inspect.Config.Tty, running: inspect.State.Running };
     }));
 }
 
@@ -74,23 +75,50 @@ export async function collectLogs(docker: DockerApi, targets: LogTarget[], optio
     return entries.sort(byTime);
 }
 
-// Follows every target until `signal` aborts, or until any one follower ends:
-// its container stopped or was recreated, so the caller should reconnect and
-// resolve the services again rather than keep streaming the others alone.
-// Every stream opened is closed on the way out, including after a failure
-// part-way through opening them.
+// Which containers the selected services have and whether each is running.
+// A change means the stream should end so the client resolves them again.
+export async function containerSignature(docker: DockerApi, project: string, services: string[]): Promise<string> {
+    const containers = await docker.listContainers(project);
+    return containers
+        .map(c => ({ service: c.Labels['com.docker.compose.service'], id: c.Id, running: c.State === 'running' }))
+        .filter(c => !services.length || services.includes(c.service))
+        .map(c => `${c.service}:${c.id}:${c.running}`)
+        .sort()
+        .join(',');
+}
+
+export interface Watch {
+    signature: () => Promise<string>;
+    intervalMs: number;
+}
+
+// Sends the tail of every target, then follows the running ones until
+// `signal` aborts, a follower ends, or the containers change (one starts,
+// stops or is recreated), so the caller can reconnect and resolve the
+// services again. A stopped container's log is finite: it is read once, not
+// followed, so it cannot end the stream. Every stream opened is closed on the
+// way out, including after a failure part-way through opening them.
 export async function followLogs(
     docker: DockerApi,
     targets: LogTarget[],
     options: { tail: number, since?: number },
     onEntry: (entry: LogEntry) => void,
     signal: AbortSignal,
+    watch?: Watch,
 ): Promise<void> {
     const streams: Readable[] = [];
     const stop = () => streams.forEach(stream => stream.destroy());
+    let timer: ReturnType<typeof setInterval> | undefined;
     signal.addEventListener('abort', stop, { once: true });
     try {
-        const opened = await Promise.allSettled(targets.map(async target => {
+        const initial = watch ? await watch.signature() : '';
+
+        const stopped = targets.filter(t => !t.running);
+        if (stopped.length) {
+            (await collectLogs(docker, stopped, options)).forEach(onEntry);
+        }
+
+        const opened = await Promise.allSettled(targets.filter(t => t.running).map(async target => {
             const stream = await docker.logs(target.id, { tail: options.tail, since: options.since, follow: true });
             streams.push(stream);
             if (signal.aborted) {
@@ -105,13 +133,23 @@ export async function followLogs(
         if (signal.aborted) {
             return;
         }
+
         const runs = (opened as PromiseFulfilledResult<{ target: LogTarget, stream: Readable }>[])
             .map(({ value }) => decode(value.target, value.stream, onEntry));
         // The followers left behind are destroyed below; their outcome no longer matters.
         runs.forEach(run => run.catch(() => {}));
-        await Promise.race(runs);
+        const aborted = new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }));
+        const changed = new Promise<void>(resolve => {
+            if (watch) {
+                timer = setInterval(() => {
+                    watch.signature().then(now => now !== initial && resolve(), () => {});
+                }, watch.intervalMs);
+            }
+        });
+        await Promise.race([...runs, aborted, changed]);
     }
     finally {
+        clearInterval(timer);
         signal.removeEventListener('abort', stop);
         stop();
     }
