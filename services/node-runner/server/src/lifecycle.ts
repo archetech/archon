@@ -45,9 +45,6 @@ export function parseActionRequest(body: unknown): ActionRequest {
 // Starting, stopping and restarting services or the whole node, each previewed
 // and then run as a job like a configuration change.
 export class Lifecycle {
-    // Services a whole-node start builds first, from its latest preview.
-    private build: string[] = [];
-
     constructor(
         private readonly options: { project: string, docker: DockerApi, nodeConfig: NodeConfig },
     ) {}
@@ -58,6 +55,12 @@ export class Lifecycle {
     }
 
     async preview(request: ActionRequest): Promise<ActionPreview> {
+        return (await this.plan(request)).preview;
+    }
+
+    // The preview and, for a whole-node start, the services it builds first.
+    // Kept per call: two previews in flight must not share build targets.
+    private async plan(request: ActionRequest): Promise<{ preview: ActionPreview, build: string[] }> {
         const containers = await this.containers();
         const active = [...containers.entries()].filter(([, c]) => ACTIVE_STATES.includes(c.State)).map(([s]) => s).sort();
 
@@ -73,22 +76,28 @@ export class Lifecycle {
                     : [request.service];
             const services = affected.map(item);
             return {
-                title: `${request.action[0].toUpperCase()}${request.action.slice(1)} ${request.service}`,
-                command: `docker compose ${request.action} ${request.service}`,
-                services,
-                stateful: request.action === 'start' ? [] : services.filter(s => s.stateful).map(s => s.service),
-                empty: services.length === 0,
+                preview: {
+                    title: `${request.action[0].toUpperCase()}${request.action.slice(1)} ${request.service}`,
+                    command: `docker compose ${request.action} ${request.service}`,
+                    services,
+                    stateful: request.action === 'start' ? [] : services.filter(s => s.stateful).map(s => s.service),
+                    empty: services.length === 0,
+                },
+                build: [],
             };
         }
 
         if (request.action === 'stop') {
             const services = active.map(item);
             return {
-                title: request.down ? 'Stop the node and remove its containers' : 'Stop the node',
-                command: request.down ? 'docker compose down' : 'docker compose stop',
-                services: request.down ? [...containers.keys()].sort().map(item) : services,
-                stateful: services.filter(s => s.stateful).map(s => s.service),
-                empty: request.down ? containers.size === 0 : services.length === 0,
+                preview: {
+                    title: request.down ? 'Stop the node and remove its containers' : 'Stop the node',
+                    command: request.down ? 'docker compose down' : 'docker compose stop',
+                    services: request.down ? [...containers.keys()].sort().map(item) : services,
+                    stateful: services.filter(s => s.stateful).map(s => s.service),
+                    empty: request.down ? containers.size === 0 : services.length === 0,
+                },
+                build: [],
             };
         }
 
@@ -96,14 +105,22 @@ export class Lifecycle {
             // Starting the node is `up -d` with the current configuration: the
             // same plan a configuration change with no edits would run.
             const { plan } = await this.options.nodeConfig.preview({});
-            const services = [...plan.create, ...plan.recreate, ...plan.start];
-            this.build = plan.rebuild.map(s => s.service);
+            const build = plan.rebuild.map(s => s.service);
+            // A rebuilt image means `up` recreates that service, so rebuild
+            // targets are listed, checked and, if stateful and active,
+            // confirmed like any recreation.
+            const byName = new Map([...plan.create, ...plan.recreate, ...plan.start, ...plan.rebuild].map(s => [s.service, s]));
+            const services = [...byName.values()].sort((a, b) => a.service.localeCompare(b.service));
+            const recreated = new Set([...plan.recreate, ...plan.rebuild.filter(s => active.includes(s.service))].map(s => s.service));
             return {
-                title: 'Start the node',
-                command: this.build.length ? `docker compose build ${this.build.join(' ')} && docker compose up -d --no-build` : 'docker compose up -d --no-build',
-                services,
-                stateful: plan.recreate.filter(s => s.stateful).map(s => s.service),
-                empty: services.length === 0,
+                preview: {
+                    title: 'Start the node',
+                    command: build.length ? `docker compose build ${build.join(' ')} && docker compose up -d --no-build` : 'docker compose up -d --no-build',
+                    services,
+                    stateful: services.filter(s => s.stateful && recreated.has(s.service)).map(s => s.service),
+                    empty: services.length === 0,
+                },
+                build,
             };
         }
 
@@ -111,16 +128,19 @@ export class Lifecycle {
         // stopped containers the review did not list.
         const services = active.map(item);
         return {
-            title: 'Restart the node',
-            command: `docker compose restart ${active.join(' ')}`,
-            services,
-            stateful: services.filter(s => s.stateful).map(s => s.service),
-            empty: services.length === 0,
+            preview: {
+                title: 'Restart the node',
+                command: `docker compose restart ${active.join(' ')}`,
+                services,
+                stateful: services.filter(s => s.stateful).map(s => s.service),
+                empty: services.length === 0,
+            },
+            build: [],
         };
     }
 
     async run(request: ActionRequest, confirmStateful: boolean): Promise<{ title: string, work: (log: JobLog) => Promise<void> }> {
-        const preview = await this.preview(request);
+        const { preview, build } = await this.plan(request);
         if (preview.empty) {
             throw new ConfigError('Nothing to do', 409);
         }
@@ -129,7 +149,6 @@ export class Lifecycle {
         }
         const { nodeConfig } = this.options;
         const services = preview.services.map(s => s.service);
-        const build = request.action === 'start' && !request.service ? this.build : [];
         return {
             title: preview.title,
             work: async log => {

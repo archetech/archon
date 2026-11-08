@@ -90,6 +90,9 @@ export class Compose implements ComposeApi {
         private readonly nodeDir: string,
         private readonly gitCommit: () => Promise<string>,
         private readonly run: Exec = exec,
+        // Pinned, so commands act on the project node-runner reads containers
+        // from, even when that was set explicitly rather than from .env.
+        private readonly project?: string,
     ) {}
 
     private async env(): Promise<NodeJS.ProcessEnv> {
@@ -101,7 +104,7 @@ export class Compose implements ComposeApi {
     }
 
     private args(envFile: string | undefined, args: string[]): string[] {
-        return ['compose', '--project-directory', this.nodeDir, ...(envFile ? ['--env-file', envFile] : []), ...args];
+        return ['compose', '--project-directory', this.nodeDir, ...(this.project ? ['--project-name', this.project] : []), ...(envFile ? ['--env-file', envFile] : []), ...args];
     }
 
     async command(args: string[], options: { envFile?: string, onLine?: (line: string) => void } = {}): Promise<CommandResult> {
