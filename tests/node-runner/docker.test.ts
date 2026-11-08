@@ -1,8 +1,6 @@
 import http from 'http';
-import { mkdtempSync, rmSync } from 'fs';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { createDockerApi, DockerError, LogDecoder, splitTimestamp } from '../../services/node-runner/server/src/docker.ts';
+import type { AddressInfo } from 'net';
+import { createDockerApi, DockerError, LogDecoder, splitTimestamp, type Transport } from '../../services/node-runner/server/src/docker.ts';
 import { frame } from './helpers.ts';
 
 describe('LogDecoder', () => {
@@ -65,13 +63,15 @@ describe('splitTimestamp', () => {
     });
 });
 
+// The tests reach a local server over TCP rather than the default Unix
+// socket transport. Jest shares core modules across the suites in a worker,
+// and once any suite has loaded nock, its passthrough drops socketPath.
 describe('createDockerApi', () => {
-    let dir: string;
     let server: http.Server;
     let requests: string[];
+    let tcp: Transport;
 
     beforeEach(async () => {
-        dir = mkdtempSync(join(tmpdir(), 'node-runner-docker-'));
         requests = [];
         server = http.createServer((req, res) => {
             requests.push(req.url!);
@@ -90,16 +90,17 @@ describe('createDockerApi', () => {
                 res.end('boom');
             }
         });
-        await new Promise<void>(resolve => server.listen(join(dir, 'docker.sock'), resolve));
+        await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+        const { port } = server.address() as AddressInfo;
+        tcp = (options, callback) => http.request({ ...options, host: '127.0.0.1', port }, callback);
     });
 
     afterEach(async () => {
         await new Promise(resolve => server.close(resolve));
-        rmSync(dir, { recursive: true, force: true });
     });
 
     it('lists only the project\'s containers', async () => {
-        const docker = createDockerApi(join(dir, 'docker.sock'));
+        const docker = createDockerApi('/var/run/docker.sock', tcp);
 
         expect(await docker.listContainers('archon')).toEqual([{ Id: 'abc' }]);
         const filters = new URL(requests[0], 'http://x').searchParams.get('filters');
@@ -107,14 +108,14 @@ describe('createDockerApi', () => {
     });
 
     it('turns a Docker error into a DockerError with its status and message', async () => {
-        const docker = createDockerApi(join(dir, 'docker.sock'));
+        const docker = createDockerApi('/var/run/docker.sock', tcp);
 
         await expect(docker.inspect('missing')).rejects.toMatchObject({ status: 404, message: 'Docker: No such container: missing' });
         await expect(docker.inspect('other')).rejects.toMatchObject({ status: 500, message: 'Docker: boom' });
     });
 
     it('asks for timestamped logs with the tail, since and follow given', async () => {
-        const docker = createDockerApi(join(dir, 'docker.sock'));
+        const docker = createDockerApi('/var/run/docker.sock', tcp);
 
         const stream = await docker.logs('abc', { tail: 10, since: 1700000000.5, follow: true });
         stream.resume();
@@ -124,8 +125,11 @@ describe('createDockerApi', () => {
         expect(Object.fromEntries(params)).toEqual({ stdout: '1', stderr: '1', timestamps: '1', tail: '10', since: '1700000000.5', follow: '1' });
     });
 
-    it('reports an unreachable socket as 503', async () => {
-        const docker = createDockerApi(join(dir, 'absent.sock'));
+    it('reports an unreachable daemon as 503', async () => {
+        await new Promise(resolve => server.close(resolve));
+        const docker = createDockerApi('/var/run/docker.sock', tcp);
+        server = http.createServer();
+        await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
 
         const error = await docker.listContainers('archon').catch(e => e);
         expect(error).toBeInstanceOf(DockerError);

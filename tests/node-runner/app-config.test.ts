@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import type { AddressInfo } from 'net';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import request from 'supertest';
@@ -119,6 +120,31 @@ describe('configuration API', () => {
         expect(res.text).toContain('event: line\ndata: {"time"');
         expect(res.text).toContain('"text":"only line"');
         expect(res.text).toMatch(/event: end\ndata: \{[^\n]*"status":"succeeded"/);
+    });
+
+    it('ends a running job\'s stream when the session is logged out', async () => {
+        let release!: () => void;
+        const { job, done } = await jobs.start('Long', async log => {
+            log('started');
+            await new Promise<void>(resolve => { release = resolve; });
+        });
+        const server = app.listen(0);
+        const { port } = server.address() as AddressInfo;
+        const res = await fetch(`http://127.0.0.1:${port}/api/jobs/${job.id}/stream`, { headers: { Cookie: cookie } });
+        const reader = res.body!.getReader();
+        let text = '';
+        while (!text.includes('started')) {
+            text += new TextDecoder().decode((await reader.read()).value);
+        }
+
+        await request(app).post('/api/logout').set('Cookie', cookie).expect(200);
+        while (!(await reader.read()).done) {
+            // Drain until the server ends the stream.
+        }
+
+        release();
+        await done;
+        await new Promise(resolve => server.close(resolve));
     });
 
     it('answers 404 for an unknown job', async () => {

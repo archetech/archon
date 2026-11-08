@@ -74,8 +74,11 @@ export async function collectLogs(docker: DockerApi, targets: LogTarget[], optio
     return entries.sort(byTime);
 }
 
-// Follows every target until `signal` aborts. Lines arrive in the order each
-// container produces them; the client merges across services by time.
+// Follows every target until `signal` aborts, or until any one follower ends:
+// its container stopped or was recreated, so the caller should reconnect and
+// resolve the services again rather than keep streaming the others alone.
+// Every stream opened is closed on the way out, including after a failure
+// part-way through opening them.
 export async function followLogs(
     docker: DockerApi,
     targets: LogTarget[],
@@ -83,15 +86,33 @@ export async function followLogs(
     onEntry: (entry: LogEntry) => void,
     signal: AbortSignal,
 ): Promise<void> {
-    const streams = await Promise.all(targets.map(async target => ({
-        target,
-        stream: await docker.logs(target.id, { tail: options.tail, since: options.since, follow: true }),
-    })));
-    const stop = () => streams.forEach(({ stream }) => stream.destroy());
-    if (signal.aborted) {
-        stop();
-        return;
-    }
+    const streams: Readable[] = [];
+    const stop = () => streams.forEach(stream => stream.destroy());
     signal.addEventListener('abort', stop, { once: true });
-    await Promise.allSettled(streams.map(({ target, stream }) => decode(target, stream, onEntry)));
+    try {
+        const opened = await Promise.allSettled(targets.map(async target => {
+            const stream = await docker.logs(target.id, { tail: options.tail, since: options.since, follow: true });
+            streams.push(stream);
+            if (signal.aborted) {
+                stream.destroy();
+            }
+            return { target, stream };
+        }));
+        const failed = opened.find(result => result.status === 'rejected');
+        if (failed) {
+            throw (failed as PromiseRejectedResult).reason;
+        }
+        if (signal.aborted) {
+            return;
+        }
+        const runs = (opened as PromiseFulfilledResult<{ target: LogTarget, stream: Readable }>[])
+            .map(({ value }) => decode(value.target, value.stream, onEntry));
+        // The followers left behind are destroyed below; their outcome no longer matters.
+        runs.forEach(run => run.catch(() => {}));
+        await Promise.race(runs);
+    }
+    finally {
+        signal.removeEventListener('abort', stop);
+        stop();
+    }
 }

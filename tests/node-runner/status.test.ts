@@ -62,6 +62,8 @@ describe('statusReport', () => {
         { service: 'lnbits-init', inspect: { State: { Status: 'exited', Running: false, ExitCode: 0, FinishedAt: '2026-11-08T10:01:00Z' }, HostConfig: { RestartPolicy: { Name: 'no' } } } },
         { service: 'rtl-init', inspect: { State: { Status: 'exited', Running: false, ExitCode: 1 }, HostConfig: { RestartPolicy: { Name: 'no' } } } },
         { service: 'didcomm', inspect: { State: { Status: 'exited', Running: false, ExitCode: 0 } } },
+        // A daemon with no restart policy that stopped cleanly is stopped, not completed.
+        { service: 'btc-signet-node', inspect: { State: { Status: 'exited', Running: false, ExitCode: 0 }, HostConfig: { RestartPolicy: { Name: 'no' } } } },
         { service: 'react-wallet', inspect: { State: { Status: 'created', Running: false } } },
     ]);
 
@@ -79,6 +81,7 @@ describe('statusReport', () => {
             'lnbits-init': 'completed',
             'rtl-init': 'failed',
             didcomm: 'stopped',
+            'btc-signet-node': 'stopped',
             'react-wallet': 'stopped',
         });
     });
@@ -104,13 +107,13 @@ describe('statusReport', () => {
 
         expect(report.services.map(s => s.service)).toEqual([
             'cli', 'gatekeeper', 'keymaster',
-            'zcash-mainnet-wallet',
+            'btc-signet-node', 'zcash-mainnet-wallet',
             'lnbits-init', 'rtl-init',
             'didcomm', 'tor',
             'grafana',
             'react-wallet',
         ]);
-        expect(report.counts).toEqual({ healthy: 1, unhealthy: 1, starting: 1, running: 2, restarting: 1, completed: 1, failed: 1, stopped: 2 });
+        expect(report.counts).toEqual({ healthy: 1, unhealthy: 1, starting: 1, running: 2, restarting: 1, completed: 1, failed: 1, stopped: 3 });
     });
 
     it('sees only its own project', async () => {

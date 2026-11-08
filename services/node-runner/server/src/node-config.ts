@@ -8,7 +8,7 @@ import type { DockerApi } from './docker.js';
 import { applyChanges, envValues, parseEnv, VALID_KEY } from './envfile.js';
 import type { JobLog } from './jobs.js';
 import { PROFILE_DESCRIPTIONS, pairingWarnings, parseProfiles, type Warning } from './profiles.js';
-import { isStateful, statusReport } from './status.js';
+import { isOneShot, isStateful, statusReport } from './status.js';
 
 export class ConfigError extends Error {
     constructor(message: string, readonly status = 400) {
@@ -295,8 +295,7 @@ export class NodeConfig {
 
         const starts = await Promise.all(plain(start).map(async item => {
             const inspect = await this.options.docker.inspect(byService.get(item.service)!.Id);
-            const policy = inspect.HostConfig.RestartPolicy?.Name ?? '';
-            const oneShot = inspect.State.ExitCode === 0 && (policy === '' || policy === 'no');
+            const oneShot = isOneShot(item.service) && inspect.State.ExitCode === 0;
             return oneShot ? { ...item, oneShot } : item;
         }));
 

@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
 import { basename, join } from 'path';
+import { envValues, parseEnv } from './envfile.js';
 
 export interface NodeRunnerConfig {
     port: number;
@@ -20,16 +21,9 @@ export function normalizeProjectName(name: string): string {
 }
 
 // COMPOSE_PROJECT_NAME from the node's .env, the one place an operator would
-// set it. Quotes are stripped the way Compose strips them.
+// set it, read with Compose's quoting and comment rules.
 export function projectNameFromEnvFile(text: string): string | null {
-    for (const line of text.split('\n')) {
-        const match = line.match(/^\s*COMPOSE_PROJECT_NAME\s*=\s*(.*?)\s*$/);
-        if (match) {
-            const value = match[1].replace(/^(['"])(.*)\1$/, '$2');
-            return value || null;
-        }
-    }
-    return null;
+    return envValues(parseEnv(text)).get('COMPOSE_PROJECT_NAME') || null;
 }
 
 export function resolveProject(nodeDir: string, explicit?: string): string {

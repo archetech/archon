@@ -2,7 +2,7 @@ import DnsOutlinedIcon from '@mui/icons-material/DnsOutlined';
 import { AppBar, Badge, Box, Button, Chip, CircularProgress, Link, Tab, Tabs, Toolbar, Typography } from '@mui/material';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, type Draft, type Info, type JobSummary, type StatusReport } from '../api';
-import { PROBLEM } from '../format';
+import { verdict } from '../format';
 import ConfigPage from '../pages/ConfigPage';
 import JobsPage from '../pages/JobsPage';
 import LogsPage from '../pages/LogsPage';
@@ -29,10 +29,11 @@ function routeFromLocation(): Route {
 }
 
 // Grafana's published host port, when the observability profile runs it.
+// Grafana serves plain HTTP there, whatever scheme node-runner is reached by.
 function grafanaUrl(report: StatusReport | null): string | null {
     const grafana = report?.services.find(s => s.service === 'grafana' && s.state === 'running');
     const port = grafana?.ports[0]?.match(/(\d+)→/)?.[1];
-    return port ? `${window.location.protocol}//${window.location.hostname}:${port}` : null;
+    return port ? `http://${window.location.hostname}:${port}` : null;
 }
 
 export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
@@ -101,7 +102,7 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
         navigate('jobs', { job: id });
     }, [navigate]);
 
-    const problems = report?.services.filter(s => PROBLEM.includes(s.health)).length ?? 0;
+    const summary = report ? verdict(report) : null;
     const running = jobs.find(j => j.status === 'running');
     const grafana = grafanaUrl(report);
     const tab = route.page === 'review' ? 'config' : route.page;
@@ -118,8 +119,13 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
                             {info.project} · {info.gitCommit}
                         </Typography>
                     )}
-                    {report && (
-                        <Chip size="small" color={problems ? 'error' : 'success'} variant="outlined" label={problems ? `${problems} need attention` : 'All healthy'} />
+                    {summary && (
+                        <Chip
+                            size="small"
+                            color={summary.severity}
+                            variant="outlined"
+                            label={summary.severity === 'success' ? 'All up' : summary.text.split(':')[0]}
+                        />
                     )}
                     {running && (
                         <Chip
