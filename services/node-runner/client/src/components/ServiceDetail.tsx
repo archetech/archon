@@ -109,7 +109,7 @@ export default function ServiceDetail({ service, onClose, onOpenLogs, onAction, 
                     </Box>
 
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {service.state === 'running'
+                        {['running', 'restarting', 'paused'].includes(service.state)
                             ? (
                                 <>
                                     <Button variant="outlined" onClick={() => onAction({ action: 'restart', service: service.service })}>Restart</Button>

@@ -105,11 +105,20 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
     }, [navigate]);
 
     const jobStarted = useCallback((id: string) => {
-        setDraft({ settings: {} });
-        setAction(null);
         api.jobs().then(r => setJobs(r.jobs), () => {});
         navigate('jobs', { job: id });
     }, [navigate]);
+
+    // Only an applied configuration change retires the draft.
+    const configApplied = useCallback((id: string) => {
+        setDraft({ settings: {} });
+        jobStarted(id);
+    }, [jobStarted]);
+
+    const actionStarted = useCallback((id: string) => {
+        setAction(null);
+        jobStarted(id);
+    }, [jobStarted]);
 
     const summary = report ? verdict(report) : null;
     const running = jobs.find(j => j.status === 'running');
@@ -177,10 +186,10 @@ export default function Layout({ onSignedOut }: { onSignedOut: () => void }) {
                     <ConfigPage draft={draft} onDraft={setDraft} onReview={() => navigate('review')} onUnauthorized={onSignedOut} />
                 )}
                 {route.page === 'review' && (
-                    <ReviewPage draft={draft} onBack={() => navigate('config')} onStarted={jobStarted} onUnauthorized={onSignedOut} />
+                    <ReviewPage draft={draft} onBack={() => navigate('config')} onStarted={configApplied} onUnauthorized={onSignedOut} />
                 )}
                 {route.page === 'action' && (action
-                    ? <ActionPage request={action} onRequest={setAction} onBack={() => navigate('overview')} onStarted={jobStarted} onUnauthorized={onSignedOut} />
+                    ? <ActionPage request={action} onRequest={setAction} onBack={() => navigate('overview')} onStarted={actionStarted} onUnauthorized={onSignedOut} />
                     : <OverviewPage report={report} error={statusError} onOpenLogs={service => navigate('logs', { services: [service] })} onAction={review} onUnauthorized={onSignedOut} />)}
                 {route.page === 'jobs' && <JobsPage jobs={jobs} selected={route.job} onSelect={id => navigate('jobs', { job: id })} />}
             </Box>
