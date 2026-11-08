@@ -262,6 +262,15 @@ describe('applying what was reviewed', () => {
         expect(readFileSync(join(nodeDir, '.env'), 'utf-8')).toContain('edited by hand');
     });
 
+    it('reports an outside edit as a stale review even when it breaks the file for Compose', async () => {
+        const draft = { settings: { ARCHON_NODE_NAME: 'beta' } };
+        const { reviewed } = await config.preview(draft);
+        writeFileSync(join(nodeDir, '.env'), ENV + 'BROKEN=1\n');
+        compose.invalid = 'invalid interpolation format';
+
+        await expect(config.apply(draft, false, reviewed)).rejects.toMatchObject({ status: 409, message: '.env changed since this change was reviewed; review it again' });
+    });
+
     it('refuses without a fingerprint, and accepts a fresh one', async () => {
         const draft = { settings: { ARCHON_NODE_NAME: 'beta' } };
         await expect(config.apply(draft, false, '')).rejects.toMatchObject({ status: 409 });

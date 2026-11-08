@@ -492,11 +492,22 @@ export class NodeConfig {
     // review was made from: if the file changed since, the plan they saw may
     // no longer be what runs, so applying refuses and asks for a new review.
     async apply(draft: Draft, confirmStateful: boolean, reviewed: string): Promise<{ title: string, work: (log: JobLog) => Promise<void> }> {
-        const preview = await this.preview(draft);
         const given = Buffer.from(String(reviewed ?? ''), 'utf-8');
-        const expected = Buffer.from(preview.reviewed, 'utf-8');
-        if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
-            throw new ConfigError('.env changed since this change was reviewed; review it again', 409);
+        const matches = (text: string) => {
+            const expected = Buffer.from(this.fingerprint(text), 'utf-8');
+            return given.length === expected.length && timingSafeEqual(given, expected);
+        };
+        const stale = () => new ConfigError('.env changed since this change was reviewed; review it again', 409);
+        // Checked first, so an outside edit is reported as such even when it
+        // also makes the file one Compose rejects.
+        if (!matches(await this.readEnv())) {
+            throw stale();
+        }
+        const preview = await this.preview(draft);
+        // And again on the file the plan was made from, in case it changed
+        // while the plan was being worked out.
+        if (!matches(preview.source)) {
+            throw stale();
         }
         if (preview.empty) {
             throw new ConfigError('Nothing to apply', 409);

@@ -54,7 +54,9 @@ export default function ReviewPage({ draft, onBack, onStarted, onUnauthorized }:
             setBusy(false);
             // .env changed under the review: show what applying would do now.
             if (e instanceof ApiError && e.status === 409 && /review it again/.test(e.message)) {
+                // Nothing stays on screen to confirm until the new review arrives.
                 setConfirmed(false);
+                setPreview(null);
                 api.preview(draft).then(setPreview, handle);
             }
         }
