@@ -48,6 +48,11 @@ const UPSTREAMS: { profile: string, key: string, what: string }[] = [
 
 const FRONTED = ['herald', 'lightning', 'tor'];
 
+// Defaults the Compose fragments apply when a key is absent (`${KEY-default}`).
+const COMPOSE_DEFAULTS: Record<string, string> = {
+    ARCHON_DIDCOMM_TOR_PROXY: 'tor:9050',
+};
+
 // Settings that only work together with a profile, checked against the
 // values the node would run with.
 export function pairingWarnings(
@@ -56,7 +61,10 @@ export function pairingWarnings(
     catalog: Map<string, CatalogSetting>,
 ): Warning[] {
     const on = new Set(profiles);
-    const value = (key: string) => values.get(key) ?? catalog.get(key)?.default ?? '';
+    // What Compose would use: the .env value when the key is there (even if
+    // empty), otherwise the fragment's own default. sample.env values are
+    // examples, used only to suggest a fix.
+    const value = (key: string) => values.has(key) ? values.get(key)! : COMPOSE_DEFAULTS[key] ?? '';
     const warnings: Warning[] = [];
 
     for (const { profile, key, what } of UPSTREAMS) {

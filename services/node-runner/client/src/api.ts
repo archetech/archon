@@ -64,6 +64,7 @@ export interface ConfigView {
     profiles: { name: string, description: string, enabled: boolean, services: string[] }[];
     sections: { name: string, settings: SettingView[] }[];
     warnings: Warning[];
+    configError: string | null;
 }
 
 export interface Draft {

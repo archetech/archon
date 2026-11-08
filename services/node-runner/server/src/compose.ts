@@ -7,7 +7,12 @@ export interface CommandResult {
 }
 
 // Runs a command, optionally reporting each output line as it arrives.
-export type Exec = (command: string, args: string[], options: { cwd: string, env: NodeJS.ProcessEnv, onLine?: (line: string) => void }) => Promise<CommandResult>;
+// With `capture: false` only the line callback sees the output, and just the
+// tail of stderr is kept for an error message: a long build's output is not
+// held in memory.
+export type Exec = (command: string, args: string[], options: { cwd: string, env: NodeJS.ProcessEnv, onLine?: (line: string) => void, capture?: boolean }) => Promise<CommandResult>;
+
+const STDERR_TAIL = 16 * 1024;
 
 export const exec: Exec = (command, args, options) => new Promise((resolve, reject) => {
     const child = spawn(command, args, { cwd: options.cwd, env: options.env });
@@ -24,8 +29,17 @@ export const exec: Exec = (command, args, options) => new Promise((resolve, reje
     };
     child.stdout.setEncoding('utf-8');
     child.stderr.setEncoding('utf-8');
-    child.stdout.on('data', (chunk: string) => { stdout += chunk; feed('out', chunk); });
-    child.stderr.on('data', (chunk: string) => { stderr += chunk; feed('err', chunk); });
+    const capture = options.capture !== false;
+    child.stdout.on('data', (chunk: string) => {
+        if (capture) {
+            stdout += chunk;
+        }
+        feed('out', chunk);
+    });
+    child.stderr.on('data', (chunk: string) => {
+        stderr = capture ? stderr + chunk : (stderr + chunk).slice(-STDERR_TAIL);
+        feed('err', chunk);
+    });
     child.on('error', reject);
     child.on('close', code => {
         (['out', 'err'] as const).forEach(which => {
@@ -91,7 +105,8 @@ export class Compose implements ComposeApi {
     }
 
     async command(args: string[], options: { envFile?: string, onLine?: (line: string) => void } = {}): Promise<CommandResult> {
-        return this.run('docker', this.args(options.envFile, args), { cwd: this.nodeDir, env: await this.env(), onLine: options.onLine });
+        // A streamed command is read line by line; only its exit code matters.
+        return this.run('docker', this.args(options.envFile, args), { cwd: this.nodeDir, env: await this.env(), onLine: options.onLine, capture: !options.onLine });
     }
 
     private async checked(args: string[], envFile?: string): Promise<string> {
