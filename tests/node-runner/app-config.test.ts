@@ -45,6 +45,12 @@ afterEach(() => {
     rmSync(nodeDir, { recursive: true, force: true });
 });
 
+// Review, then apply with that review's fingerprint, as the page does.
+async function apply(draft: object) {
+    const preview = await request(app).post('/api/config/preview').set('Cookie', cookie).send({ draft }).expect(200);
+    return request(app).post('/api/config/apply').set('Cookie', cookie).send({ draft, reviewed: preview.body.reviewed });
+}
+
 async function finished(id: string) {
     for (;;) {
         const res = await request(app).get(`/api/jobs/${id}`).set('Cookie', cookie).expect(200);
@@ -76,6 +82,7 @@ describe('configuration API', () => {
 
         expect(res.body.text).toBeUndefined();
         expect(res.body.source).toBeUndefined();
+        expect(res.body.reviewed).toMatch(/^[0-9a-f]{64}$/);
         expect(res.text).not.toContain('secret-value');
         expect(res.text).not.toContain('super-secret');
         expect(res.body.plan.recreate).toEqual([{ service: 'gatekeeper', stateful: false }]);
@@ -89,8 +96,8 @@ describe('configuration API', () => {
     });
 
     it('applies as a job and records it', async () => {
-        const res = await request(app).post('/api/config/apply').set('Cookie', cookie)
-            .send({ draft: { settings: { ARCHON_NODE_NAME: 'beta' } } }).expect(202);
+        const res = await apply({ settings: { ARCHON_NODE_NAME: 'beta' } });
+        expect(res.status).toBe(202);
 
         const job = await finished(res.body.id);
         expect(job).toMatchObject({ title: 'Apply 1 configuration change', status: 'succeeded' });
@@ -105,8 +112,8 @@ describe('configuration API', () => {
         let release!: () => void;
         const { done } = await jobs.start('Holding', () => new Promise<void>(resolve => { release = resolve; }));
 
-        const res = await request(app).post('/api/config/apply').set('Cookie', cookie)
-            .send({ draft: { settings: { ARCHON_NODE_NAME: 'beta' } } }).expect(409);
+        const res = await apply({ settings: { ARCHON_NODE_NAME: 'beta' } });
+        expect(res.status).toBe(409);
         expect(res.body.error).toBe('Another job is running');
         release();
         await done;

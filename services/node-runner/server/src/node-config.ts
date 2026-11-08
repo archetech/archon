@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+import { createHmac, randomBytes, timingSafeEqual } from 'crypto';
 import { promises as fs } from 'fs';
 import os from 'os';
 import { join } from 'path';
@@ -68,6 +68,10 @@ export interface Plan {
 export interface Preview {
     // The .env the preview was made from; applying refuses if it changed.
     source: string;
+    // A fingerprint of that .env for the browser to send back with Apply, so
+    // Apply can refuse if the file is no longer the one the operator reviewed.
+    // Keyed, so it reveals nothing about the file's secrets.
+    reviewed: string;
     diff: DiffLine[];
     warnings: Warning[];
     plan: Plan;
@@ -291,6 +295,7 @@ export class NodeConfig {
         return {
             text,
             source: current,
+            reviewed: this.fingerprint(current),
             diff,
             warnings: pairingWarnings(parseProfiles(after.get('COMPOSE_PROFILES')), after, byKey),
             plan,
@@ -475,10 +480,35 @@ export class NodeConfig {
         }
     }
 
-    // The apply job. The preview is recomputed here, so what runs is what the
-    // configuration says now, not what a browser showed earlier.
-    async apply(draft: Draft, confirmStateful: boolean): Promise<{ title: string, work: (log: JobLog) => Promise<void> }> {
+    // A fingerprint of an .env, keyed per process. A restart makes earlier
+    // reviews stale, which only asks the operator to review again.
+    private readonly reviewKey = randomBytes(32);
+
+    private fingerprint(text: string): string {
+        return createHmac('sha256', this.reviewKey).update(text).digest('hex');
+    }
+
+    // The apply job. `reviewed` is the fingerprint of the .env the operator's
+    // review was made from: if the file changed since, the plan they saw may
+    // no longer be what runs, so applying refuses and asks for a new review.
+    async apply(draft: Draft, confirmStateful: boolean, reviewed: string): Promise<{ title: string, work: (log: JobLog) => Promise<void> }> {
+        const given = Buffer.from(String(reviewed ?? ''), 'utf-8');
+        const matches = (text: string) => {
+            const expected = Buffer.from(this.fingerprint(text), 'utf-8');
+            return given.length === expected.length && timingSafeEqual(given, expected);
+        };
+        const stale = () => new ConfigError('.env changed since this change was reviewed; review it again', 409);
+        // Checked first, so an outside edit is reported as such even when it
+        // also makes the file one Compose rejects.
+        if (!matches(await this.readEnv())) {
+            throw stale();
+        }
         const preview = await this.preview(draft);
+        // And again on the file the plan was made from, in case it changed
+        // while the plan was being worked out.
+        if (!matches(preview.source)) {
+            throw stale();
+        }
         if (preview.empty) {
             throw new ConfigError('Nothing to apply', 409);
         }

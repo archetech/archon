@@ -46,12 +46,19 @@ export default function ReviewPage({ draft, onBack, onStarted, onUnauthorized }:
         setBusy(true);
         setError('');
         try {
-            const { id } = await api.apply(draft, confirmed);
+            const { id } = await api.apply(draft, confirmed, preview!.reviewed);
             onStarted(id);
         }
         catch (e) {
             handle(e);
             setBusy(false);
+            // .env changed under the review: show what applying would do now.
+            if (e instanceof ApiError && e.status === 409 && /review it again/.test(e.message)) {
+                // Nothing stays on screen to confirm until the new review arrives.
+                setConfirmed(false);
+                setPreview(null);
+                api.preview(draft).then(setPreview, handle);
+            }
         }
     }
 
