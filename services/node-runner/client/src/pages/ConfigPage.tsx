@@ -1,6 +1,7 @@
 import { Alert, Box, Button, Chip, FormControlLabel, Paper, Skeleton, Switch, Tab, Tabs, TextField, Typography } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import { api, ApiError, type ConfigView, type Draft, type SettingView, type Warning } from '../api';
+import CreateEnvCard from '../components/CreateEnvCard';
 
 interface Props {
     draft: Draft;
@@ -109,6 +110,15 @@ export default function ConfigPage({ draft, onDraft, onReview, onUnauthorized }:
 
     if (!view) {
         return error ? <Alert severity="error">{error}</Alert> : <Skeleton variant="rounded" height={320} />;
+    }
+
+    if (view.envMissing) {
+        return (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <Typography variant="h2" component="h1">Configuration</Typography>
+                <CreateEnvCard onCreated={() => api.config().then(setView, e => setError(e instanceof Error ? e.message : String(e)))} onUnauthorized={onUnauthorized} />
+            </Box>
+        );
     }
 
     const count = draftCount(draft, view);

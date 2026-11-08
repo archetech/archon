@@ -282,6 +282,16 @@ export function createApp(deps: AppDependencies): express.Express {
             }
         });
 
+        api.post('/config/create', async (req, res) => {
+            try {
+                await nodeConfig.createEnv(req.body?.passphrase);
+                res.status(201).json({ ok: true });
+            }
+            catch (error) {
+                sendError(res, error);
+            }
+        });
+
         api.post('/config/preview', async (req, res) => {
             try {
                 // The candidate and the original .env stay on the server: both

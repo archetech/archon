@@ -125,8 +125,11 @@ export class Updates {
     private async statefulAtRisk(): Promise<string[]> {
         const config = await this.options.nodeConfig.composeConfig();
         const built = Object.entries(config.services).filter(([name, def]) => def.build && isStateful(name)).map(([name]) => name);
-        const { plan } = await this.options.nodeConfig.preview({});
-        const stale = plan.recreate.filter(s => s.stateful).map(s => s.service);
+        // Without a .env there is no plan to read; status still reports.
+        const stale = await this.options.nodeConfig.preview({}).then(
+            ({ plan }) => plan.recreate.filter(s => s.stateful).map(s => s.service),
+            () => [] as string[],
+        );
         return [...new Set([...built, ...stale])].sort();
     }
 
@@ -333,6 +336,7 @@ export class Updates {
     // Any other stateful service the update would recreate stops it after the
     // build, with the update left unfinished for a confirmed rerun.
     async run(confirmed: string[]): Promise<{ title: string, work: JobWork }> {
+        await this.options.nodeConfig.requireEnv();
         const status = await this.status(true);
         if (status.fetchError && !status.unfinished) {
             throw new ConfigError(`Could not fetch updates: ${status.fetchError}`, 502);

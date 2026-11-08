@@ -7,7 +7,7 @@ import { ComposeError, type ComposeApi, type ComposeConfig } from './compose.js'
 import type { DockerApi } from './docker.js';
 import { applyChanges, envValues, parseEnv, VALID_KEY } from './envfile.js';
 import type { JobLog } from './jobs.js';
-import { PROFILE_DESCRIPTIONS, pairingWarnings, parseProfiles, type Warning } from './profiles.js';
+import { PLACEHOLDER, PROFILE_DESCRIPTIONS, pairingWarnings, parseProfiles, requiredWarnings, type Warning } from './profiles.js';
 import { ACTIVE_STATES, isOneShot, isStateful, statusReport } from './status.js';
 
 export class ConfigError extends Error {
@@ -40,6 +40,8 @@ export interface ConfigView {
     // Compose's error when the current .env does not make a valid
     // configuration. The page still loads, so the mistake can be repaired.
     configError: string | null;
+    // The node has no .env yet: the page offers to create one.
+    envMissing: boolean;
 }
 
 export interface DiffLine {
@@ -86,6 +88,8 @@ export interface NodeConfigOptions {
     cpuCount?: () => number;
     sleep?: (ms: number) => Promise<void>;
     healthTimeoutMs?: number;
+    // The user and group node-runner runs as: the operator's.
+    ids?: { uid: number, gid: number };
 }
 
 const MAX_BACKUPS = 20;
@@ -137,6 +141,57 @@ export class NodeConfig {
         this.healthTimeoutMs = options.healthTimeoutMs ?? 3 * 60 * 1000;
     }
 
+    private get ids(): { uid: number, gid: number } {
+        return this.options.ids ?? { uid: process.getuid!(), gid: process.getgid!() };
+    }
+
+    async envExists(): Promise<boolean> {
+        return fs.access(this.envPath).then(() => true, () => false);
+    }
+
+    // Changes and starts need a real .env: without one, Compose fills every
+    // setting with an empty value and services run as root.
+    async requireEnv(): Promise<void> {
+        if (!(await this.envExists())) {
+            throw new ConfigError('This node has no .env yet; create it on the Configuration page first', 409);
+        }
+    }
+
+    // Creates .env from sample.env for a node that has none: the operator's
+    // user and group, a generated admin key, the passphrase they chose, and
+    // no profiles, so the node starts as a core node. Upstream URLs that
+    // would advertise services of disabled profiles are cleared.
+    async createEnv(passphrase: unknown): Promise<void> {
+        if (typeof passphrase !== 'string' || passphrase.length < 12 || /[\r\n]/.test(passphrase) || passphrase === PLACEHOLDER) {
+            throw new ConfigError('Choose a passphrase of at least 12 characters, on one line');
+        }
+        const sample = await fs.readFile(this.samplePath, 'utf-8').catch(() => null);
+        if (sample === null) {
+            throw new ConfigError(`No sample.env in ${this.options.nodeDir} to create .env from`, 500);
+        }
+        let text = applyChanges(sample, {
+            ARCHON_UID: String(this.ids.uid),
+            ARCHON_GID: String(this.ids.gid),
+            ARCHON_ADMIN_API_KEY: randomBytes(32).toString('hex'),
+            ARCHON_PASSPHRASE: passphrase,
+            COMPOSE_PROFILES: '',
+        });
+        const { byKey } = await this.catalog();
+        const clears = pairingWarnings([], envValues(parseEnv(text)), byKey).filter(w => w.fix?.value === '').map(w => [w.fix!.key, '']);
+        if (clears.length) {
+            text = applyChanges(text, Object.fromEntries(clears));
+        }
+        try {
+            await fs.writeFile(this.envPath, text, { mode: 0o600, flag: 'wx' });
+        }
+        catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+                throw new ConfigError('.env already exists', 409);
+            }
+            throw error;
+        }
+    }
+
     private async readEnv(): Promise<string> {
         try {
             return await fs.readFile(this.envPath, 'utf-8');
@@ -155,6 +210,7 @@ export class NodeConfig {
     }
 
     async view(): Promise<ConfigView> {
+        const envMissing = !(await this.envExists());
         const values = envValues(parseEnv(await this.readEnv()));
         const { sections, byKey } = await this.catalog();
         const enabled = new Set(parseProfiles(values.get('COMPOSE_PROFILES')));
@@ -201,8 +257,9 @@ export class NodeConfig {
                 ...sections.map(section => ({ name: section.name, settings: section.settings.map(s => view(s, s.key)) })),
                 ...(unknown.length ? [{ name: 'Other settings in .env', settings: unknown.map(key => view(null, key)) }] : []),
             ],
-            warnings: pairingWarnings([...enabled], values, byKey),
+            warnings: envMissing ? [] : [...requiredWarnings(values, this.ids), ...pairingWarnings([...enabled], values, byKey)],
             configError,
+            envMissing,
         };
     }
 
@@ -254,6 +311,7 @@ export class NodeConfig {
     // Profiles are checked against the candidate configuration, not the
     // current one, so a .env Compose rejects can still be repaired here.
     async preview(draft: Draft): Promise<Preview & { text: string }> {
+        await this.requireEnv();
         const current = await this.readEnv();
         const { byKey } = await this.catalog();
         const before = envValues(parseEnv(current));
@@ -292,7 +350,7 @@ export class NodeConfig {
             text,
             source: current,
             diff,
-            warnings: pairingWarnings(parseProfiles(after.get('COMPOSE_PROFILES')), after, byKey),
+            warnings: [...requiredWarnings(after, this.ids), ...pairingWarnings(parseProfiles(after.get('COMPOSE_PROFILES')), after, byKey)],
             plan,
             stateful,
             empty,

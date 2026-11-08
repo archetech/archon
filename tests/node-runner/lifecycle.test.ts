@@ -115,6 +115,16 @@ describe('one service', () => {
     });
 });
 
+describe('a node with no .env', () => {
+    it('refuses to start or restart, but still stops', async () => {
+        rmSync(join(nodeDir, '.env'));
+
+        await expect(lifecycle.run({ action: 'start' }, true)).rejects.toMatchObject({ status: 409 });
+        await expect(lifecycle.run({ action: 'restart', service: 'gatekeeper' }, true)).rejects.toMatchObject({ status: 409 });
+        await expect(lifecycle.run({ action: 'stop', service: 'gatekeeper' }, true)).resolves.toMatchObject({ title: 'Stop gatekeeper' });
+    });
+});
+
 describe('the whole node', () => {
     it('lists, checks and confirms a running service that only needs its image rebuilt', async () => {
         docker.missingImages.add('archon-redis');

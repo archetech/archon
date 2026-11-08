@@ -104,3 +104,34 @@ export function pairingWarnings(
 
     return warnings;
 }
+
+// The placeholder sample.env puts in settings that must be chosen.
+export const PLACEHOLDER = 'CHANGE_ME';
+
+// Settings a node cannot run correctly without. `ids` is the user node-runner
+// runs as, which is the operator: the value ARCHON_UID and ARCHON_GID need.
+export function requiredWarnings(values: Map<string, string>, ids: { uid: number, gid: number }): Warning[] {
+    const warnings: Warning[] = [];
+    for (const [key, id] of [['ARCHON_UID', ids.uid], ['ARCHON_GID', ids.gid]] as const) {
+        if (!values.get(key)) {
+            warnings.push({
+                message: `${key} is not set, so services that run as the node's user run as root and leave root-owned files in data/.`,
+                fix: { key, value: String(id), label: `Set ${key}=${id}` },
+            });
+        }
+    }
+    const secrets: [string, string][] = [
+        ['ARCHON_ADMIN_API_KEY', 'Gatekeeper will not start without it. Generate one with `openssl rand -hex 32`.'],
+        ['ARCHON_PASSPHRASE', 'Keymaster will not start without it. It encrypts the wallet, so change it only on a node with no wallet yet.'],
+    ];
+    for (const [key, why] of secrets) {
+        const value = values.get(key);
+        if (!value) {
+            warnings.push({ message: `${key} is not set. ${why}` });
+        }
+        else if (value === PLACEHOLDER) {
+            warnings.push({ message: `${key} is still the sample placeholder ${PLACEHOLDER}. ${why}` });
+        }
+    }
+    return warnings;
+}
