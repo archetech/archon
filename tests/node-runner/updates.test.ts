@@ -306,7 +306,7 @@ describe('history and branches', () => {
         const shallowDir = join(root, 'shallow');
         git(root, 'clone', '-q', '--depth', '1', `file://${origin}`, shallowDir);
         writeFileSync(join(shallowDir, 'sample.env'), '');
-        const shallow = new Updates({ nodeDir: shallowDir, dataDir: join(shallowDir, 'data'), nodeConfig: new NodeConfig({ nodeDir: shallowDir, dataDir: join(shallowDir, 'data'), project: 'archon', compose, docker }), exec: mixedExec, selfImage: 'img' });
+        const shallow = new Updates({ nodeDir: shallowDir, dataDir: join(shallowDir, 'data'), nodeConfig: new NodeConfig({ nodeDir: shallowDir, dataDir: join(shallowDir, 'data'), project: 'archon', compose, docker, loadAverage: () => 0, cpuCount: () => 4 }), exec: mixedExec, selfImage: 'img' });
 
         expect((await shallow.status(false)).note).toMatch(/shallow/);
         const status = await shallow.status(true);
