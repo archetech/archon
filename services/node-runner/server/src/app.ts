@@ -7,6 +7,7 @@ import { collectLogs, followLogs, parseTail, resolveTargets, timeKey } from './l
 import { statusReport } from './status.js';
 
 export const SESSION_COOKIE = 'node_runner_session';
+export const SESSION_RECHECK_MS = 10000;
 
 export interface AppDependencies {
     auth: Auth;
@@ -133,10 +134,13 @@ export function createApp(deps: AppDependencies): express.Express {
                 res.status(401).json({ error: 'node-runner is not set up yet' });
                 return;
             }
-            if (!auth.checkSession(readCookie(req.headers.cookie, SESSION_COOKIE))) {
+            const token = readCookie(req.headers.cookie, SESSION_COOKIE);
+            if (!auth.checkSession(token)) {
                 res.status(401).json({ error: 'Not signed in' });
                 return;
             }
+            // The session slides on the server, so the cookie slides with it.
+            setSessionCookie(req, res, token!);
             next();
         }
         catch (error) {
@@ -182,6 +186,23 @@ export function createApp(deps: AppDependencies): express.Express {
     api.get('/logs/stream', async (req, res) => {
         const controller = new AbortController();
         req.on('close', () => controller.abort());
+        // Access is checked once at the start; the stream ends as soon as the
+        // session does, through logout, expiry or a password reset.
+        const token = readCookie(req.headers.cookie, SESSION_COOKIE);
+        const stopRevoke = auth.onRevoke(revoked => {
+            if (revoked === null || revoked === token) {
+                controller.abort();
+            }
+        });
+        const recheck = setInterval(async () => {
+            if (!auth.peekSession(token) || !(await auth.isConfigured())) {
+                controller.abort();
+            }
+        }, SESSION_RECHECK_MS);
+        controller.signal.addEventListener('abort', () => {
+            stopRevoke();
+            clearInterval(recheck);
+        }, { once: true });
         try {
             const targets = await resolveTargets(docker, project, serviceList(req.query.services));
             res.writeHead(200, {
@@ -196,7 +217,6 @@ export function createApp(deps: AppDependencies): express.Express {
             await followLogs(docker, targets, { tail: parseTail(req.query.tail, 200), since: sinceSeconds(req.query.since) }, entry => {
                 res.write(`event: log\ndata: ${JSON.stringify({ ...entry, key: timeKey(entry.time) })}\n\n`);
             }, controller.signal);
-            clearInterval(heartbeat);
             res.end();
         }
         catch (error) {
@@ -204,8 +224,19 @@ export function createApp(deps: AppDependencies): express.Express {
                 sendError(res, error);
             }
             else {
+                // The stream is already open, so the failure travels as an event.
+                const status = (error as { status?: unknown })?.status;
+                const message = error instanceof Error && typeof status === 'number' ? error.message : 'Internal error';
+                if (message === 'Internal error') {
+                    console.error(error);
+                }
+                res.write(`event: failure\ndata: ${JSON.stringify({ error: message })}\n\n`);
                 res.end();
             }
+        }
+        finally {
+            // Releases the heartbeat, the revocation listener and the recheck.
+            controller.abort();
         }
     });
 

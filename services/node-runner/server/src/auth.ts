@@ -1,4 +1,5 @@
 import { randomBytes, randomInt, scrypt as scryptCallback, timingSafeEqual } from 'crypto';
+import { EventEmitter } from 'events';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
@@ -89,6 +90,7 @@ export class Auth {
     private readonly now: () => number;
     private readonly failureDelayMs: number;
     private readonly sessions = new Map<string, number>();
+    private readonly revocations = new EventEmitter();
 
     constructor(options: AuthOptions) {
         this.dataDir = options.dataDir;
@@ -117,7 +119,10 @@ export class Auth {
         if (await this.isConfigured()) {
             return null;
         }
-        this.sessions.clear();
+        if (this.sessions.size) {
+            this.sessions.clear();
+            this.revocations.emit('revoke', null);
+        }
         let code = (await readOptional(this.setupCodePath))?.trim();
         if (!code) {
             code = generateSetupCode();
@@ -145,7 +150,17 @@ export class Auth {
         if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
             throw new AuthError(`The password must be at least ${MIN_PASSWORD_LENGTH} characters`, 400);
         }
-        await fs.writeFile(this.passwordPath, `${await hashPassword(password)}\n`, { mode: 0o600 });
+        // Created exclusively: of two setups racing with the same code, only
+        // the first to write sets the password.
+        try {
+            await fs.writeFile(this.passwordPath, `${await hashPassword(password)}\n`, { mode: 0o600, flag: 'wx' });
+        }
+        catch (error) {
+            if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+                throw new AuthError('node-runner is already set up', 409);
+            }
+            throw error;
+        }
         await fs.rm(this.setupCodePath, { force: true });
         return this.createSession();
     }
@@ -185,9 +200,22 @@ export class Auth {
         return true;
     }
 
+    // Whether a session is still valid, without extending it: long-lived
+    // streams recheck access this way so they do not keep an idle session alive.
+    peekSession(token: string | undefined): boolean {
+        const expires = token ? this.sessions.get(token) : undefined;
+        return expires !== undefined && expires > this.now();
+    }
+
     logout(token: string | undefined): void {
-        if (token) {
-            this.sessions.delete(token);
+        if (token && this.sessions.delete(token)) {
+            this.revocations.emit('revoke', token);
         }
+    }
+
+    // Called with the ended session's token, or null when every session ended.
+    onRevoke(listener: (token: string | null) => void): () => void {
+        this.revocations.on('revoke', listener);
+        return () => this.revocations.off('revoke', listener);
     }
 }

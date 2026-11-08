@@ -104,6 +104,20 @@ describe('first-run setup', () => {
     });
 });
 
+describe('concurrent setup', () => {
+    it('lets only one of two setups with the same code set the password', async () => {
+        const auth = makeAuth();
+        const code = (await auth.ensureSetupCode())!;
+
+        const results = await Promise.allSettled([auth.setup(code, 'first password!'), auth.setup(code, 'second password')]);
+
+        expect(results.map(r => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+        expect((results.find(r => r.status === 'rejected') as PromiseRejectedResult).reason).toMatchObject({ status: 409 });
+        const winner = results[0].status === 'fulfilled' ? 'first password!' : 'second password';
+        expect(await verifyPassword(winner, readFileSync(join(dataDir, 'admin-password'), 'utf-8'))).toBe(true);
+    });
+});
+
 describe('login and sessions', () => {
     async function configured(): Promise<Auth> {
         const auth = makeAuth();
@@ -132,6 +146,34 @@ describe('login and sessions', () => {
         expect(auth.checkSession(token)).toBe(true);
         now += SESSION_TTL_MS;
         expect(auth.checkSession(token)).toBe(false);
+    });
+
+    it('checks a session without extending it', async () => {
+        const auth = await configured();
+        const token = await auth.login(PASSWORD);
+
+        now += SESSION_TTL_MS - 1;
+        expect(auth.peekSession(token)).toBe(true);
+        now += 2;
+        expect(auth.peekSession(token)).toBe(false);
+        expect(auth.peekSession(undefined)).toBe(false);
+    });
+
+    it('announces ended sessions: one on logout, all on reset', async () => {
+        const auth = await configured();
+        const token = await auth.login(PASSWORD);
+        const revoked: (string | null)[] = [];
+        const stop = auth.onRevoke(t => revoked.push(t));
+
+        auth.logout(token);
+        auth.logout(token);
+        await auth.login(PASSWORD);
+        rmSync(join(dataDir, 'admin-password'));
+        await auth.ensureSetupCode();
+        stop();
+        auth.logout('anything');
+
+        expect(revoked).toEqual([token, null]);
     });
 
     it('ends a session on logout', async () => {

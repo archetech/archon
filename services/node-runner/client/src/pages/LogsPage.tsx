@@ -47,39 +47,64 @@ export default function LogsPage({ report, initialServices, onUnauthorized }: Pr
     const [follow, setFollow] = useState(true);
     const [lines, setLines] = useState<Keyed[]>([]);
     const [connection, setConnection] = useState<'connecting' | 'live' | 'retrying'>('connecting');
+    const [failure, setFailure] = useState('');
     const scroller = useRef<HTMLDivElement>(null);
 
     useEffect(() => setServices(initialServices), [initialServices]);
 
     const servicesKey = services.join(',');
 
-    // One EventSource per selection. On an error it reconnects from the last
-    // line received rather than replaying the tail, so nothing repeats.
+    // One EventSource per selection. When it drops (the server also ends it
+    // when a container is recreated) it reconnects from the oldest of each
+    // service's last lines, so no service's unseen lines are skipped, and
+    // drops the lines it already holds from the overlap.
     useEffect(() => {
         const selected = servicesKey ? servicesKey.split(',') : [];
         let source: EventSource | null = null;
         let pending: Keyed[] = [];
-        let lastKey = '';
-        let lastTime = '';
         let retry: ReturnType<typeof setTimeout> | undefined;
         let closed = false;
+        const last = new Map<string, { key: string, time: string }>();
+        const seen = new Set<string>();
+        const identity = (e: Keyed) => `${e.service}\u0000${e.key}\u0000${e.text}`;
+        const connectedAt = Math.floor(Date.now() / 1000);
 
         setLines([]);
         setConnection('connecting');
 
+        const resumeFrom = (): number => {
+            const services = selected.length ? selected : [...last.keys()];
+            const times = services.map(service => last.get(service)?.time);
+            if (!times.length || times.some(t => !t)) {
+                return connectedAt;
+            }
+            return Math.min(...times.map(t => Math.floor(Date.parse(t!) / 1000)));
+        };
+
         const connect = (since?: number) => {
             source = new EventSource(api.streamUrl(selected, since ? MAX_LINES : tail, since));
-            source.onopen = () => setConnection('live');
+            source.onopen = () => {
+                setConnection('live');
+                setFailure('');
+            };
             source.addEventListener('log', event => {
                 const entry = JSON.parse((event as MessageEvent).data) as Keyed;
-                if (since && entry.key <= lastKey) {
+                const id = identity(entry);
+                if (seen.has(id)) {
                     return;
                 }
-                pending.push(entry);
-                if (entry.key > lastKey) {
-                    lastKey = entry.key;
-                    lastTime = entry.time;
+                seen.add(id);
+                if (seen.size > MAX_LINES * 4) {
+                    seen.clear();
                 }
+                pending.push(entry);
+                const previous = last.get(entry.service);
+                if (!previous || entry.key > previous.key) {
+                    last.set(entry.service, { key: entry.key, time: entry.time });
+                }
+            });
+            source.addEventListener('failure', event => {
+                setFailure(JSON.parse((event as MessageEvent).data).error);
             });
             source.onerror = () => {
                 source?.close();
@@ -93,7 +118,7 @@ export default function LogsPage({ report, initialServices, onUnauthorized }: Pr
                         onUnauthorized();
                     }
                 }, () => {});
-                retry = setTimeout(() => connect(lastTime ? Math.floor(Date.parse(lastTime) / 1000) : undefined), RECONNECT_MS);
+                retry = setTimeout(() => connect(resumeFrom()), RECONNECT_MS);
             };
         };
         connect();
@@ -141,7 +166,9 @@ export default function LogsPage({ report, initialServices, onUnauthorized }: Pr
     const toggle = (service: string) => setServices(current =>
         current.includes(service) ? current.filter(s => s !== service) : [...current, service]);
 
-    const names = (report?.services ?? []).filter(s => s.state === 'running' || services.includes(s.service)).map(s => s.service);
+    // Every service, running or not: Docker keeps a stopped container's log,
+    // and comparing failed services is the point.
+    const names = (report?.services ?? []).map(s => s.service);
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -177,6 +204,8 @@ export default function LogsPage({ report, initialServices, onUnauthorized }: Pr
                     {TAILS.map(n => <MenuItem key={n} value={n}>Last {n}</MenuItem>)}
                 </TextField>
             </Box>
+
+            {failure && <Alert severity="error">The log stream failed: {failure}</Alert>}
 
             {lines.length >= MAX_LINES && (
                 <Alert severity="info">Showing the latest {MAX_LINES} lines. Download for more.</Alert>

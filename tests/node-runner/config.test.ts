@@ -23,6 +23,8 @@ describe('project name', () => {
         expect(projectNameFromEnvFile("  COMPOSE_PROJECT_NAME = 'x' ")).toBe('x');
         expect(projectNameFromEnvFile('# COMPOSE_PROJECT_NAME=commented\n')).toBeNull();
         expect(projectNameFromEnvFile('COMPOSE_PROJECT_NAME=\n')).toBeNull();
+        expect(projectNameFromEnvFile('COMPOSE_PROJECT_NAME=archon-main # production\n')).toBe('archon-main');
+        expect(projectNameFromEnvFile('COMPOSE_PROJECT_NAME=first\nCOMPOSE_PROJECT_NAME=second\n')).toBe('second');
     });
 
     it('prefers an explicit name, then .env, then the directory name', () => {

@@ -1,4 +1,4 @@
-import type { Health } from './api';
+import type { Health, StatusReport } from './api';
 
 export function duration(fromIso: string | null, now = Date.now()): string {
     if (!fromIso) {
@@ -49,4 +49,39 @@ export function colorSlot(name: string, slots: number): number {
         hash = (hash * 31 + char.charCodeAt(0)) % 9973;
     }
     return hash % slots;
+}
+
+export interface Verdict {
+    severity: 'success' | 'info' | 'warning' | 'error';
+    text: string;
+    // The services the verdict is about, worst first.
+    services: string[];
+}
+
+// One summary of the whole node. Only running services that pass their checks
+// (or have none) and init containers that completed count as fine; anything
+// stopped or still starting is said so, and an empty project is not healthy.
+export function verdict(report: StatusReport): Verdict {
+    const named = (health: Health[]) => report.services.filter(s => health.includes(s.health)).map(s => s.service);
+    const problems = named(PROBLEM);
+    if (problems.length) {
+        return { severity: 'error', text: `${problems.length} need attention: ${problems.join(', ')}`, services: problems };
+    }
+    if (!report.services.length) {
+        return { severity: 'info', text: `No containers in project ${report.project}`, services: [] };
+    }
+    const stopped = named(['stopped']);
+    if (stopped.length) {
+        return { severity: 'warning', text: `${stopped.length} stopped: ${stopped.join(', ')}`, services: stopped };
+    }
+    const starting = named(['starting']);
+    if (starting.length) {
+        return { severity: 'info', text: `${starting.length} starting: ${starting.join(', ')}`, services: starting };
+    }
+    const unchecked = named(['running']).length;
+    return {
+        severity: 'success',
+        text: unchecked ? `All running services up; ${unchecked} have no health check` : 'All services healthy',
+        services: [],
+    };
 }

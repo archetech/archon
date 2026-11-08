@@ -69,12 +69,19 @@ export function formatPorts(ports: ContainerSummary['Ports']): string[] {
     return [...new Set(published)].sort();
 }
 
+// Init containers run once and exit; the stack names them `*-init`. A restart
+// policy cannot tell them apart: some long-running daemons have none either,
+// and one that stopped cleanly is stopped, not completed.
+export function isOneShot(service: string): boolean {
+    return service.endsWith('-init');
+}
+
 function hasHealthcheck(inspect: ContainerInspect): boolean {
     const test = inspect.Config.Healthcheck?.Test;
     return !!test && test.length > 0 && test[0] !== 'NONE';
 }
 
-function healthOf(inspect: ContainerInspect): Health {
+function healthOf(service: string, inspect: ContainerInspect): Health {
     const state = inspect.State;
     if (state.Restarting || state.Status === 'restarting') {
         return 'restarting';
@@ -91,8 +98,7 @@ function healthOf(inspect: ContainerInspect): Health {
         if (state.ExitCode !== 0) {
             return 'failed';
         }
-        const policy = inspect.HostConfig.RestartPolicy?.Name ?? '';
-        return policy === '' || policy === 'no' ? 'completed' : 'stopped';
+        return isOneShot(service) ? 'completed' : 'stopped';
     }
     return 'stopped';
 }
@@ -114,7 +120,7 @@ export function serviceStatus(summary: ContainerSummary, inspect: ContainerInspe
         stateful: isStateful(service),
         image: inspect.Config.Image,
         state: inspect.State.Status,
-        health: healthOf(inspect),
+        health: healthOf(service, inspect),
         hasHealthcheck: hasHealthcheck(inspect),
         healthOutput: last ? last.Output.trim().slice(-500) || null : null,
         failingStreak: inspect.State.Health?.FailingStreak ?? 0,

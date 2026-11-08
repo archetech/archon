@@ -20,6 +20,8 @@ export interface FakeContainer {
     // Lines as "<timestamp> <text>"; stderr lines start with "!".
     logs?: string[];
     tty?: boolean;
+    // Opening its log stream fails, after a delay so others open first.
+    failLogs?: boolean;
 }
 
 export function inspectOf(container: FakeContainer): ContainerInspect {
@@ -51,7 +53,7 @@ export class FakeDocker implements DockerApi {
     readonly followed: PassThrough[] = [];
     readonly logCalls: { id: string, options: LogOptions }[] = [];
 
-    constructor(private readonly containers: FakeContainer[], readonly project = 'archon') {}
+    constructor(readonly containers: FakeContainer[], readonly project = 'archon') {}
 
     async listContainers(project: string): Promise<ContainerSummary[]> {
         if (project !== this.project) {
@@ -79,6 +81,10 @@ export class FakeDocker implements DockerApi {
     async logs(id: string, options: LogOptions): Promise<Readable> {
         this.logCalls.push({ id, options });
         const container = this.containers.find(c => `id-${c.service}` === id)!;
+        if (container.failLogs) {
+            await new Promise(resolve => setTimeout(resolve, 20));
+            throw new Error(`logs unavailable for ${container.service}`);
+        }
         const lines = (container.logs ?? []).slice(-(options.tail ?? Infinity));
         const chunks = lines.map(line => {
             const stderr = line.startsWith('!');

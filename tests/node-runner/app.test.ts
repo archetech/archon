@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import type { Server } from 'http';
 import type { AddressInfo } from 'net';
@@ -82,6 +83,14 @@ describe('session API', () => {
         expect(res.body).toEqual({ error: 'The password is not correct' });
     });
 
+    it('renews the cookie on each authenticated request, as the session slides', async () => {
+        const cookie = await signedIn();
+
+        const res = await request(app()).get('/api/info').set('Cookie', cookie).expect(200);
+
+        expect((res.headers['set-cookie'] as unknown as string[])[0]).toBe(`${cookie}; Path=/; HttpOnly; SameSite=Strict; Max-Age=43200`);
+    });
+
     it('signs in, reports the session, and signs out', async () => {
         await signedIn();
 
@@ -164,6 +173,71 @@ describe('live logs', () => {
 
     afterEach(async () => {
         await new Promise(resolve => server?.close(resolve));
+    });
+
+    async function openStream(cookie: string, query: string) {
+        server = app().listen(0);
+        const { port } = server.address() as AddressInfo;
+        const res = await fetch(`http://127.0.0.1:${port}/api/logs/stream?${query}`, { headers: { Cookie: cookie } });
+        const reader = res.body!.getReader();
+        const decoder = new TextDecoder();
+        let text = '';
+        return {
+            res,
+            async until(needle: string) {
+                while (!text.includes(needle)) {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        throw new Error(`stream ended before ${needle}`);
+                    }
+                    text += decoder.decode(value);
+                }
+            },
+            async ended() {
+                for (;;) {
+                    const { done } = await reader.read();
+                    if (done) {
+                        return;
+                    }
+                }
+            },
+        };
+    }
+
+    it('ends the stream when its session is logged out', async () => {
+        const cookie = await signedIn();
+        const stream = await openStream(cookie, 'services=gatekeeper&tail=1');
+        await stream.until('gk two');
+
+        await request(app()).post('/api/logout').set('Cookie', cookie).expect(200);
+
+        await stream.ended();
+        expect(docker.followed[0].destroyed).toBe(true);
+    });
+
+    it('ends the whole stream when one container\'s log ends, so the client reconnects', async () => {
+        const cookie = await signedIn();
+        const stream = await openStream(cookie, 'tail=1');
+        await stream.until('km err');
+
+        docker.followed[0].end();
+
+        await stream.ended();
+        expect(docker.followed.every(f => f.destroyed)).toBe(true);
+    });
+
+    it('closes the streams it opened when another fails to open', async () => {
+        docker.containers.push({ service: 'broken', failLogs: true });
+        const cookie = await signedIn();
+        const logged = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+        const res = await request(app()).get('/api/logs/stream').set('Cookie', cookie);
+
+        expect(logged).toHaveBeenCalled();
+        logged.mockRestore();
+        expect(res.text).toContain('event: failure\ndata: {"error":"Internal error"}');
+        expect(docker.followed).toHaveLength(2);
+        expect(docker.followed.every(f => f.destroyed)).toBe(true);
     });
 
     it('streams the tail and then new lines as server-sent events, and stops following on disconnect', async () => {

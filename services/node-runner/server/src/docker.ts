@@ -74,12 +74,17 @@ export class DockerError extends Error {
     }
 }
 
+export type Transport = (options: http.RequestOptions, callback: (res: http.IncomingMessage) => void) => http.ClientRequest;
+
 // Talks to the Engine API over its Unix socket. Requests carry no API version
 // prefix, so the daemon answers with its own current version.
-export function createDockerApi(socketPath: string): DockerApi {
+export function createDockerApi(
+    socketPath: string,
+    transport: Transport = (options, callback) => http.request({ ...options, socketPath }, callback),
+): DockerApi {
     function request(path: string): Promise<http.IncomingMessage> {
         return new Promise((resolve, reject) => {
-            const req = http.request({ socketPath, path, method: 'GET' }, res => {
+            const req = transport({ path, method: 'GET' }, res => {
                 if ((res.statusCode ?? 500) >= 400) {
                     let body = '';
                     res.setEncoding('utf-8');
@@ -98,7 +103,7 @@ export function createDockerApi(socketPath: string): DockerApi {
                 }
                 resolve(res);
             });
-            req.on('error', error => reject(new DockerError(`Docker is not reachable at ${socketPath}: ${error.message}`, 503)));
+            req.on('error', error => reject(new DockerError(`Docker is not reachable at ${socketPath}: ${error.message || (error as NodeJS.ErrnoException).code}`, 503)));
             req.end();
         });
     }

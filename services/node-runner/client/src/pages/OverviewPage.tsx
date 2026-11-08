@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import type { ServiceStatus, StatusReport } from '../api';
 import ServiceDetail from '../components/ServiceDetail';
 import StatusBadge from '../components/StatusBadge';
-import { duration, PROBLEM } from '../format';
+import { duration, PROBLEM, verdict } from '../format';
 
 interface Props {
     report: StatusReport | null;
@@ -23,7 +23,7 @@ function meta(service: ServiceStatus): string {
     return parts.join(' · ');
 }
 
-function summary(report: StatusReport): string {
+function describe(report: StatusReport): string {
     const c = report.counts;
     const parts = [
         `${c.healthy} healthy`,
@@ -53,29 +53,20 @@ export default function OverviewPage({ report, error, onOpenLogs, onUnauthorized
             : <Skeleton variant="rounded" height={240} />;
     }
 
-    const problems = report.services.filter(s => PROBLEM.includes(s.health));
+    const summary = verdict(report);
     const selectedService = report.services.find(s => s.service === selected) ?? null;
 
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             {error && <Alert severity="warning">Status is not updating: {error}</Alert>}
-            {problems.length > 0
-                ? (
-                    <Alert
-                        severity="error"
-                        action={<Button color="inherit" size="small" onClick={() => setSelected(problems[0].service)}>Show</Button>}
-                    >
-                        {problems.map(p => `${p.service} ${p.health}`).join(', ')}
-                    </Alert>
-                )
-                : report.services.length > 0 && <Alert severity="success">All services healthy</Alert>}
-            {report.services.length === 0 && (
-                <Alert severity="info">
-                    No containers found for Compose project <b>{report.project}</b>. The node is not running, or
-                    node-runner is looking at a different project.
-                </Alert>
-            )}
-            <Typography variant="body2" color="text.secondary">{summary(report)}</Typography>
+            <Alert
+                severity={summary.severity}
+                action={summary.services.length > 0 && <Button color="inherit" size="small" onClick={() => setSelected(summary.services[0])}>Show</Button>}
+            >
+                {summary.text}
+                {report.services.length === 0 && '. The node is not running, or node-runner is looking at a different project.'}
+            </Alert>
+            <Typography variant="body2" color="text.secondary">{describe(report)}</Typography>
 
             {groups.map(([group, services]) => (
                 <Box component="section" key={group} sx={{ display: 'flex', flexDirection: 'column', gap: 1.25 }}>
