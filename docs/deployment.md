@@ -4,6 +4,15 @@ This guide walks you through deploying an Archon node, from a core DID-only setu
 
 For the full stack (`docker-compose.yml` and its profiles), every `.env` change and every start, stop or update in this guide can also be made from a browser with [node-runner](#2-managing-the-node-with-node-runner), which shows what each change will do before it runs. The minimal stack in [§3](#3-core-node-did-only) is run from the shell.
 
+**Following this guide as an agent.** Every step can be run from a shell; node-runner (§2) needs a browser and can be skipped. The [archon-noderunner skill](https://github.com/archetech/archon/tree/main/deploy/claude-skill/archon-noderunner) is a staged installer for agents built on this guide. Some decisions belong to the node's operator; stop and ask rather than choose for them:
+
+- the wallet passphrase (`ARCHON_PASSPHRASE`) and the node agent name (`ARCHON_NODE_ID`), which cannot be changed later without consequences;
+- anything that spends money: funding a registry's writer wallet, opening Lightning channels, paid providers;
+- exposing a service publicly: binding a port beyond `127.0.0.1`, DNS, a reverse proxy, or Tor;
+- running a Cashu mint, which holds other people's funds.
+
+Keep secrets out of terminal output and logs: write generated values straight into `.env`, as Initial Setup does, rather than printing them.
+
 ## Table of Contents
 
 1. [Prerequisites](#1-prerequisites)
@@ -37,24 +46,34 @@ For the full stack (`docker-compose.yml` and its profiles), every `.env` change 
 git clone https://github.com/archetech/archon.git
 cd archon
 cp sample.env .env
+chmod 600 .env
 ```
 
 To try a node out before configuring the full stack, use the minimal compose
 file instead — see [§3](#3-core-node-did-only).
 
-Set your user/group IDs so containers run with the correct permissions:
+Set your user and group IDs, so containers run with the correct permissions,
+and generate the admin API key. These commands write the values into `.env`
+without printing the key:
 
 ```bash
-# Add these to your .env
-ARCHON_UID=$(id -u)
-ARCHON_GID=$(id -g)
+sed -i "s/^ARCHON_UID=.*/ARCHON_UID=$(id -u)/; s/^ARCHON_GID=.*/ARCHON_GID=$(id -g)/" .env
+sed -i "s/^ARCHON_ADMIN_API_KEY=.*/ARCHON_ADMIN_API_KEY=$(openssl rand -hex 32)/" .env
 ```
 
-Generate an admin API key:
+Then edit `.env` and set the three values only the operator can choose:
+
+| Setting | Sample value | What it is |
+|---|---|---|
+| `ARCHON_PASSPHRASE` | `CHANGE_ME` | Encrypts the node's wallet. Keymaster runs with any non-empty value, including the published `CHANGE_ME` |
+| `ARCHON_NODE_ID` | `mynodeID` | The name of the node's own agent, created on first start. Changing it later creates a new agent rather than renaming this one |
+| `ARCHON_NODE_NAME` | `mynodeName` | The node's name on the Hyperswarm network |
+
+Before the first start, check that none of the sample values remain. This
+prints nothing when `.env` is ready:
 
 ```bash
-# Add to .env as ARCHON_ADMIN_API_KEY
-openssl rand -hex 32
+grep -E '^ARCHON_(ADMIN_API_KEY|PASSPHRASE)=(CHANGE_ME)?$|^ARCHON_NODE_(ID|NAME)=(mynode(ID|Name))?$|^ARCHON_[UG]ID=$' .env
 ```
 
 Internal service-to-service admin requests use the `X-Archon-Admin-Key` header. Reserve `Authorization` for user/session/OAuth-style flows.
@@ -78,7 +97,9 @@ Compose project, so stopping the node does not stop it. It manages the full
 stack defined by `docker-compose.yml`; it does not use
 `docker/compose/minimal.yml`, so run the minimal stack from the shell.
 
-It needs the checkout. If you have not created `.env` as in
+It needs the checkout and a browser; without a browser, skip this section and
+run the node from the shell as the rest of this guide describes. If you have
+not created `.env` as in
 [Initial Setup](#initial-setup), node-runner's Configuration page creates it
 from `sample.env`, with your user and group, a generated admin key, the node
 agent name, node name and wallet passphrase you choose, and no profiles
@@ -212,7 +233,7 @@ COMPOSE_PROFILES=
 COMPOSE_PROFILES=hyperswarm,cli,explorer,gatekeeper-client,keymaster-client,react-wallet,observability,btc-signet
 ```
 
-Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `lightning`, `drawbridge`, `herald`, `tor`, `didcomm`, `zcash-mainnet`, `eth-mainnet`, `eth-sepolia`, `sol-mainnet`, `sol-devnet`, `pinning`, and `filecoin`.
+Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `mongodb`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `btc-testnet4-hosted`, `lightning`, `drawbridge`, `herald`, `tor`, `didcomm`, `cashu`, `zcash-mainnet`, `eth-mainnet`, `eth-sepolia`, `sol-mainnet`, `sol-devnet`, `pinning`, and `filecoin`.
 
 `drawbridge`, `lightning`, `herald`, and `tor` are independent — each starts only what it is named after, and they compose freely. See [§9](#9-adding-drawbridge-api-gateway--tor).
 
@@ -262,12 +283,21 @@ Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keyma
 ### Start and Verify
 
 ```bash
-COMPOSE_PROFILES= docker compose up -d
-docker compose logs -f gatekeeper   # watch for startup
+# Start and wait until every service is running and healthy
+COMPOSE_PROFILES= docker compose up -d --wait
 
-# Verify gatekeeper is running
-curl http://localhost:4224/api/v1/version
+# Each prints "ready" only when the service reports itself ready
+curl -fsS http://localhost:4224/api/v1/ready | grep -Eq '^(true|\{"ready":true)' && echo ready
+curl -fsS http://localhost:4226/api/v1/ready | grep -Eq '^(true|\{"ready":true)' && echo ready
 ```
+
+If `--wait` fails, `docker compose ps` shows which service is not healthy and
+`docker compose logs --tail 100 <service>` shows why. (`logs -f` follows the
+log until interrupted, so use it only interactively.)
+
+In the Verify steps below, `curl -fsS` exits non-zero when a request fails. A
+`/ready` endpoint answers HTTP 200 even when the service is not ready, with
+`false` or `{"ready":false,...}`, so its checks also test the response.
 
 Optional UIs when their profiles are enabled:
 
@@ -325,10 +355,10 @@ ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,BTC:mainnet
 
 ```bash
 # Mainnet mediator metrics
-curl http://localhost:4234/metrics
+curl -fsS http://localhost:4234/metrics
 
 # Signet mediator metrics (if enabled)
-curl http://localhost:4236/metrics
+curl -fsS http://localhost:4236/metrics
 ```
 
 ---
@@ -373,10 +403,10 @@ COMPOSE_PROFILES=hyperswarm,zcash-mainnet
 
 ```bash
 # Zcash mediator metrics
-curl http://localhost:4238/metrics
+curl -fsS http://localhost:4238/metrics
 
 # Zcash wallet metrics
-curl http://localhost:4251/metrics
+curl -fsS http://localhost:4251/metrics
 ```
 
 Grafana includes chain mediator dashboards, including **Zcash Mediator (ZEC:mainnet)**, when the observability stack is enabled.
@@ -458,16 +488,16 @@ ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,ETH:sepolia
 
 ```bash
 # Ethereum mainnet mediator metrics
-curl http://localhost:4246/metrics
+curl -fsS http://localhost:4246/metrics
 
 # Ethereum mainnet wallet metrics
-curl http://localhost:4255/metrics
+curl -fsS http://localhost:4255/metrics
 
 # Ethereum Sepolia mediator metrics
-curl http://localhost:4239/metrics
+curl -fsS http://localhost:4239/metrics
 
 # Ethereum Sepolia wallet metrics
-curl http://localhost:4253/metrics
+curl -fsS http://localhost:4253/metrics
 ```
 
 The reference Solidity contract lives at `services/mediators/ethereum/contracts/ArchonRegistry.sol`.
@@ -532,16 +562,16 @@ ARCHON_GATEKEEPER_REGISTRIES=hyperswarm,SOL:devnet
 
 ```bash
 # Solana mainnet mediator metrics
-curl http://localhost:4248/metrics
+curl -fsS http://localhost:4248/metrics
 
 # Solana mainnet wallet metrics
-curl http://localhost:4257/metrics
+curl -fsS http://localhost:4257/metrics
 
 # Solana Devnet mediator metrics
-curl http://localhost:4249/metrics
+curl -fsS http://localhost:4249/metrics
 
 # Solana Devnet wallet metrics
-curl http://localhost:4263/metrics
+curl -fsS http://localhost:4263/metrics
 ```
 
 ---
@@ -602,7 +632,7 @@ ARCHON_PIN_ORIGINS=/ip4/203.0.113.10/tcp/4001/p2p/12D3KooW...
 ### Verify
 
 ```bash
-curl http://localhost:4273/metrics
+curl -fsS http://localhost:4273/metrics
 ```
 
 The mediator leaves operations queued while a provider reports `queued` or `pinning`, and clears them only after the provider reports `pinned`.
@@ -695,6 +725,7 @@ Note that `drawbridge` alone no longer brings in Lightning. To paywall the API w
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE` | empty | CLN rune used by the mediator; auto-loaded from `./data/cln-mainnet/drawbridge/rune.txt` in the bundled stack |
 | `ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL` | `http://lnbits:5000` | LNbits base URL used by the mediator |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | *(auto)* | Public Drawbridge URL used for published invoice endpoints |
+| `ARCHON_HERALD_SESSION_SECRET` | *(empty)* | **Required with the `herald` profile.** Herald refuses to start without it. Generate it into `.env` as Initial Setup does for the admin key: `sed -i "s/^ARCHON_HERALD_SESSION_SECRET=.*/ARCHON_HERALD_SESSION_SECRET=$(openssl rand -hex 32)/" .env` |
 | `ARCHON_TOR_SOCKS_PORT` | `127.0.0.1:9050` | Optional host-side Tor SOCKS bind; use `HOST_IP:HOST_PORT` such as `127.0.0.1:9051` when overriding |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX` | `100` | Max requests per window |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW` | `60` | Rate limit window in seconds |
@@ -711,7 +742,7 @@ The Drawbridge entrypoint script handles secrets automatically:
 ### Verify
 
 ```bash
-curl http://localhost:4222/api/v1/ready
+curl -fsS http://localhost:4222/api/v1/ready | grep -Eq '^(true|\{"ready":true)' && echo ready
 ```
 
 Optional UIs when Drawbridge is enabled:
@@ -819,7 +850,7 @@ open http://localhost:3002
 open http://localhost:5000
 
 # Lightning mediator health
-curl http://localhost:4235/ready
+curl -fsS http://localhost:4235/ready | grep -Eq '^(true|\{"ready":true)' && echo ready
 ```
 
 ### Cashu Mint (Optional, Experimental)
@@ -1053,7 +1084,7 @@ Check Zebra RPC connectivity and credentials:
 ```bash
 docker compose logs zcash-mainnet-mediator
 docker compose logs zcash-mainnet-wallet
-curl http://localhost:4238/metrics
+curl -fsS http://localhost:4238/metrics
 ```
 
 Verify `ARCHON_ZEC_HOST`, `ARCHON_ZEC_PORT`, `ARCHON_ZEC_USER`, and `ARCHON_ZEC_PASS` are correct and reachable from inside the Docker network. Also confirm `ARCHON_GATEKEEPER_REGISTRIES` includes `ZEC:mainnet`; otherwise Gatekeeper will not accept queued Zcash operations.
