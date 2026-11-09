@@ -16,7 +16,7 @@ services:
       - ARCHON_DIDCOMM_PORT=4236
       - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
-      - ARCHON_DIDCOMM_UPLOAD_LIMIT=${ARCHON_DIDCOMM_UPLOAD_LIMIT}
+      - ARCHON_DIDCOMM_UPLOAD_LIMIT=${ARCHON_DIDCOMM_UPLOAD_LIMIT:-}
       # Storage caps. Deposit is unauthenticated by design, so these bound
       # growth; TTLs alone only bound retention. Byte-based, not counts.
       # The total cap is enforced by the memory backend only -- on redis,
