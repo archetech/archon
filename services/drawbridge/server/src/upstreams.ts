@@ -38,5 +38,7 @@ export function upstreamURL(upstream: Upstream, env: NodeJS.ProcessEnv = process
     if (profiles === undefined) {
         return value ?? upstream.standalone;
     }
-    return profiles.split(',').map(p => p.trim()).includes(upstream.profile) ? upstream.container : '';
+    // `*` enables every profile, as it does for Compose.
+    const enabled = profiles.split(',').map(p => p.trim());
+    return enabled.includes('*') || enabled.includes(upstream.profile) ? upstream.container : '';
 }

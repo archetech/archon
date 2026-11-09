@@ -25,6 +25,10 @@ describe('upstreamURL', () => {
         it.each(Object.values(UPSTREAMS))('resolves $variable from the $profile profile', upstream => {
             expect(upstreamURL(upstream, { ARCHON_COMPOSE_PROFILES: upstream.profile })).toBe(upstream.container);
         });
+
+        it.each(Object.values(UPSTREAMS))('resolves $variable when every profile is enabled with *', upstream => {
+            expect(upstreamURL(upstream, { ARCHON_COMPOSE_PROFILES: '*' })).toBe(upstream.container);
+        });
     });
 
     describe('outside Compose', () => {
