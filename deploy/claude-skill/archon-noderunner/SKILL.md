@@ -27,7 +27,7 @@ Container set (6): `gatekeeper`, `keymaster`, `redis`, `ipfs` (always-on core), 
 | Placeholder | Source |
 |---|---|
 | `{{UID}}`, `{{GID}}` | `id -u` and `id -g` of the user that owns the checkout |
-| `{{ADMIN_API_KEY}}` | Generate with `openssl rand -hex 32` and write it straight into `.env` without printing it, e.g. `sed -i "s/{{ADMIN_API_KEY}}/$(openssl rand -hex 32)/" .env` |
+| `{{ADMIN_API_KEY}}` | Generate with `openssl rand -hex 32` and write it into `.env` without printing it or passing it as a command argument, which `ps` shows to other users: `key=$(openssl rand -hex 32); sed -i '/^ARCHON_ADMIN_API_KEY=/d' .env && printf 'ARCHON_ADMIN_API_KEY=%s\n' "$key" >> .env; unset key` |
 | `{{PASSPHRASE}}` | **🛑 Human checkpoint.** Ask the operator to choose it and keep it safe; it encrypts the node's wallet. Never invent it and never echo it back |
 | `{{NODE_NAME}}`, `{{NODE_ID}}` | `--node-name` and `--node-id`. The node ID is fixed once the node first starts |
 | `{{DOMAIN}}`, `{{ADMIN_EMAIL}}`, `{{UPSTREAM_URL}}` | `--domain`, the operator's email, and the upstream Archon |

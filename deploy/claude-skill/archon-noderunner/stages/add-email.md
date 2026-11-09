@@ -16,7 +16,7 @@ Enable Herald, the node's name service (`/names/*`, `/.well-known/*`), together 
    - the `From:` address for mail not sent by a named user (default `dmail@<domain>`), on the authenticated domain;
    - the parse host for inbound mail (default `parse.<domain>`).
 
-2. **Splice** into `.env`. Generate the session and webhook secrets with `openssl rand -hex 32` and write them without printing them:
+2. **Splice** into `.env`. Generate the session and webhook secrets with `openssl rand -hex 32` and write them as SKILL.md writes the admin key, through a shell variable and `printf`, so they are neither printed nor passed as command arguments:
    ```
    ARCHON_HERALD_DOMAIN={{DOMAIN}}
    ARCHON_HERALD_SESSION_SECRET={{generated}}

@@ -54,11 +54,15 @@ file instead — see [§3](#3-core-node-did-only).
 
 Set your user and group IDs, so containers run with the correct permissions,
 and generate the admin API key. These commands write the values into `.env`
-without printing the key:
+without printing the key. The key goes through a shell variable and the
+`printf` builtin, so it never appears in a command's arguments, which other
+users on the host can read with `ps`:
 
 ```bash
 sed -i "s/^ARCHON_UID=.*/ARCHON_UID=$(id -u)/; s/^ARCHON_GID=.*/ARCHON_GID=$(id -g)/" .env
-sed -i "s/^ARCHON_ADMIN_API_KEY=.*/ARCHON_ADMIN_API_KEY=$(openssl rand -hex 32)/" .env
+key=$(openssl rand -hex 32)
+sed -i '/^ARCHON_ADMIN_API_KEY=/d' .env && printf 'ARCHON_ADMIN_API_KEY=%s\n' "$key" >> .env
+unset key
 ```
 
 Then edit `.env` and set the three values only the operator can choose:
@@ -725,7 +729,7 @@ Note that `drawbridge` alone no longer brings in Lightning. To paywall the API w
 | `ARCHON_LIGHTNING_MEDIATOR_CLN_RUNE` | empty | CLN rune used by the mediator; auto-loaded from `./data/cln-mainnet/drawbridge/rune.txt` in the bundled stack |
 | `ARCHON_LIGHTNING_MEDIATOR_LNBITS_URL` | `http://lnbits:5000` | LNbits base URL used by the mediator |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | *(auto)* | Public Drawbridge URL used for published invoice endpoints |
-| `ARCHON_HERALD_SESSION_SECRET` | *(empty)* | **Required with the `herald` profile.** Herald refuses to start without it. Generate it into `.env` as Initial Setup does for the admin key: `sed -i "s/^ARCHON_HERALD_SESSION_SECRET=.*/ARCHON_HERALD_SESSION_SECRET=$(openssl rand -hex 32)/" .env` |
+| `ARCHON_HERALD_SESSION_SECRET` | *(empty)* | **Required with the `herald` profile.** Herald refuses to start without it. Generate it into `.env` as Initial Setup does for the admin key: `key=$(openssl rand -hex 32); sed -i '/^ARCHON_HERALD_SESSION_SECRET=/d' .env && printf 'ARCHON_HERALD_SESSION_SECRET=%s\n' "$key" >> .env; unset key` |
 | `ARCHON_TOR_SOCKS_PORT` | `127.0.0.1:9050` | Optional host-side Tor SOCKS bind; use `HOST_IP:HOST_PORT` such as `127.0.0.1:9051` when overriding |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_MAX` | `100` | Max requests per window |
 | `ARCHON_DRAWBRIDGE_RATE_LIMIT_WINDOW` | `60` | Rate limit window in seconds |
