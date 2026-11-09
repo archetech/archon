@@ -8,12 +8,11 @@ No human checkpoint required — this is the smoothest add-stage. Free to run wi
 
 1. **Splice** into `.env`:
    ```
-   ARCHON_DIDCOMM_URL=http://didcomm:4236
    ARCHON_DIDCOMM_PORT=4236
    ARCHON_DIDCOMM_HOST_BIND=127.0.0.1
    ARCHON_DIDCOMM_DB=redis
    ```
-   Append `didcomm` to `COMPOSE_PROFILES`.
+   Append `didcomm` to `COMPOSE_PROFILES`. When Drawbridge runs, it offers the relay because the profile is listed; do not set `ARCHON_DIDCOMM_URL`.
 
 2. **Caddy** — append handler inside the `{{DOMAIN}}` block. The published endpoint is the bare `https://<domain>/didcomm`, and senders POST to it exactly as published, so the matcher must cover `/didcomm` itself as well as the paths under it. `handle /didcomm/*` does not match `/didcomm`, and every delivery to the node then fails with 404.
 
