@@ -154,7 +154,6 @@ describe('preview', () => {
         expect(p.create).toEqual(['herald']);
         expect(p.stateful).toEqual(['cln-mainnet-node']);
         expect(p.warnings.map(w => w.message)).toEqual([
-            'The herald profile runs Herald, but Drawbridge only offers it when ARCHON_HERALD_URL is set.',
             'herald is enabled without drawbridge, so nothing fronts it.',
         ]);
     });

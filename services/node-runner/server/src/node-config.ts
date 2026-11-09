@@ -180,8 +180,7 @@ export class NodeConfig {
             ARCHON_PASSPHRASE: passphrase,
             COMPOSE_PROFILES: '',
         });
-        const { byKey } = await this.catalog();
-        const clears = pairingWarnings([], envValues(parseEnv(text)), byKey).filter(w => w.fix?.value === '').map(w => [w.fix!.key, '']);
+        const clears = pairingWarnings([], envValues(parseEnv(text))).filter(w => w.fix?.value === '').map(w => [w.fix!.key, '']);
         if (clears.length) {
             text = applyChanges(text, Object.fromEntries(clears));
         }
@@ -261,7 +260,7 @@ export class NodeConfig {
                 ...sections.map(section => ({ name: section.name, settings: section.settings.map(s => view(s, s.key)) })),
                 ...(unknown.length ? [{ name: 'Other settings in .env', settings: unknown.map(key => view(null, key)) }] : []),
             ],
-            warnings: envMissing ? [] : [...requiredWarnings(values, this.ids), ...pairingWarnings([...enabled], values, byKey)],
+            warnings: envMissing ? [] : [...requiredWarnings(values, this.ids), ...pairingWarnings([...enabled], values)],
             configError,
             envMissing,
         };
@@ -355,7 +354,7 @@ export class NodeConfig {
             source: current,
             reviewed: this.fingerprint(current),
             diff,
-            warnings: [...requiredWarnings(after, this.ids), ...pairingWarnings(parseProfiles(after.get('COMPOSE_PROFILES')), after, byKey)],
+            warnings: [...requiredWarnings(after, this.ids), ...pairingWarnings(parseProfiles(after.get('COMPOSE_PROFILES')), after)],
             plan,
             stateful,
             empty,

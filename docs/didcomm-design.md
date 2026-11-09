@@ -346,8 +346,9 @@ overrides for ad-hoc use.
 
 **DIDComm is an optional node service, advertised via a capability manifest.** Drawbridge serves
 `GET /api/v1/capabilities` → `{ didcomm, lightning, names }`, where each flag reflects whether the
-downstream service URL is configured (an operator opts a service *out* by setting its URL empty, e.g.
-`ARCHON_DIDCOMM_URL=`; an unset var keeps the default). When off, the corresponding proxy mount
+downstream service URL resolves to a non-empty value (under the bundled Compose, when the service's
+profile is enabled; outside it, an operator opts a service *out* by setting its URL empty, e.g.
+`ARCHON_DIDCOMM_URL=`). When off, the corresponding proxy mount
 (`/didcomm`, `/lightning`, `/names`) returns **501** rather than proxying to nothing. The keymaster
 fetches the manifest once (memoized) and gates the relevant verbs: `send`/`receive`/`mediate`/`publishDidComm`
 on `didcomm`, all Lightning ops on `lightning` (via the single `getLightningConfig` chokepoint). A node
