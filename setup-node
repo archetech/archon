@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Starts or updates node-runner, then prints where to open it and, until an
+# admin password is set, the one-time setup code the first visit asks for.
+set -euo pipefail
+
+cd "$(dirname "$(readlink -f "$0")")"
+
+./node-runner up -d --build
+
+# The address Docker actually published, so .env overrides need no parsing here.
+published="$(./node-runner port node-runner 4280 | head -n 1)"
+[ -n "$published" ] || { echo "setup-node: node-runner did not publish port 4280" >&2; exit 1; }
+port="${published##*:}"
+host="${published%:*}"
+host="${host#[}"
+host="${host%]}"
+
+case "$host" in
+    0.0.0.0 | ::) probe=127.0.0.1; host="$(hostname -f 2>/dev/null || hostname)" ;;
+    *) probe="$host" ;;
+esac
+case "$host" in
+    *:*) url="http://[$host]:$port" ;;
+    *) url="http://$host:$port" ;;
+esac
+
+# node-runner writes the setup code before it starts listening, so once the
+# port answers the code is on disk.
+for _ in $(seq 60); do
+    if (exec 3<>"/dev/tcp/$probe/$port") 2>/dev/null; then
+        ready=1
+        break
+    fi
+    sleep 1
+done
+if [ -z "${ready:-}" ]; then
+    echo "setup-node: node-runner is not answering on $probe:$port; see ./node-runner logs" >&2
+    exit 1
+fi
+
+echo
+echo "node-runner is running at $url"
+
+if [ -f data/node-runner/admin-password ]; then
+    echo "Sign in with the admin password."
+elif [ -f data/node-runner/setup-code ]; then
+    echo "Setup code: $(cat data/node-runner/setup-code)"
+    echo "The first visit asks for this code and then for an admin password."
+fi
+
+case "$probe" in
+    127.* | ::1)
+        # SSH_CONNECTION is "client port server port": the address you reached.
+        if [ -n "${SSH_CONNECTION:-}" ]; then
+            server="$(echo "$SSH_CONNECTION" | cut -d ' ' -f 3)"
+            echo
+            echo "It listens on loopback only. From your own machine, tunnel the port first:"
+            echo "  ssh -L $port:$probe:$port $(id -un)@$server"
+            echo "then open http://127.0.0.1:$port"
+        fi
+        ;;
+esac
