@@ -28,9 +28,10 @@ export const PROFILE_DESCRIPTIONS: Record<string, string> = {
     filecoin: 'Filecoin storage for operations.',
 };
 
+// A fix sets `key` to `value`, or to a value the client generates.
 export interface Warning {
     message: string;
-    fix?: { key: string, value: string, label: string };
+    fix?: { key: string, label: string, value?: string, generate?: 'hex-32' };
 }
 
 export function parseProfiles(value: string | undefined): string[] {
@@ -120,21 +121,35 @@ export function requiredWarnings(values: Map<string, string>, ids: { uid: number
             });
         }
     }
-    const secrets: [string, string][] = [
-        ['ARCHON_ADMIN_API_KEY', 'Gatekeeper will not start without it. Generate one with `openssl rand -hex 32`.'],
-        ['ARCHON_PASSPHRASE', 'Keymaster will not start without it. It encrypts the wallet, so change it only on a node with no wallet yet.'],
+    // An unset secret stops its service at startup; the placeholder does not,
+    // so the service runs on a value anyone can read in sample.env.
+    const secrets = [
+        {
+            key: 'ARCHON_ADMIN_API_KEY',
+            unset: 'Gatekeeper will not start without it.',
+            placeholder: 'Gatekeeper accepts it, so its admin routes are protected by a published key.',
+            // Random bytes, so the browser generates it: secrets never travel
+            // from node-runner to the client.
+            fix: { key: 'ARCHON_ADMIN_API_KEY', generate: 'hex-32' as const, label: 'Generate a key' },
+        },
+        {
+            key: 'ARCHON_PASSPHRASE',
+            unset: 'Keymaster will not start without it.',
+            placeholder: 'Keymaster accepts it, so the wallet and the admin key are protected by a published passphrase.',
+            note: 'It encrypts the wallet, so change it only on a node with no wallet yet.',
+        },
     ];
     // Keymaster still reads the older name when the new one is empty.
     const effective = (key: string) => key === 'ARCHON_PASSPHRASE'
         ? values.get(key) || values.get('ARCHON_ENCRYPTED_PASSPHRASE')
         : values.get(key);
-    for (const [key, why] of secrets) {
-        const value = effective(key);
-        if (!value) {
-            warnings.push({ message: `${key} is not set. ${why}` });
-        }
-        else if (value === PLACEHOLDER) {
-            warnings.push({ message: `${key} is still the sample placeholder ${PLACEHOLDER}. ${why}` });
+    for (const secret of secrets) {
+        const value = effective(secret.key);
+        const why = !value ? `${secret.key} is not set. ${secret.unset}`
+            : value === PLACEHOLDER ? `${secret.key} is still the sample placeholder ${PLACEHOLDER}. ${secret.placeholder}`
+                : null;
+        if (why) {
+            warnings.push({ message: secret.note ? `${why} ${secret.note}` : why, ...(secret.fix && { fix: secret.fix }) });
         }
     }
     return warnings;

@@ -233,9 +233,27 @@ describe('required settings', () => {
         expect(view.warnings.map(w => [w.message.split(' ').slice(0, 4).join(' '), w.fix?.label])).toEqual([
             ['ARCHON_UID is not set,', 'Set ARCHON_UID=1000'],
             ['ARCHON_GID is not set,', 'Set ARCHON_GID=1000'],
-            ['ARCHON_ADMIN_API_KEY is still the', undefined],
+            ['ARCHON_ADMIN_API_KEY is still the', 'Generate a key'],
             ['ARCHON_PASSPHRASE is not set.', undefined],
         ]);
+    });
+
+    it('offers to generate an unset admin key in the browser, sending no value', async () => {
+        writeFileSync(join(nodeDir, '.env'), 'ARCHON_UID=1000\nARCHON_GID=1000\nARCHON_PASSPHRASE=a-long-passphrase\n');
+
+        const [warning] = (await config.view()).warnings;
+
+        expect(warning.message).toMatch(/^ARCHON_ADMIN_API_KEY is not set\. Gatekeeper will not start without it\.$/);
+        expect(warning.fix).toEqual({ key: 'ARCHON_ADMIN_API_KEY', generate: 'hex-32', label: 'Generate a key' });
+    });
+
+    it('says the placeholder passphrase runs Keymaster on a published value, offering no fix', async () => {
+        writeFileSync(join(nodeDir, '.env'), 'ARCHON_UID=1000\nARCHON_GID=1000\nARCHON_ADMIN_API_KEY=key\nARCHON_PASSPHRASE=CHANGE_ME\n');
+
+        const [warning] = (await config.view()).warnings;
+
+        expect(warning.message).toMatch(/published passphrase\. It encrypts the wallet/);
+        expect(warning.fix).toBeUndefined();
     });
 });
 
