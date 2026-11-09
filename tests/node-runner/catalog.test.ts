@@ -93,25 +93,22 @@ describe('isSecret', () => {
 });
 
 describe('pairingWarnings', () => {
-    const catalog = new Map(parseCatalog(`# Drawbridge
-# ARCHON_DIDCOMM_URL=http://didcomm:4236
-ARCHON_HERALD_URL=
-`).flatMap(s => s.settings).map(s => [s.key, s]));
-
     const messages = (profiles: string[], values: Record<string, string>) =>
-        pairingWarnings(profiles, new Map(Object.entries(values)), catalog);
+        pairingWarnings(profiles, new Map(Object.entries(values)));
 
-    it('offers the example URL when a profile runs a service Drawbridge does not offer', () => {
-        const [warning] = messages(['didcomm', 'drawbridge', 'tor'], {});
-
-        expect(warning.message).toBe('The didcomm profile runs the DIDComm relay, but Drawbridge only offers it when ARCHON_DIDCOMM_URL is set.');
-        expect(warning.fix).toEqual({ key: 'ARCHON_DIDCOMM_URL', value: 'http://didcomm:4236', label: 'Set ARCHON_DIDCOMM_URL=http://didcomm:4236' });
+    it('needs no URL for a profile, since Drawbridge reads the profiles', () => {
+        expect(messages(['didcomm', 'drawbridge', 'tor', 'herald', 'lightning', 'explorer', 'cashu'], {})).toEqual([]);
     });
 
-    it('offers to clear a URL whose profile is off', () => {
+    it('offers to clear a URL that names a container whose profile is off', () => {
         const [warning] = messages(['drawbridge'], { ARCHON_HERALD_URL: 'http://herald:4230' });
 
+        expect(warning.message).toBe('ARCHON_HERALD_URL points at the herald container without the herald profile, so Drawbridge would offer Herald while it is not running.');
         expect(warning.fix).toEqual({ key: 'ARCHON_HERALD_URL', value: '', label: 'Clear ARCHON_HERALD_URL' });
+    });
+
+    it('leaves a URL on another host alone', () => {
+        expect(messages(['drawbridge'], { ARCHON_HERALD_URL: 'https://herald.example', ARCHON_CASHU_MINT_URL: 'not a url' })).toEqual([]);
     });
 
     it('flags a Tor proxy without tor, fronted services without drawbridge, and mongodb without its profile', () => {
@@ -129,10 +126,7 @@ ARCHON_HERALD_URL=
         ]);
     });
 
-    it('uses what Compose would: an absent key falls back to the fragment default, not the sample value', () => {
-        // lightning on, its URL absent: Drawbridge gets an empty value.
-        expect(messages(['lightning', 'drawbridge'], {}).map(w => w.message)).toContain(
-            'The lightning profile runs Lightning, but Drawbridge only offers it when ARCHON_LIGHTNING_MEDIATOR_URL is set.');
+    it('uses what Compose would: an absent key falls back to the fragment default', () => {
         // Tor proxy absent: Compose defaults it to tor:9050.
         expect(messages(['didcomm', 'drawbridge'], { ARCHON_DIDCOMM_URL: 'http://didcomm:4236' }).map(w => w.message)).toContain(
             'The DIDComm relay still points at Tor, which is not enabled; .onion delivery would fail on connect.');

@@ -1,4 +1,3 @@
-import type { CatalogSetting } from './catalog.js';
 
 export const PROFILE_DESCRIPTIONS: Record<string, string> = {
     hyperswarm: 'Peer-to-peer gossip of DID operations.',
@@ -37,14 +36,25 @@ export function parseProfiles(value: string | undefined): string[] {
     return (value ?? '').split(',').map(p => p.trim()).filter(Boolean);
 }
 
-// Drawbridge offers a service when its upstream URL is set, independently of
-// whether the profile that runs it is enabled (see sample.env). Both or neither.
-const UPSTREAMS: { profile: string, key: string, what: string }[] = [
-    { profile: 'didcomm', key: 'ARCHON_DIDCOMM_URL', what: 'the DIDComm relay' },
-    { profile: 'herald', key: 'ARCHON_HERALD_URL', what: 'Herald' },
-    { profile: 'explorer', key: 'ARCHON_EXPLORER_URL', what: 'the explorer' },
-    { profile: 'lightning', key: 'ARCHON_LIGHTNING_MEDIATOR_URL', what: 'Lightning' },
+// Drawbridge offers a service at its container when the URL is empty and the
+// profile is enabled. A URL that is set is used as given, even when it names a
+// container whose profile is off.
+const UPSTREAMS: { profile: string, key: string, host: string, what: string }[] = [
+    { profile: 'didcomm', key: 'ARCHON_DIDCOMM_URL', host: 'didcomm', what: 'the DIDComm relay' },
+    { profile: 'herald', key: 'ARCHON_HERALD_URL', host: 'herald', what: 'Herald' },
+    { profile: 'explorer', key: 'ARCHON_EXPLORER_URL', host: 'explorer', what: 'the explorer' },
+    { profile: 'lightning', key: 'ARCHON_LIGHTNING_MEDIATOR_URL', host: 'lightning-mediator', what: 'Lightning' },
+    { profile: 'cashu', key: 'ARCHON_CASHU_MINT_URL', host: 'cashu-mint', what: 'the Cashu mint' },
 ];
+
+function hostOf(url: string): string | null {
+    try {
+        return new URL(url).hostname;
+    }
+    catch {
+        return null;
+    }
+}
 
 const FRONTED = ['herald', 'lightning', 'tor'];
 
@@ -58,27 +68,17 @@ const COMPOSE_DEFAULTS: Record<string, string> = {
 export function pairingWarnings(
     profiles: string[],
     values: Map<string, string>,
-    catalog: Map<string, CatalogSetting>,
 ): Warning[] {
     const on = new Set(profiles);
     // What Compose would use: the .env value when the key is there (even if
-    // empty), otherwise the fragment's own default. sample.env values are
-    // examples, used only to suggest a fix.
+    // empty), otherwise the fragment's own default.
     const value = (key: string) => values.has(key) ? values.get(key)! : COMPOSE_DEFAULTS[key] ?? '';
     const warnings: Warning[] = [];
 
-    for (const { profile, key, what } of UPSTREAMS) {
-        const url = value(key);
-        const example = catalog.get(key)?.example || catalog.get(key)?.default;
-        if (on.has(profile) && !url) {
+    for (const { profile, key, host, what } of UPSTREAMS) {
+        if (!on.has(profile) && hostOf(value(key)) === host) {
             warnings.push({
-                message: `The ${profile} profile runs ${what}, but Drawbridge only offers it when ${key} is set.`,
-                ...(example ? { fix: { key, value: example, label: `Set ${key}=${example}` } } : {}),
-            });
-        }
-        if (!on.has(profile) && url) {
-            warnings.push({
-                message: `${key} is set without the ${profile} profile, so Drawbridge would offer ${what} while it is not running.`,
+                message: `${key} points at the ${host} container without the ${profile} profile, so Drawbridge would offer ${what} while it is not running.`,
                 fix: { key, value: '', label: `Clear ${key}` },
             });
         }
