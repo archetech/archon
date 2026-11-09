@@ -71,6 +71,10 @@ function SettingField({ setting, draft, onChange, onDiscard }: {
     );
 }
 
+function randomHex(bytes: number): string {
+    return Array.from(crypto.getRandomValues(new Uint8Array(bytes)), b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export default function ConfigPage({ draft, onDraft, onReview, onUnauthorized }: Props) {
     const [view, setView] = useState<ConfigView | null>(null);
     const [error, setError] = useState('');
@@ -104,7 +108,11 @@ export default function ConfigPage({ draft, onDraft, onReview, onUnauthorized }:
         const next = enabled.includes(name) ? enabled.filter(p => p !== name) : [...enabled, name];
         onDraft({ ...draft, profiles: next });
     };
-    const fix = (warning: Warning) => warning.fix && setSetting(warning.fix.key, warning.fix.value);
+    const fix = ({ fix }: Warning) => {
+        if (fix) {
+            setSetting(fix.key, fix.generate === 'hex-32' ? randomHex(32) : fix.value ?? '');
+        }
+    };
 
     const needle = query.trim().toLowerCase();
     const sections = useMemo(() => (view?.sections ?? []).map(section => ({
