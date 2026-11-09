@@ -84,18 +84,22 @@ from `sample.env`, with your user and group, a generated admin key and a wallet
 passphrase you choose, and no profiles enabled. From the node directory:
 
 ```bash
-./node-runner up -d --build
+./setup-node
 ```
 
-Open http://127.0.0.1:4280. On a remote host, tunnel the port first:
+It builds and starts node-runner (`./node-runner up -d --build`), then prints
+the address to open and, until an admin password is set, the one-time setup
+code. The first visit asks for that code and then for an admin password. Run
+it again to update node-runner or to see the address and code again; the code
+is also in `data/node-runner/setup-code` and in node-runner's log
+(`./node-runner logs`).
+
+node-runner listens on http://127.0.0.1:4280. On a remote host, tunnel the
+port first (over SSH, `./setup-node` prints this command):
 
 ```bash
 ssh -L 4280:127.0.0.1:4280 <host>
 ```
-
-The first visit asks for a one-time setup code and then for an admin password.
-The code is in `data/node-runner/setup-code` and in node-runner's log
-(`./node-runner logs`).
 
 The rest of this guide still applies: its sections explain what each profile
 and setting does. Instead of editing `.env` and running `docker compose up -d`,

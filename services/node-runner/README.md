@@ -12,7 +12,8 @@ node-runner runs as its own Compose project, `archon-node-runner`, so stopping
 the node does not stop node-runner. From the node directory:
 
 ```bash
-./node-runner up -d --build     # start or update node-runner
+./setup-node                    # start or update node-runner, print its address and setup code
+./node-runner up -d --build     # start or update node-runner only
 ./node-runner logs              # its log, which shows the setup code
 ./node-runner down              # stop node-runner; the node keeps running
 ```
@@ -28,7 +29,8 @@ TLS. Do not expose it through Drawbridge or Tor.
 ## First run
 
 On its first start node-runner creates a one-time setup code. It writes the
-code to `data/node-runner/setup-code` and to its log (`./node-runner logs`).
+code to `data/node-runner/setup-code` and to its log (`./node-runner logs`),
+and `./setup-node` prints it.
 The first visit to the page asks for that code and then for an admin password
 of at least 12 characters. node-runner stores only a scrypt hash of the
 password, in `data/node-runner/admin-password`, and the setup code stops
