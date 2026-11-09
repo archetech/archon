@@ -42,7 +42,7 @@ jobs:
         run: npm ci
 
       - name: Set up Java 21
-        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78
         with:
           distribution: "temurin"
           java-version: "21"
@@ -85,7 +85,7 @@ jobs:
 
       # The downloaded artifact will be in the repository root
       - name: Create Release and Upload APK
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3
         with:
           files: app-debug.apk
           fail_on_unmatched_files: true
@@ -140,7 +140,7 @@ jobs:
           name: browser-extensions
 
       - name: Upload the extensions to the release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3
         with:
           files: archon-wallet-*.zip
           fail_on_unmatched_files: true
