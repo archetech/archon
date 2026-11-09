@@ -65,7 +65,12 @@ sed -i '/^ARCHON_ADMIN_API_KEY=/d' .env && printf 'ARCHON_ADMIN_API_KEY=%s\n' "$
 unset key
 ```
 
-Then edit `.env` and set the three values only the operator can choose:
+Then edit `.env` and set the three values only the operator can choose. Put
+each in single quotes, e.g. `ARCHON_PASSPHRASE='my pass #1 $phrase'`: Compose
+expands `$…` in an unquoted value and ends it at ` #`, so Keymaster would
+receive, and encrypt the wallet with, something other than what you typed. A
+value containing a single quote goes in double quotes instead, with `\`, `"`
+and `$` escaped by a backslash.
 
 | Setting | Sample value | What it is |
 |---|---|---|
@@ -77,7 +82,7 @@ Before the first start, check that none of the sample values remain. This
 prints nothing when `.env` is ready:
 
 ```bash
-grep -E '^ARCHON_(ADMIN_API_KEY|PASSPHRASE)=(CHANGE_ME)?$|^ARCHON_NODE_(ID|NAME)=(mynode(ID|Name))?$|^ARCHON_[UG]ID=$' .env
+grep -E "^ARCHON_(ADMIN_API_KEY|PASSPHRASE)=(CHANGE_ME|'CHANGE_ME'|'')?$|^ARCHON_NODE_(ID|NAME)=(mynode(ID|Name)|'mynode(ID|Name)'|'')?$|^ARCHON_[UG]ID=$" .env
 ```
 
 Internal service-to-service admin requests use the `X-Archon-Admin-Key` header. Reserve `Authorization` for user/session/OAuth-style flows.

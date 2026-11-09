@@ -23,6 +23,13 @@ function settingsIn(paths: string[]): Map<string, string[]> {
     return found;
 }
 
+// The whole name, followed by the end of the reference or a fallback
+// (`${NAME}`, `${NAME:-x}`, `${NAME-x}`, `${NAME:?x}`...), so a truncated name
+// does not pass as a prefix of a longer one.
+function reads(compose: string, name: string): boolean {
+    return new RegExp(`\\$\\{${name}[}:?+-]`).test(compose);
+}
+
 describe('archon-noderunner skill settings', () => {
     const skill = settingsIn(globSync(`${SKILL}/**/*.{md,template,sh}`));
     const compose = COMPOSE.map(path => readFileSync(path, 'utf-8')).join('\n');
@@ -32,9 +39,26 @@ describe('archon-noderunner skill settings', () => {
         expect(skill.has('ARCHON_HERALD_SESSION_SECRET')).toBe(true);
     });
 
+    it('matches whole names, not prefixes of longer ones', () => {
+        const ref = (body: string) => `$\{${body}}`;
+        const compose = `- ARCHON_PIN_API_TOKEN=${ref('ARCHON_PIN_API_TOKEN:-')}\n- ARCHON_X=${ref('ARCHON_X')}`;
+
+        expect(reads(compose, 'ARCHON_PIN_API_TOKEN')).toBe(true);
+        expect(reads(compose, 'ARCHON_X')).toBe(true);
+        expect(reads(compose, 'ARCHON_PIN_API')).toBe(false);
+    });
+
+    it('keeps the values the operator chooses in single quotes, which Compose reads literally', () => {
+        const template = readFileSync(`${SKILL}/templates/env.stage0.template`, 'utf-8');
+
+        for (const name of ['ARCHON_PASSPHRASE', 'ARCHON_NODE_ID', 'ARCHON_NODE_NAME']) {
+            expect(template).toMatch(new RegExp(`^${name}='\\{\\{[A-Z_]+\\}\\}'$`, 'm'));
+        }
+    });
+
     it('names only settings a Compose file reads', () => {
         const unread = [...skill.entries()]
-            .filter(([name]) => !INSTALLER_ONLY.has(name) && !compose.includes(`\${${name}`))
+            .filter(([name]) => !INSTALLER_ONLY.has(name) && !reads(compose, name))
             .map(([name, paths]) => `${name} (${[...new Set(paths)].join(', ')})`);
 
         expect(unread).toEqual([]);
@@ -44,7 +68,7 @@ describe('archon-noderunner skill settings', () => {
         const template = readFileSync(`${SKILL}/templates/env.stage0.template`, 'utf-8');
 
         for (const name of ['ARCHON_UID', 'ARCHON_GID', 'ARCHON_ADMIN_API_KEY', 'ARCHON_PASSPHRASE', 'ARCHON_NODE_ID']) {
-            expect(template).toMatch(new RegExp(`^${name}=\\{\\{[A-Z_]+\\}\\}$`, 'm'));
+            expect(template).toMatch(new RegExp(`^${name}='?\\{\\{[A-Z_]+\\}\\}'?$`, 'm'));
         }
     });
 
