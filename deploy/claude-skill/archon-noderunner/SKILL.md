@@ -28,8 +28,8 @@ Container set (6): `gatekeeper`, `keymaster`, `redis`, `ipfs` (always-on core), 
 |---|---|
 | `{{UID}}`, `{{GID}}` | `id -u` and `id -g` of the user that owns the checkout |
 | `{{ADMIN_API_KEY}}` | Generate with `openssl rand -hex 32` and write it into `.env` without printing it or passing it as a command argument, which `ps` shows to other users: `key=$(openssl rand -hex 32); sed -i '/^ARCHON_ADMIN_API_KEY=/d' .env && printf 'ARCHON_ADMIN_API_KEY=%s\n' "$key" >> .env; unset key` |
-| `{{PASSPHRASE}}` | **🛑 Human checkpoint.** Ask the operator to choose it and keep it safe; it encrypts the node's wallet. Never invent it and never echo it back |
-| `{{NODE_NAME}}`, `{{NODE_ID}}` | `--node-name` and `--node-id`. The node ID is fixed once the node first starts |
+| `{{PASSPHRASE}}` | **🛑 Human checkpoint.** Ask the operator to choose it and keep it safe; it encrypts the node's wallet. Never invent it and never echo it back. Keep it inside the template's single quotes: unquoted, Compose expands `$…` and cuts the value at ` #`, so the wallet would be encrypted with something other than what the operator chose. If it contains a single quote, write it in double quotes instead, escaping `\`, `"` and `$` with a backslash |
+| `{{NODE_NAME}}`, `{{NODE_ID}}` | `--node-name` and `--node-id`, quoted the same way as the passphrase. The node ID is fixed once the node first starts |
 | `{{DOMAIN}}`, `{{ADMIN_EMAIL}}`, `{{UPSTREAM_URL}}` | `--domain`, the operator's email, and the upstream Archon |
 
 Write `.env` with mode 600. Before starting, confirm no `{{` remains: `grep -c '{{' .env` must print 0.
