@@ -11,30 +11,44 @@ cd "$(dirname "$(readlink -f "$0")")"
 published="$(./node-runner port node-runner 4280 | head -n 1)"
 [ -n "$published" ] || { echo "setup-node: node-runner did not publish port 4280" >&2; exit 1; }
 port="${published##*:}"
-host="${published%:*}"
-host="${host#[}"
-host="${host%]}"
+bind="${published%:*}"
+bind="${bind#[}"
+bind="${bind%]}"
 
-case "$host" in
-    0.0.0.0 | ::) probe=127.0.0.1; host="$(hostname -f 2>/dev/null || hostname)" ;;
-    *) probe="$host" ;;
+# Where to check that node-runner answers, and the address to open.
+case "$bind" in
+    0.0.0.0) probe=127.0.0.1; host="$(hostname -f 2>/dev/null || hostname)" ;;
+    ::) probe=::1; host="$(hostname -f 2>/dev/null || hostname)" ;;
+    *) probe="$bind"; host="$bind" ;;
 esac
-case "$host" in
-    *:*) url="http://[$host]:$port" ;;
-    *) url="http://$host:$port" ;;
-esac
+bracket() {
+    case "$1" in
+        *:*) echo "[$1]" ;;
+        *) echo "$1" ;;
+    esac
+}
+url="http://$(bracket "$host"):$port"
 
-# node-runner writes the setup code before it starts listening, so once the
-# port answers the code is on disk.
+# Docker's port proxy accepts connections before node-runner listens, so wait
+# for an HTTP response from node-runner itself. It writes the setup code
+# before it starts listening, so once it answers the code is on disk.
+answers() {
+    timeout 2 bash -c '
+        exec 3<>"/dev/tcp/$1/$2" || exit 1
+        printf "GET / HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3
+        read -r status <&3
+        case "$status" in HTTP/1.?\ 200*) exit 0 ;; *) exit 1 ;; esac
+    ' _ "$probe" "$port" 2>/dev/null
+}
 for _ in $(seq 60); do
-    if (exec 3<>"/dev/tcp/$probe/$port") 2>/dev/null; then
+    if answers; then
         ready=1
         break
     fi
     sleep 1
 done
 if [ -z "${ready:-}" ]; then
-    echo "setup-node: node-runner is not answering on $probe:$port; see ./node-runner logs" >&2
+    echo "setup-node: node-runner is not answering on $(bracket "$probe"):$port; see ./node-runner logs" >&2
     exit 1
 fi
 
@@ -48,14 +62,17 @@ elif [ -f data/node-runner/setup-code ]; then
     echo "The first visit asks for this code and then for an admin password."
 fi
 
-case "$probe" in
+case "$bind" in
     127.* | ::1)
-        # SSH_CONNECTION is "client port server port": the address you reached.
+        # SSH_CONNECTION is "client port server port": the address and port
+        # this session reached.
         if [ -n "${SSH_CONNECTION:-}" ]; then
-            server="$(echo "$SSH_CONNECTION" | cut -d ' ' -f 3)"
+            read -r _ _ server server_port <<< "$SSH_CONNECTION"
+            ssh_port=""
+            [ "$server_port" = 22 ] || ssh_port="-p $server_port "
             echo
             echo "It listens on loopback only. From your own machine, tunnel the port first:"
-            echo "  ssh -L $port:$probe:$port $(id -un)@$server"
+            echo "  ssh ${ssh_port}-L $port:$(bracket "$bind"):$port $(id -un)@$server"
             echo "then open http://127.0.0.1:$port"
         fi
         ;;
