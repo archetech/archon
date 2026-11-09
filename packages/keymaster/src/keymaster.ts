@@ -3934,7 +3934,7 @@ export default class Keymaster implements KeymasterInterface {
 
     async removeAlias(alias: string): Promise<boolean> {
         await this.mutateWallet((wallet) => {
-            if (!hasName(wallet.aliases, alias)) {
+            if (!wallet.aliases || !hasName(wallet.aliases, alias)) {
                 return;
             }
             delete wallet.aliases[alias];
