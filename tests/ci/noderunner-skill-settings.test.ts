@@ -47,4 +47,13 @@ describe('archon-noderunner skill settings', () => {
             expect(template).toMatch(new RegExp(`^${name}=\\{\\{[A-Z_]+\\}\\}$`, 'm'));
         }
     });
+
+    it('has no placeholder outside a setting, so the filled file passes the skill\'s `{{` check', () => {
+        const template = readFileSync(`${SKILL}/templates/env.stage0.template`, 'utf-8');
+        const filled = template.split('\n')
+            .map(line => /^[A-Z0-9_]+=/.test(line) ? line.replace(/\{\{[A-Z_]+\}\}/g, 'x') : line)
+            .join('\n');
+
+        expect(filled).not.toContain('{{');
+    });
 });

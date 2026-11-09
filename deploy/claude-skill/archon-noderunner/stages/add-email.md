@@ -5,14 +5,15 @@ Enable Herald, the node's name service (`/names/*`, `/.well-known/*`), together 
 ## Prereqs
 
 - `drawbridge` enabled (`add-lightning` first, or add `drawbridge` alone), since Drawbridge is what fronts `/names/*`.
-- A SendGrid account with a verified sender for the `From:` address.
+- A SendGrid account with **Domain Authentication** for the node's domain. Herald sends a named user's dmail from `<name>@<domain>` and other mail from the configured `From:` address, so verifying a single sender is not enough.
 - DNS control for the domain, for the Inbound Parse MX record.
 
 ## Procedure
 
 1. **🛑 Human checkpoint — SendGrid.** Ask the operator for:
    - a SendGrid API key with Mail Send permission;
-   - the `From:` address SendGrid has verified (default `dmail@<domain>`);
+   - confirmation that SendGrid shows the domain as authenticated (Settings → Sender Authentication). If it does not, print the DNS records SendGrid gives for it and wait for the operator to add them and verify;
+   - the `From:` address for mail not sent by a named user (default `dmail@<domain>`), on the authenticated domain;
    - the parse host for inbound mail (default `parse.<domain>`).
 
 2. **Splice** into `.env`. Generate the session and webhook secrets with `openssl rand -hex 32` and write them without printing them:
