@@ -111,17 +111,14 @@ services:
       - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
       # Drawbridge offers an optional service (capability true, routes proxied)
-      # exactly when its URL is non-empty. Each service runs under its own
-      # profile, and Compose cannot read the selected profiles into a value, so
-      # every URL defaults EMPTY (capability false + 501) and is set alongside
-      # the profile: add `lightning` to COMPOSE_PROFILES AND set
-      # ARCHON_LIGHTNING_MEDIATOR_URL=http://lightning-mediator:4235; `didcomm`
-      # with ARCHON_DIDCOMM_URL=http://didcomm:4236. A default naming the
-      # container would advertise it on nodes that do not run its profile.
+      # when its URL is non-empty. Left empty, the URL points at the service's
+      # container when its profile is in COMPOSE_PROFILES and stays off
+      # otherwise, so these default empty and Drawbridge reads the profiles.
+      # Set a URL only to point at an upstream elsewhere. Profiles given with
+      # `--profile` instead of COMPOSE_PROFILES are not seen here.
+      - ARCHON_COMPOSE_PROFILES=${COMPOSE_PROFILES-}
       - ARCHON_LIGHTNING_MEDIATOR_URL=${ARCHON_LIGHTNING_MEDIATOR_URL-}
       - ARCHON_DIDCOMM_URL=${ARCHON_DIDCOMM_URL-}
-      # The Cashu mint is opt-in the same way: add `cashu` to COMPOSE_PROFILES
-      # AND set ARCHON_CASHU_MINT_URL=http://cashu-mint:8085.
       - ARCHON_CASHU_MINT_URL=${ARCHON_CASHU_MINT_URL-}
       # Public base URL advertised by GET /api/v1/didcomm-endpoint (used by
       # publish-didcomm). Without this the endpoint falls back to the Tor onion.
@@ -169,9 +166,7 @@ services:
       - ARCHON_DRAWBRIDGE_POPPY_AUTH_PER_SOURCE=${ARCHON_DRAWBRIDGE_POPPY_AUTH_PER_SOURCE:-120}
       - ARCHON_DRAWBRIDGE_POPPY_AUTH_GLOBAL=${ARCHON_DRAWBRIDGE_POPPY_AUTH_GLOBAL:-1200}
       - ARCHON_DRAWBRIDGE_PUBLIC_RATE_LIMIT_WINDOW=${ARCHON_DRAWBRIDGE_PUBLIC_RATE_LIMIT_WINDOW:-60}
-      # Set with the `herald` profile: ARCHON_HERALD_URL=http://herald:4230.
       - ARCHON_HERALD_URL=${ARCHON_HERALD_URL-}
-      # Set with the `explorer` profile: ARCHON_EXPLORER_URL=http://explorer:4000.
       - ARCHON_EXPLORER_URL=${ARCHON_EXPLORER_URL-}
     user: "${ARCHON_UID}:${ARCHON_GID}"
     ports:

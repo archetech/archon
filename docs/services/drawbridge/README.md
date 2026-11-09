@@ -48,10 +48,12 @@ has three jobs:
 
 ### Optional services
 
-DIDComm, Lightning, and Herald name resolution are **optional** — a node
-may not deploy them. Each is "offered" iff its downstream URL is
-configured (see [§8.2](#82-environment-variables)); an operator opts a
-service *out* by setting its URL **empty** (e.g. `ARCHON_DIDCOMM_URL=`).
+DIDComm, Lightning, Herald name resolution, the explorer and the Cashu
+mint are **optional** — a node may not deploy them. Each is "offered" iff
+its downstream URL resolves to a non-empty value (see
+[§8.2](#82-environment-variables)). Under the bundled Compose that follows
+the service's profile in `COMPOSE_PROFILES`; outside Compose an operator
+opts a service *out* by setting its URL **empty** (e.g. `ARCHON_DIDCOMM_URL=`).
 When a service is off:
 
 - `GET /api/v1/capabilities` reports it `false`, and
@@ -571,10 +573,12 @@ shared with the reference TypeScript service.
 | `ARCHON_DRAWBRIDGE_PORT` | `4222` | HTTP listen port. |
 | `ARCHON_BIND_ADDRESS` | `0.0.0.0` | |
 | `ARCHON_GATEKEEPER_URL` | `http://localhost:4224` | Upstream Gatekeeper. |
-| `ARCHON_HERALD_URL` | `http://localhost:4230` | Upstream Herald (for `/.well-known/*` and `/names/*`). Set **empty** to disable name resolution (capability `names:false`, `/names` → 501). |
-| `ARCHON_LIGHTNING_MEDIATOR_URL` | `http://localhost:4235` | Upstream for Lightning routes + L402 invoice/pending storage. Set **empty** to disable Lightning (capability `lightning:false`, `/lightning` + `/invoice/:did` → 501). |
-| `ARCHON_EXPLORER_URL` | `http://localhost:4000` | Upstream DID explorer proxied at `/explorer`. Set **empty** to disable it (capability `explorer:false`, `/explorer` → 501). Belongs to the `explorer` profile — blank it when that profile is off, or Herald links visitors at a container that is not running. |
-| `ARCHON_DIDCOMM_URL` | `http://localhost:4236` | Upstream DIDComm relay proxied at `/didcomm`. Set **empty** to disable DIDComm (capability `didcomm:false`, `/didcomm` → 501). *The bundled compose defaults this **empty** (DIDComm is opt-in, off by default); enabling requires the `didcomm` profile **and** setting this URL.* |
+| `ARCHON_COMPOSE_PROFILES` | unset | The node's `COMPOSE_PROFILES`, passed by the bundled Compose. When present, an empty upstream URL below resolves to its container if the service's profile is listed, and stays off otherwise. |
+| `ARCHON_HERALD_URL` | `http://localhost:4230` | Upstream Herald (for `/.well-known/*` and `/names/*`); container `http://herald:4230`, profile `herald`. Off: capability `names:false`, `/names` → 501. |
+| `ARCHON_LIGHTNING_MEDIATOR_URL` | `http://localhost:4235` | Upstream for Lightning routes + L402 invoice/pending storage; container `http://lightning-mediator:4235`, profile `lightning`. Off: capability `lightning:false`, `/lightning` + `/invoice/:did` → 501. |
+| `ARCHON_EXPLORER_URL` | `http://localhost:4000` | Upstream DID explorer proxied at `/explorer`; container `http://explorer:4000`, profile `explorer`. Off: capability `explorer:false`, `/explorer` → 501. |
+| `ARCHON_DIDCOMM_URL` | `http://localhost:4236` | Upstream DIDComm relay proxied at `/didcomm`; container `http://didcomm:4236`, profile `didcomm`. Off: capability `didcomm:false`, `/didcomm` → 501. |
+| `ARCHON_CASHU_MINT_URL` | empty | Upstream Cashu mint proxied at `/cashu`; container `http://cashu-mint:8085`, profile `cashu`. Off: capability `cashu:false`, `/cashu` → 501. |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | empty | Public base URL this node is reachable at (clearnet host or Tor onion). Used by `/didcomm-endpoint` to advertise `<host>/didcomm`. |
 | `ARCHON_DRAWBRIDGE_TOR_HOSTNAME_FILE` | `/data/tor/hostname` | When `PUBLIC_HOST` is empty, `/didcomm-endpoint` falls back to the Tor onion read from this shared hidden-service hostname file. |
 | `ARCHON_DRAWBRIDGE_TOR_PROXY` | `tor:9050` | SOCKS5 proxy used to check that the published hidden service is reachable. Set to the Docker network address for bundled Tor. |
@@ -592,14 +596,15 @@ shared with the reference TypeScript service.
 | `ARCHON_DRAWBRIDGE_PRICING` | unset | JSON pricing override; `{ "operations": { "<scope>": { "amountSat": <n>, "description": "..." } } }`. Merged on top of the per-operation env vars. |
 | `GIT_COMMIT` | `unknown` | Build commit. |
 
-> **Off-switch semantics.** The optional-service URLs
-> (`ARCHON_DIDCOMM_URL`, `ARCHON_LIGHTNING_MEDIATOR_URL`,
-> `ARCHON_HERALD_URL`) are read with `??`, not `||`: an **unset** var
-> falls back to the default (service on), while an **explicitly empty**
-> value disables the service. This is what drives `/capabilities` and
-> the 501 gating. The bundled compose defaults these, along with
-> `ARCHON_EXPLORER_URL` and `ARCHON_CASHU_MINT_URL`, to **empty**: each
-> service runs under its own profile, so its URL is set alongside it.
+> **How an upstream URL resolves** (`upstreams.ts`). A non-empty value is
+> used as given, whether or not its profile runs. Otherwise, when
+> `ARCHON_COMPOSE_PROFILES` is present (the bundled Compose always passes
+> it), the URL is the service's container if its profile is listed and
+> empty (off) if not. Without `ARCHON_COMPOSE_PROFILES`, an **unset** URL
+> falls back to the localhost default and an **explicitly empty** one
+> turns the service off. The result drives `/capabilities` and the 501
+> gating. Profiles given with `docker compose --profile` instead of
+> `COMPOSE_PROFILES` are not visible here; set the URL for those.
 
 ### 8.3 Shutdown
 

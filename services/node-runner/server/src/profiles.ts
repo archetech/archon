@@ -1,4 +1,3 @@
-import type { CatalogSetting } from './catalog.js';
 
 export const PROFILE_DESCRIPTIONS: Record<string, string> = {
     hyperswarm: 'Peer-to-peer gossip of DID operations.',
@@ -28,23 +27,35 @@ export const PROFILE_DESCRIPTIONS: Record<string, string> = {
     filecoin: 'Filecoin storage for operations.',
 };
 
+// A fix sets `key` to `value`, or to a value the client generates.
 export interface Warning {
     message: string;
-    fix?: { key: string, value: string, label: string };
+    fix?: { key: string, label: string, value?: string, generate?: 'hex-32' };
 }
 
 export function parseProfiles(value: string | undefined): string[] {
     return (value ?? '').split(',').map(p => p.trim()).filter(Boolean);
 }
 
-// Drawbridge offers a service when its upstream URL is set, independently of
-// whether the profile that runs it is enabled (see sample.env). Both or neither.
-const UPSTREAMS: { profile: string, key: string, what: string }[] = [
-    { profile: 'didcomm', key: 'ARCHON_DIDCOMM_URL', what: 'the DIDComm relay' },
-    { profile: 'herald', key: 'ARCHON_HERALD_URL', what: 'Herald' },
-    { profile: 'explorer', key: 'ARCHON_EXPLORER_URL', what: 'the explorer' },
-    { profile: 'lightning', key: 'ARCHON_LIGHTNING_MEDIATOR_URL', what: 'Lightning' },
+// Drawbridge offers a service at its container when the URL is empty and the
+// profile is enabled. A URL that is set is used as given, even when it names a
+// container whose profile is off.
+const UPSTREAMS: { profile: string, key: string, host: string, what: string }[] = [
+    { profile: 'didcomm', key: 'ARCHON_DIDCOMM_URL', host: 'didcomm', what: 'the DIDComm relay' },
+    { profile: 'herald', key: 'ARCHON_HERALD_URL', host: 'herald', what: 'Herald' },
+    { profile: 'explorer', key: 'ARCHON_EXPLORER_URL', host: 'explorer', what: 'the explorer' },
+    { profile: 'lightning', key: 'ARCHON_LIGHTNING_MEDIATOR_URL', host: 'lightning-mediator', what: 'Lightning' },
+    { profile: 'cashu', key: 'ARCHON_CASHU_MINT_URL', host: 'cashu-mint', what: 'the Cashu mint' },
 ];
+
+function hostOf(url: string): string | null {
+    try {
+        return new URL(url).hostname;
+    }
+    catch {
+        return null;
+    }
+}
 
 const FRONTED = ['herald', 'lightning', 'tor'];
 
@@ -58,27 +69,17 @@ const COMPOSE_DEFAULTS: Record<string, string> = {
 export function pairingWarnings(
     profiles: string[],
     values: Map<string, string>,
-    catalog: Map<string, CatalogSetting>,
 ): Warning[] {
     const on = new Set(profiles);
     // What Compose would use: the .env value when the key is there (even if
-    // empty), otherwise the fragment's own default. sample.env values are
-    // examples, used only to suggest a fix.
+    // empty), otherwise the fragment's own default.
     const value = (key: string) => values.has(key) ? values.get(key)! : COMPOSE_DEFAULTS[key] ?? '';
     const warnings: Warning[] = [];
 
-    for (const { profile, key, what } of UPSTREAMS) {
-        const url = value(key);
-        const example = catalog.get(key)?.example || catalog.get(key)?.default;
-        if (on.has(profile) && !url) {
+    for (const { profile, key, host, what } of UPSTREAMS) {
+        if (!on.has(profile) && hostOf(value(key)) === host) {
             warnings.push({
-                message: `The ${profile} profile runs ${what}, but Drawbridge only offers it when ${key} is set.`,
-                ...(example ? { fix: { key, value: example, label: `Set ${key}=${example}` } } : {}),
-            });
-        }
-        if (!on.has(profile) && url) {
-            warnings.push({
-                message: `${key} is set without the ${profile} profile, so Drawbridge would offer ${what} while it is not running.`,
+                message: `${key} points at the ${host} container without the ${profile} profile, so Drawbridge would offer ${what} while it is not running.`,
                 fix: { key, value: '', label: `Clear ${key}` },
             });
         }
@@ -143,21 +144,35 @@ export function requiredWarnings(values: Map<string, string>, ids: { uid: number
             });
         }
     }
-    const secrets: [string, string][] = [
-        ['ARCHON_ADMIN_API_KEY', 'Gatekeeper will not start without it. Generate one with `openssl rand -hex 32`.'],
-        ['ARCHON_PASSPHRASE', 'Keymaster will not start without it. It encrypts the wallet, so change it only on a node with no wallet yet.'],
+    // An unset secret stops its service at startup; the placeholder does not,
+    // so the service runs on a value anyone can read in sample.env.
+    const secrets = [
+        {
+            key: 'ARCHON_ADMIN_API_KEY',
+            unset: 'Gatekeeper will not start without it.',
+            placeholder: 'Gatekeeper accepts it, so its admin routes are protected by a published key.',
+            // Random bytes, so the browser generates it: secrets never travel
+            // from node-runner to the client.
+            fix: { key: 'ARCHON_ADMIN_API_KEY', generate: 'hex-32' as const, label: 'Generate a key' },
+        },
+        {
+            key: 'ARCHON_PASSPHRASE',
+            unset: 'Keymaster will not start without it.',
+            placeholder: 'Keymaster accepts it, so the wallet and the admin key are protected by a published passphrase.',
+            note: 'It encrypts the wallet, so change it only on a node with no wallet yet.',
+        },
     ];
     // Keymaster still reads the older name when the new one is empty.
     const effective = (key: string) => key === 'ARCHON_PASSPHRASE'
         ? values.get(key) || values.get('ARCHON_ENCRYPTED_PASSPHRASE')
         : values.get(key);
-    for (const [key, why] of secrets) {
-        const value = effective(key);
-        if (!value) {
-            warnings.push({ message: `${key} is not set. ${why}` });
-        }
-        else if (value === PLACEHOLDER) {
-            warnings.push({ message: `${key} is still the sample placeholder ${PLACEHOLDER}. ${why}` });
+    for (const secret of secrets) {
+        const value = effective(secret.key);
+        const why = !value ? `${secret.key} is not set. ${secret.unset}`
+            : value === PLACEHOLDER ? `${secret.key} is still the sample placeholder ${PLACEHOLDER}. ${secret.placeholder}`
+                : null;
+        if (why) {
+            warnings.push({ message: secret.note ? `${why} ${secret.note}` : why, ...(secret.fix && { fix: secret.fix }) });
         }
     }
 

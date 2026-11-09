@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
 
+import { UPSTREAMS, upstreamURL } from './upstreams.js';
+
 dotenv.config();
 
 // parseInt yields NaN for a malformed value. NaN reaches the limiter's Lua as a
@@ -25,19 +27,12 @@ const config = {
     port: process.env.ARCHON_DRAWBRIDGE_PORT ? parseInt(process.env.ARCHON_DRAWBRIDGE_PORT) : 4222,
     bindAddress: process.env.ARCHON_BIND_ADDRESS || '0.0.0.0',
     gatekeeperURL: process.env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224',
-    // `??` (not `||`) so an explicitly-empty value disables the optional service
-    // (the capability off-switch), while an unset var falls back to the default.
-    heraldURL: process.env.ARCHON_HERALD_URL ?? 'http://localhost:4230',
-    lightningMediatorURL: process.env.ARCHON_LIGHTNING_MEDIATOR_URL ?? 'http://localhost:4235',
-    // Follows the same convention as heraldURL and lightningMediatorURL: it
-    // defaults to the container, and an operator running without the `explorer`
-    // profile blanks it, which makes /explorer answer 501 rather than proxying
-    // to something that is not running.
-    explorerURL: process.env.ARCHON_EXPLORER_URL ?? 'http://localhost:4000',
-    didcommURL: process.env.ARCHON_DIDCOMM_URL ?? 'http://localhost:4236',
-    // The optional Cashu mint (the `cashu` profile). Unlike the services above
-    // it defaults to off: a node without a mint must not advertise one.
-    cashuMintURL: process.env.ARCHON_CASHU_MINT_URL ?? '',
+    // Optional services; see upstreams.ts for how an empty URL is resolved.
+    heraldURL: upstreamURL(UPSTREAMS.herald),
+    lightningMediatorURL: upstreamURL(UPSTREAMS.lightningMediator),
+    explorerURL: upstreamURL(UPSTREAMS.explorer),
+    didcommURL: upstreamURL(UPSTREAMS.didcomm),
+    cashuMintURL: upstreamURL(UPSTREAMS.cashuMint),
     // Public base URL this node is reachable at (clearnet host or Tor onion).
     // Used to advertise the DIDComm relay endpoint (`<publicHost>/didcomm`).
     publicHost: process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || '',

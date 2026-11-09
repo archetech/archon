@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs node-runner's own Compose project for the node in this directory.
 #
+#   ./setup-node                    start or update it, print the address and setup code
 #   ./node-runner up -d --build     start or update it
 #   ./node-runner logs -f           follow its log (the setup code is printed there)
 #   ./node-runner down              stop it; the node keeps running

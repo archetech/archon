@@ -46,7 +46,7 @@ export interface Info {
 
 export interface Warning {
     message: string;
-    fix?: { key: string, value: string, label: string };
+    fix?: { key: string, label: string, value?: string, generate?: 'hex-32' };
 }
 
 export interface SettingView {
