@@ -119,6 +119,18 @@ import {
 } from '@didcid/cipher/didcomm';
 import { decryptWithPassphrase, encryptWithPassphrase } from '@didcid/cipher/passphrase';
 
+// Wallet IDs and aliases are plain objects keyed by user-chosen names, so a
+// name such as `constructor` or `__proto__` must be looked up and stored as an
+// own property: `in` and indexing also see Object.prototype, and assigning
+// `__proto__` replaces the prototype instead of adding an entry.
+function hasName(map: object | undefined, name: string): boolean {
+    return !!map && Object.prototype.hasOwnProperty.call(map, name);
+}
+
+function setName<T>(map: Record<string, T>, name: string, value: T): void {
+    Object.defineProperty(map, name, { value, writable: true, enumerable: true, configurable: true });
+}
+
 // The keys are the only way to reach the funds, and come from LNbits, so the
 // recovery phrase cannot recreate them.
 function hasLightningKeys(idInfo: IDInfo): boolean {
@@ -882,7 +894,7 @@ export default class Keymaster implements KeymasterInterface {
 
     async setCurrentId(name: string) {
         await this.mutateWallet((wallet) => {
-            if (!(name in wallet.ids)) {
+            if (!hasName(wallet.ids, name)) {
                 throw new UnknownIDError();
             }
             wallet.current = name;
@@ -919,7 +931,7 @@ export default class Keymaster implements KeymasterInterface {
                     }
                 }
             }
-            else {
+            else if (hasName(wallet.ids, id)) {
                 idInfo = wallet.ids[id];
             }
         }
@@ -2053,11 +2065,11 @@ export default class Keymaster implements KeymasterInterface {
 
         const wallet = await this.loadWallet();
 
-        if (wallet.aliases && name in wallet.aliases) {
-            return wallet.aliases[name];
+        if (hasName(wallet.aliases, name)) {
+            return wallet.aliases![name];
         }
 
-        if (wallet.ids && name in wallet.ids) {
+        if (hasName(wallet.ids, name)) {
             return wallet.ids[name].did;
         }
 
@@ -2255,11 +2267,11 @@ export default class Keymaster implements KeymasterInterface {
 
         const alreadyUsedError = `${label} already used`;
 
-        if (wallet && wallet.aliases && alias in wallet.aliases) {
+        if (wallet && hasName(wallet.aliases, alias)) {
             throw new InvalidParameterError(alreadyUsedError);
         }
 
-        if (wallet && wallet.ids && alias in wallet.ids) {
+        if (wallet && hasName(wallet.ids, alias)) {
             throw new InvalidParameterError(alreadyUsedError);
         }
 
@@ -2278,7 +2290,7 @@ export default class Keymaster implements KeymasterInterface {
 
             did = await this.gatekeeper.createDID(signed);
 
-            wallet.ids[name] = { did, account, index };
+            setName(wallet.ids, name, { did, account, index });
             wallet.counter += 1;
             wallet.current = name;
         });
@@ -2324,7 +2336,7 @@ export default class Keymaster implements KeymasterInterface {
 
     async removeId(name: string): Promise<boolean> {
         await this.mutateWallet((wallet) => {
-            if (!(name in wallet.ids)) {
+            if (!hasName(wallet.ids, name)) {
                 throw new UnknownIDError();
             }
             // Its proofs are the funds themselves, and its journal the only
@@ -2350,14 +2362,14 @@ export default class Keymaster implements KeymasterInterface {
         await this.mutateWallet((wallet) => {
             name = this.validateAlias(name);
 
-            if (!(id in wallet.ids)) {
+            if (!hasName(wallet.ids, id)) {
                 throw new UnknownIDError();
             }
-            if (name in wallet.ids) {
+            if (hasName(wallet.ids, name)) {
                 throw new InvalidParameterError('name already used');
             }
 
-            wallet.ids[name] = wallet.ids[id];
+            setName(wallet.ids, name, wallet.ids[id]);
             delete wallet.ids[id];
 
             if (wallet.current && wallet.current === id) {
@@ -2417,10 +2429,10 @@ export default class Keymaster implements KeymasterInterface {
             const data = JSON.parse(backup) as { name: string; id: IDInfo };
 
             await this.mutateWallet((wallet) => {
-                if (wallet.ids[data.name]) {
+                if (hasName(wallet.ids, data.name)) {
                     throw new KeymasterError(`${data.name} already exists in wallet`);
                 }
-                wallet.ids[data.name] = data.id;
+                setName(wallet.ids, data.name, data.id);
                 wallet.current = data.name;
                 wallet.counter += 1;
             });
@@ -2505,7 +2517,7 @@ export default class Keymaster implements KeymasterInterface {
 
         if (includeIDs) {
             for (const [name, id] of Object.entries(wallet.ids || {})) {
-                aliases[name] = id.did;
+                setName(aliases, name, id.did);
             }
         }
 
@@ -3905,7 +3917,7 @@ export default class Keymaster implements KeymasterInterface {
                 wallet.aliases = {};
             }
             alias = this.validateAlias(alias, wallet, 'alias');
-            wallet.aliases[alias] = did;
+            setName(wallet.aliases, alias, did);
         });
         return true;
     }
@@ -3913,8 +3925,8 @@ export default class Keymaster implements KeymasterInterface {
     async getAlias(alias: string): Promise<string | null> {
         const wallet = await this.loadWallet();
 
-        if (wallet.aliases && alias in wallet.aliases) {
-            return wallet.aliases[alias];
+        if (hasName(wallet.aliases, alias)) {
+            return wallet.aliases![alias];
         }
 
         return null;
@@ -3922,7 +3934,7 @@ export default class Keymaster implements KeymasterInterface {
 
     async removeAlias(alias: string): Promise<boolean> {
         await this.mutateWallet((wallet) => {
-            if (!wallet.aliases || !(alias in wallet.aliases)) {
+            if (!hasName(wallet.aliases, alias)) {
                 return;
             }
             delete wallet.aliases[alias];
@@ -6763,7 +6775,7 @@ export default class Keymaster implements KeymasterInterface {
         let candidate = baseName;
         let suffix = 2;
 
-        while (candidate in aliases) {
+        while (hasName(aliases, candidate)) {
             if (aliases[candidate] === did) {
                 return; // Already aliased to this DID
             }
