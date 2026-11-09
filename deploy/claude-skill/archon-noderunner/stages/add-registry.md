@@ -17,9 +17,9 @@ Add a chain-writer mediator to the node.
 3. **Prompt** the operator:
    - RPC endpoint for the chain (own node URL, Alchemy/Infura key, or public default)
    - `ARCHON_<CHAIN>_START_BLOCK` (current chain tip minus a small margin, unless they want to backfill history)
-   - Any chain-specific config from the archon `.env.example` (fee ceilings default OK)
+   - Any chain-specific config from the archon `sample.env` (fee ceilings default OK)
 
-4. **Splice** the chain's config keys into `.env`. Add the profile to `COMPOSE_PROFILES` idempotently. Add the chain to `ARCHON_GATEKEEPER_REGISTRIES_PIN` (comma-separated, dedup).
+4. **Splice** the chain's config keys into `.env`. Add the profile to `COMPOSE_PROFILES` idempotently. Add the chain's registry (e.g. `BTC:mainnet`) to `ARCHON_GATEKEEPER_REGISTRIES` (comma-separated, dedup): Gatekeeper accepts operations for a registry only when it is listed there, and stage 0 lists only `hyperswarm`.
 
 5. **Build & bring up** the new services (`docker compose build <chain>-mainnet-mediator <chain>-mainnet-wallet`, then `up -d`).
 

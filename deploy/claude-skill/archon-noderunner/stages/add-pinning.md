@@ -2,7 +2,7 @@
 
 Enable the pinning-mediator so this node can pin content-addressed blobs to IPFS.
 
-Current supported backends: **Pinata** (default). Others (Web3.Storage, self-hosted IPFS cluster) require code paths that may or may not exist upstream — check `services/mediators/pinning/` before offering.
+The mediator speaks the standard IPFS Pinning Service API, so any compatible provider works; `docs/deployment.md` §8 gives Filebase and Pinata settings. This stage uses **Pinata**.
 
 ## Procedure
 
@@ -14,10 +14,10 @@ Current supported backends: **Pinata** (default). Others (Web3.Storage, self-hos
 2. **Splice** into `.env`:
    ```
    ARCHON_PIN_PROVIDER=pinata
-   ARCHON_PIN_API_URL=https://api.pinata.cloud
-   ARCHON_PIN_JWT={{jwt}}
+   ARCHON_PIN_API_URL=https://api.pinata.cloud/psa
+   ARCHON_PIN_API_TOKEN={{jwt}}
    ```
-   Append `pinning` to `COMPOSE_PROFILES`. Add `pin` to `ARCHON_GATEKEEPER_REGISTRIES_PIN` (existing chain-registry pins remain).
+   Append `pinning` to `COMPOSE_PROFILES`. Set `ARCHON_GATEKEEPER_REGISTRIES_PIN` to the chain registries whose operations should be pinned, e.g. `BTC:mainnet` (comma-separated, dedup); with it empty, nothing is queued for pinning.
 
 3. **Bring up** the pinning-mediator. Wait for readiness.
 
@@ -31,4 +31,4 @@ Pinata's free tier caps at ~1 GB / 1000 files. Warn the operator to monitor usag
 
 ## Rollback
 
-`remove-pinning` — remove JWT from `.env`, tear down container. **Data already pinned to Pinata stays pinned** until unpinned via Pinata's dashboard.
+`remove-pinning` — remove `ARCHON_PIN_API_TOKEN` from `.env`, tear down container. **Data already pinned to Pinata stays pinned** until unpinned via Pinata's dashboard.

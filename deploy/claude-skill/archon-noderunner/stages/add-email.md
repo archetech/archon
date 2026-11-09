@@ -1,38 +1,41 @@
 # Stage: `add-email`
 
-Enable Herald email-challenge flow (email-based DID verification).
+Enable Herald, the node's name service (`/names/*`, `/.well-known/*`), together with its email bridge, which relays dmail to and from ordinary email through SendGrid. Herald has no SMTP support: SendGrid sends the outbound mail and its Inbound Parse webhook delivers the inbound mail.
 
 ## Prereqs
 
-- SMTP relay account with sender authorization for `noreply@<domain>` (or similar).
-  Common choices: Postmark, AWS SES, Mailgun, SendGrid, Fastmail.
-- MX / SPF / DKIM DNS records for the domain (may already be in place).
+- `drawbridge` enabled (`add-lightning` first, or add `drawbridge` alone), since Drawbridge is what fronts `/names/*`.
+- A SendGrid account with a verified sender for the `From:` address.
+- DNS control for the domain, for the Inbound Parse MX record.
 
 ## Procedure
 
-1. **🛑 Human checkpoint — SMTP credentials.** Ask for:
-   - SMTP host + port (e.g. `smtp.postmarkapp.com:587`)
-   - Username / API key
-   - Password / secret
-   - `From:` address the relay allows
+1. **🛑 Human checkpoint — SendGrid.** Ask the operator for:
+   - a SendGrid API key with Mail Send permission;
+   - the `From:` address SendGrid has verified (default `dmail@<domain>`);
+   - the parse host for inbound mail (default `parse.<domain>`).
 
-2. **Splice** into `.env`:
+2. **Splice** into `.env`. Generate the session and webhook secrets with `openssl rand -hex 32` and write them without printing them:
    ```
-   ARCHON_HERALD_SMTP_HOST={{host}}
-   ARCHON_HERALD_SMTP_PORT={{port}}
-   ARCHON_HERALD_SMTP_USER={{user}}
-   ARCHON_HERALD_SMTP_PASS={{pass}}
-   ARCHON_HERALD_SMTP_FROM={{from}}
-   ARCHON_HERALD_URL=http://herald:4230
+   ARCHON_HERALD_DOMAIN={{DOMAIN}}
+   ARCHON_HERALD_SESSION_SECRET={{generated}}
+   ARCHON_HERALD_SENDGRID_API_KEY={{api key}}
+   ARCHON_HERALD_SENDGRID_FROM_EMAIL={{from}}
+   ARCHON_HERALD_SENDGRID_PARSE_DOMAIN={{parse host}}
+   ARCHON_HERALD_WEBHOOK_SECRET={{generated}}
    # Explicitly empty: this stage does not enable the `tor` profile. The compose
    # default is `${ARCHON_HERALD_TOR_PROXY-tor:9050}` (single dash), so leaving
    # the key UNSET still resolves to tor:9050 and Herald would dial a container
    # that isn't running. Only an explicit empty value disables onion egress.
    ARCHON_HERALD_TOR_PROXY=
    ```
-   Append `herald` to `COMPOSE_PROFILES` (it carries `herald` and `herald-client`; ensure `drawbridge` is present too, since Drawbridge is what fronts `/names/*`). Setting `ARCHON_HERALD_URL` in the same step is required — Drawbridge advertises and proxies `/names/*` based on that URL, not on the profile.
+   Herald refuses to start without `ARCHON_HERALD_SESSION_SECRET`. Append `herald` to `COMPOSE_PROFILES` (it carries `herald` and `herald-client`). Drawbridge offers `/names/*` because the profile is listed; do not set `ARCHON_HERALD_URL`.
 
-3. **DNS check** — verify SPF/DKIM records are in place. If not, print required records and wait for the operator to add them and confirm.
+3. **🛑 Human checkpoint — inbound mail.** Print, and wait for the operator to confirm:
+   - an MX record for the parse host pointing at `mx.sendgrid.net`;
+   - a SendGrid Inbound Parse entry for the parse host, posting to `https://names.{{DOMAIN}}/names/api/inbound-email?secret=<ARCHON_HERALD_WEBHOOK_SECRET>`. Read the secret from `.env` when printing this URL for the operator, and do not log it elsewhere.
+
+   Check the MX record with `dig +short MX <parse host>`.
 
 4. **Caddy** — add `names.<domain>` block routing to the herald-client:
    ```
@@ -48,10 +51,10 @@ Enable Herald email-challenge flow (email-based DID verification).
 
 5. **Bring up** herald + herald-client. Wait for readiness.
 
-6. **Verify** — send a test challenge from `keymaster` to the operator's own inbox; confirm receipt and completion.
+6. **Verify** — `curl -fsS https://names.{{DOMAIN}}/names/api/config` returns JSON with a `relayAgent` DID, which Herald reports only when SendGrid is configured. Then ask the operator to send an email to `<name>@<parse host>`, for a name claimed on this Herald, and confirm it arrives as dmail for that name.
 
-7. **Report** — where to point users to claim names, subject-line format, mailbox for support if `noreply@` bounces.
+7. **Report** — where users claim names, the relay agent DID, and the parse host for inbound mail.
 
 ## Rollback
 
-`remove-email` — remove SMTP creds from `.env`, tear down herald/herald-client, restore Caddyfile. DNS records left alone (operator's registrar).
+`remove-email` — remove the SendGrid settings from `.env`, tear down herald/herald-client, restore Caddyfile. DNS records left alone (operator's registrar).
