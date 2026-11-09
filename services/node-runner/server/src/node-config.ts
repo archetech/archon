@@ -7,7 +7,7 @@ import { ComposeError, type ComposeApi, type ComposeConfig } from './compose.js'
 import type { DockerApi } from './docker.js';
 import { applyChanges, envValues, parseEnv, VALID_KEY } from './envfile.js';
 import type { JobLog } from './jobs.js';
-import { PLACEHOLDER, PROFILE_DESCRIPTIONS, pairingWarnings, parseProfiles, requiredWarnings, type Warning } from './profiles.js';
+import { PLACEHOLDER, PROFILE_DESCRIPTIONS, SAMPLE_NODE_ID, SAMPLE_NODE_NAME, nameError, pairingWarnings, parseProfiles, requiredWarnings, type Warning } from './profiles.js';
 import { ACTIVE_STATES, isOneShot, isStateful, statusReport } from './status.js';
 
 export class ConfigError extends Error {
@@ -162,12 +162,21 @@ export class NodeConfig {
     }
 
     // Creates .env from sample.env for a node that has none: the operator's
-    // user and group, a generated admin key, the passphrase they chose, and
-    // no profiles, so the node starts as a core node. Upstream URLs that
-    // would advertise services of disabled profiles are cleared.
-    async createEnv(passphrase: unknown): Promise<void> {
+    // user and group, a generated admin key, the node's names and the
+    // passphrase they chose, and no profiles, so the node starts as a core
+    // node. Upstream URLs that would advertise services of disabled profiles
+    // are cleared.
+    async createEnv(input: { passphrase?: unknown, nodeId?: unknown, nodeName?: unknown }): Promise<void> {
+        const { passphrase, nodeId, nodeName } = input;
         if (typeof passphrase !== 'string' || passphrase.length < 12 || /[\r\n]/.test(passphrase) || passphrase === PLACEHOLDER) {
             throw new ConfigError('Choose a passphrase of at least 12 characters, on one line');
+        }
+        const invalid = nameError('node agent name', nodeId) ?? nameError('node name', nodeName);
+        if (invalid) {
+            throw new ConfigError(invalid);
+        }
+        if (nodeId === SAMPLE_NODE_ID || nodeName === SAMPLE_NODE_NAME) {
+            throw new ConfigError('Choose names of your own rather than the ones in sample.env');
         }
         const sample = await fs.readFile(this.samplePath, 'utf-8').catch(() => null);
         if (sample === null) {
@@ -178,6 +187,8 @@ export class NodeConfig {
             ARCHON_GID: String(this.ids.gid),
             ARCHON_ADMIN_API_KEY: randomBytes(32).toString('hex'),
             ARCHON_PASSPHRASE: passphrase,
+            ARCHON_NODE_ID: nodeId as string,
+            ARCHON_NODE_NAME: nodeName as string,
             COMPOSE_PROFILES: '',
         });
         const { byKey } = await this.catalog();

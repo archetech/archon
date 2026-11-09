@@ -4,8 +4,11 @@ import { join } from 'path';
 import { NodeConfig, type Draft } from '../../services/node-runner/server/src/node-config.ts';
 import { FakeCompose, FakeDocker, type FakeContainer } from './helpers.ts';
 
+const NAMES = { nodeId: 'alpha-agent', nodeName: 'alpha' };
+
 const SAMPLE = `# General
 ARCHON_NODE_NAME=mynode
+ARCHON_NODE_ID=mynodeID
 # Protects admin routes.
 ARCHON_ADMIN_API_KEY=CHANGE_ME
 ARCHON_UID=1000
@@ -22,6 +25,7 @@ ARCHON_REACT_WALLET_GATEKEEPER_URL=
 const ENV = `# my node
 COMPOSE_PROJECT_NAME=archon
 COMPOSE_PROFILES=lightning,react-wallet
+ARCHON_NODE_ID=alpha-agent
 ARCHON_NODE_NAME=alpha
 ARCHON_ADMIN_API_KEY=super-secret
 ARCHON_UID=1000
@@ -202,11 +206,11 @@ describe('a node with no .env', () => {
     it('creates .env from sample.env with the operator\'s ids, a new admin key, the passphrase and no profiles', async () => {
         writeFileSync(join(nodeDir, 'sample.env'), SAMPLE.replace('# ARCHON_HERALD_URL=http://herald:4230', 'ARCHON_HERALD_URL=http://herald:4230') + 'COMPOSE_PROFILES=lightning,herald\n');
 
-        await config.createEnv('a long wallet passphrase');
+        await config.createEnv({ ...NAMES, passphrase: 'a long wallet passphrase' });
 
         const text = readFileSync(join(nodeDir, '.env'), 'utf-8');
         const values = Object.fromEntries(text.split('\n').filter(l => /^[A-Z_]+=/.test(l)).map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
-        expect(values).toMatchObject({ ARCHON_UID: '1000', ARCHON_GID: '1000', ARCHON_PASSPHRASE: "'a long wallet passphrase'", COMPOSE_PROFILES: '', ARCHON_HERALD_URL: '' });
+        expect(values).toMatchObject({ ARCHON_UID: '1000', ARCHON_GID: '1000', ARCHON_PASSPHRASE: "'a long wallet passphrase'", ARCHON_NODE_ID: 'alpha-agent', ARCHON_NODE_NAME: 'alpha', COMPOSE_PROFILES: '', ARCHON_HERALD_URL: '' });
         expect(values.ARCHON_ADMIN_API_KEY).toMatch(/^[0-9a-f]{64}$/);
         expect(text).toContain('# Protects admin routes.');
         expect(statSync(join(nodeDir, '.env')).mode & 0o777).toBe(0o600);
@@ -217,10 +221,23 @@ describe('a node with no .env', () => {
     });
 
     it('refuses a short passphrase, the placeholder, or an existing .env', async () => {
-        await expect(config.createEnv('short')).rejects.toMatchObject({ status: 400 });
-        await expect(config.createEnv('CHANGE_ME')).rejects.toMatchObject({ status: 400 });
-        await config.createEnv('a long wallet passphrase');
-        await expect(config.createEnv('another long passphrase')).rejects.toMatchObject({ status: 409, message: '.env already exists' });
+        await expect(config.createEnv({ ...NAMES, passphrase: 'short' })).rejects.toMatchObject({ status: 400 });
+        await expect(config.createEnv({ ...NAMES, passphrase: 'CHANGE_ME' })).rejects.toMatchObject({ status: 400 });
+        await config.createEnv({ ...NAMES, passphrase: 'a long wallet passphrase' });
+        await expect(config.createEnv({ ...NAMES, passphrase: 'another long passphrase' })).rejects.toMatchObject({ status: 409, message: '.env already exists' });
+    });
+
+    it.each([
+        [{ nodeId: '' }, 'Choose a node agent name'],
+        [{ nodeName: undefined }, 'Choose a node name'],
+        [{ nodeId: ' alpha' }, 'The node agent name cannot start or end with a space'],
+        [{ nodeName: 'x'.repeat(33) }, 'The node name can be at most 32 characters'],
+        [{ nodeId: 'a\tb' }, 'The node agent name cannot contain control characters'],
+        [{ nodeId: 'mynodeID' }, 'Choose names of your own rather than the ones in sample.env'],
+        [{ nodeName: 'mynodeName' }, 'Choose names of your own rather than the ones in sample.env'],
+    ])('refuses node names %j', async (names, message) => {
+        await expect(config.createEnv({ ...NAMES, ...names, passphrase: 'a long wallet passphrase' })).rejects.toMatchObject({ status: 400, message });
+        expect(existsSync(join(nodeDir, '.env'))).toBe(false);
     });
 });
 
@@ -235,6 +252,19 @@ describe('required settings', () => {
             ['ARCHON_GID is not set,', 'Set ARCHON_GID=1000'],
             ['ARCHON_ADMIN_API_KEY is still the', undefined],
             ['ARCHON_PASSPHRASE is not set.', undefined],
+            ['ARCHON_NODE_ID is not set.', undefined],
+            ['ARCHON_NODE_NAME is not set,', undefined],
+        ]);
+    });
+
+    it('warns about the sample names, and that a new agent name makes a new agent', async () => {
+        writeFileSync(join(nodeDir, '.env'), 'ARCHON_UID=1000\nARCHON_GID=1000\nARCHON_ADMIN_API_KEY=key\nARCHON_PASSPHRASE=a-long-passphrase\nARCHON_NODE_ID=mynodeID\nARCHON_NODE_NAME=mynodeName\n');
+
+        const messages = (await config.view()).warnings.map(w => w.message);
+
+        expect(messages).toEqual([
+            expect.stringMatching(/^ARCHON_NODE_ID is still the sample name mynodeID.*creates a new agent rather than renaming the existing one\.$/),
+            expect.stringMatching(/^ARCHON_NODE_NAME is still the sample name mynodeName/),
         ]);
     });
 });

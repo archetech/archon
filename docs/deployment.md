@@ -80,8 +80,9 @@ stack defined by `docker-compose.yml`; it does not use
 
 It needs the checkout. If you have not created `.env` as in
 [Initial Setup](#initial-setup), node-runner's Configuration page creates it
-from `sample.env`, with your user and group, a generated admin key and a wallet
-passphrase you choose, and no profiles enabled. From the node directory:
+from `sample.env`, with your user and group, a generated admin key, the node
+agent name, node name and wallet passphrase you choose, and no profiles
+enabled. From the node directory:
 
 ```bash
 ./node-runner up -d --build
@@ -218,8 +219,8 @@ Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keyma
 | `ARCHON_ADMIN_API_KEY` | *(empty)* | **Required.** Protects admin API routes, and on Keymaster the whole v1 API. Gatekeeper and Keymaster both refuse to start without it; mediators and the CLI use the same value to authenticate against it |
 | `ARCHON_PASSPHRASE` | *(empty)* | **Required.** Passphrase for encrypting the wallet, and the value the CLIs and MCP server read. Keymaster won't start without it |
 | `ARCHON_ENCRYPTED_PASSPHRASE` | *(empty)* | Older name for `ARCHON_PASSPHRASE`, still read so existing deployments keep working |
-| `ARCHON_NODE_ID` | `mynodeID` | Alias for the node's agent DID (created on first run) |
-| `ARCHON_NODE_NAME` | `mynodeName` | Human-readable node name for peer discovery |
+| `ARCHON_NODE_ID` | `mynodeID` | **Choose one.** Alias for the node's agent DID, created on first run; the chain mediators register batches under it. Changing it later creates a new agent rather than renaming this one |
+| `ARCHON_NODE_NAME` | `mynodeName` | **Choose one.** Human-readable node name for peer discovery on Hyperswarm |
 | `COMPOSE_PROFILES` | sample default | Optional Docker Compose service profiles |
 | `ARCHON_GATEKEEPER_PORT` | `4224` | Gatekeeper API port |
 | `ARCHON_KEYMASTER_PORT` | `4226` | Keymaster API port |

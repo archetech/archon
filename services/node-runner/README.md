@@ -62,12 +62,16 @@ running container.
 
 On a node with no `.env` yet, the Configuration page offers to create one from
 `sample.env`: with your user and group as `ARCHON_UID` and `ARCHON_GID` (so
-containers do not run as root), a generated `ARCHON_ADMIN_API_KEY`, the wallet
-passphrase you choose as `ARCHON_PASSPHRASE`, and no profiles, so the node
-starts as a core node. Until `.env` exists, node-runner does not apply changes,
-start, restart or update the node. On an existing `.env`, it warns when
-`ARCHON_UID` or `ARCHON_GID` is unset, or when the admin key or passphrase is
-unset or still `CHANGE_ME`.
+containers do not run as root), a generated `ARCHON_ADMIN_API_KEY`, the node
+agent name and node name you choose as `ARCHON_NODE_ID` and `ARCHON_NODE_NAME`,
+the wallet passphrase you choose as `ARCHON_PASSPHRASE`, and no profiles, so
+the node starts as a core node. Choose the agent name with care: Keymaster
+creates the node's agent under it on first start, and changing it later creates
+a new agent rather than renaming that one. Until `.env` exists, node-runner
+does not apply changes, start, restart or update the node. On an existing
+`.env`, it warns when `ARCHON_UID` or `ARCHON_GID` is unset, when the admin key
+or passphrase is unset or still `CHANGE_ME`, and when `ARCHON_NODE_ID` or
+`ARCHON_NODE_NAME` is unset or still the `sample.env` name.
 
 If Compose rejects the current `.env`, the page still loads, shows Compose's
 error, and lets you repair the file.

@@ -108,6 +108,29 @@ export function pairingWarnings(
 // The placeholder sample.env puts in settings that must be chosen.
 export const PLACEHOLDER = 'CHANGE_ME';
 
+// sample.env's names for the node, which every node set up from it shares.
+export const SAMPLE_NODE_ID = 'mynodeID';
+export const SAMPLE_NODE_NAME = 'mynodeName';
+
+// Keymaster's rule for an ID name: 1 to 32 characters, no control characters.
+// Surrounding spaces are refused rather than trimmed, so .env holds the name
+// Keymaster uses.
+export function nameError(label: string, value: unknown): string | null {
+    if (typeof value !== 'string' || !value.trim()) {
+        return `Choose a ${label}`;
+    }
+    if (value !== value.trim()) {
+        return `The ${label} cannot start or end with a space`;
+    }
+    if (value.length > 32) {
+        return `The ${label} can be at most 32 characters`;
+    }
+    if (/\p{Cc}/u.test(value)) {
+        return `The ${label} cannot contain control characters`;
+    }
+    return null;
+}
+
 // Settings a node cannot run correctly without. `ids` is the user node-runner
 // runs as, which is the operator: the value ARCHON_UID and ARCHON_GID need.
 export function requiredWarnings(values: Map<string, string>, ids: { uid: number, gid: number }): Warning[] {
@@ -136,6 +159,22 @@ export function requiredWarnings(values: Map<string, string>, ids: { uid: number
         else if (value === PLACEHOLDER) {
             warnings.push({ message: `${key} is still the sample placeholder ${PLACEHOLDER}. ${why}` });
         }
+    }
+
+    const nodeId = values.get('ARCHON_NODE_ID');
+    const renamed = 'Changing it on a node that already has a wallet creates a new agent rather than renaming the existing one.';
+    if (!nodeId) {
+        warnings.push({ message: 'ARCHON_NODE_ID is not set. Keymaster will not start without it: it names the node\'s agent.' });
+    }
+    else if (nodeId === SAMPLE_NODE_ID) {
+        warnings.push({ message: `ARCHON_NODE_ID is still the sample name ${SAMPLE_NODE_ID}, so the node's agent has the same name as every node set up from sample.env. ${renamed}` });
+    }
+    const nodeName = values.get('ARCHON_NODE_NAME');
+    if (!nodeName) {
+        warnings.push({ message: 'ARCHON_NODE_NAME is not set, so the node has no name on the Hyperswarm network.' });
+    }
+    else if (nodeName === SAMPLE_NODE_NAME) {
+        warnings.push({ message: `ARCHON_NODE_NAME is still the sample name ${SAMPLE_NODE_NAME}, the name every node set up from sample.env has on the Hyperswarm network.` });
     }
     return warnings;
 }
