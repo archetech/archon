@@ -662,3 +662,44 @@ describe('setCurrentId', () => {
         }
     });
 });
+
+// Wallet IDs are a plain object keyed by name, so names that are also
+// Object.prototype properties must not collide with them (#1579).
+describe('names that are Object.prototype properties', () => {
+    const NAMES = ['constructor', 'toString', 'hasOwnProperty', '__proto__'];
+
+    it.each(NAMES)('creates, selects, renames and removes an ID named %s', async name => {
+        const did = await keymaster.createId(name);
+
+        expect(await keymaster.listIds()).toEqual([name]);
+        expect(await keymaster.getCurrentId()).toBe(name);
+        expect((await keymaster.fetchIdInfo(name)).did).toBe(did);
+        expect(await keymaster.lookupDID(name)).toBe(did);
+
+        // The name survives the wallet's serialization.
+        const reloaded = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });
+        const stored = await reloaded.loadWallet();
+        expect(Object.keys(stored.ids)).toEqual([name]);
+        expect(Object.getPrototypeOf(stored.ids)).toBe(Object.prototype);
+
+        await keymaster.createId('Bob');
+        await keymaster.setCurrentId(name);
+        expect(await keymaster.getCurrentId()).toBe(name);
+
+        await keymaster.renameId(name, 'Alice');
+        expect((await keymaster.listIds()).sort()).toEqual(['Alice', 'Bob']);
+        await keymaster.renameId('Alice', name);
+
+        await keymaster.removeId(name);
+        expect(await keymaster.listIds()).toEqual(['Bob']);
+    });
+
+    it.each(NAMES)('does not find an ID named %s that the wallet lacks', async name => {
+        await keymaster.createId('Bob');
+
+        await expect(keymaster.fetchIdInfo(name)).rejects.toThrow(UnknownIDError);
+        await expect(keymaster.setCurrentId(name)).rejects.toThrow(UnknownIDError);
+        await expect(keymaster.removeId(name)).rejects.toThrow(UnknownIDError);
+        await expect(keymaster.renameId(name, 'Alice')).rejects.toThrow(UnknownIDError);
+    });
+});

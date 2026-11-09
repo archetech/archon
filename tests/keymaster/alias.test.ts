@@ -271,3 +271,25 @@ describe('listAliases', () => {
         expect(walletData.aliases!['asset-2']).toBe(bob);
     });
 });
+
+// Aliases are a plain object keyed by name, so names that are also
+// Object.prototype properties must not collide with them (#1579).
+describe('aliases that are Object.prototype properties', () => {
+    const NAMES = ['constructor', 'toString', 'hasOwnProperty', '__proto__'];
+
+    it.each(NAMES)('adds, reads, lists and removes the alias %s', async name => {
+        const bob = await keymaster.createId('Bob');
+
+        expect(await keymaster.getAlias(name)).toBeNull();
+
+        await keymaster.addAlias(name, bob);
+        expect(await keymaster.getAlias(name)).toBe(bob);
+        expect(await keymaster.lookupDID(name)).toBe(bob);
+        expect(await keymaster.listAliases()).toEqual({ [name]: bob });
+        expect(Object.keys(await keymaster.listAliases({ includeIDs: true })).sort()).toEqual(['Bob', name].sort());
+
+        await keymaster.removeAlias(name);
+        expect(await keymaster.getAlias(name)).toBeNull();
+        expect(await keymaster.listAliases()).toEqual({});
+    });
+});
