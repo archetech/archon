@@ -10,7 +10,26 @@ set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
 socket=/var/run/docker.sock
-[ -S "$socket" ] || { echo "node-runner: no Docker socket at $socket" >&2; exit 1; }
+fail() { printf 'node-runner: %s\n' "$@" >&2; exit 1; }
+
+# Each check names what is wrong and how to fix it, before anything starts.
+command -v docker >/dev/null \
+    || fail "Docker is not installed." \
+            "Install Docker Engine with the Compose plugin: https://docs.docker.com/engine/install/"
+[ -S "$socket" ] \
+    || fail "Docker is not running: there is no socket at $socket." \
+            "Start it, for example with: sudo systemctl start docker"
+[ -r "$socket" ] && [ -w "$socket" ] \
+    || fail "$(id -un) cannot use Docker: $socket is not readable and writable by this user." \
+            "Add the user to the docker group and log in again: sudo usermod -aG docker $(id -un)"
+compose="$(docker compose version --short 2>/dev/null)" \
+    || fail "The Docker Compose plugin is not installed." \
+            "Install it, for example with: sudo apt-get install docker-compose-plugin"
+# The compose files use `depends_on: … required: false`, added in 2.20.
+IFS=. read -r major minor _ <<< "${compose#v}"
+[ "${major:-0}" -gt 2 ] || { [ "${major:-0}" -eq 2 ] && [ "${minor:-0}" -ge 20 ]; } \
+    || fail "Docker Compose $compose is too old; Archon needs 2.20 or later." \
+            "Upgrade the Compose plugin, for example with: sudo apt-get install --only-upgrade docker-compose-plugin"
 
 export NODE_RUNNER_NODE_DIR="$PWD"
 export NODE_RUNNER_UID="$(id -u)"
