@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { isSecret, parseCatalog } from '../../services/node-runner/server/src/catalog.ts';
-import { pairingWarnings } from '../../services/node-runner/server/src/profiles.ts';
+import { pairingWarnings, SAMPLE_NODE_ID, SAMPLE_NODE_NAME } from '../../services/node-runner/server/src/profiles.ts';
 
 const SAMPLE = `# General
 ARCHON_UID=1000
@@ -66,6 +66,13 @@ describe('parseCatalog', () => {
 
         expect(keys.length).toBe(new Set(keys).size);
         expect(assigned.filter(k => !keys.includes(k))).toEqual([]);
+    });
+
+    it('matches the sample node names node-runner warns about', () => {
+        const real = readFileSync('sample.env', 'utf-8');
+
+        expect(real).toMatch(new RegExp(`^ARCHON_NODE_ID=${SAMPLE_NODE_ID}$`, 'm'));
+        expect(real).toMatch(new RegExp(`^ARCHON_NODE_NAME=${SAMPLE_NODE_NAME}$`, 'm'));
     });
 });
 

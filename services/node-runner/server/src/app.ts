@@ -284,7 +284,7 @@ export function createApp(deps: AppDependencies): express.Express {
 
         api.post('/config/create', async (req, res) => {
             try {
-                await nodeConfig.createEnv(req.body?.passphrase);
+                await nodeConfig.createEnv({ passphrase: req.body?.passphrase, nodeId: req.body?.nodeId, nodeName: req.body?.nodeName });
                 res.status(201).json({ ok: true });
             }
             catch (error) {

@@ -157,14 +157,15 @@ describe('configuration API', () => {
     });
 
     it('creates .env on a node that has none, once', async () => {
-        await request(app).post('/api/config/create').send({ passphrase: 'a long wallet passphrase' }).expect(401);
-        await request(app).post('/api/config/create').set('Cookie', cookie).send({ passphrase: 'a long wallet passphrase' }).expect(409);
+        await request(app).post('/api/config/create').send({ passphrase: 'a long wallet passphrase', nodeId: 'alpha-agent', nodeName: 'alpha' }).expect(401);
+        await request(app).post('/api/config/create').set('Cookie', cookie).send({ passphrase: 'a long wallet passphrase', nodeId: 'alpha-agent', nodeName: 'alpha' }).expect(409);
 
         rmSync(join(nodeDir, '.env'));
         expect((await request(app).get('/api/config').set('Cookie', cookie)).body.envMissing).toBe(true);
-        await request(app).post('/api/config/create').set('Cookie', cookie).send({ passphrase: 'short' }).expect(400);
-        await request(app).post('/api/config/create').set('Cookie', cookie).send({ passphrase: 'a long wallet passphrase' }).expect(201);
+        await request(app).post('/api/config/create').set('Cookie', cookie).send({ passphrase: 'short', nodeId: 'alpha-agent', nodeName: 'alpha' }).expect(400);
+        await request(app).post('/api/config/create').set('Cookie', cookie).send({ passphrase: 'a long wallet passphrase', nodeId: 'alpha-agent', nodeName: 'alpha' }).expect(201);
         expect(readFileSync(join(nodeDir, '.env'), 'utf-8')).toContain("ARCHON_PASSPHRASE='a long wallet passphrase'");
+        expect(readFileSync(join(nodeDir, '.env'), 'utf-8')).toContain('ARCHON_NODE_ID=alpha-agent');
     });
 
     it('answers 404 for an unknown job', async () => {
