@@ -73,7 +73,7 @@ Before the first start, check that none of the sample values remain. This
 prints nothing when `.env` is ready:
 
 ```bash
-grep -E '^ARCHON_(ADMIN_API_KEY|PASSPHRASE)=(CHANGE_ME)?$|^ARCHON_NODE_(ID|NAME)=mynode(ID|Name)$|^ARCHON_[UG]ID=$' .env
+grep -E '^ARCHON_(ADMIN_API_KEY|PASSPHRASE)=(CHANGE_ME)?$|^ARCHON_NODE_(ID|NAME)=(mynode(ID|Name))?$|^ARCHON_[UG]ID=$' .env
 ```
 
 Internal service-to-service admin requests use the `X-Archon-Admin-Key` header. Reserve `Authorization` for user/session/OAuth-style flows.
@@ -286,17 +286,18 @@ Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keyma
 # Start and wait until every service is running and healthy
 COMPOSE_PROFILES= docker compose up -d --wait
 
-# Both print a ready response
-curl -fsS http://localhost:4224/api/v1/ready
-curl -fsS http://localhost:4226/api/v1/ready
+# Each prints "ready" only when the service reports itself ready
+curl -fsS http://localhost:4224/api/v1/ready | grep -Eq '^(true|\{"ready":true)' && echo ready
+curl -fsS http://localhost:4226/api/v1/ready | grep -Eq '^(true|\{"ready":true)' && echo ready
 ```
 
 If `--wait` fails, `docker compose ps` shows which service is not healthy and
 `docker compose logs --tail 100 <service>` shows why. (`logs -f` follows the
 log until interrupted, so use it only interactively.)
 
-In the Verify steps below, `curl -fsS` exits non-zero when a check fails, so a
-script can test the exit status rather than read the output.
+In the Verify steps below, `curl -fsS` exits non-zero when a request fails. A
+`/ready` endpoint answers HTTP 200 even when the service is not ready, with
+`false` or `{"ready":false,...}`, so its checks also test the response.
 
 Optional UIs when their profiles are enabled:
 
@@ -741,7 +742,7 @@ The Drawbridge entrypoint script handles secrets automatically:
 ### Verify
 
 ```bash
-curl -fsS http://localhost:4222/api/v1/ready
+curl -fsS http://localhost:4222/api/v1/ready | grep -Eq '^(true|\{"ready":true)' && echo ready
 ```
 
 Optional UIs when Drawbridge is enabled:
@@ -849,7 +850,7 @@ open http://localhost:3002
 open http://localhost:5000
 
 # Lightning mediator health
-curl -fsS http://localhost:4235/ready
+curl -fsS http://localhost:4235/ready | grep -Eq '^(true|\{"ready":true)' && echo ready
 ```
 
 ### Cashu Mint (Optional, Experimental)
