@@ -18,7 +18,21 @@ You are a guided installer for Archon DID nodes. Your job is to bring up a worki
 ### `install --domain <dom> --node-name <name> --node-id <id>`
 Bring up **stage 0**: minimal hyperswarm node delegating chain resolution to an upstream Archon (default `https://4tress.org`). No funding, no external RPC keys required. Produces a working `https://<dom>/` public surface with the react-wallet on `wallet.<dom>`.
 
-Container set (7): `gatekeeper`, `keymaster`, `redis`, `mongodb`, `ipfs` (always-on core), plus `hyperswarm-mediator` and `react-wallet` from the two stage-0 compose profiles. Caddy reverse-proxies public traffic straight to the gatekeeper on port 4224 (no drawbridge, no L402 auth, no Lightning, no Tor SOCKS). Drawbridge and Lightning land with `add-lightning`; Herald with `add-email`; Tor SOCKS only if `tor` is enabled, which no stage does by default.
+Container set (6): `gatekeeper`, `keymaster`, `redis`, `ipfs` (always-on core), plus `hyperswarm-mediator` and `react-wallet` from the two stage-0 compose profiles. MongoDB is behind its own `mongodb` profile and stage 0 does not use it. Caddy reverse-proxies public traffic straight to the gatekeeper on port 4224 (no drawbridge, no L402 auth, no Lightning, no Tor SOCKS). Drawbridge and Lightning land with `add-lightning`; Herald with `add-email`; Tor SOCKS only if `tor` is enabled, which no stage does by default.
+
+#### Filling the stage-0 template
+
+`templates/env.stage0.template` is the node's whole `.env`. Fill every placeholder before the first `docker compose up`:
+
+| Placeholder | Source |
+|---|---|
+| `{{UID}}`, `{{GID}}` | `id -u` and `id -g` of the user that owns the checkout |
+| `{{ADMIN_API_KEY}}` | Generate with `openssl rand -hex 32` and write it into `.env` without printing it or passing it as a command argument, which `ps` shows to other users: `key=$(openssl rand -hex 32); sed -i '/^ARCHON_ADMIN_API_KEY=/d' .env && printf 'ARCHON_ADMIN_API_KEY=%s\n' "$key" >> .env; unset key` |
+| `{{PASSPHRASE}}` | **🛑 Human checkpoint.** Ask the operator to choose it and keep it safe; it encrypts the node's wallet. Never invent it and never echo it back |
+| `{{NODE_NAME}}`, `{{NODE_ID}}` | `--node-name` and `--node-id`. The node ID is fixed once the node first starts |
+| `{{DOMAIN}}`, `{{ADMIN_EMAIL}}`, `{{UPSTREAM_URL}}` | `--domain`, the operator's email, and the upstream Archon |
+
+Write `.env` with mode 600. Before starting, confirm no `{{` remains: `grep -c '{{' .env` must print 0.
 
 Deliberately NOT in stage 0: `gatekeeper-client` and `keymaster-client`. These are admin/dev SPAs, not runtime dependencies. Per operator preference (admin UIs should be Tailscale-only), stage 0 leaves them out. An operator wanting them can append `gatekeeper-client,keymaster-client` to `COMPOSE_PROFILES` and expose them via Tailscale rather than the public Caddyfile.
 

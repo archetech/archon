@@ -8,8 +8,9 @@ Two containers only, no funding, no external credentials. But per operator prefe
 
 1. **Splice** into `.env`:
    ```
-   ARCHON_GRAFANA_ADMIN_PASSWORD={{generated-strong-password}}
+   GRAFANA_ADMIN_PASSWORD={{generated-strong-password}}
    ```
+   Grafana's admin password defaults to `admin` when this is unset. It is read only when Grafana first creates its database, so set it before the first start.
    Append `observability` to `COMPOSE_PROFILES`.
 
 2. **Bring up** — `docker compose up -d prometheus grafana`. Wait for both healthchecks to pass.
