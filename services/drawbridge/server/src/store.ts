@@ -100,7 +100,7 @@ export class RedisStore implements DrawbridgeStore {
         return {
             id: data.id,
             did: data.did,
-            method: data.method as 'lightning',
+            method: data.method as PaymentRecord['method'],
             paymentHash: data.paymentHash,
             amountSat: parseInt(data.amountSat, 10),
             createdAt: parseInt(data.createdAt, 10),

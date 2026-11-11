@@ -109,6 +109,12 @@ services:
       - ARCHON_DRAWBRIDGE_PORT=4222
       - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
       - ARCHON_ADMIN_API_KEY=${ARCHON_ADMIN_API_KEY}
+      # Cashu payment for priced routes (NUT-24) is redeemed by the node's own
+      # Keymaster into ARCHON_NODE_ID's wallet. The URL is fixed to the internal
+      # service, so the admin key is never sent anywhere else.
+      - ARCHON_DRAWBRIDGE_KEYMASTER_URL=http://keymaster:4226
+      - ARCHON_DRAWBRIDGE_KEYMASTER_ADMIN_KEY=${ARCHON_ADMIN_API_KEY}
+      - ARCHON_NODE_ID=${ARCHON_NODE_ID}
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
       # Drawbridge offers an optional service (capability true, routes proxied)
       # when its URL is non-empty. Left empty, the URL points at the service's

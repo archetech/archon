@@ -41,6 +41,14 @@ const config = {
     torHostnameFile: process.env.ARCHON_DRAWBRIDGE_TOR_HOSTNAME_FILE || '/data/tor/hostname',
     torProxy: process.env.ARCHON_DRAWBRIDGE_TOR_PROXY ?? 'tor:9050',
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',
+    // The node's Keymaster, which redeems Cashu payments (#1596) into the
+    // identity ARCHON_NODE_ID. Its admin key is given explicitly rather than
+    // taken from ARCHON_ADMIN_API_KEY, so the local secret is never sent to a
+    // configured URL by default. Cashu payment is offered only when all three
+    // are set and the node has a public https mint.
+    keymasterURL: process.env.ARCHON_DRAWBRIDGE_KEYMASTER_URL || '',
+    keymasterAdminKey: process.env.ARCHON_DRAWBRIDGE_KEYMASTER_ADMIN_KEY || '',
+    nodeId: process.env.ARCHON_NODE_ID || '',
 
     // L402
     l402Enabled: process.env.ARCHON_DRAWBRIDGE_L402_ENABLED === 'true',

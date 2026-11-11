@@ -180,10 +180,12 @@ Constant-time comparison is used.
 ### 2.3 Authenticated proxy routes
 
 When L402 is enabled, protected routes require a matching admin key, a valid
-L402 bearer, or the explicitly enabled subscription stub. Public read exceptions
-are listed in [§3.2](#32-bypass-routes). On 402 challenge, the response is HTTP 402 with a
-`WWW-Authenticate: L402 macaroon="<base64>", invoice="<bolt11>"` header
-and a JSON body with the same fields.
+L402 bearer, a Cashu payment ([§4.5](#45-cashu-payment-nut-24)), or the
+explicitly enabled subscription stub. Public read exceptions are listed in
+[§3.2](#32-bypass-routes). On 402 challenge, the response is HTTP 402 with a
+`WWW-Authenticate: L402 macaroon="<base64>", invoice="<bolt11>"` header, an
+`X-Cashu` header when Cashu payment is offered, and a JSON body with the same
+fields.
 
 Each route is a 1:1 forward to the upstream Gatekeeper after auth
 passes; the response shape is identical to the Gatekeeper's. See the
@@ -248,6 +250,8 @@ status codes:
 - `501` — the requested optional service (DIDComm / Lightning / names) is not enabled on this node
 - `502` — upstream Gatekeeper / Lightning / Herald / DIDComm unreachable
 - `503` — Lightning service unavailable (L402 invoice creation failed)
+- `400` — an `X-Cashu` token that cannot pay the request or that the node refused
+- `503` — Cashu payment could not be redeemed, or no payment method is available
 
 ### 2.7 Route-normalization for metrics
 
@@ -298,8 +302,9 @@ continues through the ordinary payment flow, including accepting a valid L402
 bearer; it does not cause an admin-auth rejection on proxy routes.
 
 For other requests, the L402 middleware looks for an `Authorization: L402 <macaroon>:<preimage>`
-header. If valid, the request proceeds. Otherwise it issues a 402
-challenge.
+header. If valid, the request proceeds. Without one, an `X-Cashu` token pays
+for the request when Cashu payment is offered ([§4.5](#45-cashu-payment-nut-24)).
+Otherwise it issues a 402 challenge.
 
 If `ARCHON_DRAWBRIDGE_L402_ENABLED=false`, the auth middleware chain
 is empty and all proxy routes are open. This is intentional for
@@ -444,6 +449,49 @@ the credential immediately:
 
 ---
 
+### 4.5 Cashu payment (NUT-24)
+
+[NUT-24](https://github.com/cashubtc/nuts/blob/main/24.md) is a second way to
+pay the same price (#1596). The 402 challenge carries `X-Cashu: creqA…`, a
+NUT-18 payment request for one call:
+
+- `a`: the price in sats;
+- `u`: `sat`;
+- `m`: the node mint's public URL, `<ARCHON_DRAWBRIDGE_PUBLIC_HOST>/cashu`.
+
+The body lists `acceptedMethods` and repeats the request as `cashu`. The client
+retries with `X-Cashu: cashuB…`. Before serving, Drawbridge:
+
+1. checks the token without contacting the mint, and answers `400` if it is from
+   another mint, of another unit, for less than the price, or carries spending
+   conditions;
+2. redeems it through the node's own Keymaster (`POST /cashu/receive`) into the
+   identity `ARCHON_NODE_ID`, so the payment lands in the node's Cashu wallet and
+   Drawbridge holds no funds. A token the node refuses, such as one already
+   spent, gets `400`; a Keymaster or mint that cannot be reached gets `503`;
+3. records a payment with `method: "cashu"`, then serves the request.
+
+A Cashu payment covers only the request it comes with, and no macaroon is
+issued. The token is redeemed before the request is served, so a request that
+then fails is still paid.
+
+Cashu is offered only while all of these hold:
+
+- the node has a mint (the `cashu` profile) and an https
+  `ARCHON_DRAWBRIDGE_PUBLIC_HOST`;
+- Drawbridge is configured with `ARCHON_DRAWBRIDGE_KEYMASTER_URL`,
+  `ARCHON_DRAWBRIDGE_KEYMASTER_ADMIN_KEY` and `ARCHON_NODE_ID`. The bundled
+  Compose sets these for the node's own Keymaster;
+- the identity `ARCHON_NODE_ID` on that Keymaster has added the node mint
+  (`archon add-cashu <node ID>`).
+
+Drawbridge checks the last at most once a minute, and logs a warning while it
+fails. Lightning and Cashu are each offered when they can work. If invoice
+creation fails while Cashu is ready, the challenge offers Cashu alone; with
+neither available, the answer is `503`.
+
+Metric: `drawbridge_cashu_payments_total`.
+
 ## 5. Pricing
 
 Per-operation prices are loaded at startup. Only two individual
@@ -580,6 +628,9 @@ shared with the reference TypeScript service.
 | `ARCHON_DIDCOMM_URL` | `http://localhost:4236` | Upstream DIDComm relay proxied at `/didcomm`; container `http://didcomm:4236`, profile `didcomm`. Off: capability `didcomm:false`, `/didcomm` → 501. |
 | `ARCHON_CASHU_MINT_URL` | empty | Upstream Cashu mint proxied at `/cashu`; container `http://cashu-mint:8085`, profile `cashu`. Off: capability `cashu:false`, `/cashu` → 501. |
 | `ARCHON_DRAWBRIDGE_PUBLIC_HOST` | empty | Public base URL this node is reachable at (clearnet host or Tor onion). Used by `/didcomm-endpoint` to advertise `<host>/didcomm`. |
+| `ARCHON_DRAWBRIDGE_KEYMASTER_URL` | empty | The node's Keymaster, which redeems Cashu payments ([§4.5](#45-cashu-payment-nut-24)). The bundled Compose fixes it to `http://keymaster:4226`. |
+| `ARCHON_DRAWBRIDGE_KEYMASTER_ADMIN_KEY` | empty | Admin key for that Keymaster. Given explicitly, not taken from `ARCHON_ADMIN_API_KEY`; the bundled Compose passes the node's admin key. |
+| `ARCHON_NODE_ID` | empty | The node identity whose Cashu wallet receives payments. |
 | `ARCHON_DRAWBRIDGE_TOR_HOSTNAME_FILE` | `/data/tor/hostname` | When `PUBLIC_HOST` is empty, `/didcomm-endpoint` falls back to the Tor onion read from this shared hidden-service hostname file. |
 | `ARCHON_DRAWBRIDGE_TOR_PROXY` | `tor:9050` | SOCKS5 proxy used to check that the published hidden service is reachable. Set to the Docker network address for bundled Tor. |
 | `ARCHON_REDIS_URL` | `redis://localhost:6379` | Macaroon/payment/rate-limit store. |
