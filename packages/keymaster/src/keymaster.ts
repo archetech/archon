@@ -2295,18 +2295,36 @@ export default class Keymaster implements KeymasterInterface {
         options: { registry?: string } = {}
     ): Promise<string> {
         return this.enqueueIdentityOp(async () => {
-            const account = (await this.loadWallet()).counter;
+            const start = await this.loadWallet();
+            const account = start.counter;
+            // Compared serialized: mutations work on a copy of the wallet.
+            const seed = JSON.stringify(start.seed.mnemonicEnc);
             const signed = await this.createIdOperation(name, account, options);
             const did = await this.gatekeeper.createDID(signed);
 
-            // The name is checked again: something else may have taken it
-            // while the DID was being created.
+            let conflict: unknown;
             await this.mutateWallet((wallet) => {
-                name = this.validateAlias(name, wallet);
-                setName(wallet.ids, name, { did, account, index: 0 });
+                // A wallet replaced meanwhile has another seed, which cannot
+                // derive this DID's key.
+                if (JSON.stringify(wallet.seed.mnemonicEnc) !== seed) {
+                    throw new KeymasterError('The wallet was replaced while the ID was being created');
+                }
+                // The account is used now, its key signing a published DID,
+                // even if the name was taken while the DID was being created.
                 wallet.counter = Math.max(wallet.counter, account + 1);
+                try {
+                    name = this.validateAlias(name, wallet);
+                }
+                catch (error) {
+                    conflict = error;
+                    return;
+                }
+                setName(wallet.ids, name, { did, account, index: 0 });
                 wallet.current = name;
             });
+            if (conflict) {
+                throw conflict;
+            }
 
             return did;
         });

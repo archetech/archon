@@ -199,6 +199,40 @@ def test_rotation_is_recorded_against_the_did_if_the_id_is_renamed_meanwhile(tes
     assert run(km.load_wallet())["ids"]["Robert"]["index"] == 1
 
 
+def test_the_used_account_is_recorded_when_the_name_is_taken_meanwhile(testbed):
+    km = testbed.keymaster
+    taken = []
+
+    async def take_name():
+        if not taken:
+            taken.append(True)
+            await km.add_alias("Bob", "did:cid:bagaaieraexample")
+
+    _hook_writes(testbed, take_name)
+    with pytest.raises(KeymasterError, match="already used"):
+        run(asyncio.wait_for(km.create_id("Bob"), DEADLINE_SECONDS))
+    assert run(km.load_wallet())["counter"] == 1
+
+    # The next identity gets the next account, not the published DID's key.
+    run(km.create_id("Carol"))
+    assert run(km.load_wallet())["ids"]["Carol"]["account"] == 1
+
+
+def test_a_did_is_not_recorded_into_a_wallet_replaced_meanwhile(testbed):
+    km = testbed.keymaster
+    replaced = []
+
+    async def replace_wallet():
+        if not replaced:
+            replaced.append(True)
+            await km.new_wallet(overwrite=True)
+
+    _hook_writes(testbed, replace_wallet)
+    with pytest.raises(KeymasterError, match="replaced"):
+        run(asyncio.wait_for(km.create_id("Bob"), DEADLINE_SECONDS))
+    assert "Bob" not in run(km.load_wallet())["ids"]
+
+
 def test_concurrent_create_ids_for_one_name_create_one_did(testbed):
     km = testbed.keymaster
     calls = []

@@ -786,6 +786,38 @@ describe('identity operations outside the wallet lock', () => {
         expect((await km.loadWallet()).ids.Robert.index).toBe(1);
     });
 
+    it('records the used account even when the name is taken while the DID is created', async () => {
+        let taken = false;
+        const km = keymasterWithHook(async (k) => {
+            if (!taken) {
+                taken = true;
+                await k.addAlias('Bob', 'did:cid:bagaaieraexample');
+            }
+        });
+        await km.newWallet();
+
+        await expect(withinDeadline(km.createId('Bob', { registry: 'local' }))).rejects.toThrow('already used');
+        expect((await km.loadWallet()).counter).toBe(1);
+
+        // The next identity gets the next account, not the published DID's key.
+        await km.createId('Carol', { registry: 'local' });
+        expect((await km.loadWallet()).ids.Carol.account).toBe(1);
+    });
+
+    it('does not record a DID into a wallet replaced while it was created', async () => {
+        let replaced = false;
+        const km = keymasterWithHook(async (k) => {
+            if (!replaced) {
+                replaced = true;
+                await k.newWallet(undefined, true);
+            }
+        });
+        await km.newWallet();
+
+        await expect(withinDeadline(km.createId('Bob', { registry: 'local' }))).rejects.toThrow('replaced');
+        expect((await km.loadWallet()).ids.Bob).toBeUndefined();
+    });
+
     it('runs concurrent createIds for one name one at a time, so only one succeeds', async () => {
         const created = jest.spyOn(gatekeeper, 'createDID');
         const km = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'passphrase' });
