@@ -469,12 +469,16 @@ retries with `X-Cashu: cashuB…`. Before serving, Drawbridge:
    conditions;
 3. redeems it through the node's own Keymaster (`POST /cashu/receive`) into the
    identity `ARCHON_NODE_ID`, so the payment lands in the node's Cashu wallet and
-   Drawbridge holds no funds. A token that cannot pay gets `400`: malformed or
-   not covering its fee, already spent, locked to another key, or needing
-   signatures the wallet cannot give. Any other failure is the node's, so it
-   gets `503` and a logged warning. That includes a Keymaster or mint that
-   cannot be reached, a Keymaster server error, or a node identity missing the
-   mint;
+   Drawbridge holds no funds. Drawbridge follows Keymaster's own
+   classification, the HTTP status `KeymasterClient` carries on its errors.
+   - A `400` means the token is at fault: malformed or not covering its fee,
+     already spent, locked to another key, or refused by the mint, for example
+     for duplicate inputs or an invalid signature. Drawbridge answers `400`.
+   - The exception is a node identity missing the mint, which is a setup
+     problem.
+   - That exception and every other failure are the node's, so they get `503`
+     and a logged warning. That includes a Keymaster or mint that cannot be
+     reached, and a Keymaster server error;
 4. requires what the node received to cover the price. The price is net of the
    mint's fees and of any proofs already spent, as NUT-18 defines a requested
    amount; a token that brings in less gets `400`, and what it brought in stays

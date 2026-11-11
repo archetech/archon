@@ -5,24 +5,7 @@
 // Cashu wallet and Drawbridge itself holds no funds.
 
 import { getTokenMetadata, PaymentRequest } from '@cashu/cashu-ts';
-import {
-    CashuMintUnsupportedError,
-    CashuTokenLockedError,
-    CashuTokenSpentError,
-    InvalidParameterError,
-} from '@didcid/common/errors';
-
-// The Keymaster errors that mean the token itself cannot pay: malformed or not
-// covering its fee, already spent, locked to another key, or needing signatures
-// the wallet cannot give. Both Keymaster ports name them alike. KeymasterClient
-// drops the HTTP status, so anything else, a server fault or a mint the node
-// identity has not added included, is the node's failure, not the token's.
-const TOKEN_REFUSALS = [
-    InvalidParameterError.type,
-    CashuTokenSpentError.type,
-    CashuTokenLockedError.type,
-    CashuMintUnsupportedError.type,
-];
+import { CashuMintNotAddedError } from '@didcid/common/errors';
 
 export const CASHU_HEADER = 'x-cashu';
 export const CASHU_UNIT = 'sat';
@@ -183,9 +166,12 @@ export function keymasterCashuPayments(
             }
             catch (error: any) {
                 // KeymasterClient rethrows an answered request as its JSON body,
-                // and a transport failure as the axios error.
+                // with the HTTP status, and a transport failure as the axios
+                // error. Both Keymaster ports answer 400 when the request is at
+                // fault: the token is invalid, spent, locked or refused by the
+                // mint. One 400 is the node's own: an identity without the mint.
                 const reason = typeof error?.error === 'string' ? error.error : null;
-                if (reason !== null && TOKEN_REFUSALS.some(type => reason.includes(type))) {
+                if (reason !== null && error.status === 400 && !reason.includes(CashuMintNotAddedError.type)) {
                     throw new CashuPaymentRefusedError(`The token was refused: ${reason}`);
                 }
                 logger?.warn?.(`Cashu payment could not be redeemed: ${reason ?? describeError(error)}`);
