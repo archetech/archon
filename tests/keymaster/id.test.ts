@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import Gatekeeper from '@didcid/gatekeeper';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
@@ -701,5 +702,116 @@ describe('names that are Object.prototype properties', () => {
         await expect(keymaster.setCurrentId(name)).rejects.toThrow(UnknownIDError);
         await expect(keymaster.removeId(name)).rejects.toThrow(UnknownIDError);
         await expect(keymaster.renameId(name, 'Alice')).rejects.toThrow(UnknownIDError);
+    });
+});
+
+// Paying a 402 from a paywalled Drawbridge mutates the wallet while createId or
+// rotateKeys waits on Gatekeeper (#1596), so neither may hold the wallet lock
+// across those calls.
+describe('identity operations outside the wallet lock', () => {
+    const DEADLINE_MS = 2000;
+
+    function withinDeadline<T>(promise: Promise<T>): Promise<T> {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const deadline = new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error('deadlocked')), DEADLINE_MS);
+        });
+        return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
+    }
+
+    // A Gatekeeper whose writes first run `during`, as a 402 payment would.
+    function keymasterWithHook(during: (km: Keymaster) => Promise<void>) {
+        const hooked: any = Object.create(gatekeeper);
+        const store = new WalletJsonMemory();
+        const km = new Keymaster({ gatekeeper: hooked, wallet: store, cipher, passphrase: 'passphrase' });
+        hooked.createDID = async (operation: any) => {
+            await during(km);
+            return gatekeeper.createDID(operation);
+        };
+        hooked.updateDID = async (operation: any) => {
+            await during(km);
+            return gatekeeper.updateDID(operation);
+        };
+        return km;
+    }
+
+    it('lets createId wait on Gatekeeper while the wallet is changed', async () => {
+        let paid = false;
+        const km = keymasterWithHook(async (k) => {
+            if (!paid) {
+                paid = true;
+                await k.addAlias('paid-for', 'did:cid:bagaaieraexample');
+            }
+        });
+        await km.newWallet();
+
+        const did = await withinDeadline(km.createId('Bob', { registry: 'local' }));
+
+        expect((await km.loadWallet()).ids.Bob.did).toBe(did);
+        expect(await km.getAlias('paid-for')).toBe('did:cid:bagaaieraexample');
+    });
+
+    it('lets rotateKeys wait on Gatekeeper while the wallet is changed', async () => {
+        let armed = false;
+        const km = keymasterWithHook(async (k) => {
+            if (armed) {
+                armed = false;
+                await k.addAlias('paid-for', 'did:cid:bagaaieraexample');
+            }
+        });
+        await km.newWallet();
+        await km.createId('Bob', { registry: 'local' });
+
+        armed = true;
+        expect(await withinDeadline(km.rotateKeys())).toBe(true);
+
+        expect((await km.loadWallet()).ids.Bob.index).toBe(1);
+        expect(await km.getAlias('paid-for')).toBe('did:cid:bagaaieraexample');
+    });
+
+    it('records a rotation against the DID even if the ID is renamed meanwhile', async () => {
+        let armed = false;
+        const km = keymasterWithHook(async (k) => {
+            if (armed) {
+                armed = false;
+                await k.renameId('Bob', 'Robert');
+            }
+        });
+        await km.newWallet();
+        await km.createId('Bob', { registry: 'local' });
+
+        armed = true;
+        await withinDeadline(km.rotateKeys());
+
+        expect((await km.loadWallet()).ids.Robert.index).toBe(1);
+    });
+
+    it('keeps the name being created reserved until the identity is recorded', async () => {
+        let attempt: Promise<unknown> | undefined;
+        const km = keymasterWithHook(async (k) => {
+            // Settled here, so the expected refusal is never an unhandled rejection.
+            attempt ??= k.addAlias('Bob', 'did:cid:bagaaieraexample').then(() => 'stored', (error: Error) => error);
+        });
+        await km.newWallet();
+
+        await withinDeadline(km.createId('Bob', { registry: 'local' }));
+
+        expect(String(await attempt)).toContain('already used');
+        expect(await km.getAlias('Bob')).toBeNull();
+    });
+
+    it('runs concurrent createIds for one name one at a time, so only one succeeds', async () => {
+        const created = jest.spyOn(gatekeeper, 'createDID');
+        const km = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'passphrase' });
+        await km.newWallet();
+
+        const results = await Promise.allSettled([
+            km.createId('Bob', { registry: 'local' }),
+            km.createId('Bob', { registry: 'local' }),
+        ]);
+
+        expect(results.map(r => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+        expect(created).toHaveBeenCalledTimes(1);
+        created.mockRestore();
     });
 });

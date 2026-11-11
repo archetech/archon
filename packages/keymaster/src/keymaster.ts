@@ -287,6 +287,13 @@ export default class Keymaster implements KeymasterInterface {
     private readonly maxDataLength: number;
     private readonly cashu: CashuWallet;
     private _mutations: Promise<unknown> = Promise.resolve();
+    // createId and rotateKeys call Gatekeeper, which a paid Drawbridge may
+    // answer with a 402 that this wallet pays (#1596). Paying mutates the
+    // wallet, so they do not hold the wallet queue across those calls: they
+    // run one at a time on this queue and take the wallet queue only to record
+    // their result. A name createId is creating stays reserved meanwhile.
+    private _identityOps: Promise<unknown> = Promise.resolve();
+    private readonly _reservedNames = new Set<string>();
     // Node capability manifest (`<nodeURL>/api/v1/capabilities`), memoized once a
     // read settles it. `undefined` = not yet settled; `null` = node has no manifest
     // (older node / not a gateway) → callers proceed lazily rather than regress.
@@ -362,6 +369,12 @@ export default class Keymaster implements KeymasterInterface {
     private enqueue<T>(work: () => Promise<T>): Promise<T> {
         const queued = this._mutations.then(work, work);
         this._mutations = queued.catch(() => {});
+        return queued;
+    }
+
+    private enqueueIdentityOp<T>(work: () => Promise<T>): Promise<T> {
+        const queued = this._identityOps.then(work, work);
+        this._identityOps = queued.catch(() => {});
         return queued;
     }
 
@@ -2249,7 +2262,8 @@ export default class Keymaster implements KeymasterInterface {
     validateAlias(
         alias: string,
         wallet?: WalletFile,
-        label: string = 'name'
+        label: string = 'name',
+        options: { reservedBy?: string } = {}
     ) {
         if (typeof alias !== 'string' || !alias.trim()) {
             throw new InvalidParameterError(`${label} must be a non-empty string`);
@@ -2275,6 +2289,12 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError(alreadyUsedError);
         }
 
+        // A name an identity is being created under, unless it is that creation
+        // recording its own result.
+        if (wallet && this._reservedNames.has(alias) && options.reservedBy !== alias) {
+            throw new InvalidParameterError(alreadyUsedError);
+        }
+
         return alias;
     }
 
@@ -2282,20 +2302,29 @@ export default class Keymaster implements KeymasterInterface {
         name: string,
         options: { registry?: string } = {}
     ): Promise<string> {
-        let did = '';
-        await this.mutateWallet(async (wallet) => {
+        return this.enqueueIdentityOp(async () => {
+            const wallet = await this.loadWallet();
+            name = this.validateAlias(name, wallet);
             const account = wallet.counter;
-            const index = 0;
-            const signed = await this.createIdOperation(name, account, options);
 
-            did = await this.gatekeeper.createDID(signed);
+            this._reservedNames.add(name);
+            try {
+                const signed = await this.signIdOperation(account, options);
+                const did = await this.gatekeeper.createDID(signed);
 
-            setName(wallet.ids, name, { did, account, index });
-            wallet.counter += 1;
-            wallet.current = name;
+                await this.mutateWallet(async (latest) => {
+                    this.validateAlias(name, latest, 'name', { reservedBy: name });
+                    setName(latest.ids, name, { did, account, index: 0 });
+                    latest.counter = Math.max(latest.counter, account + 1);
+                    latest.current = name;
+                });
+
+                return did;
+            }
+            finally {
+                this._reservedNames.delete(name);
+            }
         });
-
-        return did;
     }
 
     async createIdOperation(
@@ -2303,10 +2332,17 @@ export default class Keymaster implements KeymasterInterface {
         account: number = 0,
         options: { registry?: string } = {}
     ): Promise<Operation> {
+        this.validateAlias(name, await this.loadWallet());
+        return this.signIdOperation(account, options);
+    }
+
+    // The signed create operation for the agent at `account`.
+    private async signIdOperation(
+        account: number,
+        options: { registry?: string } = {}
+    ): Promise<Operation> {
         const { registry = this.defaultRegistry } = options;
         const wallet = await this.loadWallet();
-
-        name = this.validateAlias(name, wallet);
 
         const hdkey = await this.getHDKeyFromCacheOrMnemonic(wallet);
         const path = `m/44'/0'/${account}'/0/0`;
@@ -2448,9 +2484,8 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     async rotateKeys(): Promise<boolean> {
-        let ok = false;
-
-        await this.mutateWallet(async (wallet) => {
+        return this.enqueueIdentityOp(async () => {
+            const wallet = await this.loadWallet();
             const id = wallet.ids[wallet.current!];
             const nextIndex = id.index + 1;
 
@@ -2495,15 +2530,23 @@ export default class Keymaster implements KeymasterInterface {
                 }),
             };
 
-            ok = await this.updateDID(id.did, { didDocument: updatedDidDocument });
+            const ok = await this.updateDID(id.did, { didDocument: updatedDidDocument });
             if (!ok) {
                 throw new KeymasterError('Cannot rotate keys');
             }
 
-            id.index = nextIndex; // persist in same mutation
-        });
+            // Recorded by DID, so a rename while the update was in flight
+            // cannot lose the new key's index.
+            await this.mutateWallet(async (latest) => {
+                const rotated = Object.values(latest.ids).find(entry => entry.did === id.did);
+                if (!rotated) {
+                    throw new KeymasterError('Cannot rotate keys: the ID was removed while rotating');
+                }
+                rotated.index = nextIndex;
+            });
 
-        return ok;
+            return ok;
+        });
     }
 
     async listAliases(
