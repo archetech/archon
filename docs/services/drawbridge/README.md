@@ -335,7 +335,10 @@ against the request path with the `/api/v1` prefix stripped:
 
 - Exact matches (any method): `/ready`, `/version`, `/status`, `/metrics`, `/capabilities`, `/didcomm-endpoint`
 - Prefix matches (any method): anything under `/l402/`
-- GET-only prefix matches: anything under `/did/` or `/ipfs/`
+- GET-only prefix matches: anything under `/did/`, `/ipfs/` or `/block/`.
+  Block reads are free because every create operation names a recent block,
+  so pricing them would make creating a DID cost two payments; adding a
+  block (`POST /block/:registry`) stays paid.
 
 (Auth is also applied per-route — only the protected proxy routes spread
 the auth middleware into their handler chain — so the public routes
@@ -346,7 +349,7 @@ to the L402 middleware at all (e.g. `/invoice/:did`, `/didcomm/*`,
 `/.well-known/*`, `/names/*`).
 
 Implementations MUST honor this list — clients depend on at least
-`/ready`, `/version`, and the GET DID/IPFS read paths being free.
+`/ready`, `/version`, and the GET DID, IPFS and block read paths being free.
 
 ---
 

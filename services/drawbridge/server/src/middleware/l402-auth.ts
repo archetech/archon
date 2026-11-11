@@ -38,8 +38,10 @@ import type {
 // Routes that bypass L402 auth
 const UNPROTECTED_PATHS = ['/ready', '/version', '/status', '/metrics', '/capabilities', '/didcomm-endpoint'];
 const UNPROTECTED_PREFIXES = ['/l402/'];
-// GET-only prefixes: read operations that should be publicly accessible
-const UNPROTECTED_GET_PREFIXES = ['/did/', '/ipfs/'];
+// GET-only prefixes: read operations that should be publicly accessible.
+// Block reads are among them: every create operation names a recent block, so
+// charging for them would make creating a DID cost two payments.
+const UNPROTECTED_GET_PREFIXES = ['/did/', '/ipfs/', '/block/'];
 
 // The request's path from the application root, as the paywall's lookups see
 // it. The paywall runs inside the router mounted at /api/v1, where req.path is

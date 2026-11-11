@@ -60,6 +60,9 @@ function app(pricing?: L402Options['pricing']) {
     v1.use(createL402Middleware(options));
     v1.post('/did', (_req, res) => { res.json({ served: 'createDID' }); });
     v1.post('/dids', (_req, res) => { res.json({ served: 'getDIDs' }); });
+    v1.get('/block/:registry/latest', (_req, res) => { res.json({ served: 'getBlock' }); });
+    v1.get('/block/:registry/:blockId', (_req, res) => { res.json({ served: 'getBlock' }); });
+    v1.post('/block/:registry', (_req, res) => { res.json({ served: 'addBlock' }); });
     const server = express();
     server.use('/api/v1', v1);
     return server;
@@ -116,6 +119,18 @@ describe('the paywall behind the /api/v1 mount', () => {
         expect(challenge.body.amountSat).toBe(10);
         expect(retry.status).toBe(200);
         expect(retry.body).toEqual({ served: 'createDID' });
+    });
+
+    it('serves block reads free, as a create operation needs one, but not block writes', async () => {
+        const server = app();
+        for (const path of ['/api/v1/block/BTC:mainnet/latest', '/api/v1/block/BTC:mainnet/938000']) {
+            const read = await request(server).get(path);
+            expect(read.status).toBe(200);
+            expect(read.body).toEqual({ served: 'getBlock' });
+        }
+
+        const write = await request(server).post('/api/v1/block/BTC:mainnet').send({});
+        expect(write.status).toBe(402);
     });
 
     it('lets a default-priced pass cover the default scopes', async () => {
