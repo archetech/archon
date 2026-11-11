@@ -9,14 +9,22 @@ async function requestLightningMediator<T>(
     path: string,
     options: RequestInit
 ): Promise<T> {
-    const response = await fetch(new URL(path, baseUrl), {
-        ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            ...(config.adminApiKey ? { [ARCHON_ADMIN_HEADER]: config.adminApiKey } : {}),
-            ...(options.headers || {}),
-        },
-    });
+    let response: Response;
+    try {
+        response = await fetch(new URL(path, baseUrl), {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...(config.adminApiKey ? { [ARCHON_ADMIN_HEADER]: config.adminApiKey } : {}),
+                ...(options.headers || {}),
+            },
+        });
+    } catch (error) {
+        // fetch rejects when the mediator cannot be reached at all.
+        throw new LightningUnavailableError(
+            `Lightning mediator unreachable: ${error instanceof Error ? error.message : String(error)}`
+        );
+    }
 
     if (!response.ok) {
         const errorBody = await response.json().catch(() => ({ error: response.statusText }));

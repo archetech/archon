@@ -250,7 +250,15 @@ async function handleCashuPayment(
 
     const { amountSat, operationName } = priceFor(options, req);
     checkCashuToken(token, amountSat, cashu.mintUrl);
-    await cashu.redeem(token);
+    // The face value can overstate what the token pays: some of its proofs may
+    // already be spent, and the mint takes its fee. The price is net of both,
+    // as NUT-18 defines a requested amount; what was received stays received.
+    const received = await cashu.redeem(token);
+    if (received < amountSat) {
+        throw new CashuPaymentRefusedError(
+            `The token brought in ${received} sat after spent proofs and fees; the price is ${amountSat} sat`
+        );
+    }
 
     const now = Math.floor(Date.now() / 1000);
     await options.store.savePayment({
@@ -258,7 +266,7 @@ async function handleCashuPayment(
         did: did || 'anonymous',
         method: 'cashu',
         paymentHash: '',
-        amountSat,
+        amountSat: received,
         createdAt: now,
         macaroonId: '',
         scope: [operationName ?? routeToScope(req.method, req.path)],

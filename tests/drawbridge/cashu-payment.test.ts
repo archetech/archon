@@ -72,7 +72,7 @@ describe('keymasterCashuPayments', () => {
     function keymaster() {
         return {
             listCashuMints: jest.fn<(name?: string) => Promise<Array<{ url: string; error?: string }>>>(),
-            receiveCashu: jest.fn<(token: string, name?: string) => Promise<unknown>>(),
+            receiveCashu: jest.fn<(token: string, name?: string) => Promise<{ amount: number }>>(),
         };
     }
 
@@ -105,11 +105,24 @@ describe('keymasterCashuPayments', () => {
         expect(await keymasterCashuPayments(unreachable, 'node-id', MINT).ready()).toBe(false);
     });
 
-    it('redeems the token into the node identity', async () => {
+    it('redeems the token into the node identity and returns what was received', async () => {
         const km = keymaster();
-        km.receiveCashu.mockResolvedValue({ amount: 10 });
-        await keymasterCashuPayments(km, 'node-id', MINT).redeem('cashuBtoken');
+        km.receiveCashu.mockResolvedValue({ amount: 2 });
+        expect(await keymasterCashuPayments(km, 'node-id', MINT).redeem('cashuBtoken')).toBe(2);
         expect(km.receiveCashu).toHaveBeenCalledWith('cashuBtoken', 'node-id');
+    });
+
+    it('shares one lookup between concurrent readiness checks', async () => {
+        const km = keymaster();
+        let answer: (mints: Array<{ url: string }>) => void = () => {};
+        km.listCashuMints.mockReturnValue(new Promise(resolve => { answer = resolve; }));
+        const payments = keymasterCashuPayments(km, 'node-id', MINT);
+
+        const checks = [payments.ready(), payments.ready(), payments.ready()];
+        answer([{ url: MINT }]);
+
+        expect(await Promise.all(checks)).toEqual([true, true, true]);
+        expect(km.listCashuMints).toHaveBeenCalledTimes(1);
     });
 
     it('refuses a token Keymaster refuses, passing on its reason', async () => {

@@ -21,8 +21,12 @@ export interface CashuPayments {
     mintUrl: string;
     /** Whether the node's Keymaster can redeem tokens from that mint now. */
     ready(): Promise<boolean>;
-    /** Redeems the token into the node's wallet, or throws one of the errors above. */
-    redeem(token: string): Promise<void>;
+    /**
+     * Redeems the token into the node's wallet and returns the sats received,
+     * net of the mint's fees and of any proofs already spent; or throws one of
+     * the errors above.
+     */
+    redeem(token: string): Promise<number>;
 }
 
 // Matches Keymaster's normalizeMintUrl, so both sides name the mint alike.
@@ -83,7 +87,7 @@ export function checkCashuToken(token: string, amountSat: number, mintUrl: strin
 /** The part of KeymasterClient this module uses. */
 export interface CashuKeymaster {
     listCashuMints(name?: string): Promise<Array<{ url: string; error?: string }>>;
-    receiveCashu(token: string, name?: string): Promise<unknown>;
+    receiveCashu(token: string, name?: string): Promise<{ amount: number }>;
 }
 
 const READY_CACHE_MS = 60_000;
@@ -100,33 +104,43 @@ export function keymasterCashuPayments(
     logger?: { warn?: (...args: any[]) => void },
 ): CashuPayments {
     let checked: { at: number; ready: boolean } | null = null;
+    // Concurrent challenges share one lookup rather than each contacting the mints.
+    let checking: Promise<boolean> | null = null;
     const accepted = normalizeMintUrl(mintUrl);
+
+    async function check(): Promise<boolean> {
+        let ready = false;
+        try {
+            const mints = await keymaster.listCashuMints(nodeId);
+            ready = mints.some(mint => normalizeMintUrl(mint.url) === accepted && !mint.error);
+            if (!ready) {
+                logger?.warn?.(`Cashu payment is not offered: ${nodeId} on the node's Keymaster has not added the node mint ${mintUrl}`);
+            }
+        }
+        catch (error) {
+            logger?.warn?.({ err: error }, 'Cashu payment is not offered: the node\'s Keymaster cannot be reached');
+        }
+        checked = { at: Date.now(), ready };
+        return ready;
+    }
 
     return {
         mintUrl,
 
-        async ready() {
+        ready() {
             if (checked && Date.now() - checked.at < READY_CACHE_MS) {
-                return checked.ready;
+                return Promise.resolve(checked.ready);
             }
-            let ready = false;
-            try {
-                const mints = await keymaster.listCashuMints(nodeId);
-                ready = mints.some(mint => normalizeMintUrl(mint.url) === accepted && !mint.error);
-                if (!ready) {
-                    logger?.warn?.(`Cashu payment is not offered: ${nodeId} on the node's Keymaster has not added the node mint ${mintUrl}`);
-                }
-            }
-            catch (error) {
-                logger?.warn?.({ err: error }, 'Cashu payment is not offered: the node\'s Keymaster cannot be reached');
-            }
-            checked = { at: Date.now(), ready };
-            return ready;
+            checking ??= check().finally(() => {
+                checking = null;
+            });
+            return checking;
         },
 
         async redeem(token) {
             try {
-                await keymaster.receiveCashu(token, nodeId);
+                const result = await keymaster.receiveCashu(token, nodeId);
+                return result.amount;
             }
             catch (error: any) {
                 // KeymasterClient rethrows an answered request as its JSON body.

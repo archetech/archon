@@ -94,7 +94,8 @@ function cashu(ready = true) {
     return {
         mintUrl: MINT,
         ready: jest.fn(async () => ready),
-        redeem: jest.fn<(token: string) => Promise<void>>(async () => {}),
+        // What the node received, net of spent proofs and the mint's fee.
+        redeem: jest.fn<(token: string) => Promise<number>>(async () => 10),
     };
 }
 
@@ -212,6 +213,19 @@ describe('paying with X-Cashu', () => {
             did: 'did:cid:payer', method: 'cashu', amountSat: 10, scope: ['createDID'],
         })]);
         expect(mockCreateL402Invoice).not.toHaveBeenCalled();
+    });
+
+    it('refuses a partly spent token that brings in less than the price', async () => {
+        const s = store();
+        const payments = cashu();
+        // 10 sat face value, of which 8 had already been spent elsewhere.
+        payments.redeem.mockResolvedValue(2);
+        const { res, next } = await call(options(s, { cashu: payments }), { 'x-cashu': token() });
+
+        expect(res.statusCode).toBe(400);
+        expect(res.body.error).toContain('brought in 2 sat');
+        expect(next).not.toHaveBeenCalled();
+        expect(s.payments).toEqual([]);
     });
 
     it('refuses a token that cannot pay, without redeeming it', async () => {
