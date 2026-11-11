@@ -94,6 +94,13 @@ transports defined today are `nostr` (NIP-17 DMs) and `post` (HTTP).
   identity, or of a membership credential, while their spending stays
   unlinkable within the member group.
 - **New work:**
+  - Herald's OAuth provider as NUT-21 requires it:
+    - a public client using PKCE without a client secret (Herald checks a
+      `client_secret` today);
+    - signed JWT access tokens in ES256 or RS256, verifiable by the mint
+      (Herald issues opaque tokens for `/userinfo`);
+    - the device-code grant NUT-21 recommends;
+    - refresh tokens.
   - Configure cdk-mintd's auth with Herald as the provider.
   - Claims for the check: DID, membership.
   - Wallet support for NUT-21 login and for minting and spending NUT-22 tokens.
@@ -103,9 +110,11 @@ transports defined today are `nostr` (NIP-17 DMs) and `post` (HTTP).
 
 ### Smaller additions
 
-- **D. Animated QR codes (NUT-16).** A token of about 1,000 sats or more
-  overflows one QR code, so the UI can only copy it today. NUT-16 animates it
-  across frames. Mostly UI work.
+- **D. Animated QR codes (NUT-16).** A serialized token longer than 2,900
+  characters overflows one QR code, so the UI can only copy it today
+  (`QR_LIMIT` in `CashuView`). The length depends on the number of proofs, not
+  the value: a 1,023-sat token of 10 proofs is about 3,000 characters. NUT-16
+  animates long tokens across frames. Mostly UI work.
 - **E. Upstream fix for cashubtc/cdk#2836.** cdk-cln treats xpay errors
   outside codes 203/205/206/207 as unknown. A failed payment (code 209) then
   leaves the melt PENDING and the proofs stuck. A merged patch improves Cashu
@@ -118,7 +127,7 @@ transports defined today are `nostr` (NIP-17 DMs) and `post` (HTTP).
 |---|---|---|---|---|---|
 | Unique to Archon | agent identity + Drawbridge | DID transport | identity-gated mint | no | no |
 | Improves Cashu beyond Archon | no | proposed transport | no | no | yes |
-| Size | medium | small after A | large | small | small–medium |
+| Size | medium | small after A | large, including Herald's provider | small | small–medium |
 | Risk | moderate | low (code) | high | low | upstream review |
 | Visible in a demo | high | medium | high | medium | low |
 
