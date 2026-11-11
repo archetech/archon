@@ -12,6 +12,13 @@ import {
 } from '../lightning-mediator-client.js';
 import { routeToScope, getPriceForOperation } from '../pricing.js';
 import {
+    CASHU_HEADER,
+    CashuPaymentRefusedError,
+    CashuPaymentUnavailableError,
+    cashuPaymentRequest,
+    checkCashuToken,
+} from '../cashu-payment.js';
+import {
     PaymentRequiredError,
     InvalidMacaroonError,
     MacaroonRevokedError,
@@ -89,13 +96,19 @@ export function createL402Middleware(options: L402Options): RequestHandler {
                 return;
             }
 
+            const cashuToken = req.headers[CASHU_HEADER];
+            if (options.cashu && typeof cashuToken === 'string' && cashuToken !== '') {
+                await handleCashuPayment(options, cashuToken, req, next);
+                return;
+            }
+
             // No auth — issue a challenge
             await handleChallenge(options, req, res);
         } catch (error) {
             if (error instanceof RateLimitExceededError) {
                 const result = await checkLimit(
                     options.store,
-                    req.headers['x-did'] as string || 'anonymous',
+                    error.bucket ?? (req.headers['x-did'] as string || 'anonymous'),
                     options.rateLimitRequests,
                     options.rateLimitWindowSeconds
                 );
@@ -119,9 +132,16 @@ export function createL402Middleware(options: L402Options): RequestHandler {
                 return;
             }
 
+            if (error instanceof CashuPaymentRefusedError) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+
             options.logger?.error?.({ err: error }, 'L402 middleware error');
             if (error instanceof LightningUnavailableError) {
                 res.status(503).json({ error: 'Lightning service unavailable' });
+            } else if (error instanceof CashuPaymentUnavailableError) {
+                res.status(503).json({ error: error.message });
             } else {
                 res.status(500).json({ error: 'Internal Drawbridge error' });
             }
@@ -195,6 +215,71 @@ async function handleMacaroonAuth(
     next();
 }
 
+// The price of this request, and the priced operation it is, if any.
+function priceFor(options: L402Options, req: Request): { amountSat: number; operationName?: string } {
+    if (options.pricing) {
+        const price = getPriceForOperation(options.pricing, req.method, req.path);
+        if (price) {
+            return { amountSat: price.amountSat, operationName: routeToScope(req.method, req.path) };
+        }
+    }
+    return { amountSat: options.defaults.amountSat };
+}
+
+// A Cashu payment covers the request it comes with and nothing else. The token
+// is redeemed before the request is served, so a spent or copied token cannot
+// pay twice.
+async function handleCashuPayment(
+    options: L402Options,
+    token: string,
+    req: Request,
+    next: NextFunction
+): Promise<void> {
+    const cashu = options.cashu!;
+    // X-DID is an unauthenticated hint: it attributes the payment but must not
+    // pick the rate-limit bucket, or rotating it would let unpaid callers drive
+    // redemption work without limit. The source address does, as for a challenge.
+    const did = req.headers['x-did'] as string | undefined;
+    const bucket = `ip:${req.ip || 'unknown'}`;
+
+    const rateLimitResult = await checkAndRecordRequest(
+        options.store,
+        bucket,
+        options.rateLimitRequests,
+        options.rateLimitWindowSeconds
+    );
+    if (!rateLimitResult.allowed) {
+        throw new RateLimitExceededError(bucket);
+    }
+
+    const { amountSat, operationName } = priceFor(options, req);
+    checkCashuToken(token, amountSat, cashu.mintUrl);
+    // The face value can overstate what the token pays: some of its proofs may
+    // already be spent, and the mint takes its fee. The price is net of both,
+    // as NUT-18 defines a requested amount; what was received stays received.
+    const received = await cashu.redeem(token);
+    if (received < amountSat) {
+        throw new CashuPaymentRefusedError(
+            `The token brought in ${received} sat after spent proofs and fees; the price is ${amountSat} sat`
+        );
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    await options.store.savePayment({
+        id: randomBytes(16).toString('hex'),
+        did: did || 'anonymous',
+        method: 'cashu',
+        paymentHash: '',
+        amountSat: received,
+        createdAt: now,
+        macaroonId: '',
+        scope: [operationName ?? routeToScope(req.method, req.path)],
+    });
+
+    options.hooks?.onCashuPayment?.();
+    next();
+}
+
 async function handleChallenge(
     options: L402Options,
     req: Request,
@@ -216,28 +301,75 @@ async function handleChallenge(
     }
 
     const scope = routeToScope(req.method, req.path);
+    const { amountSat, operationName } = priceFor(options, req);
 
-    // Determine price
-    let amountSat = options.defaults.amountSat;
-    let operationName: string | undefined;
+    // Each method is offered only when it can work now. Lightning needs the
+    // mediator; Cashu needs the node mint and a Keymaster that holds it.
+    const cashuOffered = options.cashu ? await options.cashu.ready() : false;
+    let lightning: { macaroon: string; invoice: string; paymentHash: string; expiresAt: number } | null = null;
 
-    if (options.pricing) {
-        const price = getPriceForOperation(options.pricing, req.method, req.path);
-        if (price) {
-            amountSat = price.amountSat;
-            operationName = scope;
+    if (options.lightningMediatorUrl) {
+        try {
+            lightning = await createLightningChallenge(options, did, scope, amountSat, operationName);
+        } catch (error) {
+            if (!(error instanceof LightningUnavailableError) || !cashuOffered) {
+                throw error;
+            }
+            options.logger?.error?.({ err: error }, 'Lightning unavailable; offering Cashu only');
         }
     }
 
-    // Create Lightning invoice
+    if (!lightning && !cashuOffered) {
+        throw new LightningUnavailableError('No payment method is available');
+    }
+
+    // Record rate limit only after a challenge could be issued
+    await options.store.recordRequest(rateLimitId, options.rateLimitWindowSeconds);
+
+    options.hooks?.onChallenge?.(!!did);
+
+    if (lightning) {
+        res.setHeader('WWW-Authenticate',
+            `L402 macaroon="${lightning.macaroon}", invoice="${lightning.invoice}"`
+        );
+    }
+
+    const cashuRequest = cashuOffered ? cashuPaymentRequest(amountSat, options.cashu!.mintUrl) : undefined;
+    if (cashuRequest) {
+        res.setHeader('X-Cashu', cashuRequest);
+    }
+
+    if (operationName) {
+        res.setHeader('X-L402-Price', String(amountSat));
+        res.setHeader('X-L402-Operation', operationName);
+    }
+
+    res.status(402).json({
+        error: 'Payment required',
+        macaroon: lightning?.macaroon,
+        invoice: lightning?.invoice,
+        paymentHash: lightning?.paymentHash,
+        amountSat,
+        expiresAt: lightning?.expiresAt,
+        operation: operationName || undefined,
+        acceptedMethods: [...(lightning ? ['lightning'] : []), ...(cashuRequest ? ['cashu'] : [])],
+        cashu: cashuRequest,
+    });
+}
+
+// Creates the invoice, macaroon and pending record for an L402 challenge.
+async function createLightningChallenge(
+    options: L402Options,
+    did: string | undefined,
+    scope: string,
+    amountSat: number,
+    operationName: string | undefined
+): Promise<{ macaroon: string; invoice: string; paymentHash: string; expiresAt: number }> {
     const memo = operationName
         ? `Drawbridge: ${operationName} (${amountSat} sats)`
         : `Drawbridge: ${scope} (${amountSat} sats)`;
 
     const invoice = await createL402Invoice(options.lightningMediatorUrl, amountSat, memo);
-
-    // Record rate limit only after successful invoice creation
-    await options.store.recordRequest(rateLimitId, options.rateLimitWindowSeconds);
 
     // Create macaroon with caveats
     const expiryTime = Math.floor(Date.now() / 1000) + options.defaults.expirySeconds;
@@ -280,27 +412,12 @@ async function handleChallenge(
     };
     await savePendingL402Invoice(options.lightningMediatorUrl, pendingInvoice);
 
-    options.hooks?.onChallenge?.(!!did);
-
-    res.setHeader('WWW-Authenticate',
-        `L402 macaroon="${token.macaroon}", invoice="${invoice.paymentRequest}"`
-    );
-
-    if (operationName) {
-        res.setHeader('X-L402-Price', String(amountSat));
-        res.setHeader('X-L402-Operation', operationName);
-    }
-
-    res.status(402).json({
-        error: 'Payment required',
+    return {
         macaroon: token.macaroon,
         invoice: invoice.paymentRequest,
         paymentHash: invoice.paymentHash,
-        amountSat,
         expiresAt: expiryTime,
-        operation: operationName || undefined,
-        acceptedMethods: ['lightning'],
-    });
+    };
 }
 
 // Payment completion endpoint handler

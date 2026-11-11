@@ -1,3 +1,5 @@
+import type { CashuPayments } from './cashu-payment.js';
+
 // L402 caveat set — conditions encoded into macaroons
 export interface L402CaveatSet {
     did?: string;
@@ -88,7 +90,8 @@ export interface MacaroonRecord {
 export interface PaymentRecord {
     id: string;
     did: string;
-    method: 'lightning';
+    method: 'lightning' | 'cashu';
+    // Empty for a Cashu payment, which has no invoice or macaroon.
     paymentHash: string;
     amountSat: number;
     createdAt: number;
@@ -140,10 +143,13 @@ export interface L402Options {
     rateLimitWindowSeconds: number;
     store: DrawbridgeStore;
     pricing?: OperationPricingConfig;
+    // Cashu as a 402 payment method (NUT-24); absent when the node offers none.
+    cashu?: CashuPayments;
     hooks?: {
         onAdminBypass?: () => void;
         onChallenge?: (didKnown: boolean) => void;
         onMacaroonVerification?: (result: 'success' | 'failure') => void;
+        onCashuPayment?: () => void;
     };
     logger?: { error?: (...args: any[]) => void };
 }

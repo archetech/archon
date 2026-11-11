@@ -36,6 +36,19 @@ describe('lightning mediator client requests', () => {
         expect(init.headers['Content-Type']).toBe('application/json');
     });
 
+    it('reports an unreachable mediator as Lightning unavailable', async () => {
+        global.fetch = jest.fn<any>().mockRejectedValue(new TypeError('fetch failed')) as any;
+
+        await expect(createL402Invoice(baseUrl, 100, 'memo')).rejects.toThrow(LightningUnavailableError);
+        await expect(createL402Invoice(baseUrl, 100, 'memo')).rejects.toThrow('unreachable: fetch failed');
+    });
+
+    it('reports an unreadable response body as Lightning unavailable', async () => {
+        mockFetch({ json: async () => { throw new SyntaxError('Unexpected end of JSON input'); } });
+
+        await expect(createL402Invoice(baseUrl, 100, 'memo')).rejects.toThrow(LightningUnavailableError);
+    });
+
     it('posts a payment check', async () => {
         const fetchMock = mockFetch({ json: async () => ({ paid: true }) });
 

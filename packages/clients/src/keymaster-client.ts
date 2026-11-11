@@ -78,9 +78,16 @@ const axios =
 const VERSION = '/api/v1';
 const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
 
+// An answered request is rethrown as its JSON body. The HTTP status rides on it
+// as a non-enumerable `status`, so callers can tell a refused request (4xx) from
+// a server fault (5xx) without the body's shape changing.
 function throwError(error: AxiosError | any): never {
     if (error.response) {
-        throw error.response.data;
+        const data = error.response.data;
+        if (data && typeof data === 'object' && !('status' in data)) {
+            Object.defineProperty(data, 'status', { value: error.response.status, enumerable: false });
+        }
+        throw data;
     }
 
     throw error;

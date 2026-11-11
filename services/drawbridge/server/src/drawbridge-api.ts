@@ -6,6 +6,7 @@ import pinoHttp from 'pino-http';
 import { register, Counter, Gauge, Histogram, collectDefaultMetrics } from 'prom-client';
 import { readFile } from 'fs/promises';
 import GatekeeperClient from '@didcid/clients/gatekeeper';
+import KeymasterClient from '@didcid/clients/keymaster';
 
 import config from './config.js';
 import { RedisStore } from './store.js';
@@ -14,7 +15,9 @@ import { routeLabel } from './metrics-path.js';
 import { REDACTED_LOG_PATHS } from './log-redaction.js';
 import { buildProxyBody, proxyHeraldRequest } from './herald-proxy.js';
 import { proxyRequest } from './proxy.js';
-import { cashuProxyHandlers } from './cashu-proxy.js';
+import { cashuProxyHandlers, publicCashuMintUrl } from './cashu-proxy.js';
+import { keymasterCashuPayments, type CashuPayments } from './cashu-payment.js';
+import { DEFAULT_CORS_OPTIONS } from './cors-options.js';
 import { resolveUpstreamUrl } from './upstream-url.js';
 import { isForwardedResponseHeader } from './response-headers.js';
 import { createAuthMiddleware } from './middleware/auth.js';
@@ -57,6 +60,11 @@ const l402VerificationsTotal = new Counter({
     name: 'drawbridge_l402_verifications_total',
     help: 'Total L402 macaroon verifications',
     labelNames: ['result'],
+});
+
+const cashuPaymentsTotal = new Counter({
+    name: 'drawbridge_cashu_payments_total',
+    help: 'Total requests paid with Cashu (NUT-24)',
 });
 
 const drawbridgeVersionInfo = new Gauge({
@@ -161,7 +169,7 @@ async function proxyLightningMediatorRequest(
 async function main() {
     const app = express();
     const v1router = express.Router();
-    const defaultCors = cors();
+    const defaultCors = cors(DEFAULT_CORS_OPTIONS);
     const heraldCors = cors({
         origin: true,
         credentials: true,
@@ -233,6 +241,17 @@ async function main() {
     // Initialize store
     const store: DrawbridgeStore = new RedisStore(config.redisUrl);
 
+    // Cashu as a 402 payment method: the node's public mint, redeemed through
+    // the node's Keymaster.
+    const cashuMintUrl = publicCashuMintUrl(config);
+    let cashuPayments: CashuPayments | undefined;
+    if (cashuMintUrl && config.keymasterURL && config.keymasterAdminKey && config.nodeId) {
+        const keymaster = new KeymasterClient();
+        await keymaster.connect({ url: config.keymasterURL, apiKey: config.keymasterAdminKey });
+        cashuPayments = keymasterCashuPayments(keymaster, config.nodeId, cashuMintUrl, logger);
+        logger.info(`Cashu payment (NUT-24) is available for ${cashuMintUrl}`);
+    }
+
     // Initialize L402 options
     const l402Options: L402Options = {
         adminApiKey: config.adminApiKey,
@@ -248,10 +267,12 @@ async function main() {
         rateLimitWindowSeconds: config.rateLimitWindow,
         store,
         pricing: loadPricingFromEnv(),
+        cashu: cashuPayments,
         hooks: {
             onAdminBypass: () => l402AdminBypassesTotal.inc(),
             onChallenge: (didKnown) => l402ChallengesTotal.inc({ did_known: String(didKnown) }),
             onMacaroonVerification: (result) => l402VerificationsTotal.inc({ result }),
+            onCashuPayment: () => cashuPaymentsTotal.inc(),
         },
         logger,
     };

@@ -874,6 +874,8 @@ COMPOSE_PROFILES=...,drawbridge,cashu
 
 With the profile, Drawbridge offers the mint (the `cashu` capability); without it, `/cashu` answers 501. Set `ARCHON_CASHU_MINT_URL` only to offer a mint that runs elsewhere.
 
+**Paying the API with ecash.** With L402 enabled, Drawbridge also accepts Cashu tokens from this mint as payment for priced routes (NUT-24). Payments are redeemed into the node identity's Cashu wallet, so add the mint to that identity once: `./archon add-cashu <ARCHON_NODE_ID>`. Until then, Drawbridge offers Lightning only and logs a warning. See the [Drawbridge README §4.5](services/drawbridge/README.md#45-cashu-payment-nut-24).
+
 **Backends.** `ARCHON_CASHU_MINT_BACKEND` defaults to `fakewallet`, which marks every quote paid without moving sats: use it to try the mint out. `cln` pays and receives through the bundled CLN node and needs the `lightning` profile and `ARCHON_CLN_RPC_SHARE=true`. That makes the CLN container open a second RPC socket in `./data/cln-mainnet/rpc-share/` for `ARCHON_GID`, which the mint mounts. **The RPC socket gives full control of the node**: a bug in or compromise of the mint could spend the node's whole Lightning balance, not only what the mint has issued. The other bundled services use CLN REST with restricted runes instead.
 
 **Settings** are read once, when the mint first starts and initializes its database:

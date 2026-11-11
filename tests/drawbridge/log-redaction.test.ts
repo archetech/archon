@@ -24,10 +24,11 @@ describe('request log redaction', () => {
             .set('DPoP', 'eyJproof')
             .set('Cookie', 'connect.sid=s3cret')
             .set('X-Archon-Admin-Key', 'admin-secret')
+            .set('X-Cashu', 'cashuBspendable-token')
             .set('User-Agent', 'test-agent');
 
         const log = lines.join('');
-        for (const secret of ['pst_secret', 'eyJproof', 's3cret', 'admin-secret', 'browser-secret', 'pac_secret']) {
+        for (const secret of ['pst_secret', 'eyJproof', 's3cret', 'admin-secret', 'browser-secret', 'pac_secret', 'cashuBspendable-token']) {
             expect(log).not.toContain(secret);
         }
         expect(log).toContain('[redacted]');

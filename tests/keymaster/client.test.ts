@@ -5303,6 +5303,21 @@ describe('DID document repair', () => {
     });
 });
 
+describe('error status', () => {
+    it('rethrows an answered request as its body, carrying the HTTP status out of sight', async () => {
+        nock(KeymasterURL)
+            .post(`${Endpoints.cashu}/receive`)
+            .reply(400, { error: 'Cashu token already spent' });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+        const error: any = await keymaster.receiveCashu('cashuB').catch(e => e);
+
+        expect(error).toStrictEqual({ error: 'Cashu token already spent' });
+        expect(error.status).toBe(400);
+        expect(Object.keys(error)).toEqual(['error']);
+    });
+});
+
 describe('Cashu', () => {
     const mint = 'https://mint.example';
     const cases: [string, 'post' | 'delete', string, (keymaster: KeymasterClient) => Promise<unknown>, object, object, unknown][] = [
