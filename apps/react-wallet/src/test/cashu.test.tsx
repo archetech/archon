@@ -746,6 +746,26 @@ describe('Cashu view: paying a payment request', () => {
         expect(screen.queryByText('10 sats, plus any mint fee', { exact: false })).toBeNull();
     });
 
+    it('withdraws the preview when the mint it names is no longer the one a payment would use', async () => {
+        holding(mintInfo(NODE, true), mintInfo(OTHER));
+        keymaster.decodeCashuRequest.mockResolvedValue({ amount: 10, mints: [OTHER, NODE], mint: OTHER });
+        keymaster.removeCashuMint.mockImplementation(async () => {
+            holding(mintInfo(NODE, true));
+            return true;
+        });
+        view();
+        const user = await decode();
+        await screen.findByRole('button', { name: 'Pay Request' });
+
+        await user.click(screen.getByRole('tab', { name: 'Wallet' }));
+        await user.click(screen.getAllByRole('button', { name: 'Remove' })[1]);
+        await waitFor(() => expect(keymaster.removeCashuMint).toHaveBeenCalled());
+        await user.click(screen.getByRole('tab', { name: 'Pay' }));
+
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Pay Request' })).toBeNull());
+        expect(requestField().value).toBe('creqAabc');
+    });
+
     it('does not put a slow decode beside another request', async () => {
         const slow = deferred();
         keymaster.decodeCashuRequest.mockReturnValue(slow.promise);

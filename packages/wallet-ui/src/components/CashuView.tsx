@@ -207,7 +207,10 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
     // Only the invoice on screen counts as reviewed: a slow decode must not put another
     // invoice's amount beside it, or enable paying it.
     const reviewed = decoded?.invoice === invoice.trim() ? decoded : null;
-    const reviewedRequest = requestInfo?.request === request.trim() ? requestInfo : null;
+    // Likewise for a request, and only while a payment would still come from the mint
+    // shown: adding or removing a mint since the decode can change which one that is.
+    const payingMint = requestInfo?.info.mints.find(url => mints?.some(item => item.url === url));
+    const reviewedRequest = requestInfo?.request === request.trim() && payingMint === requestInfo.info.mint ? requestInfo : null;
     const nodeMint = mints?.find(item => item.isNodeMint)?.url;
     const mint = mints?.some(item => item.url === chosenMint) ? chosenMint : nodeMint ?? mints?.[0]?.url;
 
