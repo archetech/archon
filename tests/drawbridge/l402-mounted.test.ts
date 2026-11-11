@@ -97,6 +97,19 @@ describe('the paywall behind the /api/v1 mount', () => {
         expect(again.status).not.toBe(200);
     });
 
+    it('prices and limits a mixed-case path as the route Express serves it on', async () => {
+        const server = app({ operations: { createDID: { amountSat: 500, description: 'Register a new DID' } } });
+        const { challenge, retry } = await payAndRetry(server, '/api/v1/DID');
+        expect(challenge.body.amountSat).toBe(500);
+        expect(challenge.body.operation).toBe('createDID');
+        expect(retry.status).toBe(200);
+
+        const again = await request(server).post('/API/V1/Did')
+            .set('Authorization', `L402 ${challenge.body.macaroon}:${PREIMAGE}`)
+            .send({});
+        expect(again.status).not.toBe(200);
+    });
+
     it('serves the request a default-priced pass was bought for', async () => {
         const server = app();
         const { challenge, retry } = await payAndRetry(server, '/api/v1/did');

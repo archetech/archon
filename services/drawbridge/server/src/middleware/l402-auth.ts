@@ -41,11 +41,14 @@ const UNPROTECTED_PREFIXES = ['/l402/'];
 // GET-only prefixes: read operations that should be publicly accessible
 const UNPROTECTED_GET_PREFIXES = ['/did/', '/ipfs/'];
 
-// The request's path from the application root. The paywall runs inside the
-// router mounted at /api/v1, where req.path is relative to the mount, while the
-// route-scope map and pricing name full paths.
+// The request's path from the application root, as the paywall's lookups see
+// it. The paywall runs inside the router mounted at /api/v1, where req.path is
+// relative to the mount, while the route-scope map and pricing name full paths.
+// Express matches routes case-insensitively, so the lookups do too: /api/v1/DID
+// reaches the /did handler and must be priced and scoped as /did. Only the
+// lookup key is lowercased; the request itself is unchanged.
 function routePath(req: Request): string {
-    return `${req.baseUrl ?? ''}${req.path}`;
+    return `${req.baseUrl ?? ''}${req.path}`.toLowerCase();
 }
 
 function isProtectedRoute(method: string, path: string): boolean {
