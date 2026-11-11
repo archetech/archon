@@ -226,6 +226,7 @@ const ROUTES: Array<[Method, string, number]> = [
     // cashu
     ['POST', '/cashu', 400],
     ['POST', '/cashu/send-to', 400],
+    ['POST', '/cashu/pay-request', 400],
     ['POST', '/cashu/messages', 400],
     ['POST', '/cashu/accept', 400],
     ['DELETE', '/cashu', 400],
@@ -431,6 +432,7 @@ describe('keymaster cashu routes', () => {
         ['POST', '/cashu/receive', { token: 't', id: 'Bob' }, 'receiveCashu', ['t', 'Bob']],
         ['POST', '/cashu/reclaim', { operationId: 'o', id: 'Bob' }, 'reclaimCashu', ['o', 'Bob']],
         ['POST', '/cashu/send-to', { recipient: 'Carol', amount: 5, memo: 'm', locktime: 60, mint: 'https://m', id: 'Bob' }, 'sendCashuTo', ['Carol', 5, { memo: 'm', locktime: 60, mint: 'https://m', name: 'Bob' }]],
+        ['POST', '/cashu/pay-request', { request: 'creqA', max: 9, id: 'Bob' }, 'payCashuRequest', ['creqA', { max: 9, name: 'Bob' }]],
         ['POST', '/cashu/messages', { id: 'Bob' }, 'listCashuMessages', ['Bob']],
         ['POST', '/cashu/accept', { id: 'Bob' }, 'receiveCashuMessages', ['Bob']],
     ])('%s %s passes its body in the method\'s argument order', async (method, path, body, name, args) => {

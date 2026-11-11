@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import time
 
+import cbor2
 import httpx
 import pytest
 
@@ -1204,3 +1206,86 @@ class TestSeveralMints:
     def test_refuses_an_unadded_mint(self, bed):
         with pytest.raises(CashuMintNotAddedError):
             run(bed.keymaster.send_cashu(1, "https://nope.example"))
+
+
+def _creq(amount: int, mints: list[str] | None = None, **extra) -> str:
+    request = {"a": amount, "u": "sat", "m": mints or [PUBLIC_URL], "s": True, **extra}
+    return "creqA" + base64.urlsafe_b64encode(cbor2.dumps(request)).decode().rstrip("=")
+
+
+class TestPayingAPaymentRequest:
+    OUTSIDE = "https://outside.example"
+
+    @pytest.fixture
+    def charged(self, monkeypatch):
+        monkeypatch.setenv("PBKDF2_ITERATIONS", "1")
+        bed = Bed(input_fee_ppk=500)
+        run(bed.keymaster.add_cashu())
+        bed.fund(100)
+        run(bed.keymaster.create_id("Bob"))
+        run(bed.keymaster.add_cashu("Bob"))
+        run(bed.keymaster.set_current_id("Alice"))
+        return bed
+
+    def test_makes_a_token_for_the_amount_asked_from_the_mint_asked(self, funded):
+        paid = run(funded.keymaster.pay_cashu_request(_creq(30)))
+
+        assert (paid["amount"], paid["fee"], paid["mint"]) == (30, 0, PUBLIC_URL)
+        assert run(funded.keymaster.receive_cashu(paid["token"], "Bob"))["amount"] == 30
+
+    def test_journals_the_send_so_an_unredeemed_token_can_be_reclaimed(self, funded):
+        paid = run(funded.keymaster.pay_cashu_request(_creq(30)))
+
+        sends = run(funded.keymaster.list_cashu_sends())
+        assert [(send["operationId"], send["amount"]) for send in sends] == [(paid["operationId"], 30)]
+        assert run(funded.keymaster.reclaim_cashu(paid["operationId"]))["amount"] == 30
+        assert funded.balance()["spendable"] == 100
+
+    def test_grosses_the_token_up_so_the_requester_nets_the_amount(self, charged):
+        paid = run(charged.keymaster.pay_cashu_request(_creq(30)))
+
+        assert (paid["amount"], paid["fee"]) == (30, 2)
+        assert run(charged.keymaster.receive_cashu(paid["token"], "Bob"))["amount"] >= 30
+
+    def test_pays_from_the_named_identity(self, funded):
+        funded.fund(40, "Bob")
+
+        paid = run(funded.keymaster.pay_cashu_request(_creq(30), {"name": "Bob"}))
+
+        assert paid["amount"] == 30
+        assert funded.balance("Bob")["spendable"] == 10
+        assert funded.balance()["spendable"] == 100
+
+    def test_uses_the_first_listed_mint_the_identity_has(self, funded):
+        paid = run(funded.keymaster.pay_cashu_request(_creq(30, [self.OUTSIDE, PUBLIC_URL + "/"])))
+
+        assert paid["mint"] == PUBLIC_URL
+
+    def test_refuses_a_request_listing_no_mint_the_identity_has(self, funded):
+        with pytest.raises(CashuMintNotAddedError):
+            run(funded.keymaster.pay_cashu_request(_creq(30, [self.OUTSIDE])))
+        assert (funded.balance()["spendable"], funded.balance()["outstanding"]) == (100, 0)
+
+    def test_refuses_a_request_asking_for_more_than_the_maximum(self, funded):
+        with pytest.raises(KeymasterError, match="asks for 31 sats, more than the maximum of 30"):
+            run(funded.keymaster.pay_cashu_request(_creq(31), {"max": 30}))
+        assert (funded.balance()["spendable"], funded.balance()["outstanding"]) == (100, 0)
+        assert run(funded.keymaster.pay_cashu_request(_creq(30), {"max": 30}))["amount"] == 30
+
+    @pytest.mark.parametrize("maximum", [0, -1, 1.5, "30", True, 2**53])
+    def test_refuses_an_invalid_maximum(self, funded, maximum):
+        with pytest.raises(KeymasterError, match="Invalid parameter: max"):
+            run(funded.keymaster.pay_cashu_request(_creq(30), {"max": maximum}))
+
+    def test_refuses_a_request_it_cannot_pay_before_touching_the_wallet(self, funded):
+        locked = _creq(30, nut10={"k": "P2PK", "d": "02" + "a" * 64})
+
+        with pytest.raises(KeymasterError, match="asks for a locked token"):
+            run(funded.keymaster.pay_cashu_request(locked))
+        with pytest.raises(KeymasterError, match="Invalid parameter: request"):
+            run(funded.keymaster.pay_cashu_request("garbage"))
+        assert run(funded.keymaster.list_cashu_sends()) == []
+
+    def test_fails_without_the_funds(self, funded):
+        with pytest.raises(CashuInsufficientFundsError):
+            run(funded.keymaster.pay_cashu_request(_creq(101)))

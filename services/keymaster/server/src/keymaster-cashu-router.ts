@@ -608,6 +608,53 @@ export function createCashuRouter(options: CreateKeymasterRouterOptions): expres
 
     /**
      * @swagger
+     * /cashu/pay-request:
+     *   post:
+     *     summary: Pay a Cashu payment request with a token.
+     *     description: >
+     *       Decodes a NUT-18 payment request, in its creqA or creqB form, and creates a
+     *       token for the amount it asks, from the first mint it lists that the identity
+     *       has. The caller delivers the token, as in the `X-Cashu` header of a request
+     *       that was answered with HTTP 402 (NUT-24). A request in another unit, without
+     *       an amount or a mint list, or asking for a locked token or for particular
+     *       payment methods is refused.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [request]
+     *             properties:
+     *               request:
+     *                 type: string
+     *                 description: The payment request.
+     *               max:
+     *                 type: integer
+     *                 description: The most the request may ask for, in sats.
+     *               id:
+     *                 type: string
+     *                 description: Optional identity name or DID.
+     *     responses:
+     *       200:
+     *         description: The token, the mint it is from, and its operation id.
+     *       400:
+     *         description: Invalid request, no listed mint the identity has, or the mint refused it.
+     *       503:
+     *         description: The mint is unavailable.
+     */
+    router.post('/cashu/pay-request', async (req, res) => {
+        try {
+            const { request, max, id } = req.body;
+            const result = await getKeymaster().payCashuRequest(request, { max, name: id });
+            res.json(result);
+        } catch (error: any) {
+            sendError(res, error);
+        }
+    });
+
+    /**
+     * @swagger
      * /cashu/send-to:
      *   post:
      *     summary: Send ecash locked to a DID's key, over DIDComm.

@@ -17,6 +17,7 @@ describe('help', () => {
             'bind-credential',
             'cashu-balance',
             'cashu-mint',
+            'cashu-pay-request',
             'cashu-send',
             'cashu-send-to',
             'check-wallet',

@@ -182,6 +182,7 @@ from .keymaster_sdk import (
     list_cashu_sends,
     reclaim_cashu,
     send_cashu_to,
+    pay_cashu_request,
     list_cashu_messages,
     receive_cashu_messages,
 )

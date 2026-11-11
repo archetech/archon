@@ -8,6 +8,7 @@ import {
     getPubKeyFromPrivKey,
     getTokenMetadata,
     createRandomSecretKey,
+    decodePaymentRequest,
     hasValidDleq,
     hashToCurve,
     signMintQuote,
@@ -48,6 +49,8 @@ import type {
     CashuReclaimResult,
     CashuRestoreResult,
     CashuSendRecord,
+    CashuPayRequestOptions,
+    CashuPayRequestResult,
     CashuSendResult,
     CashuSendToOptions,
     CashuSendToResult,
@@ -125,6 +128,56 @@ export function normalizeMintUrl(url: string): string {
         throw new InvalidParameterError('mint url');
     }
     return `${parsed.protocol}//${parsed.host}${parsed.pathname}`.replace(/\/+$/, '');
+}
+
+export interface CashuRequestTerms {
+    amount: number;
+    mints: string[];
+}
+
+// What a NUT-18 payment request asks for, if sendCashu can pay it: an amount in
+// sats, from a listed mint, as an unlocked token, whatever the mint's melt methods.
+// Accepts creqA and creqB (NUT-26).
+export function cashuRequestTerms(request: string): CashuRequestTerms {
+    if (typeof request !== 'string' || !request) {
+        throw new InvalidParameterError('request');
+    }
+    let asked;
+    try {
+        // NUT-26 has decoders take the creqA prefix in either case.
+        asked = decodePaymentRequest(request.trim().replace(/^creqa/i, 'creqA'));
+    }
+    catch {
+        throw new InvalidParameterError('request');
+    }
+    if (asked.unit !== UNIT) {
+        throw new InvalidParameterError('request: the unit is not sat');
+    }
+    if (!asked.amount || !asked.amount.isSafeNumber() || asked.amount.isZero()) {
+        throw new InvalidParameterError('request: names no amount');
+    }
+    if (asked.nut10) {
+        throw new InvalidParameterError('request: asks for a locked token');
+    }
+    // NUT-18 has such a request paid only from a mint that melts by one of the
+    // methods, which is not checked here.
+    if (asked.supportedMethods?.length) {
+        throw new InvalidParameterError('request: asks for particular payment methods');
+    }
+    const mints: string[] = [];
+    // cashu-ts passes the list through as it was encoded, whatever its type.
+    for (const mint of Array.isArray(asked.mints) ? asked.mints : []) {
+        try {
+            mints.push(normalizeMintUrl(mint));
+        }
+        catch {
+            // A mint that cannot be named is one the identity cannot hold.
+        }
+    }
+    if (mints.length === 0) {
+        throw new InvalidParameterError('request: names no mint');
+    }
+    return { amount: asked.amount.toNumber(), mints };
 }
 
 // A mint's own refusal, with its NUT error code.
@@ -1588,6 +1641,25 @@ export class CashuWallet {
         const op = (await this.readOp(ctx, id))!;
         const token = getEncodedToken({ mint: ctx.url, unit: UNIT, proofs: op.sent as never });
         return { token, amount, fee: gross - amount, operationId: id };
+    }
+
+    async payCashuRequest(request: string, options: CashuPayRequestOptions = {}): Promise<CashuPayRequestResult> {
+        const { max, name } = options;
+        if (max !== undefined && (!Number.isSafeInteger(max) || max <= 0)) {
+            throw new InvalidParameterError('max');
+        }
+        const { amount, mints } = cashuRequestTerms(request);
+        if (max !== undefined && amount > max) {
+            throw new InvalidParameterError(`request: asks for ${amount} sats, more than the maximum of ${max}`);
+        }
+        const idInfo = await this.host.fetchIdInfo(name, await this.host.loadWallet());
+        const held = this.mints(idInfo);
+        const mint = mints.find(url => held[url]);
+        if (!mint) {
+            throw new CashuMintNotAddedError(mints[0]);
+        }
+        // By DID, so the send comes from the identity whose mints were checked.
+        return { ...await this.sendCashu(amount, mint, idInfo.did), mint };
     }
 
     private tokenMint(token: string): string {

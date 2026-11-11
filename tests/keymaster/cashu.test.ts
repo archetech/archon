@@ -16,7 +16,7 @@ import {
     CashuUnavailableError,
 } from '@didcid/common/errors';
 import { signedInvoice } from '../cli/helpers.ts';
-import { getEncodedToken } from '@cashu/cashu-ts';
+import { PaymentRequest, getEncodedToken } from '@cashu/cashu-ts';
 import { CashuWallet, normalizeMintUrl, proofY, splitAmount } from '../../packages/keymaster/src/cashu.ts';
 import { FakeMint } from './cashu-fake-mint.ts';
 import type { FakeMintOptions } from './cashu-fake-mint.ts';
@@ -1306,5 +1306,114 @@ describe('several mints', () => {
 
     it('refuses a mint the identity has not added', async () => {
         await expect(keymaster.sendCashu(1, 'https://nope.example')).rejects.toThrow(CashuMintNotAddedError);
+    });
+});
+
+describe('paying a payment request', () => {
+    const OUTSIDE = 'https://outside.example';
+
+    function creq(amount: number, mints: string[] = [PUBLIC_URL]): string {
+        return new PaymentRequest(undefined, undefined, amount, 'sat', mints, undefined, true).toEncodedCreqA();
+    }
+
+    async function funded(options: FakeMintOptions = {}): Promise<void> {
+        await setup(options);
+        await keymaster.addCashu();
+        await fund(100);
+        await keymaster.createId('Bob');
+        await keymaster.addCashu('Bob');
+        await keymaster.setCurrentId('Alice');
+    }
+
+    it('makes a token for the amount asked, from the mint asked', async () => {
+        await funded();
+
+        const paid = await keymaster.payCashuRequest(creq(30));
+
+        expect(paid).toMatchObject({ amount: 30, fee: 0, mint: PUBLIC_URL });
+        await expect(keymaster.receiveCashu(paid.token, 'Bob')).resolves.toMatchObject({ amount: 30 });
+    });
+
+    it('reads a creqB request', async () => {
+        await funded();
+        const request = new PaymentRequest(undefined, undefined, 30, 'sat', [PUBLIC_URL]).toEncodedCreqB();
+
+        await expect(keymaster.payCashuRequest(request)).resolves.toMatchObject({ amount: 30, mint: PUBLIC_URL });
+    });
+
+    it('journals the send, so an unredeemed token can be reclaimed', async () => {
+        await funded();
+
+        const paid = await keymaster.payCashuRequest(creq(30));
+
+        await expect(keymaster.listCashuSends()).resolves.toMatchObject([{ operationId: paid.operationId, amount: 30 }]);
+        await expect(keymaster.reclaimCashu(paid.operationId)).resolves.toMatchObject({ amount: 30 });
+        await expect(keymaster.getCashuBalance()).resolves.toMatchObject({ spendable: 100 });
+    });
+
+    it('grosses the token up so the requester nets the amount after its fee', async () => {
+        await funded({ inputFeePpk: 500 });
+
+        const paid = await keymaster.payCashuRequest(creq(30));
+
+        expect(paid).toMatchObject({ amount: 30, fee: 2 });
+        const received = await keymaster.receiveCashu(paid.token, 'Bob');
+        expect(received.amount).toBeGreaterThanOrEqual(30);
+    });
+
+    it('pays from the named identity', async () => {
+        await funded();
+        await fund(40, 'Bob');
+
+        const paid = await keymaster.payCashuRequest(creq(30), { name: 'Bob' });
+
+        expect(paid.amount).toBe(30);
+        await expect(keymaster.getCashuBalance(undefined, 'Bob')).resolves.toMatchObject({ spendable: 10 });
+        await expect(keymaster.getCashuBalance()).resolves.toMatchObject({ spendable: 100 });
+    });
+
+    it('uses the first listed mint the identity has', async () => {
+        await funded();
+
+        const paid = await keymaster.payCashuRequest(creq(30, [OUTSIDE, `${PUBLIC_URL}/`]));
+
+        expect(paid.mint).toBe(PUBLIC_URL);
+    });
+
+    it('refuses a request listing no mint the identity has, spending nothing', async () => {
+        await funded();
+
+        await expect(keymaster.payCashuRequest(creq(30, [OUTSIDE]))).rejects.toThrow(CashuMintNotAddedError);
+        await expect(keymaster.getCashuBalance()).resolves.toMatchObject({ spendable: 100, outstanding: 0 });
+    });
+
+    it('refuses a request asking for more than the maximum, spending nothing', async () => {
+        await funded();
+
+        await expect(keymaster.payCashuRequest(creq(31), { max: 30 })).rejects.toThrow('asks for 31 sats, more than the maximum of 30');
+        await expect(keymaster.getCashuBalance()).resolves.toMatchObject({ spendable: 100, outstanding: 0 });
+        await expect(keymaster.payCashuRequest(creq(30), { max: 30 })).resolves.toMatchObject({ amount: 30 });
+    });
+
+    it.each([0, -1, 1.5, '30', Number.MAX_SAFE_INTEGER + 1])('refuses the maximum %p', async (max) => {
+        await funded();
+
+        await expect(keymaster.payCashuRequest(creq(30), { max: max as never })).rejects.toThrow('Invalid parameter: max');
+    });
+
+    it('refuses a request it cannot pay before touching the wallet', async () => {
+        await funded();
+        const locked = new PaymentRequest(undefined, undefined, 30, 'sat', [PUBLIC_URL], undefined, true,
+            { kind: 'P2PK', data: '02'.padEnd(66, 'a'), tags: [] }).toEncodedCreqA();
+
+        await expect(keymaster.payCashuRequest(locked)).rejects.toThrow('asks for a locked token');
+        await expect(keymaster.payCashuRequest('garbage')).rejects.toThrow('Invalid parameter: request');
+        await expect(keymaster.listCashuSends()).resolves.toEqual([]);
+    });
+
+    it('fails without the funds', async () => {
+        await funded();
+
+        await expect(keymaster.payCashuRequest(creq(101))).rejects.toThrow(CashuInsufficientFundsError);
     });
 });

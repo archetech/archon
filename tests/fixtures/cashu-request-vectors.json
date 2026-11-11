@@ -1,0 +1,207 @@
+{
+    "accepted": [
+        {
+            "name": "creqA",
+            "request": "creqApmFpZGRlbW9hYQphdWNzYXRhbYF4Gmh0dHBzOi8vbWludC5leGFtcGxlL2Nhc2h1YWRtQSBwcmljZWQgY2FsbGFz9Q==",
+            "amount": 10,
+            "mints": [
+                "https://mint.example/cashu"
+            ]
+        },
+        {
+            "name": "creqA with a lowercase prefix",
+            "request": "creqapmFpZGRlbW9hYQphdWNzYXRhbYF4Gmh0dHBzOi8vbWludC5leGFtcGxlL2Nhc2h1YWRtQSBwcmljZWQgY2FsbGFz9Q==",
+            "amount": 10,
+            "mints": [
+                "https://mint.example/cashu"
+            ]
+        },
+        {
+            "name": "creqB",
+            "request": "CREQB1QYQQGER9D4HSYQQGQQQQQQQQQQQQ5QCQQYQQGQQPQYZSQXNGW368QUE69UHK66TWWSHX27RPD4CXCEF0VDSHX6R4QCQQ6SFQWPEXJCM9VSSXXCTVDSZD55ZU",
+            "amount": 10,
+            "mints": [
+                "https://mint.example/cashu"
+            ]
+        },
+        {
+            "name": "creqB in lowercase",
+            "request": "creqb1qyqqger9d4hsyqqgqqqqqqqqqqqq5qcqqyqqgqqpqyzsqxngw368que69uhk66twwshx27rpd4cxcef0vdshx6r4qcqq6sfqwpexjcm9vssxxctvdszd55zu",
+            "amount": 10,
+            "mints": [
+                "https://mint.example/cashu"
+            ]
+        },
+        {
+            "name": "surrounding whitespace",
+            "request": " CREQB1QYQQGER9D4HSYQQGQQQQQQQQQQQQ5QCQQYQQGQQPQYZSQXNGW368QUE69UHK66TWWSHX27RPD4CXCEF0VDSHX6R4QCQQ6SFQWPEXJCM9VSSXXCTVDSZD55ZU\n",
+            "amount": 10,
+            "mints": [
+                "https://mint.example/cashu"
+            ]
+        },
+        {
+            "name": "the NUT-26 example",
+            "request": "CREQB1QYQQWER9D4HNZV3NQGQQSQQQQQQQQQQRAQPSQQGQQSQQZQG9QQVXSAR5WPEN5TE0D45KUAPWV4UXZMTSD3JJUCM0D5RQQRJRDANXVET9YPCXZ7TDV4H8GXHR3TQ",
+            "amount": 1000,
+            "mints": [
+                "https://mint.example.com"
+            ]
+        },
+        {
+            "name": "several mints, normalized, creqA",
+            "request": "creqApmFpZGRlbW9hYQphdWNzYXRhbYJ2aHR0cHM6Ly9vdGhlci5leGFtcGxlL3gbSFRUUFM6Ly9NSU5ULkVYQU1QTEUvY2FzaHUvYWRtQSBwcmljZWQgY2FsbGFz9Q==",
+            "amount": 10,
+            "mints": [
+                "https://other.example",
+                "https://mint.example/cashu"
+            ]
+        },
+        {
+            "name": "several mints, normalized, creqB",
+            "request": "CREQB1QYQQGER9D4HSYQQGQQQQQQQQQQQQ5QCQQYQQGQQPQYZSQ9NGW368QUE69UHK7ARGV4EZUETCV9KHQMR99UZSQX6G2329Q5E69UH56J2W2SHY2KZPF4GYC3F0VDSHX6R49URQQR2PYPC8Y6TRV4JZQCMPD3KQZ0LRN9",
+            "amount": 10,
+            "mints": [
+                "https://other.example",
+                "https://mint.example/cashu"
+            ]
+        },
+        {
+            "name": "an unusable mint beside a usable one",
+            "request": "creqApmFpZGRlbW9hYQphdWNzYXRhbYJpbm90IGEgdXJseBpodHRwczovL21pbnQuZXhhbXBsZS9jYXNodWFkbUEgcHJpY2VkIGNhbGxhc_U=",
+            "amount": 10,
+            "mints": [
+                "https://mint.example/cashu"
+            ]
+        },
+        {
+            "name": "an advisory mint list",
+            "request": "CREQB1QYQQGER9D4HSYQQGQQQQQQQQQQQQ5QCQQYQQGQQPQYZSQXNGW368QUE69UHK66TWWSHX27RPD4CXCEF0VDSHX6R4QCQQ6SFQWPEXJCM9VSSXXCTVDSYSQQGP2NDZ5U",
+            "amount": 10,
+            "mints": [
+                "https://mint.example/cashu"
+            ]
+        },
+        {
+            "name": "an empty list of payment methods",
+            "request": "creqApmFpZGRlbW9hYQphdWNzYXRhbYF4Gmh0dHBzOi8vbWludC5leGFtcGxlL2Nhc2h1YWRtQSBwcmljZWQgY2FsbGFz9Q==",
+            "amount": 10,
+            "mints": [
+                "https://mint.example/cashu"
+            ]
+        },
+        {
+            "name": "fields in another order",
+            "request": "CREQB1Q5QP56R5W3C8XW309AKKJMN59EJHSCTDWPKX2TMRV9EKSAGRQQQSQQSQPQQQQQQQQQQQQZSD2PG7Y",
+            "amount": 10,
+            "mints": [
+                "https://mint.example/cashu"
+            ]
+        },
+        {
+            "name": "a transport",
+            "request": "creqAp2F0gaNhdGRwb3N0YWF4HGh0dHBzOi8vcGF5LmV4YW1wbGUvY2FsbGJhY2thZ_dhaWRkZW1vYWEKYXVjc2F0YW2BeBpodHRwczovL21pbnQuZXhhbXBsZS9jYXNodWFkbUEgcHJpY2VkIGNhbGxhc_U=",
+            "amount": 10,
+            "mints": [
+                "https://mint.example/cashu"
+            ]
+        }
+    ],
+    "refused": [
+        {
+            "name": "not a request",
+            "request": "garbage",
+            "error": "request"
+        },
+        {
+            "name": "empty",
+            "request": "",
+            "error": "request"
+        },
+        {
+            "name": "creqA that is not base64",
+            "request": "creqA!!!",
+            "error": "request"
+        },
+        {
+            "name": "creqA that is not CBOR",
+            "request": "creqAgarbage",
+            "error": "request"
+        },
+        {
+            "name": "creqB with a wrong checksum",
+            "request": "CREQB1QYQQGER9D4HSYQQGQQQQQQQQQQQQ5QCQQYQQGQQPQYZSQXNGW368QUE69UHK66TWWSHX27RPD4CXCEF0VDSHX6R4QCQQ6SFQWPEXJCM9VSSXXCTVDSZD55ZQ",
+            "error": "request"
+        },
+        {
+            "name": "another unit, creqA",
+            "request": "creqApmFpZGRlbW9hYQphdWN1c2RhbYF4Gmh0dHBzOi8vbWludC5leGFtcGxlL2Nhc2h1YWRtQSBwcmljZWQgY2FsbGFz9Q==",
+            "error": "request: the unit is not sat"
+        },
+        {
+            "name": "another unit, creqB",
+            "request": "CREQB1QYQQGER9D4HSYQQGQQQQQQQQQQQQ5QCQQD6HXEQYQQQSZPGQRF58GARSWVAZ7TMDD9H8GTN90PSK6URVV5HKXCTNDP6SVQQDGYS8QUNFVDJKGGRRV9KXC5JX89C",
+            "error": "request: the unit is not sat"
+        },
+        {
+            "name": "no amount, creqA",
+            "request": "creqApWFpZGRlbW9hdWNzYXRhbYF4Gmh0dHBzOi8vbWludC5leGFtcGxlL2Nhc2h1YWRtQSBwcmljZWQgY2FsbGFz9Q==",
+            "error": "request: names no amount"
+        },
+        {
+            "name": "no amount, creqB",
+            "request": "CREQB1QYQQGER9D4HSXQQPQQZQQQGPQ5QP56R5W3C8XW309AKKJMN59EJHSCTDWPKX2TMRV9EKSAGXQQX5ZGRSWF5KXETYYP3KZMRV344U96",
+            "error": "request: names no amount"
+        },
+        {
+            "name": "a locked token, creqA",
+            "request": "creqAp2FpZGRlbW9hYQphdWNzYXRhbYF4Gmh0dHBzOi8vbWludC5leGFtcGxlL2Nhc2h1YWRtQSBwcmljZWQgY2FsbGFz9WVudXQxMKNha2RQMlBLYWR4QjAyYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWF0gA==",
+            "error": "request: asks for a locked token"
+        },
+        {
+            "name": "a locked token, creqB",
+            "request": "CREQB1QYQQGER9D4HSYQQGQQQQQQQQQQQQ5QCQQYQQGQQPQYZSQXNGW368QUE69UHK66TWWSHX27RPD4CXCEF0VDSHX6R4QCQQ6SFQWPEXJCM9VSSXXCTVDSYQQJGPQQQSQQSQGGCRYCTPV9SKZCTPV9SKZCTPV9SKZCTPV9SKZCTPV9SKZCTPV9SKZCTPV9SKZCTPV9SKZCTPV9SKZCTPV9SKZCTPV9SKZCTPV9SKZCTPV9SSSYURAZ",
+            "error": "request: asks for a locked token"
+        },
+        {
+            "name": "no mint list, creqA",
+            "request": "creqApWFpZGRlbW9hYQphdWNzYXRhZG1BIHByaWNlZCBjYWxsYXP1",
+            "error": "request: names no mint"
+        },
+        {
+            "name": "no mint list, creqB",
+            "request": "CREQB1QYQQGER9D4HSYQQGQQQQQQQQQQQQ5QCQQYQQGQQPQYRQQR2PYPC8Y6TRV4JZQCMPD3KQEGJCMS",
+            "error": "request: names no mint"
+        },
+        {
+            "name": "only an unusable mint",
+            "request": "creqApmFpZGRlbW9hYQphdWNzYXRhbYFpbm90IGEgdXJsYWRtQSBwcmljZWQgY2FsbGFz9Q==",
+            "error": "request: names no mint"
+        },
+        {
+            "name": "a mint list that is not a list",
+            "request": "creqApmFpZGRlbW9hYQphdWNzYXRhbRgqYWRtQSBwcmljZWQgY2FsbGFz9Q==",
+            "error": "request: names no mint"
+        },
+        {
+            "name": "payment methods, creqA",
+            "request": "creqAp2FpZGRlbW9hYQphdWNzYXRhbYF4Gmh0dHBzOi8vbWludC5leGFtcGxlL2Nhc2h1YWRtQSBwcmljZWQgY2FsbGFz9WJzbYGhYm1uZmJvbHQxMg==",
+            "error": "request: asks for particular payment methods"
+        },
+        {
+            "name": "payment methods, creqB",
+            "request": "CREQB1QYQQGER9D4HSYQQGQQQQQQQQQQQQ5QCQQYQQGQQPQYZSQXNGW368QUE69UHK66TWWSHX27RPD4CXCEF0VDSHX6R4QCQQ6SFQWPEXJCM9VSSXXCTVDS9QQZGPQQRXYMMVWSCNYFW7LFU",
+            "error": "request: asks for particular payment methods"
+        },
+        {
+            "name": "two amounts",
+            "request": "CREQB1QGQQSQQQQQQQQQQQRCPQQZQQQQQQQQQQQQQSXQQPQQZSQXNGW368QUE69UHK66TWWSHX27RPD4CXCEF0VDSHX6R4QPSYY7",
+            "error": "request"
+        },
+        {
+            "name": "two units",
+            "request": "CREQB1QGQQSQQQQQQQQQQQRCPSQQGQQVQQZQQ9QQDXSAR5WPEN5TE0D45KUAPWV4UXZMTSD3JJ7CMPWD582C6Z974",
+            "error": "request"
+        }
+    ]
+}

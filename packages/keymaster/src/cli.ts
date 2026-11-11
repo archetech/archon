@@ -1640,6 +1640,25 @@ program
     });
 
 program
+    .command('cashu-pay-request <request> [id]')
+    .description('Pay a Cashu payment request and print the token')
+    .option('--max <sats>', 'refuse a request asking for more than this')
+    .action(async (request, id, options) => {
+        try {
+            const result = await keymaster.payCashuRequest(request, {
+                max: options.max === undefined ? undefined : parseSats(options.max),
+                name: id,
+            });
+            // The token alone on stdout, so it can be piped.
+            console.log(result.token);
+            note(`Paid ${result.amount} sats from ${result.mint}, fee ${result.fee}, operation ${result.operationId}`);
+        }
+        catch (error: any) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
     .command('cashu-send-to <recipient> <amount> [memo] [id]')
     .description('Send ecash locked to a DID, over DIDComm')
     .option('--locktime <duration>', 'when the sender can reclaim it: seconds, or 30m, 12h, 7d (default 3d)')

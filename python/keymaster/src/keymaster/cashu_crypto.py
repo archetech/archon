@@ -387,3 +387,118 @@ def encode_token(mint: str, unit: str, proofs: list[dict[str, Any]]) -> str:
         groups.setdefault(proof["id"][:16], []).append(entry)
     token = {"m": mint, "u": unit, "t": [{"i": bytes.fromhex(keyset), "p": entries} for keyset, entries in groups.items()]}
     return "cashuB" + base64.urlsafe_b64encode(cbor2.dumps(token)).decode().rstrip("=")
+
+
+BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+BECH32M_CONST = 0x2BC830A3
+PAYMENT_REQUEST_MAX_LENGTH = 1023
+
+
+def _bech32_polymod(values: list[int]) -> int:
+    generator = (0x3B6A57B2, 0x26508E6D, 0x1EA119FA, 0x3D4233DD, 0x2A1462B3)
+    checksum = 1
+    for value in values:
+        top = checksum >> 25
+        checksum = ((checksum & 0x1FFFFFF) << 5) ^ value
+        for i, term in enumerate(generator):
+            if (top >> i) & 1:
+                checksum ^= term
+    return checksum
+
+
+def _bech32m_decode(text: str, hrp: str) -> bytes:
+    """The bytes of a bech32m string, which BIP-350 limits to 90 characters and NUT-26 does not."""
+    if len(text) > PAYMENT_REQUEST_MAX_LENGTH or text.lower() != text and text.upper() != text:
+        raise CashuTokenError("Invalid payment request")
+    text = text.lower()
+    if not text.startswith(hrp + "1"):
+        raise CashuTokenError("Invalid payment request")
+    try:
+        words = [BECH32_CHARSET.index(char) for char in text[len(hrp) + 1:]]
+    except ValueError as exc:
+        raise CashuTokenError("Invalid payment request") from exc
+    expanded = [ord(char) >> 5 for char in hrp] + [0] + [ord(char) & 31 for char in hrp]
+    if len(words) < 6 or _bech32_polymod(expanded + words) != BECH32M_CONST:
+        raise CashuTokenError("Invalid payment request")
+    accumulator = 0
+    bits = 0
+    data = bytearray()
+    for word in words[:-6]:
+        accumulator = (accumulator << 5) | word
+        bits += 5
+        if bits >= 8:
+            bits -= 8
+            data.append((accumulator >> bits) & 0xFF)
+    if bits >= 5 or accumulator & ((1 << bits) - 1):
+        raise CashuTokenError("Invalid payment request")
+    return bytes(data)
+
+
+def _tlv_fields(data: bytes) -> list[tuple[int, bytes]]:
+    fields = []
+    offset = 0
+    while offset < len(data):
+        if offset + 3 > len(data):
+            raise CashuTokenError("Invalid payment request")
+        length = int.from_bytes(data[offset + 1:offset + 3], "big")
+        value = data[offset + 3:offset + 3 + length]
+        if len(value) != length:
+            raise CashuTokenError("Invalid payment request")
+        fields.append((data[offset], value))
+        offset += 3 + length
+    return fields
+
+
+# The NUT-26 tags a request carries at most once: id, amount, unit, single use,
+# description, lock and mint preference.
+_REQUEST_SINGLE_TAGS = frozenset({0x01, 0x02, 0x03, 0x04, 0x06, 0x08, 0x09})
+
+
+def _decode_request_tlv(data: bytes) -> dict[str, Any]:
+    request: dict[str, Any] = {}
+    seen: set[int] = set()
+    try:
+        for tag, value in _tlv_fields(data):
+            if tag in _REQUEST_SINGLE_TAGS:
+                if tag in seen:
+                    raise CashuTokenError("Invalid payment request")
+                seen.add(tag)
+            if tag == 0x02:
+                if len(value) != 8:
+                    raise CashuTokenError("Invalid payment request")
+                request["a"] = int.from_bytes(value, "big")
+            elif tag == 0x03:
+                request["u"] = "sat" if value == b"\x00" else value.decode("utf-8")
+            elif tag == 0x05:
+                request.setdefault("m", []).append(value.decode("utf-8"))
+            elif tag == 0x08:
+                request["nut10"] = True
+            elif tag == 0x0A:
+                request["sm"] = True
+    except UnicodeDecodeError as exc:
+        raise CashuTokenError("Invalid payment request") from exc
+    return request
+
+
+def decode_payment_request(request: str) -> dict[str, Any]:
+    """The amount, unit, mints, lock and payment methods of a NUT-18 request, from creqA
+    or creqB (NUT-26).
+
+    Keyed as in NUT-18: `a`, `u`, `m`, `nut10` and `sm`, each present only if the
+    request has it. Other fields are not read.
+    """
+    if not isinstance(request, str):
+        raise CashuTokenError("Invalid payment request")
+    request = request.strip()
+    if request[:5].lower() == "creqb":
+        return _decode_request_tlv(_bech32m_decode(request, "creqb"))
+    if request[:5].lower() != "creqa":
+        raise CashuTokenError("Invalid payment request")
+    try:
+        decoded = cbor2.loads(_decode_base64url(request[5:]))
+    except (ValueError, RecursionError, EOFError) as exc:
+        raise CashuTokenError("Invalid payment request") from exc
+    if not isinstance(decoded, dict):
+        raise CashuTokenError("Invalid payment request")
+    return {key: decoded[key] for key in ("a", "u", "m", "nut10", "sm") if decoded.get(key) is not None}
+

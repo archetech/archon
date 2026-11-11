@@ -1,3 +1,4 @@
+import { PaymentRequest } from '@cashu/cashu-ts';
 import { archon, archonFails, freshWalletWithId, parseDid, resetAll, signedInvoice } from './helpers.ts';
 
 // Runs against the node mint behind Drawbridge, whose fakewallet backend settles
@@ -69,6 +70,24 @@ describe('cashu', () => {
         const { status, stderr } = await archonFails('cashu-receive', token, 'bob');
         expect(status).toBe(1);
         expect(stderr).toContain('Cashu token already spent');
+    });
+
+    test('cashu-pay-request pays a payment request with a token its requester redeems', async () => {
+        await fund(100);
+        const [{ url }] = JSON.parse(await archon('list-cashu-mints'));
+        const request = new PaymentRequest(undefined, undefined, 30, 'sat', [url], undefined, true);
+
+        const refused = await archonFails('cashu-pay-request', request.toEncodedCreqA(), '--max', '29');
+        expect(refused.stderr).toContain('more than the maximum of 29');
+        expect(await balance()).toMatchObject({ spendable: 100, outstanding: 0 });
+
+        const token = await archon('cashu-pay-request', request.toEncodedCreqB(), '--max', '30');
+        expect(token).toMatch(/^cashuB\S+$/);
+
+        await archon('create-id', '-r', 'local', 'bob');
+        await archon('add-cashu', 'bob');
+        const received = JSON.parse(await archon('cashu-receive', token, 'bob'));
+        expect(received.amount).toBeGreaterThanOrEqual(30);
     });
 
     test('cashu-reclaim takes back a send nobody redeemed', async () => {

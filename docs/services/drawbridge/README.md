@@ -471,7 +471,16 @@ NUT-18 payment request for one call:
 - `m`: the node mint's public URL, `<ARCHON_DRAWBRIDGE_PUBLIC_HOST>/cashu`.
 
 The body lists `acceptedMethods` and repeats the request as `cashu`. The client
-retries with `X-Cashu: cashuB…`. Before serving, Drawbridge:
+retries with `X-Cashu: cashuB…`. A Keymaster wallet that has the node mint makes
+that token from the request:
+
+```sh
+token=$(keymaster cashu-pay-request "$request" --max 10)
+curl -H "X-Cashu: $token" …
+```
+
+`--max` refuses a request asking for more sats than the caller expects. Before
+serving, Drawbridge:
 
 1. counts the attempt against the caller's source address, not `X-DID`, which is
    unauthenticated and attributes the payment only;

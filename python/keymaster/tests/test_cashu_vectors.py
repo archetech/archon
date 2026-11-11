@@ -8,6 +8,7 @@ import pytest
 from bip_utils import Bip39SeedGenerator
 from coincurve import PublicKey
 
+from keymaster.cashu import cashu_request_terms
 from keymaster.cashu_crypto import (
     CashuTokenError,
     blind,
@@ -32,6 +33,7 @@ from keymaster.cashu_crypto import (
     verify_p2pk_witness,
     verify_proof_dleq,
 )
+from keymaster.errors import KeymasterError
 
 # The same two files drive tests/keymaster/cashu-vectors.test.ts: the published
 # NUT vectors, and what cashu-ts produces for fixed inputs.
@@ -243,3 +245,23 @@ def test_a_new_secret_is_read_back_the_same():
 
     assert p2pk_lock(secret) == P2PK["conditions"]
     assert verify_p2pk_witness(secret, p2pk_witness(secret, P2PK["privateKey"]), P2PK["publicKey"])
+
+
+REQUESTS = json.loads((FIXTURES / "cashu-request-vectors.json").read_text())
+
+
+@pytest.mark.parametrize("vector", REQUESTS["accepted"], ids=lambda vector: vector["name"])
+def test_reads_a_payment_request(vector):
+    assert cashu_request_terms(vector["request"]) == (vector["amount"], vector["mints"])
+
+
+@pytest.mark.parametrize("vector", REQUESTS["refused"], ids=lambda vector: vector["name"])
+def test_refuses_a_payment_request(vector):
+    with pytest.raises(KeymasterError) as raised:
+        cashu_request_terms(vector["request"])
+    assert str(raised.value) == f"Invalid parameter: {vector['error']}"
+
+
+def test_refuses_a_payment_request_that_is_not_a_string():
+    with pytest.raises(KeymasterError, match="Invalid parameter: request"):
+        cashu_request_terms(None)

@@ -824,6 +824,9 @@ class Keymaster:
     async def send_cashu_to(self, recipient: str, amount: int, options: dict[str, Any] | None = None) -> dict[str, Any]:
         return await self.cashu.send_cashu_to(recipient, amount, options)
 
+    async def pay_cashu_request(self, request: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        return await self.cashu.pay_cashu_request(request, options)
+
     async def list_cashu_messages(self, name: str | None = None) -> list[dict[str, Any]]:
         return await self.cashu.list_cashu_messages(name)
 

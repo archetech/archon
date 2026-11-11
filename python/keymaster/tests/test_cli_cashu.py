@@ -150,6 +150,25 @@ def test_send_prints_only_the_token_on_stdout(monkeypatch, tmp_path, capsys) -> 
     assert "Balance: 21" in captured.err
 
 
+def test_pay_request_prints_only_the_token_on_stdout(monkeypatch, tmp_path, capsys) -> None:
+    stub = _keymaster(pay_cashu_request={"token": "cashuBpaid", "amount": 10, "fee": 1, "operationId": "op-2", "mint": MINT})
+
+    assert _run(monkeypatch, tmp_path, ["cashu-pay-request", "creqAabc", "Bob", "--max", "12"], stub) == 0
+
+    captured = capsys.readouterr()
+    assert captured.out.strip() == "cashuBpaid"
+    assert f"Paid 10 sats from {MINT}, fee 1, operation op-2" in captured.err
+    assert stub.calls == [("pay_cashu_request", ("creqAabc", {"max": 12, "name": "Bob"}))]
+
+
+@pytest.mark.parametrize("maximum", ["0", "1.5", "ten"])
+def test_pay_request_refuses_a_malformed_maximum(monkeypatch, tmp_path, maximum) -> None:
+    stub = _keymaster(pay_cashu_request={})
+
+    assert _run(monkeypatch, tmp_path, ["cashu-pay-request", "creqAabc", "--max", maximum], stub) == 1
+    assert stub.calls == []
+
+
 def test_send_succeeds_when_the_balance_cannot_be_read(monkeypatch, tmp_path, capsys) -> None:
     def unavailable() -> None:
         raise CashuUnavailableError("mint down")
