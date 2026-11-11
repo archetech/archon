@@ -492,8 +492,9 @@ Cashu is offered only while all of these hold:
 - the identity `ARCHON_NODE_ID` on that Keymaster has added the node mint
   (`archon add-cashu <node ID>`).
 
-Drawbridge checks the last at most once a minute, and logs a warning while it
-fails. Lightning and Cashu are each offered when they can work. If invoice
+Drawbridge checks the last at most once a minute, gives up on a lookup after 5
+seconds so a stalled Keymaster cannot hold up a Lightning challenge, and logs a
+warning while it fails. Lightning and Cashu are each offered when they can work. If invoice
 creation fails while Cashu is ready, the challenge offers Cashu alone; with
 neither available, the answer is `503`.
 

@@ -105,6 +105,34 @@ describe('keymasterCashuPayments', () => {
         expect(await keymasterCashuPayments(unreachable, 'node-id', MINT).ready()).toBe(false);
     });
 
+    it('logs an unreachable Keymaster without the admin key its request carried', async () => {
+        const km = keymaster();
+        const warn = jest.fn();
+        // The shape KeymasterClient rethrows on a transport failure.
+        const axiosError = Object.assign(new Error('connect ECONNREFUSED 10.0.0.5:4226'), {
+            code: 'ECONNREFUSED',
+            config: { headers: { 'X-Archon-Admin-Key': 'admin-secret-key' } },
+            request: {},
+        });
+        km.listCashuMints.mockRejectedValue(axiosError);
+
+        expect(await keymasterCashuPayments(km, 'node-id', MINT, { warn }).ready()).toBe(false);
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(JSON.stringify(warn.mock.calls)).not.toContain('admin-secret-key');
+        expect(warn.mock.calls[0][0]).toContain('ECONNREFUSED');
+    });
+
+    it('is not ready when the lookup stalls past its deadline', async () => {
+        const km = keymaster();
+        const warn = jest.fn();
+        km.listCashuMints.mockReturnValue(new Promise(() => {}));
+        const started = Date.now();
+
+        expect(await keymasterCashuPayments(km, 'node-id', MINT, { warn }, 50).ready()).toBe(false);
+        expect(Date.now() - started).toBeLessThan(2000);
+        expect(warn.mock.calls[0][0]).toContain('no answer within 50 ms');
+    });
+
     it('redeems the token into the node identity and returns what was received', async () => {
         const km = keymaster();
         km.receiveCashu.mockResolvedValue({ amount: 2 });

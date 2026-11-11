@@ -91,6 +91,27 @@ export interface CashuKeymaster {
 }
 
 const READY_CACHE_MS = 60_000;
+// The readiness probe runs before every unpaid challenge is answered, so a
+// stalled Keymaster must not hold up a challenge Lightning could answer.
+const READY_TIMEOUT_MS = 5_000;
+
+// A diagnostic safe to log. KeymasterClient rethrows transport failures as the
+// axios error, whose request config carries the outbound admin key.
+function describeError(error: unknown): string {
+    if (error instanceof Error) {
+        const code = (error as { code?: unknown }).code;
+        return typeof code === 'string' ? `${code}: ${error.message}` : error.message;
+    }
+    return 'unknown error';
+}
+
+function withDeadline<T>(promise: Promise<T>, ms: number): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`no answer within ${ms} ms`)), ms);
+    });
+    return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
+}
 
 /**
  * Payments redeemed by the node's Keymaster into the identity `nodeId`. Cashu
@@ -102,6 +123,7 @@ export function keymasterCashuPayments(
     nodeId: string,
     mintUrl: string,
     logger?: { warn?: (...args: any[]) => void },
+    readyTimeoutMs = READY_TIMEOUT_MS,
 ): CashuPayments {
     let checked: { at: number; ready: boolean } | null = null;
     // Concurrent challenges share one lookup rather than each contacting the mints.
@@ -111,14 +133,14 @@ export function keymasterCashuPayments(
     async function check(): Promise<boolean> {
         let ready = false;
         try {
-            const mints = await keymaster.listCashuMints(nodeId);
+            const mints = await withDeadline(keymaster.listCashuMints(nodeId), readyTimeoutMs);
             ready = mints.some(mint => normalizeMintUrl(mint.url) === accepted && !mint.error);
             if (!ready) {
                 logger?.warn?.(`Cashu payment is not offered: ${nodeId} on the node's Keymaster has not added the node mint ${mintUrl}`);
             }
         }
         catch (error) {
-            logger?.warn?.({ err: error }, 'Cashu payment is not offered: the node\'s Keymaster cannot be reached');
+            logger?.warn?.(`Cashu payment is not offered: the node's Keymaster cannot be reached (${describeError(error)})`);
         }
         checked = { at: Date.now(), ready };
         return ready;
