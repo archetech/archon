@@ -14,6 +14,7 @@ const keymaster = {
     createCashuMintQuote: vi.fn(), claimCashuMintQuote: vi.fn(), listCashuQuotes: vi.fn(),
     meltCashu: vi.fn(), sendCashu: vi.fn(), receiveCashu: vi.fn(), checkCashu: vi.fn(), restoreCashu: vi.fn(),
     listCashuSends: vi.fn(), reclaimCashu: vi.fn(), sendCashuTo: vi.fn(), listCashuMessages: vi.fn(), receiveCashuMessages: vi.fn(),
+    payCashuRequest: vi.fn(),
     getLightningBalance: vi.fn(), payLightningInvoice: vi.fn(), decodeLightningInvoice: vi.fn(),
 };
 const notify = { error: vi.fn(), success: vi.fn(), warning: vi.fn() };
@@ -684,5 +685,51 @@ describe('Cashu view: DIDComm', () => {
         await waitFor(() => expect(keymaster.listCashuMessages).toHaveBeenCalled());
         await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
         expect(keymaster.listCashuMessages).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('Cashu view: paying a payment request', () => {
+    const paid = { token: 'cashuBpaid', amount: 10, fee: 1, operationId: 'op', mint: NODE };
+
+    beforeEach(() => {
+        holding(mintInfo(NODE, true));
+    });
+
+    it('pays the request for the identity shown, up to the most the user will pay, and shows the token', async () => {
+        keymaster.payCashuRequest.mockResolvedValue(paid);
+        view();
+        const user = await open('Pay');
+        await user.type(screen.getByLabelText(/^Payment Request/), ' creqAabc ');
+        await user.type(screen.getByLabelText(/^Pay At Most/), '12');
+        await user.click(screen.getByRole('button', { name: 'Pay Request' }));
+
+        await waitFor(() => expect(keymaster.payCashuRequest).toHaveBeenCalledWith('creqAabc', { max: 12, name: 'Alice' }));
+        expect(((await screen.findByLabelText(`Token for 10 sats from ${NODE}`)) as HTMLTextAreaElement).value).toBe('cashuBpaid');
+        expect(screen.getByText(/It includes a fee of 1 sat for their redemption/)).toBeTruthy();
+        expect((screen.getByLabelText(/^Payment Request/) as HTMLTextAreaElement).value).toBe('');
+    });
+
+    it('does not pay without a maximum', async () => {
+        view();
+        const user = await open('Pay');
+        await user.type(screen.getByLabelText(/^Payment Request/), 'creqAabc');
+        await user.click(screen.getByRole('button', { name: 'Pay Request' }));
+
+        expect(notify.error).toHaveBeenCalledWith('Enter the most you will pay, in satoshis');
+        expect(keymaster.payCashuRequest).not.toHaveBeenCalled();
+    });
+
+    it('reports a refusal and keeps the request', async () => {
+        const refusal = new Error('Invalid parameter: request: asks for 30 sats, more than the maximum of 12');
+        keymaster.payCashuRequest.mockRejectedValue(refusal);
+        view();
+        const user = await open('Pay');
+        await user.type(screen.getByLabelText(/^Payment Request/), 'creqAabc');
+        await user.type(screen.getByLabelText(/^Pay At Most/), '12');
+        await user.click(screen.getByRole('button', { name: 'Pay Request' }));
+
+        await waitFor(() => expect(notify.error).toHaveBeenCalledWith(refusal));
+        expect((screen.getByLabelText(/^Payment Request/) as HTMLTextAreaElement).value).toBe('creqAabc');
+        expect(screen.queryByLabelText(/^Token for/)).toBeNull();
     });
 });

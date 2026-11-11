@@ -11,6 +11,7 @@ import {
     DialogContent,
     DialogContentText,
     DialogTitle,
+    Divider,
     MenuItem,
     Tab,
     Tabs,
@@ -26,6 +27,7 @@ import type {
     CashuMessage,
     CashuMintInfo,
     CashuMintQuote,
+    CashuPayRequestResult,
     CashuQuoteRecord,
     CashuSendRecord,
     CashuSendResult,
@@ -42,6 +44,7 @@ export type CashuKeymaster = Pick<KeymasterInterface,
     | "createCashuMintQuote" | "claimCashuMintQuote" | "listCashuQuotes"
     | "meltCashu" | "sendCashu" | "receiveCashu" | "checkCashu" | "restoreCashu"
     | "listCashuSends" | "reclaimCashu" | "sendCashuTo" | "listCashuMessages" | "receiveCashuMessages"
+    | "payCashuRequest"
     | "getLightningBalance" | "payLightningInvoice" | "decodeLightningInvoice"
 >;
 
@@ -182,6 +185,10 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
     const [invoice, setInvoice] = useState("");
     const [decoded, setDecoded] = useState<{ invoice: string; info: DecodedLightningInvoice } | null>(null);
     const [melted, setMelted] = useState<CashuMeltResult | null>(null);
+
+    const [request, setRequest] = useState("");
+    const [requestMax, setRequestMax] = useState("");
+    const [requestPaid, setRequestPaid] = useState<CashuPayRequestResult | null>(null);
 
     const [sendAmount, setSendAmount] = useState("");
     const [sent, setSent] = useState<CashuSendResult | null>(null);
@@ -451,6 +458,22 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
             } else {
                 notify.error("The mint did not pay that invoice, and your ecash is unspent");
             }
+        });
+    }
+
+    // The request says what it costs, and nothing here decodes it first, so the
+    // most the user will pay is asked for and Keymaster refuses a request above it.
+    function handlePayRequest() {
+        const max = parseAmount(requestMax);
+        if (!max) {
+            notify.error("Enter the most you will pay, in satoshis");
+            return;
+        }
+        const submitted = request.trim();
+        run("payRequest", async () => {
+            setRequestPaid(null);
+            setRequestPaid(await keymaster.payCashuRequest(submitted, { max, name: identity }));
+            setRequest(current => (current.trim() === submitted ? "" : current));
         });
     }
 
@@ -811,6 +834,32 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                                 </Typography>
                             )}
                         </Box>
+                    )}
+                    <Divider />
+                    <Typography variant="body2">
+                        Or pay a Cashu payment request, such as the one a paid API sends with HTTP 402. It names its own mint.
+                    </Typography>
+                    <TextField label="Payment Request" placeholder="creqA..." value={request} multiline rows={3} size="small"
+                        onChange={event => {
+                            setRequest(event.target.value);
+                            setRequestPaid(null);
+                        }} />
+                    <TextField label="Pay At Most (sats)" type="number" value={requestMax}
+                        onChange={event => setRequestMax(event.target.value)}
+                        slotProps={{ htmlInput: { min: 1 } }} size="small" />
+                    <Box>
+                        <ActionButton label="Pay Request" variant="contained" busy={busy.payRequest}
+                            disabled={!request.trim()} onClick={handlePayRequest} />
+                    </Box>
+                    {requestPaid && (
+                        <>
+                            <Alert severity="info">
+                                Give this token to whoever sent the request. It is cash: you can reclaim it from Outstanding until they redeem it.
+                                {requestPaid.fee > 0 && ` It includes a fee of ${sats(requestPaid.fee)} for their redemption.`}
+                            </Alert>
+                            <CopyAndQr label={`Token for ${sats(requestPaid.amount)} from ${requestPaid.mint}`} value={requestPaid.token}
+                                onCopy={copied("Token")} onCopyFailed={notify.error} />
+                        </>
                     )}
                 </Stack>
             )}
