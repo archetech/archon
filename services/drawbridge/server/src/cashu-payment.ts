@@ -5,7 +5,24 @@
 // Cashu wallet and Drawbridge itself holds no funds.
 
 import { getTokenMetadata, PaymentRequest } from '@cashu/cashu-ts';
-import { CashuUnavailableError } from '@didcid/common/errors';
+import {
+    CashuMintUnsupportedError,
+    CashuTokenLockedError,
+    CashuTokenSpentError,
+    InvalidParameterError,
+} from '@didcid/common/errors';
+
+// The Keymaster errors that mean the token itself cannot pay: malformed or not
+// covering its fee, already spent, locked to another key, or needing signatures
+// the wallet cannot give. Both Keymaster ports name them alike. KeymasterClient
+// drops the HTTP status, so anything else, a server fault or a mint the node
+// identity has not added included, is the node's failure, not the token's.
+const TOKEN_REFUSALS = [
+    InvalidParameterError.type,
+    CashuTokenSpentError.type,
+    CashuTokenLockedError.type,
+    CashuMintUnsupportedError.type,
+];
 
 export const CASHU_HEADER = 'x-cashu';
 export const CASHU_UNIT = 'sat';
@@ -165,12 +182,14 @@ export function keymasterCashuPayments(
                 return result.amount;
             }
             catch (error: any) {
-                // KeymasterClient rethrows an answered request as its JSON body.
+                // KeymasterClient rethrows an answered request as its JSON body,
+                // and a transport failure as the axios error.
                 const reason = typeof error?.error === 'string' ? error.error : null;
-                if (reason === null || reason.includes(CashuUnavailableError.type)) {
-                    throw new CashuPaymentUnavailableError('The node could not redeem the token');
+                if (reason !== null && TOKEN_REFUSALS.some(type => reason.includes(type))) {
+                    throw new CashuPaymentRefusedError(`The token was refused: ${reason}`);
                 }
-                throw new CashuPaymentRefusedError(`The token was refused: ${reason}`);
+                logger?.warn?.(`Cashu payment could not be redeemed: ${reason ?? describeError(error)}`);
+                throw new CashuPaymentUnavailableError('The node could not redeem the token');
             }
         },
     };

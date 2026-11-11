@@ -34,7 +34,8 @@ export class PaymentVerificationError extends DrawbridgeError {
 }
 
 export class RateLimitExceededError extends DrawbridgeError {
-    constructor() {
+    // The rate-limit bucket that was exhausted, when it is not the caller's DID.
+    constructor(public readonly bucket?: string) {
         super('Rate limit exceeded');
         this.name = 'RateLimitExceededError';
     }

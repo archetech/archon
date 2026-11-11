@@ -108,7 +108,7 @@ export function createL402Middleware(options: L402Options): RequestHandler {
             if (error instanceof RateLimitExceededError) {
                 const result = await checkLimit(
                     options.store,
-                    req.headers['x-did'] as string || 'anonymous',
+                    error.bucket ?? (req.headers['x-did'] as string || 'anonymous'),
                     options.rateLimitRequests,
                     options.rateLimitWindowSeconds
                 );
@@ -236,16 +236,20 @@ async function handleCashuPayment(
     next: NextFunction
 ): Promise<void> {
     const cashu = options.cashu!;
+    // X-DID is an unauthenticated hint: it attributes the payment but must not
+    // pick the rate-limit bucket, or rotating it would let unpaid callers drive
+    // redemption work without limit. The source address does, as for a challenge.
     const did = req.headers['x-did'] as string | undefined;
+    const bucket = `ip:${req.ip || 'unknown'}`;
 
     const rateLimitResult = await checkAndRecordRequest(
         options.store,
-        did || `ip:${req.ip || 'unknown'}`,
+        bucket,
         options.rateLimitRequests,
         options.rateLimitWindowSeconds
     );
     if (!rateLimitResult.allowed) {
-        throw new RateLimitExceededError();
+        throw new RateLimitExceededError(bucket);
     }
 
     const { amountSat, operationName } = priceFor(options, req);

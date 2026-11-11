@@ -33,7 +33,14 @@ async function requestLightningMediator<T>(
         );
     }
 
-    return response.json() as Promise<T>;
+    // A truncated or malformed body is as unavailable as no answer at all.
+    try {
+        return await response.json() as T;
+    } catch (error) {
+        throw new LightningUnavailableError(
+            `Lightning mediator sent an unreadable response: ${error instanceof Error ? error.message : String(error)}`
+        );
+    }
 }
 
 export function createL402Invoice(

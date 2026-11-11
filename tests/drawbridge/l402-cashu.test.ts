@@ -259,6 +259,17 @@ describe('paying with X-Cashu', () => {
         const { res } = await call(options(store(), { cashu: payments }), { 'x-cashu': token() });
         expect(res.statusCode).toBe(429);
         expect(payments.redeem).not.toHaveBeenCalled();
+        // The reset time comes from the same bucket that was exhausted.
+        expect(mockCheckLimit).toHaveBeenCalledWith(expect.anything(), 'ip:127.0.0.1', 100, 60);
+    });
+
+    it('limits by source address, so a changing X-DID gets no fresh budget', async () => {
+        const opts = options(store(), { cashu: cashu() });
+        await call(opts, { 'x-cashu': token(), 'x-did': 'did:cid:one' });
+        await call(opts, { 'x-cashu': token(), 'x-did': 'did:cid:two' });
+
+        const buckets = mockCheckAndRecordRequest.mock.calls.map(call => call[1]);
+        expect(buckets).toEqual(['ip:127.0.0.1', 'ip:127.0.0.1']);
     });
 
     it('ignores X-Cashu on a node that offers no Cashu payment', async () => {

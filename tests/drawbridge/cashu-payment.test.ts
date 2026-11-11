@@ -162,6 +162,34 @@ describe('keymasterCashuPayments', () => {
             .rejects.toThrow('Cashu token already spent');
     });
 
+    it('refuses only for errors that mean the token cannot pay, in either Keymaster port', async () => {
+        for (const reason of [
+            'Error: Invalid parameter: token',            // TypeScript
+            'Invalid parameter: token amount does not cover its fee', // Python
+            'Cashu token locked: locked to a key this identity does not hold',
+            'Cashu mint unsupported: a token needing SIG_ALL or several signatures',
+        ]) {
+            const km = keymaster();
+            km.receiveCashu.mockRejectedValue({ error: reason });
+            await expect(keymasterCashuPayments(km, 'node-id', MINT).redeem('cashuBtoken'))
+                .rejects.toThrow(CashuPaymentRefusedError);
+        }
+    });
+
+    it("treats the node's own failures as unavailable, not as a refused token", async () => {
+        for (const reason of [
+            'Error: Failed to save wallet',                // a Keymaster 500
+            'Cashu mint not added: https://node.example/cashu', // operator setup missing
+        ]) {
+            const km = keymaster();
+            const warn = jest.fn();
+            km.receiveCashu.mockRejectedValue({ error: reason });
+            await expect(keymasterCashuPayments(km, 'node-id', MINT, { warn }).redeem('cashuBtoken'))
+                .rejects.toThrow(CashuPaymentUnavailableError);
+            expect(warn.mock.calls[0][0]).toContain(reason);
+        }
+    });
+
     it('is unavailable when the mint or Keymaster cannot be reached', async () => {
         const mintDown = keymaster();
         mintDown.receiveCashu.mockRejectedValue({ error: 'Error: Cashu mint unavailable: connect ECONNREFUSED' });

@@ -462,18 +462,24 @@ NUT-18 payment request for one call:
 The body lists `acceptedMethods` and repeats the request as `cashu`. The client
 retries with `X-Cashu: cashuB…`. Before serving, Drawbridge:
 
-1. checks the token without contacting the mint, and answers `400` if it is from
+1. counts the attempt against the caller's source address, not `X-DID`, which is
+   unauthenticated and attributes the payment only;
+2. checks the token without contacting the mint, and answers `400` if it is from
    another mint, of another unit, for less than the price, or carries spending
    conditions;
-2. redeems it through the node's own Keymaster (`POST /cashu/receive`) into the
+3. redeems it through the node's own Keymaster (`POST /cashu/receive`) into the
    identity `ARCHON_NODE_ID`, so the payment lands in the node's Cashu wallet and
-   Drawbridge holds no funds. A token the node refuses, such as one already
-   spent, gets `400`; a Keymaster or mint that cannot be reached gets `503`;
-3. requires what the node received to cover the price. The price is net of the
+   Drawbridge holds no funds. A token that cannot pay gets `400`: malformed or
+   not covering its fee, already spent, locked to another key, or needing
+   signatures the wallet cannot give. Any other failure is the node's, so it
+   gets `503` and a logged warning. That includes a Keymaster or mint that
+   cannot be reached, a Keymaster server error, or a node identity missing the
+   mint;
+4. requires what the node received to cover the price. The price is net of the
    mint's fees and of any proofs already spent, as NUT-18 defines a requested
    amount; a token that brings in less gets `400`, and what it brought in stays
    received;
-4. records a payment with `method: "cashu"`, then serves the request.
+5. records a payment with `method: "cashu"`, then serves the request.
 
 `X-Cashu` is redacted from request logs: a token refused before redemption is
 still spendable.
