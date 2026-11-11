@@ -2295,18 +2295,17 @@ export default class Keymaster implements KeymasterInterface {
         options: { registry?: string } = {}
     ): Promise<string> {
         return this.enqueueIdentityOp(async () => {
-            const start = await this.loadWallet();
-            const account = start.counter;
-            // Compared serialized: mutations work on a copy of the wallet.
-            const seed = JSON.stringify(start.seed.mnemonicEnc);
+            const account = (await this.loadWallet()).counter;
             const signed = await this.createIdOperation(name, account, options);
             const did = await this.gatekeeper.createDID(signed);
+            const signer = JSON.stringify(signed.publicJwk);
 
             let conflict: unknown;
-            await this.mutateWallet((wallet) => {
+            await this.mutateWallet(async (wallet) => {
                 // A wallet replaced meanwhile has another seed, which cannot
-                // derive this DID's key.
-                if (JSON.stringify(wallet.seed.mnemonicEnc) !== seed) {
+                // derive this DID's key. A new passphrase keeps the seed.
+                const { publicJwk } = await this.accountKeyPair(wallet, account);
+                if (JSON.stringify(publicJwk) !== signer) {
                     throw new KeymasterError('The wallet was replaced while the ID was being created');
                 }
                 // The account is used now, its key signing a published DID,
@@ -2330,6 +2329,11 @@ export default class Keymaster implements KeymasterInterface {
         });
     }
 
+    private async accountKeyPair(wallet: WalletFile, account: number): Promise<EcdsaJwkPair> {
+        const hdkey = await this.getHDKeyFromCacheOrMnemonic(wallet);
+        return this.cipher.generateJwk(hdkey.derive(`m/44'/0'/${account}'/0/0`).privateKey!);
+    }
+
     async createIdOperation(
         name: string,
         account: number = 0,
@@ -2340,10 +2344,7 @@ export default class Keymaster implements KeymasterInterface {
 
         name = this.validateAlias(name, wallet);
 
-        const hdkey = await this.getHDKeyFromCacheOrMnemonic(wallet);
-        const path = `m/44'/0'/${account}'/0/0`;
-        const didkey = hdkey.derive(path);
-        const keypair = this.cipher.generateJwk(didkey.privateKey!);
+        const keypair = await this.accountKeyPair(wallet, account);
 
         const block = await this.gatekeeper.getBlock(registry);
         const blockid = block?.hash;

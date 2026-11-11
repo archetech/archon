@@ -577,17 +577,16 @@ class Keymaster:
 
     async def create_id(self, name: str, options: dict[str, Any] | None = None) -> str:
         async with self._identity_lock:
-            start = await self.load_wallet()
-            account = start["counter"]
-            seed = start["seed"]["mnemonicEnc"]
+            account = (await self.load_wallet())["counter"]
             signed = await self.create_id_operation(name, account, options or {})
             did = await self.gatekeeper.create_did(signed)
 
             async with self._lock:
                 wallet = await self.load_wallet()
                 # A wallet replaced meanwhile has another seed, which cannot
-                # derive this DID's key.
-                if wallet["seed"]["mnemonicEnc"] != seed:
+                # derive this DID's key. A new passphrase keeps the seed.
+                keypair = await self.derive_key_pair(account, 0, wallet)
+                if keypair["publicJwk"] != signed["publicJwk"]:
                     raise KeymasterError("The wallet was replaced while the ID was being created")
                 # The account is used now, its key signing a published DID, even
                 # if the name was taken while the DID was being created.

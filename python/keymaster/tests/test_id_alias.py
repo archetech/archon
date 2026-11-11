@@ -233,6 +233,22 @@ def test_a_did_is_not_recorded_into_a_wallet_replaced_meanwhile(testbed):
     assert "Bob" not in run(km.load_wallet())["ids"]
 
 
+def test_a_did_is_recorded_when_the_passphrase_changed_meanwhile(testbed):
+    km = testbed.keymaster
+    changed = []
+
+    async def change_passphrase():
+        if not changed:
+            changed.append(True)
+            await km.change_passphrase("new passphrase")
+
+    _hook_writes(testbed, change_passphrase)
+    did = run(asyncio.wait_for(km.create_id("Bob"), DEADLINE_SECONDS))
+    wallet = run(km.load_wallet())
+    assert wallet["ids"]["Bob"] == {"did": did, "account": 0, "index": 0}
+    assert wallet["counter"] == 1
+
+
 def test_concurrent_create_ids_for_one_name_create_one_did(testbed):
     km = testbed.keymaster
     calls = []

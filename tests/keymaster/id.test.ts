@@ -818,6 +818,22 @@ describe('identity operations outside the wallet lock', () => {
         expect((await km.loadWallet()).ids.Bob).toBeUndefined();
     });
 
+    it('records a DID when the passphrase changed while it was created', async () => {
+        let changed = false;
+        const km = keymasterWithHook(async (k) => {
+            if (!changed) {
+                changed = true;
+                await k.changePassphrase('new passphrase');
+            }
+        });
+        await km.newWallet();
+
+        const did = await withinDeadline(km.createId('Bob', { registry: 'local' }));
+        const wallet = await km.loadWallet();
+        expect(wallet.ids.Bob).toEqual({ did, account: 0, index: 0 });
+        expect(wallet.counter).toBe(1);
+    });
+
     it('runs concurrent createIds for one name one at a time, so only one succeeds', async () => {
         const created = jest.spyOn(gatekeeper, 'createDID');
         const km = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'passphrase' });
