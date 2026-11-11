@@ -242,6 +242,7 @@ function mockRuntime(overrides: Record<string, unknown> = {}) {
         listCashuSends: jest.fn<any>().mockResolvedValue([]),
         reclaimCashu: jest.fn<any>().mockResolvedValue({ amount: 21, mint: 'https://mint.example' }),
         sendCashuTo: jest.fn<any>().mockResolvedValue({ token: 'cashuB', delivered: true }),
+        decodeCashuRequest: jest.fn<any>().mockResolvedValue({ amount: 10, mints: ['https://mint.example'], mint: 'https://mint.example' }),
         payCashuRequest: jest.fn<any>().mockResolvedValue({ token: 'cashuB', amount: 10, fee: 0, operationId: 'op', mint: 'https://mint.example' }),
         listCashuMessages: jest.fn<any>().mockResolvedValue([]),
         receiveCashuMessages: jest.fn<any>().mockResolvedValue({ redeemed: [], failed: [] }),

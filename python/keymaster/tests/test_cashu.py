@@ -1233,6 +1233,25 @@ class TestPayingAPaymentRequest:
         assert (paid["amount"], paid["fee"], paid["mint"]) == (30, 0, PUBLIC_URL)
         assert run(funded.keymaster.receive_cashu(paid["token"], "Bob"))["amount"] == 30
 
+    def test_shows_what_a_request_asks_for_without_paying(self, funded):
+        km = funded.keymaster
+
+        assert run(km.decode_cashu_request(_creq(30, [self.OUTSIDE, PUBLIC_URL + "/"]))) == {
+            "amount": 30, "mints": [self.OUTSIDE, PUBLIC_URL], "mint": PUBLIC_URL,
+        }
+        assert run(km.decode_cashu_request(_creq(30, [self.OUTSIDE]))) == {"amount": 30, "mints": [self.OUTSIDE]}
+        with pytest.raises(KeymasterError, match="Invalid parameter: request"):
+            run(km.decode_cashu_request("garbage"))
+        assert (funded.balance()["spendable"], funded.balance()["outstanding"]) == (100, 0)
+
+    def test_names_the_mint_of_the_identity_asked_about(self, funded):
+        km = funded.keymaster
+        run(km.create_id("Carol"))
+        run(km.set_current_id("Alice"))
+
+        assert run(km.decode_cashu_request(_creq(30), "Bob"))["mint"] == PUBLIC_URL
+        assert run(km.decode_cashu_request(_creq(30), "Carol")) == {"amount": 30, "mints": [PUBLIC_URL]}
+
     def test_journals_the_send_so_an_unredeemed_token_can_be_reclaimed(self, funded):
         paid = run(funded.keymaster.pay_cashu_request(_creq(30)))
 

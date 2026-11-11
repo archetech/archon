@@ -14,7 +14,7 @@ const keymaster = {
     createCashuMintQuote: vi.fn(), claimCashuMintQuote: vi.fn(), listCashuQuotes: vi.fn(),
     meltCashu: vi.fn(), sendCashu: vi.fn(), receiveCashu: vi.fn(), checkCashu: vi.fn(), restoreCashu: vi.fn(),
     listCashuSends: vi.fn(), reclaimCashu: vi.fn(), sendCashuTo: vi.fn(), listCashuMessages: vi.fn(), receiveCashuMessages: vi.fn(),
-    payCashuRequest: vi.fn(),
+    decodeCashuRequest: vi.fn(), payCashuRequest: vi.fn(),
     getLightningBalance: vi.fn(), payLightningInvoice: vi.fn(), decodeLightningInvoice: vi.fn(),
 };
 const notify = { error: vi.fn(), success: vi.fn(), warning: vi.fn() };
@@ -690,67 +690,116 @@ describe('Cashu view: DIDComm', () => {
 
 describe('Cashu view: paying a payment request', () => {
     const paid = { token: 'cashuBpaid', amount: 10, fee: 1, operationId: 'op', mint: NODE };
+    const info = { amount: 10, mints: [NODE], mint: NODE };
+    const requestField = () => screen.getByLabelText(/^Payment Request/) as HTMLTextAreaElement;
 
     beforeEach(() => {
         holding(mintInfo(NODE, true));
     });
 
-    it('pays the request for the identity shown, up to the most the user will pay, and shows the token', async () => {
-        keymaster.payCashuRequest.mockResolvedValue(paid);
+    async function decode(request = 'creqAabc') {
+        const user = await open('Pay');
+        await user.type(requestField(), request);
+        await user.click(screen.getByRole('button', { name: 'Decode Request' }));
+        return user;
+    }
+
+    it('shows the amount and the mint before anything can be paid', async () => {
+        keymaster.decodeCashuRequest.mockResolvedValue(info);
         view();
         const user = await open('Pay');
-        await user.type(screen.getByLabelText(/^Payment Request/), ' creqAabc ');
-        await user.type(screen.getByLabelText(/^Pay At Most/), '12');
-        await user.click(screen.getByRole('button', { name: 'Pay Request' }));
+        await user.type(requestField(), ' creqAabc ');
+        expect(screen.queryByRole('button', { name: 'Pay Request' })).toBeNull();
 
-        await waitFor(() => expect(keymaster.payCashuRequest).toHaveBeenCalledWith('creqAabc', { max: 12, name: 'Alice' }));
+        await user.click(screen.getByRole('button', { name: 'Decode Request' }));
+
+        expect(await screen.findByText('10 sats, plus any mint fee', { exact: false })).toBeTruthy();
+        expect(screen.getByText(NODE)).toBeTruthy();
+        expect(keymaster.decodeCashuRequest).toHaveBeenCalledWith('creqAabc', 'Alice');
+        expect(screen.getByRole('button', { name: 'Pay Request' })).toBeTruthy();
+        expect(keymaster.payCashuRequest).not.toHaveBeenCalled();
+    });
+
+    it('pays the request shown, for no more than the amount shown, and shows the token', async () => {
+        keymaster.decodeCashuRequest.mockResolvedValue(info);
+        keymaster.payCashuRequest.mockResolvedValue(paid);
+        view();
+        const user = await decode();
+        await user.click(await screen.findByRole('button', { name: 'Pay Request' }));
+
+        await waitFor(() => expect(keymaster.payCashuRequest).toHaveBeenCalledWith('creqAabc', { max: 10, name: 'Alice' }));
         expect(((await screen.findByLabelText(`Token for 10 sats from ${NODE}`)) as HTMLTextAreaElement).value).toBe('cashuBpaid');
         expect(screen.getByText(/It includes a fee of 1 sat for their redemption/)).toBeTruthy();
-        expect((screen.getByLabelText(/^Payment Request/) as HTMLTextAreaElement).value).toBe('');
+        expect(requestField().value).toBe('');
+        expect(screen.queryByRole('button', { name: 'Pay Request' })).toBeNull();
+    });
+
+    it('withdraws the amount and the Pay button when the request changes', async () => {
+        keymaster.decodeCashuRequest.mockResolvedValue(info);
+        view();
+        const user = await decode();
+        await screen.findByRole('button', { name: 'Pay Request' });
+
+        await user.type(requestField(), 'x');
+
+        expect(screen.queryByRole('button', { name: 'Pay Request' })).toBeNull();
+        expect(screen.queryByText('10 sats, plus any mint fee', { exact: false })).toBeNull();
+    });
+
+    it('does not put a slow decode beside another request', async () => {
+        const slow = deferred();
+        keymaster.decodeCashuRequest.mockReturnValue(slow.promise);
+        view();
+        const user = await decode();
+        await user.type(requestField(), 'x');
+
+        await act(async () => slow.finish(info));
+
+        expect(screen.queryByRole('button', { name: 'Pay Request' })).toBeNull();
+    });
+
+    it('offers no payment when the identity has none of the mints, and names them', async () => {
+        keymaster.decodeCashuRequest.mockResolvedValue({ amount: 10, mints: [OTHER] });
+        view();
+        await decode();
+
+        expect(await screen.findByText(`You have no ecash at a mint this request accepts: ${OTHER}`)).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Pay Request' })).toBeNull();
     });
 
     it('holds the request while it is being paid, so the token shown is for the request shown', async () => {
         const payment = deferred();
+        keymaster.decodeCashuRequest.mockResolvedValue(info);
         keymaster.payCashuRequest.mockReturnValue(payment.promise);
         view();
-        const user = await open('Pay');
-        await user.type(screen.getByLabelText(/^Payment Request/), 'creqAabc');
-        await user.type(screen.getByLabelText(/^Pay At Most/), '12');
-        await user.click(screen.getByRole('button', { name: 'Pay Request' }));
+        const user = await decode();
+        await user.click(await screen.findByRole('button', { name: 'Pay Request' }));
 
-        await waitFor(() => expect((screen.getByLabelText(/^Payment Request/) as HTMLTextAreaElement).disabled).toBe(true));
+        await waitFor(() => expect(requestField().disabled).toBe(true));
         await act(async () => payment.finish(paid));
-        await waitFor(() => expect((screen.getByLabelText(/^Payment Request/) as HTMLTextAreaElement).disabled).toBe(false));
+        await waitFor(() => expect(requestField().disabled).toBe(false));
     });
 
-    it('says that the maximum does not include a mint fee', async () => {
+    it('reports a request that cannot be read', async () => {
+        const refusal = new Error('Invalid parameter: request');
+        keymaster.decodeCashuRequest.mockRejectedValue(refusal);
         view();
-        await open('Pay');
-
-        expect(screen.getByText('The most the request may ask for. A mint fee can come on top of it.')).toBeTruthy();
-    });
-
-    it('does not pay without a maximum', async () => {
-        view();
-        const user = await open('Pay');
-        await user.type(screen.getByLabelText(/^Payment Request/), 'creqAabc');
-        await user.click(screen.getByRole('button', { name: 'Pay Request' }));
-
-        expect(notify.error).toHaveBeenCalledWith('Enter the most you will pay, in satoshis');
-        expect(keymaster.payCashuRequest).not.toHaveBeenCalled();
-    });
-
-    it('reports a refusal and keeps the request', async () => {
-        const refusal = new Error('Invalid parameter: request: asks for 30 sats, more than the maximum of 12');
-        keymaster.payCashuRequest.mockRejectedValue(refusal);
-        view();
-        const user = await open('Pay');
-        await user.type(screen.getByLabelText(/^Payment Request/), 'creqAabc');
-        await user.type(screen.getByLabelText(/^Pay At Most/), '12');
-        await user.click(screen.getByRole('button', { name: 'Pay Request' }));
+        await decode('garbage');
 
         await waitFor(() => expect(notify.error).toHaveBeenCalledWith(refusal));
-        expect((screen.getByLabelText(/^Payment Request/) as HTMLTextAreaElement).value).toBe('creqAabc');
+        expect(screen.queryByRole('button', { name: 'Pay Request' })).toBeNull();
+    });
+
+    it('reports a refused payment and keeps the request', async () => {
+        const refusal = new Error('Cashu insufficient funds');
+        keymaster.decodeCashuRequest.mockResolvedValue(info);
+        keymaster.payCashuRequest.mockRejectedValue(refusal);
+        view();
+        const user = await decode();
+        await user.click(await screen.findByRole('button', { name: 'Pay Request' }));
+
+        await waitFor(() => expect(notify.error).toHaveBeenCalledWith(refusal));
+        expect(requestField().value).toBe('creqAabc');
         expect(screen.queryByLabelText(/^Token for/)).toBeNull();
     });
 });

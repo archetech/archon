@@ -4156,6 +4156,7 @@ export default class Keymaster implements KeymasterInterface {
     listCashuSends(mint?: string, name?: string) { return this.cashu.listCashuSends(mint, name); }
     reclaimCashu(operationId: string, name?: string) { return this.cashu.reclaimCashu(operationId, name); }
     sendCashuTo(recipient: string, amount: number, options?: CashuSendToOptions) { return this.cashu.sendCashuTo(recipient, amount, options); }
+    decodeCashuRequest(request: string, name?: string) { return this.cashu.decodeCashuRequest(request, name); }
     payCashuRequest(request: string, options?: CashuPayRequestOptions) { return this.cashu.payCashuRequest(request, options); }
     listCashuMessages(name?: string) { return this.cashu.listCashuMessages(name); }
     receiveCashuMessages(name?: string) { return this.cashu.receiveCashuMessages(name); }

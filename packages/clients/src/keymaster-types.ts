@@ -485,6 +485,15 @@ export interface CashuSendToOptions {
     name?: string;
 }
 
+// What a payment request asks for, as far as this wallet can pay it.
+export interface CashuRequestInfo {
+    amount: number;
+    // The mints the request accepts.
+    mints: string[];
+    // The one of them a payment would come from. Absent if the identity has none.
+    mint?: string;
+}
+
 export interface CashuPayRequestOptions {
     // The most the request may ask for, in sats. A request asking for more is refused.
     max?: number;
@@ -772,6 +781,7 @@ export interface KeymasterInterface {
     listCashuSends(mint?: string, name?: string): Promise<CashuSendRecord[]>;
     reclaimCashu(operationId: string, name?: string): Promise<CashuReclaimResult>;
     sendCashuTo(recipient: string, amount: number, options?: CashuSendToOptions): Promise<CashuSendToResult>;
+    decodeCashuRequest(request: string, name?: string): Promise<CashuRequestInfo>;
     payCashuRequest(request: string, options?: CashuPayRequestOptions): Promise<CashuPayRequestResult>;
     listCashuMessages(name?: string): Promise<CashuMessage[]>;
     receiveCashuMessages(name?: string): Promise<CashuAcceptResult>;

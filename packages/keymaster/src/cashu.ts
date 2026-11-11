@@ -47,6 +47,7 @@ import type {
     CashuQuoteRecord,
     CashuReceiveResult,
     CashuReclaimResult,
+    CashuRequestInfo,
     CashuRestoreResult,
     CashuSendRecord,
     CashuPayRequestOptions,
@@ -1652,14 +1653,26 @@ export class CashuWallet {
         if (max !== undefined && amount > max) {
             throw new InvalidParameterError(`request: asks for ${amount} sats, more than the maximum of ${max}`);
         }
-        const idInfo = await this.host.fetchIdInfo(name, await this.host.loadWallet());
-        const held = this.mints(idInfo);
-        const mint = mints.find(url => held[url]);
+        const { did, mint } = await this.requestMint(mints, name);
         if (!mint) {
             throw new CashuMintNotAddedError(mints[0]);
         }
         // By DID, so the send comes from the identity whose mints were checked.
-        return { ...await this.sendCashu(amount, mint, idInfo.did), mint };
+        return { ...await this.sendCashu(amount, mint, did), mint };
+    }
+
+    // What payCashuRequest would pay, without paying it.
+    async decodeCashuRequest(request: string, name?: string): Promise<CashuRequestInfo> {
+        const { amount, mints } = cashuRequestTerms(request);
+        const { mint } = await this.requestMint(mints, name);
+        return { amount, mints, ...(mint && { mint }) };
+    }
+
+    // The first of a request's mints the identity has.
+    private async requestMint(mints: string[], name?: string): Promise<{ did: string, mint?: string }> {
+        const idInfo = await this.host.fetchIdInfo(name, await this.host.loadWallet());
+        const held = this.mints(idInfo);
+        return { did: idInfo.did, mint: mints.find(url => held[url]) };
     }
 
     private tokenMint(token: string): string {

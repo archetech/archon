@@ -69,6 +69,7 @@ beforeEach(() => {
         '/cashu/claim': () => ({ body: { amount: 21, mint: MINT } }),
         '/cashu/balance': () => ({ body: { spendable: 21, inFlight: 0, outstanding: 0 } }),
         '/cashu/send': () => ({ body: { token: 'cashuBtoken', amount: 21, fee: 1, operationId: 'op-1' } }),
+        '/cashu/decode-request': () => ({ body: { amount: 10, mints: ['https://mint.example/cashu'], mint: 'https://mint.example/cashu' } }),
         '/cashu/pay-request': () => ({ body: { token: 'cashuBpaid', amount: 10, fee: 1, operationId: 'op-2', mint: 'https://mint.example/cashu' } }),
     };
 });
@@ -191,6 +192,16 @@ describe('cashu-send', () => {
         expect(status).toBe(0);
         expect(stdout).toBe('cashuBtoken');
         expect(stderr).not.toContain('Balance');
+    });
+});
+
+describe('cashu-decode-request', () => {
+    it('prints what the request asks for', async () => {
+        const { status, stdout } = await run('cashu-decode-request', 'creqAabc', 'Bob');
+
+        expect(status).toBe(0);
+        expect(JSON.parse(stdout)).toEqual({ amount: 10, mints: ['https://mint.example/cashu'], mint: 'https://mint.example/cashu' });
+        expect(requests.at(-1)).toEqual({ path: '/cashu/decode-request', body: { request: 'creqAabc', id: 'Bob' } });
     });
 });
 

@@ -150,6 +150,16 @@ def test_send_prints_only_the_token_on_stdout(monkeypatch, tmp_path, capsys) -> 
     assert "Balance: 21" in captured.err
 
 
+def test_decode_request_prints_what_the_request_asks_for(monkeypatch, tmp_path, capsys) -> None:
+    info = {"amount": 10, "mints": [MINT], "mint": MINT}
+    stub = _keymaster(decode_cashu_request=info)
+
+    assert _run(monkeypatch, tmp_path, ["cashu-decode-request", "creqAabc", "Bob"], stub) == 0
+
+    assert json.loads(capsys.readouterr().out) == info
+    assert stub.calls == [("decode_cashu_request", ("creqAabc", "Bob"))]
+
+
 def test_pay_request_prints_only_the_token_on_stdout(monkeypatch, tmp_path, capsys) -> None:
     stub = _keymaster(pay_cashu_request={"token": "cashuBpaid", "amount": 10, "fee": 1, "operationId": "op-2", "mint": MINT})
 

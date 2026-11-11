@@ -29,6 +29,7 @@ import type {
     CashuMintQuote,
     CashuPayRequestResult,
     CashuQuoteRecord,
+    CashuRequestInfo,
     CashuSendRecord,
     CashuSendResult,
     CashuSendToResult,
@@ -44,7 +45,7 @@ export type CashuKeymaster = Pick<KeymasterInterface,
     | "createCashuMintQuote" | "claimCashuMintQuote" | "listCashuQuotes"
     | "meltCashu" | "sendCashu" | "receiveCashu" | "checkCashu" | "restoreCashu"
     | "listCashuSends" | "reclaimCashu" | "sendCashuTo" | "listCashuMessages" | "receiveCashuMessages"
-    | "payCashuRequest"
+    | "decodeCashuRequest" | "payCashuRequest"
     | "getLightningBalance" | "payLightningInvoice" | "decodeLightningInvoice"
 >;
 
@@ -187,7 +188,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
     const [melted, setMelted] = useState<CashuMeltResult | null>(null);
 
     const [request, setRequest] = useState("");
-    const [requestMax, setRequestMax] = useState("");
+    const [requestInfo, setRequestInfo] = useState<{ request: string; info: CashuRequestInfo } | null>(null);
     const [requestPaid, setRequestPaid] = useState<CashuPayRequestResult | null>(null);
 
     const [sendAmount, setSendAmount] = useState("");
@@ -206,6 +207,7 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
     // Only the invoice on screen counts as reviewed: a slow decode must not put another
     // invoice's amount beside it, or enable paying it.
     const reviewed = decoded?.invoice === invoice.trim() ? decoded : null;
+    const reviewedRequest = requestInfo?.request === request.trim() ? requestInfo : null;
     const nodeMint = mints?.find(item => item.isNodeMint)?.url;
     const mint = mints?.some(item => item.url === chosenMint) ? chosenMint : nodeMint ?? mints?.[0]?.url;
 
@@ -461,19 +463,20 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         });
     }
 
-    // The request says what it costs, and nothing here decodes it first, so the
-    // most the user will pay is asked for and Keymaster refuses a request above it.
-    function handlePayRequest() {
-        const max = parseAmount(requestMax);
-        if (!max) {
-            notify.error("Enter the most you will pay, in satoshis");
-            return;
-        }
-        const submitted = request.trim();
+    function handleDecodeRequest() {
+        const reading = request.trim();
+        run("decodeRequest", async () => {
+            setRequestInfo({ request: reading, info: await keymaster.decodeCashuRequest(reading, identity) });
+        });
+    }
+
+    // Pays the request that was shown, for no more than the amount that was shown.
+    function handlePayRequest(shown: { request: string; info: CashuRequestInfo }) {
         run("payRequest", async () => {
             setRequestPaid(null);
-            setRequestPaid(await keymaster.payCashuRequest(submitted, { max, name: identity }));
-            setRequest(current => (current.trim() === submitted ? "" : current));
+            setRequestPaid(await keymaster.payCashuRequest(shown.request, { max: shown.info.amount, name: identity }));
+            setRequestInfo(null);
+            setRequest(current => (current.trim() === shown.request ? "" : current));
         });
     }
 
@@ -844,16 +847,29 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                         disabled={busy.payRequest}
                         onChange={event => {
                             setRequest(event.target.value);
+                            setRequestInfo(null);
                             setRequestPaid(null);
                         }} />
-                    <TextField label="Pay At Most (sats)" type="number" value={requestMax}
-                        helperText="The most the request may ask for. A mint fee can come on top of it."
-                        onChange={event => setRequestMax(event.target.value)}
-                        slotProps={{ htmlInput: { min: 1 } }} size="small" />
-                    <Box>
-                        <ActionButton label="Pay Request" variant="contained" busy={busy.payRequest}
-                            disabled={!request.trim()} onClick={handlePayRequest} />
-                    </Box>
+                    <Row>
+                        <ActionButton label="Decode Request" busy={busy.decodeRequest}
+                            disabled={!request.trim() || busy.payRequest} onClick={handleDecodeRequest} />
+                        {reviewedRequest?.info.mint && (
+                            <ActionButton label="Pay Request" variant="contained" busy={busy.payRequest}
+                                onClick={() => handlePayRequest(reviewedRequest)} />
+                        )}
+                    </Row>
+                    {reviewedRequest && (
+                        <Box>
+                            <Typography variant="body2"><strong>Amount:</strong> {sats(reviewedRequest.info.amount)}, plus any mint fee</Typography>
+                            {reviewedRequest.info.mint
+                                ? <Typography variant="body2" sx={{ wordBreak: "break-all" }}><strong>Paid from:</strong> {reviewedRequest.info.mint}</Typography>
+                                : (
+                                    <Alert severity="warning">
+                                        You have no ecash at a mint this request accepts: {reviewedRequest.info.mints.join(", ")}
+                                    </Alert>
+                                )}
+                        </Box>
+                    )}
                     {requestPaid && (
                         <>
                             <Alert severity="info">

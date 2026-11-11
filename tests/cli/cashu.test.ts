@@ -77,6 +77,8 @@ describe('cashu', () => {
         const [{ url }] = JSON.parse(await archon('list-cashu-mints'));
         const request = new PaymentRequest(undefined, undefined, 30, 'sat', [url], undefined, true);
 
+        expect(JSON.parse(await archon('cashu-decode-request', request.toEncodedCreqA()))).toEqual({ amount: 30, mints: [url], mint: url });
+
         const refused = await archonFails('cashu-pay-request', request.toEncodedCreqA(), '--max', '29');
         expect(refused.stderr).toContain('more than the maximum of 29');
         expect(await balance()).toMatchObject({ spendable: 100, outstanding: 0 });

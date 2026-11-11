@@ -5338,6 +5338,7 @@ describe('Cashu', () => {
         ['listCashuSends', 'post', '/sends', k => k.listCashuSends(mint, 'Alice'), { mint, id: 'Alice' }, { sends: [{ amount: 21 }] }, [{ amount: 21 }]],
         ['reclaimCashu', 'post', '/reclaim', k => k.reclaimCashu('op', 'Alice'), { operationId: 'op', id: 'Alice' }, { amount: 21 }, { amount: 21 }],
         ['sendCashuTo', 'post', '/send-to', k => k.sendCashuTo('Bob', 21, { memo: 'm', locktime: 60, mint, name: 'Alice' }), { recipient: 'Bob', amount: 21, memo: 'm', locktime: 60, mint, id: 'Alice' }, { delivered: true }, { delivered: true }],
+        ['decodeCashuRequest', 'post', '/decode-request', k => k.decodeCashuRequest('creqA', 'Alice'), { request: 'creqA', id: 'Alice' }, { amount: 10, mints: [mint], mint }, { amount: 10, mints: [mint], mint }],
         ['payCashuRequest', 'post', '/pay-request', k => k.payCashuRequest('creqA', { max: 9, name: 'Alice' }), { request: 'creqA', max: 9, id: 'Alice' }, { token: 'cashuB', mint }, { token: 'cashuB', mint }],
         ['listCashuMessages', 'post', '/messages', k => k.listCashuMessages('Alice'), { id: 'Alice' }, { messages: [{ id: '1' }] }, [{ id: '1' }]],
         ['receiveCashuMessages', 'post', '/accept', k => k.receiveCashuMessages('Alice'), { id: 'Alice' }, { redeemed: [], failed: [] }, { redeemed: [], failed: [] }],

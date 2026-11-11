@@ -8,6 +8,7 @@ import {
     CashuMessage,
     CashuPayRequestOptions,
     CashuPayRequestResult,
+    CashuRequestInfo,
     CashuSendToOptions,
     CashuSendToResult,
     CashuCheckResult,
@@ -1040,6 +1041,16 @@ export default class KeymasterClient implements KeymasterInterface {
         const { memo, locktime, mint, name } = options;
         try {
             const response = await this.axios.post(`${this.API}/cashu/send-to`, { recipient, amount, memo, locktime, mint, id: name });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async decodeCashuRequest(request: string, name?: string): Promise<CashuRequestInfo> {
+        try {
+            const response = await this.axios.post(`${this.API}/cashu/decode-request`, { request, id: name });
             return response.data;
         }
         catch (error) {
