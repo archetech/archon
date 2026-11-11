@@ -17,6 +17,7 @@ import { buildProxyBody, proxyHeraldRequest } from './herald-proxy.js';
 import { proxyRequest } from './proxy.js';
 import { cashuProxyHandlers, publicCashuMintUrl } from './cashu-proxy.js';
 import { keymasterCashuPayments, type CashuPayments } from './cashu-payment.js';
+import { DEFAULT_CORS_OPTIONS } from './cors-options.js';
 import { resolveUpstreamUrl } from './upstream-url.js';
 import { isForwardedResponseHeader } from './response-headers.js';
 import { createAuthMiddleware } from './middleware/auth.js';
@@ -168,7 +169,7 @@ async function proxyLightningMediatorRequest(
 async function main() {
     const app = express();
     const v1router = express.Router();
-    const defaultCors = cors();
+    const defaultCors = cors(DEFAULT_CORS_OPTIONS);
     const heraldCors = cors({
         origin: true,
         credentials: true,

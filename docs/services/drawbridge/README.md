@@ -232,7 +232,9 @@ so the upstream Kubo client can stream the request body directly.
 ### 2.5 CORS
 
 - Default routes: `cors()` with permissive defaults (any origin, no
-  credentials).
+  credentials). It exposes the 402 challenge headers `WWW-Authenticate`,
+  `X-Cashu`, `X-L402-Price` and `X-L402-Operation`, so a browser client can
+  read the payment requests from the headers and not only from the body.
 - Herald-bound routes (`/.well-known/*`, `/names/*`): `cors({ origin:
   true, credentials: true })` — required for browser flows that depend
   on session cookies (Herald login, OAuth/OIDC).
