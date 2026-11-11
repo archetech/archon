@@ -291,9 +291,8 @@ export default class Keymaster implements KeymasterInterface {
     // answer with a 402 that this wallet pays (#1596). Paying mutates the
     // wallet, so they do not hold the wallet queue across those calls: they
     // run one at a time on this queue and take the wallet queue only to record
-    // their result. A name createId is creating stays reserved meanwhile.
+    // their result.
     private _identityOps: Promise<unknown> = Promise.resolve();
-    private readonly _reservedNames = new Set<string>();
     // Node capability manifest (`<nodeURL>/api/v1/capabilities`), memoized once a
     // read settles it. `undefined` = not yet settled; `null` = node has no manifest
     // (older node / not a gateway) → callers proceed lazily rather than regress.
@@ -2262,8 +2261,7 @@ export default class Keymaster implements KeymasterInterface {
     validateAlias(
         alias: string,
         wallet?: WalletFile,
-        label: string = 'name',
-        options: { reservedBy?: string } = {}
+        label: string = 'name'
     ) {
         if (typeof alias !== 'string' || !alias.trim()) {
             throw new InvalidParameterError(`${label} must be a non-empty string`);
@@ -2289,12 +2287,6 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError(alreadyUsedError);
         }
 
-        // A name an identity is being created under, unless it is that creation
-        // recording its own result.
-        if (wallet && this._reservedNames.has(alias) && options.reservedBy !== alias) {
-            throw new InvalidParameterError(alreadyUsedError);
-        }
-
         return alias;
     }
 
@@ -2303,27 +2295,20 @@ export default class Keymaster implements KeymasterInterface {
         options: { registry?: string } = {}
     ): Promise<string> {
         return this.enqueueIdentityOp(async () => {
-            const wallet = await this.loadWallet();
-            name = this.validateAlias(name, wallet);
-            const account = wallet.counter;
+            const account = (await this.loadWallet()).counter;
+            const signed = await this.createIdOperation(name, account, options);
+            const did = await this.gatekeeper.createDID(signed);
 
-            this._reservedNames.add(name);
-            try {
-                const signed = await this.signIdOperation(account, options);
-                const did = await this.gatekeeper.createDID(signed);
+            // The name is checked again: something else may have taken it
+            // while the DID was being created.
+            await this.mutateWallet((wallet) => {
+                name = this.validateAlias(name, wallet);
+                setName(wallet.ids, name, { did, account, index: 0 });
+                wallet.counter = Math.max(wallet.counter, account + 1);
+                wallet.current = name;
+            });
 
-                await this.mutateWallet(async (latest) => {
-                    this.validateAlias(name, latest, 'name', { reservedBy: name });
-                    setName(latest.ids, name, { did, account, index: 0 });
-                    latest.counter = Math.max(latest.counter, account + 1);
-                    latest.current = name;
-                });
-
-                return did;
-            }
-            finally {
-                this._reservedNames.delete(name);
-            }
+            return did;
         });
     }
 
@@ -2332,17 +2317,10 @@ export default class Keymaster implements KeymasterInterface {
         account: number = 0,
         options: { registry?: string } = {}
     ): Promise<Operation> {
-        this.validateAlias(name, await this.loadWallet());
-        return this.signIdOperation(account, options);
-    }
-
-    // The signed create operation for the agent at `account`.
-    private async signIdOperation(
-        account: number,
-        options: { registry?: string } = {}
-    ): Promise<Operation> {
         const { registry = this.defaultRegistry } = options;
         const wallet = await this.loadWallet();
+
+        name = this.validateAlias(name, wallet);
 
         const hdkey = await this.getHDKeyFromCacheOrMnemonic(wallet);
         const path = `m/44'/0'/${account}'/0/0`;

@@ -786,20 +786,6 @@ describe('identity operations outside the wallet lock', () => {
         expect((await km.loadWallet()).ids.Robert.index).toBe(1);
     });
 
-    it('keeps the name being created reserved until the identity is recorded', async () => {
-        let attempt: Promise<unknown> | undefined;
-        const km = keymasterWithHook(async (k) => {
-            // Settled here, so the expected refusal is never an unhandled rejection.
-            attempt ??= k.addAlias('Bob', 'did:cid:bagaaieraexample').then(() => 'stored', (error: Error) => error);
-        });
-        await km.newWallet();
-
-        await withinDeadline(km.createId('Bob', { registry: 'local' }));
-
-        expect(String(await attempt)).toContain('already used');
-        expect(await km.getAlias('Bob')).toBeNull();
-    });
-
     it('runs concurrent createIds for one name one at a time, so only one succeeds', async () => {
         const created = jest.spyOn(gatekeeper, 'createDID');
         const km = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher, passphrase: 'passphrase' });

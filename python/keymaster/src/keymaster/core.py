@@ -243,10 +243,8 @@ class Keymaster:
         # create_id and rotate_keys call Gatekeeper, which a paid Drawbridge may
         # answer with a 402 that this wallet pays (#1596). Paying mutates the
         # wallet, so they do not hold _lock across those calls: they run one at
-        # a time under this lock and take _lock only to record their result. A
-        # name create_id is creating stays reserved meanwhile.
+        # a time under this lock and take _lock only to record their result.
         self._identity_lock = asyncio.Lock()
-        self._reserved_names: set[str] = set()
         self.cashu = CashuWallet(self)
         # Node capability manifest (<nodeURL>/api/v1/capabilities), fetched once and
         # memoized. _UNFETCHED until first read; None = node has no manifest (older
@@ -462,13 +460,7 @@ class Keymaster:
     def did_match(self, did1: str, did2: str) -> bool:
         return did1.split(":")[-1] == did2.split(":")[-1]
 
-    def validate_alias(
-        self,
-        alias: str,
-        wallet: dict[str, Any] | None = None,
-        label: str = "name",
-        reserved_by: str | None = None,
-    ) -> str:
+    def validate_alias(self, alias: str, wallet: dict[str, Any] | None = None, label: str = "name") -> str:
         if not isinstance(alias, str) or not alias.strip():
             raise KeymasterError(f"Invalid parameter: {label} must be a non-empty string")
         alias = alias.strip()
@@ -477,10 +469,6 @@ class Keymaster:
         if any(not char.isprintable() for char in alias):
             raise KeymasterError(f"Invalid parameter: {label} contains unprintable characters")
         if wallet and (alias in wallet.get("aliases", {}) or alias in wallet.get("ids", {})):
-            raise KeymasterError(f"Invalid parameter: {label} already used")
-        # A name an identity is being created under, unless it is that creation
-        # recording its own result.
-        if wallet and alias in self._reserved_names and reserved_by != alias:
             raise KeymasterError(f"Invalid parameter: {label} already used")
         return alias
 
@@ -567,14 +555,10 @@ class Keymaster:
         return True
 
     async def create_id_operation(self, name: str, account: int = 0, options: dict[str, Any] | None = None) -> dict[str, Any]:
-        self.validate_alias(name, await self.load_wallet())
-        return await self._sign_id_operation(account, options)
-
-    async def _sign_id_operation(self, account: int, options: dict[str, Any] | None = None) -> dict[str, Any]:
-        """The signed create operation for the agent at ``account``."""
         wallet = await self.load_wallet()
         options = options or {}
         registry = options.get("registry", self.default_registry)
+        self.validate_alias(name, wallet)
         keypair = await self.derive_key_pair(account, 0, wallet)
         block = await self.gatekeeper.get_block(registry)
         operation = {
@@ -593,25 +577,20 @@ class Keymaster:
 
     async def create_id(self, name: str, options: dict[str, Any] | None = None) -> str:
         async with self._identity_lock:
-            wallet = await self.load_wallet()
-            name = self.validate_alias(name, wallet)
-            account = wallet["counter"]
+            account = (await self.load_wallet())["counter"]
+            signed = await self.create_id_operation(name, account, options or {})
+            did = await self.gatekeeper.create_did(signed)
 
-            self._reserved_names.add(name)
-            try:
-                signed = await self._sign_id_operation(account, options or {})
-                did = await self.gatekeeper.create_did(signed)
-
-                async with self._lock:
-                    latest = await self.load_wallet()
-                    self.validate_alias(name, latest, reserved_by=name)
-                    latest["ids"][name] = {"did": did, "account": account, "index": 0}
-                    latest["counter"] = max(latest["counter"], account + 1)
-                    latest["current"] = name
-                    await self._save_loaded_wallet(latest, overwrite=True)
-                return did
-            finally:
-                self._reserved_names.discard(name)
+            # The name is checked again: something else may have taken it while
+            # the DID was being created.
+            async with self._lock:
+                wallet = await self.load_wallet()
+                name = self.validate_alias(name, wallet)
+                wallet["ids"][name] = {"did": did, "account": account, "index": 0}
+                wallet["counter"] = max(wallet["counter"], account + 1)
+                wallet["current"] = name
+                await self._save_loaded_wallet(wallet, overwrite=True)
+            return did
 
     async def remove_id(self, name: str) -> bool:
         async with self._lock:

@@ -199,25 +199,6 @@ def test_rotation_is_recorded_against_the_did_if_the_id_is_renamed_meanwhile(tes
     assert run(km.load_wallet())["ids"]["Robert"]["index"] == 1
 
 
-def test_the_name_being_created_stays_reserved(testbed):
-    km = testbed.keymaster
-    attempts = []
-
-    async def take_name():
-        if not attempts:
-            try:
-                await km.add_alias("Bob", "did:cid:bagaaieraexample")
-                attempts.append("stored")
-            except KeymasterError as error:
-                attempts.append(str(error))
-
-    _hook_writes(testbed, take_name)
-    run(asyncio.wait_for(km.create_id("Bob"), DEADLINE_SECONDS))
-
-    assert "already used" in attempts[0]
-    assert run(km.get_alias("Bob")) is None
-
-
 def test_concurrent_create_ids_for_one_name_create_one_did(testbed):
     km = testbed.keymaster
     calls = []
