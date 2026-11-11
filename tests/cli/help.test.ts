@@ -16,6 +16,7 @@ describe('help', () => {
             'backup-id',
             'bind-credential',
             'cashu-balance',
+            'cashu-decode-request',
             'cashu-mint',
             'cashu-pay-request',
             'cashu-send',

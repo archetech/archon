@@ -1524,13 +1524,23 @@ class CashuWallet:
         amount, mints = cashu_request_terms(request)
         if maximum is not None and amount > maximum:
             raise _invalid(f"request: asks for {amount} sats, more than the maximum of {maximum}")
-        id_info = await self.host.fetch_id_info(options.get("name"), await self.host.load_wallet())
-        held = _mints(id_info)
-        mint = next((url for url in mints if url in held), None)
+        did, mint = await self._request_mint(mints, options.get("name"))
         if mint is None:
             raise CashuMintNotAddedError(mints[0])
         # By DID, so the send comes from the identity whose mints were checked.
-        return {**await self.send_cashu(amount, mint, id_info["did"]), "mint": mint}
+        return {**await self.send_cashu(amount, mint, did), "mint": mint}
+
+    async def decode_cashu_request(self, request: str, name: str | None = None) -> dict[str, Any]:
+        """What pay_cashu_request would pay, without paying it."""
+        amount, mints = cashu_request_terms(request)
+        _, mint = await self._request_mint(mints, name)
+        return {"amount": amount, "mints": mints, **({"mint": mint} if mint is not None else {})}
+
+    async def _request_mint(self, mints: list[str], name: str | None) -> tuple[str, str | None]:
+        """The first of a request's mints the identity has."""
+        id_info = await self.host.fetch_id_info(name, await self.host.load_wallet())
+        held = _mints(id_info)
+        return id_info["did"], next((url for url in mints if url in held), None)
 
     async def send_cashu_to(self, recipient: str, amount: int, options: dict[str, Any] | None = None) -> dict[str, Any]:
         options = options or {}

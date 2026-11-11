@@ -2360,6 +2360,18 @@ program
     });
 
 program
+    .command('cashu-decode-request <request> [id]')
+    .description('Show what a Cashu payment request asks for')
+    .action(async (request, id) => {
+        try {
+            console.log(JSON.stringify(await keymaster.decodeCashuRequest(request, id), null, 4));
+        }
+        catch (error) {
+            fail(error.error || error.message || error);
+        }
+    });
+
+program
     .command('cashu-pay-request <request> [id]')
     .description('Pay a Cashu payment request and print the token')
     .option('--max <sats>', 'refuse a request asking for more than this')

@@ -1546,6 +1546,15 @@ def send_cashu_to(recipient, amount, memo=None, locktime=None, mint=None, id=Non
     return response
 
 
+def decode_cashu_request(request, id=None):
+    response = proxy_request(
+        "POST",
+        f"{_keymaster_api}/cashu/decode-request",
+        json={"request": request, **({"id": id} if id is not None else {})},
+    )
+    return response
+
+
 def pay_cashu_request(request, max=None, id=None):
     optional = {"max": max, "id": id}
     response = proxy_request(

@@ -608,6 +608,46 @@ export function createCashuRouter(options: CreateKeymasterRouterOptions): expres
 
     /**
      * @swagger
+     * /cashu/decode-request:
+     *   post:
+     *     summary: Show what a Cashu payment request asks for, without paying it.
+     *     description: >
+     *       Decodes a NUT-18 payment request as `/cashu/pay-request` would, and refuses
+     *       the same requests. Returns the amount in sats, the mints the request
+     *       accepts, and as `mint` the one of them a payment would come from, which is
+     *       absent when the identity has none of them.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required: [request]
+     *             properties:
+     *               request:
+     *                 type: string
+     *                 description: The payment request.
+     *               id:
+     *                 type: string
+     *                 description: Optional identity name or DID.
+     *     responses:
+     *       200:
+     *         description: The amount, the mints accepted, and the mint a payment would use.
+     *       400:
+     *         description: Invalid request.
+     */
+    router.post('/cashu/decode-request', async (req, res) => {
+        try {
+            const { request, id } = req.body;
+            const result = await getKeymaster().decodeCashuRequest(request, id);
+            res.json(result);
+        } catch (error: any) {
+            sendError(res, error);
+        }
+    });
+
+    /**
+     * @swagger
      * /cashu/pay-request:
      *   post:
      *     summary: Pay a Cashu payment request with a token.

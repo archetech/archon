@@ -1334,6 +1334,24 @@ describe('paying a payment request', () => {
         await expect(keymaster.receiveCashu(paid.token, 'Bob')).resolves.toMatchObject({ amount: 30 });
     });
 
+    it('shows what a request asks for, and the mint it would be paid from, without paying', async () => {
+        await funded();
+
+        await expect(keymaster.decodeCashuRequest(creq(30, [OUTSIDE, `${PUBLIC_URL}/`])))
+            .resolves.toEqual({ amount: 30, mints: [OUTSIDE, PUBLIC_URL], mint: PUBLIC_URL });
+        await expect(keymaster.decodeCashuRequest(creq(30, [OUTSIDE]))).resolves.toEqual({ amount: 30, mints: [OUTSIDE] });
+        await expect(keymaster.decodeCashuRequest('garbage')).rejects.toThrow('Invalid parameter: request');
+        await expect(keymaster.getCashuBalance()).resolves.toMatchObject({ spendable: 100, outstanding: 0 });
+    });
+
+    it('names the mint of the identity asked about', async () => {
+        await funded();
+        await keymaster.createId('Carol');
+
+        await expect(keymaster.decodeCashuRequest(creq(30), 'Bob')).resolves.toMatchObject({ mint: PUBLIC_URL });
+        await expect(keymaster.decodeCashuRequest(creq(30), 'Carol')).resolves.toEqual({ amount: 30, mints: [PUBLIC_URL] });
+    });
+
     it('reads a creqB request', async () => {
         await funded();
         const request = new PaymentRequest(undefined, undefined, 30, 'sat', [PUBLIC_URL]).toEncodedCreqB();

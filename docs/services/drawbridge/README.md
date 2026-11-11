@@ -475,6 +475,7 @@ retries with `X-Cashu: cashuB…`. A Keymaster wallet that has the node mint mak
 that token from the request:
 
 ```sh
+keymaster cashu-decode-request "$request"    # the amount, and the mint it would be paid from
 token=$(keymaster cashu-pay-request "$request" --max 10)
 curl -H "X-Cashu: $token" …
 ```

@@ -1075,6 +1075,10 @@ async def cmd_cashu_send_to(km: Keymaster, args: argparse.Namespace) -> None:
     await _print_cashu_result(km, result, result["mint"], args.id)
 
 
+async def cmd_cashu_decode_request(km: Keymaster, args: argparse.Namespace) -> None:
+    _print_json(await km.decode_cashu_request(args.request, args.id))
+
+
 async def cmd_cashu_pay_request(km: Keymaster, args: argparse.Namespace) -> None:
     options = {"max": None if args.max is None else _parse_sats(args.max), "name": args.id}
     result = await km.pay_cashu_request(args.request, options)
@@ -1826,6 +1830,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("id", nargs="?")
     sp.add_argument("--locktime", help="when the sender can reclaim it: seconds, or 30m, 12h, 7d (default 3d)")
     sp.add_argument("-m", "--mint", help=mint_help)
+    sp = add("cashu-decode-request", "Show what a Cashu payment request asks for", cmd_cashu_decode_request)
+    sp.add_argument("request")
+    sp.add_argument("id", nargs="?")
     sp = add("cashu-pay-request", "Pay a Cashu payment request and print the token", cmd_cashu_pay_request)
     sp.add_argument("request")
     sp.add_argument("id", nargs="?")

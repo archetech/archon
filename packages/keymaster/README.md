@@ -289,6 +289,7 @@ It then uses `ARCHON_NODE_URL` and `ARCHON_PASSPHRASE` during setup, creates the
 | Cashu | `cashu-sends [id] [-m <url>]` | List sent tokens not yet settled |
 | Cashu | `cashu-reclaim <operationId> [id]` | Take back a sent token not yet redeemed, or a locked one after its locktime |
 | Cashu | `cashu-send-to <recipient> <amount> [memo] [id] [--locktime <duration>] [-m <url>]` | Send ecash locked to a DID, over DIDComm |
+| Cashu | `cashu-decode-request <request> [id]` | Show the amount and mints a Cashu payment request asks for |
 | Cashu | `cashu-pay-request <request> [id] [--max <sats>]` | Pay a Cashu payment request, as from an HTTP 402, and print the token |
 | Cashu | `cashu-messages [id]` | List token messages waiting in the DIDComm inbox |
 | Cashu | `cashu-accept [id]` | Redeem the token messages in the DIDComm inbox |

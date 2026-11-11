@@ -11,6 +11,7 @@ import {
     DialogContent,
     DialogContentText,
     DialogTitle,
+    Divider,
     MenuItem,
     Tab,
     Tabs,
@@ -26,7 +27,9 @@ import type {
     CashuMessage,
     CashuMintInfo,
     CashuMintQuote,
+    CashuPayRequestResult,
     CashuQuoteRecord,
+    CashuRequestInfo,
     CashuSendRecord,
     CashuSendResult,
     CashuSendToResult,
@@ -42,6 +45,7 @@ export type CashuKeymaster = Pick<KeymasterInterface,
     | "createCashuMintQuote" | "claimCashuMintQuote" | "listCashuQuotes"
     | "meltCashu" | "sendCashu" | "receiveCashu" | "checkCashu" | "restoreCashu"
     | "listCashuSends" | "reclaimCashu" | "sendCashuTo" | "listCashuMessages" | "receiveCashuMessages"
+    | "decodeCashuRequest" | "payCashuRequest"
     | "getLightningBalance" | "payLightningInvoice" | "decodeLightningInvoice"
 >;
 
@@ -183,6 +187,10 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
     const [decoded, setDecoded] = useState<{ invoice: string; info: DecodedLightningInvoice } | null>(null);
     const [melted, setMelted] = useState<CashuMeltResult | null>(null);
 
+    const [request, setRequest] = useState("");
+    const [requestInfo, setRequestInfo] = useState<{ request: string; info: CashuRequestInfo } | null>(null);
+    const [requestPaid, setRequestPaid] = useState<CashuPayRequestResult | null>(null);
+
     const [sendAmount, setSendAmount] = useState("");
     const [sent, setSent] = useState<CashuSendResult | null>(null);
     const [token, setToken] = useState("");
@@ -199,6 +207,10 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
     // Only the invoice on screen counts as reviewed: a slow decode must not put another
     // invoice's amount beside it, or enable paying it.
     const reviewed = decoded?.invoice === invoice.trim() ? decoded : null;
+    // Likewise for a request, and only while a payment would still come from the mint
+    // shown: adding or removing a mint since the decode can change which one that is.
+    const payingMint = requestInfo?.info.mints.find(url => mints?.some(item => item.url === url));
+    const reviewedRequest = requestInfo?.request === request.trim() && payingMint === requestInfo.info.mint ? requestInfo : null;
     const nodeMint = mints?.find(item => item.isNodeMint)?.url;
     const mint = mints?.some(item => item.url === chosenMint) ? chosenMint : nodeMint ?? mints?.[0]?.url;
 
@@ -451,6 +463,23 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
             } else {
                 notify.error("The mint did not pay that invoice, and your ecash is unspent");
             }
+        });
+    }
+
+    function handleDecodeRequest() {
+        const reading = request.trim();
+        run("decodeRequest", async () => {
+            setRequestInfo({ request: reading, info: await keymaster.decodeCashuRequest(reading, identity) });
+        });
+    }
+
+    // Pays the request that was shown, for no more than the amount that was shown.
+    function handlePayRequest(shown: { request: string; info: CashuRequestInfo }) {
+        run("payRequest", async () => {
+            setRequestPaid(null);
+            setRequestPaid(await keymaster.payCashuRequest(shown.request, { max: shown.info.amount, name: identity }));
+            setRequestInfo(null);
+            setRequest(current => (current.trim() === shown.request ? "" : current));
         });
     }
 
@@ -811,6 +840,48 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                                 </Typography>
                             )}
                         </Box>
+                    )}
+                    <Divider />
+                    <Typography variant="body2">
+                        Or pay a Cashu payment request, such as the one a paid API sends with HTTP 402. It names its own mint.
+                    </Typography>
+                    {/* Held while paying, so the token shown is for the request shown. */}
+                    <TextField label="Payment Request" placeholder="creqA..." value={request} multiline rows={3} size="small"
+                        disabled={busy.payRequest}
+                        onChange={event => {
+                            setRequest(event.target.value);
+                            setRequestInfo(null);
+                            setRequestPaid(null);
+                        }} />
+                    <Row>
+                        <ActionButton label="Decode Request" busy={busy.decodeRequest}
+                            disabled={!request.trim() || busy.payRequest} onClick={handleDecodeRequest} />
+                        {reviewedRequest?.info.mint && (
+                            <ActionButton label="Pay Request" variant="contained" busy={busy.payRequest}
+                                onClick={() => handlePayRequest(reviewedRequest)} />
+                        )}
+                    </Row>
+                    {reviewedRequest && (
+                        <Box>
+                            <Typography variant="body2"><strong>Amount:</strong> {sats(reviewedRequest.info.amount)}, plus any mint fee</Typography>
+                            {reviewedRequest.info.mint
+                                ? <Typography variant="body2" sx={{ wordBreak: "break-all" }}><strong>Paid from:</strong> {reviewedRequest.info.mint}</Typography>
+                                : (
+                                    <Alert severity="warning">
+                                        You have no ecash at a mint this request accepts: {reviewedRequest.info.mints.join(", ")}
+                                    </Alert>
+                                )}
+                        </Box>
+                    )}
+                    {requestPaid && (
+                        <>
+                            <Alert severity="info">
+                                Give this token to whoever sent the request. It is cash: you can reclaim it from Outstanding until they redeem it.
+                                {requestPaid.fee > 0 && ` It includes a fee of ${sats(requestPaid.fee)} for their redemption.`}
+                            </Alert>
+                            <CopyAndQr label={`Token for ${sats(requestPaid.amount)} from ${requestPaid.mint}`} value={requestPaid.token}
+                                onCopy={copied("Token")} onCopyFailed={notify.error} />
+                        </>
                     )}
                 </Stack>
             )}
