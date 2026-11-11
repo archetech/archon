@@ -4,15 +4,23 @@ import type { LightningInvoice, LightningPaymentResult, PendingInvoiceData } fro
 
 const ARCHON_ADMIN_HEADER = 'X-Archon-Admin-Key';
 
+// A 402 challenge waits on the mediator for its invoice, so a mediator that
+// accepts the connection but never answers must not hold challenges open: past
+// this deadline Lightning counts as unavailable and Cashu can be offered alone.
+export const LIGHTNING_MEDIATOR_TIMEOUT_MS = 10_000;
+
 async function requestLightningMediator<T>(
     baseUrl: string,
     path: string,
-    options: RequestInit
+    options: RequestInit,
+    timeoutMs = LIGHTNING_MEDIATOR_TIMEOUT_MS
 ): Promise<T> {
     let response: Response;
     try {
         response = await fetch(new URL(path, baseUrl), {
             ...options,
+            // Covers reading the body as well as waiting for the headers.
+            signal: AbortSignal.timeout(timeoutMs),
             headers: {
                 'Content-Type': 'application/json',
                 ...(config.adminApiKey ? { [ARCHON_ADMIN_HEADER]: config.adminApiKey } : {}),

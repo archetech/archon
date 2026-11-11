@@ -49,6 +49,19 @@ describe('lightning mediator client requests', () => {
         await expect(createL402Invoice(baseUrl, 100, 'memo')).rejects.toThrow(LightningUnavailableError);
     });
 
+    it('gives every request a deadline, and reports one that expires as Lightning unavailable', async () => {
+        const fetchMock = mockFetch({ json: async () => ({ paid: true }) });
+        await checkL402Invoice(baseUrl, 'ab');
+        const signal = (fetchMock.mock.calls[0] as any[])[1].signal as AbortSignal;
+        expect(signal).toBeInstanceOf(AbortSignal);
+        expect(signal.aborted).toBe(false);
+
+        global.fetch = jest.fn<any>().mockRejectedValue(
+            new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+        ) as any;
+        await expect(createL402Invoice(baseUrl, 100, 'memo')).rejects.toThrow(LightningUnavailableError);
+    });
+
     it('posts a payment check', async () => {
         const fetchMock = mockFetch({ json: async () => ({ paid: true }) });
 

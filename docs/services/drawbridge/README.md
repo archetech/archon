@@ -361,15 +361,21 @@ Drawbridge implements a slight variant compatible with
 When auth fails on a protected route, Drawbridge:
 
 1. Determines the operation key (e.g. `resolveDID`, `getDIDs`) by
-   matching the route to the pricing config (see [§5](#5-pricing)).
+   matching the route's full path, `/api/v1/...`, to the pricing config
+   (see [§5](#5-pricing)).
 2. Looks up the price (in sats) for that operation, falling back to
    `ARCHON_DRAWBRIDGE_DEFAULT_PRICE_SATS` (default 10).
 3. Asks the Lightning mediator's `POST /api/v1/l402/invoice` to create
-   a CLN invoice for that amount.
+   a CLN invoice for that amount. The mediator gets 10 seconds; past that,
+   Lightning counts as unavailable, and a challenge can offer Cashu alone
+   ([§4.5](#45-cashu-payment-nut-24)).
 4. Generates a fresh macaroon ID (16 random bytes hex) and builds a
    macaroon with these caveats:
    - `did = <header X-DID or empty>`
-   - `scope = <operation key>`
+   - `scope =` the operation key for a priced operation, with one use. A
+     default-priced pass covers the default scopes (`resolveDID`,
+     `getDIDs`, `listRegistries`, `searchDIDs`) and always the operation
+     it was bought for, with no use limit until expiry.
    - `expiry = <now + ARCHON_DRAWBRIDGE_INVOICE_EXPIRY seconds>` (default 3600)
    - `payment_hash = <invoice payment hash>`
 5. Persists the pending macaroon record via `POST /api/v1/l402/pending`

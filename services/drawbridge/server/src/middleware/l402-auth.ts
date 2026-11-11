@@ -41,6 +41,13 @@ const UNPROTECTED_PREFIXES = ['/l402/'];
 // GET-only prefixes: read operations that should be publicly accessible
 const UNPROTECTED_GET_PREFIXES = ['/did/', '/ipfs/'];
 
+// The request's path from the application root. The paywall runs inside the
+// router mounted at /api/v1, where req.path is relative to the mount, while the
+// route-scope map and pricing name full paths.
+function routePath(req: Request): string {
+    return `${req.baseUrl ?? ''}${req.path}`;
+}
+
 function isProtectedRoute(method: string, path: string): boolean {
     const basePath = path.replace(/^\/api\/v1/, '');
     if (UNPROTECTED_PATHS.includes(basePath)) return false;
@@ -68,7 +75,7 @@ function parseL402Header(authHeader: string): { macaroon: string; proof: string 
 
 export function createL402Middleware(options: L402Options): RequestHandler {
     return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-        const path = req.path;
+        const path = routePath(req);
 
         if (!isProtectedRoute(req.method, path)) {
             next();
@@ -156,7 +163,7 @@ async function handleMacaroonAuth(
     res: Response,
     next: NextFunction
 ): Promise<void> {
-    const scope = routeToScope(req.method, req.path);
+    const scope = routeToScope(req.method, routePath(req));
     const did = req.headers['x-did'] as string | undefined;
 
     const caveats = extractCaveats(l402.macaroon);
@@ -218,9 +225,9 @@ async function handleMacaroonAuth(
 // The price of this request, and the priced operation it is, if any.
 function priceFor(options: L402Options, req: Request): { amountSat: number; operationName?: string } {
     if (options.pricing) {
-        const price = getPriceForOperation(options.pricing, req.method, req.path);
+        const price = getPriceForOperation(options.pricing, req.method, routePath(req));
         if (price) {
-            return { amountSat: price.amountSat, operationName: routeToScope(req.method, req.path) };
+            return { amountSat: price.amountSat, operationName: routeToScope(req.method, routePath(req)) };
         }
     }
     return { amountSat: options.defaults.amountSat };
@@ -273,7 +280,7 @@ async function handleCashuPayment(
         amountSat: received,
         createdAt: now,
         macaroonId: '',
-        scope: [operationName ?? routeToScope(req.method, req.path)],
+        scope: [operationName ?? routeToScope(req.method, routePath(req))],
     });
 
     options.hooks?.onCashuPayment?.();
@@ -300,7 +307,7 @@ async function handleChallenge(
         throw new RateLimitExceededError();
     }
 
-    const scope = routeToScope(req.method, req.path);
+    const scope = routeToScope(req.method, routePath(req));
     const { amountSat, operationName } = priceFor(options, req);
 
     // Each method is offered only when it can work now. Lightning needs the
@@ -377,7 +384,9 @@ async function createLightningChallenge(
 
     const caveatSet: L402CaveatSet = {
         did: did || undefined,
-        scope: operationName ? [scope] : options.defaults.scopes,
+        // A default-priced pass covers the default scopes and, always, the
+        // request it was bought for.
+        scope: operationName ? [scope] : [...new Set([...options.defaults.scopes, scope])],
         expiry: expiryTime,
         maxUses,
         paymentHash: invoice.paymentHash,
