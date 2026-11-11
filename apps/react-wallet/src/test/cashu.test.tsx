@@ -709,6 +709,27 @@ describe('Cashu view: paying a payment request', () => {
         expect((screen.getByLabelText(/^Payment Request/) as HTMLTextAreaElement).value).toBe('');
     });
 
+    it('holds the request while it is being paid, so the token shown is for the request shown', async () => {
+        const payment = deferred();
+        keymaster.payCashuRequest.mockReturnValue(payment.promise);
+        view();
+        const user = await open('Pay');
+        await user.type(screen.getByLabelText(/^Payment Request/), 'creqAabc');
+        await user.type(screen.getByLabelText(/^Pay At Most/), '12');
+        await user.click(screen.getByRole('button', { name: 'Pay Request' }));
+
+        await waitFor(() => expect((screen.getByLabelText(/^Payment Request/) as HTMLTextAreaElement).disabled).toBe(true));
+        await act(async () => payment.finish(paid));
+        await waitFor(() => expect((screen.getByLabelText(/^Payment Request/) as HTMLTextAreaElement).disabled).toBe(false));
+    });
+
+    it('says that the maximum does not include a mint fee', async () => {
+        view();
+        await open('Pay');
+
+        expect(screen.getByText('The most the request may ask for. A mint fee can come on top of it.')).toBeTruthy();
+    });
+
     it('does not pay without a maximum', async () => {
         view();
         const user = await open('Pay');

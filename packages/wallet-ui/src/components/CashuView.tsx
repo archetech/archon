@@ -839,12 +839,15 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
                     <Typography variant="body2">
                         Or pay a Cashu payment request, such as the one a paid API sends with HTTP 402. It names its own mint.
                     </Typography>
+                    {/* Held while paying, so the token shown is for the request shown. */}
                     <TextField label="Payment Request" placeholder="creqA..." value={request} multiline rows={3} size="small"
+                        disabled={busy.payRequest}
                         onChange={event => {
                             setRequest(event.target.value);
                             setRequestPaid(null);
                         }} />
                     <TextField label="Pay At Most (sats)" type="number" value={requestMax}
+                        helperText="The most the request may ask for. A mint fee can come on top of it."
                         onChange={event => setRequestMax(event.target.value)}
                         slotProps={{ htmlInput: { min: 1 } }} size="small" />
                     <Box>
