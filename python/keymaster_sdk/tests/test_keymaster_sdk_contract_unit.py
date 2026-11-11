@@ -444,6 +444,7 @@ def test_cashu_wrappers_forward_expected_requests(monkeypatch):
         ("POST", "/cashu/sends"): {"sends": [{"amount": 21}]},
         ("POST", "/cashu/reclaim"): {"amount": 21},
         ("POST", "/cashu/send-to"): {"token": "cashuB", "delivered": True},
+        ("POST", "/cashu/pay-request"): {"token": "cashuB", "mint": "m"},
         ("POST", "/cashu/messages"): {"messages": [{"id": "1"}]},
         ("POST", "/cashu/accept"): {"redeemed": [], "failed": []},
     }
@@ -473,6 +474,7 @@ def test_cashu_wrappers_forward_expected_requests(monkeypatch):
     assert sdk.list_cashu_sends("m", "A") == [{"amount": 21}]
     assert sdk.reclaim_cashu("op", "A") == {"amount": 21}
     assert sdk.send_cashu_to("B", 21, "m", 60, "url", "A") == {"token": "cashuB", "delivered": True}
+    assert sdk.pay_cashu_request("creqA", 9, "A") == {"token": "cashuB", "mint": "m"}
     assert sdk.list_cashu_messages("A") == [{"id": "1"}]
     assert sdk.receive_cashu_messages("A") == {"redeemed": [], "failed": []}
 
@@ -494,6 +496,7 @@ def test_cashu_wrappers_forward_expected_requests(monkeypatch):
         ("POST", "/cashu/sends", {"mint": "m", "id": "A"}),
         ("POST", "/cashu/reclaim", {"operationId": "op", "id": "A"}),
         ("POST", "/cashu/send-to", {"recipient": "B", "amount": 21, "memo": "m", "locktime": 60, "mint": "url", "id": "A"}),
+        ("POST", "/cashu/pay-request", {"request": "creqA", "max": 9, "id": "A"}),
         ("POST", "/cashu/messages", {"id": "A"}),
         ("POST", "/cashu/accept", {"id": "A"}),
     ]

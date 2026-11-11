@@ -17,7 +17,7 @@ import {
     verifyMintQuoteSignature,
     hasP2PKSignedProof,
 } from '@cashu/cashu-ts';
-import { normalizeMintUrl, p2pkLock, proofY } from '../../packages/keymaster/src/cashu.ts';
+import { cashuRequestTerms, normalizeMintUrl, p2pkLock, proofY } from '../../packages/keymaster/src/cashu.ts';
 import { CashuMintUnsupportedError } from '@didcid/common/errors';
 
 // The same two files drive python/keymaster/tests/test_cashu_vectors.py. The NUT
@@ -167,5 +167,23 @@ describe('NUT-11 vectors', () => {
 
     it('refuses a spending condition it does not implement', () => {
         expect(() => p2pkLock(p2pk.unsupported)).toThrow(CashuMintUnsupportedError);
+    });
+});
+
+// cashu-ts's encodings of NUT-18 requests, from
+// tests/keymaster/generate-cashu-request-vectors.mjs, with what a payment makes of each.
+describe('payment request vectors', () => {
+    const requests = JSON.parse(readFileSync('tests/fixtures/cashu-request-vectors.json', 'utf-8'));
+
+    it.each(requests.accepted as any[])('reads $name', ({ request, amount, mints }) => {
+        expect(cashuRequestTerms(request)).toEqual({ amount, mints });
+    });
+
+    it.each(requests.refused as any[])('refuses $name', ({ request, error }) => {
+        expect(() => cashuRequestTerms(request)).toThrow(new RegExp(`^Invalid parameter: ${error}$`));
+    });
+
+    it('refuses a request that is not a string', () => {
+        expect(() => cashuRequestTerms(undefined as never)).toThrow('Invalid parameter: request');
     });
 });

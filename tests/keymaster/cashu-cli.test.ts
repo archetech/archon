@@ -69,6 +69,7 @@ beforeEach(() => {
         '/cashu/claim': () => ({ body: { amount: 21, mint: MINT } }),
         '/cashu/balance': () => ({ body: { spendable: 21, inFlight: 0, outstanding: 0 } }),
         '/cashu/send': () => ({ body: { token: 'cashuBtoken', amount: 21, fee: 1, operationId: 'op-1' } }),
+        '/cashu/pay-request': () => ({ body: { token: 'cashuBpaid', amount: 10, fee: 1, operationId: 'op-2', mint: 'https://mint.example/cashu' } }),
     };
 });
 
@@ -190,6 +191,43 @@ describe('cashu-send', () => {
         expect(status).toBe(0);
         expect(stdout).toBe('cashuBtoken');
         expect(stderr).not.toContain('Balance');
+    });
+});
+
+describe('cashu-pay-request', () => {
+    it('prints only the token on stdout', async () => {
+        const { status, stdout, stderr } = await run('cashu-pay-request', 'creqAabc');
+
+        expect(status).toBe(0);
+        expect(stdout).toBe('cashuBpaid');
+        expect(stderr).toContain('Paid 10 sats from https://mint.example/cashu, fee 1, operation op-2');
+    });
+
+    it('passes the request, the maximum and the identity', async () => {
+        let sent: unknown;
+        routes['/cashu/pay-request'] = (body: unknown) => {
+            sent = body;
+            return { body: { token: 'cashuBpaid', amount: 10, fee: 0, operationId: 'op-2', mint: 'https://mint.example/cashu' } };
+        };
+
+        const { status } = await run('cashu-pay-request', 'creqAabc', 'Bob', '--max', '12');
+
+        expect(status).toBe(0);
+        expect(sent).toEqual({ request: 'creqAabc', max: 12, id: 'Bob' });
+    });
+
+    it.each(['0', '1.5', 'ten'])('refuses the maximum %s without paying', async (max) => {
+        let called = false;
+        routes['/cashu/pay-request'] = () => {
+            called = true;
+            return { body: {} };
+        };
+
+        const { status, stderr } = await run('cashu-pay-request', 'creqAabc', '--max', max);
+
+        expect(status).toBe(1);
+        expect(stderr).toContain('positive whole number of sats');
+        expect(called).toBe(false);
     });
 });
 

@@ -112,6 +112,35 @@ def _invalid(what: str) -> KeymasterError:
     return KeymasterError(f"Invalid parameter: {what}")
 
 
+def cashu_request_terms(request: Any) -> tuple[int, list[str]]:
+    """The amount and mints a NUT-18 payment request asks for, if send_cashu can pay it:
+    an amount in sats, from a listed mint, as an unlocked token."""
+    if not isinstance(request, str) or not request:
+        raise _invalid("request")
+    try:
+        asked = cc.decode_payment_request(request)
+    except cc.CashuTokenError as exc:
+        raise _invalid("request") from exc
+    if asked.get("u") != UNIT:
+        raise _invalid("request: the unit is not sat")
+    amount = asked.get("a")
+    if isinstance(amount, bool) or not isinstance(amount, int) or amount <= 0 or amount > 2**53 - 1:
+        raise _invalid("request: names no amount")
+    if "nut10" in asked:
+        raise _invalid("request: asks for a locked token")
+    mints = []
+    listed = asked.get("m")
+    for mint in listed if isinstance(listed, list) else []:
+        try:
+            mints.append(normalize_mint_url(mint))
+        except KeymasterError:
+            # A mint that cannot be named is one the identity cannot hold.
+            pass
+    if not mints:
+        raise _invalid("request: names no mint")
+    return amount, mints
+
+
 def normalize_mint_url(url: str) -> str:
     if not isinstance(url, str):
         raise _invalid("mint url")
@@ -1481,6 +1510,22 @@ class CashuWallet:
             if datetime.fromisoformat(seen.replace("Z", "+00:00")).timestamp() < cutoff:
                 del inbox[known]
         inbox[key] = _now()
+
+    async def pay_cashu_request(self, request: str, options: dict[str, Any] | None = None) -> dict[str, Any]:
+        options = options or {}
+        maximum = options.get("max")
+        if maximum is not None and (isinstance(maximum, bool) or not isinstance(maximum, int) or maximum <= 0 or maximum > 2**53 - 1):
+            raise _invalid("max")
+        amount, mints = cashu_request_terms(request)
+        if maximum is not None and amount > maximum:
+            raise _invalid(f"request: asks for {amount} sats, more than the maximum of {maximum}")
+        id_info = await self.host.fetch_id_info(options.get("name"), await self.host.load_wallet())
+        held = _mints(id_info)
+        mint = next((url for url in mints if url in held), None)
+        if mint is None:
+            raise CashuMintNotAddedError(mints[0])
+        # By DID, so the send comes from the identity whose mints were checked.
+        return {**await self.send_cashu(amount, mint, id_info["did"]), "mint": mint}
 
     async def send_cashu_to(self, recipient: str, amount: int, options: dict[str, Any] | None = None) -> dict[str, Any]:
         options = options or {}

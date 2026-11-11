@@ -485,6 +485,16 @@ export interface CashuSendToOptions {
     name?: string;
 }
 
+export interface CashuPayRequestOptions {
+    // The most the request may ask for, in sats. A request asking for more is refused.
+    max?: number;
+    name?: string;
+}
+
+export interface CashuPayRequestResult extends CashuSendResult {
+    mint: string;
+}
+
 export interface CashuSendToResult extends CashuSendResult {
     mint: string;
     recipient: string;
@@ -762,6 +772,7 @@ export interface KeymasterInterface {
     listCashuSends(mint?: string, name?: string): Promise<CashuSendRecord[]>;
     reclaimCashu(operationId: string, name?: string): Promise<CashuReclaimResult>;
     sendCashuTo(recipient: string, amount: number, options?: CashuSendToOptions): Promise<CashuSendToResult>;
+    payCashuRequest(request: string, options?: CashuPayRequestOptions): Promise<CashuPayRequestResult>;
     listCashuMessages(name?: string): Promise<CashuMessage[]>;
     receiveCashuMessages(name?: string): Promise<CashuAcceptResult>;
 

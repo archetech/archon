@@ -516,6 +516,11 @@ async def send_cashu_to(body: CashuBody) -> dict[str, Any]:
     return await service.send_cashu_to(body.get("recipient"), body.get("amount"), options)
 
 
+@protected_api.post("/cashu/pay-request")
+async def pay_cashu_request(body: CashuBody) -> dict[str, Any]:
+    return await service.pay_cashu_request(body.get("request"), {"max": body.get("max"), "name": body.get("id")})
+
+
 @protected_api.post("/cashu/messages")
 async def list_cashu_messages(body: CashuBody) -> dict[str, Any]:
     return {"messages": await service.list_cashu_messages(body.get("id"))}

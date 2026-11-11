@@ -1075,6 +1075,17 @@ async def cmd_cashu_send_to(km: Keymaster, args: argparse.Namespace) -> None:
     await _print_cashu_result(km, result, result["mint"], args.id)
 
 
+async def cmd_cashu_pay_request(km: Keymaster, args: argparse.Namespace) -> None:
+    options = {"max": None if args.max is None else _parse_sats(args.max), "name": args.id}
+    result = await km.pay_cashu_request(args.request, options)
+    # The token alone on stdout, so it can be piped.
+    print(result["token"], flush=True)
+    print(
+        f"Paid {result['amount']} sats from {result['mint']}, fee {result['fee']}, operation {result['operationId']}",
+        file=sys.stderr,
+    )
+
+
 async def cmd_cashu_messages(km: Keymaster, args: argparse.Namespace) -> None:
     _print_json(await km.list_cashu_messages(args.id))
 
@@ -1815,6 +1826,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("id", nargs="?")
     sp.add_argument("--locktime", help="when the sender can reclaim it: seconds, or 30m, 12h, 7d (default 3d)")
     sp.add_argument("-m", "--mint", help=mint_help)
+    sp = add("cashu-pay-request", "Pay a Cashu payment request and print the token", cmd_cashu_pay_request)
+    sp.add_argument("request")
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("--max", help="refuse a request asking for more than this")
     sp = add("cashu-messages", "List token messages waiting in the DIDComm inbox", cmd_cashu_messages)
     sp.add_argument("id", nargs="?")
     sp = add("cashu-accept", "Redeem the token messages in the DIDComm inbox", cmd_cashu_accept)
