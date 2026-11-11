@@ -616,7 +616,8 @@ export function createCashuRouter(options: CreateKeymasterRouterOptions): expres
      *       token for the amount it asks, from the first mint it lists that the identity
      *       has. The caller delivers the token, as in the `X-Cashu` header of a request
      *       that was answered with HTTP 402 (NUT-24). A request in another unit, without
-     *       an amount or a mint list, or asking for a locked token is refused.
+     *       an amount or a mint list, or asking for a locked token or for particular
+     *       payment methods is refused.
      *     requestBody:
      *       required: true
      *       content:

@@ -136,7 +136,8 @@ export interface CashuRequestTerms {
 }
 
 // What a NUT-18 payment request asks for, if sendCashu can pay it: an amount in
-// sats, from a listed mint, as an unlocked token. Accepts creqA and creqB (NUT-26).
+// sats, from a listed mint, as an unlocked token, whatever the mint's melt methods.
+// Accepts creqA and creqB (NUT-26).
 export function cashuRequestTerms(request: string): CashuRequestTerms {
     if (typeof request !== 'string' || !request) {
         throw new InvalidParameterError('request');
@@ -158,8 +159,14 @@ export function cashuRequestTerms(request: string): CashuRequestTerms {
     if (asked.nut10) {
         throw new InvalidParameterError('request: asks for a locked token');
     }
+    // NUT-18 has such a request paid only from a mint that melts by one of the
+    // methods, which is not checked here.
+    if (asked.supportedMethods?.length) {
+        throw new InvalidParameterError('request: asks for particular payment methods');
+    }
     const mints: string[] = [];
-    for (const mint of asked.mints ?? []) {
+    // cashu-ts passes the list through as it was encoded, whatever its type.
+    for (const mint of Array.isArray(asked.mints) ? asked.mints : []) {
         try {
             mints.push(normalizeMintUrl(mint));
         }

@@ -6,14 +6,24 @@
 
 import { writeFileSync } from 'node:fs';
 import { PaymentRequest } from '@cashu/cashu-ts';
+import { bech32m } from '@scure/base';
 
 const MINT = 'https://mint.example/cashu';
 const OTHER = 'https://other.example';
 
 // A field given as null is left out of the request.
-function request({ amount = 10, unit = 'sat', mints = [MINT], nut10, preferred, transport } = {}) {
-    return new PaymentRequest(transport, 'demo', amount ?? undefined, unit, mints ?? undefined, 'A priced call', true, nut10, preferred);
+function request({ amount = 10, unit = 'sat', mints = [MINT], nut10, preferred, transport, methods } = {}) {
+    return new PaymentRequest(transport, 'demo', amount ?? undefined, unit, mints ?? undefined, 'A priced call', true, nut10, preferred, methods);
 }
+
+// A creqB from NUT-26 fields given as [tag, bytes], for requests cashu-ts will not encode.
+function creqBOf(fields) {
+    const bytes = fields.flatMap(([tag, value]) => [tag, value.length >> 8, value.length & 0xff, ...value]);
+    return bech32m.encode('creqb', bech32m.toWords(Uint8Array.from(bytes)), 1023).toUpperCase();
+}
+
+const u64 = value => [0, 0, 0, 0, 0, 0, 0, value];
+const mintField = [0x05, [...new TextEncoder().encode(MINT)]];
 
 const plain = request();
 const creqB = plain.toEncodedCreqB();
@@ -47,6 +57,8 @@ const accepted = [
         request: request({ mints: ['not a url', MINT] }).toEncodedCreqA(),
     },
     { name: 'an advisory mint list', request: request({ preferred: true }).toEncodedCreqB() },
+    { name: 'an empty list of payment methods', request: request({ methods: [] }).toEncodedCreqA() },
+    { name: 'fields in another order', request: creqBOf([mintField, [0x03, [0]], [0x02, u64(10)]]) },
     {
         name: 'a transport',
         request: request({ transport: [{ type: 'post', target: 'https://pay.example/callback' }] }).toEncodedCreqA(),
@@ -70,6 +82,19 @@ const refused = [
     { name: 'no mint list, creqA', request: request({ mints: null }).toEncodedCreqA(), error: 'request: names no mint' },
     { name: 'no mint list, creqB', request: request({ mints: null }).toEncodedCreqB(), error: 'request: names no mint' },
     { name: 'only an unusable mint', request: request({ mints: ['not a url'] }).toEncodedCreqA(), error: 'request: names no mint' },
+    { name: 'a mint list that is not a list', request: request({ mints: 42 }).toEncodedCreqA(), error: 'request: names no mint' },
+    {
+        name: 'payment methods, creqA',
+        request: request({ methods: [{ method: 'bolt12' }] }).toEncodedCreqA(),
+        error: 'request: asks for particular payment methods',
+    },
+    {
+        name: 'payment methods, creqB',
+        request: request({ methods: [{ method: 'bolt12' }] }).toEncodedCreqB(),
+        error: 'request: asks for particular payment methods',
+    },
+    { name: 'two amounts', request: creqBOf([[0x02, u64(30)], [0x02, u64(1)], [0x03, [0]], mintField]), error: 'request' },
+    { name: 'two units', request: creqBOf([[0x02, u64(30)], [0x03, [0]], [0x03, [0]], mintField]), error: 'request' },
 ];
 
 writeFileSync('tests/fixtures/cashu-request-vectors.json', JSON.stringify({ accepted, refused }, null, 4) + '\n');

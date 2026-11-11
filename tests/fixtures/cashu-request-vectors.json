@@ -83,6 +83,22 @@
             ]
         },
         {
+            "name": "an empty list of payment methods",
+            "request": "creqApmFpZGRlbW9hYQphdWNzYXRhbYF4Gmh0dHBzOi8vbWludC5leGFtcGxlL2Nhc2h1YWRtQSBwcmljZWQgY2FsbGFz9Q==",
+            "amount": 10,
+            "mints": [
+                "https://mint.example/cashu"
+            ]
+        },
+        {
+            "name": "fields in another order",
+            "request": "CREQB1Q5QP56R5W3C8XW309AKKJMN59EJHSCTDWPKX2TMRV9EKSAGRQQQSQQSQPQQQQQQQQQQQQZSD2PG7Y",
+            "amount": 10,
+            "mints": [
+                "https://mint.example/cashu"
+            ]
+        },
+        {
             "name": "a transport",
             "request": "creqAp2F0gaNhdGRwb3N0YWF4HGh0dHBzOi8vcGF5LmV4YW1wbGUvY2FsbGJhY2thZ_dhaWRkZW1vYWEKYXVjc2F0YW2BeBpodHRwczovL21pbnQuZXhhbXBsZS9jYXNodWFkbUEgcHJpY2VkIGNhbGxhc_U=",
             "amount": 10,
@@ -161,6 +177,31 @@
             "name": "only an unusable mint",
             "request": "creqApmFpZGRlbW9hYQphdWNzYXRhbYFpbm90IGEgdXJsYWRtQSBwcmljZWQgY2FsbGFz9Q==",
             "error": "request: names no mint"
+        },
+        {
+            "name": "a mint list that is not a list",
+            "request": "creqApmFpZGRlbW9hYQphdWNzYXRhbRgqYWRtQSBwcmljZWQgY2FsbGFz9Q==",
+            "error": "request: names no mint"
+        },
+        {
+            "name": "payment methods, creqA",
+            "request": "creqAp2FpZGRlbW9hYQphdWNzYXRhbYF4Gmh0dHBzOi8vbWludC5leGFtcGxlL2Nhc2h1YWRtQSBwcmljZWQgY2FsbGFz9WJzbYGhYm1uZmJvbHQxMg==",
+            "error": "request: asks for particular payment methods"
+        },
+        {
+            "name": "payment methods, creqB",
+            "request": "CREQB1QYQQGER9D4HSYQQGQQQQQQQQQQQQ5QCQQYQQGQQPQYZSQXNGW368QUE69UHK66TWWSHX27RPD4CXCEF0VDSHX6R4QCQQ6SFQWPEXJCM9VSSXXCTVDS9QQZGPQQRXYMMVWSCNYFW7LFU",
+            "error": "request: asks for particular payment methods"
+        },
+        {
+            "name": "two amounts",
+            "request": "CREQB1QGQQSQQQQQQQQQQQRCPQQZQQQQQQQQQQQQQSXQQPQQZSQXNGW368QUE69UHK66TWWSHX27RPD4CXCEF0VDSHX6R4QPSYY7",
+            "error": "request"
+        },
+        {
+            "name": "two units",
+            "request": "CREQB1QGQQSQQQQQQQQQQQRCPSQQGQQVQQZQQ9QQDXSAR5WPEN5TE0D45KUAPWV4UXZMTSD3JJ7CMPWD582C6Z974",
+            "error": "request"
         }
     ]
 }

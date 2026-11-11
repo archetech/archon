@@ -114,7 +114,8 @@ def _invalid(what: str) -> KeymasterError:
 
 def cashu_request_terms(request: Any) -> tuple[int, list[str]]:
     """The amount and mints a NUT-18 payment request asks for, if send_cashu can pay it:
-    an amount in sats, from a listed mint, as an unlocked token."""
+    an amount in sats, from a listed mint, as an unlocked token, whatever the mint's
+    melt methods."""
     if not isinstance(request, str) or not request:
         raise _invalid("request")
     try:
@@ -128,6 +129,10 @@ def cashu_request_terms(request: Any) -> tuple[int, list[str]]:
         raise _invalid("request: names no amount")
     if "nut10" in asked:
         raise _invalid("request: asks for a locked token")
+    # NUT-18 has such a request paid only from a mint that melts by one of the
+    # methods, which is not checked here.
+    if asked.get("sm"):
+        raise _invalid("request: asks for particular payment methods")
     mints = []
     listed = asked.get("m")
     for mint in listed if isinstance(listed, list) else []:

@@ -449,10 +449,20 @@ def _tlv_fields(data: bytes) -> list[tuple[int, bytes]]:
     return fields
 
 
+# The NUT-26 tags a request carries at most once: id, amount, unit, single use,
+# description, lock and mint preference.
+_REQUEST_SINGLE_TAGS = frozenset({0x01, 0x02, 0x03, 0x04, 0x06, 0x08, 0x09})
+
+
 def _decode_request_tlv(data: bytes) -> dict[str, Any]:
     request: dict[str, Any] = {}
+    seen: set[int] = set()
     try:
         for tag, value in _tlv_fields(data):
+            if tag in _REQUEST_SINGLE_TAGS:
+                if tag in seen:
+                    raise CashuTokenError("Invalid payment request")
+                seen.add(tag)
             if tag == 0x02:
                 if len(value) != 8:
                     raise CashuTokenError("Invalid payment request")
@@ -463,16 +473,19 @@ def _decode_request_tlv(data: bytes) -> dict[str, Any]:
                 request.setdefault("m", []).append(value.decode("utf-8"))
             elif tag == 0x08:
                 request["nut10"] = True
+            elif tag == 0x0A:
+                request["sm"] = True
     except UnicodeDecodeError as exc:
         raise CashuTokenError("Invalid payment request") from exc
     return request
 
 
 def decode_payment_request(request: str) -> dict[str, Any]:
-    """The amount, unit, mints and lock of a NUT-18 request, from creqA or creqB (NUT-26).
+    """The amount, unit, mints, lock and payment methods of a NUT-18 request, from creqA
+    or creqB (NUT-26).
 
-    Keyed as in NUT-18: `a`, `u`, `m` and `nut10`, each present only if the request
-    has it. Other fields are not read.
+    Keyed as in NUT-18: `a`, `u`, `m`, `nut10` and `sm`, each present only if the
+    request has it. Other fields are not read.
     """
     if not isinstance(request, str):
         raise CashuTokenError("Invalid payment request")
@@ -487,5 +500,5 @@ def decode_payment_request(request: str) -> dict[str, Any]:
         raise CashuTokenError("Invalid payment request") from exc
     if not isinstance(decoded, dict):
         raise CashuTokenError("Invalid payment request")
-    return {key: decoded[key] for key in ("a", "u", "m", "nut10") if decoded.get(key) is not None}
+    return {key: decoded[key] for key in ("a", "u", "m", "nut10", "sm") if decoded.get(key) is not None}
 
