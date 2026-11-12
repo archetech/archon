@@ -6,6 +6,7 @@ import { AssertionError, verifyAssertion } from './assertions.js';
 import {
     SCOPES,
     authorizationServerMetadata,
+    currentScopes,
     endpoints,
     poppyDocument,
     protectedResourceMetadata,
@@ -279,7 +280,10 @@ export function createPoppy(options: PoppyOptions): Poppy {
     }
 
     // Completes a sign-in: a refresh token and a first access token (4.7).
-    async function completeSignIn(agent: Agent, did: string, scope: string[], jkt: string) {
+    async function completeSignIn(agent: Agent, did: string, granted: string[], jkt: string) {
+        // A sign-in approved before the scopes were renamed is still pending
+        // for a few minutes after an upgrade.
+        const scope = currentScopes(granted);
         const refreshToken = randomSecret('prt_');
         const grant: Grant = {
             id: randomSecret('grt_', 16),

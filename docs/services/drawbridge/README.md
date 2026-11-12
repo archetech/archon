@@ -146,8 +146,8 @@ device polling every five seconds, sign-in pages and wallet responses are POSTs,
 not name writes; on the write budget, a device sign-in that follows the advertised
 polling interval would be refused. Account writes through Poppy's API
 (`/names/poppy/api/*`) stay on the write budget. The bucket is chosen from the path Herald
-receives after dot-segment removal, and its 429 body is `{"error":"rate_limited"}`, as
-Poppy requires.
+receives after dot-segment removal. Its 429 carries `Retry-After` and an empty JSON
+body: Poppy defines no error code for a rate limit.
 
 **Per-source keying applies only when the source identifies a client**, exactly
 as on `/didcomm`: `trust proxy` is not configured, so behind the bundled Tor

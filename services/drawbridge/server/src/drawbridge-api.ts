@@ -341,8 +341,9 @@ async function main() {
         readPerSourceMax: config.poppyAuthPerSource,
         readGlobalMax: config.poppyAuthGlobal,
         windowSeconds: config.publicRateLimitWindow,
-        // Poppy defines this body at its token and sign-in endpoints (4.3).
-        refusalBody: { error: 'rate_limited' },
+        // A Poppy rate limit is the status and Retry-After, with no error
+        // code (spec 5.6), as Herald answers its own.
+        refusalBody: {},
         logger,
     });
 

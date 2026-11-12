@@ -580,6 +580,21 @@ describe('Direct Sign-In', () => {
         expect(response.status).toBe(403);
     });
 
+    it('issues the renamed scopes for a sign-in approved under the draft 0.2 names', async () => {
+        const verifier = crypto.randomBytes(32).toString('base64url');
+        await new PoppyStore(kv).putAuthCode('pac_before-upgrade', {
+            clientId: AGENT_ID,
+            redirectUri: REDIRECT,
+            codeChallenge: crypto.createHash('sha256').update(verifier).digest('base64url'),
+            did: ALICE,
+            scope: ['poppy:read', 'poppy:write'],
+        }, Date.now() + 60_000);
+
+        const response = await exchange(new URL(`${REDIRECT}?code=pac_before-upgrade`), verifier);
+        expect(response.body.scope).toBe('profile:read name:write');
+        expect((await api('put', '/account/name', response.body.access_token, { name: 'alicia' })).status).toBe(200);
+    });
+
     it('accepts a code only once', async () => {
         const { redirect, verifier } = await directSignIn(ALICE, 'profile:read');
         expect((await exchange(redirect, verifier)).status).toBe(200);
