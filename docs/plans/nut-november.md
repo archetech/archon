@@ -1,6 +1,7 @@
 # Nut November options
 
-Status: options for review. Nothing here is decided.
+Status: option A is delivered ([cashu-402-1596.md](cashu-402-1596.md)), and option E
+is open upstream as cashubtc/cdk#2874. The other options are undecided.
 
 [Nut November](https://nutnovember.org) is a month-long Cashu hackathon. Work
 made from November 1 counts; submissions close **November 27, 23:59 UTC**, and
@@ -22,8 +23,58 @@ qualifies as it stands:
 - **A regtest suite against real Lightning** (#1529).
 - **An upstream bug report:** cashubtc/cdk#2836, a melt that stays PENDING after a failed payment.
 
-The wallet implements the mandatory NUTs plus 11 (P2PK) and 13 (deterministic
-secrets). Of the optional NUTs, the ones below fit what Archon already has.
+## NUTs implemented
+
+As of November 11, with option A delivered. Numbers and names are from the
+[NUT index](https://github.com/cashubtc/nuts).
+
+**The wallet, in both Keymasters (TypeScript and Python)**
+
+| NUT | Name | Used for |
+|---|---|---|
+| 00 | Cryptography and models | Tokens and blind signatures. Python has its own implementation |
+| 01 | Mint public keys | Fetching a mint's keys |
+| 02 | Keysets and fees | Keysets, keyset rotation and input fees |
+| 03 | Swapping tokens | Send, receive and rotation |
+| 04 | Minting tokens | Ecash from a paid invoice |
+| 05 | Melting tokens | Paying an invoice from ecash |
+| 06 | Mint info | Reading it, and refusing a mint without NUT-07, 08 or 09 |
+| 07 | Token state check | Settling the journal |
+| 08 | Overpaid Lightning fees | Change from a melt's fee reserve |
+| 09 | Signature restore | Restoring from the seed, and recovery after a lost response |
+| 10 | Spending conditions | Only the kind NUT-11 needs |
+| 11 | Pay-to-pubkey | Ecash locked to a DID's key, with a locktime and a refund to the sender |
+| 12 | DLEQ proofs | Verifying the mint's signatures |
+| 13 | Deterministic secrets | Derived from the wallet's existing BIP-39 seed |
+| 20 | Signature on mint quote | Only a quote's creator can claim it |
+| 23 | Payment method: BOLT11 | The invoices minted and melted with |
+
+**HTTP 402 payments (option A)**
+
+| NUT | Name | Used for |
+|---|---|---|
+| 24 | HTTP 402 Payment Required | Drawbridge sends the request and redeems the token |
+| 18 | Payment requests | Drawbridge creates them; Keymaster decodes and pays them |
+| 26 | Payment request bech32m encoding | Decoding `creqB` requests |
+
+The NUT index lists no implementation of NUT-24 yet.
+
+**Partial**
+
+- **NUT-18:** in-band payment only. A request that asks for a locked token or
+  names payment methods is refused, and the Nostr and HTTP POST transports are
+  not implemented.
+- **NUT-10:** pay-to-pubkey only. Hashed timelock contracts (NUT-14) are not
+  implemented.
+
+**Not ours**
+
+- **The mint** is `cashubtc/mintd`, which the node bundles and proxies.
+- **NUT-17** (WebSocket subscriptions): Drawbridge removes it from the mint's
+  advertised info, since the proxy cannot carry it.
+- **NUT-16** and **NUT-21/22** are options below, not built.
+
+Of the optional NUTs, the ones below fit what Archon already has.
 
 ## Options
 
