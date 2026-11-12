@@ -97,8 +97,10 @@ export async function verifyDpopProof(check: DpopCheck, kv: PoppyKV, now: () => 
 
     const thumbprint = await calculateJwkThumbprint(jwk, 'sha256');
     // The replay cache is shared through the store, so it covers every Herald
-    // process. The token endpoint must have one; APIs check it too.
-    const ttl = ACCEPTANCE_WINDOW_SECONDS + 2 * CLOCK_SKEW_SECONDS;
+    // process. The token endpoint must have one; APIs check it too. It lasts
+    // one second longer than the longest a proof stays acceptable, from one
+    // signed the full skew ahead, so the entry cannot expire first.
+    const ttl = ACCEPTANCE_WINDOW_SECONDS + 2 * CLOCK_SKEW_SECONDS + 1;
     if (!await kv.setIfAbsent(`jti:dpop:${thumbprint}:${payload.jti}`, '1', ttl)) {
         throw new DpopError('DPoP proof has already been used');
     }

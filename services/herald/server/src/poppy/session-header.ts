@@ -206,6 +206,8 @@ export async function verifySessionHeader(check: SessionCheck, verifier: Session
         ({ payload } = await jwtVerify(token, await importJWK(delegated.jwk, SESSION_ALGORITHM), {
             algorithms: [SESSION_ALGORITHM],
             typ: SESSION_TYPE,
+            clockTolerance: CLOCK_SKEW_SECONDS,
+            currentDate: new Date(nowSeconds * 1000),
             requiredClaims: ['iss', 'aud', 'sid', 'sub', 'htm', 'htu', 'iat', 'jti'],
         }));
         if (header.kid !== await calculateJwkThumbprint(delegated.jwk, 'sha256')) {
@@ -272,7 +274,9 @@ export async function verifySessionHeader(check: SessionCheck, verifier: Session
         throw invalid('ath is present without an access token');
     }
 
-    const ttl = ACCEPTANCE_WINDOW_SECONDS + 2 * CLOCK_SKEW_SECONDS;
+    // One second longer than the longest a JWT stays acceptable, from one
+    // signed the full skew ahead, so the entry cannot expire first.
+    const ttl = ACCEPTANCE_WINDOW_SECONDS + 2 * CLOCK_SKEW_SECONDS + 1;
     if (!await verifier.kv.setIfAbsent(`jti:session:${clientId}:${jti}`, '1', ttl)) {
         throw invalid('Session JWT has already been used');
     }

@@ -44,6 +44,17 @@ describe('DPoP Proof validation', () => {
         await expect(verify(await proof())).resolves.toMatch(/^[A-Za-z0-9_-]{43}$/);
     });
 
+    it('still rejects a reused proof at the last moment it is acceptable', async () => {
+        let clock = Date.now();
+        kv = new MemoryKV(() => clock);
+        // Signed the full skew ahead, it stays acceptable for 120 seconds.
+        const header = await proof({ iat: Math.floor(clock / 1000) + 30 });
+        await verify(header, {}, () => clock);
+
+        clock += 120_000;
+        await expect(verify(header, {}, () => clock)).rejects.toThrow('already been used');
+    });
+
     it('rejects two DPoP headers joined into one', async () => {
         await expect(verify(`${await proof()}, ${await proof()}`)).rejects.toThrow('exactly one DPoP header is required');
     });

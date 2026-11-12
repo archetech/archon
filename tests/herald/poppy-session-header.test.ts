@@ -294,6 +294,31 @@ describe('the Session JWT', () => {
         await verifySessionHeader(check(header), verifier);
         await refused(header, 'already been used');
     });
+
+    it('still refuses a second use at the last moment the JWT is acceptable', async () => {
+        let clock = Date.now();
+        verifier.now = () => clock;
+        verifier.kv = new MemoryKV(() => clock);
+        // Signed the full skew ahead, it stays acceptable for 120 seconds.
+        const header = await agent.session('GET', URL, { iat: Math.floor(clock / 1000) + 30 });
+        await verifySessionHeader(check(header), verifier);
+
+        clock += 120_000;
+        await refused(header, 'already been used');
+        clock += 1000;
+        await refused(header, 'acceptance window');
+    });
+
+    it('checks every claim against the verifier\'s clock, not the wall clock', async () => {
+        // An hour ahead: by the wall clock this JWT is not valid yet.
+        const clock = Date.now() + 3600_000;
+        const at = Math.floor(clock / 1000);
+        verifier.now = () => clock;
+        const delegation = await agent.delegation({ iat: at, exp: at + 3600 });
+        const header = await agent.session('GET', URL, { iat: at, nbf: at - 10, exp: at + 60 }, { poppy_dlg: delegation });
+
+        await expect(verifySessionHeader(check(header), verifier)).resolves.toBeDefined();
+    });
 });
 
 describe('the access token', () => {
