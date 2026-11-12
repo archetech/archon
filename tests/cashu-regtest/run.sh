@@ -118,7 +118,8 @@ ready() {
         process.exit(r.ok && !/\"ready\":false|^false/.test(text) ? 0 : 1);
     }).catch(() => process.exit(1))"
 }
-for url in http://cashu-mint:8085/v1/info http://drawbridge:4222/api/v1/ready http://keymaster-ts:4226/api/v1/ready http://keymaster-py:4226/api/v1/ready; do
+for url in http://cashu-mint:8085/v1/info http://drawbridge:4222/api/v1/ready http://keymaster-ts:4226/api/v1/ready http://keymaster-py:4226/api/v1/ready \
+    http://drawbridge-paid-ts:4222/api/v1/ready http://drawbridge-paid-py:4222/api/v1/ready; do
     retry 180 ready "$url"
 done
 # LNbits redirects everything to this page until an administrator exists.

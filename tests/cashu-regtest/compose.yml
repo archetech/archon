@@ -180,11 +180,11 @@ services:
       cashu-mint-init:
         condition: service_completed_successfully
 
-  drawbridge:
+  drawbridge: &drawbridge
     image: cashu-regtest/drawbridge:local
     pull_policy: never
     entrypoint: ["/bin/sh", "/scripts/drawbridge-entrypoint.sh"]
-    environment:
+    environment: &drawbridge-env
       <<: *svc-env
       ARCHON_DRAWBRIDGE_PORT: "4222"
       ARCHON_GATEKEEPER_URL: http://gatekeeper:4224
@@ -200,6 +200,30 @@ services:
     volumes:
       - ../../scripts/drawbridge-entrypoint.sh:/scripts/drawbridge-entrypoint.sh:ro
       - tor-hostname:/data/tor:ro
+
+  # The same node behind its paywall, once for each Keymaster flavor that redeems the
+  # ecash it is paid. The Keymasters themselves use the open one above, as a node's own
+  # services do with their admin key. Each keeps its paywall state in its own database.
+  drawbridge-paid-ts:
+    <<: *drawbridge
+    environment:
+      <<: *drawbridge-env
+      ARCHON_DRAWBRIDGE_L402_ENABLED: "true"
+      ARCHON_DRAWBRIDGE_DEFAULT_PRICE_SATS: "10"
+      ARCHON_DRAWBRIDGE_KEYMASTER_URL: http://keymaster-ts:4226
+      ARCHON_DRAWBRIDGE_KEYMASTER_ADMIN_KEY: *admin
+      ARCHON_NODE_ID: cashu-regtest
+      ARCHON_REDIS_URL: redis://redis:6379/1
+  drawbridge-paid-py:
+    <<: *drawbridge
+    environment:
+      <<: *drawbridge-env
+      ARCHON_DRAWBRIDGE_L402_ENABLED: "true"
+      ARCHON_DRAWBRIDGE_DEFAULT_PRICE_SATS: "10"
+      ARCHON_DRAWBRIDGE_KEYMASTER_URL: http://keymaster-py:4226
+      ARCHON_DRAWBRIDGE_KEYMASTER_ADMIN_KEY: *admin
+      ARCHON_NODE_ID: cashu-regtest
+      ARCHON_REDIS_URL: redis://redis:6379/2
 
   keymaster-ts:
     image: cashu-regtest/keymaster-ts:local
@@ -222,6 +246,9 @@ services:
     entrypoint: ["/bin/sh", "-c", "sleep infinity"]
     environment:
       ARCHON_ADMIN_API_KEY: *admin
+    volumes:
+      # Under /app, so it resolves the image's packages.
+      - ./agent.mjs:/app/agent.mjs:ro
 
 volumes:
   cln-user:
