@@ -47,6 +47,7 @@ beforeEach(async () => {
     jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.spyOn(console, 'warn').mockImplementation(() => {});
     agent = await new TestAgent().init();
+    await agent.newSessionKey();
     docs = agent.docs();
 });
 
@@ -107,22 +108,17 @@ function mount({ users = {}, keymaster = createKeymaster(), kv = new MemoryKV(),
 
 type App = ReturnType<typeof mount>['app'];
 
-async function startSession(app: App) {
-    const response = await request(app).post('/poppy/token').type('form')
-        .set('DPoP', await agent.proof('POST', TOKEN))
-        .send({
-            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-            assertion: await agent.assertion({ sub: 'usr_1' }),
-            ...await agent.clientAuth(),
-        });
-    expect(response.status).toBe(200);
-    return response.body as { access_token: string; session_id: string };
-}
-
-async function api(app: App, method: 'get' | 'put' | 'delete', apiPath: string, accessToken: string, body?: object) {
-    const req = request(app)[method](`/poppy/api${apiPath}`)
-        .set('Authorization', `DPoP ${accessToken}`)
-        .set('DPoP', await agent.proof(method.toUpperCase(), `${API}${apiPath}`, accessToken));
+// A request as a Personal Agent sends it: the Session header and version on
+// every one, and the access token with its DPoP proof when signed in.
+async function api(app: App, method: 'get' | 'put' | 'delete', apiPath: string, accessToken?: string, body?: object) {
+    const url = `${API}${apiPath}`;
+    let req = request(app)[method](`/poppy/api${apiPath}`)
+        .set('Poppy-Session', await agent.session(method.toUpperCase(), url, {}, {}, accessToken))
+        .set('Poppy-Version', '0.4');
+    if (accessToken) {
+        req = req.set('Authorization', `DPoP ${accessToken}`)
+            .set('DPoP', await agent.proof(method.toUpperCase(), url, accessToken));
+    }
     return body === undefined ? req : req.send(body);
 }
 
@@ -134,7 +130,7 @@ async function answerChallenge(app: App, did: string) {
         response_type: 'code',
         client_id: AGENT_ID,
         redirect_uri: REDIRECT,
-        scope: 'poppy:read poppy:write',
+        scope: 'profile:read name:write',
         state: 'st-1',
         code_challenge: crypto.createHash('sha256').update(verifier).digest('base64url'),
         code_challenge_method: 'S256',
@@ -154,10 +150,9 @@ async function answerChallenge(app: App, did: string) {
 }
 
 async function signIn(app: App, did: string) {
-    const session = await startSession(app);
     const { verifier, cookie, csrf, decideUrl } = await answerChallenge(app, did);
     const decided = await request(app).post(decideUrl).set('Cookie', cookie).set('X-Poppy-CSRF', csrf)
-        .send({ decision: 'approve', scope: ['poppy:read', 'poppy:write'] });
+        .send({ decision: 'approve', scope: ['profile:read', 'name:write'] });
     expect(decided.status).toBe(200);
     const code = new URL(decided.body.redirect).searchParams.get('code')!;
 
@@ -168,7 +163,6 @@ async function signIn(app: App, did: string) {
             code,
             redirect_uri: REDIRECT,
             code_verifier: verifier,
-            session_id: session.session_id,
             ...await agent.clientAuth(),
         });
     expect(response.status).toBe(200);
@@ -214,13 +208,12 @@ describe('Herald accounts behind the Personal Agent Protocol', () => {
     describe('public lookups', () => {
         it('resolves a name case-insensitively and 404s an unknown one', async () => {
             const { app } = mount({ users: { [ALICE]: { name: 'alice' } } });
-            const { access_token } = await startSession(app);
 
-            const found = await api(app, 'get', '/names/Alice', access_token);
+            const found = await api(app, 'get', '/names/Alice');
             expect(found.status).toBe(200);
             expect(found.body).toEqual({ name: 'alice', did: ALICE });
 
-            const missing = await api(app, 'get', '/names/nobody', access_token);
+            const missing = await api(app, 'get', '/names/nobody');
             expect(missing.status).toBe(404);
             expect(missing.body).toEqual({ error: 'name_not_found' });
         });
@@ -233,9 +226,8 @@ describe('Herald accounts behind the Personal Agent Protocol', () => {
                 didDocumentData: { manifest: { 'did:cid:vc': { credentialSubject: { id: CAROL } } } },
             });
             const { app } = mount({ users: { [ALICE]: { name: 'alice' } }, keymaster });
-            const { access_token } = await startSession(app);
 
-            const response = await api(app, 'get', '/members/ALICE', access_token);
+            const response = await api(app, 'get', '/members/ALICE');
 
             expect(response.status).toBe(200);
             expect(response.body.didDocument).toEqual({ id: ALICE });
@@ -243,15 +235,14 @@ describe('Herald accounts behind the Personal Agent Protocol', () => {
                 'did:cid:vc': { status: 'unverified', reason: 'issued to a different subject' },
             });
 
-            const missing = await api(app, 'get', '/members/nobody', access_token);
+            const missing = await api(app, 'get', '/members/nobody');
             expect(missing.status).toBe(404);
         });
 
         it('reports a member with no manifest as having no credentials to check', async () => {
             const { app } = mount({ users: { [ALICE]: { name: 'alice' } } });
-            const { access_token } = await startSession(app);
 
-            const response = await api(app, 'get', '/members/alice', access_token);
+            const response = await api(app, 'get', '/members/alice');
 
             expect(response.status).toBe(200);
             expect(response.body.credentialStatus).toEqual({});
@@ -259,9 +250,8 @@ describe('Herald accounts behind the Personal Agent Protocol', () => {
 
         it('resolves a DID', async () => {
             const { app, keymaster } = mount();
-            const { access_token } = await startSession(app);
 
-            const response = await api(app, 'get', `/dids/${ALICE}`, access_token);
+            const response = await api(app, 'get', `/dids/${ALICE}`);
 
             expect(response.status).toBe(200);
             expect(response.body).toEqual({ didDocument: { id: ALICE } });
@@ -272,9 +262,8 @@ describe('Herald accounts behind the Personal Agent Protocol', () => {
         // the agent's business.
         it('refuses to resolve anything that is not a DID', async () => {
             const { app, keymaster } = mount();
-            const { access_token } = await startSession(app);
 
-            const response = await api(app, 'get', '/dids/name-service', access_token);
+            const response = await api(app, 'get', '/dids/name-service');
 
             expect(response.status).toBe(404);
             expect(response.body).toEqual({ error: 'did_not_found' });
@@ -285,9 +274,8 @@ describe('Herald accounts behind the Personal Agent Protocol', () => {
             const keymaster = createKeymaster();
             keymaster.resolveDID.mockRejectedValue(new Error('unknown DID'));
             const { app } = mount({ keymaster });
-            const { access_token } = await startSession(app);
 
-            const response = await api(app, 'get', '/dids/did:cid:missing', access_token);
+            const response = await api(app, 'get', '/dids/did:cid:missing');
 
             expect(response.status).toBe(404);
             expect(response.body).toEqual({ error: 'did_not_found' });
@@ -295,9 +283,8 @@ describe('Herald accounts behind the Personal Agent Protocol', () => {
 
         it('serves the name directory', async () => {
             const { app } = mount({ users: { [ALICE]: { name: 'alice' }, [CAROL]: {} } });
-            const { access_token } = await startSession(app);
 
-            const response = await api(app, 'get', '/directory', access_token);
+            const response = await api(app, 'get', '/directory');
 
             expect(response.status).toBe(200);
             expect(response.body).toMatchObject({ version: 1, names: { alice: ALICE } });
@@ -397,7 +384,7 @@ describe('Herald account settings for connected agents', () => {
             clientId: AGENT_ID,
             name: 'Example Agent',
             domain: 'agent.example',
-            scope: ['poppy:read', 'poppy:write'],
+            scope: ['name:write', 'profile:read'],
         })]);
     });
 
@@ -412,7 +399,8 @@ describe('Herald account settings for connected agents', () => {
         expect(removed.body).toEqual({ ok: true });
         expect((await request(app).get('/api/poppy/connections')).body.connections).toEqual([]);
         const account = await api(app, 'get', '/account', accessToken);
-        expect(account.status).toBe(403);
+        expect(account.status).toBe(401);
+        expect(account.headers['www-authenticate']).toContain('error="invalid_token"');
     });
 
     it('reports a store failure while listing connections as 500', async () => {

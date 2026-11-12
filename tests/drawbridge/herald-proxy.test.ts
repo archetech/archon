@@ -28,6 +28,7 @@ let docs: Docs;
 
 beforeAll(async () => {
     agent = await new TestAgent().init();
+    await agent.newSessionKey();
     docs = agent.docs();
     const poppy = createPoppy({
         config: createPoppyConfig(ORIGIN, 'archon.test', 'https://wallet.archon.test'),
@@ -63,10 +64,17 @@ async function token(form: Record<string, string>) {
         .send({ ...form, ...await agent.clientAuth() });
 }
 
-async function api(method: 'get' | 'put', path: string, accessToken: string, body?: object) {
-    const req = request(drawbridge)[method](`/names/poppy/api${path}`)
-        .set('Authorization', `DPoP ${accessToken}`)
-        .set('DPoP', await agent.proof(method.toUpperCase(), `${API}${path}`, accessToken));
+// The Session header and version on every request, and the access token with
+// its DPoP proof when signed in.
+async function api(method: 'get' | 'put', path: string, accessToken?: string, body?: object) {
+    const url = `${API}${path}`;
+    let req = request(drawbridge)[method](`/names/poppy/api${path}`)
+        .set('Poppy-Session', await agent.session(method.toUpperCase(), url, {}, {}, accessToken))
+        .set('Poppy-Version', '0.4');
+    if (accessToken) {
+        req = req.set('Authorization', `DPoP ${accessToken}`)
+            .set('DPoP', await agent.proof(method.toUpperCase(), url, accessToken));
+    }
     return body ? req.send(body) : req;
 }
 
@@ -76,26 +84,24 @@ describe('Poppy through the Drawbridge Herald proxy', () => {
         expect(poppy.status).toBe(200);
         expect(poppy.body.auth.issuer).toBe(ISSUER);
 
+        const resource = await request(drawbridge).get('/.well-known/oauth-protected-resource');
+        expect(resource.status).toBe(200);
+        expect(resource.body.authorization_servers).toEqual([ISSUER]);
+
         const metadata = await request(drawbridge).get('/.well-known/oauth-authorization-server/names/poppy');
         expect(metadata.status).toBe(200);
         expect(metadata.body.token_endpoint).toBe(TOKEN);
     });
 
-    it('starts a Session and calls the API with DPoP-bound tokens', async () => {
-        const session = await token({
-            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-            assertion: await agent.assertion({ sub: 'usr_proxy' }),
-        });
-        expect(session.status).toBe(200);
-        expect(session.headers['cache-control']).toBe('no-store');
-
-        const lookup = await api('get', '/names/alice', session.body.access_token);
+    it('passes the Session header and version through, so the API answers signed out', async () => {
+        const lookup = await api('get', '/names/alice');
         expect(lookup.status).toBe(200);
         expect(lookup.body.did).toBe(ALICE);
 
-        const signedOut = await api('get', '/account', session.body.access_token);
-        expect(signedOut.status).toBe(403);
-        expect(signedOut.headers['www-authenticate']).toContain('sign_in_required');
+        const signedOut = await api('get', '/account');
+        expect(signedOut.status).toBe(401);
+        expect(signedOut.headers['www-authenticate']).toContain('scope="profile:read"');
+        expect(signedOut.headers['cache-control']).toBe('no-store');
     });
 
     it('keeps repeated form parameters repeated, so Herald still refuses them', async () => {
@@ -106,16 +112,12 @@ describe('Poppy through the Drawbridge Herald proxy', () => {
     });
 
     it('completes Direct Sign-In: cookie, wallet response, redirect and code exchange', async () => {
-        const session = await token({
-            grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-            assertion: await agent.assertion({ sub: 'usr_proxy_signin' }),
-        });
         const verifier = crypto.randomBytes(32).toString('base64url');
         const page = await request(drawbridge).get('/names/poppy/authorize').query({
             response_type: 'code',
             client_id: AGENT_ID,
             redirect_uri: REDIRECT,
-            scope: 'poppy:read poppy:write',
+            scope: 'profile:read name:write',
             state: 'st',
             code_challenge: crypto.createHash('sha256').update(verifier).digest('base64url'),
             code_challenge_method: 'S256',
@@ -137,7 +139,7 @@ describe('Poppy through the Drawbridge Herald proxy', () => {
         expect(status.body).toMatchObject({ status: 'authenticated', did: ALICE });
 
         const decided = await request(drawbridge).post(decideUrl).set('Cookie', cookie).set('X-Poppy-CSRF', csrf)
-            .send({ decision: 'approve', scope: ['poppy:read', 'poppy:write'] });
+            .send({ decision: 'approve', scope: ['profile:read', 'name:write'] });
         expect(decided.status).toBe(200);
         const redirect = new URL(decided.body.redirect);
         expect(redirect.searchParams.get('iss')).toBe(ISSUER);
@@ -147,10 +149,9 @@ describe('Poppy through the Drawbridge Herald proxy', () => {
             code: redirect.searchParams.get('code')!,
             redirect_uri: REDIRECT,
             code_verifier: verifier,
-            session_id: session.body.session_id,
         });
         expect(signIn.status).toBe(200);
-        expect(signIn.body.signed_in).toBe(true);
+        expect(signIn.body.refresh_token).toMatch(/^prt_/);
 
         const renamed = await api('put', '/account/name', signIn.body.access_token, { name: 'alicia' });
         expect(renamed.status).toBe(200);

@@ -3,6 +3,14 @@
 // guides ask a Company to keep per client_id, per new client_id, and per
 // sign-in attempt, which Drawbridge cannot see.
 
+// Thrown where a limit is met deep inside a check, to be answered with HTTP
+// 429 and Retry-After (spec 5.6).
+export class RateLimitedError extends Error {
+    constructor(readonly retryAfter: number) {
+        super('too many requests');
+    }
+}
+
 export class RateLimiter {
     private readonly windows = new Map<string, { start: number; count: number }>();
 

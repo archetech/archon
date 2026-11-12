@@ -1,32 +1,32 @@
 import crypto from 'crypto';
 import express, { Request, Response, Router } from 'express';
 import QRCode from 'qrcode';
-import { AgentDirectory, AgentError, clientIdDomain, type Agent } from './agents.js';
+import { AgentDirectory, AgentError, clientIdDomain, redirectMatches, type Agent } from './agents.js';
 import { AssertionError, verifyAssertion } from './assertions.js';
 import {
     SCOPES,
     authorizationServerMetadata,
     endpoints,
     poppyDocument,
+    protectedResourceMetadata,
     type PoppyConfig,
 } from './config.js';
 import { DpopError, verifyDpopProof } from './dpop.js';
 import { consentPage, deviceEntryPage, errorPage, pageHeaders } from './pages.js';
-import { RateLimiter } from './rate-limit.js';
+import { RateLimitedError, RateLimiter } from './rate-limit.js';
 import {
     PoppyStore,
     hashSecret,
     randomSecret,
     type Grant,
-    type Session,
     type SignIn,
 } from './store.js';
 import { createApiRouter, type PoppyAccounts } from './api.js';
 
-// Personal Agent Protocol (draft 0.2) Company endpoints for Herald: the token
-// endpoint (4.2, 4.4-4.8), revocation (4.9), Direct and Device Sign-In with an
-// Archon wallet (4.5, 4.6), and the OpenAPI interface (section 6). Mediated
-// Sign-In (4.7) does not apply: Archon accounts have no passwords to submit.
+// Personal Agent Protocol (0.4) Company endpoints for Herald: the OAuth
+// server (section 4) with Direct and Device Sign-In by Archon wallet (4.2,
+// 4.3), refresh (4.4) and revocation (4.6), and the OpenAPI interface (section
+// 7). Sign-in is plain OAuth and knows no Session; the API joins the two.
 
 export interface PoppyOptions {
     config: PoppyConfig;
@@ -54,13 +54,11 @@ export interface Poppy {
     disconnect(did: string, agentId: string): Promise<boolean>;
 }
 
-const JWT_BEARER = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
 const DEVICE_CODE = 'urn:ietf:params:oauth:grant-type:device_code';
 const CLIENT_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 const USER_CODE_ALPHABET = 'BCDFGHJKLMNPQRSTVWXZ';
 const PKCE_VERIFIER = /^[A-Za-z0-9\-._~]{43,128}$/;
 const PKCE_S256_CHALLENGE = /^[A-Za-z0-9_-]{43}$/;
-const MAX_USER_ID_LENGTH = 255;
 
 class OAuthError extends Error {
     constructor(readonly status: number, readonly code: string, description: string, readonly retryAfter?: number) {
@@ -73,7 +71,10 @@ function sendOAuthError(res: Response, error: OAuthError): void {
     if (error.retryAfter) {
         res.set('Retry-After', String(error.retryAfter));
     }
-    res.status(error.status).json({ error: error.code, error_description: error.message });
+    // A rate limit is HTTP 429 with Retry-After, and has no error code (5.6).
+    res.status(error.status).json(error.status === 429
+        ? { error_description: error.message }
+        : { error: error.code, error_description: error.message });
 }
 
 // Form parameters must appear once; a repeated one parses as an array.
@@ -246,139 +247,65 @@ export function createPoppy(options: PoppyOptions): Poppy {
         }
     }
 
-    // ---------- Sessions and tokens ----------
+    // ---------- tokens ----------
 
-    async function newSession(clientId: string, userId: string): Promise<Session> {
-        const session: Session = {
-            id: randomSecret('ses_', 16),
-            clientId,
-            userId,
-            createdAt: now(),
-            expiresAt: now() + config.sessionSeconds * 1000,
-        };
-        await store.putSession(session);
-        return session;
-    }
-
-    async function sessionFor(sessionId: string | undefined, clientId: string, userId?: string): Promise<Session | null> {
-        if (sessionId === undefined) {
-            return null;
-        }
-        const session = await store.getSession(sessionId);
-        if (!session || session.clientId !== clientId || (userId !== undefined && session.userId !== userId)) {
-            throw new OAuthError(400, 'invalid_session', 'the Session has ended or belongs to another Personal Agent or User');
-        }
-        return session;
-    }
-
+    // One access token works at every service of the domain (4.5). A token
+    // for another resource is one Herald does not serve.
     function checkResource(body: Record<string, unknown>): void {
         const resource = param(body, 'resource');
-        if (resource !== undefined && resource !== urls.api) {
+        if (resource !== undefined && resource !== config.resource) {
             throw new OAuthError(400, 'invalid_target', 'unknown resource');
         }
     }
 
-    async function issueSessionToken(session: Session, jkt: string, scope: string[], grant?: Grant) {
-        const token = randomSecret('pst_');
-        await store.putSessionToken(token, {
-            sessionId: session.id,
-            clientId: session.clientId,
-            userId: session.userId,
-            jkt,
+    // Access tokens are DPoP-bound: the Company's choice (4.5), announced by
+    // dpop_signing_alg_values_supported in the issuer's metadata.
+    async function issueAccessToken(grant: Grant, scope: string[], jkt: string) {
+        const token = randomSecret('pat_');
+        await store.putAccessToken(token, {
+            clientId: grant.clientId,
+            did: grant.did,
             scope,
-            signedIn: Boolean(grant),
-            grantId: grant?.id,
-            did: grant?.did,
-            expiresAt: now() + config.sessionTokenSeconds * 1000,
+            grantId: grant.id,
+            jkt,
+            expiresAt: now() + config.accessTokenSeconds * 1000,
         });
         return {
             access_token: token,
             token_type: 'DPoP',
-            expires_in: config.sessionTokenSeconds,
+            expires_in: config.accessTokenSeconds,
             scope: scope.join(' '),
-            session_id: session.id,
-            signed_in: Boolean(grant),
         };
     }
 
-    const ACCOUNT_MISMATCH = 'this Session is, or was, signed in to a different account';
-
-    async function signInSession(session: Session, grant: Grant): Promise<Session> {
-        if (!await store.bindSessionAccount(session, grant.did)) {
-            throw new OAuthError(400, 'account_mismatch', ACCOUNT_MISMATCH);
-        }
-        await store.addGrantSession(grant, session.id);
-        if (!await store.setSessionGrant(session, grant.id)) {
-            throw new OAuthError(400, 'invalid_session', 'the Session has ended');
-        }
-        return session;
-    }
-
-    // Completes a sign-in: a new Account Token and a signed-in Session Token.
-    // The Session is bound to the account before the grant exists, so a
-    // request that loses the binding leaves no usable Account Token behind.
-    async function completeSignIn(session: Session, agent: Agent, did: string, scope: string[], tokenScope: string[], jkt: string) {
-        if (!await store.bindSessionAccount(session, did)) {
-            throw new OAuthError(400, 'account_mismatch', ACCOUNT_MISMATCH);
-        }
-        const accountToken = randomSecret('pat_');
+    // Completes a sign-in: a refresh token and a first access token (4.7).
+    async function completeSignIn(agent: Agent, did: string, scope: string[], jkt: string) {
+        const refreshToken = randomSecret('prt_');
         const grant: Grant = {
             id: randomSecret('grt_', 16),
-            tokenHash: hashSecret(accountToken),
+            tokenHash: hashSecret(refreshToken),
             clientId: agent.clientId,
             clientName: agent.metadata.client_name || agent.domain,
             domain: agent.domain,
-            userId: session.userId,
             did,
             scope,
             createdAt: now(),
-            expiresAt: now() + config.accountTokenSeconds * 1000,
+            expiresAt: now() + config.refreshTokenSeconds * 1000,
             lastUsedAt: now(),
         };
         await store.putGrant(grant);
-        const signedIn = await signInSession(session, grant);
         return {
-            ...await issueSessionToken(signedIn, jkt, tokenScope, grant),
-            refresh_token: accountToken,
-            refresh_token_expires_in: config.accountTokenSeconds,
+            ...await issueAccessToken(grant, scope, jkt),
+            refresh_token: refreshToken,
         };
     }
 
     // ---------- grant handlers ----------
 
-    // Any token request may ask for fewer scopes than were granted (4.3);
-    // the Account Token keeps the granted ones.
-    function narrowScope(body: Record<string, unknown>, granted: string[]): string[] {
-        const requested = param(body, 'scope');
-        if (requested === undefined) {
-            return granted;
-        }
-        const scope = parseScope(requested);
-        if (!scope.every(item => granted.includes(item))) {
-            throw new OAuthError(400, 'invalid_scope', 'scope can only narrow what was granted');
-        }
-        return scope;
-    }
-
-    async function jwtBearerGrant(req: Request, agent: Agent, jkt: string) {
-        const { payload } = await verifyAssertion(param(req.body, 'assertion'), agent, agents, config.issuer, store.kv, now)
-            .catch(error => { throw new OAuthError(400, 'invalid_grant', error instanceof Error ? error.message : 'assertion rejected'); });
-        const userId = payload.sub;
-        if (typeof userId !== 'string' || !userId || userId.length > MAX_USER_ID_LENGTH) {
-            throw new OAuthError(400, 'invalid_grant', 'sub must be the User ID');
-        }
-        const session = await sessionFor(param(req.body, 'session_id'), agent.clientId, userId)
-            ?? await newSession(agent.clientId, userId);
-        // A signed-in Session is renewed with its Account Token (4.8); the
-        // assertion renews it signed out.
-        return issueSessionToken(session, jkt, []);
-    }
-
     async function authorizationCodeGrant(req: Request, agent: Agent, jkt: string) {
         const code = required(req.body, 'code');
         const redirectUri = required(req.body, 'redirect_uri');
         const verifier = required(req.body, 'code_verifier');
-        const session = await sessionFor(required(req.body, 'session_id'), agent.clientId);
         const record = await store.takeAuthCode(code);
         if (!record || record.clientId !== agent.clientId || record.redirectUri !== redirectUri) {
             throw new OAuthError(400, 'invalid_grant', 'the code is invalid, expired or already used');
@@ -386,36 +313,35 @@ export function createPoppy(options: PoppyOptions): Poppy {
         if (!pkceMatches(verifier, record.codeChallenge)) {
             throw new OAuthError(400, 'invalid_grant', 'code_verifier does not match');
         }
-        const scope = narrowScope(req.body, record.scope);
-        return completeSignIn(session!, agent, record.did, record.scope, scope, jkt);
+        return completeSignIn(agent, record.did, record.scope, jkt);
     }
 
     async function refreshTokenGrant(req: Request, agent: Agent, jkt: string) {
-        const revoked = () => new OAuthError(400, 'invalid_grant', 'the Account Token is invalid, expired or revoked');
+        const revoked = () => new OAuthError(400, 'invalid_grant', 'the refresh token is invalid, expired or revoked');
         const grant = await store.getGrantByToken(param(req.body, 'refresh_token'));
         if (!grant || grant.clientId !== agent.clientId) {
             throw revoked();
         }
-        const scope = narrowScope(req.body, grant.scope);
-        const session = await sessionFor(param(req.body, 'session_id'), agent.clientId, grant.userId)
-            ?? await newSession(agent.clientId, grant.userId);
+        // A refresh may ask for fewer scopes than the grant has (4.4).
+        let scope = grant.scope;
+        const requested = param(req.body, 'scope');
+        if (requested !== undefined) {
+            scope = parseScope(requested);
+            if (!scope.every(item => grant.scope.includes(item))) {
+                throw new OAuthError(400, 'invalid_scope', 'scope can only narrow what was granted');
+            }
+        }
         // A revocation may land at any point here. Touching never recreates a
-        // deleted grant, and the check after signing in undoes the Session's
-        // link to a grant revoked meanwhile, so revocation always wins.
+        // deleted grant, and each access token is checked against its grant
+        // when used, so revocation always wins.
         if (!await store.touchGrant(grant)) {
             throw revoked();
         }
-        const signedIn = await signInSession(session, grant);
-        if (!await store.getGrant(grant.id)) {
-            await store.clearSessionGrant(signedIn.id, grant.id);
-            throw revoked();
-        }
-        return issueSessionToken(signedIn, jkt, scope, grant);
+        return issueAccessToken(grant, scope, jkt);
     }
 
     async function deviceCodeGrant(req: Request, agent: Agent, jkt: string) {
         const deviceHash = hashSecret(required(req.body, 'device_code'));
-        const session = await sessionFor(required(req.body, 'session_id'), agent.clientId);
         const device = await store.getDevice(deviceHash);
         if (!device || device.clientId !== agent.clientId) {
             throw new OAuthError(400, 'invalid_grant', 'unknown device_code');
@@ -440,8 +366,6 @@ export function createPoppy(options: PoppyOptions): Poppy {
             throw new OAuthError(400, 'authorization_pending', 'the User has not finished signing in');
         }
 
-        // Checked before consuming, so a bad request does not use up an approval.
-        const scope = decision.approved ? narrowScope(req.body, decision.scope) : [];
         // Only the poll that consumes the decision acts on it.
         if (!await store.consumeDeviceDecision(deviceHash, device)) {
             throw new OAuthError(400, 'invalid_grant', 'the device code has already been used');
@@ -450,7 +374,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
         if (!decision.approved) {
             throw new OAuthError(400, 'access_denied', 'the User declined');
         }
-        return completeSignIn(session!, agent, decision.did, decision.scope, scope, jkt);
+        return completeSignIn(agent, decision.did, decision.scope, jkt);
     }
 
     // ---------- router ----------
@@ -468,9 +392,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
             checkResource(body);
 
             let response;
-            if (grantType === JWT_BEARER) {
-                response = await jwtBearerGrant(req, agent, jkt);
-            } else if (grantType === 'authorization_code') {
+            if (grantType === 'authorization_code') {
                 response = await authorizationCodeGrant(req, agent, jkt);
             } else if (grantType === 'refresh_token') {
                 response = await refreshTokenGrant(req, agent, jkt);
@@ -492,7 +414,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
             const body = req.body ?? {};
             const agent = await authenticateClient(body);
             const grant = await store.getGrantByToken(required(body, 'token'));
-            // Only the client the Account Token was issued to can revoke it;
+            // Only the client the refresh token was issued to can revoke it;
             // anything else is answered as RFC 7009 answers an unknown token.
             if (grant && grant.clientId === agent.clientId) {
                 await store.revokeGrant(grant);
@@ -592,7 +514,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
             agentDomain: signIn.domain,
             logoUri: signIn.logoUri,
             scope: signIn.scope,
-            accessDays: Math.round(config.accountTokenSeconds / 86400),
+            accessDays: Math.round(config.refreshTokenSeconds / 86400),
             challengeUrl,
             challengeQrSvg,
             statusUrl: `${config.issuer}/signin/${id}/status`,
@@ -615,7 +537,7 @@ export function createPoppy(options: PoppyOptions): Poppy {
             agent = await loadAgent(clientId);
             // Errors are shown here rather than redirected until the
             // redirect_uri is known to belong to the agent.
-            if (!agent.metadata.redirect_uris.includes(redirectUri)) {
+            if (!redirectMatches(agent.metadata.redirect_uris, redirectUri)) {
                 throw new Error('redirect_uri is not one of the agent’s redirect_uris');
             }
         }
@@ -829,7 +751,20 @@ export function createPoppy(options: PoppyOptions): Poppy {
         }
     });
 
-    router.use('/', createApiRouter({ config, store, accounts, now }));
+    // Verifying a Session header loads the agent it names, before anything
+    // about the request is authenticated, so an unknown client_id spends the
+    // same budget here as at the token endpoint.
+    async function loadAgentForSession(clientId: string, refreshKeys?: boolean): Promise<Agent> {
+        if (!knownClients.has(clientId)) {
+            const wait = newClientLimiter.take('new');
+            if (wait) {
+                throw new RateLimitedError(wait);
+            }
+        }
+        return agents.get(clientId, refreshKeys);
+    }
+
+    router.use('/', createApiRouter({ config, store, accounts, now, loadAgent: loadAgentForSession, rememberClient }));
 
     // ---------- discovery (section 3) ----------
 
@@ -837,6 +772,10 @@ export function createPoppy(options: PoppyOptions): Poppy {
     wellKnown.get('/.well-known/poppy.json', (_req: Request, res: Response) => {
         res.set('Cache-Control', 'public, max-age=300');
         res.json(poppyDocument(config));
+    });
+    wellKnown.get('/.well-known/oauth-protected-resource', (_req: Request, res: Response) => {
+        res.set('Cache-Control', 'public, max-age=300');
+        res.json(protectedResourceMetadata(config));
     });
     wellKnown.get(`/.well-known/oauth-authorization-server${new URL(config.issuer).pathname}`, (_req: Request, res: Response) => {
         res.set('Cache-Control', 'public, max-age=300');

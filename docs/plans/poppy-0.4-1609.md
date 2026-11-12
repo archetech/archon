@@ -1,6 +1,7 @@
 # Move Herald's Personal Agent Protocol support to 0.4 (#1609)
 
-Status: accepted on 2026-11-12, with every recommendation below. Nothing is built yet.
+Status: accepted on 2026-11-12, with every recommendation below, and built: PR 1 is
+#1611, and PR 2 also carries what PR 3 was to deliver.
 
 Herald serves the [Personal Agent Protocol](https://personalagentprotocol.org/docs/0.4/spec)
 (Poppy) at draft 0.2 ([poppy-1395.md](poppy-1395.md), #1403). Upstream published 0.4 on
@@ -145,7 +146,7 @@ Poppy is off unless `ARCHON_HERALD_POPPY_ENABLED=true`. Each PR leaves `main` co
 |---|---|
 | 1 | Session header verification as its own module, with tests: delegations, the Session JWT checks, `Poppy-Version`. Nothing calls it yet |
 | 2 | The switch to 0.4: `poppy.json`, the protected resource and authorization server metadata, the token endpoint without Sessions, the API on access tokens and the Session header, and the new errors. The 0.2 Session grant and Session Tokens are removed |
-| 3 | The Herald README, this plan's status, and the store records 0.2 no longer needs |
+| 3 | The Herald README, this plan's status, and the store records 0.2 no longer needs. Done with PR 2: the records it leaves in Redis expire on their own |
 
 ## Testing
 
