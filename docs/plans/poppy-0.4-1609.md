@@ -45,6 +45,11 @@ Section numbers are from 0.4.
   none, it ends as a decline (4.7).
 - Client assertions: `ES256` must be accepted and `PS384` should be (4.1). Herald accepts
   `ES256` and `RS256` today.
+- Loopback redirect URIs (4.1, 4.2, RFC 8252 §7.3). An agent's `redirect_uris` may list one
+  for an app on the User's computer, and the authorization request matches it whatever
+  its port. Herald refuses any `redirect_uris` entry that is not HTTPS on the agent's
+  domain, and matches redirects exactly, so an agent that lists one cannot be loaded at
+  all, for sign-in or for Session verification.
 - A sign-in opened on another device follows RFC 10027 §2, as Device Sign-In already must
   (4.2, 10.8). Herald's consent page and the wallet challenge text already name the agent
   and ask the User to continue only if they started it; both need checking against the
@@ -57,7 +62,12 @@ Section numbers are from 0.4.
 - Verifying `Poppy-Session` (5.2, 5.3): fetch the agent's client metadata and keys; verify
   the delegation in `poppy_dlg` (signed by a key from `jwks_uri`, at most 24 hours long)
   and then the Session JWT with the delegated key; check `typ`, `aud` (Herald's issuer),
-  `htm`, `htu`, `iat`, and `ath` against the access token when there is one.
+  `htm`, `htu` and `iat`.
+- Joining the header to the access token (5.3, step 3). With a token, `ath` must match it
+  and the token must have been issued to the `client_id` in the header's `iss`. A matching
+  `ath` alone shows only that the header covers those token bytes, not that both belong to
+  one agent; today the two cannot differ, because one Session Token carries both. Without
+  a token, `ath` must be absent.
 - `Poppy-Version` is checked wherever the Session header is verified. A missing or
   unserved version gets `version_unsupported` (3.4).
 - Sessions are found by `client_id`, `sid` and User ID. An unknown combination starts one.
@@ -116,7 +126,9 @@ Section numbers are from 0.4.
 5. **What the scopes are called.** 0.4 no longer defines `poppy:read` and `poppy:write`,
    or reserves the `poppy:` prefix; each Company names its own. Recommended: rename to
    `profile:read` and `name:write`, described in `auth.scopes` with `scope_hints`
-   (`profile:read`: no changes, personal data; `name:write`: reversible, personal data).
+   (`profile:read`: no changes, personal data; `name:write`: irreversible, personal data,
+   because releasing a name revokes the membership credential and frees the name for
+   someone else).
    Grants issued under the old names would be read as the new ones.
 
 6. **Which issuers the domain's protected resource metadata lists.** Recommended: the
@@ -140,7 +152,10 @@ With decision 3 answered "accept without verifying", PR 1 is dropped and PR 2 sh
 - Unit tests for the verifier with real signed JWTs: a valid delegation and Session JWT,
   and each refusal (wrong `typ`, `aud`, `htm`, `htu`, `ath`, an expired or over-long
   delegation, a Session JWT signed directly with a `jwks_uri` key, a `kid` that is not the
-  delegated key's thumbprint).
+  delegated key's thumbprint, an access token issued to another agent, and an `ath` on a
+  signed-out request).
+- Loopback redirects: a listed loopback URI matched on another port, and a refused HTTP
+  redirect that is not loopback.
 - Route tests through the real router for discovery, each grant, revocation, and each API
   error in the table of section 7.
 - An end-to-end test with a test agent that discovers Herald the way 5.3 and 3.2 describe,
