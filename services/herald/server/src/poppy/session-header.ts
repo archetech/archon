@@ -123,29 +123,43 @@ async function verifyDelegation(token: string, clientId: string, verifier: Sessi
         currentDate: new Date(nowSeconds * 1000),
         requiredClaims: ['iss', 'iat', 'exp', 'jti', 'cnf'],
     };
-    let payload: JWTPayload;
-    try {
-        const agent = await verifier.loadAgent(clientId);
+    // Only loading the agent can fail for a reason that is not the caller's
+    // doing. Whatever verification throws, a malformed key included, refuses
+    // the delegation.
+    const load = async (refreshKeys?: boolean) => {
         try {
-            ({ payload } = await jwtVerify(token, createLocalJWKSet(agent.jwks), options));
+            return await verifier.loadAgent(clientId, refreshKeys);
         }
         catch (error) {
-            // An unknown kid may mean the agent rotated keys; refetch, throttled.
-            if (!(error instanceof errors.JWKSNoMatchingKey)) {
+            throw error instanceof AgentError ? invalid(`client_id refused: ${error.message}`) : error;
+        }
+    };
+    const verify = async (agent: Agent) => {
+        try {
+            return (await jwtVerify(token, createLocalJWKSet(agent.jwks), options)).payload;
+        }
+        catch (error) {
+            if (error instanceof errors.JWKSNoMatchingKey) {
                 throw error;
             }
-            const refreshed = await verifier.loadAgent(clientId, true);
-            ({ payload } = await jwtVerify(token, createLocalJWKSet(refreshed.jwks), options));
+            throw invalid(error instanceof Error ? `delegation rejected: ${error.message}` : 'delegation rejected');
         }
+    };
+    let payload: JWTPayload;
+    try {
+        payload = await verify(await load());
     }
     catch (error) {
-        if (error instanceof AgentError) {
-            throw invalid(`client_id refused: ${error.message}`);
+        // An unknown kid may mean the agent rotated keys; refetch, throttled.
+        if (!(error instanceof errors.JWKSNoMatchingKey)) {
+            throw error;
         }
-        if (error instanceof errors.JOSEError) {
-            throw invalid(`delegation rejected: ${error.message}`);
+        try {
+            payload = await verify(await load(true));
         }
-        throw error;
+        catch (again) {
+            throw again instanceof errors.JWKSNoMatchingKey ? invalid(`delegation rejected: ${again.message}`) : again;
+        }
     }
 
     const iat = payload.iat!;
@@ -240,7 +254,10 @@ export async function verifySessionHeader(check: SessionCheck, verifier: Session
     }
     let htu: string;
     try {
-        htu = normalizeHtu(String(payload.htu));
+        if (typeof payload.htu !== 'string') {
+            throw new TypeError('htu is not a string');
+        }
+        htu = normalizeHtu(payload.htu);
     }
     catch {
         throw invalid('htu is not a URL');
@@ -252,7 +269,8 @@ export async function verifySessionHeader(check: SessionCheck, verifier: Session
     if (iat > nowSeconds + CLOCK_SKEW_SECONDS || iat < nowSeconds - ACCEPTANCE_WINDOW_SECONDS - CLOCK_SKEW_SECONDS) {
         throw invalid('Session JWT is outside the acceptance window');
     }
-    if (iat > delegated.exp + CLOCK_SKEW_SECONDS) {
+    // Both times are the agent's own, so no clock tolerance applies.
+    if (iat > delegated.exp) {
         throw invalid('Session JWT was signed after its delegation expired');
     }
     if (typeof jti !== 'string' || jti.length < MIN_JTI_LENGTH) {

@@ -55,6 +55,10 @@ describe('DPoP Proof validation', () => {
         await expect(verify(header, {}, () => clock)).rejects.toThrow('already been used');
     });
 
+    it('rejects an htu that is not a string, though it would read as the same URL', async () => {
+        await expect(verify(await proof({ htu: [TOKEN] }))).rejects.toThrow('htu is not a URL');
+    });
+
     it('rejects two DPoP headers joined into one', async () => {
         await expect(verify(`${await proof()}, ${await proof()}`)).rejects.toThrow('exactly one DPoP header is required');
     });

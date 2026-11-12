@@ -75,7 +75,10 @@ export async function verifyDpopProof(check: DpopCheck, kv: PoppyKV, now: () => 
     }
     let htu: string;
     try {
-        htu = normalizeHtu(String(payload.htu));
+        if (typeof payload.htu !== 'string') {
+            throw new TypeError('htu is not a string');
+        }
+        htu = normalizeHtu(payload.htu);
     }
     catch {
         throw new DpopError('DPoP proof htu is not a URL');

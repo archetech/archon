@@ -209,6 +209,20 @@ describe('the delegation', () => {
         await refused(await agent.session('GET', URL, {}, { poppy_dlg: leaked }), 'cnf.jwk must be a public key');
     });
 
+    it('refuses one whose signing key in jwks_uri is malformed, as a refusal and not a failure', async () => {
+        docs['https://agent.example/jwks.json'] = { keys: [{ ...agent.publicJwk, x: 'AAAA', y: 'AAAA' }] };
+        await refused(await agent.session('GET', URL), 'delegation rejected');
+    });
+
+    it('refuses a Session JWT signed after its delegation expired, with no tolerance', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        // Still valid by the verifier's clock, within its tolerance.
+        const delegation = await agent.delegation({ iat: now - 3600, exp: now - 10 });
+        await refused(await agent.session('GET', URL, { iat: now - 9 }, { poppy_dlg: delegation }), 'signed after its delegation expired');
+        await expect(verifySessionHeader(check(await agent.session('GET', URL, { iat: now - 10 }, { poppy_dlg: delegation })), verifier))
+            .resolves.toBeDefined();
+    });
+
     it('refuses a client whose metadata cannot be loaded', async () => {
         delete docs[AGENT_ID];
         await refused(await agent.session('GET', URL), 'client_id refused');
@@ -277,6 +291,7 @@ describe('the Session JWT', () => {
         await refused(await agent.session('POST', URL), 'htm does not match');
         await refused(await agent.session('GET', `${API}/account/name`), 'htu does not match');
         await refused(await agent.session('GET', URL, { htu: 'not a url' }), 'htu is not a URL');
+        await refused(await agent.session('GET', URL, { htu: [URL] }), 'htu is not a URL');
     });
 
     it('refuses one signed outside the acceptance window', async () => {
