@@ -13,6 +13,12 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 COMPOSE = ["docker", "compose", "-p", "cashu-regtest", "-f", "compose.yml"]
 RPC = "/data/lightning/regtest/regtest/lightning-rpc"
 FLAVORS = ("keymaster-py", "keymaster-ts")
+ADMIN_KEY = "0" * 64
+NODE_ID = "cashu-regtest"
+NODE_MINT = "https://mint.invalid/cashu"
+PRICE = 10
+# The node behind its paywall, by the Keymaster flavor that redeems what it is paid.
+PAYWALLS = {"keymaster-ts": "http://drawbridge-paid-ts:4222", "keymaster-py": "http://drawbridge-paid-py:4222"}
 
 failures = []
 known = []
@@ -365,6 +371,67 @@ def locked_send_then_melt():
         check(melted["paid"] and paid("cln-payee", label), f"{recipient.service} melted the value received")
 
 
+def http(method, url, headers=None, body=None):
+    """A request from inside the stack, which publishes no ports."""
+    script = ("const [method, url, headers, body] = JSON.parse(process.argv[1]);"
+              "fetch(url, { method, headers, body: body ?? undefined, signal: AbortSignal.timeout(30000) })"
+              ".then(async r => console.log(JSON.stringify({ status: r.status, body: await r.text() })))")
+    result = compose("exec", "-T", "cli", "node", "-e", script, json.dumps([method, url, headers or {}, body]))
+    if result.returncode:
+        sys.exit(f"{method} {url}: {result.stderr[-500:]}")
+    return json.loads(result.stdout)
+
+
+def pays_a_priced_call(payer_service, node_service):
+    """An agent with ecash registers a DID through the node's paywall, where the node's
+    own Keymaster redeems the token. The two flavors pay each other."""
+    section(f"{payer_service} pays for createDID at a node whose {node_service} redeems the ecash")
+    paywall = PAYWALLS[node_service]
+    node = Wallet(node_service, NODE_ID)
+    # The operator's one step: the node identity joins the node mint. Refused if done already.
+    node.cli("add-cashu", NODE_ID, check_exit=False)
+    check(until(lambda: http("GET", f"{paywall}/api/v1/ready")["status"] == 200, 60) is True, "the paywalled node is up")
+    earned = node.balance()["spendable"]
+    agent = new_wallet(payer_service, 1000)
+
+    result = run(*COMPOSE, "exec", "-T", "-e", f"ARCHON_KEYMASTER_URL=http://{payer_service}:4226",
+                 "cli", "node", "agent.mjs", paywall, agent.name, timeout=180)
+    if result.returncode:
+        check(False, f"the agent paid for its call: {result.stderr[-600:]}")
+        return
+    paid = json.loads(result.stdout.strip().splitlines()[-1])
+
+    check(sorted(paid["acceptedMethods"]) == ["cashu", "lightning"], "the 402 offers Lightning and Cashu")
+    check(paid["asked"] == {"amount": PRICE, "mints": [NODE_MINT], "mint": NODE_MINT},
+          f"the request asks for {PRICE} sats at the node mint: {paid['asked']}")
+    check(agent.json("resolve-did", paid["did"])["didDocument"]["id"] == paid["did"], "the DID it paid for is registered")
+    check(node.balance()["spendable"] == earned + PRICE, f"the node's wallet holds {PRICE} sats more")
+
+    agent.cli("cashu-check", agent.name)
+    balance = agent.balance()
+    check(balance == {"spendable": 1000 - PRICE - paid["paid"]["fee"], "inFlight": 0, "outstanding": 0},
+          f"the agent's wallet settled the send: {balance}")
+
+    records = http("GET", f"{paywall}/api/v1/l402/payments/{paid['payer']}", {"X-Archon-Admin-Key": ADMIN_KEY})
+    payments = json.loads(records["body"]) if records["status"] == 200 else []
+    check(any(item["method"] == "cashu" and item["amountSat"] == PRICE for item in payments),
+          f"the node recorded a Cashu payment for the agent: {records['body'][:200]}")
+
+    # The same token again: the mint has it as spent, so it buys nothing.
+    operation = json.dumps({"type": "create"})
+    replay = http("POST", f"{paywall}/api/v1/did", {"Content-Type": "application/json", "X-Cashu": paid["token"]}, operation)
+    check(replay["status"] == 400, f"a spent token is refused with 400: {replay['status']} {replay['body'][:120]}")
+
+    # A token for less than the price is refused before it is redeemed, so it stays the agent's.
+    small = agent.cli("cashu-send", str(PRICE - 1), agent.name).stdout.strip()
+    underpaid = http("POST", f"{paywall}/api/v1/did", {"Content-Type": "application/json", "X-Cashu": small}, operation)
+    check(underpaid["status"] == 400, f"a token below the price is refused with 400: {underpaid['status']}")
+    check(node.balance()["spendable"] == earned + PRICE, "neither refusal paid the node anything")
+    [unredeemed] = agent.json("cashu-sends", agent.name)
+    reclaimed = agent.json("cashu-reclaim", unredeemed["operationId"], agent.name)
+    check(reclaimed["amount"] == PRICE - 1, "the agent reclaims the token the node refused")
+
+
 def main():
     stop_holding()
     forget_routes()
@@ -377,6 +444,8 @@ def main():
         held_melt_survives_a_crash(service)
         payee_rejects_a_held_melt(service)
     locked_send_then_melt()
+    pays_a_priced_call("keymaster-ts", "keymaster-py")
+    pays_a_priced_call("keymaster-py", "keymaster-ts")
     for service in FLAVORS:
         payee_offline(service)
 
