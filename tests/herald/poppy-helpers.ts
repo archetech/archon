@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { SignJWT, exportJWK, generateKeyPair, type JWK } from 'jose';
+import { SignJWT, calculateJwkThumbprint, exportJWK, generateKeyPair, type JWK } from 'jose';
 
 import type { AccountResult, PoppyAccounts } from '../../services/herald/server/src/poppy/api.ts';
 
@@ -81,6 +81,71 @@ export class TestAgent {
             client_assertion_type: 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
             client_assertion: await this.assertion(),
         };
+    }
+
+    // A delegated key (spec 0.4, 5.2): it signs Session JWTs, and a key from
+    // jwks_uri vouches for it in a delegation.
+    sessionKey!: CryptoKey;
+    sessionJwk!: JWK;
+
+    async newSessionKey(): Promise<void> {
+        const { privateKey, publicKey } = await generateKeyPair('ES256', { extractable: true });
+        this.sessionKey = privateKey as CryptoKey;
+        this.sessionJwk = await exportJWK(publicKey);
+    }
+
+    async delegation(claims: Record<string, unknown> = {}, header: Record<string, unknown> = {}): Promise<string> {
+        if (!this.sessionKey) {
+            await this.newSessionKey();
+        }
+        const now = Math.floor(Date.now() / 1000);
+        return this.jwt({
+            iss: this.clientId,
+            cnf: { jwk: this.sessionJwk },
+            iat: now,
+            exp: now + 3600,
+            jti: crypto.randomBytes(16).toString('base64url'),
+            ...claims,
+        }, { typ: 'poppy-delegation+jwt', ...header });
+    }
+
+    // A Poppy-Session header value for one request. `claims` and `header`
+    // override or, with undefined, remove what a correct JWT would carry.
+    async session(
+        method: string,
+        url: string,
+        claims: Record<string, unknown> = {},
+        header: Record<string, unknown> = {},
+        accessToken?: string,
+    ): Promise<string> {
+        const delegation = header.poppy_dlg ?? await this.delegation();
+        const payload: Record<string, unknown> = {
+            iss: this.clientId,
+            aud: ISSUER,
+            sid: 'Yx2b7Qd_Kp8mR3vT1nWc4A',
+            sub: 'usr_Q7c1vK',
+            htm: method,
+            htu: url,
+            iat: Math.floor(Date.now() / 1000),
+            jti: crypto.randomBytes(16).toString('base64url'),
+            ...(accessToken && { ath: crypto.createHash('sha256').update(accessToken).digest('base64url') }),
+            ...claims,
+        };
+        const protectedHeader: Record<string, unknown> = {
+            typ: 'poppy-session+jwt',
+            alg: 'ES256',
+            kid: await calculateJwkThumbprint(this.sessionJwk, 'sha256'),
+            poppy_dlg: delegation,
+            ...header,
+        };
+        for (const target of [payload, protectedHeader]) {
+            for (const [key, value] of Object.entries(target)) {
+                if (value === undefined) {
+                    delete target[key];
+                }
+            }
+        }
+        return new SignJWT(payload).setProtectedHeader(protectedHeader as never).sign(this.sessionKey);
     }
 
     async proof(method: string, url: string, accessToken?: string, key = this.dpopKey, jwk = this.dpopJwk): Promise<string> {
