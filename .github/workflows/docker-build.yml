@@ -21,7 +21,7 @@ jobs:
       CALVER: ${{ steps.calculate-calver.outputs.calver }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Calculate Calver
         id: calculate-calver
@@ -37,7 +37,7 @@ jobs:
       images: ${{ steps.affected.outputs.images }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
 
@@ -131,7 +131,7 @@ jobs:
             image: node-runner
     steps:
       - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       # Required for the GitHub Actions layer cache below: the default docker
       # driver cannot export cache, only the docker-container driver can.
