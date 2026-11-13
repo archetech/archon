@@ -16,7 +16,7 @@ export default defineConfig({
         // @didcid/wallet-ui is consumed as source from outside this app, so
         // its imports would otherwise resolve a second copy of React and MUI
         // from the repo root. Two MUI instances means two emotion caches.
-        dedupe: ["@mui/lab", "qrcode.react", "@uiw/react-json-view", "@mui/material", "@mui/icons-material", "@emotion/react", "@emotion/styled", "react", "react-dom"],
+        dedupe: ["@mui/lab", "qrcode.react", "@gandlaf21/bc-ur", "buffer", "@uiw/react-json-view", "@mui/material", "@mui/icons-material", "@emotion/react", "@emotion/styled", "react", "react-dom"],
         alias: {
             // For the render test of the demo client UI, which imports this subpath.
             "@didcid/wallet-ui/did-repair": path.resolve(__dirname, "../../packages/wallet-ui/src/components/DIDRepairDialog.tsx"),

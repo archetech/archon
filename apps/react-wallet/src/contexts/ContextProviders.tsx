@@ -7,7 +7,7 @@ import { Box, CssBaseline, useMediaQuery } from "@mui/material";
 import { createAppTheme } from "../theme";
 import { SafeAreaProvider, useSafeArea } from "./SafeAreaContext";
 import { useDeepLinks } from "../hooks/useDeepLinks";
-import { scanAliasQrCode, scanQrText } from "../utils/utils";
+import { scanAliasQrCode, scanQrFrames, scanQrText } from "../utils/utils";
 import { dispatchDeepLink } from "../utils/deepLinkQueue";
 import WalletWeb from "@didcid/keymaster/wallet/web";
 import { DEFAULT_GATEKEEPER_URL, GATEKEEPER_KEY } from "../constants";
@@ -170,6 +170,7 @@ export function ContextProviders(
                                                 is the one with a camera. */}
                                             <PlatformCapabilitiesProvider
                                                 scanQr={scanQrText}
+                                                scanQrFrames={scanQrFrames}
                                                 scanAliasQr={scanAliasQrCode}
                                                 loadRefreshInterval={async () => loadRefreshIntervalSeconds()}
                                             >

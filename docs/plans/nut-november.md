@@ -1,7 +1,8 @@
 # Nut November options
 
-Status: option A is delivered ([cashu-402-1596.md](cashu-402-1596.md)), and option E
-is open upstream as cashubtc/cdk#2874. The other options are undecided.
+Status: options A ([cashu-402-1596.md](cashu-402-1596.md)) and D (#1616) are
+delivered, and option E is open upstream as cashubtc/cdk#2874. The other options are
+undecided.
 
 [Nut November](https://nutnovember.org) is a month-long Cashu hackathon. Work
 made from November 1 counts; submissions close **November 27, 23:59 UTC**, and
@@ -25,7 +26,7 @@ qualifies as it stands:
 
 ## NUTs implemented
 
-As of November 11, with option A delivered. Numbers and names are from the
+As of November 13, with options A and D delivered. Numbers and names are from the
 [NUT index](https://github.com/cashubtc/nuts).
 
 **The wallet, in both Keymasters (TypeScript and Python)**
@@ -59,6 +60,12 @@ As of November 11, with option A delivered. Numbers and names are from the
 
 The NUT index lists no implementation of NUT-24 yet.
 
+**Animated QR codes (option D)**
+
+| NUT | Name | Used for |
+|---|---|---|
+| 16 | Animated QR codes | Showing a token too long for one code, in the wallets and the standalone clients; reading one with the camera, in the React wallet on Android |
+
 **Partial**
 
 - **NUT-18:** in-band payment only. A request that asks for a locked token or
@@ -72,7 +79,7 @@ The NUT index lists no implementation of NUT-24 yet.
 - **The mint** is `cashubtc/mintd`, which the node bundles and proxies.
 - **NUT-17** (WebSocket subscriptions): Drawbridge removes it from the mint's
   advertised info, since the proxy cannot carry it.
-- **NUT-16** and **NUT-21/22** are options below, not built.
+- **NUT-21/22** is an option below, not built.
 
 Of the optional NUTs, the ones below fit what Archon already has.
 
@@ -161,8 +168,8 @@ transports defined today are `nostr` (NIP-17 DMs) and `post` (HTTP).
 
 ### Smaller additions
 
-- **D. Animated QR codes (NUT-16).** A serialized token longer than 2,900
-  characters overflows one QR code, so the UI can only copy it today
+- **D. Animated QR codes (NUT-16).** Delivered (#1616). A serialized token longer than 2,900
+  characters overflows one QR code, so the UI could only copy it before
   (`QR_LIMIT` in `CashuView`). The length depends on the number of proofs, not
   the value: a 1,023-sat token of 10 proofs is about 3,000 characters. NUT-16
   animates long tokens across frames. Mostly UI work.

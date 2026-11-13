@@ -1,4 +1,4 @@
-import {BarcodeScanner} from "@capacitor-mlkit/barcode-scanning";
+import {BarcodeFormat, BarcodeScanner} from "@capacitor-mlkit/barcode-scanning";
 
 export function extractDid(input: string): string | null {
     if (!input) {
@@ -172,6 +172,102 @@ export async function scanQrText(): Promise<string | null> {
         return barcodes[0]?.rawValue ?? null;
     } catch {}
     return null;
+}
+
+const SCANNING_CLASS = 'barcode-scanner-active';
+
+// While the camera is open the plugin draws its preview behind the web view,
+// so the page has to be hidden for it to show. Only this overlay stays visible.
+function scannerOverlay(onCancel: () => void) {
+    if (!document.getElementById('barcode-scanner-style')) {
+        const style = document.createElement('style');
+        style.id = 'barcode-scanner-style';
+        style.textContent = `
+            html.${SCANNING_CLASS}, body.${SCANNING_CLASS} { background: transparent !important; }
+            body.${SCANNING_CLASS} { visibility: hidden; }
+            .barcode-scanner-modal {
+                visibility: visible; position: fixed; inset: 0; z-index: 2147483647;
+                display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+                padding: calc(24px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));
+                color: #fff; font-family: sans-serif; text-align: center;
+            }
+            .barcode-scanner-modal p { margin: 0; padding: 8px 12px; border-radius: 8px; background: rgba(0, 0, 0, 0.6); }
+            .barcode-scanner-modal button {
+                padding: 12px 32px; border: 0; border-radius: 24px; font-size: 16px;
+                color: #000; background: #fff;
+            }`;
+        document.head.appendChild(style);
+    }
+    const modal = document.createElement('div');
+    modal.className = 'barcode-scanner-modal';
+    const status = document.createElement('p');
+    status.setAttribute('role', 'status');
+    status.textContent = 'Point the camera at the QR code';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = 'Cancel';
+    cancel.addEventListener('click', onCancel);
+    modal.append(status, cancel);
+    document.body.appendChild(modal);
+    document.documentElement.classList.add(SCANNING_CLASS);
+    document.body.classList.add(SCANNING_CLASS);
+    return {
+        progress(fraction: number) {
+            status.textContent = `Reading an animated code: ${Math.floor(fraction * 100)}%. Keep the camera on it.`;
+        },
+        remove() {
+            document.documentElement.classList.remove(SCANNING_CLASS);
+            document.body.classList.remove(SCANNING_CLASS);
+            modal.remove();
+        },
+    };
+}
+
+// Keeps the camera open and gives every QR code it reads to `accept` until
+// that reports the text complete, or the user cancels. An animated code, such
+// as a long Cashu token, arrives over many reads; the one-shot scanner above
+// returns after the first. Resolves whether the text was completed.
+export async function scanQrFrames(accept: (scanned: string) => number): Promise<boolean> {
+    try {
+        const perm = await BarcodeScanner.requestPermissions();
+        if (perm.camera !== 'granted') {
+            return false;
+        }
+    } catch {
+        return false;
+    }
+
+    let finish!: (completed: boolean) => void;
+    const finished = new Promise<boolean>(resolve => { finish = resolve; });
+    const overlay = scannerOverlay(() => finish(false));
+    // Reads keep arriving while the scan is being stopped.
+    let done = false;
+    const listening = BarcodeScanner.addListener('barcodesScanned', ({ barcodes }) => {
+        for (const barcode of barcodes) {
+            if (done) {
+                return;
+            }
+            const fraction = accept(barcode.rawValue);
+            if (fraction >= 1) {
+                done = true;
+                finish(true);
+            } else if (fraction > 0) {
+                overlay.progress(fraction);
+            }
+        }
+    });
+    try {
+        await listening;
+        await BarcodeScanner.startScan({ formats: [BarcodeFormat.QrCode] });
+        return await finished;
+    } catch {
+        return false;
+    } finally {
+        done = true;
+        await listening.then(listener => listener.remove()).catch(() => undefined);
+        await BarcodeScanner.stopScan().catch(() => undefined);
+        overlay.remove();
+    }
 }
 
 export async function scanAliasQrCode(): Promise<{ alias: string; did: string } | null> {

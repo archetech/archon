@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import CashuView from '../../../../packages/wallet-ui/src/components/CashuView';
+import { animatedQrFrames, qrCollector } from '../../../../packages/wallet-ui/src/utils/animatedQr';
 
 const NODE = 'https://node.example.com/cashu';
 const OTHER = 'https://other.example.com';
@@ -418,7 +419,7 @@ describe('Cashu view: sending', () => {
     it('shows a token with a QR code', async () => {
         await createToken('cashuBshort');
         expect(document.querySelector('svg')).toBeTruthy();
-        expect(screen.queryByText(/Too long for a QR code/)).toBeNull();
+        expect(screen.queryByText(/animated/)).toBeNull();
     });
 
     it('selects the token when it is clicked, and copes with a click on its label', async () => {
@@ -435,9 +436,29 @@ describe('Cashu view: sending', () => {
         expect(field.value.slice(field.selectionStart, field.selectionEnd)).toBe('cashuBshort');
     });
 
-    it('offers a token too long for a QR code as text, rather than crashing', async () => {
-        await createToken(`cashuB${'a'.repeat(5000)}`);
-        expect(screen.getByText(/Too long for a QR code/)).toBeTruthy();
+    // A QR code cannot be read back in jsdom, so these read the frames the
+    // component is given: the same source, started again from its first part.
+    it('shows a token too long for one QR code as an animated one, whose frames another wallet can read', async () => {
+        const token = `cashuB${'abcdefghij'.repeat(500)}`;
+        await createToken(token);
+        expect(screen.getByText(/Too long for one QR code, so this one is animated/)).toBeTruthy();
+        expect(screen.getByLabelText('Animated QR code')).toBeTruthy();
+
+        const next = animatedQrFrames(token);
+        const collector = qrCollector();
+        let frames = 0;
+        while (collector.accept(next()) < 1) {
+            frames += 1;
+            expect(frames).toBeLessThan(200);
+        }
+        expect(collector.result()).toBe(token);
+    });
+
+    it('changes the animated code from frame to frame', async () => {
+        await createToken(`cashuB${'abcdefghij'.repeat(500)}`);
+        const drawn = () => screen.getByLabelText('Animated QR code').innerHTML;
+        const first = drawn();
+        await waitFor(() => expect(drawn()).not.toBe(first), { timeout: 2000 });
     });
 
     it('receives a pasted token and says what someone else already spent', async () => {
@@ -821,5 +842,67 @@ describe('Cashu view: paying a payment request', () => {
         await waitFor(() => expect(notify.error).toHaveBeenCalledWith(refusal));
         expect(requestField().value).toBe('creqAabc');
         expect(screen.queryByLabelText(/^Token for/)).toBeNull();
+    });
+});
+
+describe('Cashu view: scanning a token', () => {
+    const TOKEN = `cashuB${'abcdefghij'.repeat(500)}`;
+
+    beforeEach(() => holding(mintInfo(NODE, true)));
+
+    // A camera that reads the given codes in turn, stopping when told the text
+    // is complete, and reports a cancel when it runs out first.
+    const camera = (codes: string[]) => vi.fn(async (accept: (scanned: string) => number) =>
+        codes.some(code => accept(code) >= 1));
+
+    const tokenField = () => screen.getByLabelText(/^Token/) as HTMLTextAreaElement;
+
+    it('offers no scan on a host without a camera', async () => {
+        view();
+        await open('Receive');
+        expect(screen.queryByRole('button', { name: 'Scan' })).toBeNull();
+    });
+
+    it('fills in a token read from an ordinary code, and leaves receiving it to the person', async () => {
+        view({ scanQrFrames: camera(['cashuBshort']) });
+        const user = await open('Receive');
+        await user.click(screen.getByRole('button', { name: 'Scan' }));
+
+        await waitFor(() => expect(tokenField().value).toBe('cashuBshort'));
+        expect(keymaster.receiveCashu).not.toHaveBeenCalled();
+    });
+
+    it('puts together a token read from an animated code', async () => {
+        const next = animatedQrFrames(TOKEN);
+        const frames = Array.from({ length: 150 }, () => next());
+        const scan = camera(frames);
+        view({ scanQrFrames: scan });
+        const user = await open('Receive');
+        await user.click(screen.getByRole('button', { name: 'Scan' }));
+
+        await waitFor(() => expect(tokenField().value).toBe(TOKEN));
+        expect(await scan.mock.results[0].value).toBe(true);
+    });
+
+    it('reads an animated code it joins late, after the in-order parts have gone by', async () => {
+        const next = animatedQrFrames(TOKEN);
+        const all = Array.from({ length: 400 }, () => next());
+        view({ scanQrFrames: camera(all.slice(200)) });
+        const user = await open('Receive');
+        await user.click(screen.getByRole('button', { name: 'Scan' }));
+
+        await waitFor(() => expect(tokenField().value).toBe(TOKEN));
+    });
+
+    it('changes nothing when the scan is cancelled part way', async () => {
+        const next = animatedQrFrames(TOKEN);
+        view({ scanQrFrames: camera([next(), next()]) });
+        const user = await open('Receive');
+        await user.type(tokenField(), 'cashuBtyped');
+        await user.click(screen.getByRole('button', { name: 'Scan' }));
+
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Scan' }).getAttribute('aria-busy')).toBe('false'));
+        expect(tokenField().value).toBe('cashuBtyped');
+        expect(notify.error).not.toHaveBeenCalled();
     });
 });
