@@ -35,6 +35,10 @@ const UR_PART = /^ur:bytes\/(?:(\d{1,9})-(\d{1,9})\/)?[a-z]+$/;
 // At the smallest part other wallets send, this is still a far longer text
 // than a token.
 const MAX_PARTS = 2000;
+// The decoder keeps to the message its first part came from and refuses parts
+// of any other. After this many refusals in a row the camera is on another
+// code, and collection starts again with it; fewer are stray reads.
+const FOREIGN_PARTS = 3;
 
 // Collects what a camera reads into one text. An ordinary code is the text; a
 // UR part is one frame of an animated code. What a camera reads is whatever is
@@ -42,6 +46,7 @@ const MAX_PARTS = 2000;
 // message that fails starts collection again.
 export function qrCollector(): QrCollector {
     let decoder = new URDecoder();
+    let foreign = 0;
     let text: string | null = null;
     return {
         accept(scanned: string): number {
@@ -58,7 +63,13 @@ export function qrCollector(): QrCollector {
                 return 0;
             }
             try {
-                decoder.receivePart(part[0]);
+                // False for a part of another message, never for a repeat.
+                foreign = decoder.receivePart(part[0]) ? 0 : foreign + 1;
+                if (foreign >= FOREIGN_PARTS) {
+                    decoder = new URDecoder();
+                    foreign = 0;
+                    decoder.receivePart(part[0]);
+                }
             }
             catch {
                 // Not a part this decoder can use. What it has stays.
@@ -85,6 +96,7 @@ export function qrCollector(): QrCollector {
             // decoder that has finished takes no more parts, so nothing further
             // could come of it.
             decoder = new URDecoder();
+            foreign = 0;
             return 0;
         },
         result: () => text,

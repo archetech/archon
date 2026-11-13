@@ -182,6 +182,44 @@ describe('collecting scanned codes', () => {
         expect(collector.accept('ur:bytes/3-34/notbytewords')).toBe(progress);
     });
 
+    it('moves to another animated code once the camera stays on it', () => {
+        const other = animatedQrFrames(`cashuB${'z'.repeat(9000)}`);
+        const collector = qrCollector();
+        for (let i = 0; i < 10; i++) {
+            collector.accept(other());
+        }
+        const next = animatedQrFrames(TOKEN);
+        for (let i = 0; i < 300 && collector.result() === null; i++) {
+            collector.accept(next());
+        }
+        expect(collector.result()).toBe(TOKEN);
+    });
+
+    it('moves on even when the other code has the same number of parts', () => {
+        const other = animatedQrFrames(TOKEN.replace(/a/g, 'z'));
+        const next = animatedQrFrames(TOKEN);
+        expect(other().split('/')[1].split('-')[1]).toBe(next().split('/')[1].split('-')[1]);
+        const collector = qrCollector();
+        collector.accept(other());
+        for (let i = 0; i < 300 && collector.result() === null; i++) {
+            collector.accept(next());
+        }
+        expect(collector.result()).toBe(TOKEN);
+    });
+
+    it('keeps its progress through one or two stray parts of another code', () => {
+        const other = animatedQrFrames(`cashuB${'z'.repeat(9000)}`);
+        const next = animatedQrFrames(TOKEN);
+        const collector = qrCollector();
+        let progress = 0;
+        for (let i = 0; i < 10; i++) {
+            progress = collector.accept(next());
+        }
+        collector.accept(other());
+        collector.accept(other());
+        expect(collector.accept(next())).toBeGreaterThanOrEqual(progress);
+    });
+
     it('keeps the first text once complete', () => {
         const collector = qrCollector();
         expect(collector.accept('first')).toBe(1);
