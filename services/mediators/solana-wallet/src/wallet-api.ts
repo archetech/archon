@@ -123,8 +123,16 @@ function batchHashForDid(batchDid: string): string {
     return `0x${createHash('sha256').update(batchDid).digest('hex')}`;
 }
 
-function lamportsToSol(lamports: number): number {
-    return lamports / LAMPORTS_PER_SOL;
+function lamportsToSol(lamports: bigint): number {
+    return Number(lamports) / LAMPORTS_PER_SOL;
+}
+
+function rpcNumber(value: bigint | number): number {
+    const number = Number(value);
+    if (!Number.isSafeInteger(number)) {
+        throw new RangeError('Solana RPC integer exceeds the safe number range');
+    }
+    return number;
 }
 
 function transactionFinality(): Finality {
@@ -135,7 +143,7 @@ function buildMemo(batchDid: string, batchHash: string, opCount: number): string
     return `${ARCHON_MEMO_PREFIX}${JSON.stringify({ batchHash, batchDid, opCount })}`;
 }
 
-function defaultRegistryKeypair(): Keypair {
+async function defaultRegistryKeypair(): Promise<Keypair> {
     const seed = createHash('sha256')
         .update('archon-solana-registry-signer-v1')
         .update(config.chain)
@@ -155,7 +163,7 @@ async function main() {
     const connection = new Connection(config.rpcUrl, config.commitment);
     const memoProgramId = new PublicKey(config.memoProgramId);
     const registryAddress = new PublicKey(config.registryAddress);
-    const registrySigner = defaultRegistryKeypair();
+    const registrySigner = await defaultRegistryKeypair();
 
     app.use(cors());
     if (process.env.NODE_ENV === 'production') {
@@ -164,6 +172,8 @@ async function main() {
         app.use(morgan('dev'));
     }
     app.use(express.json());
+    app.set('json replacer', (_key: string, value: unknown) =>
+        typeof value === 'bigint' ? rpcNumber(value) : value);
 
     app.use((req, res, next) => {
         const start = process.hrtime.bigint();
@@ -239,7 +249,7 @@ async function main() {
                 connection.getSlot(config.commitment),
             ]);
             walletBalanceConfirmed.set(lamportsToSol(balance));
-            walletSlotHeight.set(slot);
+            walletSlotHeight.set(rpcNumber(slot));
         } catch (error: any) {
             logger.debug({ err: error }, 'Metrics update failed');
         }
@@ -316,7 +326,7 @@ async function main() {
                 address: keypair.publicKey.toBase58(),
                 balance: lamportsToSol(balanceLamports),
                 balanceLamports: balanceLamports.toString(),
-                slot,
+                slot: rpcNumber(slot),
                 network: config.network,
                 derivationPath: config.derivationPath,
             });
@@ -441,8 +451,9 @@ async function main() {
                 confirmations: confirmed ? 1 : 0,
                 confirmationStatus: value?.confirmationStatus,
                 err: value?.err,
-                slot: value?.slot ?? transaction?.slot,
-                blockTime: transaction?.blockTime,
+                slot: value?.slot !== undefined ? rpcNumber(value.slot)
+                    : transaction ? rpcNumber(transaction.slot) : undefined,
+                blockTime: transaction?.blockTime == null ? transaction?.blockTime : rpcNumber(transaction.blockTime),
                 network: config.network,
             });
         } catch (error: any) {

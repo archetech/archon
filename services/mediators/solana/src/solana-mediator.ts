@@ -404,6 +404,14 @@ async function addBlock(height: number, hash: string, time: number): Promise<voi
     await gatekeeper.addBlock(REGISTRY, { hash, height, time });
 }
 
+function rpcNumber(value: bigint | number): number {
+    const number = Number(value);
+    if (!Number.isSafeInteger(number)) {
+        throw new RangeError('Solana RPC integer exceeds the safe number range');
+    }
+    return number;
+}
+
 async function getSlotBlock(slot: number, finality: Finality = 'finalized'): Promise<{ height: number; hash: string; time: number } | undefined> {
     const block = await connection.getBlock(slot, {
         commitment: finality,
@@ -411,16 +419,14 @@ async function getSlotBlock(slot: number, finality: Finality = 'finalized'): Pro
         rewards: false,
     });
 
-    const rpcBlock = block as typeof block & { blockHeight?: number | null };
-
-    if (!block?.blockhash || block.blockTime === null || rpcBlock.blockHeight == null) {
+    if (!block?.blockhash || block.blockTime === null || block.blockHeight == null) {
         return undefined;
     }
 
     return {
-        height: rpcBlock.blockHeight,
+        height: rpcNumber(block.blockHeight),
         hash: block.blockhash,
-        time: block.blockTime,
+        time: rpcNumber(block.blockTime),
     };
 }
 
@@ -433,13 +439,13 @@ async function getNearestProducedBlockAtOrBefore(slot: number, finality: Finalit
         return undefined;
     }
 
-    const block = await getSlotBlock(producedSlot, finality);
-    return block ? { slot: producedSlot, height: block.height } : undefined;
+    const block = await getSlotBlock(rpcNumber(producedSlot), finality);
+    return block ? { slot: rpcNumber(producedSlot), height: block.height } : undefined;
 }
 
 async function getBlocksOrPause(startSlot: number, endSlot: number, finality: Finality): Promise<number[] | undefined> {
     try {
-        return await connection.getBlocks(startSlot, endSlot, finality);
+        return (await connection.getBlocks(startSlot, endSlot, finality)).map(rpcNumber);
     } catch (error) {
         if (isRateLimitError(error)) {
             console.log(`Pausing ${REGISTRY} checkpoint sync at slot ${startSlot}: Solana RPC rate limit`);
@@ -497,8 +503,8 @@ async function findFirstSlotAtOrAfterBlockHeight(targetHeight: number, currentSl
 
 async function syncBlockCheckpoints(): Promise<void> {
     const finality: Finality = 'finalized';
-    const currentSlot = await connection.getSlot(finality);
-    const currentBlockHeight = await connection.getBlockHeight(finality);
+    const currentSlot = rpcNumber(await connection.getSlot(finality));
+    const currentBlockHeight = rpcNumber(await connection.getBlockHeight(finality));
 
     if (config.startBlock > currentBlockHeight) {
         console.log(`Skipping ${REGISTRY} checkpoint sync because start block ${config.startBlock} is ahead of finalized block height ${currentBlockHeight}`);
@@ -638,8 +644,8 @@ function memoFromInstruction(instruction: ParsedInstruction | PartiallyDecodedIn
 }
 
 async function scanSignatures(): Promise<void> {
-    const currentSlot = await connection.getSlot('finalized');
-    const currentBlockHeight = await connection.getBlockHeight('finalized');
+    const currentSlot = rpcNumber(await connection.getSlot('finalized'));
+    const currentBlockHeight = rpcNumber(await connection.getBlockHeight('finalized'));
     const db = await loadDb();
     const scanFloor = db.height > 0 ? Math.max(0, db.height - SLOT_OVERLAP) : 0;
 
@@ -655,7 +661,7 @@ async function scanSignatures(): Promise<void> {
         return;
     }
 
-    const candidates: { signature: string; slot: number; blockTime?: number | null }[] = [];
+    const candidates: { signature: string; slot: number }[] = [];
     let before: string | undefined;
 
     for (let page = 0; page < config.signaturePageMax; page++) {
@@ -672,7 +678,7 @@ async function scanSignatures(): Promise<void> {
             if (signature.slot < scanFloor) {
                 break;
             }
-            candidates.push(signature);
+            candidates.push({ signature: signature.signature, slot: rpcNumber(signature.slot) });
         }
 
         if (signatures.some(signature => signature.slot < scanFloor)) {
@@ -911,7 +917,7 @@ async function checkPendingTransactions(pending: NonNullable<MediatorDb['pending
         }
     }
 
-    const currentSlot = await connection.getSlot(config.commitment);
+    const currentSlot = rpcNumber(await connection.getSlot(config.commitment));
     const elapsedSlots = Math.max(0, currentSlot - pending.blockCount);
 
     if (config.pendingTxTimeoutSlots > 0 && elapsedSlots >= config.pendingTxTimeoutSlots && pending.batchDid && pending.batchHash) {
@@ -1048,7 +1054,7 @@ async function anchorBatch(): Promise<void> {
             // Read before broadcasting. Anything fallible between the broadcast and
             // the record risks losing a transaction already paid for, which is what
             // has the next cycle anchor the same batch again.
-            const blockCount = await connection.getSlot(config.commitment);
+            const blockCount = rpcNumber(await connection.getSlot(config.commitment));
 
             let txid: string | undefined;
 

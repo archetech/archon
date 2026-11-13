@@ -31,3 +31,16 @@ All wallet endpoints are under `/api/v1` and require `X-Archon-Admin-Key` when `
 | `ARCHON_WALLET_SOL_COMMITMENT` | `ARCHON_SOL_COMMITMENT` or `confirmed` | Solana commitment |
 | `ARCHON_SOL_MEMO_PROGRAM_ID` | Memo program | Solana Memo program ID used for anchors |
 | `ARCHON_WALLET_SOL_DERIVATION_PATH` | `m/44'/501'/0'/0'` | HD derivation path |
+
+## Testing
+
+The Solana services use `@solana/web3.js` v3. From the repository root, install both services' dependencies before running the SDK regression tests:
+
+```sh
+npm ci
+npm ci --prefix services/mediators/solana --ignore-scripts
+npm ci --prefix services/mediators/solana-wallet --ignore-scripts
+npm test -- --runTestsByPath tests/mediators/solana-wallet.test.ts tests/mediators/solana-finality.test.ts --coverage=false
+```
+
+These tests exercise deterministic addresses, finalized reads, bigint JSON boundaries, and real SDK signing/submission against a simulated RPC endpoint; they do not spend SOL or contact a public network.
