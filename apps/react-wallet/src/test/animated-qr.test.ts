@@ -1,7 +1,8 @@
 import { Buffer } from 'buffer';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { UR, URDecoder, UREncoder } from '@gandlaf21/bc-ur';
 import { animatedQrFrames, qrCollector } from '../../../../packages/wallet-ui/src/utils/animatedQr';
+import reference from '../../../../tests/fixtures/animated-qr-frames.json';
 
 // Animated QR codes (NUT-16). The frames are checked against the UR library
 // used the way another Cashu wallet uses it, since interoperating with those
@@ -22,6 +23,16 @@ function collect(frames: string[]) {
 }
 
 describe('animated QR frames', () => {
+    // The extension builds the library against another version of the hash
+    // function that seeds the coded frames, and checks the same file.
+    it('are the same from one build to another, the fountain-coded ones included', () => {
+        const next = animatedQrFrames(reference.text);
+        const frames = Array.from({ length: 80 }, () => next());
+        for (const [number, frame] of Object.entries(reference.frames)) {
+            expect(frames[Number(number) - 1]).toBe(frame);
+        }
+    });
+
     it('are UR parts of a bytes message, in uppercase', () => {
         const next = animatedQrFrames(TOKEN);
         const frames = Array.from({ length: 5 }, () => next());
@@ -83,6 +94,62 @@ describe('collecting scanned codes', () => {
         const frames = Array.from({ length: 300 }, () => next());
         const noisy = frames.flatMap((frame, i) => (i % 7 === 0 ? ['UR:BYTES/1-3/NOTBYTEWORDS', 'ur:', frame] : [frame]));
         expect(collect(noisy).text).toBe(TOKEN);
+    });
+
+    it('drops a part that claims more parts than any token has, without handing it to the decoder', () => {
+        const receive = vi.spyOn(URDecoder.prototype, 'receivePart');
+        const collector = qrCollector();
+        // A real part of a one-part message, relabelled.
+        const body = new UREncoder(UR.fromBuffer(Buffer.from('short')), 150).nextPart().split('/').pop();
+        for (const claim of ['1-1000000000', '1-2001', '0-5', '1-0', '99999999999-5']) {
+            expect(collector.accept(`ur:bytes/${claim}/${body}`)).toBe(0);
+        }
+        expect(receive).not.toHaveBeenCalled();
+        receive.mockRestore();
+
+        const next = animatedQrFrames(TOKEN);
+        expect(collect(Array.from({ length: 300 }, () => next())).text).toBe(TOKEN);
+    });
+
+    it('ignores a UR of another type, which would otherwise fix the decoder on that type', () => {
+        const collector = qrCollector();
+        expect(collector.accept('ur:crypto-psbt/notbytewords')).toBe(0);
+        expect(collector.accept('UR:CRYPTO-PSBT/1-3/LPADAXCS')).toBe(0);
+
+        const next = animatedQrFrames(TOKEN);
+        let progress = 0;
+        for (let i = 0; i < 300 && progress < 1; i++) {
+            progress = collector.accept(next());
+        }
+        expect(collector.result()).toBe(TOKEN);
+    });
+
+    it('starts again after a message that fails its checksum', async () => {
+        const { FountainEncoderPart } = await import('../../node_modules/@gandlaf21/bc-ur/dist/lib/es6/fountainEncoder.js');
+        const bytewords = (await import('../../node_modules/@gandlaf21/bc-ur/dist/lib/es6/bytewords.js')).default;
+        const encoder = new UREncoder(UR.fromBuffer(Buffer.from(TOKEN)), 150);
+        const count = Number(encoder.nextPart().split('/')[1].split('-')[1]);
+        const fresh = new UREncoder(UR.fromBuffer(Buffer.from(TOKEN)), 150);
+        const frames = Array.from({ length: count }, () => fresh.nextPart());
+        // The first part with its data changed and its own checksum made good,
+        // so only the message's checksum can catch it.
+        const [, sequence, body] = frames[0].split('/');
+        const part = FountainEncoderPart.fromCBOR(bytewords.decode(body, bytewords.STYLES.MINIMAL));
+        const fragment = Buffer.from(part.fragment);
+        fragment[0] ^= 0xff;
+        const forged = new FountainEncoderPart(part.seqNum, part.seqLength, part.messageLength, part.checksum, fragment);
+        frames[0] = `ur:bytes/${sequence}/${bytewords.encode(forged.cbor().toString('hex'), bytewords.STYLES.MINIMAL)}`;
+
+        const collector = qrCollector();
+        const progress = frames.map(frame => collector.accept(frame));
+        expect(progress[progress.length - 1]).toBe(0);
+        expect(collector.result()).toBeNull();
+
+        const next = animatedQrFrames(TOKEN);
+        for (let i = 0; i < 300 && collector.result() === null; i++) {
+            collector.accept(next());
+        }
+        expect(collector.result()).toBe(TOKEN);
     });
 
     it('keeps the first text once complete', () => {

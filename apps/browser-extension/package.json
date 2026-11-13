@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@gandlaf21/bc-ur": "^1.1.12",
+    "@noble/hashes": "^2.4.0",
     "qrcode.react": "^4.2.0"
   }
 }
