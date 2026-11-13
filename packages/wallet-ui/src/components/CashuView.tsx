@@ -36,6 +36,7 @@ import type {
     DecodedLightningInvoice,
     KeymasterInterface,
 } from "@didcid/clients/keymaster-types";
+import { FRAME_MS, animatedQrFrames, qrCollector } from "../utils/animatedQr";
 import PageHeader from "./layout/PageHeader";
 import EmptyState from "./layout/EmptyState";
 
@@ -59,6 +60,9 @@ type Props = {
     hasNodeMint: boolean;
     hasDidComm: boolean;
     recipients: string[];
+    // The host's camera, where it can scan continuously. Without it the view
+    // offers no scan.
+    scanQrFrames?: (accept: (scanned: string) => number) => Promise<boolean>;
     notify: {
         error: (error: unknown) => void;
         success: (message: string) => void;
@@ -140,23 +144,36 @@ function CopyAndQr({ label, value, onCopy, onCopyFailed }: {
                     Copy
                 </Button>
             </Box>
-            {value.length <= QR_LIMIT ? (
-                // White plate: a dark page behind the code breaks scanning.
-                <Box sx={{ p: 2, backgroundColor: "#fff", alignSelf: "flex-start" }}>
-                    <QRCodeSVG value={value} size={220} />
-                </Box>
-            ) : (
+            {/* White plate: a dark page behind the code breaks scanning. */}
+            <Box sx={{ p: 2, backgroundColor: "#fff", alignSelf: "flex-start" }}>
+                {value.length <= QR_LIMIT ? <QRCodeSVG value={value} size={220} /> : <AnimatedQr value={value} />}
+            </Box>
+            {value.length > QR_LIMIT && (
                 <Typography variant="body2" color="text.secondary">
-                    Too long for a QR code. Copy it instead.
+                    Too long for one QR code, so this one is animated. Keep the camera on it until the other wallet has read every part.
                 </Typography>
             )}
         </Box>
     );
 }
 
+// A text too long for one code, shown a part at a time (NUT-16).
+function AnimatedQr({ value }: { value: string }) {
+    const [frame, setFrame] = useState("");
+
+    useEffect(() => {
+        const next = animatedQrFrames(value);
+        setFrame(next());
+        const timer = setInterval(() => setFrame(next()), FRAME_MS);
+        return () => clearInterval(timer);
+    }, [value]);
+
+    return frame ? <QRCodeSVG value={frame} size={220} aria-label="Animated QR code" /> : null;
+}
+
 // Shared by the wallets and the standalone clients. Every decision about value stays
 // in Keymaster: this view asks it and shows the answer.
-export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm, recipients, notify: hostNotify }: Props) {
+export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm, recipients, scanQrFrames, notify: hostNotify }: Props) {
     // Hosts build these afresh on each render, and showing one renders the host, so
     // nothing here may depend on their identity.
     const notifyRef = useRef(hostNotify);
@@ -507,6 +524,19 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         }
     }
 
+    // Fills in the token, and leaves receiving it to the person, who can see
+    // what was scanned first. A cancelled scan changes nothing.
+    function handleScan() {
+        run("scan", async () => {
+            const collector = qrCollector();
+            const completed = await scanQrFrames!(scanned => collector.accept(scanned));
+            const scanned = collector.result();
+            if (completed && scanned) {
+                setToken(scanned);
+            }
+        });
+    }
+
     function handleReceive() {
         const submitted = token.trim();
         run("receive", async () => {
@@ -636,9 +666,10 @@ export default function CashuView({ keymaster, identity, hasNodeMint, hasDidComm
         <>
             <TextField label="Token" placeholder="cashuB..." value={token} multiline rows={4} size="small"
                 onChange={event => setToken(event.target.value)} />
-            <Box>
+            <Row>
                 <ActionButton label="Receive" variant="contained" busy={busy.receive} disabled={!token.trim() || busy.addAndReceive} onClick={handleReceive} />
-            </Box>
+                {scanQrFrames && <ActionButton label="Scan" busy={busy.scan} onClick={handleScan} />}
+            </Row>
             {offeredMint && (
                 <Alert severity="warning">
                     <Box sx={{ wordBreak: "break-all" }}>This token is at a mint you have not added: {offeredMint.url}</Box>

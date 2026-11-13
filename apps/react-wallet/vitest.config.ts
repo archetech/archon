@@ -24,6 +24,10 @@ export default mergeConfig(viteConfig, defineConfig({
             // expected" before a wallet can be created. Under Node the native
             // Buffer already is one, so the polyfill is only in the way here.
             { find: 'buffer', replacement: 'node:buffer' },
+            // The UR library's CommonJS build requires cborg, which ships as ES
+            // modules only, so it cannot load under Node. Its ES build, which
+            // the app's bundle uses through the `module` field, can.
+            { find: '@gandlaf21/bc-ur', replacement: path.resolve(__dirname, 'node_modules/@gandlaf21/bc-ur/dist/lib/es6/index.js') },
             // The app imports the shared UI whole. KeymasterUI, which a test mounts
             // here, imports these entry points of it.
             { find: '@didcid/wallet-ui/did-repair', replacement: path.resolve(__dirname, '../../packages/wallet-ui/src/components/DIDRepairDialog.tsx') },
@@ -34,6 +38,9 @@ export default mergeConfig(viteConfig, defineConfig({
         environment: 'jsdom',
         include: ['src/**/*.test.tsx', 'src/**/*.test.ts'],
         setupFiles: ['./src/test/setup.ts'],
+        // Its ES build is plain `.js` in a package not marked as a module, so
+        // vite has to transform it rather than hand it to Node.
+        server: { deps: { inline: ['@gandlaf21/bc-ur'] } },
         // These mount real provider trees; a hang should fail rather than sit.
         testTimeout: 15000,
         // The render tests are the only ones that load the shared wallet UI,
