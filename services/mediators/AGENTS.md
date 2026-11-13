@@ -6,6 +6,8 @@
 
 - Solana imports must use finalized commitment for tips, signature discovery, parsed transactions, and block retrieval regardless of the outbound transaction commitment setting.
 
+- Solana web3.js v3 key creation is asynchronous and RPC integers are bigint. Await keys before use, preserve deterministic registry/wallet derivation, and convert chain positions to safe integers at Archon's JSON/storage boundaries; keep exact lamport amounts as strings.
+
 - Rewind exclusion must cover complete CID fetch/import requests, not just event processing or a queue snapshot. Test imports already in flight and arrivals during withdrawal; preserve retry behavior in both cases. Numeric block height zero must use `/0`, not `/latest`, in shared clients.
 
 - Genesis retrieval must validate cached operation shape and DID identity before accepting a cache hit. CID ingress can retain retrieval aliases, so an invalid cache hit must retry IPFS without rewriting historical aliases. Cover recovery through ordinary CID ingress with a corrected upstream response.

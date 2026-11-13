@@ -98,13 +98,13 @@ const network = toNetwork(process.env.ARCHON_SOL_NETWORK);
 const chain = process.env.ARCHON_SOL_CHAIN || defaultChain(network);
 const memoProgramId = process.env.ARCHON_SOL_MEMO_PROGRAM_ID || 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
 
-function registryAddress(): string {
+async function registryAddress(): Promise<string> {
     const seed = createHash('sha256')
         .update('archon-solana-registry-signer-v1')
         .update(chain)
         .update(memoProgramId)
         .digest();
-    return Keypair.fromSeed(seed).publicKey.toBase58();
+    return (await Keypair.fromSeed(seed)).publicKey.toBase58();
 }
 
 const config: AppConfig = {
@@ -118,7 +118,7 @@ const config: AppConfig = {
     rpcUrl: process.env.ARCHON_SOL_RPC_URL || defaultRpcUrl(network),
     commitment: toCommitment(process.env.ARCHON_SOL_COMMITMENT),
     memoProgramId,
-    registryAddress: registryAddress(),
+    registryAddress: await registryAddress(),
     importInterval: process.env.ARCHON_SOL_IMPORT_INTERVAL ? parseInt(process.env.ARCHON_SOL_IMPORT_INTERVAL) : 0,
     exportInterval: process.env.ARCHON_SOL_EXPORT_INTERVAL ? parseInt(process.env.ARCHON_SOL_EXPORT_INTERVAL) : 0,
     signaturePageLimit: process.env.ARCHON_SOL_SIGNATURE_PAGE_LIMIT ? parseInt(process.env.ARCHON_SOL_SIGNATURE_PAGE_LIMIT) : 100,

@@ -66,13 +66,13 @@ const network = toNetwork(process.env.ARCHON_WALLET_SOL_NETWORK || process.env.A
 const chain = process.env.ARCHON_SOL_CHAIN || (network === 'mainnet-beta' ? 'SOL:mainnet-beta' : `SOL:${network}`);
 const memoProgramId = process.env.ARCHON_SOL_MEMO_PROGRAM_ID || 'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr';
 
-function registryAddress(): string {
+async function registryAddress(): Promise<string> {
     const seed = createHash('sha256')
         .update('archon-solana-registry-signer-v1')
         .update(chain)
         .update(memoProgramId)
         .digest();
-    return Keypair.fromSeed(seed).publicKey.toBase58();
+    return (await Keypair.fromSeed(seed)).publicKey.toBase58();
 }
 
 const config: AppConfig = {
@@ -85,7 +85,7 @@ const config: AppConfig = {
     network,
     commitment: toCommitment(process.env.ARCHON_WALLET_SOL_COMMITMENT || process.env.ARCHON_SOL_COMMITMENT),
     memoProgramId,
-    registryAddress: registryAddress(),
+    registryAddress: await registryAddress(),
     derivationPath: process.env.ARCHON_WALLET_SOL_DERIVATION_PATH || "m/44'/501'/0'/0'",
 };
 

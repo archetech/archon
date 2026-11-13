@@ -37,6 +37,8 @@ updates:
       - "/services/keymaster/server"
       - "/services/mediators/hyperswarm"
       - "/services/mediators/satoshi"
+      - "/services/mediators/solana"
+      - "/services/mediators/solana-wallet"
       - "/services/satoshi-wallet/server"
     schedule:
       interval: "weekly"
@@ -58,29 +60,6 @@ updates:
         update-types:
           - "minor"
           - "patch"
-
-  # The Solana mediators get security updates only (limit 0 disables routine
-  # version updates). @solana/web3.js 3 is a rewrite with an async Keypair API
-  # that these mediators do not use yet, so its major versions are ignored.
-  - package-ecosystem: "npm"
-    directories:
-      - "/services/mediators/solana"
-      - "/services/mediators/solana-wallet"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "05:00"
-      timezone: "America/Toronto"
-    open-pull-requests-limit: 0
-    labels:
-      - "dependencies"
-      - "javascript"
-    commit-message:
-      prefix: "deps"
-    ignore:
-      - dependency-name: "@solana/web3.js"
-        update-types:
-          - "version-update:semver-major"
 
   # Core Lightning releases, for the ghcr.io/archetech/cln base image. Only
   # this image is allowed: the other Dockerfiles' bases are not managed here.
