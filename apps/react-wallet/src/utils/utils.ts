@@ -1,3 +1,4 @@
+import {Capacitor} from "@capacitor/core";
 import {BarcodeFormat, BarcodeScanner} from "@capacitor-mlkit/barcode-scanning";
 
 export function extractDid(input: string): string | null {
@@ -268,6 +269,13 @@ export async function scanQrFrames(accept: (scanned: string) => number): Promise
         await BarcodeScanner.stopScan().catch(() => undefined);
         overlay.remove();
     }
+}
+
+// The continuous scanner, where this app has one. It also runs in a browser,
+// where the plugin would need a video element to draw into, which nothing here
+// gives it; a view offers no scan without this.
+export function nativeScanQrFrames(): typeof scanQrFrames | undefined {
+    return Capacitor.isNativePlatform() ? scanQrFrames : undefined;
 }
 
 export async function scanAliasQrCode(): Promise<{ alias: string; did: string } | null> {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { scanQrFrames } from '../utils/utils';
+import { nativeScanQrFrames, scanQrFrames } from '../utils/utils';
 
 // The continuous scanner the wallet gives the shared UI on Android. The plugin
 // is replaced by one whose camera the test drives: it hands the listener the
@@ -9,10 +9,15 @@ type Listener = (event: { barcodes: { rawValue: string }[] }) => void;
 
 const plugin = vi.hoisted(() => ({
     listener: undefined as Listener | undefined,
+    native: true,
     removed: 0,
     requestPermissions: vi.fn(),
     startScan: vi.fn(),
     stopScan: vi.fn(),
+}));
+
+vi.mock('@capacitor/core', () => ({
+    Capacitor: { isNativePlatform: () => plugin.native, getPlatform: () => (plugin.native ? 'android' : 'web') },
 }));
 
 vi.mock('@capacitor-mlkit/barcode-scanning', () => ({
@@ -36,6 +41,7 @@ const opened = () => vi.waitFor(() => expect(plugin.startScan).toHaveBeenCalled(
 
 beforeEach(() => {
     plugin.listener = undefined;
+    plugin.native = true;
     plugin.removed = 0;
     plugin.requestPermissions.mockReset().mockResolvedValue({ camera: 'granted' });
     plugin.startScan.mockReset().mockResolvedValue(undefined);
@@ -104,5 +110,16 @@ describe('scanQrFrames', () => {
         expect(plugin.removed).toBe(1);
         expect(scanning()).toBe(false);
         expect(overlay()).toBeNull();
+    });
+});
+
+describe('the continuous scanner as a capability', () => {
+    it('is offered in the native app', () => {
+        expect(nativeScanQrFrames()).toBe(scanQrFrames);
+    });
+
+    it('is not offered in a browser, where the plugin has nothing to draw the camera into', () => {
+        plugin.native = false;
+        expect(nativeScanQrFrames()).toBeUndefined();
     });
 });
