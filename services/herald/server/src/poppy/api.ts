@@ -1,14 +1,16 @@
 import { Request, Response, Router, NextFunction } from 'express';
-import { endpoints, type PoppyConfig } from './config.js';
+import type { Agent } from './agents.js';
+import { POPPY_PROTOCOL_VERSION, endpoints, type PoppyConfig } from './config.js';
 import { DPOP_ALGORITHMS, verifyDpopProof } from './dpop.js';
-import { RateLimiter } from './rate-limit.js';
+import { RateLimitedError, RateLimiter } from './rate-limit.js';
+import { SessionHeaderError, verifySessionHeader } from './session-header.js';
 import type { PoppyStore } from './store.js';
 
-// The OpenAPI interface listed in poppy.json (spec section 6). Every request
-// carries a DPoP-bound Session Token; Bearer tokens are refused because this
-// is not an MCP API (4.3). Signed out, an agent can do what any visitor to
-// Herald can; signed in, it acts on the User's own Herald account within the
-// scopes the User granted.
+// The OpenAPI interface listed in poppy.json (spec section 7). Every request
+// carries the Session header, which says which agent, User and Session it is
+// from. A signed-in request also carries a DPoP-bound access token, which says
+// which account it may act on and with which scopes. Signed out, an agent can
+// do what any visitor to Herald can.
 
 export interface AccountResult {
     status: number;
@@ -38,7 +40,8 @@ export interface PoppyAccounts {
 export interface PoppyRequestContext {
     clientId: string;
     userId: string;
-    sessionId: string;
+    sessionKey: string;
+    agentId?: string;
     did?: string;
     scope: string[];
 }
@@ -48,26 +51,46 @@ interface ApiOptions {
     store: PoppyStore;
     accounts: PoppyAccounts;
     now: () => number;
+    // Loads the agent a Session header names, within the budget for clients
+    // not seen before; `rememberClient` takes a verified one out of it.
+    loadAgent(clientId: string, refreshKeys?: boolean): Promise<Agent>;
+    rememberClient(clientId: string): void;
 }
 
-function challenge(res: Response, status: number, error?: string, extra: Record<string, string> = {}): void {
+// An access token error, in WWW-Authenticate as RFC 9449 §7.1 and RFC 6750 §3
+// describe. With no error code, the request needs the account and carried no
+// token; `scope` then names what to ask for (spec section 7).
+function challenge(res: Response, status: number, error?: string, scope?: string): void {
     const params = [`algs="${DPOP_ALGORITHMS.join(' ')}"`];
+    if (scope) {
+        params.unshift(`scope="${scope}"`);
+    }
     if (error) {
         params.unshift(`error="${error}"`);
     }
-    for (const [key, value] of Object.entries(extra)) {
-        params.push(`${key}="${value}"`);
-    }
     res.set('WWW-Authenticate', `DPoP ${params.join(', ')}`);
     res.set('Cache-Control', 'no-store');
-    res.status(status).json({ error: error ?? 'invalid_token' });
+    res.status(status).json(error ? { error } : {});
+}
+
+// A Session or version error: HTTP 400 with a JSON body, not 401, so that an
+// OAuth library does not take it for a problem with the token (5.3).
+function sessionError(res: Response, error: string, description?: string): void {
+    res.set('Cache-Control', 'no-store');
+    res.status(400).json(description ? { error, error_description: description } : { error });
+}
+
+function tooManyRequests(res: Response, retryAfter: number): void {
+    res.set('Retry-After', String(retryAfter));
+    res.set('Cache-Control', 'no-store');
+    res.status(429).json({});
 }
 
 function context(res: Response): PoppyRequestContext {
     return res.locals.poppy as PoppyRequestContext;
 }
 
-export function createApiRouter({ config, store, accounts, now }: ApiOptions): Router {
+export function createApiRouter({ config, store, accounts, now, loadAgent, rememberClient }: ApiOptions): Router {
     const urls = endpoints(config);
     const clientLimiter = new RateLimiter(600, 60_000, now);
     const sessionLimiter = new RateLimiter(120, 60_000, now);
@@ -79,57 +102,83 @@ export function createApiRouter({ config, store, accounts, now }: ApiOptions): R
                 res.status(400).json({ error: 'invalid_request', error_description: 'tokens are not accepted in a URL' });
                 return;
             }
-            const authorization = req.headers.authorization || '';
-            // Authentication schemes are case-insensitive (RFC 9110 §11.1).
-            const match = /^DPoP\s+([A-Za-z0-9\-._~+/]+=*)$/i.exec(authorization);
-            if (!match) {
-                challenge(res, 401, authorization ? 'invalid_token' : undefined);
-                return;
-            }
-            const token = match[1];
-            const record = await store.getSessionToken(token);
-            if (!record) {
-                challenge(res, 401, 'invalid_token');
-                return;
-            }
             const url = `${config.origin}/names${new URL(req.originalUrl, 'http://herald').pathname}`;
-            let jkt: string;
-            try {
-                jkt = await verifyDpopProof({ header: req.headers.dpop, method: req.method, url, accessToken: token }, store.kv, now);
-            }
-            catch {
-                challenge(res, 401, 'invalid_dpop_proof');
-                return;
-            }
-            if (jkt !== record.jkt) {
-                challenge(res, 401, 'invalid_dpop_proof');
-                return;
-            }
 
-            const wait = clientLimiter.take(record.clientId) || sessionLimiter.take(record.sessionId);
-            if (wait) {
-                res.set('Retry-After', String(wait));
-                res.status(429).json({ error: 'rate_limited' });
-                return;
-            }
-
-            // Sign-out takes effect at once: a signed-in token counts only
-            // while its Session is still signed in with the same grant (4.9).
-            let did: string | undefined;
-            if (record.signedIn && record.grantId) {
-                const session = await store.getSession(record.sessionId);
-                const current = session ? await store.getSessionGrant(session.id) : null;
-                const grant = current === record.grantId ? await store.getGrant(record.grantId) : null;
-                if (grant && grant.did === record.did) {
-                    did = grant.did;
+            // The access token, when there is one. It is checked before the
+            // Session header so that an expired token is reported as one,
+            // which the agent fixes by refreshing.
+            let account: { token: string; clientId: string; did: string; scope: string[] } | undefined;
+            const authorization = req.headers.authorization;
+            if (authorization) {
+                // Authentication schemes are case-insensitive (RFC 9110 §11.1).
+                const match = /^DPoP\s+([A-Za-z0-9\-._~+/]+=*)$/i.exec(authorization);
+                const token = match?.[1];
+                const record = token ? await store.getAccessToken(token) : null;
+                // Revocation takes effect at once: a token counts only while
+                // the grant it was issued under still exists (5.5).
+                const grant = record ? await store.getGrant(record.grantId) : null;
+                if (!token || !record || !grant || grant.did !== record.did) {
+                    challenge(res, 401, 'invalid_token');
+                    return;
                 }
+                let jkt: string | undefined;
+                try {
+                    jkt = await verifyDpopProof({ header: req.headers.dpop, method: req.method, url, accessToken: token }, store.kv, now);
+                }
+                catch {
+                    // Left undefined, it fails the comparison below.
+                }
+                if (jkt !== record.jkt) {
+                    challenge(res, 401, 'invalid_dpop_proof');
+                    return;
+                }
+                account = { token, clientId: record.clientId, did: record.did, scope: record.scope };
             }
+
+            let session;
+            try {
+                session = await verifySessionHeader({
+                    header: req.headers['poppy-session'],
+                    version: req.headers['poppy-version'],
+                    method: req.method,
+                    url,
+                    accessToken: account && { token: account.token, clientId: account.clientId },
+                }, { issuer: config.issuer, versions: [POPPY_PROTOCOL_VERSION], loadAgent, kv: store.kv, now });
+            }
+            catch (error) {
+                if (error instanceof SessionHeaderError) {
+                    sessionError(res, error.code, error.message);
+                    return;
+                }
+                if (error instanceof RateLimitedError) {
+                    tooManyRequests(res, error.retryAfter);
+                    return;
+                }
+                throw error;
+            }
+            rememberClient(session.clientId);
+
+            const sessionKey = store.sessionKey(session.clientId, session.sessionId, session.userId);
+            const wait = clientLimiter.take(session.clientId) || sessionLimiter.take(sessionKey);
+            if (wait) {
+                tooManyRequests(res, wait);
+                return;
+            }
+
+            // A Session uses one account. A token for another one is refused,
+            // and the agent starts a new Session for it (5.4).
+            if (account && !await store.bindSessionAccount(sessionKey, account.did, config.sessionSeconds)) {
+                sessionError(res, 'session_ended', 'this Session has used a different account');
+                return;
+            }
+
             res.locals.poppy = {
-                clientId: record.clientId,
-                userId: record.userId,
-                sessionId: record.sessionId,
-                did,
-                scope: did ? record.scope : [],
+                clientId: session.clientId,
+                userId: session.userId,
+                sessionKey,
+                agentId: session.agentId,
+                did: account?.did,
+                scope: account?.scope ?? [],
             } satisfies PoppyRequestContext;
             next();
         }
@@ -142,11 +191,11 @@ export function createApiRouter({ config, store, accounts, now }: ApiOptions): R
         return (_req: Request, res: Response, next: NextFunction) => {
             const ctx = context(res);
             if (!ctx.did) {
-                challenge(res, 403, 'sign_in_required');
+                challenge(res, 401, undefined, scope);
                 return;
             }
             if (!ctx.scope.includes(scope)) {
-                challenge(res, 403, 'insufficient_scope', { scope });
+                challenge(res, 403, 'insufficient_scope', scope);
                 return;
             }
             next();
@@ -197,20 +246,20 @@ export function createApiRouter({ config, store, accounts, now }: ApiOptions): R
         send(res, { status: 200, body: await accounts.directory() });
     }));
 
-    router.get('/api/account', requireScope('poppy:read'), handle(async (_req, res) => {
+    router.get('/api/account', requireScope('profile:read'), handle(async (_req, res) => {
         const profile = await accounts.profile(context(res).did!);
         send(res, profile ? { status: 200, body: profile } : { status: 404, body: { error: 'account_not_found' } });
     }));
 
-    router.get('/api/account/credential', requireScope('poppy:read'), handle(async (_req, res) => {
+    router.get('/api/account/credential', requireScope('profile:read'), handle(async (_req, res) => {
         send(res, await accounts.credential(context(res).did!));
     }));
 
-    router.put('/api/account/name', requireScope('poppy:write'), handle(async (req, res) => {
+    router.put('/api/account/name', requireScope('name:write'), handle(async (req, res) => {
         send(res, await accounts.setName(context(res).did!, req.body?.name));
     }));
 
-    router.delete('/api/account/name', requireScope('poppy:write'), handle(async (_req, res) => {
+    router.delete('/api/account/name', requireScope('name:write'), handle(async (_req, res) => {
         send(res, await accounts.deleteName(context(res).did!));
     }));
 
@@ -220,6 +269,7 @@ export function createApiRouter({ config, store, accounts, now }: ApiOptions): R
 export function openApiDocument(config: PoppyConfig, apiUrl: string) {
     const error = { $ref: '#/components/schemas/Error' };
     const json = (schema: unknown) => ({ content: { 'application/json': { schema } } });
+    // Only the /account operations need an access token.
     const security = [{ dpop: [] }];
     const nameParam = { name: 'name', in: 'path', required: true, schema: { type: 'string' } };
     return {
@@ -227,13 +277,12 @@ export function openApiDocument(config: PoppyConfig, apiUrl: string) {
         info: {
             title: `${config.organizationName} names`,
             version: '1.0.0',
-            description: `Archon names at ${config.domain}. Requests carry a DPoP-bound Personal Agent Protocol Session Token. Lookups work signed out; /account needs a signed-in Session with poppy:read or poppy:write.`,
+            description: `Archon names at ${config.domain}. Every request carries the Personal Agent Protocol Session header. Lookups work signed out; /account also needs a DPoP-bound access token with profile:read or name:write.`,
         },
         servers: [{ url: apiUrl }],
-        security,
         components: {
             securitySchemes: {
-                dpop: { type: 'http', scheme: 'DPoP', description: 'Session Token with a DPoP Proof (RFC 9449).' },
+                dpop: { type: 'http', scheme: 'DPoP', description: 'Access token with a DPoP proof (RFC 9449), for the /account operations.' },
             },
             schemas: {
                 Error: { type: 'object', properties: { error: { type: 'string' } }, required: ['error'] },
@@ -289,27 +338,31 @@ export function openApiDocument(config: PoppyConfig, apiUrl: string) {
             '/account': {
                 get: {
                     operationId: 'getAccount',
-                    summary: "The signed-in User's profile (poppy:read)",
-                    responses: { 200: { description: 'Profile', ...json({ $ref: '#/components/schemas/Account' }) }, 403: { description: 'sign_in_required or insufficient_scope', ...json(error) } },
+                    security,
+                    summary: "The signed-in User's profile (profile:read)",
+                    responses: { 200: { description: 'Profile', ...json({ $ref: '#/components/schemas/Account' }) }, 401: { description: 'No access token; the challenge names the scope needed' }, 403: { description: 'insufficient_scope', ...json(error) } },
                 },
             },
             '/account/credential': {
                 get: {
                     operationId: 'getAccountCredential',
-                    summary: "The signed-in User's membership credential (poppy:read)",
+                    security,
+                    summary: "The signed-in User's membership credential (profile:read)",
                     responses: { 200: { description: 'Verifiable credential', ...json({ type: 'object' }) }, 404: { description: 'No credential', ...json(error) } },
                 },
             },
             '/account/name': {
                 put: {
                     operationId: 'setAccountName',
-                    summary: "Claim or change the signed-in User's name (poppy:write)",
+                    security,
+                    summary: "Claim or change the signed-in User's name (name:write)",
                     requestBody: { required: true, ...json({ type: 'object', properties: { name: { type: 'string' } }, required: ['name'] }) },
                     responses: { 200: { description: 'Name set', ...json({ type: 'object' }) }, 400: { description: 'Invalid name', ...json({ type: 'object' }) }, 409: { description: 'Name taken', ...json({ type: 'object' }) } },
                 },
                 delete: {
                     operationId: 'deleteAccountName',
-                    summary: "Release the signed-in User's name and revoke its credential (poppy:write)",
+                    security,
+                    summary: "Release the signed-in User's name and revoke its credential (name:write)",
                     responses: { 200: { description: 'Name released', ...json({ type: 'object' }) }, 404: { description: 'No name', ...json({ type: 'object' }) } },
                 },
             },

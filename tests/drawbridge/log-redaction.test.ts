@@ -6,8 +6,9 @@ import { Writable } from 'stream';
 
 import { REDACTED_LOG_PATHS } from '../../services/drawbridge/server/src/log-redaction.ts';
 
-// Drawbridge's production request log records headers; bearer secrets in them
-// (Poppy Session Tokens and proofs, cookies, codes in redirects) are redacted.
+// Drawbridge's production request log records headers; secrets in them (Poppy
+// access tokens, proofs and Session JWTs, cookies, codes in redirects) are
+// redacted.
 describe('request log redaction', () => {
     it('logs secret-bearing headers as redacted and keeps the rest', async () => {
         const lines: string[] = [];
@@ -20,15 +21,16 @@ describe('request log redaction', () => {
         });
 
         await request(app).get('/names/poppy/authorize')
-            .set('Authorization', 'DPoP pst_secret')
+            .set('Authorization', 'DPoP pat_secret')
             .set('DPoP', 'eyJproof')
+            .set('Poppy-Session', 'eyJsession')
             .set('Cookie', 'connect.sid=s3cret')
             .set('X-Archon-Admin-Key', 'admin-secret')
             .set('X-Cashu', 'cashuBspendable-token')
             .set('User-Agent', 'test-agent');
 
         const log = lines.join('');
-        for (const secret of ['pst_secret', 'eyJproof', 's3cret', 'admin-secret', 'browser-secret', 'pac_secret', 'cashuBspendable-token']) {
+        for (const secret of ['pat_secret', 'eyJproof', 'eyJsession', 's3cret', 'admin-secret', 'browser-secret', 'pac_secret', 'cashuBspendable-token']) {
             expect(log).not.toContain(secret);
         }
         expect(log).toContain('[redacted]');

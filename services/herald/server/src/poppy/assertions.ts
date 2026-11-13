@@ -2,11 +2,12 @@ import { createLocalJWKSet, decodeProtectedHeader, errors, jwtVerify, type JWTPa
 import type { Agent, AgentDirectory } from './agents.js';
 import type { PoppyKV } from './kv.js';
 
-// Client assertions (spec 4.1, RFC 7523) and Session assertions (4.2), both
-// signed with a key from the Personal Agent's jwks_uri and addressed to this
-// Company's issuer as a single string.
+// Client assertions (spec 4.1, RFC 7523): signed with a key from the Personal
+// Agent's jwks_uri and addressed to this Company's issuer as a single string.
+// ES256 must be accepted; PS384 lets an agent have its assertions signed
+// blindly (10.7).
 
-export const ASSERTION_ALGORITHMS = ['ES256', 'RS256'];
+export const ASSERTION_ALGORITHMS = ['ES256', 'PS384', 'RS256'];
 const CLOCK_SKEW_SECONDS = 30;
 const MAX_LIFETIME_SECONDS = 5 * 60;
 const MIN_JTI_LENGTH = 16;
@@ -14,8 +15,9 @@ const MIN_JTI_LENGTH = 16;
 export class AssertionError extends Error {}
 
 // Header types that belong to other uses and must never authenticate a token
-// request: a browser assertion (spec 5) and a DPoP Proof (4.3).
-const FOREIGN_TYPES = new Set(['poppy-browser+jwt', 'dpop+jwt']);
+// request: a browser assertion (spec 6), a DPoP proof (4.5), and a Session
+// JWT or its delegation (5.2).
+const FOREIGN_TYPES = new Set(['poppy-browser+jwt', 'dpop+jwt', 'poppy-session+jwt', 'poppy-delegation+jwt']);
 
 async function verifyWithAgentKeys(token: string, agent: Agent, directory: AgentDirectory, issuer: string) {
     const options = {

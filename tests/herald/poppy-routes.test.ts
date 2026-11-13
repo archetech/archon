@@ -55,9 +55,14 @@ describe('herald with the Personal Agent Protocol enabled', () => {
         expect(poppy.body.organization).toEqual({ name: 'archon.test', domain: 'archon.test' });
         expect(poppy.body.auth.issuer).toBe('https://archon.test/names/poppy');
 
+        // How an agent finds the issuer, and how the issuer confirms it.
+        const resource = await request(app).get('/.well-known/oauth-protected-resource');
+        expect(resource.status).toBe(200);
+        expect(resource.body).toMatchObject({ resource: 'https://archon.test', authorization_servers: ['https://archon.test/names/poppy'] });
+
         const metadata = await request(app).get('/.well-known/oauth-authorization-server/names/poppy');
         expect(metadata.status).toBe(200);
-        expect(metadata.body.poppy_domains).toEqual(['archon.test']);
+        expect(metadata.body.protected_resources).toEqual(['https://archon.test']);
     });
 
     it('mounts the token endpoint under /poppy', async () => {

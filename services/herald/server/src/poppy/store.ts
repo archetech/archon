@@ -1,8 +1,9 @@
 import crypto from 'crypto';
+import { currentScopes } from './config.js';
 import type { PoppyKV } from './kv.js';
 
-// Durable Poppy state. Bearer secrets (Session Tokens, Account Tokens,
-// authorization and device codes) are stored only as SHA-256 hashes.
+// Durable Poppy state. Secrets (access tokens, refresh tokens, authorization
+// and device codes) are stored only as SHA-256 hashes.
 //
 // Herald may run several requests for the same Session, sign-in or device
 // code at once, so every one-way transition is decided by one atomic store
@@ -11,33 +12,23 @@ import type { PoppyKV } from './kv.js';
 // that a revocation may have just deleted. Records that such transitions
 // depend on are written once and never rewritten.
 
-export interface Session {
-    id: string;
+export interface AccessToken {
     clientId: string;
-    userId: string;
-    createdAt: number;
-    expiresAt: number;
-}
-
-export interface SessionToken {
-    sessionId: string;
-    clientId: string;
-    userId: string;
-    jkt: string;
+    did: string;
     scope: string[];
-    signedIn: boolean;
-    grantId?: string;
-    did?: string;
+    grantId: string;
+    // Thumbprint of the DPoP key the token is bound to.
+    jkt: string;
     expiresAt: number;
 }
 
+// A refresh token and what it grants.
 export interface Grant {
     id: string;
     tokenHash: string;
     clientId: string;
     clientName: string;
     domain: string;
-    userId: string;
     did: string;
     scope: string[];
     createdAt: number;
@@ -129,59 +120,35 @@ export class PoppyStore {
 
     // ---------- Sessions ----------
 
-    async putSession(session: Session): Promise<void> {
-        await this.putJson(`session:${session.id}`, session, session.expiresAt);
+    // A Session is named by the agent, the Session ID and the User ID in a
+    // verified Session header (spec 5.3). Herald keeps nothing for one beyond
+    // the account it has used.
+    sessionKey(clientId: string, sessionId: string, userId: string): string {
+        return hashSecret(JSON.stringify([clientId, sessionId, userId]));
     }
 
-    async getSession(id: unknown): Promise<Session | null> {
-        if (typeof id !== 'string' || !id) {
-            return null;
-        }
-        const session = await this.getJson<Session>(`session:${id}`);
-        return session && session.expiresAt > this.now() ? session : null;
-    }
-
-    // The grant a Session is signed in with now, kept apart from the Session
-    // record so that signing out can clear it only while it still names the
-    // revoked grant: a concurrent sign-in with another grant survives.
-    async getSessionGrant(sessionId: string): Promise<string | null> {
-        return this.kv.get(`session-grant:${sessionId}`);
-    }
-
-    async setSessionGrant(session: Session, grantId: string): Promise<boolean> {
-        if (!await this.getSession(session.id)) {
-            return false;
-        }
-        await this.kv.set(`session-grant:${session.id}`, grantId, this.ttl(session.expiresAt));
-        return true;
-    }
-
-    async clearSessionGrant(sessionId: string, grantId: string): Promise<void> {
-        await this.kv.deleteIfEquals(`session-grant:${sessionId}`, grantId);
-    }
-
-    // A Session is signed in to at most one account, ever (spec 4.4). The
-    // first DID to bind wins; returns whether `did` is that account.
-    async bindSessionAccount(session: Session, did: string): Promise<boolean> {
-        const key = `session-account:${session.id}`;
-        if (await this.kv.setIfAbsent(key, did, this.ttl(session.expiresAt))) {
+    // A Session uses at most one account (5.4). The first DID to bind wins;
+    // returns whether `did` is that account.
+    async bindSessionAccount(sessionKey: string, did: string, lifetimeSeconds: number): Promise<boolean> {
+        const key = `session-account:${sessionKey}`;
+        if (await this.kv.setIfAbsent(key, did, lifetimeSeconds)) {
             return true;
         }
         return (await this.kv.get(key)) === did;
     }
 
-    // ---------- Session Tokens ----------
+    // ---------- Access tokens ----------
 
-    async putSessionToken(token: string, record: SessionToken): Promise<void> {
-        await this.putJson(`stoken:${hashSecret(token)}`, record, record.expiresAt);
+    async putAccessToken(token: string, record: AccessToken): Promise<void> {
+        await this.putJson(`atoken:${hashSecret(token)}`, record, record.expiresAt);
     }
 
-    async getSessionToken(token: string): Promise<SessionToken | null> {
-        const record = await this.getJson<SessionToken>(`stoken:${hashSecret(token)}`);
+    async getAccessToken(token: string): Promise<AccessToken | null> {
+        const record = await this.getJson<AccessToken>(`atoken:${hashSecret(token)}`);
         return record && record.expiresAt > this.now() ? record : null;
     }
 
-    // ---------- Account Token grants ----------
+    // ---------- Refresh token grants ----------
 
     async putGrant(grant: Grant): Promise<void> {
         const ttl = this.ttl(grant.expiresAt);
@@ -192,7 +159,7 @@ export class PoppyStore {
 
     async getGrant(id: string): Promise<Grant | null> {
         const grant = await this.getJson<Grant>(`grant:${id}`);
-        return grant && grant.expiresAt > this.now() ? grant : null;
+        return grant && grant.expiresAt > this.now() ? { ...grant, scope: currentScopes(grant.scope) } : null;
     }
 
     async getGrantByToken(token: unknown): Promise<Grant | null> {
@@ -209,10 +176,6 @@ export class PoppyStore {
         return this.kv.setIfPresent(`grant:${grant.id}`, JSON.stringify({ ...grant, lastUsedAt: this.now() }), this.ttl(grant.expiresAt));
     }
 
-    async addGrantSession(grant: Grant, sessionId: string): Promise<void> {
-        await this.kv.addToSet(`grant-sessions:${grant.id}`, sessionId, this.ttl(grant.expiresAt));
-    }
-
     async listGrantsForDid(did: string): Promise<Grant[]> {
         const ids = await this.kv.members(`grants-by-did:${did}`);
         const grants: Grant[] = [];
@@ -227,16 +190,12 @@ export class PoppyStore {
         return grants;
     }
 
-    // Revokes a grant and signs out every Session signed in with it. The
-    // Sessions continue signed out, bound to their account (spec 4.9).
+    // Revokes a grant. Access tokens issued under it stop working at once,
+    // since each is checked against its grant (spec 5.5).
     async revokeGrant(grant: Grant): Promise<void> {
         await this.kv.del(`grant:${grant.id}`);
         await this.kv.del(`grant-token:${grant.tokenHash}`);
         await this.kv.removeFromSet(`grants-by-did:${grant.did}`, grant.id);
-        for (const sessionId of await this.kv.members(`grant-sessions:${grant.id}`)) {
-            await this.clearSessionGrant(sessionId, grant.id);
-        }
-        await this.kv.del(`grant-sessions:${grant.id}`);
     }
 
     // ---------- Authorization codes, single use ----------

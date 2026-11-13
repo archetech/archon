@@ -435,13 +435,13 @@ describe('protocol-defined refusals', () => {
         const app = express();
         app.use(publicRateLimit({
             store, name: 'poppy:auth', readPerSourceMax: 1, readGlobalMax: 1, windowSeconds: 60,
-            refusalBody: { error: 'rate_limited' },
+            refusalBody: {},
         }), (_req, res) => res.json({ ok: true }));
 
         const response = await request(app).post('/names/poppy/token');
 
         expect(response.status).toBe(429);
-        expect(response.body).toEqual({ error: 'rate_limited' });
+        expect(response.body).toEqual({});
         expect(response.headers['retry-after']).toBeDefined();
     });
 });

@@ -31,7 +31,7 @@ export function accessTokenHash(token: string): string {
     return crypto.createHash('sha256').update(token, 'ascii').digest('base64url');
 }
 
-// Returns the proof key's JWK thumbprint, which binds a Session Token.
+// Returns the proof key's JWK thumbprint, which binds an access token.
 export async function verifyDpopProof(check: DpopCheck, kv: PoppyKV, now: () => number = Date.now): Promise<string> {
     const { header } = check;
     // Node joins repeated unknown headers with ", "; a compact JWT has no comma.
@@ -92,7 +92,7 @@ export async function verifyDpopProof(check: DpopCheck, kv: PoppyKV, now: () => 
         throw new DpopError('DPoP proof is outside the acceptance window');
     }
     if (check.accessToken !== undefined && payload.ath !== accessTokenHash(check.accessToken)) {
-        throw new DpopError('DPoP proof ath does not match the Session Token');
+        throw new DpopError('DPoP proof ath does not match the access token');
     }
     if (typeof payload.jti !== 'string' || !payload.jti) {
         throw new DpopError('DPoP proof jti is missing');

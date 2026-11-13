@@ -22,9 +22,8 @@ function grant(id: string, lifetimeMs: number): Grant {
         clientId: AGENT_ID,
         clientName: 'Example Agent',
         domain: 'agent.example',
-        userId: 'usr_1',
         did: ALICE,
-        scope: ['poppy:read'],
+        scope: ['profile:read'],
         createdAt: clock,
         expiresAt: clock + lifetimeMs,
         lastUsedAt: clock,
@@ -33,19 +32,44 @@ function grant(id: string, lifetimeMs: number): Grant {
 
 describe('PoppyStore', () => {
     it('treats a missing or non-string identifier as unknown', async () => {
-        expect(await store.getSession(undefined)).toBeNull();
-        expect(await store.getSession(['ses_a', 'ses_b'])).toBeNull();
         expect(await store.getSignIn('')).toBeNull();
         expect(await store.takeAuthCode(undefined)).toBeNull();
         expect(await store.getGrantByToken(undefined)).toBeNull();
     });
 
-    it('does not sign in a Session that has ended', async () => {
-        const session = { id: 'ses_old', clientId: AGENT_ID, userId: 'usr_1', createdAt: clock, expiresAt: clock + 60_000 };
-        await store.putSession(session);
+    it('names a Session by its agent, Session ID and User ID together', () => {
+        const key = store.sessionKey(AGENT_ID, 'sid-1', 'usr_1');
+        expect(store.sessionKey(AGENT_ID, 'sid-1', 'usr_1')).toBe(key);
+        expect(store.sessionKey('https://other.example/agent.json', 'sid-1', 'usr_1')).not.toBe(key);
+        expect(store.sessionKey(AGENT_ID, 'sid-2', 'usr_1')).not.toBe(key);
+        expect(store.sessionKey(AGENT_ID, 'sid-1', 'usr_2')).not.toBe(key);
+        // The parts cannot be shifted between one another to collide.
+        expect(store.sessionKey(AGENT_ID, 'sid-1"', ',"usr_1')).not.toBe(store.sessionKey(AGENT_ID, 'sid-1', 'usr_1'));
+    });
+
+    it('binds a Session to the first account it uses, for as long as the Session lasts', async () => {
+        const key = store.sessionKey(AGENT_ID, 'sid-1', 'usr_1');
+        expect(await store.bindSessionAccount(key, ALICE, 60)).toBe(true);
+        expect(await store.bindSessionAccount(key, ALICE, 60)).toBe(true);
+        expect(await store.bindSessionAccount(key, 'did:cid:bob', 60)).toBe(false);
+
         clock += 61_000;
-        expect(await store.setSessionGrant(session, 'grt_a')).toBe(false);
-        expect(await store.getSessionGrant(session.id)).toBeNull();
+        expect(await store.bindSessionAccount(key, 'did:cid:bob', 60)).toBe(true);
+    });
+
+    it('keeps an access token until it expires', async () => {
+        const record = { clientId: AGENT_ID, did: ALICE, scope: ['profile:read'], grantId: 'grt_a', jkt: 'thumb', expiresAt: clock + 60_000 };
+        await store.putAccessToken('pat_token', record);
+        expect(await store.getAccessToken('pat_token')).toEqual(record);
+        expect(await store.getAccessToken('pat_other')).toBeNull();
+
+        clock += 61_000;
+        expect(await store.getAccessToken('pat_token')).toBeNull();
+    });
+
+    it('reads a grant stored under the draft 0.2 scope names as the scopes that replace them', async () => {
+        await store.putGrant({ ...grant('grt_old', 60_000), scope: ['poppy:read', 'poppy:write'] });
+        expect((await store.getGrant('grt_old'))!.scope).toEqual(['profile:read', 'name:write']);
     });
 
     it('drops expired grants from an account’s index as it lists them', async () => {

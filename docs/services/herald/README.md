@@ -167,51 +167,85 @@ tokens and authorization codes remain in memory and do not survive restart.
 ### 2.8a Personal Agent Protocol Company (`/poppy`, opt-in)
 
 With `ARCHON_HERALD_POPPY_ENABLED=true`, Herald acts as a Company under the
-[Personal Agent Protocol](https://personalagentprotocol.org/docs/spec) (Poppy,
-draft 0.2; `poppy.json` advertises `protocol_version: "0.2"`): personal agents discover it, start Sessions, sign Users in with their
+[Personal Agent Protocol](https://personalagentprotocol.org/docs/0.4/spec) (Poppy)
+at version 0.4, the 1.0 release candidate; `poppy.json` advertises
+`protocol_version: "0.4"`. Personal agents discover it, sign Users in with their
 Archon wallet, and use an OpenAPI interface. The issuer is
 `${ARCHON_DRAWBRIDGE_PUBLIC_HOST}/names/poppy`, separate from the OIDC issuer at
 `/names`, so Poppy's metadata cannot change what OIDC relying parties do. The
-public host must be HTTPS. Design notes are in `docs/plans/poppy-1395.md`.
+public host must be HTTPS. Design notes are in `docs/plans/poppy-1395.md` and
+`docs/plans/poppy-0.4-1609.md`.
+
+Sign-in is plain OAuth and knows no Session. Each API request names its Session
+in a `Poppy-Session` header, a JWT the agent signs for that one request with a
+delegated key; a signed-in request also carries an access token.
 
 | Method | Path | Notes |
 | --- | --- | --- |
-| `GET` | `/.well-known/poppy.json` | Discovery document: organization name (`ARCHON_HERALD_DOMAIN`) and domain (the public host), issuer, Direct and Device Sign-In scopes, the OpenAPI interface. |
-| `GET` | `/.well-known/oauth-authorization-server/names/poppy` | RFC 8414 metadata with `poppy_domains` and `dpop_signing_alg_values_supported: ['ES256','RS256']`. |
-| `POST` | `/poppy/token` | JWT-bearer (Sessions), `authorization_code`, `refresh_token` (Account Tokens) and `device_code` grants. Every request carries a `private_key_jwt` client assertion and a DPoP Proof; tokens are DPoP-bound. |
-| `POST` | `/poppy/revoke` | RFC 7009 revocation of an Account Token by the client it was issued to; signs out the Sessions using it. |
-| `GET` | `/poppy/authorize` | Direct Sign-In consent page (PKCE S256 only). The User signs in by answering a wallet challenge, then chooses which scopes to grant. |
+| `GET` | `/.well-known/poppy.json` | Discovery document: organization name (`ARCHON_HERALD_DOMAIN`) and domain (the public host), the scopes with their descriptions and hints, the OpenAPI interface. |
+| `GET` | `/.well-known/oauth-protected-resource` | RFC 9728 metadata for the domain, which is how an agent finds the issuer: `resource` is `https://<domain>` and `authorization_servers` lists the Poppy issuer only. |
+| `GET` | `/.well-known/oauth-authorization-server/names/poppy` | RFC 8414 metadata. `protected_resources` lists the domain, `grant_types_supported` says which sign-in types are offered, and `dpop_signing_alg_values_supported` is `['ES256','RS256']`. |
+| `POST` | `/poppy/token` | `authorization_code`, `refresh_token` and `device_code` grants. Every request carries a `private_key_jwt` client assertion (`ES256`, `PS384` or `RS256`) and a DPoP proof. A sign-in returns an access token and a refresh token; a refresh returns an access token, for fewer scopes if asked. Access tokens are DPoP-bound. |
+| `POST` | `/poppy/revoke` | RFC 7009 revocation of a refresh token by the client it was issued to. Access tokens issued under it stop working at once. |
+| `GET` | `/poppy/authorize` | Direct Sign-In consent page (PKCE S256 only). The User signs in by answering a wallet challenge, then chooses which scopes to grant. A `redirect_uri` must be one the agent lists; a loopback one (`http://127.0.0.1/...` or `http://[::1]/...`) matches on any port. |
 | `POST` | `/poppy/device_authorization`, `GET`/`POST` `/poppy/device` | Device Sign-In: codes for the agent, and the page where the User enters the user code before the same wallet sign-in and consent. |
 | `POST` | `/poppy/signin/response` | The wallet posts its challenge response here. |
 | `GET` | `/poppy/openapi.json` | OpenAPI 3.1 description of `/poppy/api`. |
-| `GET` | `/poppy/api/names/{name}`, `/members/{name}`, `/dids/{did}`, `/directory` | Lookups, open to signed-out Sessions. `/dids` accepts DIDs only, never wallet aliases. |
-| `GET` | `/poppy/api/account`, `/account/credential` | The signed-in User's profile and membership credential (`poppy:read`). |
-| `PUT`/`DELETE` | `/poppy/api/account/name` | Claim, change or release the User's name, with the same rules as `PUT /api/name` (`poppy:write`). |
-| `GET`/`DELETE` | `/api/poppy/connections[/:id]` | Session-authenticated account settings: one entry per agent connected to the signed-in DID; disconnecting one revokes all of that agent's Account Tokens for the account. |
+| `GET` | `/poppy/api/names/{name}`, `/members/{name}`, `/dids/{did}`, `/directory` | Lookups, answered signed out. `/dids` accepts DIDs only, never wallet aliases. |
+| `GET` | `/poppy/api/account`, `/account/credential` | The signed-in User's profile and membership credential (`profile:read`). |
+| `PUT`/`DELETE` | `/poppy/api/account/name` | Claim, change or release the User's name, with the same rules as `PUT /api/name` (`name:write`). |
+| `GET`/`DELETE` | `/api/poppy/connections[/:id]` | Session-authenticated account settings: one entry per agent connected to the signed-in DID; disconnecting one revokes all of that agent's refresh tokens for the account. |
+
+Every `/poppy/api` request must carry `Poppy-Session` and `Poppy-Version`. API
+errors:
+
+| Status | Error | When |
+| --- | --- | --- |
+| `400` | `version_unsupported` | `Poppy-Version` is missing or is not `0.4`. |
+| `400` | `invalid_session` | The Session header is missing or fails verification, or the agent's metadata cannot be loaded. |
+| `400` | `session_ended` | The access token is for a different account than the Session used before. The agent starts a new Session. |
+| `401` | none | The request needs the account and carries no access token. `WWW-Authenticate` names the scope. |
+| `401` | `invalid_token`, `invalid_dpop_proof` | The access token is unknown, expired or revoked, or its DPoP proof does not match. |
+| `403` | `insufficient_scope` | The access token lacks the scope `WWW-Authenticate` names. |
+| `429` | none | A limit was met. `Retry-After` says how long to wait. |
 
 Agent client metadata and key sets are fetched without redirects through the
 destination-validating public HTTPS transport, limited to 100 KB and five seconds,
 cached for one minute to one day, and refetched for an unknown `kid` at most once
-per 30 seconds. Assertions must name the issuer as a single-string `aud` and carry
-a unique `jti`; DPoP Proofs are checked against the public URL built from
-`ARCHON_DRAWBRIDGE_PUBLIC_HOST`, not the `Host` header. Session Tokens last one hour,
-Account Tokens 90 days. One-way transitions (binding a Session to its DID, answering a
-sign-in, consuming a device approval, touching a grant a revocation may have deleted) are
-single atomic Redis operations, so concurrent requests cannot both win. Per-address
-limits are Drawbridge's, since Herald cannot trust forwarded addresses. Herald's own limits
-are keyed on what an attacker cannot rotate for free (the authenticated `client_id`, or the
-agent domain a sign-in page is for: 60 pages a minute each), and its global caps (new
-agents, failed user codes, sign-in pages) equal Drawbridge's global allowance of 1200 a
-minute, so no single source can exhaust them for others. Only failed user codes are
-counted. The wallet challenge carries a `description` naming the agent, its domain, the
-access requested and, for Device Sign-In, the user code; wallets show it with the
-destination, so a challenge forwarded from someone else's sign-in page is recognizable.
-The consent page renders its QR code as inline SVG and loads no third-party script. A Session is signed in to at most one DID, and API requests
-check on each call that the Session is still signed in, so revocation and
-disconnection take effect at once. State lives in Redis (`ARCHON_HERALD_REDIS_URL`
-or `ARCHON_REDIS_URL`) under the `<ARCHON_HERALD_NAME>:poppy` prefix; bearer
-secrets are stored only as SHA-256 hashes. Mediated Sign-In is not offered:
-Archon accounts have no passwords.
+per 30 seconds. Verifying a Session header loads the agent it names before
+anything about the request is authenticated, so an agent not seen before spends
+the same budget there as at the token endpoint. Client assertions must name the
+issuer as a single-string `aud` and carry a unique `jti`. A Session JWT must be
+signed by a key that a delegation of at most 24 hours vouches for, name the
+issuer as its `aud`, match the request's method and URL, be no more than a minute
+old, cover the access token when there is one, and be used once. Session JWTs and
+DPoP proofs are checked against the public URL built from
+`ARCHON_DRAWBRIDGE_PUBLIC_HOST`, not the `Host` header. Access tokens last one
+hour, refresh tokens 90 days. One-way transitions (binding a Session to its DID,
+answering a sign-in, consuming a device approval, touching a grant a revocation
+may have deleted) are single atomic Redis operations, so concurrent requests
+cannot both win. Per-address limits are Drawbridge's, since Herald cannot trust
+forwarded addresses. Herald's own limits are keyed on what an attacker cannot
+rotate for free (the verified `client_id`, the Session, or the agent domain a
+sign-in page is for: 60 pages a minute each), and its global caps (new agents,
+failed user codes, sign-in pages) equal Drawbridge's global allowance of 1200 a
+minute, so no single source can exhaust them for others. Only failed user codes
+are counted. The wallet challenge carries a `description` naming the agent, its
+domain, the access requested and, for Device Sign-In, the user code; wallets show
+it with the destination, so a challenge forwarded from someone else's sign-in page
+is recognizable. The consent page renders its QR code as inline SVG and loads no
+third-party script. A Session uses at most one DID, and each API request checks
+that the access token's grant still exists, so revocation and disconnection take
+effect at once. State lives in Redis (`ARCHON_HERALD_REDIS_URL` or
+`ARCHON_REDIS_URL`) under the `<ARCHON_HERALD_NAME>:poppy` prefix; secrets are
+stored only as SHA-256 hashes. Drawbridge redacts `Poppy-Session` from its request
+logs along with access tokens and DPoP proofs. Mediated Sign-In, conversations,
+browser join and an MCP interface (#1404) are not offered.
+
+Herald served draft 0.2 before. A grant issued then still works as a refresh
+token, and its `poppy:read` and `poppy:write` scopes are read as `profile:read`
+and `name:write`. Nothing else of 0.2 is served: an agent on 0.2 gets
+`version_unsupported`.
 
 ### 2.9 Admin (owner-only)
 

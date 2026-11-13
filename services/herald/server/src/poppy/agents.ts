@@ -115,6 +115,41 @@ async function fetchJson(fetcher: Fetcher, url: string): Promise<{ body: unknown
     }
 }
 
+// A loopback redirect URI, for an app on the User's computer (RFC 8252 §7.3):
+// http to a loopback IP literal. `localhost` is left out, as the RFC advises,
+// since it need not resolve to the loopback interface.
+function loopbackUrl(value: unknown): URL | null {
+    if (typeof value !== 'string') {
+        return null;
+    }
+    let url: URL;
+    try {
+        url = new URL(value);
+    }
+    catch {
+        return null;
+    }
+    const loopback = url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+    return url.protocol === 'http:' && loopback && !url.username && !url.password && !url.hash ? url : null;
+}
+
+// Whether a redirect_uri in an authorization request is one the agent listed.
+// The match is exact, except that a loopback redirect may use any port: the
+// app asks the system for a free one when it starts (spec 4.2).
+export function redirectMatches(listed: string[], requested: string): boolean {
+    if (listed.includes(requested)) {
+        return true;
+    }
+    const asked = loopbackUrl(requested);
+    if (!asked) {
+        return false;
+    }
+    return listed.some(entry => {
+        const url = loopbackUrl(entry);
+        return url !== null && url.hostname === asked.hostname && url.pathname === asked.pathname && url.search === asked.search;
+    });
+}
+
 export function validateClientMetadata(clientId: string, body: unknown): ClientMetadata {
     const domain = clientIdDomain(clientId);
     if (!domain) {
@@ -132,8 +167,9 @@ export function validateClientMetadata(clientId: string, body: unknown): ClientM
         throw new AgentError('jwks_uri must be an HTTPS URL on the client_id domain');
     }
     const redirectUris = metadata.redirect_uris ?? [];
-    if (!Array.isArray(redirectUris) || !redirectUris.every(uri => httpsUrl(uri)?.hostname.toLowerCase() === domain)) {
-        throw new AgentError('redirect_uris must be HTTPS URLs on the client_id domain');
+    if (!Array.isArray(redirectUris)
+        || !redirectUris.every(uri => httpsUrl(uri)?.hostname.toLowerCase() === domain || loopbackUrl(uri) !== null)) {
+        throw new AgentError('redirect_uris must be HTTPS URLs on the client_id domain, or loopback redirect URIs');
     }
     if (metadata.token_endpoint_auth_method !== undefined && metadata.token_endpoint_auth_method !== 'private_key_jwt') {
         throw new AgentError('token_endpoint_auth_method must be private_key_jwt');
