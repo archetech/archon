@@ -26,8 +26,15 @@ export default defineConfig({
         // single copy of React and MUI in play -- two MUI instances means two
         // emotion caches. Same list the react-wallet vite config carries, and
         // the counterpart of webpack's `resolve.modules`.
-        dedupe: ['@mui/lab', 'qrcode.react', '@uiw/react-json-view', '@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled', 'react', 'react-dom'],
+        dedupe: ['@mui/lab', 'qrcode.react', 'buffer', '@uiw/react-json-view', '@mui/material', '@mui/icons-material', '@emotion/react', '@emotion/styled', 'react', 'react-dom'],
         alias: {
+            // The UR library's CommonJS build requires cborg, which ships as ES
+            // modules only, so it cannot load under Node. Its ES build, which
+            // webpack uses through the `module` field, can.
+            '@gandlaf21/bc-ur': path.resolve(__dirname, 'node_modules/@gandlaf21/bc-ur/dist/lib/es6/index.js'),
+            // As in webpack.common.js: the library imports sha256 by the path
+            // @noble/hashes 1 had, and version 2 is the one installed here.
+            '@noble/hashes/sha256': path.resolve(__dirname, 'node_modules/@noble/hashes/sha2.js'),
             '@didcid/wallet-ui': path.join(packages, 'wallet-ui/src/index.ts'),
             '@didcid/cipher/web': path.join(packages, 'cipher/dist/esm/cipher-web.js'),
             '@didcid/cipher/passphrase': path.join(packages, 'cipher/dist/esm/passphrase.js'),
@@ -49,5 +56,8 @@ export default defineConfig({
         include: ['src/**/*.test.tsx', 'src/**/*.test.ts'],
         setupFiles: ['./src/test/setup.ts'],
         testTimeout: 15000,
+        // Its ES build is plain `.js` in a package not marked as a module, so
+        // vite has to transform it rather than hand it to Node.
+        server: { deps: { inline: ['@gandlaf21/bc-ur'] } },
     },
 });

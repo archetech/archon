@@ -17,7 +17,7 @@ export default defineConfig({
         // bare imports resolve upward from packages/ and would otherwise load the
         // copies npm installs at the root for its peerDependencies -- a second
         // React and a second MUI, which is both wrong and 25% more bundle.
-        dedupe: ["@mui/material", "@mui/icons-material", "@emotion/react", "@emotion/styled", "qrcode.react", "axios", "react", "react-dom"],
+        dedupe: ["@mui/material", "@mui/icons-material", "@emotion/react", "@emotion/styled", "qrcode.react", "@gandlaf21/bc-ur", "buffer", "axios", "react", "react-dom"],
         alias: {
             "@didcid/keymaster-ui/App.css": path.resolve(__dirname, "../../packages/keymaster-ui/src/App.css"),
             "@didcid/keymaster-ui": path.resolve(__dirname, "../../packages/keymaster-ui/src/index.js"),

@@ -67,6 +67,11 @@ module.exports = {
         // alias this leaves package export subpaths working.
         modules: [path.resolve(__dirname, "node_modules"), "node_modules"],
         alias: {
+            // The UR library imports sha256 by the path @noble/hashes 1 had. The
+            // version installed here is 2, which @didcid/cipher needs, and
+            // `modules` above lets only one be found. Version 2 has the same
+            // function in another file.
+            "@noble/hashes/sha256$": path.resolve(__dirname, "node_modules/@noble/hashes/sha2.js"),
             "@didcid/wallet-ui": path.resolve(__dirname, "../../packages/wallet-ui/src/index.ts"),
             "@didcid/cipher/web": path.resolve(__dirname, "../../packages/cipher/dist/esm/cipher-web.js"),
             "@didcid/common/errors": path.resolve(__dirname, "../../packages/common/dist/esm/errors.js"),

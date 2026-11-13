@@ -11,11 +11,13 @@
     "./cashu": "./src/components/CashuView.tsx"
   },
   "peerDependencies": {
+    "@gandlaf21/bc-ur": "^1.1.12",
     "@mui/icons-material": "^7.3.9",
     "@mui/lab": "^7.0.1-beta.19",
     "@mui/material": "^7.3.5",
     "@uiw/react-json-view": "^2.0.0-alpha.39",
     "axios": "^1.21.1",
+    "buffer": "^6.0.3",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.8"
   }
