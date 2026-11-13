@@ -59,23 +59,31 @@ export function qrCollector(): QrCollector {
             }
             try {
                 decoder.receivePart(part[0]);
-                if (decoder.isSuccess()) {
-                    // The bytes come back as a Buffer or a plain Uint8Array,
-                    // depending on the platform.
-                    text = new TextDecoder().decode(decoder.resultUR().decodeCBOR());
-                    return 1;
-                }
-                if (!decoder.isError()) {
-                    // Never 1 before the checksum has passed.
-                    return Math.min(decoder.estimatedPercentComplete(), 0.99);
-                }
             }
             catch {
-                // Not a part this decoder can use.
+                // Not a part this decoder can use. What it has stays.
+            }
+            if (decoder.isSuccess()) {
+                try {
+                    // The bytes come back as a Buffer or a plain Uint8Array,
+                    // depending on the platform.
+                    const bytes: unknown = decoder.resultUR().decodeCBOR();
+                    if (bytes instanceof Uint8Array) {
+                        text = new TextDecoder().decode(bytes);
+                        return 1;
+                    }
+                }
+                catch {
+                    // A whole message whose payload is not CBOR.
+                }
+            }
+            else if (!decoder.isError()) {
+                // Never 1 before the checksum has passed.
                 return Math.min(decoder.estimatedPercentComplete(), 0.99);
             }
-            // The parts made a message that failed its checksum. The decoder
-            // keeps them, so nothing further could complete it.
+            // The message failed its checksum, or was not a byte string. A
+            // decoder that has finished takes no more parts, so nothing further
+            // could come of it.
             decoder = new URDecoder();
             return 0;
         },

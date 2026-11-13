@@ -152,6 +152,36 @@ describe('collecting scanned codes', () => {
         expect(collector.result()).toBe(TOKEN);
     });
 
+    // Whole messages with a valid checksum, whose payload is not the bytes of
+    // a text: a CBOR map, and bytes that are not CBOR at all.
+    it.each([
+        ['a payload that is not a byte string', [0xa0]],
+        ['a payload that is not CBOR', [0xff]],
+    ])('starts again after %s', (_what, payload) => {
+        const collector = qrCollector();
+        const whole = new UREncoder(new UR(Buffer.from(payload)), 150).nextPart();
+        expect(whole).toMatch(/^ur:bytes\/[a-z]+$/);
+        expect(collector.accept(whole)).toBe(0);
+        expect(collector.result()).toBeNull();
+
+        const next = animatedQrFrames(TOKEN);
+        for (let i = 0; i < 300 && collector.result() === null; i++) {
+            collector.accept(next());
+        }
+        expect(collector.result()).toBe(TOKEN);
+    });
+
+    it('keeps what it has when a part in the middle is unusable', () => {
+        const next = animatedQrFrames(TOKEN);
+        const collector = qrCollector();
+        let progress = 0;
+        for (let i = 0; i < 10; i++) {
+            progress = collector.accept(next());
+        }
+        expect(progress).toBeGreaterThan(0);
+        expect(collector.accept('ur:bytes/3-34/notbytewords')).toBe(progress);
+    });
+
     it('keeps the first text once complete', () => {
         const collector = qrCollector();
         expect(collector.accept('first')).toBe(1);
