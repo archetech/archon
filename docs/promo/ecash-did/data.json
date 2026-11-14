@@ -1,0 +1,22 @@
+{
+    "alice": "did:cid:bagaaieraeyossyxx54uq4pmovtvd7dpu3tbpwqnset53bwvk2iyk4ud6somq",
+    "bob": "did:cid:bagaaierannca6dw4u2wfraljranuqykbmlfkaykw5hiz76g35wi3f3z2j6rq",
+    "keyX": "eZmkBCMCPG-VqDHAEvMFFBt0SjFwLNZz3HJIRuB3jzA",
+    "kaX": "mH3oxCYfldop8Ynl7cM1rTdXG0lz040YpmtDffVgyCc",
+    "endpoint": "https://archon.example/didcomm",
+    "lock": "037999a40423023c6f95a831c012f305141b744a31702cd673dc724846e0778f30",
+    "nonce": "75fd6cb1d46b8291fc9803b6f2273bb88592c2cf2837cfb4a21b312217b000e4",
+    "locktime": "1794772694",
+    "refund": "02bc5c58c0702365c1f7b652d8752884fa76638159c4f0cca993d8f81bbf2d7422",
+    "type": "https://archetech.com/didcomm/cashu/1.0/token",
+    "memo": "Dinner on Friday",
+    "token": "cashuBo2FteBxodHRwczovL2FyY2hv",
+    "before": {
+        "alice": "21,000",
+        "bob": "0"
+    },
+    "after": {
+        "alice": "18,900",
+        "bob": "2,100"
+    }
+}

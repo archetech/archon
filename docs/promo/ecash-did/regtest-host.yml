@@ -1,0 +1,13 @@
+# The regtest stack's public name, for the recording. tests/cashu-regtest uses
+# mint.invalid; .example reads better on screen and is just as unresolvable.
+services:
+  lightning-mediator:
+    environment: { ARCHON_DRAWBRIDGE_PUBLIC_HOST: "https://archon.example" }
+  cashu-mint:
+    environment: { MINT_URL: "https://archon.example/cashu" }
+  drawbridge:
+    environment: { ARCHON_DRAWBRIDGE_PUBLIC_HOST: "https://archon.example" }
+  drawbridge-paid-ts:
+    environment: { ARCHON_DRAWBRIDGE_PUBLIC_HOST: "https://archon.example" }
+  drawbridge-paid-py:
+    environment: { ARCHON_DRAWBRIDGE_PUBLIC_HOST: "https://archon.example" }

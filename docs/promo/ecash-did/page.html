@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>How ecash finds a DID</title>
+<style>
+@font-face { font-family: "Geist"; src: url("fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
+@font-face { font-family: "GeistMono"; src: url("fonts/geist-mono.woff2") format("woff2"); font-weight: 100 900; }
+:root { --bg: #08090a; --ink: #f7f8f8; --soft: #8a8f98; --dim: #5c616b; --hair: rgba(255, 255, 255, .09); --hair2: rgba(255, 255, 255, .16); --panel: #0f1011; --v: #7c83f5; --am: #f5a524; --ok: #3ecf8e; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--ink); font-family: "Geist", sans-serif; -webkit-font-smoothing: antialiased; }
+.lines { position: absolute; inset: 0; background-image: linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px); background-size: 64px 64px; background-position: -1px -1px;
+    -webkit-mask-image: radial-gradient(900px 620px at 50% 40%, #000, transparent 85%); }
+.spot { position: absolute; left: 0; right: 0; top: -420px; height: 760px; background: radial-gradient(closest-side, rgba(255, 255, 255, .07), transparent); }
+
+@keyframes in { from { opacity: 0 } to { opacity: 1 } }
+@keyframes out { from { opacity: 1 } to { opacity: 0 } }
+@keyframes rise { from { opacity: 0; filter: blur(12px); transform: translateY(22px) } to { opacity: 1; filter: blur(0); transform: none } }
+.t { opacity: 0; animation: in .35s ease var(--a) both, out .3s ease var(--b) forwards; }
+.t.hold { animation: in .35s ease var(--a) both; }
+.r { opacity: 0; animation: rise .75s cubic-bezier(.16, 1, .3, 1) calc(var(--a) + var(--d, 0s)) both, out .3s ease var(--b) forwards; }
+.mono { font-family: "GeistMono"; }
+
+/* Title */
+.title { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 150px; --a: .2s; --b: 3.5s; }
+.eyebrow { font-family: "GeistMono"; font-size: 20px; letter-spacing: .14em; text-transform: uppercase; color: var(--soft); display: flex; align-items: center; gap: 14px; }
+.eyebrow i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 5px rgba(62, 207, 142, .18); }
+.title h1 { font-size: 196px; font-weight: 600; letter-spacing: -.065em; line-height: .9; margin-top: 34px; }
+.title h1 em { font-style: normal; color: var(--v); }
+.title p { font-size: 38px; color: var(--soft); margin-top: 44px; letter-spacing: -.02em; max-width: 1100px; line-height: 1.25; }
+
+/* Stage */
+.stage { position: absolute; inset: 0; --a: 3.7s; --b: 57.6s; }
+.top { position: absolute; top: 36px; left: 70px; right: 70px; height: 40px; display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 12px; font-size: 24px; font-weight: 600; letter-spacing: -.03em; }
+.brand img { width: 30px; height: 30px; }
+.prog { display: flex; gap: 8px; align-items: center; }
+.prog div { position: relative; font-family: "GeistMono"; font-size: 14px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); padding: 8px 14px; border-radius: 99px; border: 1px solid var(--hair); }
+.prog div span { position: absolute; inset: -1px; border-radius: 99px; background: var(--ink); color: var(--bg); display: grid; place-items: center; font-weight: 600; }
+.reg { font-family: "GeistMono"; font-size: 14px; color: var(--dim); letter-spacing: .04em; }
+
+.phone { position: absolute; top: 86px; width: 372px; }
+.phone.a { left: 70px; } .phone.b { left: 1478px; }
+.phone .id { height: 60px; margin-bottom: 14px; display: flex; flex-direction: column; justify-content: center; }
+.phone .id b { font-size: 26px; font-weight: 600; letter-spacing: -.03em; }
+.phone .id span { font-family: "GeistMono"; font-size: 13.5px; color: var(--soft); margin-top: 3px; }
+.screen { position: relative; width: 372px; height: 778px; border-radius: 38px; overflow: hidden; background: #0a0b0d; border: 1px solid var(--hair2); box-shadow: 0 0 0 7px #0d0e10, 0 0 0 8px var(--hair), 0 50px 120px -30px rgba(0, 0, 0, .9); }
+.screen img { position: absolute; left: 0; top: 0; width: 372px; }
+
+/* Services */
+.node { position: absolute; left: 760px; width: 400px; height: 78px; border-radius: 18px; background: var(--panel); border: 1px solid var(--hair); display: flex; align-items: center; gap: 16px; padding: 0 18px; }
+.node .ic { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; font-family: "GeistMono"; font-weight: 600; font-size: 15px; color: var(--v); background: rgba(124, 131, 245, .12); border: 1px solid rgba(124, 131, 245, .25); flex: none; }
+.node.mint .ic { color: var(--am); background: rgba(245, 165, 36, .1); border-color: rgba(245, 165, 36, .28); }
+.node b { display: block; font-size: 21px; font-weight: 600; letter-spacing: -.02em; }
+.node small { display: block; font-family: "GeistMono"; font-size: 13.5px; color: var(--soft); margin-top: 3px; }
+.node .ring { position: absolute; inset: -1px; border-radius: 18px; border: 1px solid var(--v); box-shadow: 0 0 0 4px rgba(124, 131, 245, .14), 0 0 60px -6px rgba(124, 131, 245, .55), inset 0 0 30px -12px rgba(124, 131, 245, .5); }
+.node.mint .ring { border-color: var(--am); box-shadow: 0 0 0 4px rgba(245, 165, 36, .12), 0 0 60px -6px rgba(245, 165, 36, .5), inset 0 0 30px -12px rgba(245, 165, 36, .45); }
+.node .badge { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-family: "GeistMono"; font-size: 13px; color: var(--bg); background: var(--v); padding: 5px 10px; border-radius: 7px; font-weight: 600; }
+.wire { position: absolute; height: 1px; background: var(--hair2); }
+.wire::before, .wire::after { content: ""; position: absolute; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: #2a2c31; }
+.wire::before { left: -3px; } .wire::after { right: -3px; }
+.sig { position: absolute; width: 0; height: 0; opacity: 0; animation: in .2s ease var(--a) both, go var(--dur, 1.25s) cubic-bezier(.5, 0, .2, 1) var(--a) both, out .25s ease calc(var(--a) + var(--dur, 1.25s)) forwards; }
+@keyframes go { from { transform: translateX(0) } to { transform: translateX(var(--dx)) } }
+.sig u { position: absolute; top: -1px; height: 3px; width: 150px; border-radius: 3px; background: linear-gradient(90deg, transparent, var(--c)); left: -150px; filter: drop-shadow(0 0 8px var(--c)); }
+.sig.rev u { left: 0; background: linear-gradient(270deg, transparent, var(--c)); }
+.sig span { position: absolute; transform: translate(-50%, -150%); white-space: nowrap; font-family: "GeistMono"; font-size: 14.5px; font-weight: 500; padding: 6px 11px; border-radius: 8px; color: var(--ink); background: #17181b; border: 1px solid var(--c); }
+
+/* Explanation */
+.say { position: absolute; left: 500px; width: 920px; top: 470px; height: 250px; }
+.say .s { position: absolute; inset: 0; display: grid; grid-template-columns: 150px 1fr; align-items: start; }
+.say .n { font-family: "GeistMono"; font-size: 96px; font-weight: 500; letter-spacing: -.06em; color: #26282d; line-height: .95; }
+.say h2 { font-size: 50px; font-weight: 600; letter-spacing: -.045em; line-height: 1.04; }
+.say p { font-size: 25px; line-height: 1.4; color: var(--soft); margin-top: 16px; letter-spacing: -.01em; }
+.say p b { color: var(--ink); font-weight: 500; }
+.codew { position: absolute; left: 500px; width: 920px; top: 734px; height: 270px; border-radius: 18px; background: var(--panel); border: 1px solid var(--hair); overflow: hidden; }
+.codew .bar { height: 38px; border-bottom: 1px solid var(--hair); display: flex; align-items: center; padding: 0 18px; font-family: "GeistMono"; font-size: 13.5px; color: var(--dim); letter-spacing: .04em; }
+.code { position: absolute; left: 0; right: 0; top: 38px; bottom: 0; padding: 0 22px; display: flex; flex-direction: column; justify-content: center; font-family: "GeistMono"; font-size: 17.5px; line-height: 1.52; color: #b4b8c0; white-space: pre; }
+.code .ln { display: block; position: relative; padding: 0 10px; margin: 0 -10px; border-radius: 6px; }
+.code .k { color: #6f747e; } .code .s { color: #e7e8ea; } .code .c { color: #555a63; }
+.code .hl { animation: glow .45s ease var(--h) both; }
+@keyframes glow { from { background: transparent; box-shadow: none } to { background: rgba(124, 131, 245, .14); box-shadow: inset 2px 0 0 var(--v) } }
+.code .hl.am { animation-name: glowa; }
+@keyframes glowa { from { background: transparent; box-shadow: none } to { background: rgba(245, 165, 36, .12); box-shadow: inset 2px 0 0 var(--am) } }
+.code .hl.ok { animation-name: glowo; }
+@keyframes glowo { from { background: transparent; box-shadow: none } to { background: rgba(62, 207, 142, .12); box-shadow: inset 2px 0 0 var(--ok) } }
+.code .tag { position: absolute; right: 10px; top: 4px; font-family: "Geist"; font-size: 13.5px; font-weight: 600; line-height: 1.55; padding: 0 9px; border-radius: 6px; color: var(--bg); background: var(--v); opacity: 0; animation: in .4s ease var(--h) both; }
+.code .tag.am { background: var(--am); } .code .tag.ok { background: var(--ok); }
+
+/* Recap and end */
+.recap { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 150px; --a: 58s; --b: 64.6s; }
+.recap .row { display: grid; grid-template-columns: 110px 640px 1fr; align-items: baseline; padding: 26px 0; border-top: 1px solid var(--hair); }
+.recap .row:last-child { border-bottom: 1px solid var(--hair); }
+.recap .row i { font-style: normal; font-family: "GeistMono"; font-size: 20px; color: var(--dim); }
+.recap .row b { font-size: 84px; font-weight: 600; letter-spacing: -.055em; line-height: 1; }
+.recap .row span { font-size: 34px; color: var(--soft); letter-spacing: -.02em; }
+.end { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 150px; --a: 65s; --b: 999s; }
+.end img { width: 96px; height: 96px; }
+.end h1 { font-size: 230px; font-weight: 600; letter-spacing: -.07em; line-height: .9; margin-top: 30px; }
+.end p { font-size: 44px; color: var(--soft); margin-top: 34px; letter-spacing: -.025em; }
+.end .where { margin-top: 60px; font-family: "GeistMono"; font-size: 26px; display: flex; gap: 40px; align-items: center; }
+.end .where span { color: var(--dim); }
+</style>
+</head>
+<body>
+<div class="lines"></div><div class="spot"></div>
+
+<section class="title">
+    <div class="eyebrow r"><i></i>Archon · Nut November 2026</div>
+    <h1 class="r" style="--d:.12s">How ecash<br>finds a <em>DID</em></h1>
+    <p class="r" style="--d:.45s">One payment, followed through DIDs, DID documents and DIDComm.</p>
+</section>
+
+<section class="stage t">
+    <div class="top">
+        <div class="brand"><img src="logo.png" alt="">Archon</div>
+        <div class="prog" id="prog"></div>
+        <div class="reg">REGTEST · REAL WALLETS</div>
+    </div>
+    <div class="phone a"><div class="id"><b>Alice</b><span id="didA"></span></div><div class="screen" id="scrA"></div></div>
+    <div class="phone b"><div class="id"><b>Bob</b><span id="didB"></span></div><div class="screen" id="scrB"></div></div>
+    <div id="between"></div>
+    <div class="say" id="say"></div>
+    <div class="codew"><div class="bar" id="bar"></div><div id="codes"></div></div>
+</section>
+
+<section class="recap">
+    <div class="row r" style="--d:0s"><i>01</i><b>DID</b><span>Who the money is for</span></div>
+    <div class="row r" style="--d:.3s"><i>02</i><b>DID document</b><span>Which key to lock it to, and where to deliver it</span></div>
+    <div class="row r" style="--d:.6s"><i>03</i><b>DIDComm</b><span>The sealed message that carries it</span></div>
+    <div class="row r" style="--d:.9s"><i>04</i><b>Cashu</b><span>The ecash itself, locked with NUT-11</span></div>
+</section>
+
+<section class="end">
+    <img class="r" src="logo.png" alt="">
+    <h1 class="r" style="--d:.12s">Archon</h1>
+    <p class="r" style="--d:.4s">Cashu ecash for decentralized identities.</p>
+    <div class="where r" style="--d:.7s">github.com/archetech/archon<span>Open source · TypeScript and Python · Nut November 2026</span></div>
+</section>
+
+<script>
+const D = window.DATA;
+const mid = (text, head = 22, tail = 8) => `${text.slice(0, head)}…${text.slice(-tail)}`;
+didA.textContent = mid(D.alice, 22, 8); didB.textContent = mid(D.bob, 22, 8);
+const states = (id, list) => document.getElementById(id).innerHTML = list.map(([file, a, b]) =>
+    `<img class="t ${b ? '' : 'hold'}" style="--a:${a}s; --b:${b || 0}s" src="screens/${file}.png" alt="">`).join('');
+states('scrA', [['a1-balance', 0, 9.6], ['a2-form', 9.6, 10.6], ['a3-to', 10.6, 12.0], ['a4-amount', 12.0, 13.2], ['a5-filled', 13.2, 15.0],
+    ['a6-sent', 15.0, 35.4], ['a7-outstanding', 35.4, 53.4], ['a9-settled', 53.4, 0]]);
+states('scrB', [['b1-balance', 0, 17.2], ['b0-endpoint', 17.2, 24.2], ['b1-balance', 24.2, 44.2], ['b2-inbox', 44.2, 47.6], ['b3-incoming', 47.6, 53.4], ['b4-balance', 53.4, 0]]);
+
+const Y = { reg: 215, mint: 313, box: 411 };
+const node = (cls, y, ic, title, sub, on, extra = '') => `<div class="node ${cls}" style="top:${y - 39}px"><div class="ic">${ic}</div><div><b>${title}</b><small>${sub}</small></div>` +
+    on.map(([a, b]) => `<div class="ring t" style="--a:${a}s; --b:${b}s"></div>`).join('') + extra + `</div>`;
+const wire = y => `<div class="wire" style="left:456px; width:304px; top:${y}px"></div><div class="wire" style="left:1160px; width:304px; top:${y}px"></div>`;
+const sig = (y, side, dir, a, label, color = 'var(--v)', dur = 1.25) => {
+    const [x0, x1] = side === 'L' ? [456, 760] : [1160, 1464];
+    return `<div class="sig ${dir < 0 ? 'rev' : ''}" style="left:${dir > 0 ? x0 : x1}px; top:${y}px; --dx:${dir * 304}px; --a:${a}s; --dur:${dur}s; --c:${color}"><u></u><span>${label}</span></div>`;
+};
+between.innerHTML = wire(Y.reg) + wire(Y.mint) + wire(Y.box) +
+    node('', Y.reg, 'DID', 'DID registry', 'gatekeeper network', [[15.2, 24]]) +
+    node('mint', Y.mint, '₿', 'Mint', 'cashu · nut-11', [[24.2, 33], [50.2, 57.4]]) +
+    node('', Y.box, '✉', "Bob's mailbox", 'didcomm service', [[33.2, 50]], `<div class="badge t" style="--a:35.0s; --b:44.4s">1 sealed</div>`) +
+    sig(Y.reg, 'L', 1, 15.4, `resolve ${mid(D.bob, 8, 4)}`) + sig(Y.reg, 'L', -1, 17.0, 'DID document') +
+    sig(Y.mint, 'L', 1, 24.5, '2,100 sats', 'var(--am)') + sig(Y.mint, 'L', -1, 26.2, '2,100 sats, locked to Bob', 'var(--am)') +
+    sig(Y.box, 'L', 1, 33.5, 'encrypted for Bob') +
+    sig(Y.box, 'R', -1, 42.4, 'signed challenge') + sig(Y.box, 'R', 1, 44.0, 'message') +
+    sig(Y.mint, 'R', -1, 50.5, 'locked ecash + signature', 'var(--am)') + sig(Y.mint, 'R', 1, 52.2, '2,100 sats', 'var(--ok)');
+
+const ln = (html, h, tag, cls = '') => `<span class="ln ${h ? 'hl ' + cls : ''}" style="--h:${h || 0}s">${html}${tag ? `<span class="tag ${cls}" style="--h:${h}s">${tag}</span>` : ''}</span>`;
+const k = text => `<span class="k">${text}</span>`, s = text => `<span class="s">${text}</span>`, c = text => `<span class="c">${text}</span>`;
+const when = new Date(Number(D.locktime) * 1000).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+const steps = [
+    { a: 3.9, b: 9.4, n: '00', file: 'two identifiers', h: 'Two people, two DIDs.', p: 'A DID is an identifier you create yourself. <b>Nobody issues it</b>, and only your keys control it.',
+      code: [ln(c('// Alice')), ln(s(D.alice)), ln(' '), ln(c('// Bob')), ln(s(D.bob))] },
+    { a: 9.8, b: 14.8, n: '00', file: 'send form', h: "Alice pastes Bob's DID.", p: 'That string is all she needs from him. Everything else, her wallet looks up.',
+      code: [ln(k('recipient  ') + s(D.bob), 10.8), ln(k('amount     ') + s('2100 sats'), 12.2), ln(k('memo       ') + s('Dinner on Friday'), 13.4), ln(k('reclaim    ') + s('after 24 hours'), 13.4)] },
+    { a: 15.2, b: 24.0, n: '01', file: "bob's DID document", h: "The DID resolves to Bob's DID document.", p: 'A public record he controls. It lists <b>his keys</b> and <b>where to reach him</b>.',
+      code: [ln(k('"id": ') + s(`"${mid(D.bob, 26, 8)}"`)), ln(k('"verificationMethod": [')),
+             ln(`  { ${k('"id":')} ${s('"#key-1"')}, ${k('secp256k1')} ${s(mid(D.keyX, 10, 4))} }`, 18.6, 'signing key'),
+             ln(`  { ${k('"id":')} ${s('"#key-agreement-1"')}, ${k('X25519')} ${s(mid(D.kaX, 8, 4))} }`, 20.2, 'encryption key'),
+             ln(k('],')), ln(k('"service": [')),
+             ln(`  { ${k('"type":')} ${s('"DIDCommMessaging"')}, ${k('"uri":')} ${s(`"${D.endpoint}"`)} }`, 21.8, 'mailbox'), ln(k(']'))] },
+    { a: 24.2, b: 33.0, n: '02', file: 'the token’s spending condition', h: "At the mint, the ecash is locked to Bob's key.", p: 'A NUT-11 condition. Only a signature from <b>#key-1</b> can spend it. If it is never claimed, Alice’s key can take it back.',
+      code: [ln(k('["P2PK", {')), ln(`  ${k('"data":')}  ${s(`"${mid(D.lock, 24, 8)}"`)}`, 27.6, "Bob's #key-1", 'am'),
+             ln(`  ${k('"nonce":')} ${s(`"${mid(D.nonce, 16, 6)}"`)}`), ln(k('  "tags": [')),
+             ln(`    [${s('"locktime"')}, ${s(`"${D.locktime}"`)}]  ${c('// ' + when)}`, 29.2, 'until', 'am'),
+             ln(`    [${s('"refund"')}, ${s(`"${mid(D.refund, 16, 6)}"`)}]`, 30.6, "Alice's key", 'am'), ln(k('  ]')), ln(k('}]'))] },
+    { a: 33.2, b: 42.0, n: '03', file: 'DIDComm message, before encryption', h: 'The token travels in a DIDComm message.', p: 'Encrypted to Bob’s <b>key-agreement key</b> and posted to the mailbox his document names. The mailbox stores it and <b>cannot read it</b>.',
+      code: [ln(`${k('"type":')} ${s(`"${D.type.replace('https://', '')}"`)}`), ln(`${k('"from":')} ${s(`"${mid(D.alice, 22, 8)}"`)}`),
+             ln(`${k('"to":')}   ${s(`["${mid(D.bob, 22, 8)}"]`)}`), ln(k('"body": {')), ln(`  ${k('"token":')} ${s(`"${D.token}…"`)}`), ln(`  ${k('"memo":')}  ${s(`"${D.memo}"`)}`), ln(k('}')),
+             ln(c('// then encrypted to #key-agreement-1'), 36.4, 'sealed')] },
+    { a: 42.2, b: 50.0, n: '04', file: "bob's inbox, after decryption", h: "Bob's wallet collects it.", p: 'It proves it controls his DID by <b>signing a challenge</b>, fetches the message and decrypts it.',
+      code: [ln(`${k('type    ')} ${s(D.type.replace('https://', ''))}`), ln(`${k('status  ')} ${s('Authenticated')}`, 45.6, 'really from Alice', 'ok'),
+             ln(`${k('from    ')} ${s(mid(D.alice, 26, 8))}`), ln(`${k('token   ')} ${s(D.token + '…')}`), ln(`${k('memo    ')} ${s(D.memo)}`)] },
+    { a: 50.2, b: 57.4, n: '05', file: 'balances', h: 'Bob claims it with his key.', p: 'His wallet signs with <b>#key-1</b>. The mint checks the signature and issues him fresh ecash that is his alone.',
+      code: [ln(`${k('Alice  ')} ${s(D.before.alice.padStart(6))} ${k('→')} ${s(D.after.alice.padStart(6) + ' sats')}`, 53.6, '', 'ok'),
+             ln(`${k('Bob    ')} ${s(D.before.bob.padStart(6))} ${k('→')} ${s(D.after.bob.padStart(6) + ' sats')}`, 53.6, 'claimed', 'ok'), ln(' '),
+             ln(c('// no account, and no payment company in between'))] },
+];
+say.innerHTML = steps.map(st => `<div class="s"><div class="n r" style="--a:${st.a}s; --b:${st.b}s">${st.n}</div><div><h2 class="r" style="--a:${st.a}s; --b:${st.b}s; --d:.08s">${st.h}</h2><p class="r" style="--a:${st.a}s; --b:${st.b}s; --d:.22s">${st.p}</p></div></div>`).join('');
+codes.innerHTML = steps.map(st => `<div class="code t" style="--a:${st.a + .25}s; --b:${st.b}s">${st.code.join('')}</div>`).join('');
+bar.innerHTML = steps.map(st => `<span class="t" style="position:absolute; --a:${st.a + .25}s; --b:${st.b}s">${st.file}</span>`).join('');
+const prog = [['Resolve', 15.2, 24.0], ['Lock', 24.2, 33.0], ['Send', 33.2, 42.0], ['Collect', 42.2, 50.0], ['Claim', 50.2, 57.4]];
+document.getElementById('prog').innerHTML = prog.map(([label, a, b], i) => `<div>0${i + 1} ${label}<span class="t" style="--a:${a}s; --b:${b}s">0${i + 1} ${label}</span></div>`).join('');
+
+window.DURATION = 70;
+window.seek = seconds => { for (const animation of document.getAnimations()) { animation.pause(); animation.currentTime = seconds * 1000; } };
+</script>
+</body>
+</html>
