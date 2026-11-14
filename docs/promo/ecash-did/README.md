@@ -1,7 +1,7 @@
 # How ecash finds a DID
 
-A 70-second, 1920×1080, silent video that follows one Cashu payment from Alice to
-Bob through the three things Archon adds to it:
+A 70-second, 1920×1080 video that follows one Cashu payment from Alice to Bob
+through the three things Archon adds to it:
 
 1. **Resolve.** Alice pastes Bob's DID. Her wallet resolves it to his DID document,
    which lists his signing key, his key-agreement key and his DIDComm mailbox.
@@ -22,7 +22,11 @@ document. The boxes and the markers that travel between them are a diagram.
 
 - `page.html` is the whole video. Every animation is positioned by `window.seek(t)`,
   so a frame depends only on its time.
-- `render.mjs` loads the page in headless Chrome and pipes the frames to ffmpeg.
+- `audio.mjs` synthesizes `soundtrack.wav` (48 kHz stereo): a pad and a soft pulse,
+  with a sweep for each marker that crosses the screen, a bell for each highlighted
+  line and a low note where a step begins, all placed at the picture's own times.
+- `render.mjs` loads the page in headless Chrome and pipes the frames to ffmpeg
+  with the soundtrack.
 - `capture.mjs` drives the two wallets and writes `screens/` and `data.json`.
 - `regtest-host.yml` gives the stack the public name `archon.example`.
 - `fonts/` holds Geist and Geist Mono, under the licence beside them.
@@ -34,11 +38,13 @@ screenshots and `data.json` are checked in, so this needs no stack.
 
 ```sh
 npm install --no-save playwright-core
+node audio.mjs                                         # → soundtrack.wav
 CHROME=/path/to/chrome node render.mjs video           # → ecash-did.mp4 (~3 min)
 CHROME=/path/to/chrome node render.mjs stills 22.5 47  # → still-22.5.png, still-47.png
 ```
 
-Outputs are git-ignored.
+Outputs are git-ignored. The times in `audio.mjs` are copied from `page.html`; change
+them together.
 
 ## Record it again
 

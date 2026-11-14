@@ -1,11 +1,11 @@
 // usage: CHROME=<headless chrome> node render.mjs stills <t1> <t2> ...   → still-<t>.png
-//        CHROME=<headless chrome> node render.mjs video                  → ecash-did.mp4 (30 fps, silent)
+//        CHROME=<headless chrome> node render.mjs video                  → ecash-did.mp4 (30 fps + soundtrack.wav)
 //
 // page.html positions every animation from window.seek(t), so a frame depends only on
 // its time and the video is the same on every run.
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -14,6 +14,8 @@ const [mode, ...args] = process.argv.slice(2);
 const FPS = 30;
 if (!process.env.CHROME) throw new Error('set CHROME to a Chrome or chrome-headless-shell binary');
 if (mode !== 'video' && mode !== 'stills') throw new Error('usage: node render.mjs video | stills <t> ...');
+const soundtrack = path.join(dir, 'soundtrack.wav');
+if (mode === 'video' && !existsSync(soundtrack)) throw new Error('soundtrack.wav is missing; run node audio.mjs first');
 
 const browser = await chromium.launch({ executablePath: process.env.CHROME });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
@@ -34,7 +36,8 @@ if (mode === 'stills') {
     }
 } else {
     const ffmpeg = spawn('ffmpeg', ['-y', '-hide_banner', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'png', '-i', '-',
-        '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', '-profile:v', 'high', '-movflags', '+faststart',
+        '-i', soundtrack, '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', '-profile:v', 'high',
+        '-c:a', 'aac', '-b:a', '256k', '-movflags', '+faststart', '-shortest',
         path.join(dir, 'ecash-did.mp4')], { stdio: ['pipe', 'inherit', 'inherit'] });
     const done = new Promise((resolve, reject) => {
         ffmpeg.on('error', error => reject(new Error(`could not start ffmpeg: ${error.message}`)));

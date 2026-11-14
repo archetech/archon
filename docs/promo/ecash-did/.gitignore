@@ -1,5 +1,6 @@
 profiles/
 node_modules/
 *.mp4
+*.wav
 still-*.png
 screens/capture.json
