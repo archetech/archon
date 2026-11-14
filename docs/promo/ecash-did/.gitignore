@@ -1,0 +1,5 @@
+profiles/
+node_modules/
+*.mp4
+still-*.png
+screens/capture.json
