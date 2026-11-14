@@ -1,4 +1,6 @@
-# Archon at Nut November 2026
+# Cashu Over DIDComm
+
+*Archon at Nut November 2026*
 
 **Ecash you can send to an identity, and ecash an AI agent can spend by itself.**
 
