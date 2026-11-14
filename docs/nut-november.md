@@ -13,11 +13,12 @@ used the identity to do three things with ecash that a Cashu wallet alone cannot
 
 1. **Send ecash to a DID.** The wallet locks the token to the recipient's key
    (NUT-11) and delivers it over DIDComm to the mailbox the recipient's DID document
-   names. A token that leaks on the way is worth nothing, and one that is never
-   claimed comes back.
+   names. A token that leaks on the way is worth nothing, and the sender can reclaim
+   one that is never claimed.
 2. **Pay an HTTP 402 with ecash (NUT-24), on both sides.** Archon nodes now accept
    ecash for priced API calls, and Archon wallets pay such requests. An AI agent
-   with its own DID pays per call from its own ecash, inside a limit its owner set.
+   with its own DID pays per call from its own ecash, and refuses a price above the
+   limit its owner set.
    The [NUT index](https://github.com/cashubtc/nuts) lists no implementation of
    NUT-24 as of November 14.
 3. **Two Cashu wallets that agree.** Archon's wallet software comes in a TypeScript
@@ -105,8 +106,10 @@ payment request. A client retries with a token in the same header.
   before serving, so a token cannot be spent twice. The ecash goes into the node's
   own Cashu wallet.
 - **The wallet** has two commands for the client side. `cashu-decode-request` says
-  what a request asks for; `cashu-pay-request --max <sats>` pays it and refuses
-  anything above the maximum. Both read `creqA` and the bech32m `creqB` form.
+  what a request asks for; `cashu-pay-request --max <sats>` pays it and refuses a
+  request for more than the maximum. The maximum is on the amount requested; the
+  mint's fee, if it charges one, is on top. Both read `creqA` and the bech32m
+  `creqB` form.
 - **An agent** uses the same two calls through the SDK or as MCP tools.
   [`agent.mjs`](../tests/cashu-regtest/agent.mjs) is a complete example in under 80 lines:
   it registers a new DID through a paywalled node, gets the 402, asks its wallet
@@ -178,10 +181,10 @@ On an Archon node with the `cashu` profile ([deployment guide](deployment.md)):
 ./archon cashu-send-to <DID> 500 "thanks"    # locked to that DID, sent over DIDComm
 ./archon cashu-accept                        # the recipient: claim what has arrived
 ./archon cashu-decode-request <creq…>        # what does this 402 want?
-./archon cashu-pay-request --max 10 <creq…>  # pay it, up to 10 sats
+./archon cashu-pay-request --max 10 <creq…>  # pay it if it asks for 10 sats or less
 ```
 
-Or run the whole thing on regtest, with nothing but Docker:
+Or run the whole thing on regtest. It needs Docker, `jq` and Python 3, and no node:
 
 ```sh
 tests/cashu-regtest/run.sh
