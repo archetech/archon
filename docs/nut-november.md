@@ -2,6 +2,10 @@
 
 **Ecash you can send to an identity, and ecash an AI agent can spend by itself.**
 
+https://github.com/user-attachments/assets/559e5a98-7f54-427f-a4b0-4e19b4f16d4d
+
+*One payment from Alice to Bob, recorded from two real wallets (70 seconds, with sound).*
+
 [Archon](https://github.com/archetech/archon) is an open-source (MIT) decentralized
 identity system: people and software agents hold DIDs, and a wallet called Keymaster
 holds their keys. In November we gave every Archon identity a Cashu wallet, and then
@@ -81,7 +85,7 @@ Alice pastes Bob's DID and an amount. Her wallet does the rest:
 5. **Claim.** Bob's wallet signs with the key the ecash is locked to, and the mint
    issues him ecash of his own.
 
-Those pictures are frames of a 70-second video. Its screens are screenshots of two
+Those pictures are frames of the video at the top. Its screens are screenshots of two
 wallets making this payment, and the panels quote that payment's own DID document,
 spending condition and message. The source, with the script that records it, is in
 [`docs/promo/ecash-did`](promo/ecash-did).
