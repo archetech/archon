@@ -143,8 +143,9 @@ These are our first contributions to Cashu.
 - **More than 550 test cases** cover the wallet, the DIDComm transport, the gateway
   and the interfaces, in both languages.
 - **Both wallets are held to the same vectors:** the NUT repository's own, and what
-  cashu-ts produces for fixed inputs, which the Python wallet has to reproduce byte
-  for byte.
+  cashu-ts produces for fixed inputs. The Python wallet has to derive the same
+  secrets and encode the same tokens byte for byte, and to verify the signatures
+  cashu-ts made.
 - **Both wallets run against a real `cashubtc/mintd`** in CI, not only against a
   fake mint. That mint uses its `fakewallet` backend, so Lightning is not part of
   those tests; the regtest suite covers it.
