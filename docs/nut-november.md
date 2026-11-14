@@ -199,7 +199,7 @@ and the Python wallet.
 | 10 | Spending conditions | The kind NUT-11 needs |
 | 11 | Pay-to-pubkey | Ecash locked to a DID's key, with a locktime and a refund to the sender |
 | 12 | DLEQ proofs | Verifying the mint's signatures |
-| 13 | Deterministic secrets | Derived from the seed the identity wallet already has, so one backup covers both |
+| 13 | Deterministic secrets | Derived from the seed the identity wallet already has, so its recovery phrase restores held ecash too. Reclaiming an unclaimed send to a DID needs the wallet file |
 | 16 | Animated QR codes | Showing a long token in every wallet and client; scanning one in the React wallet on Android |
 | 18 | Payment requests | Created by nodes, decoded and paid by wallets |
 | 20 | Signature on mint quote | Only a quote's creator can claim it |
