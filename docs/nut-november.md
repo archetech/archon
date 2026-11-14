@@ -163,16 +163,31 @@ These are our first contributions to Cashu.
 
 ## Try it
 
-On an Archon node with the `cashu` profile ([deployment guide](deployment.md)):
+People use the Cashu screens in the wallets. The Keymaster command line is the
+interface for agents and scripts, and the MCP server offers the same commands as
+tools.
+
+The Cashu commands are on `main` and not yet in the `@didcid/keymaster` release on
+npm, so build the CLI from source and point it at a node that runs a mint:
 
 ```sh
-./archon add-cashu                           # join this node's mint
-./archon cashu-mint 1000                     # an invoice; pay it, then cashu-claim
-./archon cashu-send-to <DID> 500 "thanks"    # locked to that DID, sent over DIDComm
-./archon cashu-accept                        # the recipient: claim what has arrived
-./archon cashu-decode-request <creq…>        # what does this 402 want?
-./archon cashu-pay-request --max 10 <creq…>  # pay it, up to 10 sats
+git clone https://github.com/archetech/archon && cd archon
+npm ci && npm run build
+export ARCHON_NODE_URL=https://4tress.org      # an Archon node with the cashu profile
+export ARCHON_PASSPHRASE=<a passphrase for the new wallet>
+
+npx keymaster create-id agent                      # an identity for the agent
+npx keymaster publish-didcomm                      # a mailbox, so it can be sent ecash
+npx keymaster add-cashu                            # join the node's mint
+npx keymaster cashu-mint 1000                      # an invoice; pay it, then cashu-claim
+npx keymaster cashu-send-to <DID> 500 "thanks"     # locked to that DID, sent over DIDComm
+npx keymaster cashu-accept                         # the recipient: claim what has arrived
+npx keymaster cashu-decode-request <creq…>         # what does this 402 want?
+npx keymaster cashu-pay-request --max 10 <creq…>   # pay it, up to 10 sats
 ```
+
+To run a node of your own with a mint, add the `cashu` profile
+([deployment guide](deployment.md)).
 
 Or run the whole thing on regtest, with nothing but Docker:
 
