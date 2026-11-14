@@ -19,9 +19,8 @@ used the identity to do three things with ecash that a Cashu wallet alone cannot
 3. **Two Cashu wallets that agree.** Archon's wallet software comes in a TypeScript
    version and a Python version, and each now has the full Cashu wallet. The
    TypeScript one is built on cashu-ts. The Python one is written from scratch,
-   including the blind-signature cryptography and the token formats, because no
-   Python library we could use covers them. Both pass the same test vectors, and in
-   our tests each sends ecash to the other.
+   including the blind-signature cryptography and the token formats. Both pass the
+   same test vectors, and in our tests each sends ecash to the other.
 
 Along the way we reported a bug in cdk's CLN backend, with a fix, both found by
 testing against real Lightning.
