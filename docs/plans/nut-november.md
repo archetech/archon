@@ -4,6 +4,8 @@ Status: options A ([cashu-402-1596.md](cashu-402-1596.md)) and D (#1616) are
 delivered, and option E is open upstream as cashubtc/cdk#2874. The other options are
 undecided.
 
+The submission, written for the judges, is [../nut-november.md](../nut-november.md).
+
 [Nut November](https://nutnovember.org) is a month-long Cashu hackathon. Work
 made from November 1 counts; submissions close **November 27, 23:59 UTC**, and
 winners are announced November 30. Existing projects may enter if the
