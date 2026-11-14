@@ -100,10 +100,12 @@ so another wallet can send a token to an Archon identity or receive one from it.
 ## Paying an HTTP 402 with ecash
 
 An Archon node can charge for API calls. Until this month the only way to pay was
-L402, which needs a Lightning payment for each credential. Now, once the operator
-has had the node's own identity join its mint, a priced call answers `402` with
-both: a Lightning invoice, and an `X-Cashu` header holding a NUT-18 payment request.
-A client retries with a token in the same header.
+L402, which needs a Lightning payment for each credential. Now a priced call can
+also be paid with ecash. Its `402` offers each method the node has working: a
+Lightning invoice when the node's Lightning service is up, and an `X-Cashu` header
+holding a NUT-18 payment request once the operator has had the node's own identity
+join its mint. A client that pays with ecash retries with a token in the same
+header.
 
 - **The node** checks the token's mint, unit and amount, and redeems it at the mint
   before serving, so a token cannot be spent twice. The ecash goes into the node's
