@@ -2,7 +2,7 @@
 
 *Archon at Nut November 2026*
 
-**Ecash you can send to an identity, and ecash an AI agent can spend by itself.**
+**Ecash you can send to an identity, and ecash a software agent can spend by itself.**
 
 https://github.com/user-attachments/assets/559e5a98-7f54-427f-a4b0-4e19b4f16d4d
 
@@ -10,17 +10,17 @@ https://github.com/user-attachments/assets/559e5a98-7f54-427f-a4b0-4e19b4f16d4d
 
 [Archon](https://github.com/archetech/archon) is an open-source (MIT) decentralized
 identity system: people and software agents hold DIDs, and a wallet called Keymaster
-holds their keys. In November we gave every Archon identity a Cashu wallet, and then
-used the identity to do three things with ecash that a Cashu wallet alone cannot.
+holds their keys. In November we added a Cashu wallet that any Archon identity can
+turn on, and built three things with it.
 
 1. **Send ecash to a DID.** The wallet locks the token to the recipient's key
    (NUT-11) and delivers it over DIDComm to the mailbox the recipient's DID document
    names. A token that leaks on the way is worth nothing, and the sender can reclaim
    one that is never claimed.
 2. **Pay an HTTP 402 with ecash (NUT-24), on both sides.** Archon nodes now accept
-   ecash for priced API calls, and Archon wallets pay such requests. An AI agent
-   with its own DID pays per call from its own ecash, and refuses a price above the
-   limit its owner set.
+   ecash for priced API calls, and Archon wallets pay such requests. An agent with
+   its own DID pays per call from its own ecash, and the wallet refuses any request
+   above the maximum the agent passes.
    The [NUT index](https://github.com/cashubtc/nuts) lists no implementation of
    NUT-24 as of November 14.
 3. **Two Cashu wallets that agree.** Archon's wallet software comes in a TypeScript
@@ -29,8 +29,8 @@ used the identity to do three things with ecash that a Cashu wallet alone cannot
    including the blind-signature cryptography and the token formats. Both pass the
    same test vectors, and in our tests each sends ecash to the other.
 
-Along the way we reported a bug in cdk's CLN backend, with a fix, both found by
-testing against real Lightning.
+Along the way, testing against real Lightning turned up a bug in cdk's CLN backend.
+We reported it and sent a fix.
 
 ## What is new since November 1
 
@@ -53,7 +53,7 @@ its Lightning (L402) paywall.
 | Nov 11 | **Nodes accept ecash as HTTP 402 payment** (NUT-24, NUT-18) | [#1598](https://github.com/archetech/archon/pull/1598) |
 | Nov 11 | **Wallets decode and pay a Cashu payment request** (NUT-18, NUT-26), within a stated maximum | [#1605](https://github.com/archetech/archon/pull/1605), [#1606](https://github.com/archetech/archon/pull/1606) |
 | Nov 11 | An agent pays a node's paywall with ecash, end to end on regtest | [#1607](https://github.com/archetech/archon/pull/1607) |
-| Nov 13 | Animated QR codes for long tokens (NUT-16): shown everywhere, scanned on Android | [#1617](https://github.com/archetech/archon/pull/1617) |
+| Nov 13 | Animated QR codes for long tokens (NUT-16): display across wallets and clients; Android scanning implemented and unit-tested, pending on-device validation | [#1617](https://github.com/archetech/archon/pull/1617) |
 | Nov 14 | A video of one payment, recorded from real wallets | [#1622](https://github.com/archetech/archon/pull/1622) |
 
 That is about 7,000 lines of wallet, gateway and interface code, not counting tests.
@@ -100,9 +100,12 @@ so another wallet can send a token to an Archon identity or receive one from it.
 ## Paying an HTTP 402 with ecash
 
 An Archon node can charge for API calls. Until this month the only way to pay was
-L402, which needs a Lightning payment for each credential. Now a priced call answers
-`402` with both: a Lightning invoice, and an `X-Cashu` header holding a NUT-18
-payment request. A client retries with a token in the same header.
+L402, which needs a Lightning payment for each credential. Now a priced call can
+also be paid with ecash. Its `402` offers each method the node has working: a
+Lightning invoice when the node's Lightning service is up, and an `X-Cashu` header
+holding a NUT-18 payment request once the operator has had the node's own identity
+join its mint. A client that pays with ecash retries with a token in the same
+header.
 
 - **The node** checks the token's mint, unit and amount, and redeems it at the mint
   before serving, so a token cannot be spent twice. The ecash goes into the node's
@@ -116,11 +119,12 @@ payment request. A client retries with a token in the same header.
   [`agent.mjs`](../tests/cashu-regtest/agent.mjs) is a complete example in under 80 lines:
   it registers a new DID through a paywalled node, gets the 402, asks its wallet
   what the request costs, pays 10 sats and retries. It needs no Lightning node, no
-  channel and no account, only ecash.
+  channel and no account, only ecash. It is a script, not an AI model, and it passes
+  the quoted price as its maximum; an agent with a budget would pass its own.
 
 The regtest suite runs that agent against both Keymaster implementations, each
 paying a node whose ecash is redeemed by the other. It also checks that a replayed
-token and an underpaying token are refused and cost the payer nothing.
+token and an underpaying token are refused and pay the node nothing.
 
 ## Given back to Cashu
 
@@ -131,9 +135,6 @@ token and an underpaying token are refused and cost the payer nothing.
 - **A fix:** [cashubtc/cdk#2874](https://github.com/cashubtc/cdk/pull/2874), open
   for review.
 - **A DIDComm protocol for Cashu tokens**, published for any wallet to implement.
-- **Test vectors** for the wallet, the pay-to-pubkey lock and both payment request
-  encodings, in [`tests/fixtures`](../tests/fixtures). Our two implementations share
-  them, and a third could.
 
 These are our first contributions to Cashu.
 
@@ -141,8 +142,13 @@ These are our first contributions to Cashu.
 
 - **More than 550 test cases** cover the wallet, the DIDComm transport, the gateway
   and the interfaces, in both languages.
+- **Both wallets are held to the same vectors:** the NUT repository's own, and what
+  cashu-ts produces for fixed inputs. The Python wallet has to derive the same
+  secrets and encode the same tokens byte for byte, and to verify the signatures
+  cashu-ts made.
 - **Both wallets run against a real `cashubtc/mintd`** in CI, not only against a
-  fake mint.
+  fake mint. That mint uses its `fakewallet` backend, so Lightning is not part of
+  those tests; the regtest suite covers it.
 - **A regtest suite on real Lightning** ([`tests/cashu-regtest`](../tests/cashu-regtest))
   makes more than 40 checks across both wallets: routing fees and change, a payment held in
   flight while the wallet is killed, a payment that fails, and the paywall.
@@ -156,7 +162,8 @@ These are our first contributions to Cashu.
 People use the Cashu screens in the wallets. The command line is the interface for
 agents and scripts, and the MCP server offers the same commands as tools.
 
-On an Archon node with the `cashu` and `didcomm` profiles
+The Cashu work is on `main` and in no tagged release yet, so this needs a node built
+from `main`, with the `cashu` and `didcomm` profiles
 ([deployment guide](deployment.md)):
 
 ```sh
@@ -181,8 +188,9 @@ the plans record the decisions: [the wallet](plans/cashu-1058.md),
 
 ## What was done
 
-Twenty NUTs, all implemented this month. The wallet NUTs are in both the TypeScript
-and the Python wallet.
+Twenty NUTs, all implemented this month, two of them in part: NUT-10 and NUT-18, as
+the next section says. The wallet NUTs are in both the TypeScript and the Python
+wallet.
 
 | NUT | Name | Used for |
 |---|---|---|
@@ -200,7 +208,7 @@ and the Python wallet.
 | 11 | Pay-to-pubkey | Ecash locked to a DID's key, with a locktime and a refund to the sender |
 | 12 | DLEQ proofs | Verifying the mint's signatures |
 | 13 | Deterministic secrets | Derived from the seed the identity wallet already has, so its recovery phrase restores held ecash too. Reclaiming an unclaimed send to a DID needs the wallet file |
-| 16 | Animated QR codes | Showing a long token in every wallet and client; scanning one in the React wallet on Android |
+| 16 | Animated QR codes | Showing a long token in every wallet and client. Scanning one is implemented in the React wallet on Android and unit-tested, pending on-device validation |
 | 18 | Payment requests | Created by nodes, decoded and paid by wallets |
 | 20 | Signature on mint quote | Only a quote's creator can claim it |
 | 23 | Payment method: BOLT11 | The invoices minted and melted with |
@@ -218,7 +226,7 @@ per-NUT detail is in the [plan](plans/nut-november.md#nuts-implemented).
   not implemented.
 - **WebSocket subscriptions** (NUT-17) are switched off at the node's mint, because
   the gateway cannot carry them.
-- **Scanning an animated QR code** is covered by tests and has not yet been tried on
-  a phone.
+- **Scanning an animated QR code** is unit-tested against a mocked camera plugin and
+  has not yet been tried on a phone.
 - **Ecash is custodial.** The mint holds the funds behind it. The wallet says so,
   and marks the feature experimental.
