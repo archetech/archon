@@ -156,9 +156,11 @@ These are our first contributions to Cashu.
 People use the Cashu screens in the wallets. The command line is the interface for
 agents and scripts, and the MCP server offers the same commands as tools.
 
-On an Archon node with the `cashu` profile ([deployment guide](deployment.md)):
+On an Archon node with the `cashu` and `didcomm` profiles
+([deployment guide](deployment.md)):
 
 ```sh
+./archon publish-didcomm                     # a mailbox, so this identity can be sent ecash
 ./archon add-cashu                           # join this node's mint
 ./archon cashu-mint 1000                     # an invoice; pay it, then cashu-claim
 ./archon cashu-send-to <DID> 500 "thanks"    # locked to that DID, sent over DIDComm
