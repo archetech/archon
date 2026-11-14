@@ -122,25 +122,6 @@ The regtest suite runs that agent against both Keymaster implementations, each
 paying a node whose ecash is redeemed by the other. It also checks that a replayed
 token and an underpaying token are refused and cost the payer nothing.
 
-## NUTs implemented
-
-Twenty, all added this month.
-
-| NUT | | Where |
-|---|---|---|
-| 00–09 | Tokens, keys, keysets and fees, swap, mint, melt, mint info, state check, fee return, restore | The wallet, TypeScript and Python |
-| 10, 11 | Spending conditions, pay-to-pubkey | Ecash locked to a DID's key, with a locktime and refund |
-| 12 | DLEQ proofs | Verifying the mint's signatures |
-| 13 | Deterministic secrets | Derived from the seed the identity wallet already has, so one backup covers both |
-| 16 | Animated QR codes | Shown in every wallet and client; scanned in the React wallet on Android |
-| 18, 26 | Payment requests, bech32m encoding | Created by nodes, decoded and paid by wallets |
-| 20 | Signature on mint quote | Only a quote's creator can claim it |
-| 23 | BOLT11 | Minting and melting |
-| 24 | HTTP 402 Payment Required | Served by nodes, paid by wallets and agents |
-
-The mint is [cdk-mintd](https://github.com/cashubtc/cdk), bundled with the node. The
-per-NUT detail and the gaps are in the [plan](plans/nut-november.md#nuts-implemented).
-
 ## Given back to Cashu
 
 - **A bug report:** [cashubtc/cdk#2836](https://github.com/cashubtc/cdk/issues/2836).
@@ -195,6 +176,37 @@ tests/cashu-regtest/run.sh
 The [walkthrough](presentations/cashu.html) explains the design with animations, and
 the plans record the decisions: [the wallet](plans/cashu-1058.md),
 [HTTP 402](plans/cashu-402-1596.md) and [this month's options](plans/nut-november.md).
+
+## What was done
+
+Twenty NUTs, all implemented this month. The wallet NUTs are in both the TypeScript
+and the Python wallet.
+
+| NUT | Name | Used for |
+|---|---|---|
+| 00 | Cryptography and models | Tokens and blind signatures |
+| 01 | Mint public keys | Fetching a mint's keys |
+| 02 | Keysets and fees | Keysets, keyset rotation and input fees |
+| 03 | Swapping tokens | Send, receive and rotation |
+| 04 | Minting tokens | Ecash from a paid invoice |
+| 05 | Melting tokens | Paying an invoice from ecash |
+| 06 | Mint info | Reading it, and refusing a mint without NUT-07, 08 or 09 |
+| 07 | Token state check | Settling the wallet's journal |
+| 08 | Overpaid Lightning fees | Change from a melt's fee reserve |
+| 09 | Signature restore | Restoring from the seed, and recovery after a lost response |
+| 10 | Spending conditions | The kind NUT-11 needs |
+| 11 | Pay-to-pubkey | Ecash locked to a DID's key, with a locktime and a refund to the sender |
+| 12 | DLEQ proofs | Verifying the mint's signatures |
+| 13 | Deterministic secrets | Derived from the seed the identity wallet already has, so one backup covers both |
+| 16 | Animated QR codes | Showing a long token in every wallet and client; scanning one in the React wallet on Android |
+| 18 | Payment requests | Created by nodes, decoded and paid by wallets |
+| 20 | Signature on mint quote | Only a quote's creator can claim it |
+| 23 | Payment method: BOLT11 | The invoices minted and melted with |
+| 24 | HTTP 402 Payment Required | Served by nodes, paid by wallets and agents |
+| 26 | Payment request bech32m encoding | Decoding `creqB` requests |
+
+The mint is [cdk-mintd](https://github.com/cashubtc/cdk), bundled with the node. The
+per-NUT detail is in the [plan](plans/nut-november.md#nuts-implemented).
 
 ## What is not done
 
