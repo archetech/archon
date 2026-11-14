@@ -53,7 +53,7 @@ its Lightning (L402) paywall.
 | Nov 11 | **Nodes accept ecash as HTTP 402 payment** (NUT-24, NUT-18) | [#1598](https://github.com/archetech/archon/pull/1598) |
 | Nov 11 | **Wallets decode and pay a Cashu payment request** (NUT-18, NUT-26), within a stated maximum | [#1605](https://github.com/archetech/archon/pull/1605), [#1606](https://github.com/archetech/archon/pull/1606) |
 | Nov 11 | An agent pays a node's paywall with ecash, end to end on regtest | [#1607](https://github.com/archetech/archon/pull/1607) |
-| Nov 13 | Animated QR codes for long tokens (NUT-16): shown everywhere, scanned on Android | [#1617](https://github.com/archetech/archon/pull/1617) |
+| Nov 13 | Animated QR codes for long tokens (NUT-16): display across wallets and clients; Android scanning implemented and unit-tested, pending on-device validation | [#1617](https://github.com/archetech/archon/pull/1617) |
 | Nov 14 | A video of one payment, recorded from real wallets | [#1622](https://github.com/archetech/archon/pull/1622) |
 
 That is about 7,000 lines of wallet, gateway and interface code, not counting tests.
@@ -200,7 +200,7 @@ and the Python wallet.
 | 11 | Pay-to-pubkey | Ecash locked to a DID's key, with a locktime and a refund to the sender |
 | 12 | DLEQ proofs | Verifying the mint's signatures |
 | 13 | Deterministic secrets | Derived from the seed the identity wallet already has, so its recovery phrase restores held ecash too. Reclaiming an unclaimed send to a DID needs the wallet file |
-| 16 | Animated QR codes | Showing a long token in every wallet and client; scanning one in the React wallet on Android |
+| 16 | Animated QR codes | Showing a long token in every wallet and client. Scanning one is implemented in the React wallet on Android and unit-tested, pending on-device validation |
 | 18 | Payment requests | Created by nodes, decoded and paid by wallets |
 | 20 | Signature on mint quote | Only a quote's creator can claim it |
 | 23 | Payment method: BOLT11 | The invoices minted and melted with |
@@ -218,7 +218,7 @@ per-NUT detail is in the [plan](plans/nut-november.md#nuts-implemented).
   not implemented.
 - **WebSocket subscriptions** (NUT-17) are switched off at the node's mint, because
   the gateway cannot carry them.
-- **Scanning an animated QR code** is covered by tests and has not yet been tried on
-  a phone.
+- **Scanning an animated QR code** is unit-tested against a mocked camera plugin and
+  has not yet been tried on a phone.
 - **Ecash is custodial.** The mint holds the funds behind it. The wallet says so,
   and marks the feature experimental.

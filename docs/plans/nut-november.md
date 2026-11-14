@@ -66,7 +66,7 @@ The NUT index lists no implementation of NUT-24 yet.
 
 | NUT | Name | Used for |
 |---|---|---|
-| 16 | Animated QR codes | Showing a token too long for one code, in the wallets and the standalone clients; reading one with the camera, in the React wallet on Android |
+| 16 | Animated QR codes | Showing a token too long for one code, in the wallets and the standalone clients; reading one with the camera is implemented in the React wallet on Android and unit-tested, not yet tried on a device |
 
 **Partial**
 
