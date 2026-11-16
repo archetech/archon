@@ -91,11 +91,14 @@ try {
     result.addresses = await pool(names, 10, async name => {
         const [local = '', outbound = ''] = (await run(name,
             `ip -4 -o addr show eth0 | awk '{print $4}'; curl -s -m 8 https://api.ipify.org || true`, { seconds: 30 })).trim().split('\n');
-        return { private: local, public: outbound };
+        return { private: local, public: /^[\d.]+$/.test(outbound.trim()) ? outbound.trim() : '' };
     });
+    // A node whose public address could not be read might be on any host, so the
+    // count is then unknown and the run cannot be called valid.
     const hosts = [...new Set(result.addresses.map(address => address.public))];
-    result.hosts = hosts.length;
-    if (hosts.length > 1) log(`the nodes are on ${hosts.length} hosts, which invalidates the run: ${result.addresses.map(address => hosts.indexOf(address.public) + 1).join(' ')}`);
+    result.hosts = hosts.includes('') ? null : hosts.length;
+    if (result.hosts === null) log('a node\'s public address could not be read, so the number of hosts is unknown');
+    else if (result.hosts > 1) log(`the nodes are on ${result.hosts} hosts, which invalidates the run: ${result.addresses.map(address => hosts.indexOf(address.public) + 1).join(' ')}`);
 
     result.clocks = await pool(names, 8, name => run(name,
         "chronyc tracking 2>/dev/null | awk -F': *' '/System time/ {print $2}' || true; timedatectl show -p NTPSynchronized --value", { seconds: 30 })
@@ -169,7 +172,7 @@ run ${id}: ${opts.nodes} nodes, ${operations.length} operations at ${opts.rate}/
   create at the origin    p50 ${result.createMs.p50} ms
   per operation, summed over the nodes: ${per('mediator_messages_relayed_total')} relayed, ${per('mediator_messages_received_total')} received, ${per('mediator_duplicate_batches_total')} duplicate batches
   connections per node    ${connections.join(' ')}
-  hosts                   ${result.hosts}${result.hosts > 1 ? ', so the run is not valid: nodes on different hosts do not connect' : ''}
+  hosts                   ${result.hosts === null ? 'unknown, so the run cannot be called valid' : result.hosts}${result.hosts > 1 ? ', so the run is not valid: nodes on different hosts do not connect' : ''}
   results                 ${file}`);
 }
 finally {

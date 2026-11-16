@@ -6,15 +6,15 @@
 //
 // --cap is a spending limit in the account's currency: before each run the sweep reads
 // the account's estimated usage and stops if the sweep has spent more than that.
-import { boxd, here, log, options } from './lib.mjs';
+import { MAX_NODES, boxd, here, log, options } from './lib.mjs';
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const opts = options(process.argv.slice(2), { sizes: '2,5,10,20,40', repeats: 3, ops: 60, rate: 1, cap: 10 });
 const sizes = opts.sizes.split(',').map(Number);
-if (!sizes.length || sizes.some(size => !Number.isInteger(size) || size < 2)) {
-    throw new Error(`--sizes takes whole numbers of two or more, separated by commas, not ${opts.sizes}`);
+if (!sizes.length || sizes.some(size => !Number.isInteger(size) || size < 2 || size > MAX_NODES)) {
+    throw new Error(`--sizes takes whole numbers from 2 to ${MAX_NODES}, separated by commas, not ${opts.sizes}`);
 }
 
 async function spent() {
@@ -68,6 +68,6 @@ const rows = runs.map(run => run.error
     ? `| ${run.options.nodes} | ${run.run ?? '-'} | failed: ${run.error} | | | | | | |`
     : `| ${run.options.nodes} | ${run.run} | ${run.arrivedEverywhere} of ${run.operations} | ${run.propagationMs.p50} | ${run.propagationMs.p95} | `
         + `${per(run, 'mediator_messages_relayed_total')} | ${per(run, 'mediator_duplicate_batches_total')} | `
-        + `${Math.min(...run.connections)} to ${Math.max(...run.connections)} | ${run.hosts} |`);
+        + `${Math.min(...run.connections)} to ${Math.max(...run.connections)} | ${run.hosts ?? 'unknown'} |`);
 console.log(['', '| Nodes | Run | Reached every node | p50 ms | p95 ms | Relayed per op | Duplicate batches per op | Peers per node | Hosts |',
     '|---|---|---|---|---|---|---|---|---|', ...rows, '', `spent ${(await spent() - before).toFixed(2)}; results in ${file}`].join('\n'));

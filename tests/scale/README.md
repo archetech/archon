@@ -100,7 +100,8 @@ connected after seven minutes.
 
 A run spread over two hosts therefore comes up as two networks, and looks as if the
 network had split. Every run records its nodes' addresses in `addresses`, counts the
-hosts in `hosts` and says so in its summary. A run with more than one host measures
+hosts in `hosts` and says so in its summary. If any node's public address could not be
+read, the count is unknown and the run is treated as not valid. A run with more than one host measures
 the placement and nothing about the node.
 
 ## Results so far
@@ -147,7 +148,8 @@ five-minute wait, three runs at each of twenty and forty nodes reached every nod
 - **Time did not grow with size.** The median stayed near one second.
 - **Messages grew with the square of the network.** A nearly complete mesh of twenty
   nodes relayed about 160 messages for each operation and one of forty about 730,
-  more than nine in ten of them duplicates (#1639).
+  and more than nine in ten of the messages received were batches the node already
+  had (#1639). Every message relayed is one received, so the two totals agree.
 - **Messages follow the connections.** The earlier forty-node run, with 4 to 21
   connections a node, relayed 198.5.
 - **Identical starts gave different meshes.**

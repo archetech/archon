@@ -67,6 +67,13 @@ export async function pool(items, limit, fn) {
     return results;
 }
 
+// node/configure.sh gives node N the subnet 10.(100+N).0.0/24, which runs out here.
+export const MAX_NODES = 150;
+
+// Options that count things. Half a node or half an identity is a mistake, and one
+// that would otherwise be found only after the machines had been paid for.
+const COUNTS = ['nodes', 'ops', 'repeats'];
+
 export function options(argv, defaults) {
     const values = { ...defaults };
     for (let i = 0; i < argv.length; i += 2) {
@@ -84,6 +91,12 @@ export function options(argv, defaults) {
         const number = Number(argv[i + 1]);
         if (!Number.isFinite(number) || number <= 0) {
             throw new Error(`${argv[i]} takes a number above zero, not ${argv[i + 1]}`);
+        }
+        if (COUNTS.includes(key) && !Number.isInteger(number)) {
+            throw new Error(`${argv[i]} takes a whole number, not ${argv[i + 1]}`);
+        }
+        if (key === 'nodes' && number > MAX_NODES) {
+            throw new Error(`--nodes takes at most ${MAX_NODES}, not ${argv[i + 1]}`);
         }
         values[key] = number;
     }
