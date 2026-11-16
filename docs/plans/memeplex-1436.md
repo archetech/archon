@@ -132,8 +132,8 @@ update, signed by the user, that changes nothing else and still satisfies the gr
 schema. The grant's **active history** is its creation followed by scope updates,
 up to the first operation that is anything else. That operation ends the grant:
 normally a deletion (`revokeDID`), but also a change of client or other data, a
-transfer, a registry change or a `validUntil`. The client cannot change in place,
-because its objects are controlled by it.
+transfer or a registry change. The client cannot change in place, because its
+objects are controlled by it.
 
 ### Authority is an interval
 
@@ -184,7 +184,7 @@ prefix whose versions satisfy the following checks:
 | Shape | Valid kind schema and semantic rules | Same validation; deletion uses its predecessor's identity and needs no data body |
 | Author and publisher | Grant creator is `author`; creation controller is the grant's client | Predecessor controller is that same client |
 | Scope | The version in force at the creation permits `kind` | Creation's permission continues to cover edits and deletion |
-| Identity | Establish `author`, `kind`, `grant`, `target`, controller and registry; no `validUntil` | Updates preserve them and add no `validUntil`; `targetVersion` may change. Deletion takes identity from its predecessor. |
+| Identity | Establish `author`, `kind`, `grant`, `target`, controller and registry; no `validUntil` | Updates preserve them; `targetVersion` may change. Deletion takes identity from its predecessor. |
 | Position | Receipt is on the grant's registry, inside its authority interval | Same condition |
 
 Object data comes from the version being checked, not the current document.
@@ -263,11 +263,6 @@ The feed is ordered by event time, not arrival. Polling alone misses late eviden
 and displaced branches, so indexers also reconcile indexed histories and reread
 the feed over its full range. Recheck dependent publications when their histories,
 grant histories or compared receipts change. Indexer caches confer no authority.
-
-A revoked client can still make its objects expire on Archon (#1466), after which
-nodes drop their histories. Indexers therefore keep the exported histories of what
-they index and keep attributing from them; a fresh indexer can rebuild only what
-some node or archive still holds.
 
 Gatekeeper's data queries are useful discovery shortcuts. They match current
 data, so they cannot find every publication preserved behind an unauthorized edit
