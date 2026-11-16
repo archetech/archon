@@ -18,3 +18,74 @@ When a node receives a `queue` message it will import the operations like during
 | `ARCHON_NODE_NAME`            | anon                   | Human-readable name for the node |
 | `ARCHON_PROTOCOL`        | set in code | Archon network topic to join |
 | `ARCHON_HYPR_EXPORT_INTERVAL` |  2                     | Seconds between export cycles |
+
+## Two nodes behind one public address
+
+Two nodes that reach the internet through the same public address do not find each
+other over Hyperswarm ([#1631](https://github.com/archetech/archon/issues/1631)).
+That covers two nodes on one home or office network, and machines that share a
+hosting provider's outbound address. Nodes with public addresses of their own, or
+behind different ones, are not affected.
+
+Each mediator joins the topic and reports no peers: `Connected nodes: 0` in its log,
+and `mediator_active_connections 0` in its metrics, while the other node is running.
+The cause is that Hyperswarm connects two such peers over their local network, and
+the mediator's container can only offer its Docker bridge address, which is the same
+on every host.
+
+There is no fix yet. The workaround below is what the scale tests use
+(`tests/scale/node/configure.sh`). It has been run on Linux with Docker Compose 2.24
+or later, on hosts that run nothing but the node, and nowhere else. Apply it on every
+node that shares the address.
+
+1. Put the mediator on the host's network, and give the node's Compose network a
+   subnet no other node uses, in `docker-compose.override.yml`:
+
+   ```yaml
+   services:
+     hyperswarm-mediator:
+       network_mode: host
+       ports: !reset []
+       environment:
+         - ARCHON_GATEKEEPER_URL=http://127.0.0.1:4224
+         - ARCHON_KEYMASTER_URL=http://127.0.0.1:4226
+         - ARCHON_IPFS_URL=http://127.0.0.1:5001/api/v0
+   networks:
+     default:
+       ipam:
+         config:
+           - subnet: 10.101.0.0/24
+   ```
+
+   Use `10.102.0.0/24` on the second node, and so on. The second number must differ
+   on every node and must not be the second number of your local network's own
+   addresses.
+
+   The three URLs are where a node with default settings publishes those services
+   on its host. If you have changed `ARCHON_GATEKEEPER_PORT`, `ARCHON_KEYMASTER_PORT`
+   or `ARCHON_KEYMASTER_HOST_BIND`, use the ports and address you chose; a mediator
+   that cannot reach them waits for them and never joins the swarm.
+
+2. Take the address off Docker's default bridge, which is also the same on every
+   host:
+
+   ```bash
+   sudo ip addr flush dev docker0
+   ```
+
+   This is the host's bridge, not the node's. Any other container on the host that
+   uses Docker's default `bridge` network loses its connectivity, so move those to
+   a network of their own first. Docker puts the address back when its daemon
+   restarts, and the command has to be repeated then.
+
+3. Recreate the services: `docker compose up -d`.
+
+What the workaround costs:
+
+- **The metrics port is open wider.** On the host's network the mediator's port 4232
+  listens on every interface of the host and not only on localhost. Close it in the
+  firewall if the host is reachable from outside.
+- **The bundled Prometheus loses the mediator.** With the `observability` profile,
+  Prometheus scrapes `hyperswarm-mediator:4232`, a name that no longer resolves once
+  the mediator has left the Compose network. Its scrape target has to be pointed at
+  the host.
