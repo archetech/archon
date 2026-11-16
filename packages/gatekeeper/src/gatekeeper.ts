@@ -1772,9 +1772,14 @@ export default class Gatekeeper implements GatekeeperInterface {
         for (const [index, target] of targets.entries()) {
             const events = histories?.get(target) ?? await this.db.getEvents(target);
             staged.set(target, []);
-            original.set(target, this.cipher.canonicalizeJSON(events));
+            // A digest, not the text: at startup the targets are every DID, and
+            // their text would be a copy of the database.
+            original.set(target, this.cipher.hashJSON(events));
             snapshot?.update(index + 1);
         }
+        // Every target is staged from here on, so replay reads what it builds
+        // and not the accepted histories it started from.
+        histories?.clear();
         // Reuse the ordinary event authorization/import algorithm against an
         // isolated view. Readers never observe a DID half way through replay.
         const db = this.db;
@@ -1865,7 +1870,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         const publishing = histories ? new ProgressLogger('history publication', targets.length) : undefined;
         let published = 0;
         const publish = async (target: string) => {
-            if (this.cipher.canonicalizeJSON(staged.get(target)) !== original.get(target)) {
+            if (this.cipher.hashJSON(staged.get(target)) !== original.get(target)) {
                 changed = true;
                 if (staged.get(target)!.length) await this.db.setEvents(target, staged.get(target)!);
                 else await this.db.deleteEvents(target);

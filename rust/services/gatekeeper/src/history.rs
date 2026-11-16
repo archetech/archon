@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::Result;
+use multihash_codetable::{Code, MultihashDigest};
 use serde_json::Value;
 #[cfg(test)]
 use serde_json::json;
@@ -248,7 +249,7 @@ pub(crate) async fn ensure_history_ready(state: &AppState) -> Result<()> {
         retain_candidates_with_histories(state, did, None, Some(&histories)).await?;
         preparing.update(index + 1);
     }
-    rebuild_histories(state, dids, Some(&histories)).await?;
+    rebuild_histories(state, dids, Some(histories)).await?;
     // Replay builds the event index from its snapshot; an empty store has none.
     state.store.lock().await.ensure_event_index(&state.config.did_prefix)?;
     *state.history_ready.lock().await = true;
@@ -308,55 +309,74 @@ async fn reconcile_history_once(state: &AppState, did: &str, rebuild_self: bool)
         .map(|_| ())
 }
 
+// Identifies an accepted history by its serialized content.
+fn history_digest(events: &[EventRecord]) -> Result<Vec<u8>> {
+    Ok(Code::Sha2_256
+        .digest(serde_json::to_string(events)?.as_bytes())
+        .to_bytes())
+}
+
 async fn rebuild_histories(
     state: &AppState,
     mut targets: Vec<String>,
-    histories: Option<&HashMap<String, Vec<EventRecord>>>,
+    histories: Option<HashMap<String, Vec<EventRecord>>>,
 ) -> Result<bool> {
     if targets.is_empty() {
         return Ok(false);
     }
     // Snapshot-backed replay is startup recovery; runtime imports stay quiet.
-    let mut snapshot = histories.map(|_| ProgressLogger::new("replay snapshot", targets.len()));
+    let startup = histories.is_some();
+    let mut snapshot = startup.then(|| ProgressLogger::new("replay snapshot", targets.len()));
     targets.sort();
-    let candidates: HashMap<_, _> = {
-        let cache = state.candidate_history.lock().await;
-        let cache = cache.as_ref().expect("candidate cache initialized");
-        targets
-            .iter()
-            .map(|target| {
-                (
-                    target.clone(),
-                    cache.get(target).cloned().unwrap_or_default(),
-                )
-            })
-            .collect()
-    };
+    let target_set: HashSet<String> = targets.iter().cloned().collect();
     let mut data = JsonDbFile::default();
-    if histories.is_some() {
-        // Startup retained and canonicalized every candidate before replay.
-        // Reuse that content for canonical predecessors instead of reading it
-        // back one operation at a time. Retrieval aliases still require the DB.
-        for event in candidates.values().flatten() {
-            if let Some(opid) = &event.opid {
-                data.ops.insert(opid.clone(), event.operation.clone());
-            }
-        }
-    }
+    let mut agents = HashSet::new();
+    // What each target's accepted history was, as a digest: startup compares
+    // every history in the database, and their text would be a copy of it.
     let mut original = HashMap::new();
     {
+        // The candidates are read where they are. At startup the targets are
+        // every DID, and a copy of them would be a copy of the whole journal.
         let cache = state.candidate_history.lock().await;
         let cache = cache.as_ref().expect("candidate cache initialized");
+        for target in &targets {
+            let events = cache.get(target).map(Vec::as_slice).unwrap_or_default();
+            if events.iter().any(|event| {
+                event.operation.get("type").and_then(Value::as_str) == Some("create")
+                    && event
+                        .operation
+                        .pointer("/registration/type")
+                        .and_then(Value::as_str)
+                        == Some("agent")
+            }) {
+                agents.insert(target.clone());
+            }
+            if startup {
+                // Startup retained and canonicalized every candidate before replay.
+                // Reuse that content for canonical predecessors instead of reading it
+                // back one operation at a time. Retrieval aliases still require the DB.
+                for event in events {
+                    if let Some(opid) = &event.opid {
+                        data.ops.insert(opid.clone(), event.operation.clone());
+                    }
+                }
+            }
+        }
         let store = state.store.lock().await;
         // Snapshot only affected histories and their transitive authorities.
         // An unrelated DID must not turn every asset import into a DB-wide scan.
-        let mut needed: HashSet<_> = targets.iter().cloned().collect();
+        let mut needed = target_set.clone();
         let mut pending = targets.clone();
         let mut references = HashSet::new();
         while let Some(key) = pending.pop() {
-            let events = histories
-                .map(|items| items.get(&key).cloned().unwrap_or_default())
-                .unwrap_or_else(|| store.get_events(&key));
+            let stored;
+            let events: &[EventRecord] = match &histories {
+                Some(items) => items.get(&key).map(Vec::as_slice).unwrap_or_default(),
+                None => {
+                    stored = store.get_events(&key);
+                    &stored
+                }
+            };
             for event in events.iter().chain(cache.get(&key).into_iter().flatten()) {
                 if let Some(previd) = event.operation.get("previd").and_then(Value::as_str) {
                     if references.insert(previd.to_string()) && !data.ops.contains_key(previd) {
@@ -378,22 +398,23 @@ async fn rebuild_histories(
                     }
                 }
             }
-            if candidates.contains_key(&key) {
-                original.insert(key.clone(), serde_json::to_string(&events)?);
+            if target_set.contains(&key) {
+                // Affected projections start empty, so replay does not inherit an
+                // arrival-dependent accepted branch from the previous materialization.
+                original.insert(key.clone(), history_digest(events)?);
                 if let Some(progress) = &mut snapshot {
                     progress.update(original.len());
                 }
+            } else {
+                data.dids.insert(
+                    key.rsplit(':').next().unwrap_or(&key).to_string(),
+                    events.to_vec(),
+                );
             }
-            data.dids
-                .insert(key.rsplit(':').next().unwrap_or(&key).to_string(), events);
         }
     }
-    // Start affected projections empty, so replay does not inherit an
-    // arrival-dependent accepted branch from the previous materialization.
-    for target in &targets {
-        data.dids
-            .remove(target.rsplit(':').next().unwrap_or(target));
-    }
+    // Replay reads the store it builds, not the accepted histories it started from.
+    drop(histories);
     let mut replay = state.clone();
     replay.store = Arc::new(Mutex::new(JsonDb {
         backend: DbBackend::Memory,
@@ -406,23 +427,24 @@ async fn rebuild_histories(
     // Only self-controlled agents can authorize another DID. Their histories
     // therefore have no external dependencies; finish them before any assets.
     // Invalid controller assignments are still rejected by normal authorization.
-    targets.sort_by_key(|target| {
-        !candidates.get(target).into_iter().flatten().any(|event| {
-            event.operation.get("type").and_then(Value::as_str) == Some("create")
-                && event
-                    .operation
-                    .pointer("/registration/type")
-                    .and_then(Value::as_str)
-                    == Some("agent")
-        })
-    });
-    let mut replay_progress = histories.map(|_| ProgressLogger::new("history replay", targets.len()));
+    targets.sort_by_key(|target| !agents.contains(target));
+    let mut replay_progress = startup.then(|| ProgressLogger::new("history replay", targets.len()));
     for (index, target) in targets.iter().enumerate() {
         #[cfg(test)]
         let _ = tests::REPLAYED_HISTORIES.try_with(|replayed| {
             replayed.borrow_mut().push(target.clone());
         });
-        let mut events = candidates.get(target).cloned().unwrap_or_default();
+        // Replay imports through the low-level importer, which leaves the journal
+        // alone, so each target's candidates can be copied as it is reached.
+        let mut events = state
+            .candidate_history
+            .lock()
+            .await
+            .as_ref()
+            .expect("candidate cache initialized")
+            .get(target)
+            .cloned()
+            .unwrap_or_default();
         events.sort_by(|a, b| {
             let a_hint = crate::is_locally_stamped_registry(&a.registry);
             let b_hint = crate::is_locally_stamped_registry(&b.registry);
@@ -455,14 +477,14 @@ async fn rebuild_histories(
             progress.update(index + 1);
         }
     }
-    let mut publishing = histories.map(|_| ProgressLogger::new("history publication", targets.len()));
+    let mut publishing = startup.then(|| ProgressLogger::new("history publication", targets.len()));
     let mut changed = Vec::new();
     {
         let replay_store = replay.store.lock().await;
         let mut store = state.store.lock().await;
         for (index, target) in targets.iter().enumerate() {
             let events = replay_store.get_events(target);
-            if original.get(target) != Some(&serde_json::to_string(&events)?) {
+            if original.get(target) != Some(&history_digest(&events)?) {
                 if events.is_empty() {
                     store.delete_events(target)?;
                 } else {
@@ -479,7 +501,7 @@ async fn rebuild_histories(
     for target in &changed {
         state.verified_dids.lock().await.remove(target);
     }
-    if histories.is_some() {
+    if startup {
         // The replay store contains every accepted startup history. Empty
         // candidates were removed from durable storage during publication and
         // must not be counted as invalid DIDs in the derived views.
