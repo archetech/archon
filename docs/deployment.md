@@ -289,6 +289,62 @@ Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keyma
 | **grafana** | Metrics dashboards |
 | **pinning-mediator** | Optional generic IPFS pinning service backup |
 
+### Two Nodes Behind One Public Address
+
+Two nodes that reach the internet through the same public address do not find each
+other over Hyperswarm ([#1631](https://github.com/archetech/archon/issues/1631)).
+That covers two nodes on one home or office network, and machines that share a
+hosting provider's outbound address. Nodes with public addresses of their own, or
+behind different ones, are not affected.
+
+Each mediator joins the topic and reports no peers: `Connected nodes: 0` in its log,
+and `mediator_active_connections 0` in its metrics, while the other node is running.
+The cause is that Hyperswarm connects two such peers over their local network, and
+the mediator's container can only offer its Docker bridge address, which is the same
+on every host.
+
+There is no fix yet. The workaround below is what the scale tests use
+(`tests/scale/node/configure.sh`). It has been run on Linux with Docker Compose 2.24
+or later, and nowhere else. Apply it on every node that shares the address.
+
+1. Put the mediator on the host's network, and give the node's Compose network a
+   subnet no other node uses, in `docker-compose.override.yml`:
+
+   ```yaml
+   services:
+     hyperswarm-mediator:
+       network_mode: host
+       ports: !reset []
+       environment:
+         - ARCHON_GATEKEEPER_URL=http://127.0.0.1:4224
+         - ARCHON_KEYMASTER_URL=http://127.0.0.1:4226
+         - ARCHON_IPFS_URL=http://127.0.0.1:5001/api/v0
+   networks:
+     default:
+       ipam:
+         config:
+           - subnet: 10.101.0.0/24
+   ```
+
+   Use `10.102.0.0/24` on the second node, and so on. The second number must differ
+   on every node and must not be the second number of your local network's own
+   addresses.
+
+2. Take the address off Docker's default bridge, which is also the same on every
+   host:
+
+   ```bash
+   sudo ip addr flush dev docker0
+   ```
+
+   Docker puts it back when its daemon restarts, so this has to be repeated then.
+
+3. Recreate the services: `docker compose up -d`.
+
+On the host's network the mediator's metrics port, 4232, listens on every interface
+of the host and not only on localhost. Close it in the firewall if the host is
+reachable from outside.
+
 ### Start and Verify
 
 ```bash
