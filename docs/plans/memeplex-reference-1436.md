@@ -916,17 +916,9 @@ needed first.
 7. **Memepool client.**
 8. **Moderation:** block lists and labels.
 
-## Open questions
+## Open question
 
-- **Action vocabulary.** Is one action per creatable kind the right granularity, and
-  should grants be able to narrow further (for example, replies only within one
-  thread)?
-- **Change feed.** Should Gatekeeper offer an arrival-ordered change feed? It would
-  let indexers follow new and displaced versions directly, instead of reconciling
-  periodically against full state.
-- **Public follows.** Whether Memeplex should ever define a public follow list (see
-  Memepool: Follows), and if so, where it lives.
-- **Content availability.** Who pins long-form content and papers, and for how long?
+**Content availability.** Who pins long-form content and papers, and for how long?
 
 ## References
 
