@@ -6,7 +6,7 @@
 //
 // Writes results/<run>.json and prints a summary. Removes its machines when it ends,
 // unless --keep yes.
-import { PREFIX, RELEASE, REMOTE, boxd, here, log, machines, options, percentile, pool, region, run, sleep } from './lib.mjs';
+import { PREFIX, RELEASE, REMOTE, boxd, here, log, options, percentile, pool, region, run, sleep } from './lib.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
@@ -34,33 +34,18 @@ function parseMetrics(text) {
 const metrics = async machine => parseMetrics(await run(machine, 'curl -s -m 10 http://localhost:4232/metrics', { seconds: 30 }));
 const jsonLines = text => text.split('\n').filter(line => line.startsWith('{')).map(line => JSON.parse(line));
 
-// The machines this run made, and the ones it asked for without hearing that they
-// were made. A request that times out or loses its answer can still have made a
-// machine, which would be paid for until its deletion timer. Such a machine is
-// removed only if it carries this run's own label: a name can already belong to
-// another run, and a request refused for that reason must leave that machine alone.
-const owner = randomBytes(16).toString('hex');
-const created = [], asked = [];
+// Only the machines this run made: a run that fails while creating them has fewer.
+const created = [];
 async function teardown() {
     await pool(created, 8, name => boxd(['machine', 'remove', name, '-y']).catch(error => log(`could not remove ${name}: ${error.message}`)));
-    const unsure = asked.filter(name => !created.includes(name));
-    if (!unsure.length) return;
-    try {
-        const mine = (await machines(`owner=${owner}`)).map(machine => machine.name).filter(name => unsure.includes(name));
-        await pool(mine, 8, name => boxd(['machine', 'remove', name, '-y']));
-        if (mine.length) log(`also removed ${mine.join(' ')}, made by requests that had reported failure`);
-    }
-    catch (error) {
-        log(`could not check for machines made by requests that had reported failure: ${error.message}`);
-    }
 }
 
 log(`run ${id}: ${opts.nodes} nodes in ${region()}, ${opts.ops} operations at ${opts.rate}/s, protocol ${protocol}`);
 const result = { run: id, release: RELEASE, region: region(), options: opts, protocol, started: new Date().toISOString() };
 try {
     log('creating machines');
-    await pool(names, 10, name => (asked.push(name), boxd(['machine', 'new', name, '--from-snapshot', opts.snapshot, '--delete-after', opts.ttl,
-        '--label', 'purpose=archon-scale', '--label', `run=${id}`, '--label', `owner=${owner}`])).then(() => created.push(name)));
+    await pool(names, 10, name => boxd(['machine', 'new', name, '--from-snapshot', opts.snapshot, '--delete-after', opts.ttl,
+        '--label', 'purpose=archon-scale', '--label', `run=${id}`]).then(() => created.push(name)));
 
     log('starting nodes');
     const images = await pool(names, 10, (name, index) => run(name, `set -euo pipefail
