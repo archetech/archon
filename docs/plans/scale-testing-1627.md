@@ -17,16 +17,22 @@ about scale.
 
 ## What experiment A found
 
-Run on 2026-11-16 against v0.14.1, with 60 identities created at one a second through
-one node. The tables are in `tests/scale/README.md`.
+Run on 2026-11-16 with 60 identities created at one a second through one node. Up to
+ten nodes the runs were of v0.14.1 as released. The twenty- and forty-node figures
+below are from v0.14.1 with the mediator of #1637 laid over the release's image
+(`golden.mjs --mediator`), because the stock runs at those sizes were spread over two
+hosts, all but one at forty nodes. The tables are in `tests/scale/README.md`.
 
 - **Every identity reached every node,** from two nodes to forty, wherever the nodes
   could connect to each other.
 - **Time did not grow with size.** The median stayed near one second.
-- **Messages grew with the square of the network.** A nearly complete mesh relayed
-  about 160 messages for each operation at twenty nodes and about 730 at forty, more
-  than nine in ten of them duplicates (#1639). By that curve a well-connected
-  network of 1,000 nodes would relay several hundred thousand for each operation.
+- **Messages grew with the square of the network.** With 11 to 19 connections a node,
+  twenty nodes relayed about 160 messages for each operation. With 31 to 39, forty
+  nodes relayed about 730. More than nine in ten of the messages received were
+  batches the node already had (#1639). By that curve a well-connected network of
+  1,000 nodes would relay several hundred thousand for each operation.
+- **Messages follow the connections.** The one stock forty-node run on a single host
+  had 4 to 21 connections a node and relayed 198.5.
 - **Two nodes behind one public address do not peer** without a change to the
   mediator's network (#1631).
 - **Machines on different hosts of one boxd region do not peer at all.** Runs that
@@ -169,11 +175,11 @@ failure can still be examined.
 What a run at 1,000 nodes should show. The figures are estimates to be tested by the
 model, not measurements:
 
-| | At 40 nodes today | At 1,000 nodes |
+| | At 40 nodes today, with #1637 | At 1,000 nodes |
 |---|---|---|
 | An operation reaches every node | yes, where nodes can connect | yes, with a fifth of the nodes leaving and rejoining |
 | Median delay | about 1.3 s | a few seconds |
-| Peers per node | every other node | about ten |
+| Peers per node | 31 to 39 of the other 39 | about ten |
 | Messages per operation | about 730, growing with the square | growing with the number of nodes: for each node, one payload and about ten small announcements |
 
 Not yet known:
@@ -189,6 +195,10 @@ Not yet known:
 
 - **Runs use the released v0.14.1 images.** Nothing is built. Results describe that
   release, not `main`.
+  - One exception so far: the twenty- and forty-node runs of experiment A that the
+    findings above cite ran the mediator of #1637, compiled from the v0.14.1 source
+    with that change applied and laid over the release's mediator image. Every other
+    service was the release's.
   - The Compose files name no version, so on their own they pull `latest`, whatever
     that is on the day. Checking out the v0.14.1 tag does not change that.
   - The registry carries a `v0.14.1` tag for each image. Before anything is pulled,
