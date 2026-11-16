@@ -898,9 +898,25 @@ Acceptance targets for each measurement (latency, memory, rebuild time) are set 
 the benchmark runs. The results size node hardware and show where optimization will be
 needed first.
 
+A first, smaller run was made on 2026-11-16 to find out what those volumes need: up to
+300,000 objects on one node with the Rust Gatekeeper. Its figures are in
+`tests/scale/memeplex/README.md`.
+
+| | At 300,000 objects | At 1 million, by the same growth |
+|---|---|---|
+| Gatekeeper memory | 11.1 GB | about 36 GB |
+| Restart until ready | 130 s | about 7 minutes |
+| A query by author or target | 0.5 s | about 1.7 s |
+| Resolving one object | 0.6 ms | the same |
+
+The benchmark at 1, 5 and 10 million objects cannot run until the Gatekeeper's memory
+for each DID (#1642) comes down. Its queries read every DID on the node (#1643), and
+the Hyperswarm mediator ran out of memory under the load (#1644).
+
 ## Milestones
 
-1. **Benchmark** objects-as-DIDs at the volumes above (Scale).
+1. **Benchmark** objects-as-DIDs at the volumes above (Scale). A sizing run to
+   300,000 objects is done; the full volumes wait on #1642.
 2. **Schemas:** JSON Schemas for every core kind and the grant, published as schema
    assets, with signed fixtures.
 3. **Verifier library:** the attribution rules, shared by clients and the indexer, with
