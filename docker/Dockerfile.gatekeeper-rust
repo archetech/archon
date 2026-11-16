@@ -39,9 +39,14 @@ COPY rust/services/gatekeeper/Cargo.toml ./Cargo.toml
 COPY rust/services/gatekeeper/Cargo.lock ./Cargo.lock
 COPY rust/services/gatekeeper/src ./src
 
+# jemalloc is built for one page size and refuses to start on a kernel with larger
+# pages. A cross build cannot ask the target, and arm64 kernels use 4K, 16K or 64K
+# pages, so the arm64 build is made for the largest, which runs on all three.
+#
 # Copied to a fixed path so the runtime stage does not need to know the triple.
 RUN set -eux; \
     target="$(cat /target)"; \
+    if [ "$TARGETARCH" = arm64 ]; then export JEMALLOC_SYS_WITH_LG_PAGE=16; fi; \
     cargo build --release --target "$target"; \
     cp "target/$target/release/archon-rust-gatekeeper" /archon-rust-gatekeeper
 

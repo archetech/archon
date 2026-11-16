@@ -33,6 +33,10 @@ tower-http = { version = "0.6", features = ["cors", "limit"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
+# The allocator for the service binary on Linux; see src/main.rs.
+[target.'cfg(all(target_os = "linux", target_env = "gnu"))'.dependencies]
+tikv-jemallocator = { version = "0.6", features = ["background_threads"] }
+
 [dev-dependencies]
 sha2 = "0.10"
 tempfile = "3"
