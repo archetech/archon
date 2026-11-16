@@ -75,7 +75,17 @@ export function options(argv, defaults) {
             const known = Object.keys(defaults).map(name => '--' + name).join(' ');
             throw new Error(`unknown or incomplete option ${argv[i]}; options are ${known}`);
         }
-        values[key] = typeof defaults[key] === 'number' ? Number(argv[i + 1]) : argv[i + 1];
+        if (typeof defaults[key] !== 'number') {
+            values[key] = argv[i + 1];
+            continue;
+        }
+        // Every number here is a count, a rate or a limit. One that is not a number
+        // would compare false with everything, which for a spending limit means no limit.
+        const number = Number(argv[i + 1]);
+        if (!Number.isFinite(number) || number <= 0) {
+            throw new Error(`${argv[i]} takes a number above zero, not ${argv[i + 1]}`);
+        }
+        values[key] = number;
     }
     return values;
 }

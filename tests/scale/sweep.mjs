@@ -8,11 +8,14 @@
 // the account's estimated usage and stops if the sweep has spent more than that.
 import { boxd, here, log, options } from './lib.mjs';
 import { spawn } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const opts = options(process.argv.slice(2), { sizes: '2,5,10,20,40', repeats: 3, ops: 60, rate: 1, cap: 10 });
 const sizes = opts.sizes.split(',').map(Number);
+if (!sizes.length || sizes.some(size => !Number.isInteger(size) || size < 2)) {
+    throw new Error(`--sizes takes whole numbers of two or more, separated by commas, not ${opts.sizes}`);
+}
 
 async function spent() {
     const total = (await boxd(['manage', 'usage'])).match(/Total: \D*([\d.]+)/);
@@ -35,6 +38,9 @@ function runOnce(nodes) {
     });
 }
 
+// A run makes this directory only once it has something to write, and a sweep has to
+// record a run that failed before that.
+mkdirSync(path.join(here, 'results'), { recursive: true });
 const before = await spent();
 const runs = [];
 const file = path.join(here, 'results', `sweep-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`);
