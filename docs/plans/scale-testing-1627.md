@@ -1,6 +1,6 @@
 # Scale testing (#1627)
 
-Status: plan for review. The four decisions at the end are open.
+Status: plan for review. Three decisions at the end are open.
 
 Archon has benchmarks for one Gatekeeper and integration tests for one node, and no
 test that runs many nodes together or one node under sustained load. Scaling problems
@@ -63,8 +63,8 @@ measures it from outside, by asking each node for a DID until it resolves.
 
 Under `tests/scale/`, driving the host's command line.
 
-1. **A golden machine.** A machine with the repository cloned and the images present,
-   saved as a snapshot before the node is first started. A node generates its
+1. **A golden machine.** A machine with the repository cloned at the release tag and
+   the release's images pulled, saved as a snapshot before the node is first started. A node generates its
    identity, wallet and swarm key on first start, so machines made from the snapshot
    are distinct nodes and not copies of one.
 2. **A launcher.** Creates N machines from the snapshot, gives each its own node ID
@@ -105,13 +105,19 @@ larger.
 - **Synthetic load.** Generated identities and updates do not have the shape of real
   use: no credentials, no assets, no long controller chains.
 
+## Decided
+
+- **Runs use the released v0.14.1 images.** Nothing is built: the golden machine
+  pulls them, as the two-node check did. Results describe that release, not `main`.
+  The node's configuration comes from the same tag, so the Compose files and the
+  images match, and each run records the digests of the images it used, because the
+  Compose files name no version and a later release would otherwise change what is
+  being measured.
+
 ## Decisions needed
 
 1. **Which experiments first.** Proposed: A and B together, then D, then C.
 2. **What scale matters.** The top of the range in A, 40 nodes, is a guess. The size
    of the real network today and the size it should be able to reach set that number.
-3. **Released images or `main`.** The first check ran the released v0.14.1 images.
-   Proposed: build `main` once on a hosted machine and snapshot it, so results describe
-   current code.
-4. **Which implementations.** Proposed: the Rust Gatekeeper first, since that is what
+3. **Which implementations.** Proposed: the Rust Gatekeeper first, since that is what
    the live node runs, with the TypeScript one as a second pass once the harness works.
