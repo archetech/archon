@@ -44,16 +44,26 @@ export async function machines() {
     return JSON.parse(await boxd(['list', '--json']));
 }
 
-// Runs fn over the items, a few at a time, keeping the order of the results.
+// Runs fn over the items, a few at a time, keeping the order of the results. After a
+// failure no new item is started, and the failure is reported only once the calls
+// already under way have finished, so a caller that cleans up afterwards is not
+// racing one that is still creating something.
 export async function pool(items, limit, fn) {
     const results = new Array(items.length);
+    const failures = [];
     let next = 0;
     await Promise.all(Array.from({ length: Math.min(limit, items.length) }, async () => {
-        while (next < items.length) {
+        while (next < items.length && !failures.length) {
             const index = next++;
-            results[index] = await fn(items[index], index);
+            try {
+                results[index] = await fn(items[index], index);
+            }
+            catch (error) {
+                failures.push(error);
+            }
         }
     }));
+    if (failures.length) throw failures[0];
     return results;
 }
 

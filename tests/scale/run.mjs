@@ -46,13 +46,14 @@ try {
         '--label', 'purpose=archon-scale', '--label', `run=${id}`]));
 
     log('starting nodes');
-    const digests = await pool(names, 5, (name, index) => run(name, `set -euo pipefail
+    const images = await pool(names, 5, (name, index) => run(name, `set -euo pipefail
         ${node}
         bash ${REMOTE}/configure.sh ${name} ${protocol} ${index + 1}
         docker compose up -d --no-build >/dev/null 2>&1
         docker compose cp ${REMOTE}/generate.mjs cli:/app/generate.mjs >/dev/null
-        docker compose images --format json`, { seconds: 420 }));
-    result.images = Object.fromEntries(JSON.parse(digests[0].trim().split('\n').pop()).map(image => [image.Repository, image.ID]));
+        docker compose config --images 2>/dev/null`, { seconds: 420 }));
+    // The references Compose resolved, which name each Archon image by digest.
+    result.images = images[0].trim().split('\n').sort();
 
     log('waiting for the nodes to find each other');
     const deadline = Date.now() + Number(process.env.SCALE_MESH_WAIT_MS || 240_000);

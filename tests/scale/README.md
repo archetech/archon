@@ -48,7 +48,8 @@ Five nodes for the six minutes of a run cost a few cents.
 - **Messages for each operation.** The mediators' relayed, received and duplicate
   counts over the run, summed across the nodes.
 - **Connections.** How many peers each node held when the load began.
-- **Memory and CPU** of every container at the end, and the image digests.
+- **Memory and CPU** of every container at the end, and the image references the
+  nodes ran, each Archon image by digest.
 
 Read the times with these in mind:
 
@@ -80,8 +81,8 @@ two on one office network, are in the same position.
 
 | Run | Nodes | Operations | Reached every node | p50 | p95 |
 |---|---|---|---|---|---|
-| 2026-11-16, v0.14.1, `fra` | 5 | 30 at 1/s | 30 of 30 | 0.8 s | 1.8 s |
+| 2026-11-16, v0.14.1, `fra` | 5 | 30 at 1/s | 30 of 30 | 1.0 s | 2.0 s |
 
-Each operation cost 7.5 relayed messages and 5.3 duplicate batches across the five
-nodes. Three of the five held four peers and two held three, four minutes after
+Each operation cost 6.6 relayed messages and 4.3 duplicate batches across the five
+nodes. One of the five held four peers and four held three, four minutes after
 starting.

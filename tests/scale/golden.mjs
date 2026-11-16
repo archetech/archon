@@ -25,7 +25,8 @@ try {
         bash ${REMOTE}/configure.sh golden /ARCHON/golden 1
         node ${REMOTE}/pin-images.mjs ${RELEASE}
         docker compose pull -q
-        rm -rf data .env scale-network.yml && mkdir data`, { seconds: 900 });
+        rm -f .env scale-network.yml
+        git status --porcelain data`, { seconds: 900 });
     const digests = JSON.parse(pinned.trim().split('\n').find(line => line.startsWith('{')));
     for (const [service, digest] of Object.entries(digests)) log(`  ${service}  ${digest}`);
     log(`saving snapshot ${snapshot}`);

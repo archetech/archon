@@ -21,7 +21,6 @@ set_env ARCHON_ADMIN_API_KEY "$(openssl rand -hex 32)"
 set_env ARCHON_PASSPHRASE "$(openssl rand -hex 16)"
 set_env ARCHON_PROTOCOL "$protocol"
 set_env COMPOSE_FILE docker-compose.yml:docker-compose.override.yml:scale-network.yml
-mkdir -p data
 
 # Machines in one region leave it through one public address, so Hyperswarm peers
 # there connect over the private network, each choosing the other's local address
