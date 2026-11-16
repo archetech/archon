@@ -34,18 +34,24 @@ function parseMetrics(text) {
 const metrics = async machine => parseMetrics(await run(machine, 'curl -s -m 10 http://localhost:4232/metrics', { seconds: 30 }));
 const jsonLines = text => text.split('\n').filter(line => line.startsWith('{')).map(line => JSON.parse(line));
 
-// Only the machines this run made: a run that fails while creating them has fewer.
-const created = [];
+// The machines this run made, and the ones it asked for without hearing that they
+// were made. A request that times out or loses its answer can still have made a
+// machine, which would be paid for until its deletion timer. Those are removed too,
+// quietly, since most of them will not exist.
+const created = [], asked = [];
 async function teardown() {
     await pool(created, 8, name => boxd(['machine', 'remove', name, '-y']).catch(error => log(`could not remove ${name}: ${error.message}`)));
+    const unsure = asked.filter(name => !created.includes(name));
+    const found = (await pool(unsure, 8, name => boxd(['machine', 'remove', name, '-y']).then(() => name, () => null))).filter(Boolean);
+    if (found.length) log(`also removed ${found.join(' ')}, made by requests that had reported failure`);
 }
 
 log(`run ${id}: ${opts.nodes} nodes in ${region()}, ${opts.ops} operations at ${opts.rate}/s, protocol ${protocol}`);
 const result = { run: id, release: RELEASE, region: region(), options: opts, protocol, started: new Date().toISOString() };
 try {
     log('creating machines');
-    await pool(names, 10, name => boxd(['machine', 'new', name, '--from-snapshot', opts.snapshot, '--delete-after', opts.ttl,
-        '--label', 'purpose=archon-scale', '--label', `run=${id}`]).then(() => created.push(name)));
+    await pool(names, 10, name => (asked.push(name), boxd(['machine', 'new', name, '--from-snapshot', opts.snapshot, '--delete-after', opts.ttl,
+        '--label', 'purpose=archon-scale', '--label', `run=${id}`])).then(() => created.push(name)));
 
     log('starting nodes');
     const images = await pool(names, 10, (name, index) => run(name, `set -euo pipefail
