@@ -85,9 +85,13 @@ try {
     log('waiting for them to arrive everywhere');
     const settle = Date.now() + 90_000;
     let sightings = [];
+    // A watcher also sees versions this run did not make, such as a node's own
+    // identity, so arrival is judged by the generated versions and not by a count.
+    const arrived = list => operations.every(operation =>
+        list.some(entry => entry.did === operation.did && entry.versionId === operation.versionId));
     while (Date.now() < settle) {
         sightings = await pool(names, 8, name => run(name, `cat ${REMOTE}/watch.jsonl 2>/dev/null || true`, { seconds: 30 }).then(jsonLines));
-        if (sightings.every(list => list.length >= opts.ops)) break;
+        if (sightings.every(arrived)) break;
         await sleep(4000);
     }
     const after = await pool(names, 8, metrics);
