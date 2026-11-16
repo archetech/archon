@@ -61,6 +61,14 @@ node that shares the address.
    on every node and must not be the second number of your local network's own
    addresses.
 
+   Compose reads that file by itself only when `COMPOSE_FILE` is not set and no
+   `-f` is given. The minimal stack sets it, so there the override has to be
+   named, in every shell that runs `docker compose` or `./archon`:
+
+   ```bash
+   export COMPOSE_FILE=docker/compose/minimal.yml:docker-compose.override.yml
+   ```
+
    The three URLs are where a node with default settings publishes those services
    on its host. If you have changed `ARCHON_GATEKEEPER_PORT`, `ARCHON_KEYMASTER_PORT`
    or `ARCHON_KEYMASTER_HOST_BIND`, use the ports and address you chose; a mediator
@@ -78,7 +86,16 @@ node that shares the address.
    a network of their own first. Docker puts the address back when its daemon
    restarts, and the command has to be repeated then.
 
-3. Recreate the services: `docker compose up -d`.
+3. Stop the node and start it again, so that its network is made anew with the
+   subnet. `docker compose up -d` alone keeps a network that already exists:
+
+   ```bash
+   docker compose down
+   docker compose up -d
+   ```
+
+   The node is offline in between. `down` removes the containers and the network
+   and leaves the node's data where it is; do not add `-v`.
 
 What the workaround costs:
 
