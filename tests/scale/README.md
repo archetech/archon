@@ -25,6 +25,9 @@ of its own, made from one snapshot, on a private swarm that exists for one run.
   `pin-images.mjs` pins the images, `generate.mjs` creates the identities and
   `watch.mjs` records when each one arrives.
 
+- `memeplex/` measures what a node costs when it holds Memeplex objects, the first
+  milestone of `docs/plans/memeplex-1436.md`. It has its own README.
+
 Experiments B, C and D of the plan are not built.
 
 ## Run it
