@@ -333,6 +333,5 @@ Memepool choices and the implementation/benchmark plan. Its rendering budgets
 limit automatic presentation; they do not decide authorship.
 
 Before implementation, settle concrete benchmark targets and publish the pinned
-schemas and signed verifier fixtures. Narrower scopes, an arrival-ordered change
-feed, public follows and long-term content pinning
-remain [open questions](memeplex-reference-1436.md#open-questions).
+schemas and signed verifier fixtures. Who pins long-form content, and for how long,
+is the one [open question](memeplex-reference-1436.md#open-question).
