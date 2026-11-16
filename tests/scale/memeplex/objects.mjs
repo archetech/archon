@@ -98,7 +98,8 @@ export function pickKind(next) {
 export async function object(by, kind, target, registry, next, created = new Date().toISOString()) {
     const base = { v: 1, author: by.user.did, grant: by.grant.did };
     const aimed = target ? { target: target.did, targetVersion: target.versionId } : {};
-    const fakeCid = () => 'bafkrei' + Array.from({ length: 52 }, () => 'abcdefghijklmnopqrstuvwxyz234567'[Math.floor(next() * 32)]).join('');
+    // A real CID of content that is stored nowhere.
+    const absent = () => generateCID({ absent: next() }, { canonical: true });
     let memeplex;
     switch (kind) {
     case 'post':
@@ -110,14 +111,14 @@ export async function object(by, kind, target, registry, next, created = new Dat
     case 'article':
         memeplex = {
             ...base, kind: 'post', title: words(next, 6), subtitle: words(next, 9), summary: words(next, 25),
-            content: { cid: fakeCid(), type: 'text/markdown', bytes: 8000 + Math.floor(next() * 60000) }, tags: [words(next, 1), words(next, 1)],
+            content: { cid: await absent(), type: 'text/markdown', bytes: 8000 + Math.floor(next() * 60000) }, tags: [words(next, 1), words(next, 1)],
         };
         break;
     case 'paper':
         memeplex = {
             ...base, kind: 'paper', title: words(next, 8), summary: words(next, 120), authors: [by.user.did],
-            content: { cid: fakeCid(), type: 'text/markdown', bytes: 40000 + Math.floor(next() * 60000) },
-            pdf: { cid: fakeCid(), type: 'application/pdf', bytes: 400000 + Math.floor(next() * 900000) }, tags: [words(next, 1), words(next, 1)],
+            content: { cid: await absent(), type: 'text/markdown', bytes: 40000 + Math.floor(next() * 60000) },
+            pdf: { cid: await absent(), type: 'application/pdf', bytes: 400000 + Math.floor(next() * 900000) }, tags: [words(next, 1), words(next, 1)],
         };
         break;
     case 'reply':

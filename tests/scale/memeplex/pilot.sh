@@ -2,6 +2,8 @@
 # Runs on the machine, in the cloned repository. Loads Memeplex objects in stages and
 # measures the node after each: memory, storage, latency and restart time.
 #   pilot.sh <cumulative object counts...>     e.g. pilot.sh 10000 100000 300000 1000000
+# Each stage's increase is shared equally among four loaders, so give counts whose
+# differences divide by four.
 # Prints one line of JSON for each stage. Stops before a stage if the Gatekeeper and
 # Redis together hold more than three quarters of the machine's memory. The scripts
 # must already be in /home/boxd/scale and copied to /app in the cli container.
@@ -40,7 +42,15 @@ for target in "$@"; do
     # Restart the Gatekeeper and time how long it takes to answer as ready again.
     restart=$(date +%s.%N)
     docker compose restart gatekeeper >/dev/null 2>&1
-    until curl -sf -m 5 http://localhost:4224/api/v1/ready 2>/dev/null | grep -q true; do sleep 1; done
+    deadline=$(( $(date +%s) + 1800 ))
+    until curl -sf -m 5 http://localhost:4224/api/v1/ready 2>/dev/null | grep -q true; do
+        # A Gatekeeper that cannot hold what was loaded never comes back.
+        if [ "$(date +%s)" -gt "$deadline" ]; then
+            echo "{\"failed\":\"the Gatekeeper was not ready 30 minutes after its restart\",\"stage\":$stage,\"objects\":$loaded}"
+            exit 1
+        fi
+        sleep 1
+    done
     startup=$(echo "$(date +%s.%N) - $restart" | bc)
     sleep 5
     after=$(bytes "$(mem archon-gatekeeper-1)")
