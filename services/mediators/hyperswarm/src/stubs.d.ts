@@ -16,13 +16,22 @@ declare module 'hyperswarm' {
         flushed(): Promise<void>;
     }
 
+    export interface HyperswarmKeyPair {
+        publicKey: Buffer;
+        secretKey?: Buffer;
+    }
+
+    export interface HyperswarmOptions {
+        keyPair?: HyperswarmKeyPair;
+    }
+
     export default class Hyperswarm {
-        public keyPair: { publicKey: Buffer; secretKey?: Buffer };
+        public keyPair: HyperswarmKeyPair;
 
         constructor(opts?: HyperswarmOptions);
 
         join(topic: Buffer, opts: { client: boolean; server: boolean }): Discovery;
         on(event: 'connection', listener: (conn: HyperswarmConnection) => void): void;
-        destroy(): void;
+        destroy(): Promise<void>;
     }
 }

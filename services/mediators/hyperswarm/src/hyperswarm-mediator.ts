@@ -18,6 +18,7 @@ import { installProcessGuards } from '@didcid/common/process-guards';
 import config from './config.js';
 import { createEvents } from './events.js';
 import { NodeInfo, PeerTracker } from './peers.js';
+import { TopicSwarm } from './swarm.js';
 import { exit } from 'process';
 
 interface HyperMessage {
@@ -66,7 +67,6 @@ const BATCH_SIZE = 100;
 const connectionInfo: Record<string, ConnectionInfo> = {};
 let peers: PeerTracker | undefined;
 
-let swarm: Hyperswarm | null = null;
 let nodeKey = '';
 let nodeInfo: NodeInfo;
 
@@ -235,27 +235,13 @@ function startMetricsServer(): void {
     });
 }
 
-goodbye(() => {
-    if (swarm) {
-        swarm.destroy();
-    }
-});
+goodbye(() => topicSwarm.destroy());
 
 async function createSwarm(): Promise<void> {
-    if (swarm) {
-        swarm.destroy();
-    }
-
-    swarm = new Hyperswarm();
-    nodeKey = b4a.toString(swarm.keyPair.publicKey, 'hex');
-
-    swarm.on('connection', conn => addConnection(conn));
-
-    const discovery = swarm.join(topic, { client: true, server: true });
-    await discovery.flushed();
+    nodeKey = b4a.toString(await topicSwarm.join(), 'hex');
 
     const shortTopic = shortName(b4a.toString(topic, 'hex'));
-    console.log(`new hyperswarm peer id: ${shortName(nodeKey)} (${config.nodeName}) joined topic: ${shortTopic} using protocol: ${config.protocol}`);
+    console.log(`hyperswarm peer id: ${shortName(nodeKey)} (${config.nodeName}) joined topic: ${shortTopic} using protocol: ${config.protocol}`);
 }
 
 let syncQueue = asyncLib.queue<HyperswarmConnection, asyncLib.ErrorCallback>(
@@ -701,6 +687,11 @@ process.stdin.on('data', d => {
 const hash = sha256(utf8ToBytes(config.protocol));
 const networkID = Buffer.from(hash).toString('hex');
 const topic = Buffer.from(b4a.from(networkID, 'hex'));
+const topicSwarm = new TopicSwarm<HyperswarmConnection>({
+    create: keyPair => new Hyperswarm({ keyPair }),
+    topic,
+    onConnection: conn => addConnection(conn),
+});
 
 async function main(): Promise<void> {
     console.log(`Starting Hyperswarm mediator v${serviceVersion} (${serviceCommit})`);
