@@ -57,7 +57,10 @@ The services export Prometheus metrics that cover most of the table.
   `did_operations_total` and the `gatekeeper_dids_*` gauges.
 
 The time for an operation to reach every node is not exported anywhere. The harness
-measures it from outside, by asking each node for a DID until it resolves.
+measures it from outside, by asking each node to resolve the DID until the answer's
+`didDocumentMetadata.versionId` is the CID of the operation that was submitted. That
+the DID resolves at all is not enough: a node that is behind still answers with the
+previous version, which would count an update as arrived before it had.
 
 ## Harness
 
