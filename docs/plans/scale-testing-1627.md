@@ -1,6 +1,6 @@
 # Scale testing (#1627)
 
-Status: plan for review. Three decisions at the end are open.
+Status: plan for review.
 
 Archon has benchmarks for one Gatekeeper and integration tests for one node, and no
 test that runs many nodes together or one node under sustained load. Scaling problems
@@ -67,7 +67,8 @@ previous version, which would count an update as arrived before it had.
 Under `tests/scale/`, driving the host's command line.
 
 1. **A golden machine.** A machine with the repository cloned at the release tag and
-   the release's images pulled, saved as a snapshot before the node is first started. A node generates its
+   the release's images pulled by digest, saved as a snapshot before the node is first
+   started. A node generates its
    identity, wallet and swarm key on first start, so machines made from the snapshot
    are distinct nodes and not copies of one.
 2. **A launcher.** Creates N machines from the snapshot, gives each its own node ID
@@ -110,17 +111,21 @@ larger.
 
 ## Decided
 
-- **Runs use the released v0.14.1 images.** Nothing is built: the golden machine
-  pulls them, as the two-node check did. Results describe that release, not `main`.
-  The node's configuration comes from the same tag, so the Compose files and the
-  images match, and each run records the digests of the images it used, because the
-  Compose files name no version and a later release would otherwise change what is
-  being measured.
-
-## Decisions needed
-
-1. **Which experiments first.** Proposed: A and B together, then D, then C.
-2. **What scale matters.** The top of the range in A, 40 nodes, is a guess. The size
-   of the real network today and the size it should be able to reach set that number.
-3. **Which implementations.** Proposed: the Rust Gatekeeper first, since that is what
-   the live node runs, with the TypeScript one as a second pass once the harness works.
+- **Runs use the released v0.14.1 images.** Nothing is built. Results describe that
+  release, not `main`.
+  - The Compose files name no version, so on their own they pull `latest`, whatever
+    that is on the day. Checking out the v0.14.1 tag does not change that.
+  - The registry carries a `v0.14.1` tag for each image. Before anything is pulled,
+    the harness resolves that tag to a digest for every image a run uses and writes a
+    Compose override naming each image by digest.
+  - The golden machine pulls with that override, and every node is started with it,
+    so a snapshot made later cannot pick up a newer release. Each results file lists
+    the digests.
+  - The node's configuration comes from the same tag, so the Compose files and the
+    images match.
+- **Order: A and B together, then D, then C.** A and B need no preparation. C waits
+  until IPFS peering is settled and a way to preload a history exists.
+- **Experiment A goes up to 40 nodes.** That is a starting range, not a claim about
+  the network's size. If the curve is still flat at 40, the next run extends it.
+- **The Rust Gatekeeper first.** It is what the live node runs. The TypeScript
+  Gatekeeper is a second pass over the same experiments once the harness works.
