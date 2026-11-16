@@ -40,8 +40,8 @@ export function copy(machine, local, remote) {
     return boxd(['machine', 'cp', local, `${machine}:${remote}`]);
 }
 
-export async function machines() {
-    return JSON.parse(await boxd(['list', '--json']));
+export async function machines(label) {
+    return JSON.parse(await boxd(['list', '--json', ...(label ? ['--label', label] : [])]));
 }
 
 // Runs fn over the items, a few at a time, keeping the order of the results. After a
