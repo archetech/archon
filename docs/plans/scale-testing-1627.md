@@ -1,6 +1,8 @@
 # Scale testing (#1627)
 
-Status: plan for review.
+Status: experiment A is done and its results are below. The harness is in
+`tests/scale`. Experiments B, C and D are not built. The path to 1,000 nodes is a
+plan for review.
 
 Archon has benchmarks for one Gatekeeper and integration tests for one node, and no
 test that runs many nodes together or one node under sustained load. Scaling problems
@@ -12,6 +14,26 @@ in New York and one in Frankfurt, connected over Hyperswarm and each resolved a 
 the other had created within about two seconds. The details are in #1627. That
 settles whether hosted machines can carry the peer-to-peer traffic; it says nothing
 about scale.
+
+## What experiment A found
+
+Run on 2026-11-16 against v0.14.1, with 60 identities created at one a second through
+one node. The tables are in `tests/scale/README.md`.
+
+- **Every identity reached every node,** from two nodes to forty, wherever the nodes
+  could connect to each other.
+- **Time did not grow with size.** The median stayed near one second.
+- **Messages grew with the square of the network.** A nearly complete mesh relayed
+  about 160 messages for each operation at twenty nodes and about 730 at forty, more
+  than nine in ten of them duplicates (#1639). By that curve a well-connected
+  network of 1,000 nodes would relay several hundred thousand for each operation.
+- **Two nodes behind one public address do not peer** without a change to the
+  mediator's network (#1631).
+- **Machines on different hosts of one boxd region do not peer at all.** Runs that
+  spanned two hosts looked like a network that had split, and were first reported as
+  one (#1635, closed). The harness now records each node's host.
+
+The second prediction below is confirmed. The first has not been measured.
 
 ## What the code suggests
 
@@ -108,13 +130,60 @@ larger.
 
 - **No chain anchoring.** The chain mediators need their chains' nodes. Runs use the
   `local` and `hyperswarm` registries.
-- **One provider's network.** Machines in one region share a private network on boxd,
-  which is kinder than the internet. Some runs should span regions.
+- **One host's network.** A valid run on boxd has every node on one host's private
+  network, with no address translation between nodes and almost no delay. That is
+  kinder than the internet, and it measures message counts better than it measures
+  how a network forms.
+- **No choice of host.** boxd decides where a machine lands. Up to forty machines
+  have landed on one host, and eighteen have been split over two. Larger runs will
+  span hosts more often, and a run that does is discarded.
 - **IPFS peering is unverified.** In the two-node check one mediator reported an IPFS
   peer and the other reported none. That needs settling before experiment C, where
   operations may be fetched by reference.
 - **Synthetic load.** Generated identities and updates do not have the shape of real
   use: no credentials, no assets, no long controller chains.
+
+## Toward 1,000 nodes
+
+A thousand nodes is a stress test today and a real size for the network in the medium
+term. Running that many against the present mediator would only repeat the result
+above at greater cost, so the work is staged.
+
+The design it aims at is the one #1639 describes: a node holds about ten peers
+however large the network is, chosen at random from a larger set of addresses it has
+learned, and is connected to every other node through them. It announces an operation
+before sending it, and takes a history from one or two peers and not from all of
+them.
+
+| Stage | What runs | What it settles |
+|---|---|---|
+| 1. Model | The gossip rules alone, in one process, at 1,000 to 10,000 nodes, calibrated against experiment A | How many peers, whether to announce before sending, how peers are chosen and replaced, how much churn and how many misbehaving nodes the network tolerates |
+| 2. Build | The chosen design in the mediator, with real nodes at twenty and forty on boxd | Whether the code behaves as the model does |
+| 3. Mediators at 1,000 | A thousand mediator processes, each with a stand-in for its Gatekeeper and Keymaster, about fifty to a machine, on a private network with its own DHT bootstrap node | Delivery, delay, traffic and memory at that size; discovery on a topic with far more peers than a DHT node returns; many nodes joining at once; the cost of a new node's first sync |
+| 4. Nodes under real conditions | Several hundred complete nodes on machines with public addresses of their own, on more than one provider and region, some behind address translation, leaving and rejoining | Whether stage 3 hid anything: peers that cannot reach each other directly, real Gatekeeper load, churn |
+
+Stages 1 and 2 need nothing new. Stage 3 leaves boxd, because it needs machines that
+can all reach each other. Stage 4 puts address translation back, at a size where a
+failure can still be examined.
+
+What a run at 1,000 nodes should show. The figures are estimates to be tested by the
+model, not measurements:
+
+| | At 40 nodes today | At 1,000 nodes |
+|---|---|---|
+| An operation reaches every node | yes, where nodes can connect | yes, with a fifth of the nodes leaving and rejoining |
+| Median delay | about 1.3 s | a few seconds |
+| Peers per node | every other node | about ten |
+| Messages per operation | about 730, growing with the square | growing with the number of nodes: for each node, one payload and about ten small announcements |
+
+Not yet known:
+
+- **How much memory a mediator needs** with a fixed number of peers, which sets how
+  many fit on a machine in stage 3.
+- **What peers a node behind strict address translation can keep.** Two such nodes
+  reach each other only through a third.
+- **Which provider and what budget** stages 3 and 4 use. Neither is needed before
+  stage 2 is done.
 
 ## Decided
 
@@ -133,6 +202,9 @@ larger.
 - **Order: A and B together, then D, then C.** A and B need no preparation. C waits
   until IPFS peering is settled and a way to preload a history exists.
 - **Experiment A goes up to 40 nodes.** That is a starting range, not a claim about
-  the network's size. If the curve is still flat at 40, the next run extends it.
+  the network's size. The curve was not flat, and larger sizes follow the stages
+  above.
+- **1,000 nodes is the size to design for:** a stress test now, and a real target
+  in the medium term.
 - **The Rust Gatekeeper first.** It is what the live node runs. The TypeScript
   Gatekeeper is a second pass over the same experiments once the harness works.
