@@ -8,7 +8,7 @@
 // the account's estimated usage and stops if the sweep has spent more than that.
 import { MAX_NODES, boxd, here, log, options } from './lib.mjs';
 import { spawn } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const opts = options(process.argv.slice(2), { sizes: '2,5,10,20,40', repeats: 3, ops: 60, rate: 1, cap: 10 });
@@ -32,8 +32,11 @@ function runOnce(nodes) {
         child.stderr.on('data', data => { out += data; process.stderr.write(data); });
         child.on('close', code => {
             const id = out.match(/run ([0-9a-f]{6}):/)?.[1];
-            if (code === 0 && id) resolve(JSON.parse(readFileSync(path.join(here, 'results', `${id}.json`), 'utf8')));
-            else resolve({ run: id, options: { nodes }, error: out.trim().split('\n').filter(line => /Error/.test(line)).pop() ?? `exited ${code}` });
+            const file = id && path.join(here, 'results', `${id}.json`);
+            if (code === 0 && id) return resolve(JSON.parse(readFileSync(file, 'utf8')));
+            // A run that fails after it has started leaves what it had learned.
+            const partial = file && existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : { run: id };
+            resolve({ ...partial, options: { nodes }, error: out.trim().split('\n').filter(line => /Error/.test(line)).pop() ?? `exited ${code}` });
         });
     });
 }
@@ -65,7 +68,7 @@ outer: for (const nodes of sizes) {
 
 const per = (run, name) => (run.mediator[name] / run.operations).toFixed(1);
 const rows = runs.map(run => run.error
-    ? `| ${run.options.nodes} | ${run.run ?? '-'} | failed: ${run.error} | | | | | | |`
+    ? `| ${run.options.nodes} | ${run.run ?? '-'} | failed: ${run.error} | | | | | | ${run.addresses ? run.hosts ?? 'unknown' : ''} |`
     : `| ${run.options.nodes} | ${run.run} | ${run.arrivedEverywhere} of ${run.operations} | ${run.propagationMs.p50} | ${run.propagationMs.p95} | `
         + `${per(run, 'mediator_messages_relayed_total')} | ${per(run, 'mediator_duplicate_batches_total')} | `
         + `${Math.min(...run.connections)} to ${Math.max(...run.connections)} | ${run.hosts ?? 'unknown'} |`);

@@ -38,12 +38,17 @@ try {
     const digests = JSON.parse(pinned.trim().split('\n').find(line => line.startsWith('{')));
     for (const [service, digest] of Object.entries(digests)) log(`  ${service}  ${digest}`);
     if (mediator) {
-        const image = `archon-scale/hyperswarm-mediator:${path.basename(path.resolve(mediator))}`;
+        // The tag is taken from the files, so two builds never share a name and a
+        // result's image says which build it ran.
         const entry = 'hyperswarm-mediator.js';
+        const files = readdirSync(mediator).filter(name => name.endsWith('.js')).sort();
         const expected = createHash('sha256').update(readFileSync(path.join(mediator, entry))).digest('hex');
+        const build = createHash('sha256');
+        for (const file of files) build.update(file).update(readFileSync(path.join(mediator, file)));
+        const image = `archon-scale/hyperswarm-mediator:${build.digest('hex').slice(0, 12)}`;
         log(`laying ${mediator} over the release's mediator as ${image}`);
         await run(machine, `rm -rf ${REMOTE}/mediator-dist && mkdir ${REMOTE}/mediator-dist`);
-        for (const file of readdirSync(mediator).filter(name => name.endsWith('.js'))) {
+        for (const file of files) {
             await copy(machine, path.join(mediator, file), `${REMOTE}/mediator-dist/${file}`);
         }
         const actual = await run(machine, `set -euo pipefail

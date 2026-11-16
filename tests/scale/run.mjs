@@ -83,11 +83,11 @@ try {
     result.connections = connections;
     result.meshWaitMs = Date.now() - waitBegan;
     log(`connections per node after ${Math.round(result.meshWaitMs / 1000)} s: ${connections.join(' ')}`);
-    if (connections.some(count => count === 0)) throw new Error('a node has no peers, so there is nothing to measure');
-
     // Machines in one region can be on different hosts, each with a private network
     // and a public address of its own. Nodes on different hosts have not connected to
     // each other, so a network that came up in groups has to be read against this.
+    // It is read before anything can stop the run: a node alone on a host has no
+    // peers, and that is the failure this explains.
     result.addresses = await pool(names, 10, async name => {
         const [local = '', outbound = ''] = (await run(name,
             `ip -4 -o addr show eth0 | awk '{print $4}'; curl -s -m 8 https://api.ipify.org || true`, { seconds: 30 })).trim().split('\n');
@@ -99,6 +99,7 @@ try {
     result.hosts = hosts.includes('') ? null : hosts.length;
     if (result.hosts === null) log('a node\'s public address could not be read, so the number of hosts is unknown');
     else if (result.hosts > 1) log(`the nodes are on ${result.hosts} hosts, which invalidates the run: ${result.addresses.map(address => hosts.indexOf(address.public) + 1).join(' ')}`);
+    if (connections.some(count => count === 0)) throw new Error('a node has no peers, so there is nothing to measure');
 
     result.clocks = await pool(names, 8, name => run(name,
         "chronyc tracking 2>/dev/null | awk -F': *' '/System time/ {print $2}' || true; timedatectl show -p NTPSynchronized --value", { seconds: 30 })
@@ -174,6 +175,13 @@ run ${id}: ${opts.nodes} nodes, ${operations.length} operations at ${opts.rate}/
   connections per node    ${connections.join(' ')}
   hosts                   ${result.hosts === null ? 'unknown, so the run cannot be called valid' : result.hosts}${result.hosts > 1 ? ', so the run is not valid: nodes on different hosts do not connect' : ''}
   results                 ${file}`);
+}
+catch (error) {
+    // What the run had learned by then, its nodes' hosts above all, says why it failed.
+    result.error = error.message;
+    mkdirSync(path.join(here, 'results'), { recursive: true });
+    writeFileSync(path.join(here, 'results', `${id}.json`), JSON.stringify(result, null, 4) + '\n');
+    throw error;
 }
 finally {
     if (opts.keep === 'yes') log(`left running: ${names.join(' ')}`);
