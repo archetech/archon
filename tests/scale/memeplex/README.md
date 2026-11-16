@@ -38,7 +38,8 @@ machine, objects on the `hyperswarm` registry, four loaders at once.
 
 Times are medians. The node also held the authors' DIDs, three for each author, so it
 had 11,373, 104,085 and 310,097 DIDs at the three sizes. A create operation averaged
-945 bytes.
+about 945 bytes; the run counted characters, which is a byte or so short for each
+reaction.
 
 - **The Gatekeeper held 36 to 48 KB of memory for each DID** (#1642). A million
   objects would need about 36 GB, which is why the run stopped at 300,000.

@@ -70,7 +70,7 @@ result.objectSeconds = await many(opts.objects, async i => {
     const target = RESPONDS.has(kind) ? targets[Math.floor(next() * next() * targets.length)] : undefined;
     const made = await object(by, kind, target, opts.registry, next);
     const body = JSON.stringify(made.operation);
-    bytes += body.length;
+    bytes += Buffer.byteLength(body);
     await submit(made.operation, made.did);
     kinds[kind] = (kinds[kind] || 0) + 1;
     if (!RESPONDS.has(kind)) {
