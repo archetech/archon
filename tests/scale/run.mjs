@@ -2,7 +2,7 @@
 // a private swarm, a stream of new identities into one of them, and how long each
 // takes to reach the rest.
 //
-//   node run.mjs --nodes 5 --ops 30 --rate 1 [--snapshot <name>] [--ttl 3h] [--keep yes]
+//   node run.mjs --nodes 5 --ops 30 --rate 1 [--wait <seconds>] [--snapshot <name>] [--ttl 3h] [--keep yes]
 //
 // Writes results/<run>.json and prints a summary. Removes its machines when it ends,
 // unless --keep yes.
@@ -12,7 +12,7 @@ import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 
 const opts = options(process.argv.slice(2), {
-    nodes: 5, ops: 30, rate: 1, snapshot: `${PREFIX}-${RELEASE.replace(/\./g, '-')}`, ttl: '3h', keep: 'no',
+    nodes: 5, ops: 30, rate: 1, wait: 0, snapshot: `${PREFIX}-${RELEASE.replace(/\./g, '-')}`, ttl: '3h', keep: 'no',
 });
 const id = randomBytes(3).toString('hex');
 const protocol = `/ARCHON/scale-${id}`;
@@ -59,23 +59,43 @@ try {
 
     // A full mesh is not required. The mediator looks for peers again only once a
     // minute, so the wait ends when every node has every peer, or when no node's
-    // count has changed for two of those rounds.
+    // count has changed for two of those rounds. With --wait the load begins after
+    // that many seconds whatever the counts are doing, to see what time alone changes.
     log('waiting for the nodes to find each other');
     const waitBegan = Date.now();
-    const deadline = waitBegan + Number(process.env.SCALE_MESH_WAIT_MS || 720_000);
+    const deadline = waitBegan + (opts.wait ? opts.wait * 1000 : Number(process.env.SCALE_MESH_WAIT_MS || 720_000));
+    const history = [];
     let connections = [], changed = Date.now();
     while (Date.now() < deadline) {
         const now = (await pool(names, 10, metrics)).map(m => m.mediator_active_connections);
-        if (now.join() !== connections.join()) changed = Date.now();
+        if (now.join() !== connections.join()) {
+            changed = Date.now();
+            history.push({ seconds: Math.round((changed - waitBegan) / 1000), connections: now });
+        }
         connections = now;
-        if (connections.every(count => count >= opts.nodes - 1)) break;
-        if (Date.now() - changed > 130_000 && connections.every(count => count > 0)) break;
-        await sleep(10_000);
+        if (!opts.wait) {
+            if (connections.every(count => count >= opts.nodes - 1)) break;
+            if (Date.now() - changed > 130_000 && connections.every(count => count > 0)) break;
+        }
+        await sleep(Math.min(10_000, Math.max(0, deadline - Date.now())));
     }
+    result.connectionHistory = history;
     result.connections = connections;
     result.meshWaitMs = Date.now() - waitBegan;
     log(`connections per node after ${Math.round(result.meshWaitMs / 1000)} s: ${connections.join(' ')}`);
     if (connections.some(count => count === 0)) throw new Error('a node has no peers, so there is nothing to measure');
+
+    // Machines in one region can be on different hosts, each with a private network
+    // and a public address of its own. Nodes on different hosts have not connected to
+    // each other, so a network that came up in groups has to be read against this.
+    result.addresses = await pool(names, 10, async name => {
+        const [local = '', outbound = ''] = (await run(name,
+            `ip -4 -o addr show eth0 | awk '{print $4}'; curl -s -m 8 https://api.ipify.org || true`, { seconds: 30 })).trim().split('\n');
+        return { private: local, public: outbound };
+    });
+    const hosts = [...new Set(result.addresses.map(address => address.public))];
+    result.hosts = hosts.length;
+    if (hosts.length > 1) log(`the nodes are on ${hosts.length} hosts, which invalidates the run: ${result.addresses.map(address => hosts.indexOf(address.public) + 1).join(' ')}`);
 
     result.clocks = await pool(names, 8, name => run(name,
         "chronyc tracking 2>/dev/null | awk -F': *' '/System time/ {print $2}' || true; timedatectl show -p NTPSynchronized --value", { seconds: 30 })
@@ -149,6 +169,7 @@ run ${id}: ${opts.nodes} nodes, ${operations.length} operations at ${opts.rate}/
   create at the origin    p50 ${result.createMs.p50} ms
   per operation, summed over the nodes: ${per('mediator_messages_relayed_total')} relayed, ${per('mediator_messages_received_total')} received, ${per('mediator_duplicate_batches_total')} duplicate batches
   connections per node    ${connections.join(' ')}
+  hosts                   ${result.hosts}${result.hosts > 1 ? ', so the run is not valid: nodes on different hosts do not connect' : ''}
   results                 ${file}`);
 }
 finally {

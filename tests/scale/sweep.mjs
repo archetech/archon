@@ -65,9 +65,9 @@ outer: for (const nodes of sizes) {
 
 const per = (run, name) => (run.mediator[name] / run.operations).toFixed(1);
 const rows = runs.map(run => run.error
-    ? `| ${run.options.nodes} | ${run.run ?? '-'} | failed: ${run.error} | | | | | |`
+    ? `| ${run.options.nodes} | ${run.run ?? '-'} | failed: ${run.error} | | | | | | |`
     : `| ${run.options.nodes} | ${run.run} | ${run.arrivedEverywhere} of ${run.operations} | ${run.propagationMs.p50} | ${run.propagationMs.p95} | `
         + `${per(run, 'mediator_messages_relayed_total')} | ${per(run, 'mediator_duplicate_batches_total')} | `
-        + `${Math.min(...run.connections)} to ${Math.max(...run.connections)} |`);
-console.log(['', '| Nodes | Run | Reached every node | p50 ms | p95 ms | Relayed per op | Duplicate batches per op | Peers per node |',
-    '|---|---|---|---|---|---|---|---|', ...rows, '', `spent ${(await spent() - before).toFixed(2)}; results in ${file}`].join('\n'));
+        + `${Math.min(...run.connections)} to ${Math.max(...run.connections)} | ${run.hosts} |`);
+console.log(['', '| Nodes | Run | Reached every node | p50 ms | p95 ms | Relayed per op | Duplicate batches per op | Peers per node | Hosts |',
+    '|---|---|---|---|---|---|---|---|---|', ...rows, '', `spent ${(await spent() - before).toFixed(2)}; results in ${file}`].join('\n'));

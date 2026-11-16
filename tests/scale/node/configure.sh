@@ -29,9 +29,15 @@ set_env COMPOSE_FILE docker-compose.yml:docker-compose.override.yml:scale-networ
 # the mediator runs on the host's network here, where it offers the machine's
 # private address, and the bridges are moved to a subnet of this machine's own so
 # that no other machine's bridge address looks nearer than its private one.
+# A snapshot made with golden.mjs --mediator names the mediator image built for it.
+image=
+if [ -f /home/boxd/scale/mediator-image ]; then
+    image="image: $(cat /home/boxd/scale/mediator-image)"
+fi
 cat > scale-network.yml <<YAML
 services:
   hyperswarm-mediator:
+    $image
     network_mode: host
     ports: !reset []
     environment:
