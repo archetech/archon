@@ -14,6 +14,9 @@ of its own, made from one snapshot, on a private swarm that exists for one run.
   has ever started. Machines made from it are distinct nodes.
 - `run.mjs` is experiment A: N nodes with empty histories, a stream of new identities
   into one of them, and how long each takes to reach the rest.
+- `sweep.mjs` runs experiment A at several sizes, several times each, and writes one
+  table. It stops if the account's usage passes a spending limit, or if the host
+  refuses to create a machine.
 - `teardown.mjs` removes the harness's machines, for when a run is interrupted.
 - `node/` holds what runs on the machines: `configure.sh` writes a node's settings,
   `pin-images.mjs` pins the images, `generate.mjs` creates the identities and
@@ -29,6 +32,7 @@ names the CLI if it is not on the path, and `BOXD_REGION` the region (default `f
 ```sh
 node golden.mjs                              # once for each release: about a minute
 node run.mjs --nodes 5 --ops 30 --rate 1     # about six minutes
+node sweep.mjs --sizes 2,5,10 --repeats 3    # each size three times, one table
 node teardown.mjs                            # only after an interrupted run
 ```
 
@@ -37,7 +41,8 @@ timer (`--ttl`, three hours by default) in case the run never gets that far. Mac
 are named `archon-scale-…` and labelled `purpose=archon-scale`; nothing else in the
 account is touched. `--keep yes` leaves a run's machines up for inspection.
 
-Five nodes for the six minutes of a run cost a few cents.
+Five nodes for the six minutes of a run cost a few cents, and forty nodes for
+fifteen minutes about thirty.
 
 ## What a run measures
 
@@ -47,7 +52,11 @@ Five nodes for the six minutes of a run cost a few cents.
   to the moment the slowest node first resolved that version of it.
 - **Messages for each operation.** The mediators' relayed, received and duplicate
   counts over the run, summed across the nodes.
-- **Connections.** How many peers each node held when the load began.
+- **Connections.** What each node's mediator reported when the load began, and how
+  long the nodes took to get there. A run does not wait for every node to hold every
+  peer: it goes on once no node's count has changed for two minutes. The count can
+  exceed the number of peers, because a mediator that rejoins the swarm does so as a
+  new peer.
 - **Memory and CPU** of every container at the end, and the image references the
   nodes ran, each Archon image by digest.
 
@@ -79,10 +88,40 @@ two on one office network, are in the same position.
 
 ## Results so far
 
-| Run | Nodes | Operations | Reached every node | p50 | p95 |
-|---|---|---|---|---|---|
-| 2026-11-16, v0.14.1, `fra` | 5 | 30 at 1/s | 30 of 30 | 1.0 s | 2.0 s |
+Experiment A on 2026-11-16: v0.14.1, region `fra`, 60 identities at one a second into
+the first node, three runs at each size. Results files are not kept in the repository.
 
-Each operation cost 6.6 relayed messages and 4.3 duplicate batches across the five
-nodes. One of the five held four peers and four held three, four minutes after
-starting.
+| Nodes | Nodes reached | Reached every node | p50 | p95 | Relayed per operation | Duplicate batches per operation | Connections per node |
+|---|---|---|---|---|---|---|---|
+| 2 | 2 | 60 of 60 | 0.6 s | 1.6 s | 0.5 | 0.0 | 1 |
+| 2 | 2 | 60 of 60 | 0.9 s | 1.7 s | 0.5 | 0.0 | 1 |
+| 2 | 2 | 60 of 60 | 1.1 s | 2.1 s | 0.5 | 0.0 | 1 |
+| 5 | 5 | 60 of 60 | 1.2 s | 2.0 s | 5.4 | 3.1 | 2 to 4 |
+| 5 | 5 | 60 of 60 | 1.1 s | 2.1 s | 3.3 | 1.0 | 1 to 3 |
+| 5 | 5 | 60 of 60 | 1.2 s | 2.2 s | 6.3 | 4.0 | 3 to 4 |
+| 10 | 10 | 60 of 60 | 1.3 s | 2.1 s | 11.0 | 6.0 | 1 to 8 |
+| 10 | 10 | 60 of 60 | 1.0 s | 1.8 s | 29.6 | 22.7 | 5 to 11 |
+| 10 | 10 | 60 of 60 | 1.1 s | 2.0 s | 14.1 | 9.0 | 2 to 8 |
+| 20 | 10 | 0 of 60 | | | 46.6 | 35.1 | 7 to 9 |
+| 20 | 9 | 0 of 60 | | | 37.6 | 27.0 | 6 to 10 |
+| 20 | 10 | 0 of 60 | | | 16.5 | 8.3 | 2 to 9 |
+| 40 | 15 | 0 of 60 | | | 89.3 | 65.1 | 3 to 15 |
+| 40 | 12 | 0 of 60 | | | 58.1 | 38.7 | 5 to 17 |
+| 40 | 40 | 60 of 60 | 1.3 s | 2.3 s | 198.5 | 172.0 | 4 to 21 |
+
+"Nodes reached" counts the first node and every node that saw the identities. The
+message counts are summed over all the nodes of a run.
+
+- **Up to ten nodes, every identity reached every node,** in all nine runs.
+- **At twenty and forty nodes the network usually split.** In five of six runs the
+  identities reached only some of the nodes, and reached those within the usual
+  second or so. The rest received none. The harness sends identities into one node
+  only, so it shows that group's size and not how the other nodes were grouped.
+- **Time did not grow with size.** Where the identities arrived, the median stayed
+  near one second from two nodes to forty.
+- **Messages grew much faster than the network.** The one forty-node run that stayed
+  whole relayed 198.5 messages for each operation, 172.0 of them duplicates.
+- **Identical starts gave different meshes.** The harness starts machines ten at a
+  time, and the groups followed those batches only roughly.
+
+The sweeps cost an estimated $0.91 on boxd.

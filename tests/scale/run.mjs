@@ -34,19 +34,21 @@ function parseMetrics(text) {
 const metrics = async machine => parseMetrics(await run(machine, 'curl -s -m 10 http://localhost:4232/metrics', { seconds: 30 }));
 const jsonLines = text => text.split('\n').filter(line => line.startsWith('{')).map(line => JSON.parse(line));
 
+// Only the machines this run made: a run that fails while creating them has fewer.
+const created = [];
 async function teardown() {
-    await pool(names, 8, name => boxd(['machine', 'remove', name, '-y']).catch(error => log(`could not remove ${name}: ${error.message}`)));
+    await pool(created, 8, name => boxd(['machine', 'remove', name, '-y']).catch(error => log(`could not remove ${name}: ${error.message}`)));
 }
 
 log(`run ${id}: ${opts.nodes} nodes in ${region()}, ${opts.ops} operations at ${opts.rate}/s, protocol ${protocol}`);
 const result = { run: id, release: RELEASE, region: region(), options: opts, protocol, started: new Date().toISOString() };
 try {
     log('creating machines');
-    await pool(names, 5, name => boxd(['machine', 'new', name, '--from-snapshot', opts.snapshot, '--delete-after', opts.ttl,
-        '--label', 'purpose=archon-scale', '--label', `run=${id}`]));
+    await pool(names, 10, name => boxd(['machine', 'new', name, '--from-snapshot', opts.snapshot, '--delete-after', opts.ttl,
+        '--label', 'purpose=archon-scale', '--label', `run=${id}`]).then(() => created.push(name)));
 
     log('starting nodes');
-    const images = await pool(names, 5, (name, index) => run(name, `set -euo pipefail
+    const images = await pool(names, 10, (name, index) => run(name, `set -euo pipefail
         ${node}
         bash ${REMOTE}/configure.sh ${name} ${protocol} ${index + 1}
         docker compose up -d --no-build >/dev/null 2>&1
@@ -55,16 +57,24 @@ try {
     // The references Compose resolved, which name each Archon image by digest.
     result.images = images[0].trim().split('\n').sort();
 
+    // A full mesh is not required. The mediator looks for peers again only once a
+    // minute, so the wait ends when every node has every peer, or when no node's
+    // count has changed for two of those rounds.
     log('waiting for the nodes to find each other');
-    const deadline = Date.now() + Number(process.env.SCALE_MESH_WAIT_MS || 240_000);
-    let connections = [];
+    const waitBegan = Date.now();
+    const deadline = waitBegan + Number(process.env.SCALE_MESH_WAIT_MS || 720_000);
+    let connections = [], changed = Date.now();
     while (Date.now() < deadline) {
-        connections = (await pool(names, 8, metrics)).map(m => m.mediator_active_connections);
+        const now = (await pool(names, 10, metrics)).map(m => m.mediator_active_connections);
+        if (now.join() !== connections.join()) changed = Date.now();
+        connections = now;
         if (connections.every(count => count >= opts.nodes - 1)) break;
-        await sleep(5000);
+        if (Date.now() - changed > 130_000 && connections.every(count => count > 0)) break;
+        await sleep(10_000);
     }
     result.connections = connections;
-    log(`connections per node: ${connections.join(' ')}`);
+    result.meshWaitMs = Date.now() - waitBegan;
+    log(`connections per node after ${Math.round(result.meshWaitMs / 1000)} s: ${connections.join(' ')}`);
     if (connections.some(count => count === 0)) throw new Error('a node has no peers, so there is nothing to measure');
 
     result.clocks = await pool(names, 8, name => run(name,
