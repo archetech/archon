@@ -97,6 +97,10 @@ const CASES: [string, unknown[]][] = [
     ['post', [{ author: 'bob' }]],
     ['post.tags', [['y']]],
     ['post.author', []],
+    ['post.author', [undefined]],
+    ['post.note', [undefined, null]],
+    ['post.tags[*]', [undefined, 'x']],
+    ['names.*.missing', [undefined]],
 ];
 
 describe('SearchIndex queries', () => {
@@ -113,6 +117,12 @@ describe('SearchIndex queries', () => {
         expect(h.query('post.n', ['1'])).toEqual([]);
         expect(h.query('post', [{ author: 'bob' }])).toEqual([]);
         expect(h.query('post.tags', [['y']])).toEqual([]);
+    });
+
+    it('finds documents without a field when asked for undefined', () => {
+        const h = populated();
+        expect(h.query('post.author', [undefined])).toEqual(['did:d', 'did:e', 'did:f']);
+        expect(h.query('post.author', [undefined, 'bob'])).toEqual(['did:b', 'did:d', 'did:e', 'did:f']);
     });
 
     it('follows updates and deletions, keeping results in insertion order', () => {

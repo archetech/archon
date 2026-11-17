@@ -70,6 +70,14 @@ export default class SearchIndex {
         }
         const list = (cond as { $in: unknown[] }).$in;
 
+        // A missing field compares as undefined, which no request can carry but a
+        // caller in the same process can pass. Indexing it would list every
+        // document without the field under every indexed path, so that one
+        // question is answered by reading the documents.
+        if (list.includes(undefined)) {
+            return [...this.docs].filter(([, doc]) => this.values(doc, rawPath).some(value => list.includes(value))).map(([did]) => did);
+        }
+
         const index = this.pathIndex(rawPath);
         const found = new Set<string>();
         for (const value of list) {

@@ -146,10 +146,48 @@ fn forget(index: &mut PathIndex, data: &Value, path: &str, entry: &Entry) {
     }
 }
 
-// Two values are equal exactly when they serialize alike: object keys are kept
-// sorted, and an integer and a float never compare equal.
+// A value as it compares: two values have the same key exactly when they are
+// equal. Serializing alone does not give that. An object keeps its members in
+// the order they were written and equals one that holds them in another, and
+// 0.0 equals -0.0, so members are written in key order and a float zero as one
+// thing. An integer and a float never compare equal, and their text differs.
 fn value_key(value: &Value) -> String {
-    serde_json::to_string(value).unwrap_or_default()
+    let mut key = String::new();
+    write_key(value, &mut key);
+    key
+}
+
+fn write_key(value: &Value, key: &mut String) {
+    match value {
+        Value::Object(members) => {
+            let mut members: Vec<_> = members.iter().collect();
+            members.sort_by(|a, b| a.0.cmp(b.0));
+            key.push('{');
+            for (position, (name, member)) in members.into_iter().enumerate() {
+                if position > 0 {
+                    key.push(',');
+                }
+                key.push_str(&serde_json::to_string(name).unwrap_or_default());
+                key.push(':');
+                write_key(member, key);
+            }
+            key.push('}');
+        }
+        Value::Array(items) => {
+            key.push('[');
+            for (position, item) in items.iter().enumerate() {
+                if position > 0 {
+                    key.push(',');
+                }
+                write_key(item, key);
+            }
+            key.push(']');
+        }
+        Value::Number(number) if number.is_f64() && number.as_f64() == Some(0.0) => {
+            key.push_str("0.0");
+        }
+        other => key.push_str(&serde_json::to_string(other).unwrap_or_default()),
+    }
 }
 
 // The values a document offers at a query path. The document matches a query
@@ -232,19 +270,53 @@ mod tests {
     use serde_json::json;
 
     // What a query returned before there were indexes: every document, in
-    // insertion order, tested against the condition.
+    // insertion order, tested against the condition by comparing values. It
+    // shares nothing with the keys the indexes are built from.
     fn scan(index: &SearchIndex, raw_path: &str, list: &[Value]) -> Vec<String> {
         index
             .order
             .iter()
-            .filter(|did| {
-                let (_, data) = &index.docs[*did];
-                query_keys(data, raw_path)
-                    .iter()
-                    .any(|key| list.iter().any(|value| &value_key(value) == key))
-            })
+            .filter(|did| scan_match(&index.docs[*did].1, raw_path, list))
             .map(|did| did.to_string())
             .collect()
+    }
+
+    fn scan_match(root: &Value, raw_path: &str, list: &[Value]) -> bool {
+        if let Some(base_path) = raw_path.strip_suffix("[*]") {
+            return json_path_get(root, base_path)
+                .and_then(Value::as_array)
+                .map(|arr| arr.iter().any(|value| list.contains(value)))
+                .unwrap_or(false);
+        }
+        if let Some((prefix, suffix)) = raw_path.split_once("[*].") {
+            return json_path_get(root, prefix)
+                .and_then(Value::as_array)
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|item| json_path_get(item, suffix))
+                        .any(|value| list.contains(value))
+                })
+                .unwrap_or(false);
+        }
+        if let Some(base_path) = raw_path.strip_suffix(".*") {
+            return json_path_get(root, base_path)
+                .and_then(Value::as_object)
+                .map(|obj| obj.keys().any(|key| list.contains(&Value::String(key.clone()))))
+                .unwrap_or(false);
+        }
+        if let Some((prefix, suffix)) = raw_path.split_once(".*.") {
+            return json_path_get(root, prefix)
+                .and_then(Value::as_object)
+                .map(|obj| {
+                    obj.values()
+                        .filter_map(|item| json_path_get(item, suffix))
+                        .any(|value| list.contains(value))
+                })
+                .unwrap_or(false);
+        }
+        json_path_get(root, raw_path)
+            .map(|value| list.contains(value))
+            .unwrap_or(false)
     }
 
     fn doc(data: Value) -> Value {
@@ -263,6 +335,7 @@ mod tests {
         index.store("did:d", &doc(json!({ "group": { "members": [{ "did": "alice" }, { "did": "carol" }] } })));
         index.store("did:e", &doc(json!({ "names": { "alice": { "role": "owner" }, "bob": { "role": "reader" } } })));
         index.store("did:f", &json!({}));
+        index.store("did:z", &doc(json!({ "zero": { "f": -0.0, "i": 0, "nested": { "a": 0.0, "b": [-0.0, { "x": 1, "y": 2 }] } } })));
         index
     }
 
@@ -277,6 +350,13 @@ mod tests {
         ("post.n", &["1"]),
         ("post.n", &["1.0"]),
         ("post", &["{\"author\":\"bob\",\"n\":1.0,\"tags\":[\"y\"]}"]),
+        ("post", &["{\"tags\":[\"y\"],\"n\":1.0,\"author\":\"bob\"}"]),
+        ("zero.f", &["0.0"]),
+        ("zero.f", &["-0.0"]),
+        ("zero.f", &["0"]),
+        ("zero.i", &["0"]),
+        ("zero.i", &["0.0"]),
+        ("zero.nested", &["{\"b\":[0.0,{\"y\":2,\"x\":1}],\"a\":-0.0}"]),
         ("post.missing", &["null"]),
         ("post.author", &[]),
     ];
@@ -298,6 +378,20 @@ mod tests {
         assert_eq!(query(&mut index, "post.author", &values(&["\"alice\""])), ["did:a", "did:c"]);
         assert_eq!(query(&mut index, "post.n", &values(&["1"])), ["did:a"]);
         assert_eq!(query(&mut index, "post.n", &values(&["1.0"])), ["did:b"]);
+        // Members in another order are the same object, and the two float zeros
+        // are the same number, but an integer is never a float.
+        assert_eq!(
+            query(&mut index, "post", &values(&["{\"tags\":[\"y\"],\"n\":1.0,\"author\":\"bob\"}"])),
+            ["did:b"]
+        );
+        assert_eq!(query(&mut index, "zero.f", &values(&["0.0"])), ["did:z"]);
+        assert!(query(&mut index, "zero.f", &values(&["0"])).is_empty());
+        assert_eq!(query(&mut index, "zero.i", &values(&["0"])), ["did:z"]);
+        assert!(query(&mut index, "zero.i", &values(&["0.0"])).is_empty());
+        assert_eq!(
+            query(&mut index, "zero.nested", &values(&["{\"b\":[0.0,{\"y\":2,\"x\":1}],\"a\":-0.0}"])),
+            ["did:z"]
+        );
     }
 
     #[test]
