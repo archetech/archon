@@ -1696,25 +1696,43 @@ impl JsonDb {
                 let script = r#"
                     local key = KEYS[1]
                     local n = tonumber(ARGV[1])
-                    local idx = 2
                     local want = {}
                     for i = 1, n do
-                      want[ARGV[idx]] = true
-                      idx = idx + 1
+                      want[ARGV[i + 1]] = true
+                    end
+                    local function wanted(raw)
+                      local ok, obj = pcall(cjson.decode, raw)
+                      return ok and obj and obj.proof and obj.proof.proofValue and want[obj.proof.proofValue]
+                    end
+                    -- A mediator clears what it took from the head of the queue, in
+                    -- order. When the first n entries are exactly the ones asked for,
+                    -- trim them without reading the rest. Anything else, a repeated
+                    -- entry included, is filtered below.
+                    local head = redis.call('LRANGE', key, 0, n - 1)
+                    local leading = 0
+                    for i = 1, #head do
+                      local ok, obj = pcall(cjson.decode, head[i])
+                      if ok and obj and obj.proof and obj.proof.proofValue == ARGV[i + 1] then
+                        leading = leading + 1
+                      else
+                        break
+                      end
+                    end
+                    if leading == n then
+                      redis.call('LTRIM', key, n, -1)
+                      return n
                     end
                     local list = redis.call('LRANGE', key, 0, -1)
                     if #list == 0 then return 0 end
                     local keep = {}
                     for i = 1, #list do
-                      local ok, obj = pcall(cjson.decode, list[i])
-                      if ok and obj and obj.proof and obj.proof.proofValue and want[obj.proof.proofValue] then
-                      else
-                        table.insert(keep, list[i])
-                      end
+                      if not wanted(list[i]) then keep[#keep + 1] = list[i] end
                     end
+                    -- One call cannot carry more than a few thousand arguments,
+                    -- and a script that fails after DEL has lost the queue.
                     redis.call('DEL', key)
-                    if #keep > 0 then
-                      redis.call('RPUSH', key, unpack(keep))
+                    for i = 1, #keep, 5000 do
+                      redis.call('RPUSH', key, unpack(keep, i, math.min(i + 4999, #keep)))
                     end
                     return #list - #keep
                 "#;
@@ -2591,6 +2609,77 @@ impl GatekeeperDb for JsonDb {
 #[cfg(test)]
 mod startup_read_tests {
     use super::*;
+
+    // Clearing part of a long queue used to delete the queue and then fail to
+    // push the rest back: one RPUSH cannot carry more than a few thousand
+    // entries. Everything not yet sent was lost (#1644).
+    #[test]
+    #[ignore = "requires isolated Redis via ARCHON_TEST_REDIS_URL"]
+    fn redis_partial_queue_clear_keeps_the_rest() -> Result<()> {
+        let url = env::var("ARCHON_TEST_REDIS_URL")?;
+        let client = redis::Client::open(url.as_str())?;
+        let directory = tempfile::tempdir()?;
+        let namespace = format!(
+            "queue-test-{}",
+            directory.path().file_name().unwrap().to_string_lossy()
+        );
+        let mut db = JsonDb {
+            backend: DbBackend::Redis {
+                url,
+                namespace: namespace.clone(),
+            },
+            data: JsonDbFile::default(),
+            redis_connection: Some(StdMutex::new(client.get_connection()?)),
+            event_index: Default::default(),
+        };
+        let operation = |index: usize| json!({"type": "create", "n": index, "proof": {"proofValue": format!("proof-{index}")}});
+        let numbers = |queue: &[Value]| queue.iter().map(|value| value["n"].as_u64().unwrap() as usize).collect::<Vec<_>>();
+        let total = 20_000;
+        {
+            let mut conn = client.get_connection()?;
+            let key = JsonDb::redis_queue_key(&namespace, "hyperswarm");
+            for start in (0..total).step_by(1000) {
+                let rows: Vec<String> = (start..start + 1000).map(|index| operation(index).to_string()).collect();
+                let _: usize = conn.rpush(&key, rows)?;
+            }
+        }
+        assert_eq!(db.get_queue("hyperswarm").len(), total);
+
+        // The head of the queue, as a mediator clears it.
+        let head: Vec<Value> = (0..1000).map(operation).collect();
+        assert!(db.clear_queue("hyperswarm", &head)?);
+        assert_eq!(numbers(&db.get_queue("hyperswarm")), (1000..total).collect::<Vec<_>>());
+
+        // Entries that are not the head, leaving far more than one call can push back.
+        let scattered: Vec<Value> = (1000..3000).step_by(2).map(operation).collect();
+        assert!(db.clear_queue("hyperswarm", &scattered)?);
+        let expected: Vec<usize> = (1000..total).filter(|index| *index >= 3000 || index % 2 == 1).collect();
+        assert_eq!(numbers(&db.get_queue("hyperswarm")), expected);
+
+        // Entries that are not queued change nothing.
+        assert!(db.clear_queue("hyperswarm", &[operation(total + 5)])?);
+        assert_eq!(db.get_queue("hyperswarm").len(), expected.len());
+
+        let rest: Vec<Value> = expected.iter().map(|index| operation(*index)).collect();
+        assert!(db.clear_queue("hyperswarm", &rest)?);
+        assert!(db.get_queue("hyperswarm").is_empty());
+
+        // A repeated entry at the head is not the sequence asked for. Trimming
+        // two entries here would remove both copies of 1 and leave 2 queued.
+        for index in [1, 1, 2, 3] {
+            db.queue_operation("hyperswarm", operation(index))?;
+        }
+        assert!(db.clear_queue("hyperswarm", &[operation(1), operation(2)])?);
+        assert_eq!(numbers(&db.get_queue("hyperswarm")), [3]);
+        // Asked for out of order, the entries are still removed.
+        for index in [4, 5] {
+            db.queue_operation("hyperswarm", operation(index))?;
+        }
+        assert!(db.clear_queue("hyperswarm", &[operation(4), operation(3)])?);
+        assert_eq!(numbers(&db.get_queue("hyperswarm")), [5]);
+        assert!(db.clear_queue("hyperswarm", &[operation(5)])?);
+        Ok(())
+    }
 
     #[test]
     #[ignore = "requires isolated Redis via ARCHON_TEST_REDIS_URL"]
