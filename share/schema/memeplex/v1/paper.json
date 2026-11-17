@@ -1,0 +1,158 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Memeplex paper",
+    "type": "object",
+    "properties": {
+        "v": {
+            "const": 1
+        },
+        "author": {
+            "$ref": "#/$defs/did"
+        },
+        "grant": {
+            "$ref": "#/$defs/did"
+        },
+        "kind": {
+            "const": "paper"
+        },
+        "content": {
+            "$ref": "#/$defs/markdown"
+        },
+        "tags": {
+            "$ref": "#/$defs/tags"
+        },
+        "title": {
+            "type": "string",
+            "maxLength": 300
+        },
+        "subtitle": {
+            "type": "string",
+            "maxLength": 300
+        },
+        "summary": {
+            "type": "string",
+            "maxLength": 5000
+        },
+        "authors": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+                "$ref": "#/$defs/did"
+            }
+        },
+        "source": {
+            "$ref": "#/$defs/source"
+        },
+        "pdf": {
+            "$ref": "#/$defs/pdf"
+        },
+        "text": false,
+        "target": false,
+        "targetVersion": false,
+        "verdict": false,
+        "rating": false,
+        "min": false,
+        "max": false,
+        "tag": false,
+        "image": false
+    },
+    "required": [
+        "v",
+        "kind",
+        "author",
+        "grant",
+        "title",
+        "summary",
+        "authors",
+        "content"
+    ],
+    "$defs": {
+        "did": {
+            "type": "string",
+            "pattern": "^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$"
+        },
+        "cid": {
+            "type": "string",
+            "pattern": "^(b[a-z2-7]{20,}|Qm[1-9A-HJ-NP-Za-km-z]{44})$"
+        },
+        "bytes": {
+            "type": "integer",
+            "minimum": 0
+        },
+        "markdown": {
+            "type": "object",
+            "required": [
+                "cid",
+                "type",
+                "bytes"
+            ],
+            "properties": {
+                "cid": {
+                    "$ref": "#/$defs/cid"
+                },
+                "type": {
+                    "const": "text/markdown"
+                },
+                "bytes": {
+                    "$ref": "#/$defs/bytes"
+                }
+            }
+        },
+        "pdf": {
+            "type": "object",
+            "required": [
+                "cid",
+                "type",
+                "bytes"
+            ],
+            "properties": {
+                "cid": {
+                    "$ref": "#/$defs/cid"
+                },
+                "type": {
+                    "const": "application/pdf"
+                },
+                "bytes": {
+                    "$ref": "#/$defs/bytes"
+                }
+            }
+        },
+        "source": {
+            "type": "object",
+            "required": [
+                "cid",
+                "type",
+                "bytes"
+            ],
+            "properties": {
+                "cid": {
+                    "$ref": "#/$defs/cid"
+                },
+                "type": {
+                    "enum": [
+                        "application/x-tex",
+                        "application/gzip"
+                    ]
+                },
+                "bytes": {
+                    "$ref": "#/$defs/bytes"
+                }
+            }
+        },
+        "tagValue": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+        },
+        "tags": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+                "$ref": "#/$defs/tagValue"
+            }
+        }
+    }
+}

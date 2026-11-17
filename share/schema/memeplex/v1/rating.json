@@ -1,0 +1,67 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Memeplex rating",
+    "type": "object",
+    "properties": {
+        "v": {
+            "const": 1
+        },
+        "author": {
+            "$ref": "#/$defs/did"
+        },
+        "grant": {
+            "$ref": "#/$defs/did"
+        },
+        "kind": {
+            "const": "rating"
+        },
+        "target": {
+            "$ref": "#/$defs/did"
+        },
+        "targetVersion": {
+            "$ref": "#/$defs/versionId"
+        },
+        "rating": {
+            "type": "integer"
+        },
+        "min": {
+            "type": "integer"
+        },
+        "max": {
+            "type": "integer"
+        },
+        "text": false,
+        "content": false,
+        "tags": false,
+        "title": false,
+        "subtitle": false,
+        "summary": false,
+        "authors": false,
+        "source": false,
+        "pdf": false,
+        "verdict": false,
+        "tag": false,
+        "image": false
+    },
+    "required": [
+        "v",
+        "kind",
+        "author",
+        "grant",
+        "target",
+        "targetVersion",
+        "rating",
+        "min",
+        "max"
+    ],
+    "$defs": {
+        "did": {
+            "type": "string",
+            "pattern": "^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$"
+        },
+        "versionId": {
+            "type": "string",
+            "pattern": "^b[a-z2-7]{20,}$"
+        }
+    }
+}

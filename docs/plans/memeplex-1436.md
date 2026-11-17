@@ -327,6 +327,7 @@ examples, rendering requirements, the grant request flow, discovery queries,
 Memepool choices and the implementation/benchmark plan. Its rendering budgets
 limit automatic presentation; they do not decide authorship.
 
-Before implementation, settle concrete benchmark targets and publish the pinned
-schemas and signed verifier fixtures. Who pins long-form content, and for how long,
+The schemas and signed fixtures are written (`share/schema/memeplex/v1`,
+`tests/fixtures/memeplex-v1-vectors.json`). Before implementation, publish the
+schemas and pin their DIDs. Who pins long-form content, and for how long,
 is the one [open question](memeplex-reference-1436.md#open-question).

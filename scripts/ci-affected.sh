@@ -36,7 +36,7 @@ classify() {
         everything
         return
     fi
-    code=$( { grep -vE '(\.md$|^deploy/)' <<<"$paths"; grep -E '^docs/scheme\.md$' <<<"$paths"; } || true)
+    code=$( { grep -vE '(\.md$|^deploy/)' <<<"$paths"; grep -E '^docs/(scheme|plans/memeplex-reference-1436)\.md$' <<<"$paths"; } || true)
     local unit=false images=false e2e=false
     [ -n "$code" ] && unit=true
     # Root-level files (package.json, lockfiles, tsconfig, compose files,
