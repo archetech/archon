@@ -55,7 +55,8 @@ experiments are aimed at them first.
 - **Operations are flooded.** A `queue` message is forwarded to every connected peer
   not yet on its relay list (`relayMsg`). In a well-connected network the messages
   sent for one operation grow with roughly the square of the number of nodes, and
-  most arrive as duplicates.
+  most arrive as duplicates. That holds while every node connects to every other,
+  which Hyperswarm's default of 64 peers allows up to about that many nodes.
 
 ## Experiments
 
@@ -156,13 +157,27 @@ term. Running that many against the present mediator would only repeat the resul
 above at greater cost, so the work is staged.
 
 The design it aims at is one change to the mediator (#1639): a node holds about ten
-peers however large the network is, chosen at random from a larger set it has learned
-of, replaces the ones it loses, and is connected to every other node through them.
+peers however large the network is, and is connected to every other node through
+them.
 
-That is what removes the growth with the square of the network. A mediator sends an
-operation to each of its peers, so with every node connected to every other the
-messages for one operation grow with the square, and with ten peers each they grow
-with the number of nodes. Two further changes were considered and left out:
+A mediator sends an operation to each of its peers, so the messages for one
+operation are the number of nodes times the peers each holds. Hyperswarm supplies
+most of what bounding the peers needs, as read from its source (4.17.0, with
+hyperdht 6.33.0) and not yet shown in a run:
+
+- **A lookup returns a random sample.** Each DHT node answers with twenty of its
+  records for the topic, drawn at random each time.
+- **A node stops opening connections at `maxPeers`,** 64 by default, which the
+  mediator does not set. The runs above, at forty nodes and fewer, were below it,
+  which is why every node connected to every other and the messages grew with the
+  square. Past 64 nodes they would grow with the number of nodes, at about a hundred
+  for each node.
+- **It looks again about every ten minutes** and tries a lost peer again.
+- **It does not limit the connections a node accepts.** `maxServerConnections` is
+  stored and never compared with anything.
+
+So the change is a lower `maxPeers` and a limit on accepted connections. Two further
+changes were considered and left out:
 
 - **Announcing an operation before sending it.** With ten peers a node receives an
   operation about ten times, a kilobyte each. Announcing first would cut that to
@@ -182,7 +197,7 @@ what it costs a busy node to serve its database, which has not been measured.
 
 | Stage | What runs | What it settles |
 |---|---|---|
-| 1. Model | The gossip rules alone, in one process, at 1,000 to 10,000 nodes, calibrated against experiment A | How many peers, how they are chosen and replaced, how much churn and how many misbehaving nodes the network tolerates |
+| 1. Model | The gossip rules alone, in one process, at 1,000 to 10,000 nodes, calibrated against experiment A | How many peers, how many accepted connections, how much churn and how many nodes that cannot reach each other the network tolerates |
 | 2. Build | The chosen design in the mediator, with real nodes at twenty and forty on boxd | Whether the code behaves as the model does |
 | 3. Mediators at 1,000 | A thousand mediator processes, each with a stand-in for its Gatekeeper and Keymaster, about fifty to a machine, on a private network with its own DHT bootstrap node | Delivery, delay, traffic and memory at that size; discovery on a topic with far more peers than a DHT node returns; many nodes joining at once; the cost of a new node's first sync |
 | 4. Nodes under real conditions | Several hundred complete nodes on machines with public addresses of their own, on more than one provider and region, some behind address translation, leaving and rejoining | Whether stage 3 hid anything: peers that cannot reach each other directly, real Gatekeeper load, churn |
@@ -199,7 +214,7 @@ model, not measurements:
 | An operation reaches every node | yes, where nodes can connect | yes, with a fifth of the nodes leaving and rejoining |
 | Median delay | about 1.3 s | a few seconds |
 | Peers per node | 31 to 39 of the other 39 | about ten |
-| Messages per operation | about 730, growing with the square | about ten for each node, growing with the number of nodes |
+| Messages per operation | about 730, with every node connected to every other | about fifteen for each node |
 
 Not yet known:
 
