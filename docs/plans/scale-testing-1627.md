@@ -29,8 +29,8 @@ hosts, all but one at forty nodes. The tables are in `tests/scale/README.md`.
 - **Messages grew with the square of the network.** With 11 to 19 connections a node,
   twenty nodes relayed about 160 messages for each operation. With 31 to 39, forty
   nodes relayed about 730. More than nine in ten of the messages received were
-  batches the node already had (#1639). By that curve a well-connected network of
-  1,000 nodes would relay several hundred thousand for each operation.
+  batches the node already had (#1639). That curve stops where
+  Hyperswarm stops opening connections, at 64 peers by default: see below.
 - **Messages follow the connections.** The one stock forty-node run on a single host
   had 4 to 21 connections a node and relayed 198.5.
 - **Two nodes behind one public address do not peer** without a change to the
