@@ -560,6 +560,9 @@ impl JsonDb {
         })
     }
 
+    /// The whole journal at once. The service reads it a batch at a time with
+    /// `get_candidates_for`; this is for tests that inspect it.
+    #[cfg(test)]
     pub(crate) fn get_candidates(&self) -> Result<HashMap<String, Vec<EventRecord>>> {
         if matches!(self.backend, DbBackend::Redis { .. }) {
             return self.with_redis_connection(|conn, namespace| {

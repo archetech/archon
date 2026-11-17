@@ -256,7 +256,7 @@ pub(crate) async fn ensure_history_ready(state: &AppState) -> Result<()> {
     tracing::info!("Gatekeeper history recovery: loading candidate journal and DID list");
     let mut dids: Vec<_> = {
         let store = state.store.lock().await;
-        let mut dids: HashSet<_> = store.get_candidates()?.into_keys().collect();
+        let mut dids: HashSet<_> = store.candidate_dids()?.into_iter().collect();
         dids.extend(store.list_dids(&state.config.did_prefix, None));
         dids.into_iter().collect()
     };
@@ -387,6 +387,15 @@ async fn rebuild_histories(
             let mut journal = store.get_candidates_for(&batch)?;
             for key in batch {
                 let candidates = journal.remove(&key).unwrap_or_default();
+                // Startup looks predecessors up among the DID's own candidates.
+                let retained: HashMap<&str, &EventRecord> = if startup {
+                    candidates
+                        .iter()
+                        .filter_map(|known| Some((known.opid.as_deref()?, known)))
+                        .collect()
+                } else {
+                    HashMap::new()
+                };
                 let target = target_set.contains(&key);
                 if target
                     && candidates.iter().any(|event| {
@@ -414,14 +423,7 @@ async fn rebuild_histories(
                             // Startup retained and canonicalized every candidate before
                             // replay, so a predecessor is taken from that content where
                             // it is there. Retrieval aliases still require the DB.
-                            let retained = startup
-                                .then(|| {
-                                    candidates
-                                        .iter()
-                                        .find(|known| known.opid.as_deref() == Some(previd))
-                                })
-                                .flatten();
-                            if let Some(known) = retained {
+                            if let Some(known) = retained.get(previd) {
                                 data.ops.insert(previd.to_string(), known.operation.clone());
                             } else if let Some(operation) = store.get_operation(previd) {
                                 data.ops.insert(previd.to_string(), operation);
