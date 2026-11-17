@@ -249,13 +249,19 @@ export default class DbRedis implements GatekeeperDb {
                         local ok, obj = pcall(cjson.decode, raw)
                         return ok and obj and obj.proof and obj.proof.proofValue and want[obj.proof.proofValue]
                       end
-                      -- A mediator clears what it took from the head of the queue,
-                      -- so the wanted entries are normally the first n. Trim them
-                      -- without reading the rest.
+                      -- A mediator clears what it took from the head of the queue, in
+                      -- order. When the first n entries are exactly the ones asked for,
+                      -- trim them without reading the rest. Anything else, a repeated
+                      -- entry included, is filtered below.
                       local head = redis.call('LRANGE', key, 0, n - 1)
                       local leading = 0
                       for i=1,#head do
-                        if wanted(head[i]) then leading = leading + 1 else break end
+                        local ok, obj = pcall(cjson.decode, head[i])
+                        if ok and obj and obj.proof and obj.proof.proofValue == ARGV[i + 1] then
+                          leading = leading + 1
+                        else
+                          break
+                        end
                       end
                       if leading == n then
                         redis.call('LTRIM', key, n, -1)

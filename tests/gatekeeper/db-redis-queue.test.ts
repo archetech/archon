@@ -49,4 +49,18 @@ describeLive('DbRedis.clearQueue on a long queue', () => {
         expect(await db.clearQueue('hyperswarm', expected.map(operation))).toBe(true);
         expect(await db.getQueue('hyperswarm')).toEqual([]);
     }, 120_000);
+
+    it('removes what was asked for when the head repeats an entry or the order differs', async () => {
+        // A repeated entry at the head is not the sequence asked for. Trimming two
+        // entries here would remove both copies of 1 and leave 2 queued.
+        for (const n of [1, 1, 2, 3]) await db.queueOperation('hyperswarm', operation(n));
+        expect(await db.clearQueue('hyperswarm', [1, 2].map(operation))).toBe(true);
+        expect(numbers(await db.getQueue('hyperswarm'))).toEqual([3]);
+
+        for (const n of [4, 5]) await db.queueOperation('hyperswarm', operation(n));
+        expect(await db.clearQueue('hyperswarm', [4, 3].map(operation))).toBe(true);
+        expect(numbers(await db.getQueue('hyperswarm'))).toEqual([5]);
+        expect(await db.clearQueue('hyperswarm', [operation(5)])).toBe(true);
+        expect(await db.getQueue('hyperswarm')).toEqual([]);
+    });
 });

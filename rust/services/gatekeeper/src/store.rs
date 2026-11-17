@@ -1704,13 +1704,19 @@ impl JsonDb {
                       local ok, obj = pcall(cjson.decode, raw)
                       return ok and obj and obj.proof and obj.proof.proofValue and want[obj.proof.proofValue]
                     end
-                    -- A mediator clears what it took from the head of the queue,
-                    -- so the wanted entries are normally the first n. Trim them
-                    -- without reading the rest.
+                    -- A mediator clears what it took from the head of the queue, in
+                    -- order. When the first n entries are exactly the ones asked for,
+                    -- trim them without reading the rest. Anything else, a repeated
+                    -- entry included, is filtered below.
                     local head = redis.call('LRANGE', key, 0, n - 1)
                     local leading = 0
                     for i = 1, #head do
-                      if wanted(head[i]) then leading = leading + 1 else break end
+                      local ok, obj = pcall(cjson.decode, head[i])
+                      if ok and obj and obj.proof and obj.proof.proofValue == ARGV[i + 1] then
+                        leading = leading + 1
+                      else
+                        break
+                      end
                     end
                     if leading == n then
                       redis.call('LTRIM', key, n, -1)
@@ -2657,6 +2663,21 @@ mod startup_read_tests {
         let rest: Vec<Value> = expected.iter().map(|index| operation(*index)).collect();
         assert!(db.clear_queue("hyperswarm", &rest)?);
         assert!(db.get_queue("hyperswarm").is_empty());
+
+        // A repeated entry at the head is not the sequence asked for. Trimming
+        // two entries here would remove both copies of 1 and leave 2 queued.
+        for index in [1, 1, 2, 3] {
+            db.queue_operation("hyperswarm", operation(index))?;
+        }
+        assert!(db.clear_queue("hyperswarm", &[operation(1), operation(2)])?);
+        assert_eq!(numbers(&db.get_queue("hyperswarm")), [3]);
+        // Asked for out of order, the entries are still removed.
+        for index in [4, 5] {
+            db.queue_operation("hyperswarm", operation(index))?;
+        }
+        assert!(db.clear_queue("hyperswarm", &[operation(4), operation(3)])?);
+        assert_eq!(numbers(&db.get_queue("hyperswarm")), [5]);
+        assert!(db.clear_queue("hyperswarm", &[operation(5)])?);
         Ok(())
     }
 
