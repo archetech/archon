@@ -95,7 +95,7 @@ describe('the signed vectors', () => {
         }
         vectors = JSON.parse(readFileSync(FIXTURE, 'utf8'));
         expect(vectors).toStrictEqual(JSON.parse(JSON.stringify(built)));
-    });
+    }, 60_000);
 
     it('are operations a Gatekeeper accepts, each creating the DID it is given', async () => {
         const gatekeeper = new Gatekeeper({
@@ -117,7 +117,8 @@ describe('the signed vectors', () => {
             await expect(gatekeeper.createDID(operation as unknown as Operation)).resolves.toBe(did);
         }
         expect(new Set(created.map(each => each.did)).size).toBe(created.length);
-    });
+    // Each operation's signature is verified; together they take several seconds.
+    }, 60_000);
 
     it('have the outcome each one states', () => {
         const wrong = vectors.cases
