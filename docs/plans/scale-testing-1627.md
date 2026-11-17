@@ -29,8 +29,8 @@ hosts, all but one at forty nodes. The tables are in `tests/scale/README.md`.
 - **Messages grew with the square of the network.** With 11 to 19 connections a node,
   twenty nodes relayed about 160 messages for each operation. With 31 to 39, forty
   nodes relayed about 730. More than nine in ten of the messages received were
-  batches the node already had (#1639). By that curve a well-connected network of
-  1,000 nodes would relay several hundred thousand for each operation.
+  batches the node already had (#1639). That curve stops where
+  Hyperswarm stops opening connections, at 64 peers by default: see below.
 - **Messages follow the connections.** The one stock forty-node run on a single host
   had 4 to 21 connections a node and relayed 198.5.
 - **Two nodes behind one public address do not peer** without a change to the
@@ -55,7 +55,8 @@ experiments are aimed at them first.
 - **Operations are flooded.** A `queue` message is forwarded to every connected peer
   not yet on its relay list (`relayMsg`). In a well-connected network the messages
   sent for one operation grow with roughly the square of the number of nodes, and
-  most arrive as duplicates.
+  most arrive as duplicates. That holds while every node connects to every other,
+  which Hyperswarm's default of 64 peers allows up to about that many nodes.
 
 ## Experiments
 
@@ -155,15 +156,48 @@ A thousand nodes is a stress test today and a real size for the network in the m
 term. Running that many against the present mediator would only repeat the result
 above at greater cost, so the work is staged.
 
-The design it aims at is the one #1639 describes: a node holds about ten peers
-however large the network is, chosen at random from a larger set of addresses it has
-learned, and is connected to every other node through them. It announces an operation
-before sending it, and takes a history from one or two peers and not from all of
+The design it aims at is one change to the mediator (#1639): a node holds about ten
+peers however large the network is, and is connected to every other node through
 them.
+
+A mediator sends an operation to each of its peers, so the messages for one
+operation are the number of nodes times the peers each holds. Hyperswarm supplies
+most of what bounding the peers needs, as read from its source (4.17.0, with
+hyperdht 6.33.0) and not yet shown in a run:
+
+- **A lookup returns a random sample.** Each DHT node answers with twenty of its
+  records for the topic, drawn at random each time.
+- **A node stops opening connections at `maxPeers`,** 64 by default, which the
+  mediator does not set. The runs above, at forty nodes and fewer, were below it,
+  which is why every node connected to every other and the messages grew with the
+  square. Past 64 nodes they would grow with the number of nodes, at about a hundred
+  for each node.
+- **It looks again about every ten minutes** and tries a lost peer again.
+- **It does not limit the connections a node accepts.** `maxServerConnections` is
+  stored and never compared with anything.
+
+So the change is a lower `maxPeers` and a limit on accepted connections. Two further
+changes were considered and left out:
+
+- **Announcing an operation before sending it.** With ten peers a node receives an
+  operation about ten times, a kilobyte each. Announcing first would cut that to
+  about a fifth, at the cost of a change to the wire protocol, a record of recent
+  operations in the mediator and a round trip on every hop. A node cannot import
+  more than a few hundred operations a second (#1651), and at that rate the
+  repeated copies are a few megabytes a second. A mediator already drops a batch it
+  has seen before it reaches the Gatekeeper.
+- **Taking a history from one or two peers and not from all of them.** A Gatekeeper
+  recognises an event it already holds in under a millisecond, against 2.3 ms for a
+  new one, so a second copy of a database costs a fraction of the first: about
+  eight minutes for a million DIDs. Every peer's copy also fills in what another
+  lacks. With ten peers there are ten copies however large the network is.
+
+Either can be taken up again if a measurement shows the need: larger operations, or
+what it costs a busy node to serve its database, which has not been measured.
 
 | Stage | What runs | What it settles |
 |---|---|---|
-| 1. Model | The gossip rules alone, in one process, at 1,000 to 10,000 nodes, calibrated against experiment A | How many peers, whether to announce before sending, how peers are chosen and replaced, how much churn and how many misbehaving nodes the network tolerates |
+| 1. Model | The gossip rules alone, in one process, at 1,000 to 10,000 nodes, calibrated against experiment A | How many peers, how many accepted connections, how much churn and how many nodes that cannot reach each other the network tolerates |
 | 2. Build | The chosen design in the mediator, with real nodes at twenty and forty on boxd | Whether the code behaves as the model does |
 | 3. Mediators at 1,000 | A thousand mediator processes, each with a stand-in for its Gatekeeper and Keymaster, about fifty to a machine, on a private network with its own DHT bootstrap node | Delivery, delay, traffic and memory at that size; discovery on a topic with far more peers than a DHT node returns; many nodes joining at once; the cost of a new node's first sync |
 | 4. Nodes under real conditions | Several hundred complete nodes on machines with public addresses of their own, on more than one provider and region, some behind address translation, leaving and rejoining | Whether stage 3 hid anything: peers that cannot reach each other directly, real Gatekeeper load, churn |
@@ -180,7 +214,7 @@ model, not measurements:
 | An operation reaches every node | yes, where nodes can connect | yes, with a fifth of the nodes leaving and rejoining |
 | Median delay | about 1.3 s | a few seconds |
 | Peers per node | 31 to 39 of the other 39 | about ten |
-| Messages per operation | about 730, growing with the square | growing with the number of nodes: for each node, one payload and about ten small announcements |
+| Messages per operation | about 730, with every node connected to every other | about fifteen for each node |
 
 Not yet known:
 
@@ -188,6 +222,8 @@ Not yet known:
   many fit on a machine in stage 3.
 - **What peers a node behind strict address translation can keep.** Two such nodes
   reach each other only through a third.
+- **What it costs a node to serve its database to a peer that asks for it,** at a
+  size where that takes minutes.
 - **Which provider and what budget** stages 3 and 4 use. Neither is needed before
   stage 2 is done.
 
