@@ -560,6 +560,9 @@ impl JsonDb {
         })
     }
 
+    /// The whole journal at once. The service reads it a batch at a time with
+    /// `get_candidates_for`; this is for tests that inspect it.
+    #[cfg(test)]
     pub(crate) fn get_candidates(&self) -> Result<HashMap<String, Vec<EventRecord>>> {
         if matches!(self.backend, DbBackend::Redis { .. }) {
             return self.with_redis_connection(|conn, namespace| {
@@ -601,6 +604,98 @@ impl JsonDb {
             });
         }
         Ok(self.data.candidates.clone())
+    }
+
+    /// The journal entries of these DIDs. A DID with no entry is left out, which
+    /// is not the same as a DID whose entry is empty.
+    pub(crate) fn get_candidates_for(
+        &self,
+        dids: &[String],
+    ) -> Result<HashMap<String, Vec<EventRecord>>> {
+        if dids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self.with_redis_connection(|conn, namespace| {
+                // HMGET by name: with one field the client would send HGET and
+                // answer with a single value.
+                let rows: Vec<Option<String>> = redis::cmd("HMGET")
+                    .arg(format!("{namespace}/candidates"))
+                    .arg(dids)
+                    .query(conn)?;
+                let mut result = HashMap::new();
+                for (did, raw) in dids.iter().zip(rows) {
+                    if let Some(raw) = raw {
+                        result.insert(did.clone(), serde_json::from_str(&raw)?);
+                    }
+                }
+                Ok(result)
+            });
+        }
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let conn = DbBackend::open_sqlite(path)?;
+            let mut statement = conn.prepare("SELECT events FROM candidates WHERE id = ?1")?;
+            let mut result = HashMap::new();
+            for did in dids {
+                let raw: Option<String> = statement
+                    .query_row(params![did], |row| row.get(0))
+                    .optional()?;
+                if let Some(raw) = raw {
+                    result.insert(did.clone(), serde_json::from_str(&raw)?);
+                }
+            }
+            return Ok(result);
+        }
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            return tokio::task::block_in_place(|| {
+                let client = self.mongo_client()?;
+                let collection = client
+                    .database(self.mongo_database_name()?)
+                    .collection::<Document>("candidates");
+                let mut result = HashMap::new();
+                for row in collection.find(doc! { "id": { "$in": dids } }).run()? {
+                    let row = row?;
+                    result.insert(
+                        row.get_str("id")?.to_string(),
+                        bson::from_bson(row.get("events").context("missing candidates")?.clone())?,
+                    );
+                }
+                return Ok(result);
+            });
+        }
+        Ok(dids
+            .iter()
+            .filter_map(|did| Some((did.clone(), self.data.candidates.get(did)?.clone())))
+            .collect())
+    }
+
+    /// Every DID that has a journal entry.
+    pub(crate) fn candidate_dids(&self) -> Result<Vec<String>> {
+        if matches!(self.backend, DbBackend::Redis { .. }) {
+            return self.with_redis_connection(|conn, namespace| {
+                Ok(conn.hkeys(format!("{namespace}/candidates"))?)
+            });
+        }
+        if let DbBackend::Sqlite { path } = &self.backend {
+            let conn = DbBackend::open_sqlite(path)?;
+            let mut statement = conn.prepare("SELECT id FROM candidates")?;
+            let rows = statement.query_map([], |row| row.get::<_, String>(0))?;
+            return rows.map(|row| Ok(row?)).collect();
+        }
+        if matches!(self.backend, DbBackend::Mongo { .. }) {
+            return tokio::task::block_in_place(|| {
+                let client = self.mongo_client()?;
+                let collection = client
+                    .database(self.mongo_database_name()?)
+                    .collection::<Document>("candidates");
+                let mut result = Vec::new();
+                for row in collection.find(doc! {}).projection(doc! { "id": 1 }).run()? {
+                    result.push(row?.get_str("id")?.to_string());
+                }
+                return Ok(result);
+            });
+        }
+        Ok(self.data.candidates.keys().cloned().collect())
     }
 
     pub(crate) fn remove_blocks(&mut self, registry: &str, from_height: u64) -> Result<()> {

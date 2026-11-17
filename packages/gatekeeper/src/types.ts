@@ -20,6 +20,13 @@ export interface JsonDbFile {
 export interface GatekeeperDb {
     getCandidates(): Promise<Record<string, GatekeeperEvent[]>>;
     setCandidates(did: string, events: GatekeeperEvent[]): Promise<void>;
+    /**
+     * The journal entries of these DIDs. A DID with no entry is left out, which
+     * is not the same as a DID whose entry is empty.
+     */
+    getCandidatesFor(dids: string[]): Promise<Record<string, GatekeeperEvent[]>>;
+    /** Every DID that has a journal entry. */
+    getCandidateDIDs(): Promise<string[]>;
     start(): Promise<void>;
     stop(): Promise<void>;
     resetDb(): Promise<void | number | JsonDbFile>;

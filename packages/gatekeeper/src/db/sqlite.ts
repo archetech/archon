@@ -65,6 +65,21 @@ export default class DbSqlite implements GatekeeperDb {
         return Object.fromEntries(rows.map(row => [row.id, JSON.parse(row.events)]));
     }
 
+    async getCandidatesFor(dids: string[]): Promise<Record<string, GatekeeperEvent[]>> {
+        if (!this.db) throw new Error(SQLITE_NOT_STARTED_ERROR);
+        const select = this.db.prepare('SELECT events FROM candidates WHERE id = ?');
+        return Object.fromEntries(dids.flatMap(did => {
+            const row = select.get(did) as unknown as { events: string } | undefined;
+            return row ? [[did, JSON.parse(row.events)]] : [];
+        }));
+    }
+
+    async getCandidateDIDs(): Promise<string[]> {
+        if (!this.db) throw new Error(SQLITE_NOT_STARTED_ERROR);
+        const rows = this.db.prepare('SELECT id FROM candidates').all() as unknown as { id: string }[];
+        return rows.map(row => row.id);
+    }
+
     async setCandidates(did: string, events: GatekeeperEvent[]): Promise<void> {
         await this.runExclusive(() => this.withTx(async () => {
             this.db!.prepare('INSERT OR REPLACE INTO candidates(id, events) VALUES (?, ?)')

@@ -587,11 +587,13 @@ pub(crate) async fn import_event_impl(state: &AppState, mut event: EventRecord) 
         }
     };
     let key = candidate_key(&event);
-    if let Some(known) = state.candidate_history.lock().await.as_ref()
-        .and_then(|candidates| candidates.get(&did))
-        .and_then(|events| events.iter().find(|known| candidate_key(known) == key))
+    let retained = state.store.lock().await.get_candidates_for(std::slice::from_ref(&did));
+    if let Some(known) = retained
+        .ok()
+        .and_then(|mut candidates| candidates.remove(&did))
+        .and_then(|events| events.into_iter().find(|known| candidate_key(known) == key))
     {
-        event = known.clone();
+        event = known;
     }
     let status = import_event_once(state, event).await;
     // Recovery and evidence changes already replay affected histories. Repeated

@@ -908,7 +908,7 @@ pub(crate) async fn db_reset(State(state): State<AppState>, headers: HeaderMap) 
         store.reset_db().is_ok()
     };
     state.events_seen.lock().await.clear();
-    *state.candidate_history.lock().await = None;
+    *state.candidates_ready.lock().await = false;
     state.dependents.lock().await.clear();
     *state.history_ready.lock().await = false;
     state.verified_dids.lock().await.clear();

@@ -51,7 +51,9 @@ pub(crate) struct AppState {
     pub(crate) status_snapshot: Arc<Mutex<Option<CheckDidsResult>>>,
     pub(crate) status_scans: Arc<StatusScans>,
     pub(crate) search_index: Arc<Mutex<SearchIndex>>,
-    pub(crate) candidate_history: Arc<Mutex<Option<HashMap<String, Vec<EventRecord>>>>>,
+    // Whether the candidate journal has been migrated and normalized. Its lock
+    // also serializes journal reads and writes; the journal itself stays in the store.
+    pub(crate) candidates_ready: Arc<Mutex<bool>>,
     pub(crate) dependents: Arc<Mutex<HashMap<String, std::collections::HashSet<String>>>>,
     pub(crate) history_lock: Arc<Mutex<()>>,
     pub(crate) history_ready: Arc<Mutex<bool>>,
@@ -187,7 +189,7 @@ fn build_state(config: Config) -> Result<AppState> {
         status_snapshot: Arc::new(Mutex::new(None)),
         status_scans: Arc::default(),
         search_index: Arc::new(Mutex::new(SearchIndex::default())),
-        candidate_history: Arc::new(Mutex::new(None)),
+        candidates_ready: Arc::new(Mutex::new(false)),
         dependents: Arc::new(Mutex::new(HashMap::new())),
         history_lock: Arc::new(Mutex::new(())),
         history_ready: Arc::new(Mutex::new(false)),
