@@ -31,6 +31,18 @@ export default class DbRedis implements GatekeeperDb {
         return Object.fromEntries(Object.entries(rows).map(([did, events]) => [did, JSON.parse(events)]));
     }
 
+    async getCandidatesFor(dids: string[]): Promise<Record<string, GatekeeperEvent[]>> {
+        if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
+        if (!dids.length) return {};
+        const rows = await this.redis.hmget(`${this.dbName}/candidates`, ...dids);
+        return Object.fromEntries(dids.flatMap((did, index) => rows[index] === null ? [] : [[did, JSON.parse(rows[index]!)]]));
+    }
+
+    async getCandidateDIDs(): Promise<string[]> {
+        if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
+        return this.redis.hkeys(`${this.dbName}/candidates`);
+    }
+
     async setCandidates(did: string, events: GatekeeperEvent[]): Promise<void> {
         if (!this.redis) throw new Error(REDIS_NOT_STARTED_ERROR);
         await this.redis.hset(`${this.dbName}/candidates`, did, JSON.stringify(events));

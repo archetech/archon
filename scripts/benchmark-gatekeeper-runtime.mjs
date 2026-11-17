@@ -56,7 +56,7 @@ try {
     // Deliberately isolate runtime from startup repair. No private state in a
     // running service is changed; this instance owns its temporary Redis prefix.
     g.historyReady = Promise.resolve();
-    g.candidateHistory = structuredClone(candidates);
+    g.candidatesReady = true;
     for (const [did, events] of Object.entries(candidates)) g.indexCandidates(did, events);
     let reads = 0;
     const get = db.getEvents.bind(db);
@@ -76,8 +76,7 @@ try {
         // deferred path; its signature need not validate before that is found.
         const operation = { ...last.operation, previd: Object.values(candidates).find(items => items[0].did !== controller)[0].opid };
         deferred = { ...last, operation, opid: await g.generateCID(operation) };
-        g.candidateHistory[controller].push(deferred);
-        await db.setCandidates(controller, g.candidateHistory[controller]);
+        await db.setCandidates(controller, [...candidates[controller], deferred]);
     }
     const latencies = [];
     async function probe() {

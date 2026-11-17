@@ -42,6 +42,19 @@ export default class DbMongo implements GatekeeperDb {
         return Object.fromEntries(rows.map(row => [row.id, row.events]));
     }
 
+    async getCandidatesFor(dids: string[]): Promise<Record<string, GatekeeperEvent[]>> {
+        if (!this.db) throw new Error(MONGO_NOT_STARTED_ERROR);
+        if (!dids.length) return {};
+        const rows = await this.db.collection<DidsDoc>('candidates').find({ id: { $in: dids } }).toArray();
+        return Object.fromEntries(rows.map(row => [row.id, row.events]));
+    }
+
+    async getCandidateDIDs(): Promise<string[]> {
+        if (!this.db) throw new Error(MONGO_NOT_STARTED_ERROR);
+        const rows = await this.db.collection<DidsDoc>('candidates').find({}, { projection: { id: 1 } }).toArray();
+        return rows.map(row => row.id);
+    }
+
     async setCandidates(did: string, events: GatekeeperEvent[]): Promise<void> {
         if (!this.db) throw new Error(MONGO_NOT_STARTED_ERROR);
         await this.db.collection<DidsDoc>('candidates').updateOne({ id: did },

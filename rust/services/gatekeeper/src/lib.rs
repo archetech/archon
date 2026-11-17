@@ -139,7 +139,7 @@ mod tests {
             status_snapshot: Arc::new(Mutex::new(None)),
             status_scans: Arc::default(),
             search_index: Arc::new(Mutex::new(SearchIndex::default())),
-            candidate_history: Arc::new(Mutex::new(None)),
+            candidates_ready: Arc::new(Mutex::new(false)),
             dependents: Arc::new(Mutex::new(HashMap::new())),
             history_lock: Arc::new(Mutex::new(())),
             history_ready: Arc::new(Mutex::new(false)),

@@ -35,6 +35,15 @@ export abstract class AbstractJson implements GatekeeperDb {
         return this.loadDb().candidates ?? {};
     }
 
+    async getCandidatesFor(dids: string[]): Promise<Record<string, GatekeeperEvent[]>> {
+        const candidates = this.loadDb().candidates ?? {};
+        return Object.fromEntries(dids.flatMap(did => candidates[did] ? [[did, candidates[did]]] : []));
+    }
+
+    async getCandidateDIDs(): Promise<string[]> {
+        return Object.keys(this.loadDb().candidates ?? {});
+    }
+
     async setCandidates(did: string, events: GatekeeperEvent[]): Promise<void> {
         await this.runExclusive(() => {
             const db = this.loadDb();

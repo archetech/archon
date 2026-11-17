@@ -61,48 +61,77 @@ pub(crate) async fn retain_candidates(
     retain_candidates_with_histories(state, did, incoming, None).await
 }
 
+// How many journal entries are read from the store at a time.
+const CANDIDATE_BATCH: usize = 512;
+
+// Migrates and normalizes the whole journal, once: every DID gets an entry, every
+// entry is in canonical form, and the dependents of every controller are indexed.
+// The entries are read and written a batch at a time and are not kept.
+fn prepare_candidates(
+    config: &crate::config::Config,
+    store: &mut JsonDb,
+    dependents: &mut HashMap<String, HashSet<String>>,
+    histories: Option<&HashMap<String, Vec<EventRecord>>>,
+    mut progress: Option<&mut ProgressLogger>,
+) -> Result<()> {
+    let mut dids: HashSet<String> = store.candidate_dids()?.into_iter().collect();
+    dids.extend(store.list_dids(&config.did_prefix, None));
+    let mut dids: Vec<_> = dids.into_iter().collect();
+    dids.sort();
+    let mut prepared = 0;
+    for batch in dids.chunks(CANDIDATE_BATCH) {
+        let mut journal = store.get_candidates_for(batch)?;
+        for did in batch {
+            // A DID without an entry predates the journal: its accepted events
+            // are its first evidence.
+            let (mut events, mut changed) = match journal.remove(did) {
+                Some(events) => (events, false),
+                None => (
+                    histories
+                        .map(|items| items.get(did).cloned().unwrap_or_default())
+                        .unwrap_or_else(|| store.get_events(did)),
+                    true,
+                ),
+            };
+            for event in events.iter_mut() {
+                let previous = (event.opid.clone(), event.time.clone());
+                normalize_candidate_event(store, event)?;
+                changed |= event.opid != previous.0 || event.time != previous.1;
+            }
+            let count = events.len();
+            let events = preferred_candidates(events);
+            changed |= events.len() != count;
+            index_candidates(dependents, did, &events);
+            if changed {
+                store.set_candidates(did, events)?;
+            }
+        }
+        prepared += batch.len();
+        if let Some(progress) = progress.as_deref_mut() {
+            progress.update(prepared);
+        }
+    }
+    Ok(())
+}
+
 async fn retain_candidates_with_histories(
     state: &AppState,
     did: &str,
     incoming: Option<EventRecord>,
     histories: Option<&HashMap<String, Vec<EventRecord>>>,
 ) -> Result<bool> {
-    let mut cache = state.candidate_history.lock().await;
+    let mut ready = state.candidates_ready.lock().await;
     let mut dependents = state.dependents.lock().await;
     let mut store = state.store.lock().await;
-    if cache.is_none() {
-        let mut candidates = store.get_candidates()?;
-        for current in store.list_dids(&state.config.did_prefix, None) {
-            if !candidates.contains_key(&current) {
-                let mut events = histories
-                    .map(|items| items.get(&current).cloned().unwrap_or_default())
-                    .unwrap_or_else(|| store.get_events(&current));
-                for event in &mut events {
-                    normalize_candidate_event(&mut store, event)?;
-                }
-                store.set_candidates(&current, events.clone())?;
-                candidates.insert(current, events);
-            }
-        }
-        for (key, events) in &mut candidates {
-            let mut changed = false;
-            for event in events.iter_mut() {
-                let previous = (event.opid.clone(), event.time.clone());
-                normalize_candidate_event(&mut store, event)?;
-                changed |= event.opid != previous.0 || event.time != previous.1;
-            }
-            let count = events.len();
-            *events = preferred_candidates(std::mem::take(events));
-            changed |= events.len() != count;
-            if changed {
-                store.set_candidates(key, events.clone())?;
-            }
-            index_candidates(&mut dependents, key, events);
-        }
-        *cache = Some(candidates);
+    if !*ready {
+        prepare_candidates(&state.config, &mut store, &mut dependents, histories, None)?;
+        *ready = true;
     }
-    let candidates = cache.as_mut().expect("candidate cache initialized");
-    let mut events = candidates.get(did).cloned().unwrap_or_default();
+    let key = did.to_string();
+    let stored = store
+        .get_candidates_for(std::slice::from_ref(&key))?
+        .remove(did);
+    let mut events = stored.clone().unwrap_or_default();
     // The journal is authoritative after migration; a stale projection cannot
     // resurrect evidence withdrawn by a reorg.
     events.extend(incoming);
@@ -110,12 +139,11 @@ async fn retain_candidates_with_histories(
         normalize_candidate_event(&mut store, event)?;
     }
     let events = preferred_candidates(events);
-    let changed = candidates.get(did) != Some(&events);
-    if changed {
-        store.set_candidates(did, events.clone())?;
-    }
+    let changed = stored.as_ref() != Some(&events);
     index_candidates(&mut dependents, did, &events);
-    candidates.insert(did.to_string(), events);
+    if changed {
+        store.set_candidates(did, events)?;
+    }
     Ok(changed)
 }
 
@@ -148,20 +176,22 @@ pub(crate) async fn rewind_registry(
         }
         let mut affected = HashSet::new();
         {
-            let mut cache = state.candidate_history.lock().await;
-            let candidates = cache.as_mut().expect("history initialized");
-            for (did, events) in candidates.iter_mut() {
-                if !events.iter().any(&withdrawn) {
-                    continue;
+            // A reorganization can withdraw receipts from any DID, so the whole
+            // journal is read, a batch at a time.
+            let ready = state.candidates_ready.lock().await;
+            assert!(*ready, "history initialized");
+            let mut store = state.store.lock().await;
+            let dids = store.candidate_dids()?;
+            for batch in dids.chunks(CANDIDATE_BATCH) {
+                for (did, events) in store.get_candidates_for(batch)? {
+                    if !events.iter().any(&withdrawn) {
+                        continue;
+                    }
+                    let retained =
+                        preferred_candidates(events.into_iter().map(&demote).collect());
+                    store.set_candidates(&did, retained)?;
+                    affected.insert(did);
                 }
-                let retained = preferred_candidates(events.iter().cloned().map(&demote).collect());
-                state
-                    .store
-                    .lock()
-                    .await
-                    .set_candidates(did, retained.clone())?;
-                *events = retained;
-                affected.insert(did.clone());
             }
         }
         state
@@ -201,13 +231,6 @@ pub(crate) async fn remove_histories(state: &AppState, dids: &[String]) -> Resul
     let result = async {
         for did in dids {
             state.store.lock().await.set_candidates(did, Vec::new())?;
-            state
-                .candidate_history
-                .lock()
-                .await
-                .as_mut()
-                .unwrap()
-                .insert(did.clone(), Vec::new());
             state.store.lock().await.delete_events(did)?;
             state.verified_dids.lock().await.remove(did);
             crate::delete_search_doc(state, did).await;
@@ -245,9 +268,20 @@ pub(crate) async fn ensure_history_ready(state: &AppState) -> Result<()> {
     let histories = state.store.lock().await.get_histories(&dids)?;
     loading.update(dids.len());
     let mut preparing = ProgressLogger::new("candidate preparation", dids.len());
-    for (index, did) in dids.iter().enumerate() {
-        retain_candidates_with_histories(state, did, None, Some(&histories)).await?;
-        preparing.update(index + 1);
+    {
+        let mut ready = state.candidates_ready.lock().await;
+        let mut dependents = state.dependents.lock().await;
+        let mut store = state.store.lock().await;
+        if !*ready {
+            prepare_candidates(
+                &state.config,
+                &mut store,
+                &mut dependents,
+                Some(&histories),
+                Some(&mut preparing),
+            )?;
+            *ready = true;
+        }
     }
     rebuild_histories(state, dids, Some(histories)).await?;
     // Replay builds the event index from its snapshot; an empty store has none.
@@ -335,81 +369,109 @@ async fn rebuild_histories(
     // every history in the database, and their text would be a copy of it.
     let mut original = HashMap::new();
     {
-        // The candidates are read where they are. At startup the targets are
-        // every DID, and a copy of them would be a copy of the whole journal.
-        let cache = state.candidate_history.lock().await;
-        let cache = cache.as_ref().expect("candidate cache initialized");
-        for target in &targets {
-            let events = cache.get(target).map(Vec::as_slice).unwrap_or_default();
-            if events.iter().any(|event| {
-                event.operation.get("type").and_then(Value::as_str) == Some("create")
-                    && event
-                        .operation
-                        .pointer("/registration/type")
-                        .and_then(Value::as_str)
-                        == Some("agent")
-            }) {
-                agents.insert(target.clone());
-            }
-            if startup {
-                // Startup retained and canonicalized every candidate before replay.
-                // Reuse that content for canonical predecessors instead of reading it
-                // back one operation at a time. Retrieval aliases still require the DB.
-                for event in events {
-                    if let Some(opid) = &event.opid {
-                        data.ops.insert(opid.clone(), event.operation.clone());
-                    }
-                }
-            }
-        }
+        // The journal stays in the store and is read a batch at a time. At
+        // startup the targets are every DID, so holding their candidates would
+        // be holding the whole journal.
+        let _journal = state.candidates_ready.lock().await;
         let store = state.store.lock().await;
         // Snapshot only affected histories and their transitive authorities.
         // An unrelated DID must not turn every asset import into a DB-wide scan.
         let mut needed = target_set.clone();
         let mut pending = targets.clone();
         let mut references = HashSet::new();
-        while let Some(key) = pending.pop() {
-            let stored;
-            let events: &[EventRecord] = match &histories {
-                Some(items) => items.get(&key).map(Vec::as_slice).unwrap_or_default(),
-                None => {
-                    stored = store.get_events(&key);
-                    &stored
+        // Predecessors named by an event and found neither among its own DID's
+        // candidates nor in the store.
+        let mut unresolved = HashSet::new();
+        while !pending.is_empty() {
+            let batch = pending.split_off(pending.len().saturating_sub(CANDIDATE_BATCH));
+            let mut journal = store.get_candidates_for(&batch)?;
+            for key in batch {
+                let candidates = journal.remove(&key).unwrap_or_default();
+                let target = target_set.contains(&key);
+                if target
+                    && candidates.iter().any(|event| {
+                        event.operation.get("type").and_then(Value::as_str) == Some("create")
+                            && event
+                                .operation
+                                .pointer("/registration/type")
+                                .and_then(Value::as_str)
+                                == Some("agent")
+                    })
+                {
+                    agents.insert(key.clone());
                 }
-            };
-            for event in events.iter().chain(cache.get(&key).into_iter().flatten()) {
-                if let Some(previd) = event.operation.get("previd").and_then(Value::as_str) {
-                    if references.insert(previd.to_string()) && !data.ops.contains_key(previd) {
-                        if let Some(operation) = store.get_operation(previd) {
-                            data.ops.insert(previd.to_string(), operation);
+                let stored;
+                let events: &[EventRecord] = match &histories {
+                    Some(items) => items.get(&key).map(Vec::as_slice).unwrap_or_default(),
+                    None => {
+                        stored = store.get_events(&key);
+                        &stored
+                    }
+                };
+                for event in events.iter().chain(candidates.iter()) {
+                    if let Some(previd) = event.operation.get("previd").and_then(Value::as_str) {
+                        if references.insert(previd.to_string()) && !data.ops.contains_key(previd) {
+                            // Startup retained and canonicalized every candidate before
+                            // replay, so a predecessor is taken from that content where
+                            // it is there. Retrieval aliases still require the DB.
+                            let retained = startup
+                                .then(|| {
+                                    candidates
+                                        .iter()
+                                        .find(|known| known.opid.as_deref() == Some(previd))
+                                })
+                                .flatten();
+                            if let Some(known) = retained {
+                                data.ops.insert(previd.to_string(), known.operation.clone());
+                            } else if let Some(operation) = store.get_operation(previd) {
+                                data.ops.insert(previd.to_string(), operation);
+                            } else if startup {
+                                unresolved.insert(previd.to_string());
+                            }
+                        }
+                    }
+                    for controller in [
+                        event.operation.get("controller"),
+                        event.operation.pointer("/doc/didDocument/controller"),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|value| value.as_str())
+                    {
+                        if needed.insert(controller.to_string()) {
+                            pending.push(controller.to_string());
                         }
                     }
                 }
-                for controller in [
-                    event.operation.get("controller"),
-                    event.operation.pointer("/doc/didDocument/controller"),
-                ]
-                .into_iter()
-                .flatten()
-                .filter_map(|value| value.as_str())
-                {
-                    if needed.insert(controller.to_string()) {
-                        pending.push(controller.to_string());
+                if target {
+                    // Affected projections start empty, so replay does not inherit an
+                    // arrival-dependent accepted branch from the previous materialization.
+                    original.insert(key.clone(), history_digest(events)?);
+                    if let Some(progress) = &mut snapshot {
+                        progress.update(original.len());
                     }
+                } else {
+                    data.dids.insert(
+                        key.rsplit(':').next().unwrap_or(&key).to_string(),
+                        events.to_vec(),
+                    );
                 }
             }
-            if target_set.contains(&key) {
-                // Affected projections start empty, so replay does not inherit an
-                // arrival-dependent accepted branch from the previous materialization.
-                original.insert(key.clone(), history_digest(events)?);
-                if let Some(progress) = &mut snapshot {
-                    progress.update(original.len());
+        }
+        if !unresolved.is_empty() {
+            // A predecessor can be evidence held under another DID. That is rare
+            // enough to look for only when something is missing.
+            for batch in targets.chunks(CANDIDATE_BATCH) {
+                for event in store.get_candidates_for(batch)?.into_values().flatten() {
+                    if let Some(opid) = &event.opid {
+                        if unresolved.remove(opid) {
+                            data.ops.insert(opid.clone(), event.operation);
+                        }
+                    }
                 }
-            } else {
-                data.dids.insert(
-                    key.rsplit(':').next().unwrap_or(&key).to_string(),
-                    events.to_vec(),
-                );
+                if unresolved.is_empty() {
+                    break;
+                }
             }
         }
     }
@@ -429,22 +491,20 @@ async fn rebuild_histories(
     // Invalid controller assignments are still rejected by normal authorization.
     targets.sort_by_key(|target| !agents.contains(target));
     let mut replay_progress = startup.then(|| ProgressLogger::new("history replay", targets.len()));
+    // Replay imports through the low-level importer, which leaves the journal
+    // alone, so the targets' candidates can be read as they are reached.
+    let mut journal = HashMap::new();
     for (index, target) in targets.iter().enumerate() {
         #[cfg(test)]
         let _ = tests::REPLAYED_HISTORIES.try_with(|replayed| {
             replayed.borrow_mut().push(target.clone());
         });
-        // Replay imports through the low-level importer, which leaves the journal
-        // alone, so each target's candidates can be copied as it is reached.
-        let mut events = state
-            .candidate_history
-            .lock()
-            .await
-            .as_ref()
-            .expect("candidate cache initialized")
-            .get(target)
-            .cloned()
-            .unwrap_or_default();
+        if index % CANDIDATE_BATCH == 0 {
+            let batch = &targets[index..targets.len().min(index + CANDIDATE_BATCH)];
+            let _journal = state.candidates_ready.lock().await;
+            journal = state.store.lock().await.get_candidates_for(batch)?;
+        }
+        let mut events = journal.remove(target).unwrap_or_default();
         events.sort_by(|a, b| {
             let a_hint = crate::is_locally_stamped_registry(&a.registry);
             let b_hint = crate::is_locally_stamped_registry(&b.registry);
@@ -1780,7 +1840,7 @@ mod tests {
             crate::events::import_event_impl(&state, identity_event(&vector["successor"], 400))
                 .await;
             *state.history_ready.lock().await = false;
-            *state.candidate_history.lock().await = None;
+            *state.candidates_ready.lock().await = false;
             ensure_history_ready(&state).await.unwrap();
             let doc = resolve_local_doc_async(
                 &state,
@@ -1837,7 +1897,7 @@ mod tests {
                     }
                 }
                 *state.history_ready.lock().await = false;
-                *state.candidate_history.lock().await = None;
+                *state.candidates_ready.lock().await = false;
                 ensure_history_ready(&state).await.unwrap();
                 let doc = resolve_local_doc_async(
                     &state,
@@ -1928,7 +1988,7 @@ mod tests {
             store.set_candidates(did, journal).unwrap();
             drop(store);
             *state.history_ready.lock().await = false;
-            *state.candidate_history.lock().await = None;
+            *state.candidates_ready.lock().await = false;
             state.dependents.lock().await.clear();
             let response = tokio::time::timeout(
                 std::time::Duration::from_secs(2),
@@ -2120,7 +2180,7 @@ mod tests {
                     store.set_candidates(&did, events).unwrap();
                     drop(store);
                     *state.history_ready.lock().await = false;
-                    *state.candidate_history.lock().await = None;
+                    *state.candidates_ready.lock().await = false;
                     state.dependents.lock().await.clear();
                     ensure_history_ready(&state).await.unwrap();
                 }
@@ -2236,7 +2296,7 @@ mod tests {
                 .await;
             }
             if restart {
-                *state.candidate_history.lock().await = None;
+                *state.candidates_ready.lock().await = false;
                 state.dependents.lock().await.clear();
                 *state.history_ready.lock().await = false;
             }
@@ -2327,7 +2387,7 @@ mod tests {
             );
             assert!(state.store.lock().await.get_candidates().unwrap()[controller].is_empty());
             *state.history_ready.lock().await = false;
-            *state.candidate_history.lock().await = None;
+            *state.candidates_ready.lock().await = false;
             state.dependents.lock().await.clear();
             ensure_history_ready(&state).await.unwrap();
             assert!(state.store.lock().await.get_events(asset).is_empty());
@@ -2402,7 +2462,7 @@ mod tests {
                             .await;
                         }
                         state.store = Arc::new(Mutex::new(JsonDb::load(&state.config).unwrap()));
-                        state.candidate_history = Arc::new(Mutex::new(None));
+                        state.candidates_ready = Arc::new(Mutex::new(false));
                         state.dependents = Arc::new(Mutex::new(HashMap::new()));
                         state.history_ready = Arc::new(Mutex::new(false));
                         ensure_history_ready(&state).await.unwrap();
@@ -2567,7 +2627,7 @@ mod tests {
         }
         for _ in 0..2 {
             *state.history_ready.lock().await = false;
-            *state.candidate_history.lock().await = None;
+            *state.candidates_ready.lock().await = false;
             state.dependents.lock().await.clear();
             state.search_index.lock().await.clear();
             ensure_history_ready(&state).await.unwrap();
@@ -2627,7 +2687,7 @@ mod tests {
         }
         // Complete one recovery so all persisted events have canonical metadata.
         *state.history_ready.lock().await = false;
-        *state.candidate_history.lock().await = None;
+        *state.candidates_ready.lock().await = false;
         ensure_history_ready(&state).await.unwrap();
         let before = {
             let mut store = state.store.lock().await;
@@ -2637,7 +2697,7 @@ mod tests {
             before
         };
         *state.history_ready.lock().await = false;
-        *state.candidate_history.lock().await = None;
+        *state.candidates_ready.lock().await = false;
         state.dependents.lock().await.clear();
         ensure_history_ready(&state).await.unwrap();
         assert_eq!(serde_json::to_value(&state.store.lock().await.data).unwrap(), before);
@@ -2719,7 +2779,7 @@ mod tests {
                 }))).await;
             }
             *state.history_ready.lock().await = false;
-            *state.candidate_history.lock().await = None;
+            *state.candidates_ready.lock().await = false;
             ensure_history_ready(&state).await.unwrap();
             let doc = crate::resolve_local_doc_async(&state, did, crate::ResolveOptions {
                 verify: true, ..Default::default()

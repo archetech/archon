@@ -515,7 +515,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     private async resetDbOnce(): Promise<boolean> {
         await this.db.resetDb();
-        this.candidateHistory = undefined;
+        this.candidatesReady = false;
         this.dependents.clear();
         this.historyReady = undefined;
         this.verifiedDIDs = {};
@@ -1591,7 +1591,6 @@ export default class Gatekeeper implements GatekeeperInterface {
         try {
             for (const did of dids) {
                 await this.db.setCandidates(did, []);
-                this.candidateHistory![did] = [];
                 await this.db.deleteEvents(did);
                 delete this.verifiedDIDs[did];
                 this.searchIndex.delete(did);
@@ -1614,7 +1613,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             console.log('Gatekeeper history recovery: loading candidate journal and DID list');
             // A journal write precedes projection writes. Rebuild on startup so
             // an interrupted publication cannot leave dependent state stale.
-            const dids = new Set(Object.keys(await this.db.getCandidates()));
+            const dids = new Set(await this.db.getCandidateDIDs());
             for (const key of await this.db.getAllKeys()) dids.add(`${this.didPrefix}:${key}`);
             const targets = [...dids].sort();
             // Retain every projection before replaying any history. Rebuild
@@ -1630,11 +1629,8 @@ export default class Gatekeeper implements GatekeeperInterface {
                 loading.update(histories.size);
             }
             const preparing = new ProgressLogger('candidate preparation', targets.length);
-            for (const [index, did] of targets.entries()) {
-                await this.retainCandidates(did, [], histories);
-                preparing.update(index + 1);
-            }
-            const result = await this.rebuildHistories(targets, this.candidateHistory ?? {}, histories);
+            if (!this.candidatesReady) await this.prepareCandidates(histories, preparing);
+            const result = await this.rebuildHistories(targets, histories);
             return result.status;
         }).catch(error => { this.historyReady = undefined; throw error; });
         return this.historyReady;
@@ -1652,11 +1648,16 @@ export default class Gatekeeper implements GatekeeperInterface {
             && (event.did === undefined || event.did === did) ? did : undefined;
     }
 
-    private async normalizeEvent(event: GatekeeperEvent): Promise<void> {
+    // `known` is what the journal already holds for the event's DID, where the
+    // caller has read it. Otherwise it is read here, and only for an event whose
+    // claimed ID is not its content's.
+    private async normalizeEvent(event: GatekeeperEvent, known?: GatekeeperEvent[]): Promise<void> {
         normalizeEventTime(event);
         const cid = await this.generateCID(event.operation);
-        if (event.opid !== cid && !this.candidateHistory?.[event.did ?? '']?.some(known => known.opid === cid)) {
-            await this.generateCID(event.operation, true);
+        if (event.opid !== cid) {
+            if (!known && this.candidatesReady && event.did) known = (await this.db.getCandidatesFor([event.did]))[event.did];
+            // Content the journal already holds was saved when it arrived.
+            if (!known?.some(candidate => candidate.opid === cid)) await this.generateCID(event.operation, true);
         }
         // Keep the existing content-backed predecessor alias mechanism usable
         // on a fresh node too. Derive the former TS CID from the complete proof
@@ -1678,7 +1679,9 @@ export default class Gatekeeper implements GatekeeperInterface {
         return operation ? this.generateCID(operation) : reference;
     }
 
-    private candidateHistory?: Record<string, GatekeeperEvent[]>;
+    // Whether the candidate journal has been migrated and normalized. The
+    // journal itself stays in the store and is read as it is needed.
+    private candidatesReady = false;
     private dependents = new Map<string, Set<string>>();
 
     private indexCandidates(did: string, events: GatekeeperEvent[]): void {
@@ -1692,45 +1695,54 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
     }
 
-    private async retainCandidates(did: string, incoming: GatekeeperEvent[] = [], histories?: Map<string, GatekeeperEvent[]>): Promise<{ candidates: Record<string, GatekeeperEvent[]>; changed: boolean }> {
-        if (!this.candidateHistory) {
-            const candidates = await this.db.getCandidates();
-            // Upgrade existing databases once, not on every import. Subsequent
-            // direct submissions and imports journal only the changed DID.
-            for (const key of await this.db.getAllKeys()) {
-                const currentDid = `${this.didPrefix}:${key}`;
-                if (!candidates[currentDid]) {
-                    candidates[currentDid] = copyJSON(histories?.get(currentDid) ?? await this.db.getEvents(currentDid));
-                    for (const event of candidates[currentDid]) await this.normalizeEvent(event);
-                    await this.db.setCandidates(currentDid, candidates[currentDid]);
-                }
-            }
-            for (const [key, events] of Object.entries(candidates)) {
-                const previous = JSON.stringify(events);
+    // Migrates and normalizes the whole journal, once: every DID gets an entry,
+    // every entry is in canonical form, and the dependents of every controller
+    // are indexed. Entries are read and written a batch at a time and not kept.
+    private async prepareCandidates(histories?: Map<string, GatekeeperEvent[]>, progress?: ProgressLogger): Promise<void> {
+        const dids = new Set(await this.db.getCandidateDIDs());
+        for (const key of await this.db.getAllKeys()) dids.add(`${this.didPrefix}:${key}`);
+        const all = [...dids].sort();
+        for (let offset = 0; offset < all.length; offset += Gatekeeper.CANDIDATE_BATCH) {
+            const batch = all.slice(offset, offset + Gatekeeper.CANDIDATE_BATCH);
+            const journal = await this.db.getCandidatesFor(batch);
+            for (const did of batch) {
+                // A DID without an entry predates the journal: its accepted
+                // events are its first evidence.
+                const previous = journal[did] ? JSON.stringify(journal[did]) : undefined;
+                const events = journal[did] ?? copyJSON(histories?.get(did) ?? await this.db.getEvents(did));
                 for (const event of events) await this.normalizeEvent(event);
                 const retained = preferredCandidates(events);
-                if (JSON.stringify(retained) !== previous) await this.db.setCandidates(key, retained);
-                candidates[key] = retained;
-                this.indexCandidates(key, retained);
+                if (JSON.stringify(retained) !== previous) await this.db.setCandidates(did, retained);
+                this.indexCandidates(did, retained);
             }
-            this.candidateHistory = candidates;
+            progress?.update(Math.min(offset + Gatekeeper.CANDIDATE_BATCH, all.length));
         }
-        const candidates = this.candidateHistory;
-        if (incoming.length && incoming.every(event => candidates[did]?.some(known =>
+        this.candidatesReady = true;
+    }
+
+    // How many journal entries are read from the store at a time.
+    private static readonly CANDIDATE_BATCH = 512;
+
+    private async retainCandidates(did: string, incoming: GatekeeperEvent[] = []): Promise<{ candidates: GatekeeperEvent[]; changed: boolean }> {
+        // Upgrade existing databases once, not on every import. Subsequent
+        // direct submissions and imports journal only the changed DID.
+        if (!this.candidatesReady) await this.prepareCandidates();
+        const stored = (await this.db.getCandidatesFor([did]))[did];
+        if (incoming.length && incoming.every(event => stored?.some(known =>
             candidateKey(known) === candidateKey(event)
             && (isLocallyStampedRegistry(event.registry) || this.cipher.canonicalizeJSON(known) === this.cipher.canonicalizeJSON(event))))) {
-            return { candidates, changed: false };
+            return { candidates: stored ?? [], changed: false };
         }
         // Once journaled, projections cannot add evidence back (notably after a rewind).
         // Pre-journal histories were migrated above; new evidence arrives explicitly.
-        const events = [...(candidates[did] ?? []), ...incoming];
-        for (const event of events) await this.normalizeEvent(event);
+        const before = this.cipher.canonicalizeJSON(stored ?? []);
+        const events = [...(stored ?? []), ...incoming];
+        for (const event of events) await this.normalizeEvent(event, stored);
         const retained = preferredCandidates(events);
-        const changed = this.cipher.canonicalizeJSON(candidates[did] ?? []) !== this.cipher.canonicalizeJSON(retained);
+        const changed = before !== this.cipher.canonicalizeJSON(retained);
         if (changed) await this.db.setCandidates(did, retained);
-        candidates[did] = retained;
         this.indexCandidates(did, retained);
-        return { candidates, changed };
+        return { candidates: retained, changed };
     }
 
     private async reconcileHistory(did: string, rebuildSelf = false, projectionUnchanged = false): Promise<void> {
@@ -1743,12 +1755,12 @@ export default class Gatekeeper implements GatekeeperInterface {
     }
 
     private async reconcileHistoryOnce(did: string, rebuildSelf: boolean, projectionUnchanged: boolean): Promise<void> {
-        const { candidates } = await this.retainCandidates(did);
+        await this.retainCandidates(did);
         // A new hint for an already accepted operation may add evidence without
         // changing the controller projection. Rebuild it first; dependents only
         // need replay if the history they authorize against actually changes.
         if (rebuildSelf && projectionUnchanged) {
-            if (!(await this.rebuildHistories([did], candidates)).changed) return;
+            if (!(await this.rebuildHistories([did])).changed) return;
             rebuildSelf = false;
         }
         const affected = new Set([did]);
@@ -1760,10 +1772,10 @@ export default class Gatekeeper implements GatekeeperInterface {
         }
 
         if (!rebuildSelf) affected.delete(did);
-        await this.rebuildHistories([...affected], candidates);
+        await this.rebuildHistories([...affected]);
     }
 
-    private async rebuildHistories(targets: string[], candidates: Record<string, GatekeeperEvent[]>, histories?: Map<string, GatekeeperEvent[]>): Promise<{ changed: boolean; status?: CheckDIDsResult }> {
+    private async rebuildHistories(targets: string[], histories?: Map<string, GatekeeperEvent[]>): Promise<{ changed: boolean; status?: CheckDIDsResult }> {
         if (!targets.length && !histories) return { changed: false };
         // Snapshot-backed replay is startup recovery; runtime imports stay quiet.
         const snapshot = histories ? new ProgressLogger('replay snapshot', targets.length) : undefined;
@@ -1800,14 +1812,41 @@ export default class Gatekeeper implements GatekeeperInterface {
         replay.replayOperationIds = new WeakMap();
         // Only self-controlled agents can authorize another DID. Complete
         // those independent histories first, then replay their assets once.
-        const isAgent = (did: string) => (candidates[did] ?? []).some(({ operation }) =>
-            operation.type === 'create' && operation.registration?.type === 'agent');
+        // The journal stays in the store and is read a batch at a time: at
+        // startup the targets are every DID. One pass finds what the order of
+        // replay depends on, and replay then reads each batch as it reaches it.
+        const agents = new Set<string>();
+        const sequential = new Set<string>();
+        const batches = (list: string[]) => Array.from({ length: Math.ceil(list.length / Gatekeeper.CANDIDATE_BATCH) },
+            (_, index) => list.slice(index * Gatekeeper.CANDIDATE_BATCH, (index + 1) * Gatekeeper.CANDIDATE_BATCH));
+        for (const batch of batches(targets)) {
+            const journal = await db.getCandidatesFor(batch);
+            for (const target of batch) {
+                const events = journal[target] ?? [];
+                const agent = events.some(({ operation }) =>
+                    operation.type === 'create' && operation.registration?.type === 'agent');
+                if (agent) agents.add(target);
+                // Self-controlled agents are independent. Assets only depend on
+                // agents. Rejected mixed-type or misaddressed evidence is still
+                // durable, and keeps the original sequential order.
+                const independent = events.every(event => {
+                    const operation = event.operation;
+                    if (event.did && event.did !== target) return false;
+                    if (operation.did && operation.did !== target) return false;
+                    if (operation.type !== 'create') return true;
+                    if (agent && operation.registration?.type !== 'agent') return false;
+                    return target === `${operation.registration?.prefix || this.didPrefix}:${event.opid}`;
+                });
+                if (!independent) sequential.add(target);
+            }
+        }
+        const isAgent = (did: string) => agents.has(did);
         targets.sort();
         targets.sort((a, b) => Number(isAgent(b)) - Number(isAgent(a)));
         const replayProgress = histories ? new ProgressLogger('history replay', targets.length) : undefined;
         let completed = 0;
-        const rebuild = async (target: string) => {
-            const events = copyJSON(candidates[target] ?? []).sort((a, b) => {
+        const rebuild = async ([target, candidates]: [string, GatekeeperEvent[]]) => {
+            const events = copyJSON(candidates).sort((a, b) => {
                 // Registry-local order first; do not compare ordinal values
                 // across registries. Stable tie-breaking makes replay independent
                 // of arrival order even when candidates compete for a predecessor.
@@ -1836,32 +1875,25 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
             replayProgress?.update(++completed);
         };
-        // Self-controlled agents are independent. Assets only depend on agents,
-        // so finish the entire agent phase before overlapping asset work. Native
+        // Finish the entire agent phase before overlapping asset work. Native
         // proof verification runs in Node's worker pool; bound outstanding work.
-        const independent = (target: string) => (candidates[target] ?? []).every(event => {
-            const operation = event.operation;
-            if (event.did && event.did !== target) return false;
-            if (operation.did && operation.did !== target) return false;
-            if (operation.type !== 'create') return true;
-            if (isAgent(target) && operation.registration?.type !== 'agent') return false;
-            return target === `${operation.registration?.prefix || this.didPrefix}:${event.opid}`;
-        });
         for (const phase of [targets.filter(isAgent), targets.filter(target => !isAgent(target))]) {
-            let pending: string[] = [];
+            let pending: [string, GatekeeperEvent[]][] = [];
             const flush = async () => {
                 await Promise.all(pending.map(rebuild));
                 pending = [];
             };
-            for (const target of phase) {
-                // Rejected mixed-type or misaddressed evidence is still durable.
-                // Keep the original sequential order at ambiguous boundaries.
-                if (!independent(target)) {
-                    await flush();
-                    await rebuild(target);
-                } else {
-                    pending.push(target);
-                    if (pending.length === 32) await flush();
+            for (const batch of batches(phase)) {
+                const journal = await db.getCandidatesFor(batch);
+                for (const target of batch) {
+                    const entry: [string, GatekeeperEvent[]] = [target, journal[target] ?? []];
+                    if (sequential.has(target)) {
+                        await flush();
+                        await rebuild(entry);
+                    } else {
+                        pending.push(entry);
+                        if (pending.length === 32) await flush();
+                    }
                 }
             }
             await flush();
@@ -1912,7 +1944,7 @@ export default class Gatekeeper implements GatekeeperInterface {
         await this.normalizeEvent(event);
         return this.withHistoryLock(async () => {
             const { candidates, changed } = await this.retainCandidates(event.did!, [event]);
-            event = candidates[event.did!].find(known => candidateKey(known) === candidateKey(event)) ?? event;
+            event = candidates.find(known => candidateKey(known) === candidateKey(event)) ?? event;
             const status = await this.importEventOnce(event);
             // Recovery and evidence changes already replay affected histories.
             // Repeated merged or deferred evidence needs no further
@@ -2431,19 +2463,23 @@ export default class Gatekeeper implements GatekeeperInterface {
                 const withdrawn = (event: GatekeeperEvent) => event.registry === registry
                     && (event.registration?.height ?? -1) >= fromHeight;
                 this.eventsQueue = this.eventsQueue.flatMap(event => withdrawn(event) ? relayHints([event]) : [event]);
-                const candidates = this.candidateHistory!;
                 const affected = new Set<string>();
-                for (const [did, events] of Object.entries(candidates)) {
-                    if (!events.some(withdrawn)) continue;
-                    const retained = preferredCandidates(events.map(event => {
-                        const retained = withdrawn(event) ? relayHints([event])[0] : event;
-                        normalizeEventTime(retained);
-                        return retained;
-                    }));
-                    // The journal is authoritative if publication is interrupted.
-                    await this.db.setCandidates(did, retained);
-                    candidates[did] = retained;
-                    affected.add(did);
+                // A reorganization can withdraw receipts from any DID, so the
+                // whole journal is read, a batch at a time.
+                const journaled = await this.db.getCandidateDIDs();
+                for (let offset = 0; offset < journaled.length; offset += Gatekeeper.CANDIDATE_BATCH) {
+                    const journal = await this.db.getCandidatesFor(journaled.slice(offset, offset + Gatekeeper.CANDIDATE_BATCH));
+                    for (const [did, events] of Object.entries(journal)) {
+                        if (!events.some(withdrawn)) continue;
+                        const retained = preferredCandidates(events.map(event => {
+                            const retained = withdrawn(event) ? relayHints([event])[0] : event;
+                            normalizeEventTime(retained);
+                            return retained;
+                        }));
+                        // The journal is authoritative if publication is interrupted.
+                        await this.db.setCandidates(did, retained);
+                        affected.add(did);
+                    }
                 }
                 await this.db.removeBlocks(registry, fromHeight);
                 // Previously seen anchors in the rescanned range must be eligible again.
@@ -2452,7 +2488,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 for (const did of pending) for (const dependent of this.dependents.get(did) ?? []) {
                     if (!affected.has(dependent)) { affected.add(dependent); pending.push(dependent); }
                 }
-                await this.rebuildHistories([...affected], candidates);
+                await this.rebuildHistories([...affected]);
                 return true;
             });
         } catch (error) {
