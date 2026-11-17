@@ -65,6 +65,13 @@ MUST share the same protocol string.
 Each mediator joins the topic as both **client** and **server** (`{client:
 true, server: true}`) so peers can dial either direction.
 
+A mediator does not connect to every peer on the topic. It opens connections until it
+holds `ARCHON_HYPR_MAX_PEERS` (default `8`), choosing from the peers a lookup returns,
+which the DHT draws at random. It goes on accepting connections after that, so it can
+hold more than the limit. Every operation is sent to every peer, so the limit sets how
+many messages the network carries for one operation; a node reaches the rest of the
+network through its peers' peers.
+
 ### 2.2 Peer identification
 
 Three layers of identity are in play:
@@ -363,6 +370,7 @@ Gatekeeper / Keymaster cleanup — those are HTTP clients.
 | `ARCHON_IPFS_URL` | `http://localhost:5001/api/v0` | Kubo HTTP API. |
 | `ARCHON_ADMIN_API_KEY` | empty | Used for both Gatekeeper and Keymaster admin calls. |
 | `ARCHON_HYPR_EXPORT_INTERVAL` | `2` | Export loop interval, seconds. |
+| `ARCHON_HYPR_MAX_PEERS` | `8` | The mediator opens no more connections once it holds this many peers. It still accepts them. |
 | `ARCHON_HYPR_METRICS_PORT` | `4232` | Metrics HTTP port. |
 | `ARCHON_DEBUG` | `false` | Reserved; currently ignored. |
 | `GIT_COMMIT` | `unknown` | Build commit (truncated to 7 chars). |

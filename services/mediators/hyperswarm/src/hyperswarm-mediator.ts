@@ -687,7 +687,7 @@ const hash = sha256(utf8ToBytes(config.protocol));
 const networkID = Buffer.from(hash).toString('hex');
 const topic = Buffer.from(b4a.from(networkID, 'hex'));
 const topicSwarm = new TopicSwarm<HyperswarmConnection>({
-    create: keyPair => new Hyperswarm({ keyPair }),
+    create: keyPair => new Hyperswarm({ keyPair, maxPeers: config.maxPeers }),
     topic,
     onConnection: conn => addConnection(conn),
 });
