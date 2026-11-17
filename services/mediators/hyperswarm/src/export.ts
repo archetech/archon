@@ -9,8 +9,9 @@ export const MAX_PART_BYTES = 1024 * 1024;
 
 export interface ExportDeps<Op> {
     getQueue(): Promise<Op[]>;
-    // Removes these operations from the Gatekeeper's queue.
-    clearQueue(operations: Op[]): Promise<unknown>;
+    // Removes these operations from the Gatekeeper's queue. A Gatekeeper answers
+    // false, without failing the request, when its store could not do it.
+    clearQueue(operations: Op[]): Promise<boolean | void>;
     // Sends one `queue` message carrying these operations to every peer.
     relay(operations: Op[]): Promise<void>;
     // Imports the operations into this node's own Gatekeeper.
@@ -47,8 +48,9 @@ export function exportParts<Op>(queue: Op[], maxOperations = MAX_PART_OPERATIONS
  * longer queue, and the mediator held and logged all of it on every pass until it
  * ran out of memory, having sent none of it (#1644).
  *
- * A part that cannot be cleared stops the pass: that part and those after it
- * stay queued for the next one. Every part cleared before it has been sent, and
+ * A part that cannot be cleared, whether the request fails or the Gatekeeper
+ * answers false, stops the pass: that part and those after it stay queued for
+ * the next one. Every part cleared before it has been sent, and
  * is merged before the failure is reported.
  */
 export async function flushQueue<Op>(deps: ExportDeps<Op>): Promise<number> {
@@ -56,7 +58,7 @@ export async function flushQueue<Op>(deps: ExportDeps<Op>): Promise<number> {
     const sent: Op[] = [];
     try {
         for (const part of exportParts(queue)) {
-            await deps.clearQueue(part);
+            if (await deps.clearQueue(part) === false) throw new Error('the Gatekeeper could not clear its queue');
             await deps.relay(part);
             sent.push(...part);
         }

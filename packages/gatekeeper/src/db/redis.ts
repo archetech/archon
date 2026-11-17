@@ -241,26 +241,37 @@ export default class DbRedis implements GatekeeperDb {
         const script = `
                       local key = KEYS[1]
                       local n   = tonumber(ARGV[1])
-                      local idx = 2
                       local want = {}
                       for i=1,n do
-                        want[ARGV[idx]] = true
-                        idx = idx + 1
+                        want[ARGV[i + 1]] = true
+                      end
+                      local function wanted(raw)
+                        local ok, obj = pcall(cjson.decode, raw)
+                        return ok and obj and obj.proof and obj.proof.proofValue and want[obj.proof.proofValue]
+                      end
+                      -- A mediator clears what it took from the head of the queue,
+                      -- so the wanted entries are normally the first n. Trim them
+                      -- without reading the rest.
+                      local head = redis.call('LRANGE', key, 0, n - 1)
+                      local leading = 0
+                      for i=1,#head do
+                        if wanted(head[i]) then leading = leading + 1 else break end
+                      end
+                      if leading == n then
+                        redis.call('LTRIM', key, n, -1)
+                        return n
                       end
                       local list = redis.call('LRANGE', key, 0, -1)
                       if #list == 0 then return 0 end
                       local keep = {}
                       for i=1,#list do
-                        local ok, obj = pcall(cjson.decode, list[i])
-                        if ok and obj and obj.proof and obj.proof.proofValue and want[obj.proof.proofValue] then
-                          -- drop
-                        else
-                          table.insert(keep, list[i])
-                        end
+                        if not wanted(list[i]) then keep[#keep + 1] = list[i] end
                       end
+                      -- One call cannot carry more than a few thousand arguments,
+                      -- and a script that fails after DEL has lost the queue.
                       redis.call('DEL', key)
-                      if #keep > 0 then
-                        redis.call('RPUSH', key, unpack(keep))
+                      for i=1,#keep,5000 do
+                        redis.call('RPUSH', key, unpack(keep, i, math.min(i + 4999, #keep)))
                       end
                       return #list - #keep
                     `;

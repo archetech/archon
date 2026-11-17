@@ -22,7 +22,7 @@ function setup(queue: Op[], overrides: Partial<ExportDeps<Op>> = {}) {
     const log: string[] = [];
     const deps: ExportDeps<Op> = {
         getQueue: jest.fn(async () => queue),
-        clearQueue: jest.fn(async (operations: Op[]) => { log.push(`clear ${ids(operations)}`); }),
+        clearQueue: jest.fn(async (operations: Op[]) => { log.push(`clear ${ids(operations)}`); return true; }),
         relay: jest.fn(async (operations: Op[]) => { log.push(`relay ${ids(operations)}`); }),
         merge: jest.fn(async (operations: Op[]) => { log.push(`merge ${ids(operations)}`); }),
         ...overrides,
@@ -114,6 +114,19 @@ describe('flushQueue', () => {
         expect(ids((deps.relay as jest.Mock).mock.calls[0][0] as Op[])).toEqual(ids(queue.slice(0, 1000)));
         expect(deps.merge).toHaveBeenCalledWith(queue.slice(0, 1000));
         expect(log.filter(line => line.startsWith('merge'))).toHaveLength(1);
+    });
+
+    // A Gatekeeper reports a store that could not clear with false, not an error.
+    it('treats a false answer as a part it could not clear', async () => {
+        const queue = Array.from({ length: 2500 }, (_, id) => op(id));
+        let calls = 0;
+        const { deps } = setup(queue, { clearQueue: jest.fn(async () => ++calls !== 2) });
+
+        await expect(flushQueue(deps)).rejects.toThrow('could not clear');
+
+        expect(deps.clearQueue).toHaveBeenCalledTimes(2);
+        expect(deps.relay).toHaveBeenCalledTimes(1);
+        expect(deps.merge).toHaveBeenCalledWith(queue.slice(0, 1000));
     });
 
     it('merges nothing when the first part cannot be cleared', async () => {
