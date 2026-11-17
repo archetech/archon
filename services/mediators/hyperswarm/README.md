@@ -18,6 +18,7 @@ When a node receives a `queue` message it will import the operations like during
 | `ARCHON_NODE_NAME`            | anon                   | Human-readable name for the node |
 | `ARCHON_PROTOCOL`        | set in code | Archon network topic to join |
 | `ARCHON_HYPR_EXPORT_INTERVAL` |  2                     | Seconds between export cycles |
+| `ARCHON_HYPR_MAX_PEERS`       |  8                     | Peers held before the mediator stops opening connections |
 
 ## Two nodes behind one public address
 

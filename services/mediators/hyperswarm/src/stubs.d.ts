@@ -23,6 +23,9 @@ declare module 'hyperswarm' {
 
     export interface HyperswarmOptions {
         keyPair?: HyperswarmKeyPair;
+        // The swarm opens no connection once it holds this many. It still
+        // accepts them.
+        maxPeers?: number;
     }
 
     export default class Hyperswarm {

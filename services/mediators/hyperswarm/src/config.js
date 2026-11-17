@@ -2,6 +2,15 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+function positiveInt(name, value, fallback) {
+    if (!value) return fallback;
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+        throw new Error(`${name} must be a positive integer, not "${value}"`);
+    }
+    return parsed;
+}
+
 const config = {
     debug: process.env.ARCHON_DEBUG ? process.env.ARCHON_DEBUG === 'true' : false,
     adminApiKey: process.env.ARCHON_ADMIN_API_KEY || '',
@@ -12,6 +21,7 @@ const config = {
     nodeName: process.env.ARCHON_NODE_NAME || 'anon',
     protocol: process.env.ARCHON_PROTOCOL || '/ARCHON/v0.13-beta',
     exportInterval: process.env.ARCHON_HYPR_EXPORT_INTERVAL ? parseInt(process.env.ARCHON_HYPR_EXPORT_INTERVAL) : 2,
+    maxPeers: positiveInt('ARCHON_HYPR_MAX_PEERS', process.env.ARCHON_HYPR_MAX_PEERS, 8),
     metricsPort: process.env.ARCHON_HYPR_METRICS_PORT ? parseInt(process.env.ARCHON_HYPR_METRICS_PORT) : 4232,
 };
 
