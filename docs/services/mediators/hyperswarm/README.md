@@ -198,9 +198,12 @@ The receiver updates `connectionInfo[peerKey].nodeName` and walks
 
 ### 3.6 Batch size limit
 
-Sender: 8 MB per single `conn.write`. If a batch exceeds the limit,
-recursively split in half and send each half. If a single operation
-exceeds the limit, log an error and drop it.
+Sender, for a `batch` message: 8 MB per single `conn.write`. If a batch
+exceeds the limit, recursively split in half and send each half. If a single
+operation exceeds the limit, log an error and drop it.
+
+Sender, for a `queue` message: at most 1,000 operations and 1 MB of
+serialized operations (§4.1).
 
 Receiver: no explicit size cap, but garbage messages fail JSON parse and
 are logged + counted.
@@ -225,18 +228,28 @@ The `mediator_duplicate_batches_total` counter tracks these drops.
 
 Interval: `ARCHON_HYPR_EXPORT_INTERVAL` seconds (default `2`). On each tick:
 
-1. `batch = gatekeeper.getQueue("hyperswarm")` — grab the outbound queue.
-2. If non-empty:
-   a. Build a `queue` message (`{ type: "queue", data: batch, ... }`).
-   b. `gatekeeper.clearQueue("hyperswarm", batch)` — remove those
-      operations from the server queue.
-   c. Relay the message to every connected peer (`relays: []`).
-   d. `mergeBatch(batch)` locally (re-submits to own Gatekeeper; idempotent).
+1. `queue = gatekeeper.getQueue("hyperswarm")` — grab the outbound queue.
+2. Split it, in order, into parts of at most 1,000 operations and 1 MB of
+   serialized operations; an operation larger than that is a part by itself.
+   For each part in turn:
+   a. `gatekeeper.clearQueue("hyperswarm", part)` — remove those operations
+      from the server queue.
+   b. Build a `queue` message (`{ type: "queue", data: part, ... }`) and relay
+      it to every connected peer (`relays: []`).
+   If a part cannot be cleared the tick stops there: that part and the ones
+   after it stay queued for the next tick.
+   c. `mergeBatch` the operations of every part that was sent (re-submits to
+      own Gatekeeper; idempotent).
 3. If the import queue is non-empty, re-schedule 60s later; otherwise
    schedule at `exportInterval`.
 
 Skipping 3 when the import queue is idle prevents the export loop from
 running faster than the importer can drain.
+
+A part is bounded because both of its uses are: `clearQueue` is one request,
+which a Gatekeeper refuses above its upload limit (10 MB by default), and a
+`queue` message is one write. A queue cleared whole could outgrow a request,
+after which no tick could clear it and the queue only grew (#1644).
 
 ### 4.2 `mergeBatch(batch)`
 

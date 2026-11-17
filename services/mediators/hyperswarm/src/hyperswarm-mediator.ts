@@ -17,6 +17,7 @@ import CipherNode from '@didcid/cipher/node';
 import { installProcessGuards } from '@didcid/common/process-guards';
 import config from './config.js';
 import { createEvents } from './events.js';
+import { ExportDeps, flushQueue } from './export.js';
 import { NodeInfo, PeerTracker } from './peers.js';
 import { TopicSwarm } from './swarm.js';
 import { exit } from 'process';
@@ -578,28 +579,26 @@ async function receiveMsg(peerKey: string, json: string): Promise<void> {
     console.log(`unknown message type: ${msg.type}`);
 }
 
-async function flushQueue(): Promise<void> {
-    const batch = await gatekeeper.getQueue(REGISTRY);
-    console.log(`${REGISTRY} queue: ${JSON.stringify(batch, null, 4)}`);
-
-    if (batch.length > 0) {
+const exportDeps: ExportDeps<Operation> = {
+    getQueue: () => gatekeeper.getQueue(REGISTRY),
+    clearQueue: operations => gatekeeper.clearQueue(REGISTRY, operations),
+    relay: operations => {
         const msg: BatchMessage = {
             type: 'queue',
             time: new Date().toISOString(),
             node: nodeInfo.name,
             relays: [],
-            data: batch,
+            data: operations,
         };
-
-        await gatekeeper.clearQueue(REGISTRY, batch);
-        await relayMsg(msg);
-        await mergeBatch(batch);
-    }
-}
+        return relayMsg(msg);
+    },
+    merge: mergeBatch,
+};
 
 async function exportLoop(): Promise<void> {
     try {
-        await flushQueue();
+        const sent = await flushQueue(exportDeps);
+        if (sent) console.log(`${REGISTRY} queue: sent ${sent} operations`);
     } catch (error) {
         mediatorErrors.inc({ operation: 'export' });
         console.error(`Error in exportLoop: ${error}`);
