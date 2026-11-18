@@ -186,10 +186,11 @@ which permits only three top-level members in a resolution result.
 Shared behavior:
 
 - **Query params:** `versionTime` (RFC 3339 date-time), `versionSequence`
-  (positive integer) and `versionId` (operation CID) only. A `versionTime`
-  that is not a date-time, or a `versionSequence` that is not a positive
-  integer, fails with `invalidOptions` (400), as it does on
-  `/api/v1/did/:did`; it is never answered with the latest version.
+  (positive integer, at most 9007199254740991) and `versionId` (operation
+  CID) only. A `versionTime` that is not a date-time, or a `versionSequence`
+  outside that range, fails with `invalidOptions` and HTTP 400; it is never
+  answered with the latest version. `/api/v1/did/:did` reports the same
+  error for the same options, in the document it returns with HTTP 200.
   Unlike `/api/v1/did/:did`, the non-standard `confirm`/`verify` params are
   NOT accepted; this surface always resolves with `confirm: true, verify:
   true` (confirmed, cryptographically verified state). Clients needing raw or
