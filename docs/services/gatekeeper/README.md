@@ -185,8 +185,12 @@ which permits only three top-level members in a resolution result.
 
 Shared behavior:
 
-- **Query params:** `versionTime` (ISO 8601), `versionSequence` (int) and
-  `versionId` (operation CID) only.
+- **Query params:** `versionTime` (RFC 3339 date-time), `versionSequence`
+  (positive integer, at most 9007199254740991) and `versionId` (operation
+  CID) only. A `versionTime` that is not a date-time, or a `versionSequence`
+  outside that range, fails with `invalidOptions` and HTTP 400; it is never
+  answered with the latest version. `/api/v1/did/:did` reports the same
+  error for the same options, in the document it returns with HTTP 200.
   Unlike `/api/v1/did/:did`, the non-standard `confirm`/`verify` params are
   NOT accepted; this surface always resolves with `confirm: true, verify:
   true` (confirmed, cryptographically verified state). Clients needing raw or
@@ -702,6 +706,11 @@ if events.is_empty():
 if !is_valid_did(did):
     return { didResolutionMetadata: { error: "invalidDid" }, didDocument: {}, didDocumentMetadata: {} }
 if options.versionId is present and (options.versionId == "" or options.versionTime or options.versionSequence):
+    return { didResolutionMetadata: { error: "invalidOptions" }, didDocument: {}, didDocumentMetadata: {} }
+// At the public entry only; internal resolution passes validated values.
+if options.versionTime is present and not rfc3339_date_time(options.versionTime):
+    return { didResolutionMetadata: { error: "invalidOptions" }, didDocument: {}, didDocumentMetadata: {} }
+if options.versionSequence is present and not positive_integer(options.versionSequence):
     return { didResolutionMetadata: { error: "invalidOptions" }, didDocument: {}, didDocumentMetadata: {} }
 target := options.versionId and canonical_reference(options.versionId)   // §6.6
 

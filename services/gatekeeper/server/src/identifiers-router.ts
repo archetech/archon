@@ -232,10 +232,9 @@ export function createIdentifiersRouter(
         }
 
         if (typeof versionSequence === 'string') {
-            const parsed = parseInt(versionSequence, 10);
-            if (!isNaN(parsed)) {
-                options.versionSequence = parsed;
-            }
+            // Passed on even when it is not a number, so that resolution refuses it;
+            // parseInt would read "3abc" as 3.
+            options.versionSequence = /^\d+$/.test(versionSequence) ? Number(versionSequence) : NaN;
         }
 
         const doc = await gatekeeper.resolveDID(req.params.did as string, options);
@@ -319,8 +318,8 @@ export function createIdentifiersRouter(
      *                   type: object
      *       400:
      *         description: >
-     *           The DID is syntactically invalid (invalidDid), or the version options conflict
-     *           (invalidOptions). The error is in didResolutionMetadata.
+     *           The DID is syntactically invalid (invalidDid), or a version option is malformed or
+     *           conflicts with another (invalidOptions). The error is in didResolutionMetadata.
      *       404:
      *         description: The DID does not exist or cannot be resolved (error in didResolutionMetadata).
      *       406:
@@ -438,7 +437,7 @@ export function createIdentifiersRouter(
      *               type: object
      *               description: Arbitrary data attached to the DID (empty object for agent DIDs).
      *       400:
-     *         description: The DID is syntactically invalid, or the version options conflict.
+     *         description: The DID is syntactically invalid, or a version option is malformed or conflicts with another.
      *         content:
      *           application/json:
      *             schema:
@@ -528,7 +527,7 @@ export function createIdentifiersRouter(
      *               type: object
      *               description: Method-specific anchoring/provenance data.
      *       400:
-     *         description: The DID is syntactically invalid, or the version options conflict.
+     *         description: The DID is syntactically invalid, or a version option is malformed or conflicts with another.
      *         content:
      *           application/json:
      *             schema:

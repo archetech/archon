@@ -1257,29 +1257,36 @@ pub(crate) async fn resolve_did(
             version_ordinal: None,
         };
 
-    let local_doc = match resolve_local_doc_async(&state, &did, resolve_options.clone()).await {
-        Ok(doc) => doc,
-        Err(error) if is_valid_did(&did) && crate::resolver::is_invalid_options(&error) => {
-            did_resolution_error_doc("invalidOptions")
-        }
-        Err(_) => {
-            // Use the same syntax check as the conformant surface. This previously
-            // tested only for a `did:` prefix, so a DID that is syntactically
-            // invalid for this method — a foreign method such as did:example:, or a
-            // malformed CID — came back as notFound where the TypeScript gatekeeper
-            // (and this service's own /1.0/identifiers surface) return invalidDid.
-            // #676/#685/#687 brought the conformant surface to parity; this legacy
-            // surface was never brought along.
-            //
-            // Deliberately NOT classify_conformant_error: that maps a non-DID-level
-            // failure to internalError, which this surface has never returned.
-            // notFound stays the default, matching TypeScript.
-            let error_kind = if !is_valid_did(&did) {
-                "invalidDid"
-            } else {
-                "notFound"
-            };
-            did_resolution_error_doc(error_kind)
+    // An option that cannot be used is an error, not a request for the latest
+    // version, and is refused before any history is read. A DID that is itself
+    // invalid is reported first.
+    let local_doc = if is_valid_did(&did) && !version_options_valid(&query) {
+        did_resolution_error_doc("invalidOptions")
+    } else {
+        match resolve_local_doc_async(&state, &did, resolve_options.clone()).await {
+            Ok(doc) => doc,
+            Err(error) if is_valid_did(&did) && crate::resolver::is_invalid_options(&error) => {
+                did_resolution_error_doc("invalidOptions")
+            }
+            Err(_) => {
+                // Use the same syntax check as the conformant surface. This previously
+                // tested only for a `did:` prefix, so a DID that is syntactically
+                // invalid for this method — a foreign method such as did:example:, or a
+                // malformed CID — came back as notFound where the TypeScript gatekeeper
+                // (and this service's own /1.0/identifiers surface) return invalidDid.
+                // #676/#685/#687 brought the conformant surface to parity; this legacy
+                // surface was never brought along.
+                //
+                // Deliberately NOT classify_conformant_error: that maps a non-DID-level
+                // failure to internalError, which this surface has never returned.
+                // notFound stays the default, matching TypeScript.
+                let error_kind = if !is_valid_did(&did) {
+                    "invalidDid"
+                } else {
+                    "notFound"
+                };
+                did_resolution_error_doc(error_kind)
+            }
         }
     };
 
@@ -1427,6 +1434,24 @@ pub(crate) async fn resolve_did(
 // Core parameters, so they are not accepted here; the surface always resolves confirmed,
 // cryptographically verified state (only the standard version selectors are honored).
 // Returns the resolved document, or an (HTTP status, DID Resolution error value) pair.
+// A versionTime is a date-time in the form every other timestamp here takes,
+// and a versionSequence is a positive integer no larger than JSON carries
+// exactly. Anything else in either is an invalid option.
+fn version_options_valid(query: &HashMap<String, String>) -> bool {
+    const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+    let time_valid = query
+        .get("versionTime")
+        .map_or(true, |value| crate::proofs::verify_date_format(Some(value)));
+    let sequence_valid = query.get("versionSequence").map_or(true, |value| {
+        !value.is_empty()
+            && value.bytes().all(|byte| byte.is_ascii_digit())
+            && value
+                .parse::<u64>()
+                .is_ok_and(|sequence| (1..=MAX_SAFE_INTEGER).contains(&sequence))
+    });
+    time_valid && sequence_valid
+}
+
 async fn resolve_conformant(
     state: &AppState,
     did: &str,
@@ -1446,6 +1471,10 @@ async fn resolve_conformant(
         verify: true,
         version_ordinal: None,
     };
+
+    if is_valid_did(did) && !version_options_valid(query) {
+        return Err((StatusCode::BAD_REQUEST, "invalidOptions".to_string()));
+    }
 
     let status_for = |error_kind: &str| -> StatusCode {
         match error_kind {

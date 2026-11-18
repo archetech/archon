@@ -1183,7 +1183,28 @@ export default class Gatekeeper implements GatekeeperInterface {
         options?: ResolveDIDOptions
     ): Promise<DidCidDocument> {
         await this.ensureHistoryReady();
+        // An option that cannot be used is an error, not a request for the
+        // latest version. A DID that is itself invalid is reported first.
+        if (did && isValidDID(did) && !this.validVersionOptions(options)) {
+            return {
+                didResolutionMetadata: {
+                    error: "invalidOptions"
+                },
+                didDocument: {},
+                didDocumentMetadata: {}
+            };
+        }
         return this.withHistoryLock(() => this.resolveDIDAt(did, options));
+    }
+
+    // A versionTime is a date-time in the form every other timestamp here takes,
+    // and a versionSequence is a positive integer.
+    private validVersionOptions(options?: ResolveDIDOptions): boolean {
+        const { versionTime, versionSequence } = options ?? {};
+        if (versionTime !== undefined && (typeof versionTime !== 'string' || !this.verifyDateFormat(versionTime))) {
+            return false;
+        }
+        return versionSequence === undefined || (Number.isSafeInteger(versionSequence) && versionSequence >= 1);
     }
 
     // The resolver behind resolveDID, with one cutoff the public options do
