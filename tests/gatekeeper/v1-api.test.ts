@@ -320,12 +320,15 @@ describe('/api/v1 DID routes', () => {
         global.fetch = originalFetch;
     });
 
-    it('passes versionTime through and ignores an unparsable versionSequence', async () => {
+    // Resolution refuses the option; a route that dropped it would return the
+    // latest version instead.
+    it('passes versionTime through, and an unparsable versionSequence on to be refused', async () => {
         const { app, gatekeeper } = mount();
 
         await request(app).get('/api/v1/did/did:cid:abc?versionTime=2026-01-01T00:00:00Z&versionSequence=nope');
         expect(gatekeeper.resolveDID).toHaveBeenCalledWith('did:cid:abc', {
             versionTime: '2026-01-01T00:00:00Z',
+            versionSequence: NaN,
         });
     });
 

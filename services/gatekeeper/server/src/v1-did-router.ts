@@ -540,10 +540,9 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
             }
     
             if (typeof versionSequence === 'string') {
-                const parsed = parseInt(versionSequence, 10);
-                if (!isNaN(parsed)) {
-                    options.versionSequence = parsed;
-                }
+                // Passed on even when it is not a number, so that resolution refuses it;
+                // parseInt would read "3abc" as 3.
+                options.versionSequence = /^\d+$/.test(versionSequence) ? Number(versionSequence) : NaN;
             }
     
             if (confirm) {

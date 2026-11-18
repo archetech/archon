@@ -2766,7 +2766,7 @@
             }
           },
           "400": {
-            "description": "The DID is syntactically invalid (invalidDid), or the version options conflict (invalidOptions). The error is in didResolutionMetadata.\n"
+            "description": "The DID is syntactically invalid (invalidDid), or a version option is malformed or conflicts with another (invalidOptions). The error is in didResolutionMetadata.\n"
           },
           "404": {
             "description": "The DID does not exist or cannot be resolved (error in didResolutionMetadata)."
@@ -2836,7 +2836,7 @@
             }
           },
           "400": {
-            "description": "The DID is syntactically invalid, or the version options conflict.",
+            "description": "The DID is syntactically invalid, or a version option is malformed or conflicts with another.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2927,7 +2927,7 @@
             }
           },
           "400": {
-            "description": "The DID is syntactically invalid, or the version options conflict.",
+            "description": "The DID is syntactically invalid, or a version option is malformed or conflicts with another.",
             "content": {
               "application/json": {
                 "schema": {

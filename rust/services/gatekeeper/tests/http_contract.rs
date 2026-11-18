@@ -457,6 +457,70 @@ async fn universal_resolver_surface_returns_fixture_stable_did_resolution_result
     Ok(())
 }
 
+// Shared vectors: what resolving a signed two-version history returns for each
+// kind of version option, on both resolution surfaces.
+#[tokio::test]
+async fn resolution_options_follow_the_shared_vectors_on_both_surfaces() -> Result<()> {
+    let vector: Value = serde_json::from_str(include_str!(
+        "../../../../tests/gatekeeper/resolution-option-v1-vectors.json"
+    ))?;
+    let did = vector["did"].as_str().unwrap();
+    let service = spawn_json().await?;
+    for operation in [&vector["agent"], &vector["update"]] {
+        let response = service
+            .client
+            .post(format!("{}/did", service.base_url))
+            .json(operation)
+            .send()
+            .await?;
+        assert!(response.status().is_success());
+    }
+
+    for (surface, url) in [
+        ("conformant", format!("{}/1.0/identifiers", service.root_url)),
+        ("v1", format!("{}/did", service.base_url)),
+    ] {
+        for case in vector["cases"].as_array().unwrap() {
+            let name = &case["name"];
+            let query = case["query"].as_str().unwrap();
+            let response = service
+                .client
+                .get(format!("{url}/{did}?{query}"))
+                .send()
+                .await?;
+            let status = response.status().as_u16();
+            let body = response.json::<Value>().await?;
+            assert_eq!(
+                body["didResolutionMetadata"]["error"], case["error"],
+                "{surface} {name}"
+            );
+            assert_eq!(
+                body["didDocumentMetadata"]["versionSequence"], case["version"],
+                "{surface} {name}"
+            );
+            if surface == "conformant" {
+                let expected = match case["error"].as_str() {
+                    Some("invalidOptions") => 400,
+                    Some("notFound") => 404,
+                    _ => 200,
+                };
+                assert_eq!(status, expected, "{surface} {name}");
+            }
+        }
+
+        // An invalid DID is reported before an invalid option.
+        let response = service
+            .client
+            .get(format!("{url}/did:cid:not-a-cid?versionTime=garbage"))
+            .send()
+            .await?;
+        let body = response.json::<Value>().await?;
+        assert_eq!(body["didResolutionMetadata"]["error"], "invalidDid", "{surface}");
+    }
+
+    Ok(())
+}
+
 #[tokio::test]
 async fn http_contract_matches_resolution_error_and_supported_registry_semantics() -> Result<()> {
     let service = spawn_json().await?;
