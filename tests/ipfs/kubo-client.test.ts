@@ -397,7 +397,7 @@ describe('KuboClient peering configuration', () => {
         await expect(client.addPeeringPeer(other, many)).resolves.toBe(true);
 
         expect(rpc.swarm.connect).toHaveBeenCalledTimes(16);
-        expect(rpc.config.set.mock.calls[0][1][0].Addrs).toEqual(many.slice(0, 16));
+        expect(rpc.config.set.mock.calls[0][1]).toEqual([{ ID: other, Addrs: many.slice(0, 16) }]);
     });
 
     // The cases both Keymasters' destination checks are held to. A literal
