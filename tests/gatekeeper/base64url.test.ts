@@ -10,10 +10,11 @@ class Db extends DbMemory {
 }
 
 // Shared signed vectors: both ports refuse base64 padding in a proofValue and in
-// a key's coordinates, on submission, import and replay. Every padded value here
-// decodes to the bytes of a valid one, so a decoder that drops padding accepts it.
+// a key's coordinates, on submission, import and replay, and give a proofValue or
+// key they cannot read the same import status. Every padded value here decodes
+// to the bytes of a valid one, so a decoder that drops padding accepts it.
 const vector = JSON.parse(readFileSync('tests/gatekeeper/base64url-v1-vectors.json', 'utf8')) as {
-    cases: { name: string; did: string; agent?: Operation; prior?: Operation; operation: Operation; accepted: boolean }[];
+    cases: { name: string; did: string; agent?: Operation; prior?: Operation; operation: Operation; accepted: boolean; imported: string }[];
 };
 const event = (operation: Operation): GatekeeperEvent => ({ operation, registry: 'hyperswarm', time: operation.proof!.created });
 
@@ -22,7 +23,7 @@ function submit(g: Gatekeeper, operation: Operation): Promise<unknown> {
     return operation.type === 'delete' ? g.deleteDID(operation) : g.updateDID(operation);
 }
 
-it.each(vector.cases)('refuses padding in $name on submission, import and restart', async ({ did, agent, prior, operation, accepted }) => {
+it.each(vector.cases)('treats $name the same on submission, import and restart', async ({ did, agent, prior, operation, accepted, imported }) => {
     const before = [agent, prior].filter((op): op is Operation => !!op);
     // Versions before the operation, and whether the DID exists without it.
     const base = before.length;
@@ -38,10 +39,7 @@ it.each(vector.cases)('refuses padding in $name on submission, import and restar
             if (!accepted) expect(JSON.stringify(db.snapshot())).toBe(stored);
         } else if (mode === 'import') {
             for (const op of before) expect(await g.importEvent(event(op))).toBe('added');
-            // Refused is either status: the ports differ on which a malformed
-            // proofValue gets, and neither adds it.
-            const imported = await g.importEvent(event(operation));
-            expect(accepted ? imported === 'added' : ['rejected', 'deferred'].includes(imported)).toBe(true);
+            expect(await g.importEvent(event(operation))).toBe(imported);
         } else {
             // A projection written by a decoder that dropped the padding.
             const events = await Promise.all([...before, operation].map(async op => ({ ...event(op), opid: await generateCID(op) })));

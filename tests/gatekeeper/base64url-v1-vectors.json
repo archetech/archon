@@ -2,6 +2,7 @@
   "cases": [
     {
       "name": "unpadded_proof",
+      "imported": "added",
       "agent": {
         "type": "create",
         "created": "2026-11-18T11:00:00.000Z",
@@ -48,6 +49,7 @@
     },
     {
       "name": "padded_proof",
+      "imported": "deferred",
       "agent": {
         "type": "create",
         "created": "2026-11-18T11:00:00.000Z",
@@ -94,6 +96,7 @@
     },
     {
       "name": "padded_proof_one_sign",
+      "imported": "deferred",
       "agent": {
         "type": "create",
         "created": "2026-11-18T11:00:00.000Z",
@@ -140,6 +143,7 @@
     },
     {
       "name": "padded_proof_on_delete",
+      "imported": "deferred",
       "agent": {
         "type": "create",
         "created": "2026-11-18T11:00:00.000Z",
@@ -180,7 +184,149 @@
       "did": "did:cid:bagaaieraswr74jdgc27scttkzvyxgzqfgh4i53z5g4k2hrirst43h7izvslq"
     },
     {
+      "name": "proof_not_base64url",
+      "imported": "deferred",
+      "agent": {
+        "type": "create",
+        "created": "2026-11-18T11:00:00.000Z",
+        "registration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "hyperswarm"
+        },
+        "publicJwk": {
+          "kty": "EC",
+          "crv": "secp256k1",
+          "x": "u1i1_spQXHTtwADYKC_FVuUaECT8jn1-Vsb4h8XI1fI",
+          "y": "AvdvUIpXrCSRrxnI5n5VEz-OHNP57iNQBxSXCF9zVvg"
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-11-18T12:00:00.000Z",
+          "verificationMethod": "#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "JKf2foMBv3vaT1_rvpdTK8HlH6mmBqBDZfqoQex05eAuWilxZZRYIAn1_U6qphsfhPRky7T9U0uZCOJ9QcA_7g"
+        }
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaieraswr74jdgc27scttkzvyxgzqfgh4i53z5g4k2hrirst43h7izvslq",
+        "previd": "bagaaieraswr74jdgc27scttkzvyxgzqfgh4i53z5g4k2hrirst43h7izvslq",
+        "doc": {
+          "didDocumentData": {
+            "case": "proof"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-11-18T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaieraswr74jdgc27scttkzvyxgzqfgh4i53z5g4k2hrirst43h7izvslq#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "gGVeVg2_GedBECO_vMYozijWLwx01LwqSIh1klXPsyNAPI1WeDaUOWx85IX7GlFwwuFeL5KZdHJoNGXROGA21!"
+        }
+      },
+      "accepted": false,
+      "did": "did:cid:bagaaieraswr74jdgc27scttkzvyxgzqfgh4i53z5g4k2hrirst43h7izvslq"
+    },
+    {
+      "name": "proof_too_short",
+      "imported": "deferred",
+      "agent": {
+        "type": "create",
+        "created": "2026-11-18T11:00:00.000Z",
+        "registration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "hyperswarm"
+        },
+        "publicJwk": {
+          "kty": "EC",
+          "crv": "secp256k1",
+          "x": "u1i1_spQXHTtwADYKC_FVuUaECT8jn1-Vsb4h8XI1fI",
+          "y": "AvdvUIpXrCSRrxnI5n5VEz-OHNP57iNQBxSXCF9zVvg"
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-11-18T12:00:00.000Z",
+          "verificationMethod": "#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "JKf2foMBv3vaT1_rvpdTK8HlH6mmBqBDZfqoQex05eAuWilxZZRYIAn1_U6qphsfhPRky7T9U0uZCOJ9QcA_7g"
+        }
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaieraswr74jdgc27scttkzvyxgzqfgh4i53z5g4k2hrirst43h7izvslq",
+        "previd": "bagaaieraswr74jdgc27scttkzvyxgzqfgh4i53z5g4k2hrirst43h7izvslq",
+        "doc": {
+          "didDocumentData": {
+            "case": "proof"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-11-18T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaieraswr74jdgc27scttkzvyxgzqfgh4i53z5g4k2hrirst43h7izvslq#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "gGVeVg2_GedBECO_vMYozijWLwx01LwqSIh1klXP"
+        }
+      },
+      "accepted": false,
+      "did": "did:cid:bagaaieraswr74jdgc27scttkzvyxgzqfgh4i53z5g4k2hrirst43h7izvslq"
+    },
+    {
+      "name": "proof_empty",
+      "imported": "rejected",
+      "agent": {
+        "type": "create",
+        "created": "2026-11-18T11:00:00.000Z",
+        "registration": {
+          "version": 1,
+          "type": "agent",
+          "registry": "hyperswarm"
+        },
+        "publicJwk": {
+          "kty": "EC",
+          "crv": "secp256k1",
+          "x": "u1i1_spQXHTtwADYKC_FVuUaECT8jn1-Vsb4h8XI1fI",
+          "y": "AvdvUIpXrCSRrxnI5n5VEz-OHNP57iNQBxSXCF9zVvg"
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-11-18T12:00:00.000Z",
+          "verificationMethod": "#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": "JKf2foMBv3vaT1_rvpdTK8HlH6mmBqBDZfqoQex05eAuWilxZZRYIAn1_U6qphsfhPRky7T9U0uZCOJ9QcA_7g"
+        }
+      },
+      "operation": {
+        "type": "update",
+        "did": "did:cid:bagaaieraswr74jdgc27scttkzvyxgzqfgh4i53z5g4k2hrirst43h7izvslq",
+        "previd": "bagaaieraswr74jdgc27scttkzvyxgzqfgh4i53z5g4k2hrirst43h7izvslq",
+        "doc": {
+          "didDocumentData": {
+            "case": "proof"
+          }
+        },
+        "proof": {
+          "type": "DataIntegrityProof",
+          "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+          "created": "2026-11-18T12:00:00.000Z",
+          "verificationMethod": "did:cid:bagaaieraswr74jdgc27scttkzvyxgzqfgh4i53z5g4k2hrirst43h7izvslq#key-1",
+          "proofPurpose": "capabilityInvocation",
+          "proofValue": ""
+        }
+      },
+      "accepted": false,
+      "did": "did:cid:bagaaieraswr74jdgc27scttkzvyxgzqfgh4i53z5g4k2hrirst43h7izvslq"
+    },
+    {
       "name": "unpadded_creation_key",
+      "imported": "added",
       "operation": {
         "type": "create",
         "created": "2026-11-18T11:00:00.000Z",
@@ -209,6 +355,7 @@
     },
     {
       "name": "padded_creation_key_x",
+      "imported": "deferred",
       "operation": {
         "type": "create",
         "created": "2026-11-18T11:00:00.000Z",
@@ -237,6 +384,7 @@
     },
     {
       "name": "padded_creation_key_y",
+      "imported": "deferred",
       "operation": {
         "type": "create",
         "created": "2026-11-18T11:00:00.000Z",
@@ -265,6 +413,7 @@
     },
     {
       "name": "padded_creation_proof",
+      "imported": "deferred",
       "operation": {
         "type": "create",
         "created": "2026-11-18T11:00:00.000Z",
@@ -293,6 +442,7 @@
     },
     {
       "name": "signed_by_replaced_unpadded_key",
+      "imported": "added",
       "agent": {
         "type": "create",
         "created": "2026-11-18T11:00:00.000Z",
@@ -382,6 +532,7 @@
     },
     {
       "name": "signed_by_padded_method_key",
+      "imported": "deferred",
       "agent": {
         "type": "create",
         "created": "2026-11-18T11:00:00.000Z",
