@@ -48,6 +48,16 @@
       "version": "2"
     },
     {
+      "name": "time_before_creation",
+      "query": "versionTime=2020-01-01T00:00:00Z",
+      "version": "1"
+    },
+    {
+      "name": "time_of_creation",
+      "query": "versionTime=2026-11-18T11:00:00Z",
+      "version": "1"
+    },
+    {
       "name": "time_between_versions",
       "query": "versionTime=2026-11-18T11:30:00Z",
       "version": "1"
