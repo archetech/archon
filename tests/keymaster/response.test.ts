@@ -845,6 +845,25 @@ describe('verifyResponse historical', () => {
         expect((await verifyAt(response, 25)).match).toBe(false);
     });
 
+    // Only a version the Gatekeeper does not find is "not found". Any other
+    // failure to resolve it is reported as itself.
+    it.each([
+        ['a transport failure', () => { throw new Error('socket hang up'); }, 'socket hang up'],
+        ['an invalid DID', () => ({ didResolutionMetadata: { error: 'invalidDid' } }), 'Invalid DID: bad format'],
+    ])('does not report %s as a missing response version', async (_name, answer, message) => {
+        const { response } = await respond();
+        const resolve = gatekeeper.resolveDID.bind(gatekeeper);
+        const spy = jest.spyOn(gatekeeper, 'resolveDID').mockImplementation(async (did, options) =>
+            options?.versionSequence === undefined ? resolve(did, options) : answer() as never);
+
+        try {
+            await expect(verifyAt(response, 30, 1)).rejects.toThrow(message);
+        }
+        finally {
+            spy.mockRestore();
+        }
+    });
+
     it('selects a response version within the versionTime context', async () => {
         const { challenge, response } = await respond();
 

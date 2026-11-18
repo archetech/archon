@@ -4307,8 +4307,10 @@ class Keymaster:
         options = {"versionTime": version_time} if version_sequence is None else {"versionSequence": version_sequence}
         try:
             doc = await self.resolve_did(did, options)
-        except KeymasterError:
-            if version_sequence is None:
+        except KeymasterError as error:
+            # Only what resolve_did raises for `notFound`. Another resolution
+            # error, such as `invalidOptions`, is not a missing version.
+            if version_sequence is None or str(error) != "notFound":
                 raise
             # Raises again when it is the DID that is unknown, not the version.
             await self.resolve_did(did)

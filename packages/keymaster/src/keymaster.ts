@@ -5018,7 +5018,11 @@ export default class Keymaster implements KeymasterInterface {
             doc = await this.resolveDID(did, versionSequence === undefined ? { versionTime } : { versionSequence });
         }
         catch (error) {
-            if (versionSequence === undefined) {
+            // Only what resolveDID raises for `notFound`. A transport failure or
+            // another resolution error is not a missing version.
+            const { type, detail } = error as { type?: string, detail?: string };
+
+            if (versionSequence === undefined || type !== InvalidDIDError.type || detail !== 'unknown') {
                 throw error;
             }
 
