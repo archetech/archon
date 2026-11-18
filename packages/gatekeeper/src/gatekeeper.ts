@@ -2250,7 +2250,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             // Gatekeeper re-materializes didDocumentMetadata during resolution, and didDocumentRegistration
             // can be carried forward from the previous version.
             // Update must include any or all of: didDocument, didDocumentData, didDocumentRegistration
-            if (!this.validUpdateComponents(doc)) {
+            if (!doc || !this.validUpdateComponents(doc)) {
                 return false;
             }
 
