@@ -73,9 +73,22 @@ function isWellFormedSecp256k1Jwk(jwk: unknown): jwk is EcdsaJwkPublic {
     return true;
 }
 
-function base64urlToHex(b64: string): string {
-    const bytes = decodeBase64url(b64);
-    return Buffer.from(bytes).toString('hex');
+// The signature a proofValue carries, as hex. One that cannot be read as a
+// signature is an invalid operation, which is how the Rust port reports it, and
+// not an internal fault: the two are classified differently on import.
+function proofSignatureHex(proofValue: unknown): string {
+    try {
+        const bytes = decodeBase64url(proofValue as string);
+
+        if (bytes.length !== 64) {
+            throw new Error('signature length');
+        }
+
+        return Buffer.from(bytes).toString('hex');
+    }
+    catch {
+        throw new InvalidOperationError('proof');
+    }
 }
 
 // The secp256k1 suite Archon defines, documented in docs/scheme.md. Credentials
@@ -937,7 +950,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             }
 
             const message = this.operationSigningBytes(operation);
-            const signatureHex = base64urlToHex(operation.proof!.proofValue);
+            const signatureHex = proofSignatureHex(operation.proof!.proofValue);
             return this.cipher.verifyMessage(message, signatureHex, operation.publicJwk);
         }
 
@@ -969,7 +982,7 @@ export default class Gatekeeper implements GatekeeperInterface {
                 return false;
             }
 
-            const signatureHex = base64urlToHex(operation.proof!.proofValue);
+            const signatureHex = proofSignatureHex(operation.proof!.proofValue);
             return this.cipher.verifyMessage(message, signatureHex, publicJwk);
         }
 
@@ -1006,7 +1019,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             return false;
         }
 
-        const signatureHex = base64urlToHex(proof.proofValue);
+        const signatureHex = proofSignatureHex(proof.proofValue);
         return this.cipher.verifyMessage(message, signatureHex, publicJwk);
     }
 

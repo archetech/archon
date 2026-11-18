@@ -28,6 +28,7 @@ function sign(operation, verificationMethod, created = '2026-11-18T12:00:00.000Z
     return { ...operation, proof: { ...proof, proofValue: Buffer.from(signature, 'hex').toString('base64url') } };
 }
 const padProof = (operation, padding) => ({ ...operation, proof: { ...operation.proof, proofValue: operation.proof.proofValue + padding } });
+const withProofValue = (operation, proofValue) => ({ ...operation, proof: { ...operation.proof, proofValue } });
 
 const registration = { version: 1, type: 'agent', registry: 'hyperswarm' };
 const genesis = publicJwk => sign({ type: 'create', created: '2026-11-18T11:00:00.000Z', registration, publicJwk }, '#key-1');
@@ -52,22 +53,28 @@ const installsPaddedKey = update(agent, { didDocument: documentWith(paddedX) });
 const installsSameKey = update(agent, { didDocument: documentWith(key.publicJwk) });
 
 // `operation` is applied after `agent` and `prior`, when the case has them. A case
-// without an agent is a creation.
+// without an agent is a creation. `imported` is what importing the operation
+// returns. A proofValue or key that cannot be read is an invalid operation, which
+// both ports defer and garbage collection later clears; neither adds it.
 const cases = [
-    { name: 'unpadded_proof', agent, operation: plain, accepted: true },
-    { name: 'padded_proof', agent, operation: padProof(plain, '=='), accepted: false },
-    { name: 'padded_proof_one_sign', agent, operation: padProof(plain, '='), accepted: false },
-    { name: 'padded_proof_on_delete', agent, operation: padProof(sign({ type: 'delete', did, previd: canonical(agent) }, `${did}#key-1`), '=='), accepted: false },
-    { name: 'unpadded_creation_key', operation: agent, accepted: true },
-    { name: 'padded_creation_key_x', operation: genesis(paddedX), accepted: false },
-    { name: 'padded_creation_key_y', operation: genesis(paddedY), accepted: false },
-    { name: 'padded_creation_proof', operation: padProof(genesis(key.publicJwk), '=='), accepted: false },
+    { name: 'unpadded_proof', imported: 'added', agent, operation: plain, accepted: true },
+    { name: 'padded_proof', imported: 'deferred', agent, operation: padProof(plain, '=='), accepted: false },
+    { name: 'padded_proof_one_sign', imported: 'deferred', agent, operation: padProof(plain, '='), accepted: false },
+    { name: 'padded_proof_on_delete', imported: 'deferred', agent, operation: padProof(sign({ type: 'delete', did, previd: canonical(agent) }, `${did}#key-1`), '=='), accepted: false },
+    { name: 'proof_not_base64url', imported: 'deferred', agent, operation: withProofValue(plain, `${plain.proof.proofValue.slice(0, -1)}!`), accepted: false },
+    { name: 'proof_too_short', imported: 'deferred', agent, operation: withProofValue(plain, plain.proof.proofValue.slice(0, 40)), accepted: false },
+    // No proofValue at all is a malformed proof, which both ports reject outright.
+    { name: 'proof_empty', imported: 'rejected', agent, operation: withProofValue(plain, ''), accepted: false },
+    { name: 'unpadded_creation_key', imported: 'added', operation: agent, accepted: true },
+    { name: 'padded_creation_key_x', imported: 'deferred', operation: genesis(paddedX), accepted: false },
+    { name: 'padded_creation_key_y', imported: 'deferred', operation: genesis(paddedY), accepted: false },
+    { name: 'padded_creation_proof', imported: 'deferred', operation: padProof(genesis(key.publicJwk), '=='), accepted: false },
     {
-        name: 'signed_by_replaced_unpadded_key', agent, prior: installsSameKey, accepted: true,
+        name: 'signed_by_replaced_unpadded_key', imported: 'added', agent, prior: installsSameKey, accepted: true,
         operation: update(installsSameKey, { didDocumentData: { case: 'replaced' } }, '2026-11-18T12:00:01.000Z'),
     },
     {
-        name: 'signed_by_padded_method_key', agent, prior: installsPaddedKey, accepted: false,
+        name: 'signed_by_padded_method_key', imported: 'deferred', agent, prior: installsPaddedKey, accepted: false,
         operation: update(installsPaddedKey, { didDocumentData: { case: 'padded method' } }, '2026-11-18T12:00:01.000Z'),
     },
 ].map(item => ({ ...item, did: item.agent ? did : `did:cid:${canonical(item.operation)}` }));

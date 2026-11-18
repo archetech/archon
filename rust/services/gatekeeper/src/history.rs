@@ -1737,7 +1737,8 @@ mod tests {
     }
 
     // Shared signed vectors: base64 padding in a proofValue or a key coordinate
-    // is refused wherever the operation arrives.
+    // is refused wherever the operation arrives, and a proofValue or key that
+    // cannot be read gets the import status the TypeScript port gives it.
     #[tokio::test]
     async fn padded_base64url_is_refused_on_submission_import_and_restart() {
         let v: Value = serde_json::from_str(include_str!(
@@ -1795,19 +1796,14 @@ mod tests {
                             crate::events::ImportStatus::Added
                         ));
                     }
-                    // Refused is either status: the ports differ on which a
-                    // malformed proofValue gets, and neither adds it.
-                    let status =
-                        crate::events::import_event_impl(&state, wrap(operation)).await;
-                    assert!(
-                        match status {
-                            crate::events::ImportStatus::Added => accepted,
-                            crate::events::ImportStatus::Rejected
-                            | crate::events::ImportStatus::Deferred => !accepted,
-                            crate::events::ImportStatus::Merged => false,
-                        },
-                        "{name} import"
-                    );
+                    let status = match crate::events::import_event_impl(&state, wrap(operation)).await
+                    {
+                        crate::events::ImportStatus::Added => "added",
+                        crate::events::ImportStatus::Merged => "merged",
+                        crate::events::ImportStatus::Rejected => "rejected",
+                        crate::events::ImportStatus::Deferred => "deferred",
+                    };
+                    assert_eq!(status, case["imported"], "{name} import");
                 } else {
                     // A projection written by a decoder that dropped the padding.
                     let events: Vec<_> = before
