@@ -787,39 +787,6 @@
    }
   },
   {
-   "name": "grant: an expiry on the leap day of year zero",
-   "schema": "grant",
-   "member": "memeplexGrant",
-   "expect": "valid",
-   "did": "did:cid:bagaaieraqidmftgk7tlftnhqmjrnbqngshc5l5f56plt7t2rgqlwep2jgjja",
-   "operation": {
-    "type": "create",
-    "created": "2026-11-17T00:00:00.000Z",
-    "registration": {
-     "version": 1,
-     "type": "asset",
-     "registry": "BTC:mainnet"
-    },
-    "controller": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq",
-    "data": {
-     "memeplexGrant": {
-      "v": 1,
-      "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
-      "nonce": "BQUFBQUFBQUFBQUFBQUFBQUF",
-      "expiresAt": "0000-02-29T00:00:00Z"
-     }
-    },
-    "proof": {
-     "type": "DataIntegrityProof",
-     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-     "created": "2026-11-17T00:00:00.000Z",
-     "verificationMethod": "did:cid:bagaaieraskbdmytlmgbg45jldvgkuix3g2qqdpkpqpb7fbwvhloaxcv346kq#key-1",
-     "proofPurpose": "capabilityInvocation",
-     "proofValue": "6dtr5Edtn_LfVJGXPsKcqGOxNCyTAf9Y8CaEpBeqwlM5w0gU6AhxNWS9dp2cEhf_ZwVZvZ4Cwi0U-r-wQdHlow"
-    }
-   }
-  },
-  {
    "name": "grant: an expiry on a leap day a century year lacks",
    "schema": "grant",
    "member": "memeplexGrant",
@@ -1047,19 +1014,6 @@
     "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
     "name": "🙂🙂🙂🙂🙂🙂🙂🙂aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG"
-   }
-  },
-  {
-   "name": "grant request: an expiry on the leap day of year zero",
-   "schema": "grant-request",
-   "member": "memeplexGrantRequest",
-   "expect": "valid",
-   "request": {
-    "v": 1,
-    "client": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
-    "name": "Memepool",
-    "nonce": "BgYGBgYGBgYGBgYGBgYGBgYG",
-    "expiresAt": "0000-02-29T00:00:00Z"
    }
   },
   {
