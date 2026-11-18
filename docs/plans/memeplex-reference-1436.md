@@ -55,10 +55,14 @@ revisions"). A venue that needs a fixed vocabulary defines an extension kind.
 
 Every kind, the grant and the grant request has a **schema**: a JSON Schema (draft
 2020-12), in the spirit of AT Protocol's Lexicon. The schema text below is normative.
-Each schema is also published as an Archon schema asset (`createSchema`), with the
-common `$defs` inlined so it stands alone, and the protocol pins its DID and
-`versionId`. A schema validates the `memeplex` member (or `memeplexGrant`,
-`memeplexGrantRequest`), not the whole `didDocumentData`.
+Each schema is also published as an Archon schema asset (`createSchema`), standing
+alone: the text below with `$schema` and the common `$defs` it refers to. Those
+files are in `share/schema/memeplex/v1`. The protocol pins each one's DID and
+`versionId`; none is published yet. A schema validates the `memeplex` member (or
+`memeplexGrant`, `memeplexGrantRequest`), not the whole `didDocumentData`.
+
+`tests/fixtures/memeplex-v1-vectors.json` holds signed operations creating objects
+and grants, valid and invalid, each with the outcome these rules give it.
 
 - **Validation.** Verifiers and indexers validate each object against its kind's
   schema. A version that fails is not attributed; earlier attributed versions still
@@ -900,25 +904,31 @@ needed first.
 
 A first, smaller run was made on 2026-11-16 to find out what those volumes need: up to
 300,000 objects on one node with the Rust Gatekeeper. Its figures are in
-`tests/scale/memeplex/README.md`.
+`tests/scale/memeplex/README.md`. It found three things in the way, all since fixed:
+the Gatekeeper's memory for each DID (#1642), queries that read every DID on the node
+(#1643), and a Hyperswarm mediator that ran out of memory under the load (#1644).
 
-| | At 300,000 objects | At 1 million, by the same growth |
+| Rust Gatekeeper | First run | After the fixes |
 |---|---|---|
-| Gatekeeper memory | 11.1 GB | about 36 GB |
-| Restart until ready | 130 s | about 7 minutes |
-| A query by author or target | 0.5 s | about 1.7 s |
-| Resolving one object | 0.6 ms | the same |
+| Memory at 300,000 objects | 11.1 GB | 0.83 GB |
+| Memory at 1 million | about 36 GB, projected | 2.8 GB, measured |
+| Restart until ready at 1 million | about 7 minutes, projected | 373 s, with a peak of 14.2 GB |
 
-The benchmark at 1, 5 and 10 million objects cannot run until the Gatekeeper's memory
-for each DID (#1642) comes down. Its queries read every DID on the node (#1643), and
-the Hyperswarm mediator ran out of memory under the load (#1644).
+What limits a node now is importing: about 2.3 ms for each operation it receives in
+the Rust Gatekeeper and about 8 ms in the TypeScript one (#1651), so a node takes in
+a few hundred objects a second at most.
+
+The benchmark at 1, 5 and 10 million objects is deferred. The first run answered
+whether every object can be a DID. The application workload cannot be measured
+until the verifier exists.
 
 ## Milestones
 
-1. **Benchmark** objects-as-DIDs at the volumes above (Scale). A sizing run to
-   300,000 objects is done; the full volumes wait on #1642.
+1. **Benchmark** objects-as-DIDs (Scale). A sizing run to 300,000 objects is done,
+   and one node has held a million. The full volumes are deferred.
 2. **Schemas:** JSON Schemas for every core kind and the grant, published as schema
-   assets, with signed fixtures.
+   assets, with signed fixtures. The schemas and fixtures are written; publishing
+   them, and pinning their DIDs here, is not done.
 3. **Verifier library:** the attribution rules, shared by clients and the indexer, with
    cross-checks against real signed objects, including revoked and forged grants,
    transferred objects, backdated siblings, and unattributed edits and deletions after

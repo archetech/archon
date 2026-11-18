@@ -1,0 +1,69 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Memeplex tag",
+    "type": "object",
+    "properties": {
+        "v": {
+            "const": 1
+        },
+        "author": {
+            "$ref": "#/$defs/did"
+        },
+        "grant": {
+            "$ref": "#/$defs/did"
+        },
+        "kind": {
+            "const": "tag"
+        },
+        "target": {
+            "$ref": "#/$defs/did"
+        },
+        "targetVersion": {
+            "$ref": "#/$defs/versionId"
+        },
+        "tag": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+        },
+        "image": {
+            "$ref": "#/$defs/pinnedDidUrl"
+        },
+        "text": false,
+        "content": false,
+        "tags": false,
+        "title": false,
+        "subtitle": false,
+        "summary": false,
+        "authors": false,
+        "source": false,
+        "pdf": false,
+        "verdict": false,
+        "rating": false,
+        "min": false,
+        "max": false
+    },
+    "required": [
+        "v",
+        "kind",
+        "author",
+        "grant",
+        "target",
+        "targetVersion",
+        "tag"
+    ],
+    "$defs": {
+        "did": {
+            "type": "string",
+            "pattern": "^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$"
+        },
+        "versionId": {
+            "type": "string",
+            "pattern": "^b[a-z2-7]{20,}$"
+        },
+        "pinnedDidUrl": {
+            "type": "string",
+            "pattern": "^did:[a-z0-9]+:[A-Za-z0-9._:%-]+\\?versionId=b[a-z2-7]{20,}$"
+        }
+    }
+}
