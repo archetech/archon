@@ -43,8 +43,10 @@ function isInstant(value: string): boolean {
     if (!parts) return false;
     const [year, month, day, hour, minute, second] = parts.slice(1, 7).map(Number);
     if (month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59) return false;
-    // Day 0 of the next month is the last day of this one.
-    return day >= 1 && day <= new Date(Date.UTC(year, month, 0)).getUTCDate();
+    // Counted here, not by Date, which reads a year below 100 as one in the 1900s.
+    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+    return day >= 1 && day <= days;
 }
 
 export function validate(name: SchemaName, data: unknown): Outcome {

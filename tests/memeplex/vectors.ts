@@ -192,6 +192,8 @@ export async function build(): Promise<Vectors> {
     await grantCase('an expiry with an offset', alice, 'schema', { ...grant, expiresAt: '2026-12-31T00:00:00+00:00' });
     await grantCase('an expiry without a time', alice, 'schema', { ...grant, expiresAt: '2026-12-31' });
     await grantCase('an expiry on a day that does not exist', alice, 'expiry-instant', { ...grant, expiresAt: '2026-02-30T00:00:00Z' });
+    await grantCase('an expiry on the leap day of year zero', alice, 'valid', { ...grant, expiresAt: '0000-02-29T00:00:00Z' });
+    await grantCase('an expiry on a leap day a century year lacks', alice, 'expiry-instant', { ...grant, expiresAt: '2100-02-29T00:00:00Z' });
     await grantCase('an expiry in a month that does not exist', alice, 'expiry-instant', { ...grant, expiresAt: '2026-13-01T00:00:00Z' });
     await grantCase('an expiry at an hour that does not exist', alice, 'expiry-instant', { ...grant, expiresAt: '2026-12-31T25:00:00Z' });
     await grantCase('a later v', alice, 'unsupported', { ...grant, v: 2 });
@@ -210,6 +212,7 @@ export async function build(): Promise<Vectors> {
     requestCase('lacks client', 'schema', without(request, 'client'));
     requestCase('an empty name', 'schema', { ...request, name: '' });
     requestCase('a name of 101 code points', 'schema', { ...request, name: codePoints(101) });
+    requestCase('an expiry on the leap day of year zero', 'valid', { ...request, expiresAt: '0000-02-29T00:00:00Z' });
     requestCase('an expiry on a day that does not exist', 'expiry-instant', { ...request, expiresAt: '2027-02-29T00:00:00Z' });
 
     // Objects. Each is created by the client that holds its author's grant.
