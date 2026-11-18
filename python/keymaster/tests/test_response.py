@@ -218,6 +218,24 @@ def test_verify_response_rejects_a_challenge_revoked_by_the_cutoff(testbed):
         _verify_at(testbed, ctx["response"], 25)
 
 
+def test_verify_response_reports_another_resolution_error_as_itself(testbed):
+    ctx = _historical_response(testbed)
+    resolve = testbed.gatekeeper.resolve_did
+
+    # Only a version Gatekeeper does not find is "not found".
+    async def refuse_sequences(did, options=None):
+        if options and options.get("versionSequence") is not None:
+            return {"didResolutionMetadata": {"error": "invalidOptions"}, "didDocumentMetadata": {}}
+        return await resolve(did, options)
+
+    testbed.gatekeeper.resolve_did = refuse_sequences
+    try:
+        with pytest.raises(KeymasterError, match="^invalidOptions$"):
+            _verify_at(testbed, ctx["response"], 30, 1)
+    finally:
+        testbed.gatekeeper.resolve_did = resolve
+
+
 def test_verify_response_historical_response_version(testbed):
     ctx = _historical_response(testbed)
     km = testbed.keymaster

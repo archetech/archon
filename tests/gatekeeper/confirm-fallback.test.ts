@@ -63,8 +63,18 @@ describe('confirmed resolution fallback', () => {
             'https://peer.example', 1000, fetchImpl, doc(true))).toBeNull();
     });
 
+    // A peer that answers a request for one version with an earlier one has
+    // not answered it, whatever the local node holds.
+    it('ignores a peer answer at an earlier version than the one asked for', async () => {
+        const fetchImpl = jest.fn(async () => new Response(JSON.stringify(doc(true)), { status: 200 }));
+
+        expect(await resolveFromConfirmFallback(DID, { confirm: true, versionSequence: 2 },
+            'https://peer.example', 1000, fetchImpl)).toBeNull();
+    });
+
     it('should return confirmed fallback documents', async () => {
         const confirmedDoc = doc(true);
+        confirmedDoc.didDocumentMetadata!.versionSequence = '2';
         const fetchImpl = jest.fn(async () => new Response(JSON.stringify(confirmedDoc), { status: 200 }));
 
         const result = await resolveFromConfirmFallback(

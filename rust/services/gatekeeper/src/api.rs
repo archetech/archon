@@ -1290,6 +1290,8 @@ pub(crate) async fn resolve_did(
         }
     };
 
+    let local_doc = sequence_reached(local_doc, resolve_options.version_sequence);
+
     let already_fallback = headers.get("x-archon-confirm-fallback").is_some();
     let pending_successor = if resolve_options.confirm
         && resolve_options.version_id.is_none()
@@ -1484,8 +1486,10 @@ async fn resolve_conformant(
         }
     };
 
+    let requested_sequence = options.version_sequence;
     match resolve_local_doc_async(state, did, options).await {
         Ok(doc) => {
+            let doc = sequence_reached(doc, requested_sequence);
             if let Some(error_kind) = doc
                 .get("didResolutionMetadata")
                 .and_then(|value| value.get("error"))
@@ -2629,6 +2633,22 @@ fn url_encode_component(value: &str) -> String {
     encoded
 }
 
+// A versionSequence names one version. When the history a resolution walks does
+// not reach it -- it is past the end, past the confirmed prefix, or outside a
+// versionTime given with it -- there is no such version to return, and an
+// earlier one is not an answer.
+fn sequence_reached(doc: Value, requested: Option<usize>) -> Value {
+    match requested {
+        Some(sequence)
+            if doc.pointer("/didResolutionMetadata/error").is_none()
+                && document_sequence(&doc) != sequence as u64 =>
+        {
+            did_resolution_error_doc("notFound")
+        }
+        _ => doc,
+    }
+}
+
 fn document_sequence(doc: &Value) -> u64 {
     doc.pointer("/didDocumentMetadata/versionSequence")
         .and_then(Value::as_str).and_then(|value| value.parse().ok()).unwrap_or(0)
@@ -2640,7 +2660,7 @@ fn confirmed_fallback_improves(peer: &Value, local: &Value, did: &str, options: 
         || peer.pointer("/didDocument/id").and_then(Value::as_str) != Some(did)
         || peer.pointer("/didDocumentMetadata/confirmed").and_then(Value::as_bool) != Some(true)
         || sequence == 0 || sequence > 9_007_199_254_740_991
-        || options.version_sequence.is_some_and(|limit| sequence > limit as u64)
+        || options.version_sequence.is_some_and(|requested| sequence != requested as u64)
         || (local.pointer("/didDocumentMetadata/confirmed").and_then(Value::as_bool) == Some(true)
             && sequence <= document_sequence(local))
     {

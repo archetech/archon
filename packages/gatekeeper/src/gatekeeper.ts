@@ -1194,7 +1194,22 @@ export default class Gatekeeper implements GatekeeperInterface {
                 didDocumentMetadata: {}
             };
         }
-        return this.withHistoryLock(() => this.resolveDIDAt(did, options));
+        const doc = await this.withHistoryLock(() => this.resolveDIDAt(did, options));
+        // A versionSequence names one version. When the history this resolution
+        // walks does not reach it -- it is past the end, past the confirmed
+        // prefix, or outside a versionTime given with it -- there is no such
+        // version to return, and an earlier one is not an answer.
+        if (options?.versionSequence !== undefined && !doc.didResolutionMetadata?.error &&
+            doc.didDocumentMetadata?.versionSequence !== String(options.versionSequence)) {
+            return {
+                didResolutionMetadata: {
+                    error: "notFound"
+                },
+                didDocument: {},
+                didDocumentMetadata: {}
+            };
+        }
+        return doc;
     }
 
     // A versionTime is a date-time in the form every other timestamp here takes,
