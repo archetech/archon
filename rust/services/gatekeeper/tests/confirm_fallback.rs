@@ -129,8 +129,15 @@ async fn pending_and_missing_history_delegate_without_importing_peer_state() -> 
             .await?
             .json()
             .await?;
+        // Version 2 is asked for and is not confirmed here. A peer answer that
+        // cannot be used leaves no such version to return; the confirmed
+        // version 1 is not an answer to the request.
         assert_eq!(
-            answer["didDocumentMetadata"]["versionSequence"], "1",
+            answer["didResolutionMetadata"]["error"], "notFound",
+            "{variant}"
+        );
+        assert!(
+            answer["didDocumentMetadata"].get("versionSequence").is_none(),
             "{variant}"
         );
     }

@@ -148,14 +148,15 @@ class FakeGatekeeper:
         if not self.historical or (not version_time and not version_sequence):
             return deepcopy(self.docs[did])
 
-        # Like Gatekeeper: the create version is always returned, and a
-        # selector past the last version returns the last version.
+        # Like Gatekeeper: a time bound never excludes the create version, and
+        # a sequence the history does not reach is not found.
         def parse(value: str) -> datetime:
             value = re.sub(r"(\.\d{6})\d+", r"\1", value.upper())
             return datetime.fromisoformat(value[:-1] + "+00:00" if value.endswith("Z") else value)
 
         versions = self.history[did]
         selected = versions[0]
+        reached = 1
         for number, version in enumerate(versions[1:], start=2):
             metadata = version["didDocumentMetadata"]
             if version_time and parse(metadata.get("deleted") or metadata["updated"]) > parse(version_time):
@@ -163,6 +164,12 @@ class FakeGatekeeper:
             if version_sequence and number > int(version_sequence):
                 break
             selected = version
+            reached = number
+        if version_sequence and reached != int(version_sequence):
+            return {
+                "didResolutionMetadata": {"error": "notFound"},
+                "didDocumentMetadata": {},
+            }
         return deepcopy(selected)
 
     async def update_did(self, operation: dict[str, Any]) -> bool:

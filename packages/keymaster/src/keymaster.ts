@@ -5001,16 +5001,32 @@ export default class Keymaster implements KeymasterInterface {
     }
 
     // Resolves a DID read by historical response verification. Gatekeeper
-    // answers a cutoff before creation with the creation version and a
-    // sequence past the latest with the latest version; neither is the
-    // requested context, so both are refused rather than returned.
+    // answers a cutoff before creation with the creation version, which is not
+    // the requested context and is refused here. A sequence the history does
+    // not reach it reports as not found, as it does an unknown DID; an older
+    // Gatekeeper answered it with the latest version. Both are refused as a
+    // version that was not found.
     private async resolveHistorical(
         did: string,
         label: string,
         versionTime: string,
         versionSequence?: number
     ): Promise<DidCidDocument> {
-        const doc = await this.resolveDID(did, versionSequence === undefined ? { versionTime } : { versionSequence });
+        let doc: DidCidDocument;
+
+        try {
+            doc = await this.resolveDID(did, versionSequence === undefined ? { versionTime } : { versionSequence });
+        }
+        catch (error) {
+            if (versionSequence === undefined) {
+                throw error;
+            }
+
+            // Throws again when it is the DID that is unknown, not the version.
+            await this.resolveDID(did);
+            throw new InvalidParameterError(`${label} version ${versionSequence} not found`);
+        }
+
         const metadata = doc.didDocumentMetadata;
         const cutoff = Date.parse(versionTime);
 

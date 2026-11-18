@@ -4292,9 +4292,11 @@ class Keymaster:
         return parsed
 
     # Resolves a DID read by historical response verification. Gatekeeper
-    # answers a cutoff before creation with the creation version and a
-    # sequence past the latest with the latest version; neither is the
-    # requested context, so both are refused rather than returned.
+    # answers a cutoff before creation with the creation version, which is not
+    # the requested context and is refused here. A sequence the history does
+    # not reach it reports as not found, as it does an unknown DID; an older
+    # Gatekeeper answered it with the latest version. Both are refused as a
+    # version that was not found.
     async def _resolve_historical(
         self,
         did: str,
@@ -4303,7 +4305,14 @@ class Keymaster:
         version_sequence: int | None = None,
     ) -> dict[str, Any]:
         options = {"versionTime": version_time} if version_sequence is None else {"versionSequence": version_sequence}
-        doc = await self.resolve_did(did, options)
+        try:
+            doc = await self.resolve_did(did, options)
+        except KeymasterError:
+            if version_sequence is None:
+                raise
+            # Raises again when it is the DID that is unknown, not the version.
+            await self.resolve_did(did)
+            raise KeymasterError(f"Invalid parameter: {label} version {version_sequence} not found") from None
         metadata = doc.get("didDocumentMetadata") or {}
         cutoff = self._parse_version_time(version_time)
 

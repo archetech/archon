@@ -191,6 +191,10 @@ Shared behavior:
   outside that range, fails with `invalidOptions` and HTTP 400; it is never
   answered with the latest version. `/api/v1/did/:did` reports the same
   error for the same options, in the document it returns with HTTP 200.
+  A `versionSequence` the history does not reach -- past the end, past the
+  confirmed prefix, or outside a `versionTime` given with it -- fails with
+  `notFound` (404 here; in the document on `/api/v1/did/:did`). An earlier
+  version is not returned in its place.
   Unlike `/api/v1/did/:did`, the non-standard `confirm`/`verify` params are
   NOT accepted; this surface always resolves with `confirm: true, verify:
   true` (confirmed, cryptographically verified state). Clients needing raw or

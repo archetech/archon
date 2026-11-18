@@ -51,6 +51,12 @@ const cases = [
     { name: 'sequence_one', query: 'versionSequence=1', version: '1' },
     { name: 'sequence_two', query: 'versionSequence=2', version: '2' },
     { name: 'sequence_with_leading_zeros', query: 'versionSequence=002', version: '2' },
+    // A sequence names one version. A history that does not reach it has none to return.
+    { name: 'sequence_past_the_end', query: 'versionSequence=3', error: 'notFound' },
+    { name: 'sequence_far_past_the_end', query: 'versionSequence=99', error: 'notFound' },
+    { name: 'sequence_not_reached_within_time', query: 'versionSequence=2&versionTime=2026-11-18T11:30:00Z', error: 'notFound' },
+    { name: 'sequence_reached_within_time', query: 'versionSequence=2&versionTime=2026-11-18T13:00:00Z', version: '2' },
+    { name: 'sequence_one_within_time', query: 'versionSequence=1&versionTime=2026-11-18T11:30:00Z', version: '1' },
     { name: 'time_not_a_date', query: 'versionTime=garbage', error: 'invalidOptions' },
     { name: 'time_empty', query: 'versionTime=', error: 'invalidOptions' },
     { name: 'time_date_only', query: 'versionTime=2026-11-18', error: 'invalidOptions' },

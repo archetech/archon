@@ -77,7 +77,7 @@ export async function resolveFromConfirmFallback(
         const sequence = Number(metadata?.versionSequence);
         if (doc.didResolutionMetadata?.error || doc.didDocument?.id !== did || metadata?.confirmed !== true ||
             !Number.isSafeInteger(sequence) || sequence < 1 ||
-            (options.versionSequence !== undefined && sequence > options.versionSequence)) return null;
+            (options.versionSequence !== undefined && sequence !== options.versionSequence)) return null;
         // A peer must improve the confirmed prefix, not replace it with an older answer.
         if (local?.didDocumentMetadata?.confirmed === true &&
             sequence <= Number(local.didDocumentMetadata.versionSequence)) return null;
