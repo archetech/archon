@@ -603,6 +603,15 @@ export default class Gatekeeper implements GatekeeperInterface {
             registration.prefix === genesis.prefix);
     }
 
+    // An update replaces whole components: it supplies at least one, and none
+    // is null. An undefined member is an omitted one, as on the JSON wire.
+    private validUpdateComponents(doc: unknown): boolean {
+        if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return false;
+        const { didDocument, didDocumentData, didDocumentRegistration } = doc as Record<string, unknown>;
+        const supplied = [didDocument, didDocumentData, didDocumentRegistration].filter(value => value !== undefined);
+        return supplied.length > 0 && !supplied.includes(null);
+    }
+
     private async isSelfControlledAgent(doc: DidCidDocument): Promise<boolean> {
         const id = doc.didDocument?.id;
         const controller = doc.didDocument?.controller;
@@ -632,6 +641,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             const genesis = await this.creationRegistration(operation.did);
             const type = genesis?.type;
             if (!this.verifyProofFormat(operation.proof)) throw new InvalidOperationError('proof');
+            if (operation.type === 'update' && !this.validUpdateComponents(operation.doc)) return false;
             if (!type || current.didDocumentMetadata?.deactivated) return this.verifyUpdateOperation(operation, current);
             if (operation.doc?.didDocumentRegistration !== undefined &&
                 !this.validRegistration(operation.doc.didDocumentRegistration, genesis,
@@ -2240,7 +2250,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             // Gatekeeper re-materializes didDocumentMetadata during resolution, and didDocumentRegistration
             // can be carried forward from the previous version.
             // Update must include any or all of: didDocument, didDocumentData, didDocumentRegistration
-            if (!doc || (!doc.didDocument && !doc.didDocumentData && !doc.didDocumentRegistration)) {
+            if (!doc || !this.validUpdateComponents(doc)) {
                 return false;
             }
 
