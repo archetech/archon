@@ -1257,34 +1257,36 @@ pub(crate) async fn resolve_did(
             version_ordinal: None,
         };
 
-    let local_doc = match resolve_local_doc_async(&state, &did, resolve_options.clone()).await {
-        // An option that cannot be used is an error, not a request for the
-        // latest version. A DID that is itself invalid is reported first.
-        _ if is_valid_did(&did) && !version_options_valid(&query) => {
-            did_resolution_error_doc("invalidOptions")
-        }
-        Ok(doc) => doc,
-        Err(error) if is_valid_did(&did) && crate::resolver::is_invalid_options(&error) => {
-            did_resolution_error_doc("invalidOptions")
-        }
-        Err(_) => {
-            // Use the same syntax check as the conformant surface. This previously
-            // tested only for a `did:` prefix, so a DID that is syntactically
-            // invalid for this method — a foreign method such as did:example:, or a
-            // malformed CID — came back as notFound where the TypeScript gatekeeper
-            // (and this service's own /1.0/identifiers surface) return invalidDid.
-            // #676/#685/#687 brought the conformant surface to parity; this legacy
-            // surface was never brought along.
-            //
-            // Deliberately NOT classify_conformant_error: that maps a non-DID-level
-            // failure to internalError, which this surface has never returned.
-            // notFound stays the default, matching TypeScript.
-            let error_kind = if !is_valid_did(&did) {
-                "invalidDid"
-            } else {
-                "notFound"
-            };
-            did_resolution_error_doc(error_kind)
+    // An option that cannot be used is an error, not a request for the latest
+    // version, and is refused before any history is read. A DID that is itself
+    // invalid is reported first.
+    let local_doc = if is_valid_did(&did) && !version_options_valid(&query) {
+        did_resolution_error_doc("invalidOptions")
+    } else {
+        match resolve_local_doc_async(&state, &did, resolve_options.clone()).await {
+            Ok(doc) => doc,
+            Err(error) if is_valid_did(&did) && crate::resolver::is_invalid_options(&error) => {
+                did_resolution_error_doc("invalidOptions")
+            }
+            Err(_) => {
+                // Use the same syntax check as the conformant surface. This previously
+                // tested only for a `did:` prefix, so a DID that is syntactically
+                // invalid for this method — a foreign method such as did:example:, or a
+                // malformed CID — came back as notFound where the TypeScript gatekeeper
+                // (and this service's own /1.0/identifiers surface) return invalidDid.
+                // #676/#685/#687 brought the conformant surface to parity; this legacy
+                // surface was never brought along.
+                //
+                // Deliberately NOT classify_conformant_error: that maps a non-DID-level
+                // failure to internalError, which this surface has never returned.
+                // notFound stays the default, matching TypeScript.
+                let error_kind = if !is_valid_did(&did) {
+                    "invalidDid"
+                } else {
+                    "notFound"
+                };
+                did_resolution_error_doc(error_kind)
+            }
         }
     };
 
