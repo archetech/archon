@@ -203,23 +203,22 @@ function isPrivateIpv6(bytes: number[]): boolean {
         return isPrivateIpv4(embedded);
     }
 
-    // ff00::/8 multicast -- not a unicast host, and never a lookup target.
-    if (bytes[0] === 0xff) {
+    // Only 2000::/3 is global unicast. Everything outside it is something
+    // else: fc00::/7 unique local, fe80::/10 link-local, fec0::/10 site-local,
+    // ff00::/8 multicast, 64:ff9b::/96 NAT64, 100::/64 discard, and space that
+    // is reserved. Naming the ranges one by one is how site-local was missed.
+    if ((bytes[0] & 0xe0) !== 0x20) {
         return true;
     }
 
-    // 2001:db8::/32, the documentation range, for the same reason as the
-    // IPv4 ones above.
-    if (bytes[0] === 0x20 && bytes[1] === 0x01 && bytes[2] === 0x0d && bytes[3] === 0xb8) {
-        return true;
+    // Within it: 2001::/23, IETF protocol assignments such as Teredo;
+    // 2001:db8::/32, the documentation range; and 2002::/16, 6to4, which
+    // carries an IPv4 address this would otherwise not look at.
+    if (bytes[0] === 0x20 && bytes[1] === 0x01) {
+        return (bytes[2] & 0xfe) === 0 || (bytes[2] === 0x0d && bytes[3] === 0xb8);
     }
 
-    // fc00::/7 unique local, fe80::/10 link-local.
-    if ((bytes[0] & 0xfe) === 0xfc) {
-        return true;
-    }
-
-    return (bytes[0] === 0xfe && (bytes[1] & 0xc0) === 0x80);
+    return bytes[0] === 0x20 && bytes[1] === 0x02;
 }
 
 // Names that resolve inside a host or a private network by convention. This
