@@ -57,7 +57,9 @@ Every kind, the grant and the grant request has a **schema**: a JSON Schema (dra
 2020-12), in the spirit of AT Protocol's Lexicon. The schema text below is normative.
 Each schema is also published as an Archon schema asset (`createSchema`), standing
 alone: the text below with `$schema` and the common `$defs` it refers to. Those
-files are in `share/schema/memeplex/v1`. The protocol pins each one's DID and
+files are in `share/schema/memeplex/v1`, and in
+[archetech/schemas](https://github.com/archetech/schemas/tree/main/memeplex/v1),
+which records each one's DID once it is published. The protocol pins each DID and
 `versionId`; none is published yet. A schema validates the `memeplex` member (or
 `memeplexGrant`, `memeplexGrantRequest`), not the whole `didDocumentData`.
 
