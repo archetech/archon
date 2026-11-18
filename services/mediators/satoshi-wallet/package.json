@@ -18,7 +18,7 @@
     "axios": "^1.20.0",
     "bip39": "^3.1.0",
     "bitcoin-core": "^5.0.0",
-    "bitcoinjs-lib": "^6.1.5",
+    "bitcoinjs-lib": "^6.1.8",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "ecpair": "^2.1.0",
