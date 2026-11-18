@@ -376,6 +376,7 @@ standards-conformant `/1.0/identifiers/:did` surface returns only the
     "verificationMethod": [...],              // agents
     "authentication": ["#key-1"],
     "assertionMethod": ["#key-1"],
+    "capabilityInvocation": ["#key-1"],
     "service": [...]                           // optional
   },
   "didDocumentMetadata": {
@@ -746,7 +747,8 @@ For agent:
     "publicKeyJwk": <operation.publicJwk>
   }],
   "authentication": ["#key-1"],
-  "assertionMethod": ["#key-1"]
+  "assertionMethod": ["#key-1"],
+  "capabilityInvocation": ["#key-1"]
 }
 ```
 
