@@ -599,7 +599,8 @@ The signer MUST sign the prehashed message (no extra hashing inside ECDSA).
 Then signature verification:
 
 1. Compute `msg_hash` as in [§5.1](#51-signing)
-2. Decode `proofValue` as base64url -> 64-byte signature
+2. Decode `proofValue` as unpadded base64url -> 64-byte signature. A value with `=` padding is refused,
+   as is one in a key's `x` or `y`
 3. Decode the signing public key (see [§5.3](#53-key-resolution-by-operation-type))
 4. ECDSA-verify the prehash against the signature with that public key
 

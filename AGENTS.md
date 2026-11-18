@@ -332,3 +332,5 @@ These rules apply to coding agents working in this repository.
 - An update supplies at least one of `didDocument`, `didDocumentData` and `didDocumentRegistration`, and none is null; `didDocumentData` may be any other JSON value, since accepted assets carry arrays and strings. One helper in each port applies this on submission, import and replay (`tests/gatekeeper/update-component-v1-vectors.json`). A JavaScript truthiness test is not a protocol rule: it rejected `""` on one path and nothing on another (#1661, #1662).
 
 - A change to what an operation may contain or to what resolution accepts and returns is a change to the did:cid method. Read the matching section of `archetech/didcid-specs` first, and change the specification with the code, not after (#1463 added `versionId` selection against text that excluded it).
+
+- A `proofValue` and a key's `x` and `y` are unpadded base64url, and both Gatekeepers refuse `=` padding. The multiformats decoder drops it silently, so the TypeScript port checks before decoding (`tests/gatekeeper/base64url-v1-vectors.json`, #1663). When a port takes a decoder from a library, test the inputs the other port's decoder refuses.
