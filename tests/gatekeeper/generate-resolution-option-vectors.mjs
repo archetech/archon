@@ -39,6 +39,11 @@ const update = sign({ type: 'update', did, previd: canonical(agent), doc: { didD
 // reports, or the versionSequence of the document it returns.
 const cases = [
     { name: 'no_options', query: '', version: '2' },
+    // Creation is never excluded by a time bound, so a time before it is not an
+    // error. It selects version 1 here because this history's update is after
+    // the bound; a successor dated at or before the bound would be selected.
+    { name: 'time_before_creation', query: 'versionTime=2020-01-01T00:00:00Z', version: '1' },
+    { name: 'time_of_creation', query: 'versionTime=2026-11-18T11:00:00Z', version: '1' },
     { name: 'time_between_versions', query: 'versionTime=2026-11-18T11:30:00Z', version: '1' },
     { name: 'time_with_fraction', query: 'versionTime=2026-11-18T11:30:00.250Z', version: '1' },
     { name: 'time_with_offset', query: `versionTime=${encodeURIComponent('2026-11-18T12:30:00+01:00')}`, version: '1' },
