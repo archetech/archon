@@ -42,6 +42,16 @@ import ProgressLogger from './progress.js';
 // the rest, so without this an operation carrying a malformed `publicJwk` (no
 // `kty`, no `crv`, a truncated coordinate) verified on TS while Rust refused it
 // -- a fork found by the structural parity fuzzer (#1140).
+// Unpadded base64url, as the specification gives for `proofValue` and as a JWK
+// requires. The multiformats decoder drops trailing `=` before decoding, where
+// the Rust port's decoder refuses it (#1663).
+function decodeBase64url(value: string): Uint8Array {
+    if (value.includes('=')) {
+        throw new Error('padded base64url');
+    }
+    return base64url.baseDecode(value);
+}
+
 function isWellFormedSecp256k1Jwk(jwk: unknown): jwk is EcdsaJwkPublic {
     const key = jwk as { kty?: unknown, crv?: unknown, x?: unknown, y?: unknown };
     if (key?.kty !== 'EC' || key?.crv !== 'secp256k1') {
@@ -52,7 +62,7 @@ function isWellFormedSecp256k1Jwk(jwk: unknown): jwk is EcdsaJwkPublic {
             return false;
         }
         try {
-            if (base64url.baseDecode(coordinate).length !== 32) {
+            if (decodeBase64url(coordinate).length !== 32) {
                 return false;
             }
         }
@@ -64,7 +74,7 @@ function isWellFormedSecp256k1Jwk(jwk: unknown): jwk is EcdsaJwkPublic {
 }
 
 function base64urlToHex(b64: string): string {
-    const bytes = base64url.baseDecode(b64);
+    const bytes = decodeBase64url(b64);
     return Buffer.from(bytes).toString('hex');
 }
 
