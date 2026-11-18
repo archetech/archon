@@ -246,6 +246,13 @@ pub(crate) async fn authorize_operation(
             {
                 return Ok(false);
             }
+            if operation.get("type").and_then(Value::as_str) == Some("update")
+                && !operation
+                    .get("doc")
+                    .is_some_and(crate::proofs::valid_update_components)
+            {
+                return Ok(false);
+            }
             if let Some(registration) = operation.pointer("/doc/didDocumentRegistration") {
                 if !valid_registration(
                     registration,

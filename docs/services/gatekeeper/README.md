@@ -1225,7 +1225,8 @@ event.operation present; compact JSON.stringify-style serialization <= 65,536 UT
 proof format valid (§5.2)
 operation.type ∈ { create, update, delete }
   - create: created, registration.{version=1, type, registry}, type-specific fields
-  - update: did, doc with at least one of { didDocument, didDocumentData, didDocumentRegistration };
+  - update: did, doc with at least one of { didDocument, didDocumentData, didDocumentRegistration },
+    none of them null (didDocumentData may be any other JSON value, "" and 0 included);
             if doc.didDocument.id is set it MUST equal operation.did
   - delete: did
 target := create ? applicableMethodPrefix + ":" + canonicalOperationCID(operation) : operation.did

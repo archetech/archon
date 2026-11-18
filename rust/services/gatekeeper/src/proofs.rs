@@ -181,9 +181,7 @@ pub(crate) fn verify_event_shape(event: &Value) -> bool {
                 && operation
                     .get("doc")
                     .map(|doc| {
-                        let has_doc_payload = doc.get("didDocument").is_some()
-                            || doc.get("didDocumentData").is_some()
-                            || doc.get("didDocumentRegistration").is_some();
+                        let has_doc_payload = valid_update_components(doc);
                         let id_matches = match (
                             doc.get("didDocument")
                                 .and_then(|value| value.get("id"))
@@ -401,6 +399,16 @@ fn operation_key<'a>(doc: &'a Value, proof: &Value) -> Option<&'a Value> {
                 .is_some_and(|id| absolute_key_id(id, did) == target)
         })
         .and_then(|method| method.get("publicKeyJwk"))
+}
+
+// An update replaces whole components: it supplies at least one, and none is
+// null.
+pub(crate) fn valid_update_components(doc: &Value) -> bool {
+    let supplied: Vec<&Value> = ["didDocument", "didDocumentData", "didDocumentRegistration"]
+        .iter()
+        .filter_map(|name| doc.get(*name))
+        .collect();
+    doc.is_object() && !supplied.is_empty() && supplied.iter().all(|value| !value.is_null())
 }
 
 fn value_without_proof(value: &Value) -> Value {
