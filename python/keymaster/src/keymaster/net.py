@@ -84,12 +84,38 @@ def _parse_ipv4_any(hostname: str) -> Optional[int]:
     return address if address <= 0xFFFFFFFF else None
 
 
-# Ranges the ipaddress flags do not cover. Carrier-grade NAT is not marked
-# private by is_private, but a name resolving into it is still pointing at
-# infrastructure rather than at a host the caller meant to reach, and the
-# TypeScript port blocks it -- the two must agree or the guard depends on
-# which language a caller happens to be using.
-_EXTRA_BLOCKED = (ipaddress.ip_network("100.64.0.0/10"),)
+# The ranges are written out, and are the ones the TypeScript port lists, so
+# that the two agree whatever interpreter runs this. ipaddress's own flags
+# (is_private, is_reserved, is_global) are not used: what they cover changes
+# between Python releases, and a guard built on them refuses different
+# addresses on different versions.
+_BLOCKED_IPV4 = tuple(ipaddress.ip_network(network) for network in (
+    "0.0.0.0/8",        # "this host"
+    "10.0.0.0/8",       # RFC 1918
+    "100.64.0.0/10",    # carrier-grade NAT
+    "127.0.0.0/8",      # loopback
+    "169.254.0.0/16",   # link-local, incl. cloud metadata
+    "172.16.0.0/12",    # RFC 1918
+    "192.0.0.0/24",     # IETF protocol assignments
+    "192.168.0.0/16",   # RFC 1918
+    "198.18.0.0/15",    # benchmarking
+    "224.0.0.0/4",      # multicast
+    "240.0.0.0/4",      # reserved, incl. broadcast
+    "192.0.2.0/24",     # TEST-NET-1
+    "198.51.100.0/24",  # TEST-NET-2
+    "203.0.113.0/24",   # TEST-NET-3
+))
+
+# Only 2000::/3 is global unicast. Within it: 2001::/23, IETF protocol
+# assignments such as Teredo; 2001:db8::/32 and 3fff::/20, documentation; and
+# 2002::/16, 6to4, which carries an IPv4 address this would otherwise not look at.
+_GLOBAL_UNICAST_IPV6 = ipaddress.ip_network("2000::/3")
+_BLOCKED_IPV6 = tuple(ipaddress.ip_network(network) for network in (
+    "2001::/23",
+    "2001:db8::/32",
+    "2002::/16",
+    "3fff::/20",
+))
 
 
 def _is_blocked_address(address: Any) -> bool:
@@ -98,19 +124,10 @@ def _is_blocked_address(address: Any) -> bool:
     if mapped is not None:
         address = mapped
 
-    if any(address in network for network in _EXTRA_BLOCKED if network.version == address.version):
-        return True
+    if address.version == 4:
+        return any(address in network for network in _BLOCKED_IPV4)
 
-    return bool(
-        address.is_private
-        or address.is_loopback
-        or address.is_link_local
-        # fec0::/10, deprecated and still not global; no other flag covers it.
-        or getattr(address, "is_site_local", False)
-        or address.is_multicast
-        or address.is_reserved
-        or address.is_unspecified
-    )
+    return address not in _GLOBAL_UNICAST_IPV6 or any(address in network for network in _BLOCKED_IPV6)
 
 
 def is_private_hostname(hostname: str) -> bool:
