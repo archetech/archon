@@ -212,10 +212,15 @@ function isPrivateIpv6(bytes: number[]): boolean {
     }
 
     // Within it: 2001::/23, IETF protocol assignments such as Teredo;
-    // 2001:db8::/32, the documentation range; and 2002::/16, 6to4, which
-    // carries an IPv4 address this would otherwise not look at.
+    // 2001:db8::/32 and 3fff::/20, the documentation ranges; and 2002::/16,
+    // 6to4, which carries an IPv4 address this would otherwise not look at.
+    // The Python port lists the same ranges; a change here is a change there.
     if (bytes[0] === 0x20 && bytes[1] === 0x01) {
         return (bytes[2] & 0xfe) === 0 || (bytes[2] === 0x0d && bytes[3] === 0xb8);
+    }
+
+    if (bytes[0] === 0x3f && bytes[1] === 0xff) {
+        return (bytes[2] & 0xf0) === 0;
     }
 
     return bytes[0] === 0x20 && bytes[1] === 0x02;
