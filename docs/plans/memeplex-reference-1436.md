@@ -70,6 +70,16 @@ and grants, valid and invalid, each with the outcome these rules give it.
   schema. A version that fails is not attributed; earlier attributed versions still
   determine publication state. Rules a schema cannot express are part of the kind's definition
   and are checked alongside (see Checks beyond the schemas).
+- **An object says which rules apply to it.** `v` chooses the rules and `kind` the
+  schema, so both are read before anything else:
+  - a `v` that is absent, or is not an integer, makes the object invalid. So does a
+    `kind` that is absent, is not a string, or is a bare name other than the five
+    core kinds;
+  - a `v` that is an integer a verifier does not support is not invalid there but
+    unsupported (see Evolution), whatever its `kind`: the kind cannot be judged
+    under rules the verifier does not have.
+
+  The same holds for the `v` of a grant and of a grant request.
 - **Core kinds have bare names** (`post`, `reply`, `rating`, …).
 - **Extension kinds are named by their schema DID:** `"kind": "did:cid:…schema?versionId=…"`.
   That gives namespacing without a registry or DNS. A client that does not know an
@@ -929,9 +939,10 @@ until the verifier exists.
 1. **Benchmark** objects-as-DIDs (Scale). A sizing run to 300,000 objects is done,
    and one node has held a million. The full volumes are deferred.
 2. **Schemas:** JSON Schemas for every core kind and the grant, published as schema
-   assets, with signed fixtures. The schemas and fixtures are written; publishing
-   them, and pinning their DIDs here, is not done.
-3. **Verifier library:** the attribution rules, shared by clients and the indexer, with
+   assets, with signed fixtures. The schemas and fixtures are written. Publishing
+   them, and pinning their DIDs here, follows the verifier: publication fixes the
+   schemas of `v: 1`, so they are exercised first.
+3. **Verifier library:** the attribution rules, in a package of its own, shared by clients and the indexer, with
    cross-checks against real signed objects, including revoked and forged grants,
    transferred objects, backdated siblings, and unattributed edits and deletions after
    revocation (of ratings and coauthor confirmations in particular), and a fresh index

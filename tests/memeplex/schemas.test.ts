@@ -4,7 +4,7 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import { generateCID } from '@didcid/ipfs/utils';
 import type { Operation } from '@didcid/gatekeeper/types';
-import { SCHEMAS, readSchema, validate } from './validate.ts';
+import { SCHEMAS, readSchema, validate, validateObject } from './validate.ts';
 import { KINDS, build } from './vectors.ts';
 import type { Vectors } from './vectors.ts';
 
@@ -124,7 +124,9 @@ describe('the signed vectors', () => {
         const wrong = vectors.cases
             .map(each => {
                 const data = each.request ?? (each.operation!.data as Record<string, unknown>)[each.member];
-                return { name: each.name, expect: each.expect, got: validate(each.schema, data) };
+                // An object is judged by the schema its own kind names; a grant by the grant's.
+                const got = each.member === 'memeplex' ? validateObject(data) : validate(each.schema!, data);
+                return { name: each.name, expect: each.expect, got };
             })
             .filter(each => each.got !== each.expect);
 
@@ -133,7 +135,7 @@ describe('the signed vectors', () => {
 
     it('show every outcome', () => {
         expect([...new Set(vectors.cases.map(each => each.expect))].sort()).toStrictEqual(
-            ['expiry-instant', 'paper-authors', 'rating-bounds', 'schema', 'unsupported', 'valid']);
+            ['expiry-instant', 'kind', 'paper-authors', 'rating-bounds', 'schema', 'unsupported', 'valid', 'version']);
     });
 
     it('cover every required field and every field of another kind, for each kind', () => {

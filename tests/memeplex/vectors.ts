@@ -27,7 +27,8 @@ export interface Identity {
 
 export interface Case {
     name: string;
-    schema: SchemaName;
+    // Absent when the object names no core kind, so that no schema applies.
+    schema?: SchemaName;
     // The member of the asset's data the schema applies to.
     member: 'memeplex' | 'memeplexGrant' | 'memeplexGrantRequest';
     expect: Outcome;
@@ -196,6 +197,8 @@ export async function build(): Promise<Vectors> {
     await grantCase('an expiry in a month that does not exist', alice, 'expiry-instant', { ...grant, expiresAt: '2026-13-01T00:00:00Z' });
     await grantCase('an expiry at an hour that does not exist', alice, 'expiry-instant', { ...grant, expiresAt: '2026-12-31T25:00:00Z' });
     await grantCase('a later v', alice, 'unsupported', { ...grant, v: 2 });
+    await grantCase('lacks v', alice, 'version', without(grant, 'v'));
+    await grantCase('v as a string', alice, 'version', { ...grant, v: '1' });
 
     const request = { v: 1, client: memepool.did, name: 'Memepool', nonce: nonce(6) };
     const requestCase = (name: string, expect: Outcome, memeplexGrantRequest: Record<string, unknown>) => {
@@ -217,7 +220,8 @@ export async function build(): Promise<Vectors> {
     const by = (user: Signer, held: Identity) => ({ v: 1, author: user.did, grant: held.did });
     const objectCase = async (name: string, client: Signer, expect: Outcome, memeplex: Record<string, unknown>) => {
         const created = await asset(client, { memeplex });
-        cases.push({ name, schema: memeplex.kind as SchemaName, member: 'memeplex', expect, ...created });
+        const schema = Object.keys(KINDS).find(kind => kind === memeplex.kind) as SchemaName | undefined;
+        cases.push({ name, ...(schema ? { schema } : {}), member: 'memeplex', expect, ...created });
         return created;
     };
     const markdown = { cid: await cid(2), type: 'text/markdown', bytes: 48213 };
@@ -284,6 +288,20 @@ export async function build(): Promise<Vectors> {
     });
     await objectCase('post: author is not a DID', memepool, 'schema', { ...post, author: 'alice' });
     await objectCase('post: a later v', memepool, 'unsupported', { ...post, v: 2 });
+    await objectCase('post: v zero', memepool, 'unsupported', { ...post, v: 0 });
+    // A value that does not say which rules apply to it is invalid, not unsupported.
+    await objectCase('post: lacks v', memepool, 'version', without(post, 'v'));
+    await objectCase('post: v as a string', memepool, 'version', { ...post, v: '1' });
+    await objectCase('post: v with a fraction', memepool, 'version', { ...post, v: 1.5 });
+    await objectCase('post: v null', memepool, 'version', { ...post, v: null });
+    // Nor does one that names no core kind say which schema applies.
+    await objectCase('object: lacks kind', memepool, 'kind', without(post, 'kind'));
+    await objectCase('object: a kind that is not a core kind', memepool, 'kind', { ...post, kind: 'article' });
+    await objectCase('object: a core kind in another case', memepool, 'kind', { ...post, kind: 'Post' });
+    await objectCase('object: an empty kind', memepool, 'kind', { ...post, kind: '' });
+    await objectCase('object: a kind that is not a string', memepool, 'kind', { ...post, kind: 42 });
+    // The rules are chosen first: under another v, the kind cannot be judged.
+    await objectCase('object: a later v and no core kind', memepool, 'unsupported', { ...post, v: 2, kind: 'article' });
 
     const paper = {
         ...by(alice, aliceOwnGrant), kind: 'paper',

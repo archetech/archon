@@ -328,6 +328,6 @@ Memepool choices and the implementation/benchmark plan. Its rendering budgets
 limit automatic presentation; they do not decide authorship.
 
 The schemas and signed fixtures are written (`share/schema/memeplex/v1`,
-`tests/fixtures/memeplex-v1-vectors.json`). Before implementation, publish the
-schemas and pin their DIDs. Who pins long-form content, and for how long,
+`tests/fixtures/memeplex-v1-vectors.json`). They are published, and their DIDs
+pinned, once the verifier has exercised them: publication fixes `v: 1`. Who pins long-form content, and for how long,
 is the one [open question](memeplex-reference-1436.md#open-question).

@@ -8,9 +8,14 @@ import * as ajv2020 from 'ajv/dist/2020.js';
 export const SCHEMAS = ['post', 'paper', 'reply', 'rating', 'tag', 'grant', 'grant-request'] as const;
 export type SchemaName = typeof SCHEMAS[number];
 
+export const KINDS = ['post', 'paper', 'reply', 'rating', 'tag'] as const;
+
 // 'valid', or the first thing that makes the value invalid. 'unsupported' is neither:
-// the value states a `v` these rules do not cover.
-export type Outcome = 'valid' | 'unsupported' | 'schema' | 'rating-bounds' | 'paper-authors' | 'expiry-instant';
+// the value states an integer `v` these rules do not cover. A `v` that is absent or
+// not an integer is 'version', and a `kind` that is absent or names no core kind is
+// 'kind': a value that does not say which rules and which schema apply to it is
+// invalid, not unsupported.
+export type Outcome = 'valid' | 'unsupported' | 'version' | 'kind' | 'schema' | 'rating-bounds' | 'paper-authors' | 'expiry-instant';
 
 export function schemaPath(name: SchemaName): string {
     return new URL(`../../share/schema/memeplex/v1/${name}.json`, import.meta.url).pathname;
@@ -49,9 +54,27 @@ function isInstant(value: string): boolean {
     return day >= 1 && day <= days;
 }
 
+// Which rules a value asks for: undefined when they are these.
+function rules(data: unknown): Outcome | undefined {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return 'schema';
+    const { v } = data as Record<string, unknown>;
+    if (!Number.isInteger(v)) return 'version';
+    return v === 1 ? undefined : 'unsupported';
+}
+
+// An object, by the schema its `kind` names.
+export function validateObject(data: unknown): Outcome {
+    const other = rules(data);
+    if (other) return other;
+    const { kind } = data as Record<string, unknown>;
+    const core = KINDS.find(name => name === kind);
+    return core ? validate(core, data) : 'kind';
+}
+
 export function validate(name: SchemaName, data: unknown): Outcome {
+    const other = rules(data);
+    if (other) return other;
     const value = data as Record<string, any>;
-    if (value && typeof value === 'object' && Number.isInteger(value.v) && value.v !== 1) return 'unsupported';
     if (!matchesSchema(name, data)) return 'schema';
     if (name === 'rating' && !(value.min < value.max && value.min <= value.rating && value.rating <= value.max)) {
         return 'rating-bounds';
