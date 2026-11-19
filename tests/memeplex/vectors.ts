@@ -1,7 +1,10 @@
 import CipherNode from '@didcid/cipher/node';
 import { generateCID } from '@didcid/ipfs/utils';
 import type { EcdsaJwkPair } from '@didcid/cipher/types';
-import type { Outcome, SchemaName } from './validate.ts';
+import type { Validity } from '@didcid/memeplex';
+
+export const SCHEMAS = ['post', 'paper', 'reply', 'rating', 'tag', 'grant', 'grant-request'] as const;
+export type SchemaName = typeof SCHEMAS[number];
 
 // Builds tests/fixtures/memeplex-v1-vectors.json: signed operations that create
 // Memeplex objects and grants, valid and invalid, each with the outcome the `v: 1`
@@ -31,7 +34,7 @@ export interface Case {
     schema?: SchemaName;
     // The member of the asset's data the schema applies to.
     member: 'memeplex' | 'memeplexGrant' | 'memeplexGrantRequest';
-    expect: Outcome;
+    expect: Validity;
     // A grant request travels in a link and is never an operation.
     did?: string;
     operation?: Record<string, unknown>;
@@ -164,7 +167,7 @@ export async function build(): Promise<Vectors> {
     const cases: Case[] = [];
 
     // Grants first: every object names one.
-    const grantCase = async (name: string, user: Signer, expect: Outcome, memeplexGrant: Record<string, unknown>) => {
+    const grantCase = async (name: string, user: Signer, expect: Validity, memeplexGrant: Record<string, unknown>) => {
         const created = await asset(user, { memeplexGrant });
         cases.push({ name: `grant: ${name}`, schema: 'grant', member: 'memeplexGrant', expect, ...created });
         return created;
@@ -201,7 +204,7 @@ export async function build(): Promise<Vectors> {
     await grantCase('v as a string', alice, 'version', { ...grant, v: '1' });
 
     const request = { v: 1, client: memepool.did, name: 'Memepool', nonce: nonce(6) };
-    const requestCase = (name: string, expect: Outcome, memeplexGrantRequest: Record<string, unknown>) => {
+    const requestCase = (name: string, expect: Validity, memeplexGrantRequest: Record<string, unknown>) => {
         cases.push({ name: `grant request: ${name}`, schema: 'grant-request', member: 'memeplexGrantRequest', expect, request: memeplexGrantRequest });
     };
     requestCase('every core kind', 'valid', request);
@@ -218,7 +221,7 @@ export async function build(): Promise<Vectors> {
 
     // Objects. Each is created by the client that holds its author's grant.
     const by = (user: Signer, held: Identity) => ({ v: 1, author: user.did, grant: held.did });
-    const objectCase = async (name: string, client: Signer, expect: Outcome, memeplex: Record<string, unknown>) => {
+    const objectCase = async (name: string, client: Signer, expect: Validity, memeplex: Record<string, unknown>) => {
         const created = await asset(client, { memeplex });
         const schema = Object.keys(KINDS).find(kind => kind === memeplex.kind) as SchemaName | undefined;
         cases.push({ name, ...(schema ? { schema } : {}), member: 'memeplex', expect, ...created });

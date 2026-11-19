@@ -46,6 +46,9 @@
       "@didcid/cipher/multikey": [
         "packages/cipher/src/multikey.ts"
       ],
+      "@didcid/memeplex": [
+        "packages/memeplex/src/index.ts"
+      ],
       "@didcid/common/errors": [
         "packages/common/src/errors.ts"
       ],
