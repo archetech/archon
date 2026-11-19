@@ -105,6 +105,8 @@ def _is_blocked_address(address: Any) -> bool:
         address.is_private
         or address.is_loopback
         or address.is_link_local
+        # fec0::/10, deprecated and still not global; no other flag covers it.
+        or getattr(address, "is_site_local", False)
         or address.is_multicast
         or address.is_reserved
         or address.is_unspecified

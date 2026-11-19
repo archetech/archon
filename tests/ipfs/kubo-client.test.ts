@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { jest } from '@jest/globals';
 
 const mockCreate = jest.fn<any>();
@@ -6,7 +7,7 @@ jest.unstable_mockModule('kubo-rpc-client', () => ({
     create: mockCreate,
 }));
 
-const { default: KuboClient } = await import('../../packages/ipfs/src/kubo-client.ts');
+const { default: KuboClient, isPublicIpMultiaddr } = await import('../../packages/ipfs/src/kubo-client.ts');
 const jsonCodec = await import('multiformats/codecs/json');
 
 const PEER_ID = '12D3KooWTestPeerIdentifier';
@@ -348,6 +349,89 @@ describe('KuboClient peering configuration', () => {
         await expect(client.addPeeringPeer(PEER_ID, ['/ip4/1.2.3.4/tcp/4001'])).resolves.toBe(false);
 
         expect(rpc.config.set).not.toHaveBeenCalled();
+    });
+
+    // The list is the other node's to write, so it is not trusted to name only
+    // places a peer could be.
+    it('dials only the public IP addresses a peer offers', async () => {
+        const { client, rpc } = await connected();
+        const internal = [
+            '/ip4/10.0.0.5/tcp/6379',
+            '/ip4/127.0.0.1/tcp/5001',
+            '/ip4/172.18.0.3/tcp/4224',
+            '/ip4/192.168.1.10/tcp/4001',
+            '/ip4/169.254.169.254/tcp/80',
+            '/ip4/127.1/tcp/4001',
+            '/ip4/0177.0.0.1/tcp/4001',
+            '/ip4/1.2.3.4.5/tcp/4001',
+            '/ip6/::1/tcp/4001',
+            '/ip6/fd00::1/tcp/4001',
+            '/ip6/::ffff:10.0.0.1/tcp/4001',
+            '/dns4/redis/tcp/6379',
+            '/dns/gatekeeper/tcp/4224',
+            '/dnsaddr/example.test',
+            '/unix/var/run/docker.sock',
+            'not-a-multiaddr',
+            '',
+            42,
+            null,
+        ] as unknown as string[];
+
+        await expect(client.addPeeringPeer(other, [...internal, '/ip4/5.6.7.8/tcp/4001'])).resolves.toBe(true);
+
+        expect(rpc.swarm.connect.mock.calls).toEqual([['/ip4/5.6.7.8/tcp/4001']]);
+        expect(rpc.config.set.mock.calls[0][1]).toEqual([{ ID: other, Addrs: ['/ip4/5.6.7.8/tcp/4001'] }]);
+
+        rpc.swarm.connect.mockClear();
+        rpc.config.set.mockClear();
+        await expect(client.addPeeringPeer(other, internal)).resolves.toBe(false);
+        await expect(client.addPeeringPeer(other, 'not-a-list' as unknown as string[])).resolves.toBe(false);
+        expect(rpc.swarm.connect).not.toHaveBeenCalled();
+        expect(rpc.config.set).not.toHaveBeenCalled();
+    });
+
+    // Entries that are not addresses are dropped before the limit is applied,
+    // so they cannot crowd out one that is.
+    it('does not count a malformed address toward the limit', async () => {
+        const { client, rpc } = await connected();
+        const malformed = ['1:2:3', '1::2::3', '12345::1', ':::', '2001:db8::g', 'fe80::1%eth0']
+            .map(host => `/ip6/${host}/tcp/4001`);
+        const valid = '/ip6/2606:4700:4700::1111/tcp/4001';
+
+        for (const address of malformed) {
+            expect([address, isPublicIpMultiaddr(address)]).toEqual([address, false]);
+        }
+
+        await expect(client.addPeeringPeer(other, [...malformed, ...malformed, ...malformed, valid])).resolves.toBe(true);
+
+        expect(rpc.swarm.connect.mock.calls).toEqual([[valid]]);
+    });
+
+    it('dials at most sixteen addresses of one peer', async () => {
+        const { client, rpc } = await connected();
+        const many = Array.from({ length: 200 }, (_, i) => `/ip4/8.8.8.${i + 1}/tcp/4001`);
+
+        await expect(client.addPeeringPeer(other, many)).resolves.toBe(true);
+
+        expect(rpc.swarm.connect).toHaveBeenCalledTimes(16);
+        expect(rpc.config.set.mock.calls[0][1]).toEqual([{ ID: other, Addrs: many.slice(0, 16) }]);
+    });
+
+    // The cases both Keymasters' destination checks are held to. A literal
+    // address among them is no more a peer here than it is a destination there.
+    it('refuses every private address of the shared fixture', () => {
+        const { blocked } = JSON.parse(readFileSync('tests/fixtures/private-hostnames.json', 'utf8')) as { blocked: string[] };
+        // Everything in the list but the names: letters past f, other than the x of a hex literal.
+        const literals = blocked.map(host => host.replace(/^\[|\]$/g, ''))
+            .filter(host => host !== '' && !/[g-wyz]/i.test(host.split('%')[0]));
+
+        expect(literals.length).toBeGreaterThan(20);
+        for (const host of literals) {
+            const address = `/ip${host.includes(':') ? 6 : 4}/${host}/tcp/4001`;
+            expect([address, isPublicIpMultiaddr(address)]).toEqual([address, false]);
+        }
+        expect(isPublicIpMultiaddr('/ip4/8.8.8.8/tcp/4001')).toBe(true);
+        expect(isPublicIpMultiaddr('/ip6/2606:4700:4700::1111/udp/4001/quic-v1')).toBe(true);
     });
 
     it('keeps only addresses it can actually dial', async () => {

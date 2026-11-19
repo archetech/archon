@@ -77,15 +77,11 @@
     "@didcid/common": "^0.5.0",
     "axios": "^1.21.1",
     "canonicalize": "^2.0.0",
-    "ip": "^2.0.1",
     "kubo-rpc-client": "^5.1.0",
     "multiformats": "^13.3.3"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/archetech/archon.git"
-  },
-  "devDependencies": {
-    "@types/ip": "^1.1.3"
   }
 }

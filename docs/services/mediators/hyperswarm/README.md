@@ -106,6 +106,13 @@ time. Every DID that resolved to IPFS node info is announced in this node's
 `ping.peers[]`, including one it cannot dial yet: other nodes may reach it. A DID
 that resolves to this node's own IPFS node is ignored and not retried.
 
+A peer's `addresses` are whatever its DID document says, so they are not dialed
+as given. Only a multiaddr that begins with a public IP address written out in
+full (`/ip4/…` or `/ip6/…`) is tried, and at most sixteen for one peer. A name
+(`/dns4/…`), a private, loopback or link-local address, and anything that is not
+a multiaddr are skipped without a connection being opened. A node advertises
+only public IP addresses of its own, so this drops nothing an honest peer sends.
+
 The goal is convergent IPFS peering across the hyperswarm: every node
 discovers every other node's IPFS endpoint and pins peering with it.
 

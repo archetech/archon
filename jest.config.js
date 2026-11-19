@@ -30,6 +30,8 @@ const config = {
         '^@didcid/common/errors$': '<rootDir>/packages/common/src/errors.ts',
         '^@didcid/common/utils$': '<rootDir>/packages/common/src/utils.ts',
         '^@didcid/common/process-guards$': '<rootDir>/packages/common/src/process-guards.ts',
+        // Node resolves ./net to net-node, which re-exports the portable guard.
+        '^@didcid/common/net$': '<rootDir>/packages/common/src/net-node.ts',
         '^@didcid/common/net-node$': '<rootDir>/packages/common/src/net-node.ts',
         '^@didcid/gatekeeper$': '<rootDir>/packages/gatekeeper/src/gatekeeper.ts',
         '^@didcid/gatekeeper/types$': '<rootDir>/packages/gatekeeper/src/types.ts',

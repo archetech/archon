@@ -3,9 +3,54 @@ import { create, KuboRPCClient } from 'kubo-rpc-client'
 import { CID } from 'multiformats/cid';
 import * as jsonCodec from 'multiformats/codecs/json';
 import * as sha256 from 'multiformats/hashes/sha2';
-import ip from 'ip';
+import { isPrivateHostname } from '@didcid/common/net';
 import { encodeJSON } from './utils.js';
 import { IPFSClient, JSONEncodingOptions } from './types.js';
+
+// The most addresses of one peer that are dialled. A node advertises a handful:
+// one for each transport on each public address it has.
+const MAX_PEER_ADDRESSES = 16;
+
+const IPV4 = /^(0|[1-9]\d{0,2})(\.(0|[1-9]\d{0,2})){3}$/;
+const IPV6 = /^[0-9a-fA-F:.]+$/;
+
+// Whether a string is an IPv6 address, by the parser every runtime has. The
+// pattern alone admits strings such as `1:2:3`, which are no address at all.
+function isIpv6Literal(host: string): boolean {
+    if (!IPV6.test(host) || !host.includes(':')) {
+        return false;
+    }
+
+    try {
+        new URL(`http://[${host}]/`);
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+
+// Whether a multiaddr begins with a public IP address written out in full. That
+// is the only kind dialled or advertised: a name could resolve anywhere, and an
+// address inside this host or its network is not a peer's to offer.
+export function isPublicIpMultiaddr(address: unknown): address is string {
+    if (typeof address !== 'string') {
+        return false;
+    }
+
+    const match = /^\/ip([46])\/([^/]+)\//.exec(address);
+
+    if (!match) {
+        return false;
+    }
+
+    const [, version, host] = match;
+    const literal = version === '4'
+        ? IPV4.test(host) && host.split('.').every(part => Number(part) <= 255)
+        : isIpv6Literal(host);
+
+    return literal && !isPrivateHostname(host);
+}
 
 interface KuboClientConfig {
     url: string;
@@ -154,15 +199,8 @@ class KuboClient implements IPFSClient {
         const publicAddresses = [];
 
         for (const addr of id.addresses) {
-            const address = addr.toString();
-            // Match both IPv4 and IPv6 addresses
-            const match = address.match(/\/ip[46]\/([a-fA-F\d.:]+)/);
-            if (match) {
-                const ipAddress = match[1];
-                // Check if the IP address is private
-                if (!ip.isPrivate(ipAddress)) {
-                    publicAddresses.push(addr);
-                }
+            if (isPublicIpMultiaddr(addr.toString())) {
+                publicAddresses.push(addr);
             }
         }
 
@@ -171,20 +209,8 @@ class KuboClient implements IPFSClient {
 
     async addPeer(peer: string): Promise<boolean> {
         try {
-            // Match both IPv4 and IPv6 addresses
-            const match = peer.match(/\/ip[46]\/([a-fA-F\d.:]+)/);
-            //const match = peer.match(/\/ip4\/([\d.]+)/);
-
-            if (!match) {
-                console.warn(`Invalid peer address format: ${peer}`);
-                return false;
-            }
-
-            const ipAddress = match[1];
-
-            // Check if the IP address is private
-            if (ip.isPrivate(ipAddress)) {
-                console.warn(`Skipping private IP address: ${ipAddress}`);
+            if (!isPublicIpMultiaddr(peer)) {
+                console.warn(`Skipping peer address that is not a public IP address: ${peer}`);
                 return false;
             }
 
@@ -243,9 +269,17 @@ class KuboClient implements IPFSClient {
             return false;
         }
 
+        // The list comes from the other node's DID document, so it is whatever
+        // that node chose to write. Only public IP addresses are dialled, and
+        // only so many of them: anything else would have this node's IPFS
+        // daemon connect to an address inside its own network on a peer's say.
+        const offered = (Array.isArray(addresses) ? addresses : [])
+            .filter(isPublicIpMultiaddr)
+            .slice(0, MAX_PEER_ADDRESSES);
+
         // Filter addresses to only those we can connect to
         const validAddresses: string[] = [];
-        for (const addr of addresses) {
+        for (const addr of offered) {
             try {
                 await this.ipfs.swarm.connect(addr);
                 validAddresses.push(addr);
