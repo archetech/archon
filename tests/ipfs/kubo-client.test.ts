@@ -390,6 +390,23 @@ describe('KuboClient peering configuration', () => {
         expect(rpc.config.set).not.toHaveBeenCalled();
     });
 
+    // Entries that are not addresses are dropped before the limit is applied,
+    // so they cannot crowd out one that is.
+    it('does not count a malformed address toward the limit', async () => {
+        const { client, rpc } = await connected();
+        const malformed = ['1:2:3', '1::2::3', '12345::1', ':::', '2001:db8::g', 'fe80::1%eth0']
+            .map(host => `/ip6/${host}/tcp/4001`);
+        const valid = '/ip6/2606:4700:4700::1111/tcp/4001';
+
+        for (const address of malformed) {
+            expect([address, isPublicIpMultiaddr(address)]).toEqual([address, false]);
+        }
+
+        await expect(client.addPeeringPeer(other, [...malformed, ...malformed, ...malformed, valid])).resolves.toBe(true);
+
+        expect(rpc.swarm.connect.mock.calls).toEqual([[valid]]);
+    });
+
     it('dials at most sixteen addresses of one peer', async () => {
         const { client, rpc } = await connected();
         const many = Array.from({ length: 200 }, (_, i) => `/ip4/8.8.8.${i + 1}/tcp/4001`);

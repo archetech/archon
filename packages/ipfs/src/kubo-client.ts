@@ -14,6 +14,22 @@ const MAX_PEER_ADDRESSES = 16;
 const IPV4 = /^(0|[1-9]\d{0,2})(\.(0|[1-9]\d{0,2})){3}$/;
 const IPV6 = /^[0-9a-fA-F:.]+$/;
 
+// Whether a string is an IPv6 address, by the parser every runtime has. The
+// pattern alone admits strings such as `1:2:3`, which are no address at all.
+function isIpv6Literal(host: string): boolean {
+    if (!IPV6.test(host) || !host.includes(':')) {
+        return false;
+    }
+
+    try {
+        new URL(`http://[${host}]/`);
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+
 // Whether a multiaddr begins with a public IP address written out in full. That
 // is the only kind dialled or advertised: a name could resolve anywhere, and an
 // address inside this host or its network is not a peer's to offer.
@@ -31,7 +47,7 @@ export function isPublicIpMultiaddr(address: unknown): address is string {
     const [, version, host] = match;
     const literal = version === '4'
         ? IPV4.test(host) && host.split('.').every(part => Number(part) <= 255)
-        : IPV6.test(host) && host.includes(':');
+        : isIpv6Literal(host);
 
     return literal && !isPrivateHostname(host);
 }
