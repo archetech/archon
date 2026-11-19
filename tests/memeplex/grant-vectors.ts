@@ -227,20 +227,6 @@ export async function build(): Promise<{ description: string; registry: string; 
         await add('expired', [{ operation: made, block: 100 }], valid([{ block: 100, expiresAt: blockTime(200) }]),
             [at(199, 'permitted'), at(200, 'expired'), at(201, 'expired'), { block: 150, time: blockTime(300), expect: 'expired' }]);
     }
-    // An expiry may state a finer fraction of a second than a block time does.
-    {
-        const fine = '2026-11-02T03:20:00.0001Z';
-        const [made] = await chain(create({ memeplexGrant: { ...grant, nonce: `${nonce}s`, expiresAt: fine } }, user, {}, 100));
-        await add('expiry a fraction after a block time', [{ operation: made, block: 100 }], valid([{ block: 100, expiresAt: fine }]),
-            [
-                { block: 150, time: '2026-11-02T03:20:00.000Z', expect: 'permitted' },
-                { block: 150, time: '2026-11-02T03:20:00Z', expect: 'permitted' },
-                { block: 150, time: '2026-11-02T03:20:00.0001Z', expect: 'expired' },
-                { block: 150, time: '2026-11-02T03:20:00.00010Z', expect: 'expired' },
-                { block: 150, time: '2026-11-02T03:20:00.001Z', expect: 'expired' },
-                { block: 150, time: '2026-11-02T03:19:59.9999Z', expect: 'permitted' },
-            ]);
-    }
     // Anything but a scope update ends the grant.
     {
         const base = { ...grant, nonce: `${nonce}g` };

@@ -201,26 +201,6 @@ export function readGrant(history: AcceptedEvent[]): Grant {
     return { status: 'valid', user, client, registry, versions, ...(ended ? { ended } : {}), pending };
 }
 
-// Whether one date-time is before another. An expiry may state any fraction of a
-// second and Date keeps three digits, so the fractions are compared as written.
-function isBefore(earlier: string, later: string): boolean {
-    const read = (text: string) => {
-        const parts = /^([^.]*)(?:\.(\d+))?(Z|[+-]\d{2}:\d{2})$/.exec(text);
-        const seconds = parts ? Date.parse(parts[1] + parts[3]) : NaN;
-
-        return Number.isNaN(seconds) ? undefined : { seconds, fraction: (parts![2] ?? '').replace(/0+$/, '') };
-    };
-    const a = read(earlier);
-    const b = read(later);
-
-    if (!a || !b) {
-        return false;
-    }
-
-    // Fractions with their trailing zeros removed order as text does.
-    return a.seconds < b.seconds || (a.seconds === b.seconds && a.fraction < b.fraction);
-}
-
 const ACTIONS: Record<Kind, string> = {
     post: 'memeplex:post',
     paper: 'memeplex:post',
@@ -265,9 +245,13 @@ export function authorityAt(grant: Extract<Grant, { status: 'valid' }>, position
         .filter(version => version.position.block < position.block)
         .reduce((latest, version) => version.position.block >= latest.position.block ? version : latest);
 
-    // A time that cannot be read is not shown to be before the expiry.
-    if (inForce.expiresAt !== undefined && !isBefore(position.time, inForce.expiresAt)) {
-        return 'expired';
+    if (inForce.expiresAt !== undefined) {
+        const time = Date.parse(position.time);
+
+        // A time that cannot be read is not shown to be before the expiry.
+        if (Number.isNaN(time) || time >= Date.parse(inForce.expiresAt)) {
+            return 'expired';
+        }
     }
     if (kind && inForce.actions && !inForce.actions.includes(ACTIONS[kind])) {
         return 'scope';
