@@ -1,0 +1,43 @@
+{
+  "name": "@didcid/memeplex",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Memeplex verifier: validity and attribution of objects published under a grant",
+  "type": "module",
+  "main": "./dist/cjs/index.cjs",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.cjs",
+      "types": "./dist/types/index.d.ts"
+    }
+  },
+  "scripts": {
+    "clean": "rm -rf dist",
+    "generate": "node scripts/generate.mjs",
+    "build:esm": "tsc -p tsconfig.json",
+    "bundle:cjs": "rollup -c rollup.cjs.config.js",
+    "build": "npm run clean && npm run build:esm && npm run bundle:cjs"
+  },
+  "keywords": [],
+  "author": "David McFadzean <davidmc@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/archetech/archon.git"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "rollup": "^4.68.3"
+  }
+}

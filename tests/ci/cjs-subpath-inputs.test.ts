@@ -6,7 +6,7 @@ import { join } from 'path';
 // in the repo consumes the CJS build, so a missing input is invisible here and
 // fails at `require()` for whoever installed the package.
 
-const PACKAGES = ['cipher', 'clients', 'common', 'gatekeeper', 'ipfs', 'keymaster'];
+const PACKAGES = ['cipher', 'clients', 'common', 'gatekeeper', 'ipfs', 'keymaster', 'memeplex'];
 
 interface Manifest {
     exports?: Record<string, unknown>;

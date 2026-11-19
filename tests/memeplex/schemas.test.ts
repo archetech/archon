@@ -4,8 +4,10 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import { generateCID } from '@didcid/ipfs/utils';
 import type { Operation } from '@didcid/gatekeeper/types';
-import { SCHEMAS, readSchema, validate, validateObject } from './validate.ts';
-import { KINDS, build } from './vectors.ts';
+import { execFileSync } from 'node:child_process';
+import { schemas, validateGrant, validateGrantRequest, validateObject } from '@didcid/memeplex';
+import { KINDS, SCHEMAS, build } from './vectors.ts';
+import type { SchemaName } from './vectors.ts';
 import type { Vectors } from './vectors.ts';
 
 // The Memeplex v1 schemas in share/schema/memeplex/v1, the normative text they
@@ -15,6 +17,10 @@ import type { Vectors } from './vectors.ts';
 // MEMEPLEX_WRITE_VECTORS=1 writes the fixture file from the builder.
 
 const FIXTURE = new URL('../fixtures/memeplex-v1-vectors.json', import.meta.url).pathname;
+
+function readSchema(name: SchemaName): Record<string, any> {
+    return JSON.parse(readFileSync(new URL(`../../share/schema/memeplex/v1/${name}.json`, import.meta.url), 'utf8'));
+}
 const reference = readFileSync(new URL('../../docs/plans/memeplex-reference-1436.md', import.meta.url), 'utf8');
 
 function section(from: string, to: string): string {
@@ -74,6 +80,16 @@ describe('the published schemas', () => {
         expect(schema).toHaveProperty('properties');
     });
 
+    // The package carries the schemas and validators compiled from them. Both are
+    // generated, and a schema file changed without them would leave the verifier
+    // judging by the old text.
+    it('are the ones the verifier package is generated from', () => {
+        for (const name of SCHEMAS) {
+            expect(schemas[name]).toStrictEqual(readSchema(name));
+        }
+        expect(() => execFileSync('node', ['packages/memeplex/scripts/generate.mjs', '--check'], { stdio: 'pipe' })).not.toThrow();
+    });
+
     it.each(Object.entries(KINDS))('%s lists every field of the field table', (kind, { allowed, required }) => {
         const schema = readSchema(kind as keyof typeof KINDS as never);
         const fields = Object.keys(schema.properties).filter(name => !['v', 'kind', 'author', 'grant'].includes(name));
@@ -125,7 +141,8 @@ describe('the signed vectors', () => {
             .map(each => {
                 const data = each.request ?? (each.operation!.data as Record<string, unknown>)[each.member];
                 // An object is judged by the schema its own kind names; a grant by the grant's.
-                const got = each.member === 'memeplex' ? validateObject(data) : validate(each.schema!, data);
+                const got = each.member === 'memeplex' ? validateObject(data)
+                    : each.member === 'memeplexGrant' ? validateGrant(data) : validateGrantRequest(data);
                 return { name: each.name, expect: each.expect, got };
             })
             .filter(each => each.got !== each.expect);

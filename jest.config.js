@@ -27,6 +27,7 @@ const config = {
         '^@didcid/cipher/didcomm$': '<rootDir>/packages/cipher/src/didcomm.ts',
         '^@didcid/cipher/multikey$': '<rootDir>/packages/cipher/src/multikey.ts',
         '^@didcid/cipher/types': '<rootDir>/packages/cipher/src/types.ts',
+        '^@didcid/memeplex$': '<rootDir>/packages/memeplex/src/index.ts',
         '^@didcid/common/errors$': '<rootDir>/packages/common/src/errors.ts',
         '^@didcid/common/utils$': '<rootDir>/packages/common/src/utils.ts',
         '^@didcid/common/process-guards$': '<rootDir>/packages/common/src/process-guards.ts',
