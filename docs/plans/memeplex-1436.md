@@ -264,6 +264,13 @@ and displaced branches, so indexers also reconcile indexed histories and reread
 the feed over its full range. Recheck dependent publications when their histories,
 grant histories or compared receipts change. Indexer caches confer no authority.
 
+A client reads publication state from an indexer it runs or chooses, as it reads
+histories from a Gatekeeper it trusts; it does not attribute every object itself.
+What makes that trust checkable is the rule above: anyone can build an index from
+the same evidence and compare. A client uses the verifier directly for two things
+only: to check an object is valid before publishing it, and to check the grant it
+publishes under.
+
 Gatekeeper's data queries are useful discovery shortcuts. They match current
 data, so they cannot find every publication preserved behind an unauthorized edit
 or deletion. Complete timelines and threads require historical discovery. Both
