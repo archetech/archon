@@ -10,7 +10,8 @@ import type { AcceptedEvent } from '@didcid/memeplex';
 // Milestone 4 of docs/plans/memeplex-reference-1436.md: a user and a client
 // publish with the asset commands a Keymaster already has, and the verifier reads
 // the result. The other Memeplex fixtures are signed by hand; these operations are
-// the ones a Keymaster writes, whole documents and all.
+// the ones a Keymaster writes. `mergeData` and `transferAsset` send the one
+// component they change, and `updateDID` sends whatever document it is given.
 
 const REGISTRY = 'BTC:mainnet';
 const blockTime = (block: number) => new Date(Date.UTC(2026, 10, 2, 0, block)).toISOString();
@@ -113,6 +114,54 @@ it('reads a Keymaster\'s update of a grant as a scope update, and its revocation
     const after = await publication(post, grant);
     expect(after).toMatchObject({ state: 'published', current: 1 });
     expect(after.versions[2]).toMatchObject({ outcome: 'unattributed', reason: 'authority', authority: 'after-end' });
+}, 60_000);
+
+// What the command line's update does: resolve the document, change it, and send
+// all of it back.
+it('reads an update that resends the whole resolved document as a scope update or an edit', async () => {
+    const scope = { v: 1, client: clientDid, nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz' };
+    const grant = await user.createAsset({ memeplexGrant: scope }, { registry: REGISTRY });
+    await anchor(100);
+
+    const post = { v: 1, kind: 'post', author: userDid, grant, text: 'First.' };
+    const object = await client.createAsset({ memeplex: post }, { registry: REGISTRY });
+    await anchor(200);
+
+    const grantDoc = await user.resolveDID(grant);
+    grantDoc.didDocumentData = { memeplexGrant: { ...scope, actions: ['memeplex:post'] } };
+    expect(await user.updateDID(grant, grantDoc)).toBe(true);
+
+    const edited = { ...post, text: 'First, edited.' };
+    const objectDoc = await client.resolveDID(object);
+    objectDoc.didDocumentData = { memeplex: edited };
+    expect(await client.updateDID(object, objectDoc)).toBe(true);
+    await anchor(300);
+
+    const sent = (await history(grant))[1].operation.doc;
+    expect(Object.keys(sent).sort()).toStrictEqual(['didDocument', 'didDocumentData', 'didDocumentRegistration']);
+
+    const read = readGrant(await history(grant));
+    expect(read.status === 'valid' && read.ended).toBeUndefined();
+    expect(read.status === 'valid' && read.versions.map(version => version.actions)).toStrictEqual([undefined, ['memeplex:post']]);
+    // The edit shares a block with the scope update, so it is not ordered against it.
+    expect((await publication(object, grant)).versions[1]).toMatchObject({ outcome: 'unattributed', authority: 'unordered' });
+}, 60_000);
+
+it('attributes an edit that resends the whole resolved document', async () => {
+    const grant = await user.createAsset({ memeplexGrant: { v: 1, client: clientDid, nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz' } }, { registry: REGISTRY });
+    await anchor(100);
+
+    const post = { v: 1, kind: 'post', author: userDid, grant, text: 'First.' };
+    const object = await client.createAsset({ memeplex: post }, { registry: REGISTRY });
+    await anchor(200);
+
+    const edited = { ...post, text: 'First, edited.' };
+    const doc = await client.resolveDID(object);
+    doc.didDocumentData = { memeplex: edited };
+    expect(await client.updateDID(object, doc)).toBe(true);
+    await anchor(300);
+
+    expect(await publication(object, grant)).toMatchObject({ state: 'published', current: 1, memeplex: edited });
 }, 60_000);
 
 it('does not attribute what the user publishes directly, or what a client publishes in another\'s name', async () => {
