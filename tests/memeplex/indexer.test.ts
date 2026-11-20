@@ -227,10 +227,30 @@ describe('Sync', () => {
         source.exportDIDs = async () => { throw new Error('the Gatekeeper is restarting'); };
         await expect(sync[pass]()).rejects.toThrow('restarting');
         expect(index.publication(first)).toBeUndefined();
+        expect(sync.complete).toBe(true);
 
         source.exportDIDs = exportDIDs;
         await sync[pass]();
         expect(index.publication(first)).toMatchObject({ state: 'published' });
+    }, 60_000);
+
+    // Whichever pass first reads the whole feed makes the index complete, a
+    // poll included: before any pass has, a poll reads everything.
+    it.each(['poll', 'reconcile'] as const)('is complete after a first %s, and not after one that failed', async pass => {
+        const index = new MemeplexIndex();
+        const source = feed();
+        const exportDIDs = source.exportDIDs;
+        const sync = syncing(index, source);
+
+        expect(sync.complete).toBe(false);
+        source.exportDIDs = async () => { throw new Error('the Gatekeeper is restarting'); };
+        await expect(sync.reconcile()).rejects.toThrow('restarting');
+        expect(sync.complete).toBe(false);
+
+        source.exportDIDs = exportDIDs;
+        await sync[pass]();
+        expect(sync.complete).toBe(true);
+        expect(index.dids()).toStrictEqual([grant]);
     }, 60_000);
 
     it('removes by reconciling a history the Gatekeeper no longer has', async () => {

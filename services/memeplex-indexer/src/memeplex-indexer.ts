@@ -36,7 +36,7 @@ function status(): IndexerStatus {
     return { ...state, ...index.size };
 }
 
-async function main(): Promise<void> {
+async function main(startupComplete: () => void): Promise<void> {
     const commit = (process.env.GIT_COMMIT || 'unknown').slice(0, 7);
     let version = 'unknown';
 
@@ -56,6 +56,7 @@ async function main(): Promise<void> {
         waitUntilReady: true,
         intervalSeconds: 5,
         chatty: true,
+        timeoutMs: config.gatekeeperTimeout * 1000,
     });
 
     const sync = new Sync({ gatekeeper: gatekeeper as unknown as FeedGatekeeper, index });
@@ -83,8 +84,9 @@ async function main(): Promise<void> {
             }
             else {
                 state.lastReconcile = now;
-                state.ready = true;
             }
+            // Either kind of pass may be the first to read the whole feed.
+            state.ready = sync.complete;
             if (name === 'reconcile' || result.histories > 0) {
                 console.log(`${name}: ${result.events} events, ${result.histories} histories, ${index.size.publications} publications`);
             }
@@ -113,9 +115,18 @@ async function main(): Promise<void> {
         res.end(await promClient.register.metrics());
     });
 
-    app.listen(config.port, config.bindAddress, () => {
-        console.log(`Memeplex indexer listening on ${config.bindAddress}:${config.port}`);
+    await new Promise<void>((resolve, reject) => {
+        const server = app.listen(config.port, config.bindAddress, () => {
+            console.log(`Memeplex indexer listening on ${config.bindAddress}:${config.port}`);
+            resolve();
+        });
+
+        server.once('error', reject);
     });
+
+    // The Gatekeeper answers and the port is bound. From here a failure is
+    // logged, and the passes that follow try again.
+    startupComplete();
 
     // The first pass reads everything, and the index answers once it has.
     await pass('reconcile');
@@ -123,9 +134,9 @@ async function main(): Promise<void> {
     setInterval(() => void pass('reconcile'), config.reconcileInterval * 1000);
 }
 
-installProcessGuards('Memeplex indexer');
-
-main().catch(error => {
+// Fatal until startup is complete: a process that is listening with no
+// Gatekeeper behind it would pass a health check and answer nothing.
+main(installProcessGuards('Memeplex indexer')).catch(error => {
     console.error(`Memeplex indexer failed to start: ${error}`);
     process.exit(1);
 });

@@ -57,7 +57,7 @@ export class Sync {
     private readonly exportSize: number;
     private readonly overlap: number;
     private readonly now: () => number;
-    /** When the previous poll began. */
+    /** When the previous pass began. Undefined until a pass has read the whole feed. */
     private polled: number | undefined;
     /**
      * The events read by the previous pass, so that the next poll, which reads
@@ -104,6 +104,11 @@ export class Sync {
                 return { events, dids, read };
             }
         }
+    }
+
+    /** Whether a pass has read the whole feed and exported what it found. */
+    get complete(): boolean {
+        return this.polled !== undefined;
     }
 
     /** Exports the current history of each DID and hands it to the index. */
