@@ -20,6 +20,9 @@ export interface AcceptedEvent {
     time: string;
     operation: Record<string, any>;
     registration?: { height?: number };
+    // The DID the event belongs to, and the canonical CID of its operation.
+    did?: string;
+    opid?: string;
 }
 
 // Where an operation sits on the grant's registry: the block that anchors it, and
