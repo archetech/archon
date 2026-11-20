@@ -1036,6 +1036,63 @@ pub(crate) async fn list_events(
     Json(json!({ "total": total, "events": events })).into_response()
 }
 
+/// Every version of each requested DID, oldest first, each as resolution
+/// returns it for that `versionSequence`. A reader that needs the whole of a
+/// DID's history gets it here as the versions this node resolves, and does not
+/// have to read the node's events and apply their operations itself.
+pub(crate) async fn resolve_versions(State(state): State<AppState>, body: Bytes) -> Response {
+    let start = Instant::now();
+    let invalid = || {
+        record_metrics(&state, "POST", "/dids/versions", 400, start.elapsed().as_secs_f64());
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Invalid parameter: dids" })),
+        )
+            .into_response()
+    };
+    let Ok(payload) = parse_optional_json_body(body) else { return invalid() };
+    let Some(items) = payload.get("dids").and_then(Value::as_array) else { return invalid() };
+    let mut dids = Vec::with_capacity(items.len());
+    for item in items {
+        let Some(did) = item.as_str() else { return invalid() };
+        dids.push(did.to_string());
+    }
+
+    if let Err(error) = crate::history::ensure_history_ready(&state).await {
+        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    }
+    // One lock for them all, so that the versions of a DID are of one history.
+    let _history_guard = state.history_lock.lock().await;
+    let mut all: Vec<Vec<Value>> = Vec::with_capacity(dids.len());
+    for did in &dids {
+        let mut versions = Vec::new();
+        let mut sequence: usize = 1;
+        loop {
+            let options = ResolveOptions {
+                version_sequence: Some(sequence),
+                ..Default::default()
+            };
+            let Ok(mut doc) = crate::resolve_local_doc_async(&state, did, options).await else { break };
+            // Resolution stops at the last version it has, so a sequence past
+            // the end returns that one again.
+            if doc.pointer("/didResolutionMetadata/error").is_some()
+                || document_sequence(&doc) != sequence as u64
+            {
+                break;
+            }
+            // When it was read is not part of what the version is.
+            if let Some(object) = doc.as_object_mut() {
+                object.remove("didResolutionMetadata");
+            }
+            versions.push(doc);
+            sequence += 1;
+        }
+        all.push(versions);
+    }
+    record_metrics(&state, "POST", "/dids/versions", 200, start.elapsed().as_secs_f64());
+    Json(json!(all)).into_response()
+}
+
 pub(crate) async fn list_changes(
     State(state): State<AppState>,
     Query(pairs): Query<Vec<(String, String)>>,

@@ -1,4 +1,5 @@
 import express from 'express';
+import { InvalidParameterError } from '@didcid/common/errors';
 import { ResolveDIDOptions, Operation } from '@didcid/gatekeeper/types';
 import type { CreateV1RouterOptions } from './v1-router-types.js';
 import { createRequireAdminKey } from './v1-admin.js';
@@ -792,6 +793,72 @@ export function createDidRouter(options: CreateV1RouterOptions): express.Router 
             const response = await gatekeeper.exportDIDs(dids);
             res.json(response);
         } catch (error: any) {
+            console.error(error);
+            res.status(500).send(error.toString());
+        }
+    });
+
+    /**
+     * @swagger
+     * /api/v1/dids/versions:
+     *   post:
+     *     summary: Resolve every version of one or more DIDs
+     *     description: >
+     *       Returns, for each requested DID, every version in its accepted
+     *       history, oldest first. Each version is what resolving the DID at that
+     *       `versionSequence` returns, without `didResolutionMetadata`: the
+     *       document, the data, the registration and the document metadata,
+     *       including the version's `versionId` and, where the node knows the
+     *       block that anchored it, its `timestamp`. The result is aligned with
+     *       the request, and a DID this node cannot resolve has no versions.
+     *     requestBody:
+     *       required: true
+     *       content:
+     *         application/json:
+     *           schema:
+     *             type: object
+     *             required:
+     *               - dids
+     *             properties:
+     *               dids:
+     *                 type: array
+     *                 items:
+     *                   type: string
+     *                 description: The DIDs whose versions to resolve.
+     *     responses:
+     *       200:
+     *         description: One array of versions for each requested DID, in the order requested.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: array
+     *               items:
+     *                 type: array
+     *                 description: The versions of one DID, oldest first.
+     *                 items:
+     *                   type: object
+     *                   properties:
+     *                     didDocument:
+     *                       type: object
+     *                     didDocumentData:
+     *                       description: The DID's data as of this version.
+     *                     didDocumentRegistration:
+     *                       type: object
+     *                     didDocumentMetadata:
+     *                       type: object
+     *       400:
+     *         description: The body has no `dids`, or `dids` is not an array of strings.
+     *       500:
+     *         description: Internal Server Error.
+     */
+    router.post('/dids/versions', async (req, res) => {
+        try {
+            res.json(await gatekeeper.resolveVersions(req.body?.dids));
+        } catch (error: any) {
+            if (error?.type === InvalidParameterError.type) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
             console.error(error);
             res.status(500).send(error.toString());
         }

@@ -230,6 +230,23 @@
     "compareMode": "jsonLoose"
   },
   {
+    "name": "dids-versions-agent-asset-and-unknown",
+    "method": "POST",
+    "path": "/api/v1/dids/versions",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "bodyTemplate": {
+      "dids": [
+        "{{createdDid}}",
+        "did:cid:mock",
+        "{{assetDid}}"
+      ]
+    },
+    "expectedStatus": 200,
+    "compareMode": "jsonLoose"
+  },
+  {
     "name": "events-list-all",
     "method": "GET",
     "path": "/api/v1/events",

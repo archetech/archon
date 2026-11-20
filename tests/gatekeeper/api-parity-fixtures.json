@@ -35,6 +35,45 @@
     "compareMode": "json"
   },
   {
+    "name": "versions-no-dids",
+    "method": "POST",
+    "path": "/api/v1/dids/versions",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {},
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
+    "name": "versions-dids-not-a-list",
+    "method": "POST",
+    "path": "/api/v1/dids/versions",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "dids": "did:cid:mock"
+    },
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
+    "name": "versions-dids-not-strings",
+    "method": "POST",
+    "path": "/api/v1/dids/versions",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "dids": [
+        1
+      ]
+    },
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
     "name": "query-bad-request",
     "method": "POST",
     "path": "/api/v1/query",

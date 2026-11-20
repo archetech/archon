@@ -1227,6 +1227,52 @@ export default class Gatekeeper implements GatekeeperInterface {
         return doc;
     }
 
+    // Every version of each DID, oldest first, each as resolution returns it
+    // when asked for that versionSequence. A DID this node cannot resolve has
+    // none. A reader that needs the whole of a DID's history, an indexer for
+    // one, gets it here as the versions this node resolves, and does not have
+    // to read the node's events and apply their operations itself.
+    async resolveVersions(dids: string[]): Promise<DidCidDocument[][]> {
+        if (!Array.isArray(dids) || dids.some(did => typeof did !== 'string')) {
+            throw new InvalidParameterError('dids');
+        }
+
+        await this.ensureHistoryReady();
+        // One lock for them all, so that the versions of a DID are of one history.
+        return this.withHistoryLock(async () => {
+            const all: DidCidDocument[][] = [];
+
+            for (const did of dids) {
+                const versions: DidCidDocument[] = [];
+
+                for (let sequence = 1; ; sequence++) {
+                    let doc: DidCidDocument;
+
+                    try {
+                        doc = await this.resolveDIDAt(did, { versionSequence: sequence });
+                    }
+                    catch {
+                        break;
+                    }
+
+                    // Resolution stops at the last version it has, so a sequence
+                    // past the end returns that one again.
+                    if (doc.didResolutionMetadata?.error || doc.didDocumentMetadata?.versionSequence !== String(sequence)) {
+                        break;
+                    }
+
+                    // When it was read is not part of what the version is.
+                    delete doc.didResolutionMetadata;
+                    versions.push(doc);
+                }
+
+                all.push(versions);
+            }
+
+            return all;
+        });
+    }
+
     // A versionTime is a date-time in the form every other timestamp here takes,
     // and a versionSequence is a positive integer.
     private validVersionOptions(options?: ResolveDIDOptions): boolean {

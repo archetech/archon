@@ -197,6 +197,12 @@ export interface GatekeeperInterface {
     deleteDID(operation: Operation): Promise<boolean>;
     getDIDs(options?: GetDIDOptions): Promise<string[] | DidCidDocument[]>;
     exportDIDs(dids?: string[]): Promise<GatekeeperEvent[][]>;
+    /**
+     * Every version of each DID, oldest first, each as resolution returns it for
+     * that `versionSequence`, without `didResolutionMetadata`. Aligned with
+     * `dids`; a DID the node cannot resolve has no versions.
+     */
+    resolveVersions(dids: string[]): Promise<DidCidDocument[][]>;
     listEvents(options?: ListEventsOptions): Promise<ListEventsResult>;
     listChanges(options?: ListChangesOptions): Promise<ListChangesResult>;
     importDIDs(dids: GatekeeperEvent[][]): Promise<ImportBatchResult>;
