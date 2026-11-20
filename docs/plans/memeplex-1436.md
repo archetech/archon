@@ -254,15 +254,19 @@ from attribution.
 
 ## A graph anyone can reconstruct
 
-An indexer discovers objects from operations in `GET /api/v1/events`, including
+An indexer discovers objects from the histories a Gatekeeper holds, including
 objects already deleted or edited out of their original shape. It then derives
-publication state from their histories. A fresh rebuild and a continuously
+publication state from those histories. A fresh rebuild and a continuously
 running index must agree on the same evidence.
 
-The feed is ordered by event time, not arrival. Polling alone misses late evidence
-and displaced branches, so indexers also reconcile indexed histories and reread
-the feed over its full range. Recheck dependent publications when their histories,
-grant histories or compared receipts change. Indexer caches confer no authority.
+It reads every DID once, then follows `GET /api/v1/changes`, which lists the DIDs
+whose accepted histories have changed in the order the node changed them: late
+evidence, a displaced branch and a removed history are each a change like any
+other. It does not follow `GET /api/v1/events`, which is ordered by event time,
+not arrival, so that what is new can sort anywhere in it. The Gatekeeper counts
+its changes from when it started, so after it restarts the indexer reads every
+DID again. Recheck dependent publications when their histories, grant histories
+or compared receipts change. Indexer caches confer no authority.
 
 A client reads publication state from an indexer it runs or chooses, as it reads
 histories from a Gatekeeper it trusts; it does not attribute every object itself.

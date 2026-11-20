@@ -37,15 +37,10 @@ async function anchor(block: number) {
     })) as never);
     await gatekeeper.processEvents();
     await gatekeeper.clearQueue(REGISTRY, operations);
-    at(block);
 }
 
-// The indexer's clock. Blocks here carry times in the past, so the clock is set
-// to the block being anchored, as a node's clock is close to its chain's.
-let clock = 0;
-const at = (block: number) => { clock = Date.parse(blockTime(block)); };
 const syncing = (index: MemeplexIndex, source = feed(), more: Record<string, unknown> = {}) =>
-    new Sync({ gatekeeper: source, index, now: () => clock, ...more });
+    new Sync({ gatekeeper: source, index, ...more });
 
 // The Gatekeeper as the indexer reads it, counting what it is asked.
 function feed(): FeedGatekeeper & { exported: string[][] } {
@@ -53,7 +48,9 @@ function feed(): FeedGatekeeper & { exported: string[][] } {
 
     return {
         exported,
-        listEvents: options => gatekeeper.listEvents(options) as never,
+        // Looked up at each call, so that the feed follows a Gatekeeper that restarts.
+        getDIDs: () => gatekeeper.getDIDs() as Promise<string[]>,
+        listChanges: options => gatekeeper.listChanges(options),
         exportDIDs: async dids => {
             exported.push(dids);
             return JSON.parse(JSON.stringify(await gatekeeper.exportDIDs(dids)));
@@ -82,21 +79,23 @@ beforeEach(async () => {
 });
 
 describe('Sync', () => {
-    it('fills an index from the feed, and keeps only objects and grants', async () => {
+    it('fills an index from every DID the node has, and keeps only objects and grants', async () => {
         const first = await post('First.');
-        await client.createAsset({ note: 'not a Memeplex object' }, { registry: REGISTRY });
+        const other = await client.createAsset({ note: 'not a Memeplex object' }, { registry: REGISTRY });
         await anchor(200);
 
         const index = new MemeplexIndex();
         const source = feed();
-        const result = await syncing(index, source).poll();
+        const sync = syncing(index, source);
 
+        expect(sync.complete).toBe(false);
+        expect(await sync.poll()).toStrictEqual({ rebuilt: true, histories: 5 });
+
+        expect(sync.complete).toBe(true);
         expect(index.publication(first)).toMatchObject({ state: 'published', did: first });
         expect(index.dids().sort()).toStrictEqual([first, grant].sort());
-        // The two agents and the other asset were read from the feed and not exported.
-        expect(result.histories).toBe(2);
-        expect(result.events).toBeGreaterThan(2);
-        expect(source.exported.flat().sort()).toStrictEqual([first, grant].sort());
+        // The two agents and the other asset were read and not kept.
+        expect(source.exported.flat().sort()).toStrictEqual([first, grant, other, userDid, clientDid].sort());
     }, 60_000);
 
     it('follows edits, deletions and a revocation by polling', async () => {
@@ -112,7 +111,7 @@ describe('Sync', () => {
         await client.mergeData(first, { memeplex: { v: 1, kind: 'post', author: userDid, grant, text: 'First, edited.' } });
         await client.revokeDID(second);
         await anchor(300);
-        await sync.poll();
+        expect((await sync.poll()).rebuilt).toBe(false);
         expect(index.timeline([userDid]).map(each => each.memeplex!.text)).toStrictEqual(['First, edited.']);
         expect(index.publication(second)!.state).toBe('withdrawn');
 
@@ -125,7 +124,7 @@ describe('Sync', () => {
         expect(index.publication(first)).toMatchObject({ state: 'published', current: 1 });
     }, 60_000);
 
-    it('reads only what is new after the first poll', async () => {
+    it('exports only what has changed since the last poll', async () => {
         const index = new MemeplexIndex();
         const source = feed();
         const sync = syncing(index, source);
@@ -137,32 +136,38 @@ describe('Sync', () => {
 
         const second = await post('Second.');
         await anchor(300);
-        const result = await sync.poll();
 
-        expect(source.exported.flat()).toStrictEqual([second]);
-        expect(result).toStrictEqual({ events: 1, histories: 1 });
-        // The next poll reads the same stretch of the feed and finds nothing new in it.
+        expect(await sync.poll()).toStrictEqual({ rebuilt: false, histories: 1 });
+        expect(source.exported).toStrictEqual([[second]]);
+
         source.exported.length = 0;
-        expect(await sync.poll()).toStrictEqual({ events: 0, histories: 0 });
+        expect(await sync.poll()).toStrictEqual({ rebuilt: false, histories: 0 });
         expect(source.exported).toStrictEqual([]);
     }, 60_000);
 
-    it('reads the feed in pages and exports in batches', async () => {
+    it('reads changes in pages and exports in batches', async () => {
+        const index = new MemeplexIndex();
+        const source = feed();
+        const sync = syncing(index, source, { pageSize: 3, exportSize: 2 });
+        await sync.poll();
+        source.exported.length = 0;
+
         const dids = [];
         for (let n = 0; n < 7; n++) dids.push(await post(`Post ${n}.`));
         await anchor(200);
-
-        const index = new MemeplexIndex();
-        const source = feed();
-        await syncing(index, source, { pageSize: 3, exportSize: 4 }).poll();
+        await sync.poll();
 
         expect(index.timeline([userDid]).map(each => each.did).sort()).toStrictEqual([...dids].sort());
-        expect(source.exported.map(batch => batch.length)).toStrictEqual([4, 4]);
+        // Each post changed twice, when created and when anchored, and is listed
+        // once: seven changes in pages of three, each exported in batches of two.
+        expect(source.exported.map(batch => batch.length)).toStrictEqual([2, 1, 2, 1, 1]);
+        expect(source.exported.flat().sort()).toStrictEqual([...dids].sort());
     }, 60_000);
 
-    // A poll reads a little way back from the previous one. Evidence that
-    // arrives carrying a time further back than that is found by reconciling.
-    it('finds by reconciling what arrives with a time a poll has passed', async () => {
+    // The events feed sorts an anchor by its block's time, so one that arrived
+    // late was found only by rereading everything. A change is a change whenever
+    // it happened.
+    it('takes in at the next poll an anchor that arrives carrying an old time', async () => {
         const index = new MemeplexIndex();
         const sync = syncing(index);
         const late = await post('Late.');
@@ -173,8 +178,6 @@ describe('Sync', () => {
         await anchor(300);
         await sync.poll();
         expect(index.publication(late)).toBeUndefined();
-        at(310);
-        await sync.poll();
 
         // The earlier post's anchor at block 200 reaches this node only now.
         await gatekeeper.importBatch(operations.map((operation, position) => ({
@@ -183,90 +186,104 @@ describe('Sync', () => {
         })) as never);
         await gatekeeper.processEvents();
 
-        at(320);
-        await sync.poll();
-        expect(index.publication(late)).toBeUndefined();
-
-        await sync.reconcile();
+        expect((await sync.poll()).rebuilt).toBe(false);
         expect(index.publication(late)).toMatchObject({ state: 'published' });
     }, 60_000);
 
-    it('is not blinded by an event dated ahead of the clock', async () => {
+    it('removes at the next poll a history the Gatekeeper no longer has', async () => {
         const index = new MemeplexIndex();
         const sync = syncing(index);
-
-        // An anchor claiming a block time a day ahead.
-        await post('From the future.');
-        const operations = await gatekeeper.getQueue(REGISTRY);
-        await gatekeeper.importBatch(operations.map((operation, position) => ({
-            registry: REGISTRY, time: blockTime(200 + 24 * 60), ordinal: [200, 0, position],
-            registration: { height: 200, index: 0, txid: 'tx-200', batch: 'did:cid:batch-200', opidx: position }, operation,
-        })) as never);
-        await gatekeeper.processEvents();
-        await gatekeeper.clearQueue(REGISTRY, operations);
-        at(200);
-        await sync.poll();
-
-        const next = await post('After it.');
-        await anchor(210);
-        await sync.poll();
-
-        expect(index.publication(next)).toMatchObject({ state: 'published' });
-    }, 60_000);
-
-    // A pass that could not export is not over: the next one tries the same again.
-    it.each(['poll', 'reconcile'] as const)('recovers by a %s from an export that failed', async pass => {
-        const index = new MemeplexIndex();
-        const source = feed();
-        const exportDIDs = source.exportDIDs;
-        const sync = syncing(index, source);
-        await sync.poll();
-
         const first = await post('First.');
         await anchor(200);
-        source.exportDIDs = async () => { throw new Error('the Gatekeeper is restarting'); };
-        await expect(sync[pass]()).rejects.toThrow('restarting');
-        expect(index.publication(first)).toBeUndefined();
-        expect(sync.complete).toBe(true);
-
-        source.exportDIDs = exportDIDs;
-        await sync[pass]();
+        await sync.poll();
         expect(index.publication(first)).toMatchObject({ state: 'published' });
-    }, 60_000);
-
-    // Whichever pass first reads the whole feed makes the index complete, a
-    // poll included: before any pass has, a poll reads everything.
-    it.each(['poll', 'reconcile'] as const)('is complete after a first %s, and not after one that failed', async pass => {
-        const index = new MemeplexIndex();
-        const source = feed();
-        const exportDIDs = source.exportDIDs;
-        const sync = syncing(index, source);
-
-        expect(sync.complete).toBe(false);
-        source.exportDIDs = async () => { throw new Error('the Gatekeeper is restarting'); };
-        await expect(sync.reconcile()).rejects.toThrow('restarting');
-        expect(sync.complete).toBe(false);
-
-        source.exportDIDs = exportDIDs;
-        await sync[pass]();
-        expect(sync.complete).toBe(true);
-        expect(index.dids()).toStrictEqual([grant]);
-    }, 60_000);
-
-    it('removes by reconciling a history the Gatekeeper no longer has', async () => {
-        const index = new MemeplexIndex();
-        const sync = syncing(index);
-        const first = await post('First.');
-        await anchor(200);
-        await sync.poll();
 
         await gatekeeper.removeDIDs([first]);
-        await sync.poll();
-        expect(index.publication(first)).toMatchObject({ state: 'published' });
+        expect((await sync.poll()).rebuilt).toBe(false);
 
-        await sync.reconcile();
         expect(index.publication(first)).toBeUndefined();
         expect(index.dids()).toStrictEqual([grant]);
+    }, 60_000);
+
+    // A Gatekeeper counts its changes from when it started. After it restarts,
+    // the sequence the indexer holds means nothing, and it reads everything.
+    it('reads everything again when the Gatekeeper has restarted', async () => {
+        const index = new MemeplexIndex();
+        const source = feed();
+        const sync = syncing(index, source);
+        const first = await post('First.');
+        await anchor(200);
+        await sync.poll();
+
+        // While the indexer is not looking: a new post, and a history removed,
+        // neither of which the new run of the Gatekeeper lists as a change.
+        const second = await post('Second.');
+        await anchor(300);
+        await gatekeeper.removeDIDs([first]);
+        const db = (gatekeeper as unknown as { db: DbJsonMemory }).db;
+        gatekeeper = new Gatekeeper({
+            db, ipfs: new MemoryClient(), registries: ['hyperswarm', REGISTRY],
+            console: { log: () => undefined, error: () => undefined, time: () => undefined, timeEnd: () => undefined } as never,
+        });
+        expect((await gatekeeper.listChanges({ since: 0 })).changes).toStrictEqual([]);
+
+        source.exported.length = 0;
+        expect((await sync.poll()).rebuilt).toBe(true);
+        expect(index.publication(second)).toMatchObject({ state: 'published' });
+        expect(index.publication(first)).toBeUndefined();
+
+        // And follows the new run from there.
+        expect(await sync.poll()).toStrictEqual({ rebuilt: false, histories: 0 });
+    }, 60_000);
+
+    // A poll that could not export is not over: the next one asks for the same.
+    it('recovers from an export that failed, at the first read and after', async () => {
+        const index = new MemeplexIndex();
+        const source = feed();
+        const exportDIDs = source.exportDIDs;
+        const failing = async () => { throw new Error('the Gatekeeper is restarting'); };
+        const sync = syncing(index, source);
+
+        source.exportDIDs = failing;
+        await expect(sync.poll()).rejects.toThrow('restarting');
+        expect(sync.complete).toBe(false);
+
+        source.exportDIDs = exportDIDs;
+        expect((await sync.poll()).rebuilt).toBe(true);
+        expect(sync.complete).toBe(true);
+
+        const first = await post('First.');
+        await anchor(200);
+        source.exportDIDs = failing;
+        await expect(sync.poll()).rejects.toThrow('restarting');
+        expect(index.publication(first)).toBeUndefined();
+
+        source.exportDIDs = exportDIDs;
+        expect((await sync.poll()).rebuilt).toBe(false);
+        expect(index.publication(first)).toMatchObject({ state: 'published' });
+    }, 60_000);
+
+    it('takes in what changes while it is reading everything', async () => {
+        const index = new MemeplexIndex();
+        const source = feed();
+        const getDIDs = source.getDIDs;
+        let during = '';
+
+        // A post is anchored after the node's DIDs were listed and before the
+        // read of them ends.
+        source.getDIDs = async () => {
+            const dids = await getDIDs();
+            during = await post('During.');
+            await anchor(200);
+            return dids;
+        };
+        const sync = syncing(index, source);
+        await sync.poll();
+        source.getDIDs = getDIDs;
+
+        expect(index.publication(during)).toBeUndefined();
+        expect((await sync.poll()).rebuilt).toBe(false);
+        expect(index.publication(during)).toMatchObject({ state: 'published' });
     }, 60_000);
 
     it('builds from nothing the same index as one kept up to date', async () => {
@@ -289,7 +306,7 @@ describe('Sync', () => {
         await sync.poll();
 
         const fresh = new MemeplexIndex();
-        await syncing(fresh).reconcile();
+        await syncing(fresh).poll();
 
         expect(fresh.snapshot()).toStrictEqual(running.snapshot());
         expect(fresh.thread(first)).toStrictEqual(running.thread(first));
@@ -316,7 +333,7 @@ describe('the HTTP views', () => {
             memeplex: { v: 1, kind: 'tag', author: userDid, grant, target: first, targetVersion: index.publication(first)!.versions[0].opid, tag: 'archon' },
         }, { registry: REGISTRY });
         await anchor(300);
-        await syncing(index).reconcile();
+        await syncing(index).rebuild();
 
         const status = () => ({ ready, ...index.size });
 
