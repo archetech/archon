@@ -34,6 +34,7 @@ function createMockGatekeeper() {
         searchDocs: jest.fn<any>().mockResolvedValue(['did:cid:abc']),
         queryDocs: jest.fn<any>().mockResolvedValue(['did:cid:abc']),
         listEvents: jest.fn<any>().mockResolvedValue({ total: 1, events: [{ did: 'did:cid:abc' }] }),
+        listChanges: jest.fn<any>().mockResolvedValue({ epoch: 'run-1', sequence: 3, changes: [{ did: 'did:cid:abc', sequence: 3 }] }),
     };
 }
 
@@ -393,6 +394,31 @@ describe('drawbridge v1 gatekeeper proxy routes', () => {
 
         gatekeeper.listEvents.mockRejectedValueOnce('connect ECONNREFUSED');
         expect((await request(app).get('/api/v1/events')).status).toBe(502);
+    });
+
+    it('lists changes, passing parameters through and upstream 400s back', async () => {
+        const { app, gatekeeper } = mount();
+
+        const listed = await request(app).get('/api/v1/changes?since=2&limit=10');
+        expect(listed.status).toBe(200);
+        expect(listed.body).toStrictEqual({ epoch: 'run-1', sequence: 3, changes: [{ did: 'did:cid:abc', sequence: 3 }] });
+        expect(gatekeeper.listChanges).toHaveBeenLastCalledWith({ since: 2, limit: 10 });
+
+        // With no sequence the gatekeeper is asked for none, not for zero.
+        await request(app).get('/api/v1/changes');
+        expect(gatekeeper.listChanges).toHaveBeenLastCalledWith({ since: undefined, limit: undefined });
+
+        // Repeated or non-digit values stay invalid for the gatekeeper to reject.
+        await request(app).get('/api/v1/changes?since=1&since=2&limit=1e1');
+        expect(gatekeeper.listChanges).toHaveBeenLastCalledWith({ since: NaN, limit: NaN });
+
+        gatekeeper.listChanges.mockRejectedValueOnce({ error: 'Invalid parameter: since' });
+        const rejected = await request(app).get('/api/v1/changes?since=-1');
+        expect(rejected.status).toBe(400);
+        expect(rejected.body).toStrictEqual({ error: 'Invalid parameter: since' });
+
+        gatekeeper.listChanges.mockRejectedValueOnce('connect ECONNREFUSED');
+        expect((await request(app).get('/api/v1/changes')).status).toBe(502);
     });
 
     it('reports any upstream gatekeeper failure as 502', async () => {

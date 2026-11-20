@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::store::EventRecord;
 
@@ -29,6 +31,104 @@ pub(crate) struct EventIndex {
     histories: HashMap<String, Vec<EventSummary>>,
     sorted: Option<Vec<EventSummary>>,
     built: bool,
+    // Every write to an accepted history passes through this index, so the log
+    // of which DIDs changed is kept here, by the same writes.
+    pub(crate) changes: ChangeLog,
+}
+
+pub(crate) struct ChangePage {
+    pub(crate) epoch: String,
+    // The sequence of the latest change.
+    pub(crate) sequence: u64,
+    // Storage keys in ascending sequence, each once, at its latest change.
+    pub(crate) changes: Vec<(String, u64)>,
+}
+
+/// Which DIDs' accepted histories have changed, in the order this node changed
+/// them. A reader that asks what has changed since it last looked can follow a
+/// node at the cost of what changed, without reading every event again.
+///
+/// The numbers are this node's own, counted from one build of its histories.
+/// They are not event times, which follow a block or a signer and not arrival,
+/// and they mean nothing on another node or after a restart: the epoch names
+/// the run they belong to, and a reader that meets a new epoch reads
+/// everything again.
+pub(crate) struct ChangeLog {
+    epoch: String,
+    sequence: u64,
+    // The latest change to each DID, and every change in order. An entry in the
+    // log that is not its DID's latest is passed over, and removed when the log
+    // is next compacted.
+    latest: HashMap<String, u64>,
+    log: Vec<(String, u64)>,
+}
+
+impl Default for ChangeLog {
+    fn default() -> Self {
+        Self {
+            epoch: new_epoch(),
+            sequence: 0,
+            latest: HashMap::new(),
+            log: Vec::new(),
+        }
+    }
+}
+
+impl ChangeLog {
+    /// Everything may have changed: the histories were built or cleared.
+    pub(crate) fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    pub(crate) fn record(&mut self, key: &str) {
+        self.sequence += 1;
+        self.latest.insert(key.to_string(), self.sequence);
+        self.log.push((key.to_string(), self.sequence));
+
+        if self.log.len() > 2 * self.latest.len() + 1024 {
+            let latest = &self.latest;
+            self.log
+                .retain(|(key, sequence)| latest.get(key) == Some(sequence));
+        }
+    }
+
+    /// The changes after a sequence, oldest first, up to a limit. With no
+    /// sequence, none: only where the log now stands.
+    pub(crate) fn since(&self, sequence: Option<u64>, limit: usize) -> ChangePage {
+        let changes = match sequence {
+            None => Vec::new(),
+            Some(since) => {
+                // The log is in ascending sequence: find the first entry after it.
+                let start = self.log.partition_point(|(_, sequence)| *sequence <= since);
+                self.log[start..]
+                    .iter()
+                    .filter(|(key, sequence)| self.latest.get(key) == Some(sequence))
+                    .take(limit)
+                    .cloned()
+                    .collect()
+            }
+        };
+        ChangePage {
+            epoch: self.epoch.clone(),
+            sequence: self.sequence,
+            changes,
+        }
+    }
+}
+
+// Unique to a build of the histories: the time, the process and a count, since
+// a process can build more than once.
+fn new_epoch() -> String {
+    static BUILDS: AtomicU64 = AtomicU64::new(0);
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or(0);
+    format!(
+        "{nanos:x}-{:x}-{:x}",
+        std::process::id(),
+        BUILDS.fetch_add(1, Ordering::Relaxed)
+    )
 }
 
 impl EventIndex {
@@ -50,12 +150,14 @@ impl EventIndex {
         }
         self.built = true;
         self.sorted = None;
+        self.changes.reset();
     }
 
     pub(crate) fn clear(&mut self) {
         self.histories.clear();
         self.built = false;
         self.sorted = None;
+        self.changes.reset();
     }
 
     pub(crate) fn set(&mut self, did: &str, events: &[EventRecord]) {
@@ -69,14 +171,17 @@ impl EventIndex {
             self.histories.insert(key.clone(), summarize(&key, events));
         }
         self.sorted = None;
+        self.changes.record(&key);
     }
 
     pub(crate) fn delete(&mut self, did: &str) {
         if !self.built {
             return;
         }
-        self.histories.remove(&storage_key(did));
+        let key = storage_key(did);
+        self.histories.remove(&key);
         self.sorted = None;
+        self.changes.record(&key);
     }
 
     pub(crate) fn query(&mut self, query: &EventQuery<'_>) -> (usize, Vec<EventSummary>) {

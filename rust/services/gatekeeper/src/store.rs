@@ -401,6 +401,12 @@ impl JsonDb {
         Ok(())
     }
 
+    /// The DIDs whose accepted histories have changed after a sequence, by
+    /// storage key, oldest first.
+    pub(crate) fn list_changes(&self, since: Option<u64>, limit: usize) -> crate::event_index::ChangePage {
+        self.event_index.changes.since(since, limit)
+    }
+
     /// One page of accepted events and the number matching the query. Each
     /// event carries its DID, from the record or else from its storage key.
     pub(crate) fn list_events(&mut self, did_prefix: &str, query: &EventQuery<'_>) -> (usize, Vec<EventRecord>) {

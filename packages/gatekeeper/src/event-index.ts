@@ -1,3 +1,4 @@
+import ChangeLog from './change-log.js';
 import type { GatekeeperEvent } from './types.js';
 
 export interface EventSummary {
@@ -37,6 +38,10 @@ export default class EventIndex {
     private sorted?: EventSummary[];
     private built = false;
 
+    // Every write to an accepted history passes through this index, so the log
+    // of which DIDs changed is kept here, by the same writes.
+    readonly changes = new ChangeLog();
+
     // Writes before the first build are ignored: the build reads everything.
     get isBuilt(): boolean {
         return this.built;
@@ -47,12 +52,14 @@ export default class EventIndex {
         for (const [did, events] of histories) this.set(did, events, true);
         this.built = true;
         this.sorted = undefined;
+        this.changes.reset();
     }
 
     clear(): void {
         this.histories.clear();
         this.built = false;
         this.sorted = undefined;
+        this.changes.reset();
     }
 
     set(did: string, events: GatekeeperEvent[], building = false): void {
@@ -61,6 +68,7 @@ export default class EventIndex {
         if (events.length) this.histories.set(key, events.map((event, position) => this.summarize(key, position, event)));
         else this.histories.delete(key);
         this.sorted = undefined;
+        if (!building) this.changes.record(key);
     }
 
     add(did: string, event: GatekeeperEvent): void {
@@ -70,12 +78,15 @@ export default class EventIndex {
         history.push(this.summarize(key, history.length, event));
         this.histories.set(key, history);
         this.sorted = undefined;
+        this.changes.record(key);
     }
 
     delete(did: string): void {
         if (!this.built) return;
-        this.histories.delete(storageKey(did));
+        const key = storageKey(did);
+        this.histories.delete(key);
         this.sorted = undefined;
+        this.changes.record(key);
     }
 
     query({ after, before, registry, limit, offset }: EventQuery): { total: number; page: EventSummary[] } {

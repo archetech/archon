@@ -27,6 +27,8 @@ import {
     GetDIDOptions,
     ListEventsOptions,
     ListEventsResult,
+    ListChangesOptions,
+    ListChangesResult,
     CheckDIDsResult,
     ImportBatchResult,
     ProcessEventsResult,
@@ -2624,6 +2626,25 @@ export default class Gatekeeper implements GatekeeperInterface {
                 return event ? [{ ...event, did: event.did ?? `${this.didPrefix}:${key}` }] : [];
             });
             return { total, events };
+        });
+    }
+
+    // Which DIDs' accepted histories have changed on this node since a sequence
+    // it gave earlier, oldest first: see ChangeLog.
+    async listChanges(options: ListChangesOptions = {}): Promise<ListChangesResult> {
+        const { since, limit = 1000 } = options;
+        if (since !== undefined && (!Number.isSafeInteger(since) || since < 0)) throw new InvalidParameterError('since');
+        if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new InvalidParameterError('limit');
+
+        await this.ensureHistoryReady();
+        return this.withHistoryLock(async () => {
+            const { epoch, sequence, changes } = this.eventIndex.changes.since(since, limit);
+
+            return {
+                epoch,
+                sequence,
+                changes: changes.map(change => ({ did: `${this.didPrefix}:${change.key}`, sequence: change.sequence })),
+            };
         });
     }
 

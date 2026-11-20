@@ -112,6 +112,7 @@ unhandled paths.
 | `GET` | `/api/v1/block/:registry/:blockId` | no | Block lookup. Numeric `blockId` is treated as height; otherwise as hash. |
 | `POST` | `/api/v1/block/:registry` | yes | Body: `BlockInfo`. Returns boolean. |
 | `GET` | `/api/v1/events` | no | Query `after`, `before`, `registry`, `limit`, `offset`. Returns `{ "total": number, "events": GatekeeperEvent[] }`, accepted events across all DIDs, newest first. See [§9.3](#93-get-apiv1events). |
+| `GET` | `/api/v1/changes` | no | Query `since`, `limit`. Returns `{ "epoch": string, "sequence": number, "changes": [{ "did": string, "sequence": number }] }`, the DIDs whose accepted histories changed after a sequence, oldest first. See [§9.4](#94-get-apiv1changes). |
 | `GET` | `/api/v1/search` | no | Query `q`. Returns array of DIDs whose `didDocumentData` contains the query string. Empty `q` returns `[]`. |
 | `POST` | `/api/v1/query` | no | Body: `{ "where": {...} }`. See [§9](#9-search-and-structured-query). MUST return HTTP 400 `{"error":"`where` must be an object"}` if `where` is missing or not an object. |
 | `GET` | `/metrics` | no | Prometheus exposition. See [§13](#13-prometheus-metrics-contract). |
@@ -1382,6 +1383,50 @@ of the DIDs it lists. Like the search index, the index reflects writes made
 by this process.
 
 ---
+
+### 9.4 `GET /api/v1/changes`
+
+Lists the DIDs whose accepted histories have changed on this node, in the
+order it changed them, so a reader that keeps its own view of some DIDs (an
+indexer, a cache) can follow a node at the cost of what changed. The events
+feed of [§9.3](#93-get-apiv1events) cannot serve that reader: it is ordered by
+event time, which follows a block or a signer and not arrival, so what is new
+may sort anywhere in it.
+
+Every write to a DID's accepted history, an event accepted, replaced, anchored
+or removed, is given the next **sequence**, counted from 1. A node counts from
+when it last built its histories, at startup or after `POST /api/v1/db/reset`,
+and names that run with an **epoch**, an opaque string. Sequences are this
+node's own. They mean nothing on another node or under another epoch, and the
+two ports need not give the same sequence to the same change.
+
+Query parameters, both optional:
+
+| Parameter | Meaning |
+| --- | --- |
+| `since` | Only changes whose sequence is greater, `0`–`9007199254740991`. Without it no changes are returned. |
+| `limit` | Page size, `1`–`1000`. Default `1000`. |
+
+Both MUST be plain decimal digits. A parameter given more than once, an empty
+value, or any other invalid value MUST return HTTP 400
+`{"error":"Invalid parameter: <name>"}`, checking `since` then `limit`.
+
+The response is
+`{ "epoch": string, "sequence": number, "changes": [{ "did": string, "sequence": number }] }`.
+`sequence` is that of the node's latest change, `0` when there has been none.
+`changes` is in ascending sequence and lists each DID once, at its latest
+change, so a DID changed again while a reader pages is met again later and
+never missed. A removed DID is listed like any other; its export is empty.
+
+A reader:
+
+1. asks with no `since` and keeps the `epoch` and `sequence`;
+2. reads everything it needs by other means;
+3. asks with `since` set to the sequence it holds, takes each DID's current
+   history from `POST /api/v1/dids/export`, and moves to the sequence of the
+   last change returned, until a page comes back short of `limit`;
+4. on meeting an `epoch` other than the one it holds, discards the page and
+   starts again at 1. Nothing listed before a build is a change after it.
 
 ## 10. Storage contract
 
