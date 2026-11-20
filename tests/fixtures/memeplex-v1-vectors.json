@@ -3331,6 +3331,158 @@
    }
   },
   {
+   "name": "rating: the widest scale",
+   "schema": "rating",
+   "member": "memeplex",
+   "expect": "valid",
+   "did": "did:cid:bagaaieracxvlcrloa4bdmt5m5cs6qgasq3d4yxr7vbpntp7ouzmvmkfmokyq",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaiera73ma7qk3wsnxncgyaourgt4pqdhx2eoe3bklhzehxaoahjmtfnma",
+      "grant": "did:cid:bagaaierazgkahz3nl2tyws2jc5p4aozmhawfqk257bngvnlvsspnotcxogrq",
+      "kind": "rating",
+      "target": "did:cid:bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
+      "targetVersion": "bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
+      "rating": 0,
+      "min": -1000000,
+      "max": 1000000
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "wt-KNY9ce0kifUtdWowUqBKzTLjTH3_FTzYDfiX3mNVVuB3Md49sJNNLhbRLCfxsJm0ghZG4Y5oSJr1HXnagSw"
+    }
+   }
+  },
+  {
+   "name": "rating: a scale that starts too low",
+   "schema": "rating",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaieraufsa3tpzycdfdporagviwojpv5sxj4c5zgdoikupukm76t24byka",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaiera73ma7qk3wsnxncgyaourgt4pqdhx2eoe3bklhzehxaoahjmtfnma",
+      "grant": "did:cid:bagaaierazgkahz3nl2tyws2jc5p4aozmhawfqk257bngvnlvsspnotcxogrq",
+      "kind": "rating",
+      "target": "did:cid:bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
+      "targetVersion": "bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
+      "rating": 3,
+      "min": -1000001,
+      "max": 5
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "7PGjpm3Gz2aCQJRDrIEdY_hJukX_IVqHU2FENRUwOyE2_ntaeh2Sw95XxArJUXW-xd56YovObyYfFgKc_Yf-AQ"
+    }
+   }
+  },
+  {
+   "name": "rating: a scale that ends too high",
+   "schema": "rating",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaierangfhg37rtrwpfxo7e2h3igakwhdr4247j6iyxql7q6wqcowh2tgq",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaiera73ma7qk3wsnxncgyaourgt4pqdhx2eoe3bklhzehxaoahjmtfnma",
+      "grant": "did:cid:bagaaierazgkahz3nl2tyws2jc5p4aozmhawfqk257bngvnlvsspnotcxogrq",
+      "kind": "rating",
+      "target": "did:cid:bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
+      "targetVersion": "bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
+      "rating": 3,
+      "min": 1,
+      "max": 1000001
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "pMA-O-gkomd5b82n_id6u6QDaszpskRYwl3AUjt5Y8xfvrQZNJN9IwgfR7VPfvMAub1OzotG5t6LjxEreLDRLw"
+    }
+   }
+  },
+  {
+   "name": "rating: a scale too large to subtract",
+   "schema": "rating",
+   "member": "memeplex",
+   "expect": "schema",
+   "did": "did:cid:bagaaiera7q2kxyqrgckfvysardg4wcdbyjiff22q33arks6losvfq273kx5a",
+   "operation": {
+    "type": "create",
+    "created": "2026-11-17T00:00:00.000Z",
+    "registration": {
+     "version": 1,
+     "type": "asset",
+     "registry": "BTC:mainnet"
+    },
+    "controller": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta",
+    "data": {
+     "memeplex": {
+      "v": 1,
+      "author": "did:cid:bagaaiera73ma7qk3wsnxncgyaourgt4pqdhx2eoe3bklhzehxaoahjmtfnma",
+      "grant": "did:cid:bagaaierazgkahz3nl2tyws2jc5p4aozmhawfqk257bngvnlvsspnotcxogrq",
+      "kind": "rating",
+      "target": "did:cid:bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
+      "targetVersion": "bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
+      "rating": 0,
+      "min": -1e+308,
+      "max": 1e+308
+     }
+    },
+    "proof": {
+     "type": "DataIntegrityProof",
+     "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+     "created": "2026-11-17T00:00:00.000Z",
+     "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
+     "proofPurpose": "capabilityInvocation",
+     "proofValue": "WFcKY5_R17A470_cUwt7X4RyFH1ZgUhpI606DWyLt8FUwfKfys6X_UT0fK8q_zsd8qH9VRBC1Yr4uc4f0R4tRA"
+    }
+   }
+  },
+  {
    "name": "rating: not an integer",
    "schema": "rating",
    "member": "memeplex",

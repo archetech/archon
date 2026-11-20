@@ -32,7 +32,7 @@ defined in the core. Examples below show asset data with abbreviated identifiers
 | `source` | `{ cid, type, bytes }` | paper |
 | `pdf` | `{ cid, type, bytes }` | paper |
 | `verdict` | string, at most 300 code points | reply |
-| `rating`, `min`, `max` | integers (see Ratings) | rating; required |
+| `rating`, `min`, `max` | integers from −1,000,000 to 1,000,000 (see Ratings) | rating; required |
 | `tag` | string, 1–64 code points (see Tags and reactions) | tag; required |
 | `image` | version-pinned DID URL of an image asset (see Custom emoji) | tag |
 
@@ -284,9 +284,9 @@ ignored, as the strictness rule requires.
     "kind": {"const": "rating"},
     "target": {"$ref": "#/$defs/did"},
     "targetVersion": {"$ref": "#/$defs/versionId"},
-    "rating": {"type": "integer"},
-    "min": {"type": "integer"},
-    "max": {"type": "integer"},
+    "rating": {"type": "integer", "minimum": -1000000, "maximum": 1000000},
+    "min": {"type": "integer", "minimum": -1000000, "maximum": 1000000},
+    "max": {"type": "integer", "minimum": -1000000, "maximum": 1000000},
     "text": false, "content": false, "tags": false, "title": false,
     "subtitle": false, "summary": false, "authors": false, "source": false,
     "pdf": false, "verdict": false, "tag": false, "image": false
@@ -503,8 +503,9 @@ down, and ratings stay comparable:
                 "rating": 3, "min": 1, "max": 5 } }
 ```
 
-- `rating`, `min` and `max` are integers with `min < max` and
-  `min ≤ rating ≤ max`.
+- `rating`, `min` and `max` are integers from −1,000,000 to 1,000,000, with
+  `min < max` and `min ≤ rating ≤ max`. The limit keeps every scale within what any
+  JSON implementation reads exactly, and its arithmetic exact.
 - The comparable value is `(rating − min) / (max − min)`, from 0 (worst) to 1 (best).
   Three stars on a 1–5 scale is 0.5; 80 on 0–100 is 0.8; a thumbs up `(1, 0, 1)` is 1.
   Centred scales work too: `(0, −2, 2)` is 0.5.
