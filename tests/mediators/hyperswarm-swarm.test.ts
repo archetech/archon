@@ -73,6 +73,21 @@ describe('TopicSwarm', () => {
         expect(swarms.map(made => made.keyPair)).toEqual([swarms[0].keyPair, swarms[0].keyPair, swarms[0].keyPair]);
     });
 
+    // A peer that kept a failed connection never hears the key it had again.
+    it('is a new peer after joining again as one, and stays that peer', async () => {
+        const { swarm, log } = setup();
+
+        const first = await swarm.join();
+        log.length = 0;
+        const second = await swarm.join({ asNewPeer: true });
+        const third = await swarm.join();
+
+        expect(second).not.toEqual(first);
+        expect(third).toEqual(second);
+        expect(log.filter(line => line.startsWith('create') || line.startsWith('destroyed')))
+            .toEqual(['destroyed key-1', 'create key-2', 'destroyed key-2', 'create key-2']);
+    });
+
     it('waits for the old swarm to go before making the new one', async () => {
         const { swarm, log } = setup();
 
