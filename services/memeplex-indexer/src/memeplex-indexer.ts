@@ -33,7 +33,7 @@ const syncErrors = new promClient.Counter({
 });
 
 function status(): IndexerStatus {
-    return { ...state, dids: index.dids().length, publications: index.snapshot().length };
+    return { ...state, ...index.size };
 }
 
 async function main(): Promise<void> {
@@ -60,10 +60,14 @@ async function main(): Promise<void> {
 
     const sync = new Sync({ gatekeeper: gatekeeper as unknown as FeedGatekeeper, index });
 
-    // One pass at a time: a poll and a reconciliation read the same feed.
+    // One pass at a time: a poll and a reconciliation read the same feed. A poll
+    // that finds a pass running is dropped, since another follows shortly. A
+    // reconciliation is kept and run when that pass ends.
     let running = false;
-    const pass = async (name: 'poll' | 'reconcile') => {
+    let reconcileWaiting = false;
+    const pass = async (name: 'poll' | 'reconcile'): Promise<void> => {
         if (running) {
+            reconcileWaiting = reconcileWaiting || name === 'reconcile';
             return;
         }
         running = true;
@@ -82,7 +86,7 @@ async function main(): Promise<void> {
                 state.ready = true;
             }
             if (name === 'reconcile' || result.histories > 0) {
-                console.log(`${name}: ${result.events} events, ${result.histories} histories, ${index.snapshot().length} publications`);
+                console.log(`${name}: ${result.events} events, ${result.histories} histories, ${index.size.publications} publications`);
             }
         }
         catch (error) {
@@ -91,9 +95,14 @@ async function main(): Promise<void> {
         }
         finally {
             end();
-            heldGauge.set(index.dids().length);
-            publicationsGauge.set(index.snapshot().length);
+            heldGauge.set(index.size.dids);
+            publicationsGauge.set(index.size.publications);
             running = false;
+        }
+
+        if (reconcileWaiting) {
+            reconcileWaiting = false;
+            await pass('reconcile');
         }
     };
 

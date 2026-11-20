@@ -151,6 +151,11 @@ export class MemeplexIndex {
         return [...this.histories.keys()];
     }
 
+    // How many DIDs are held, and how many of them have a publication.
+    get size(): { dids: number; publications: number } {
+        return { dids: this.histories.size, publications: this.publications.size };
+    }
+
     // The publication of an object, published or withdrawn. An object with no
     // attributed version has none.
     publication(did: string): Publication | undefined {

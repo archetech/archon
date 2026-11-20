@@ -214,6 +214,25 @@ describe('Sync', () => {
         expect(index.publication(next)).toMatchObject({ state: 'published' });
     }, 60_000);
 
+    // A pass that could not export is not over: the next one tries the same again.
+    it.each(['poll', 'reconcile'] as const)('recovers by a %s from an export that failed', async pass => {
+        const index = new MemeplexIndex();
+        const source = feed();
+        const exportDIDs = source.exportDIDs;
+        const sync = syncing(index, source);
+        await sync.poll();
+
+        const first = await post('First.');
+        await anchor(200);
+        source.exportDIDs = async () => { throw new Error('the Gatekeeper is restarting'); };
+        await expect(sync[pass]()).rejects.toThrow('restarting');
+        expect(index.publication(first)).toBeUndefined();
+
+        source.exportDIDs = exportDIDs;
+        await sync[pass]();
+        expect(index.publication(first)).toMatchObject({ state: 'published' });
+    }, 60_000);
+
     it('removes by reconciling a history the Gatekeeper no longer has', async () => {
         const index = new MemeplexIndex();
         const sync = syncing(index);
@@ -279,7 +298,7 @@ describe('the HTTP views', () => {
         await anchor(300);
         await syncing(index).reconcile();
 
-        const status = () => ({ ready, dids: index.dids().length, publications: index.snapshot().length });
+        const status = () => ({ ready, ...index.size });
 
         return { app: createIndexerApp({ index, status, version }), first, reply, rating, tag };
     }

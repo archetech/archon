@@ -73,11 +73,12 @@ export class Sync {
     }
 
     /**
-     * Reads the feed from a time on, newest first, and returns the DIDs with an
-     * event not read by the previous pass that matter: those an event shows to
-     * be an object or a grant, and those the index already holds.
+     * Reads the feed from a time on, newest first, and returns the DIDs that
+     * matter: those an event shows to be an object or a grant, and those the
+     * index already holds. A poll takes them only from events the previous pass
+     * had not read; a reconciliation takes them from every event.
      */
-    private async discover(after?: string): Promise<{ events: number; dids: Set<string> }> {
+    private async discover(after: string | undefined, everything: boolean): Promise<{ events: number; dids: Set<string>; read: Set<string> }> {
         const { gatekeeper, index } = this.options;
         const dids = new Set<string>();
         const read = new Set<string>();
@@ -88,19 +89,19 @@ export class Sync {
 
             for (const event of page) {
                 const key = keyOf(event);
+                const unread = !this.read.has(key);
 
                 read.add(key);
-                if (!this.read.has(key)) {
+                if (unread) {
                     events++;
-                    if (event.did && (createsMemeplex(event) || index.holds(event.did))) {
-                        dids.add(event.did);
-                    }
+                }
+                if ((unread || everything) && event.did && (createsMemeplex(event) || index.holds(event.did))) {
+                    dids.add(event.did);
                 }
             }
 
             if (page.length < this.pageSize) {
-                this.read = read;
-                return { events, dids };
+                return { events, dids, read };
             }
         }
     }
@@ -132,10 +133,14 @@ export class Sync {
     async poll(): Promise<SyncResult> {
         const began = this.now();
         const after = this.polled === undefined ? undefined : new Date(this.polled - this.overlap).toISOString();
-        const { events, dids } = await this.discover(after);
+        const { events, dids, read } = await this.discover(after, false);
+        const histories = await this.refresh([...dids]);
 
+        // Only now is the pass over. Had an export failed, the next poll has to
+        // read the same events as unread and try again.
+        this.read = read;
         this.polled = began;
-        return { events, histories: await this.refresh([...dids]) };
+        return { events, histories };
     }
 
     /**
@@ -146,13 +151,16 @@ export class Sync {
      */
     async reconcile(): Promise<SyncResult> {
         const began = this.now();
-        const { events, dids } = await this.discover();
+        const { events, dids, read } = await this.discover(undefined, true);
 
-        this.polled = began;
         for (const did of this.options.index.dids()) {
             dids.add(did);
         }
 
-        return { events, histories: await this.refresh([...dids]) };
+        const histories = await this.refresh([...dids]);
+
+        this.read = read;
+        this.polled = began;
+        return { events, histories };
     }
 }
