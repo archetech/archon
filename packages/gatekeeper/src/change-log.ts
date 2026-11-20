@@ -42,6 +42,16 @@ export default class ChangeLog {
     record(key: string): void {
         this.sequence += 1;
         this.latest.set(key, this.sequence);
+
+        // A run of writes to one DID, as an import of its history is, keeps the
+        // one entry: a reader is not made to pass over the run to reach it.
+        const last = this.log[this.log.length - 1];
+
+        if (last?.key === key) {
+            last.sequence = this.sequence;
+            return;
+        }
+
         this.log.push({ key, sequence: this.sequence });
 
         if (this.log.length > 2 * this.latest.size + 1024) {

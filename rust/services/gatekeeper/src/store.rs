@@ -351,15 +351,35 @@ impl JsonDb {
     // one, whichever caller or backend makes it. Creates and follow-ups may
     // decline to write, so their DID's history is reread afterwards.
     fn add_create_event(&mut self, did: &str, event: EventRecord) -> Result<String> {
+        let before = self.indexed_state(did);
         let result = self.add_create_event_unindexed(did, event)?;
         self.refresh_event_index(did);
+        self.record_if_written(did, before, false);
         Ok(result)
     }
 
     fn add_followup_event(&mut self, did: &str, event: EventRecord) -> Result<bool> {
+        let before = self.indexed_state(did);
         let result = self.add_followup_event_unindexed(did, event)?;
         self.refresh_event_index(did);
+        self.record_if_written(did, before, result);
         Ok(result)
+    }
+
+    // A create or a follow-up appends one event or declines to write, as a
+    // repeated create does. Only a write is a change, so the DID is recorded
+    // when the write was reported or its history has grown, unless the backend
+    // made the write through `set_events`, which has recorded it already.
+    fn indexed_state(&self, did: &str) -> (usize, u64) {
+        (self.event_index.len_of(did), self.event_index.changes.sequence())
+    }
+
+    fn record_if_written(&mut self, did: &str, before: (usize, u64), reported: bool) {
+        let (length, sequence) = before;
+        let written = reported || self.event_index.len_of(did) != length;
+        if written && self.event_index.changes.sequence() == sequence {
+            self.event_index.record(did);
+        }
     }
 
     fn set_events(&mut self, did: &str, events: Vec<EventRecord>) -> Result<()> {
@@ -384,10 +404,11 @@ impl JsonDb {
         Ok(())
     }
 
+    // Brings the index in step with a history, without saying it changed.
     fn refresh_event_index(&mut self, did: &str) {
         if self.event_index.is_built() {
             let events = self.get_events(did);
-            self.event_index.set(did, &events);
+            self.event_index.refresh(did, &events);
         }
     }
 

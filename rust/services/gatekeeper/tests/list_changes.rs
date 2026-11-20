@@ -143,7 +143,17 @@ async fn changes_list_each_did_once_in_the_order_changed() -> Result<()> {
         vec![first.clone(), second.clone(), third.clone()]
     );
 
+    // A create posted again writes nothing, and is not a change.
     let (_, mark) = head(&service).await?;
+    let again = create_did(
+        &service,
+        create_agent_operation(31, "2026-04-11T12:00:00Z", "local"),
+    )
+    .await?;
+    assert_eq!(again, first);
+    assert_eq!(head(&service).await?.1, mark);
+    assert_eq!(follow(&service, mark, 1000).await?, Vec::<String>::new());
+
     update_did(
         &service,
         31,

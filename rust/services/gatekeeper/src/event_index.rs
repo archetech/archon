@@ -80,9 +80,24 @@ impl ChangeLog {
         *self = Self::default();
     }
 
+    /// The sequence of the latest change.
+    pub(crate) fn sequence(&self) -> u64 {
+        self.sequence
+    }
+
     pub(crate) fn record(&mut self, key: &str) {
         self.sequence += 1;
         self.latest.insert(key.to_string(), self.sequence);
+
+        // A run of writes to one DID, as an import of its history is, keeps the
+        // one entry: a reader is not made to pass over the run to reach it.
+        if let Some(last) = self.log.last_mut() {
+            if last.0 == key {
+                last.1 = self.sequence;
+                return;
+            }
+        }
+
         self.log.push((key.to_string(), self.sequence));
 
         if self.log.len() > 2 * self.latest.len() + 1024 {
@@ -160,7 +175,19 @@ impl EventIndex {
         self.changes.reset();
     }
 
+    /// Takes a history that was written: the index follows it, and the DID is
+    /// recorded as changed.
     pub(crate) fn set(&mut self, did: &str, events: &[EventRecord]) {
+        if !self.built {
+            return;
+        }
+        self.refresh(did, events);
+        self.changes.record(&storage_key(did));
+    }
+
+    /// Takes a history as it now stands, whether or not it was written. The
+    /// caller records a change if there was one.
+    pub(crate) fn refresh(&mut self, did: &str, events: &[EventRecord]) {
         if !self.built {
             return;
         }
@@ -171,7 +198,18 @@ impl EventIndex {
             self.histories.insert(key.clone(), summarize(&key, events));
         }
         self.sorted = None;
-        self.changes.record(&key);
+    }
+
+    /// How many events the index holds for a DID.
+    pub(crate) fn len_of(&self, did: &str) -> usize {
+        self.histories.get(&storage_key(did)).map_or(0, Vec::len)
+    }
+
+    /// Records a DID as changed.
+    pub(crate) fn record(&mut self, did: &str) {
+        if self.built {
+            self.changes.record(&storage_key(did));
+        }
     }
 
     pub(crate) fn delete(&mut self, did: &str) {

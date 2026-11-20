@@ -89,6 +89,20 @@ describe('ChangeLog', () => {
         expect(log.since(99, 10).changes).toStrictEqual([]);
     });
 
+    it('keeps one entry for a run of changes to one key', () => {
+        const log = new ChangeLog();
+
+        log.record('a');
+        for (let n = 0; n < 5000; n++) log.record('b');
+        log.record('a');
+
+        expect(log.since(0, 10).changes).toStrictEqual([{ key: 'b', sequence: 5001 }, { key: 'a', sequence: 5002 }]);
+        expect(log.since(1, 10).changes).toStrictEqual([{ key: 'b', sequence: 5001 }, { key: 'a', sequence: 5002 }]);
+        expect(log.since(5001, 10).changes).toStrictEqual([{ key: 'a', sequence: 5002 }]);
+        // The five thousand writes to `b` left one entry, not five thousand.
+        expect((log as unknown as { log: unknown[] }).log).toHaveLength(3);
+    });
+
     it('pages by limit, and gives only where it stands when asked for no sequence', () => {
         const log = new ChangeLog();
 
@@ -151,6 +165,18 @@ describe('listChanges', () => {
         expect((await follow(0)).dids).toStrictEqual([second.did, first.did]);
         expect((await follow(mark)).dids).toStrictEqual([first.did]);
         expect((await follow((await gatekeeper.listChanges()).sequence)).dids).toStrictEqual([]);
+    });
+
+    it('does not list a DID whose create is posted again', async () => {
+        const keypair = cipher.generateRandomJwk();
+        const operation = await helper.createAgentOp(keypair, { registry: 'local' });
+        const did = await gatekeeper.createDID(operation);
+        const mark = (await gatekeeper.listChanges()).sequence;
+
+        expect(await gatekeeper.createDID(operation)).toBe(did);
+
+        expect((await gatekeeper.listChanges()).sequence).toBe(mark);
+        expect((await follow(mark)).dids).toStrictEqual([]);
     });
 
     it('returns no changes without a sequence, only where the node stands', async () => {
