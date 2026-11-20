@@ -91,6 +91,7 @@ unhandled paths.
 | `POST` | `/api/v1/dids/` | no | List DIDs. Body: `GetDIDOptions`. Only `/dids/` is registered explicitly; Express matches both `/dids` and `/dids/`. |
 | `POST` | `/api/v1/dids/remove` | yes | Body: array of DIDs. Returns boolean. |
 | `POST` | `/api/v1/dids/export` | no | Body: `{ "dids": string[] | undefined }`. Returns `GatekeeperEvent[][]` (one inner array per DID). |
+| `POST` | `/api/v1/dids/versions` | no | Body: `{ "dids": string[] }`. Returns `DidCidDocument[][]`, every version of each DID, oldest first, each as resolution returns it for that `versionSequence`. See [§9.5](#95-post-apiv1didsversions). |
 | `POST` | `/api/v1/dids/import` | yes | Body: `GatekeeperEvent[][]`. Flattens into a batch and queues for processing. Returns `ImportBatchResult`. |
 | `POST` | `/api/v1/batch/export` | yes | Body: `{ "dids": string[] | undefined }`. Returns a single `GatekeeperEvent[]`, sorted by `proof.created`, holding the full history of every chosen DID that is gossip-eligible. Eligibility is per DID, not per event, and an eligible DID exports its `local` operations too — see [§8.7](#87-batch-export-eligibility). |
 | `POST` | `/api/v1/batch/import` | yes | Body: `GatekeeperEvent[]`. Returns `ImportBatchResult`. Empty arrays MUST be rejected with HTTP 500 `Error: Invalid parameter: batch`. |
@@ -1427,6 +1428,33 @@ A reader:
    last change returned, until a page comes back short of `limit`;
 4. on meeting an `epoch` other than the one it holds, discards the page and
    starts again at 1. Nothing listed before a build is a change after it.
+
+### 9.5 `POST /api/v1/dids/versions`
+
+Returns every version of one or more DIDs. A reader that needs the whole of a
+DID's history, as an indexer does, takes the versions from here and applies its
+own rules to them. It does not read the node's events and apply their operations
+itself, which would repeat what resolution does and could come to differ from it.
+
+The body is `{ "dids": string[] }`. A body without `dids`, or with `dids` that
+is not an array of strings, MUST return HTTP 400
+`{"error":"Invalid parameter: dids"}`.
+
+The response is an array aligned with `dids`. Each entry is the versions of that
+DID, oldest first, and is empty for a DID the node cannot resolve, whether it is
+unknown or not a valid DID. Version *n* of a DID is exactly what
+`GET /api/v1/did/:did?versionSequence=n` returns, without
+`didResolutionMetadata`:
+
+- `didDocument`, `didDocumentData` and `didDocumentRegistration` as of that version;
+- `didDocumentMetadata`, with the version's `versionId` and `versionSequence`,
+  `confirmed`, `deactivated` on the version that deletes the DID, and `timestamp`
+  where the node has the blocks that bound it. `timestamp.upperBound` is the
+  block that anchored the version on `timestamp.chain`.
+
+The versions of one DID are read from one accepted history. When that history
+changes, the DID is listed by `GET /api/v1/changes` ([§9.4](#94-get-apiv1changes))
+and its versions are to be read again.
 
 ## 10. Storage contract
 

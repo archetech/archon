@@ -22,6 +22,7 @@ The TypeScript service exposes these public routes under `/api/v1`:
 | `POST` | `/dids/` | DID listing and optional resolution/filtering. |
 | `POST` | `/dids/remove` | Admin protected. |
 | `POST` | `/dids/export` | Export one or more DID event chains. |
+| `POST` | `/dids/versions` | Every version of one or more DIDs, each as resolution returns it for that `versionSequence`. |
 | `POST` | `/dids/import` | Admin protected. |
 | `POST` | `/batch/export` | Admin protected. |
 | `POST` | `/batch/import` | Admin protected. |

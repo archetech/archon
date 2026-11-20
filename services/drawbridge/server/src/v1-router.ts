@@ -180,6 +180,20 @@ export function createV1Router(options: CreateV1RouterOptions): express.Router {
         }
     });
 
+    v1router.post('/dids/versions', ...authMiddleware, async (req, res) => {
+        try {
+            const result = await gatekeeper.resolveVersions(req.body?.dids);
+            res.json(result);
+        } catch (error: any) {
+            if (typeof error?.error === 'string' && error.error.startsWith('Invalid parameter')) {
+                res.status(400).json(error);
+                return;
+            }
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
+        }
+    });
+
     // IPFS routes
 
     v1router.post('/ipfs/json', ...authMiddleware, async (req, res) => {

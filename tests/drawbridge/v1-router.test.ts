@@ -34,6 +34,7 @@ function createMockGatekeeper() {
         searchDocs: jest.fn<any>().mockResolvedValue(['did:cid:abc']),
         queryDocs: jest.fn<any>().mockResolvedValue(['did:cid:abc']),
         listEvents: jest.fn<any>().mockResolvedValue({ total: 1, events: [{ did: 'did:cid:abc' }] }),
+        resolveVersions: jest.fn<any>().mockResolvedValue([[{ didDocument: { id: 'did:cid:abc' } }], []]),
         listChanges: jest.fn<any>().mockResolvedValue({ epoch: 'run-1', sequence: 3, changes: [{ did: 'did:cid:abc', sequence: 3 }] }),
     };
 }
@@ -396,6 +397,23 @@ describe('drawbridge v1 gatekeeper proxy routes', () => {
         expect((await request(app).get('/api/v1/events')).status).toBe(502);
     });
 
+    it('resolves versions, passing the DIDs through and upstream 400s back', async () => {
+        const { app, gatekeeper } = mount();
+
+        const resolved = await request(app).post('/api/v1/dids/versions').send({ dids: ['did:cid:abc', 'did:cid:mock'] });
+        expect(resolved.status).toBe(200);
+        expect(resolved.body).toStrictEqual([[{ didDocument: { id: 'did:cid:abc' } }], []]);
+        expect(gatekeeper.resolveVersions).toHaveBeenLastCalledWith(['did:cid:abc', 'did:cid:mock']);
+
+        gatekeeper.resolveVersions.mockRejectedValueOnce({ error: 'Invalid parameter: dids' });
+        const rejected = await request(app).post('/api/v1/dids/versions').send({});
+        expect(rejected.status).toBe(400);
+        expect(rejected.body).toStrictEqual({ error: 'Invalid parameter: dids' });
+
+        gatekeeper.resolveVersions.mockRejectedValueOnce('connect ECONNREFUSED');
+        expect((await request(app).post('/api/v1/dids/versions').send({ dids: [] })).status).toBe(502);
+    });
+
     it('lists changes, passing parameters through and upstream 400s back', async () => {
         const { app, gatekeeper } = mount();
 
@@ -435,6 +453,7 @@ describe('drawbridge v1 gatekeeper proxy routes', () => {
             ['did/:did', () => request(app).get('/api/v1/did/did:cid:abc')],
             ['dids', () => request(app).post('/api/v1/dids').send({})],
             ['dids/export', () => request(app).post('/api/v1/dids/export').send({})],
+            ['dids/versions', () => request(app).post('/api/v1/dids/versions').send({ dids: [] })],
             ['ipfs/json', () => request(app).post('/api/v1/ipfs/json').send({})],
             ['ipfs/json/:cid', () => request(app).get('/api/v1/ipfs/json/cid')],
             ['ipfs/text', () => request(app).post('/api/v1/ipfs/text').send({})],

@@ -29,7 +29,7 @@ use crate::{
         db_verify, export_batch, export_dids, generate_did, get_block_by_id, get_latest_block,
         get_metrics, get_genesis, get_queue, import_batch, import_batch_by_cids, import_dids, ipfs_add_data,
         ipfs_add_json, ipfs_add_stream, ipfs_add_text, ipfs_get_data, ipfs_get_json,
-        ipfs_get_stream, ipfs_get_text, list_changes, list_dids, list_events, not_found, process_events_route, query_docs,
+        ipfs_get_stream, ipfs_get_text, list_changes, list_dids, list_events, not_found, process_events_route, query_docs, resolve_versions,
         ready, registries, remove_dids, resolve_did, search_docs, status, version,
     },
     current_status, log_status_snapshot, start_background_tasks, CheckDidsResult, Config,
@@ -241,6 +241,7 @@ fn build_router(state: AppState) -> Router {
         .route("/dids/", post(list_dids))
         .route("/dids/remove", post(remove_dids))
         .route("/dids/export", post(export_dids))
+        .route("/dids/versions", post(resolve_versions))
         .route("/dids/import", post(import_dids))
         .route("/batch/export", post(export_batch))
         .route("/batch/import", post(import_batch))

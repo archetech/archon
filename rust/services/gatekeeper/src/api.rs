@@ -1036,6 +1036,80 @@ pub(crate) async fn list_events(
     Json(json!({ "total": total, "events": events })).into_response()
 }
 
+/// Every version of each requested DID, oldest first, each as resolution
+/// returns it for that `versionSequence`. A DID this node cannot resolve has
+/// none.
+pub(crate) async fn resolve_versions(State(state): State<AppState>, body: Bytes) -> Response {
+    let start = Instant::now();
+    let invalid = || {
+        record_metrics(&state, "POST", "/dids/versions", 400, start.elapsed().as_secs_f64());
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "Invalid parameter: dids" })),
+        )
+            .into_response()
+    };
+    let Ok(payload) = parse_optional_json_body(body) else { return invalid() };
+    let Some(items) = payload.get("dids").and_then(Value::as_array) else { return invalid() };
+    let mut dids = Vec::with_capacity(items.len());
+    for item in items {
+        let Some(did) = item.as_str() else { return invalid() };
+        dids.push(did.to_string());
+    }
+
+    if let Err(error) = crate::history::ensure_history_ready(&state).await {
+        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    }
+    // One lock for them all, so that the versions of a DID are of one history.
+    let _history_guard = state.history_lock.lock().await;
+    let mut all: Vec<Vec<Value>> = Vec::with_capacity(dids.len());
+    let store = state.store.lock().await;
+    for did in &dids {
+        // The store finds a history by the last part of the name it is given, so
+        // what is not a DID is turned away here and has no versions.
+        if !is_valid_did(did) {
+            all.push(Vec::new());
+            continue;
+        }
+        // One read of the history serves every version of the DID.
+        let events = store.get_events(did);
+        let mut versions = Vec::with_capacity(events.len());
+        for sequence in 1..=events.len() {
+            let options = ResolveOptions {
+                version_sequence: Some(sequence),
+                ..Default::default()
+            };
+            // A failure here is not the end of the history. It is an error, so
+            // that a reader is never handed part of one as the whole.
+            let resolved = store.resolve_doc_from(did, options, &events);
+            let mut doc = match resolved {
+                Ok(doc)
+                    if doc.pointer("/didResolutionMetadata/error").is_none()
+                        && document_sequence(&doc) == sequence as u64 =>
+                {
+                    doc
+                }
+                _ => {
+                    record_metrics(&state, "POST", "/dids/versions", 500, start.elapsed().as_secs_f64());
+                    return text_error_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        &format!("Error: version {sequence} of {did} did not resolve"),
+                    );
+                }
+            };
+            // When it was read is not part of what the version is.
+            if let Some(object) = doc.as_object_mut() {
+                object.remove("didResolutionMetadata");
+            }
+            versions.push(doc);
+        }
+        all.push(versions);
+    }
+    drop(store);
+    record_metrics(&state, "POST", "/dids/versions", 200, start.elapsed().as_secs_f64());
+    Json(json!(all)).into_response()
+}
+
 pub(crate) async fn list_changes(
     State(state): State<AppState>,
     Query(pairs): Query<Vec<(String, String)>>,

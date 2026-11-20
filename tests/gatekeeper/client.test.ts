@@ -525,6 +525,35 @@ describe('listEvents', () => {
     });
 });
 
+describe('resolveVersions', () => {
+    it('should post the DIDs and return their versions', async () => {
+        const versions = [[{ didDocument: { id: 'did:cid:abc' }, didDocumentMetadata: { versionSequence: '1' } }], []];
+        nock(GatekeeperURL)
+            .post('/api/v1/dids/versions', { dids: ['did:cid:abc', 'did:cid:mock'] })
+            .reply(200, versions);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+
+        expect(await gatekeeper.resolveVersions(['did:cid:abc', 'did:cid:mock'])).toStrictEqual(versions);
+    });
+
+    it('should throw exception on resolveVersions server error', async () => {
+        nock(GatekeeperURL)
+            .post('/api/v1/dids/versions')
+            .reply(500, ServerError);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+
+        try {
+            await gatekeeper.resolveVersions(['did:cid:abc']);
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('listChanges', () => {
     it('should send the options as query parameters and return the page', async () => {
         const page = { epoch: 'run-1', sequence: 9, changes: [{ did: 'did:cid:abc', sequence: 8 }] };

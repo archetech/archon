@@ -291,6 +291,16 @@ export default class GatekeeperClient implements GatekeeperInterface {
         }
     }
 
+    async resolveVersions(dids: string[]): Promise<DidCidDocument[][]> {
+        try {
+            const response = await this.axios.post(`${this.API}/dids/versions`, { dids });
+            return response.data;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
     async listEvents(options: ListEventsOptions = {}): Promise<ListEventsResult> {
         try {
             const response = await this.axios.get(`${this.API}/events`, { params: options });

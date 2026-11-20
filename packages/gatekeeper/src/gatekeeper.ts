@@ -1227,6 +1227,45 @@ export default class Gatekeeper implements GatekeeperInterface {
         return doc;
     }
 
+    // Every version of each DID, oldest first, each as resolution returns it
+    // when asked for that versionSequence. A DID this node cannot resolve has
+    // none.
+    async resolveVersions(dids: string[]): Promise<DidCidDocument[][]> {
+        if (!Array.isArray(dids) || dids.some(did => typeof did !== 'string')) {
+            throw new InvalidParameterError('dids');
+        }
+
+        await this.ensureHistoryReady();
+        // One lock for them all, so that the versions of a DID are of one history.
+        return this.withHistoryLock(async () => {
+            const all: DidCidDocument[][] = [];
+
+            for (const did of dids) {
+                const versions: DidCidDocument[] = [];
+                // One read of the history serves every version of the DID.
+                const history = isValidDID(did) ? await this.db.getEvents(did) : [];
+
+                for (let sequence = 1; sequence <= history.length; sequence++) {
+                    // A failure here is not the end of the history. It is thrown,
+                    // so that a reader is never handed part of one as the whole.
+                    const doc = await this.resolveDIDAt(did, { versionSequence: sequence }, history);
+
+                    if (doc.didResolutionMetadata?.error || doc.didDocumentMetadata?.versionSequence !== String(sequence)) {
+                        throw new Error(`version ${sequence} of ${did} did not resolve`);
+                    }
+
+                    // When it was read is not part of what the version is.
+                    delete doc.didResolutionMetadata;
+                    versions.push(doc);
+                }
+
+                all.push(versions);
+            }
+
+            return all;
+        });
+    }
+
     // A versionTime is a date-time in the form every other timestamp here takes,
     // and a versionSequence is a positive integer.
     private validVersionOptions(options?: ResolveDIDOptions): boolean {
@@ -1249,7 +1288,9 @@ export default class Gatekeeper implements GatekeeperInterface {
     // sequence-based.
     private async resolveDIDAt(
         did?: string,
-        options?: ResolveDIDOptions & { versionOrdinal?: { registry: string, ordinal: number[] } }
+        options?: ResolveDIDOptions & { versionOrdinal?: { registry: string, ordinal: number[] } },
+        // The DID's accepted history, when the caller has read it already.
+        history?: GatekeeperEvent[]
     ): Promise<DidCidDocument> {
         const { versionTime, versionSequence, versionId: requestedId, versionOrdinal, confirm = false, verify = false } = options || {};
 
@@ -1276,7 +1317,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             };
         }
 
-        const events = await this.db.getEvents(did);
+        const events = history ?? await this.db.getEvents(did);
 
         if (events.length === 0) {
             return {
