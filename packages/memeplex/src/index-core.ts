@@ -141,6 +141,21 @@ export class MemeplexIndex {
         return [...index.get(key) ?? []].flatMap(did => this.publications.get(did) ?? []);
     }
 
+    // Whether the index holds a history for a DID, and every DID it holds one
+    // for: objects, attributed or not, and grants.
+    holds(did: string): boolean {
+        return this.histories.has(did);
+    }
+
+    dids(): string[] {
+        return [...this.histories.keys()];
+    }
+
+    // How many DIDs are held, and how many of them have a publication.
+    get size(): { dids: number; publications: number } {
+        return { dids: this.histories.size, publications: this.publications.size };
+    }
+
     // The publication of an object, published or withdrawn. An object with no
     // attributed version has none.
     publication(did: string): Publication | undefined {
