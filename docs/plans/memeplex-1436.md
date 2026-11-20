@@ -217,20 +217,22 @@ No special rule for ratings or revocation is needed.
 
 ### Reading the evidence
 
-Use `exportDIDs` (`POST /api/v1/dids/export`) for accepted events and
-`resolveDID` with `versionId` for version-specific data. A version's identity is
-the canonical CID of its operation (`opid`, or computed as Gatekeeper computes
-it); `previd` links its predecessor. Keep all comparisons on the same accepted
-history, and recompute when that history changes.
+Read every version of a DID from the Gatekeeper (`POST /api/v1/dids/versions`).
+Each version is the document, data and registration as the Gatekeeper resolves
+them at that point of the accepted history, with the version's identity
+(`versionId`, the canonical CID of its operation) and where it was anchored. What
+a version is belongs to the Gatekeeper to say: a verifier applies the rules above
+to the versions and does not read operations or apply them itself. Keep all
+comparisons on the same accepted history, and read the versions again when that
+history changes.
 
-For creation, the signer is the controller named by the operation; thereafter it
-is the predecessor's controller. `proof.verificationMethod` selects a key and may
-be relative, so it is not a source of the signer DID. A verifier relying on its
-trusted Gatekeeper need not repeat signature verification.
+The controller of a version is the one its document names. A verifier relying on
+its trusted Gatekeeper does not repeat signature verification.
 
-A position is the receipt's block height (`registration.height`) on the grant's
-registry, and the event's `time` is that block's time. Implement this
-interpretation once in a library shared by clients and indexers.
+A position is the block that anchored the version on the grant's registry
+(`didDocumentMetadata.timestamp.upperBound`, when `timestamp.chain` is that
+registry), with that block's height and time. A version without one is not
+anchored there yet.
 
 ## References remember what was read
 

@@ -28,6 +28,8 @@ let grant: string;
 async function anchor(block: number) {
     const operations = await gatekeeper.getQueue(REGISTRY);
 
+    await gatekeeper.addBlock(REGISTRY, { height: block, hash: `block-${block}`, time: Date.parse(blockTime(block)) / 1000 });
+
     await gatekeeper.importBatch(operations.map((operation, index) => ({
         registry: REGISTRY,
         time: blockTime(block),
@@ -51,9 +53,9 @@ function feed(): FeedGatekeeper & { exported: string[][] } {
         // Looked up at each call, so that the feed follows a Gatekeeper that restarts.
         getDIDs: () => gatekeeper.getDIDs() as Promise<string[]>,
         listChanges: options => gatekeeper.listChanges(options),
-        exportDIDs: async dids => {
+        resolveVersions: async dids => {
             exported.push(dids);
-            return JSON.parse(JSON.stringify(await gatekeeper.exportDIDs(dids)));
+            return JSON.parse(JSON.stringify(await gatekeeper.resolveVersions(dids)));
         },
     };
 }
@@ -180,6 +182,7 @@ describe('Sync', () => {
         expect(index.publication(late)).toBeUndefined();
 
         // The earlier post's anchor at block 200 reaches this node only now.
+        await gatekeeper.addBlock(REGISTRY, { height: 200, hash: 'block-200', time: Date.parse(blockTime(200)) / 1000 });
         await gatekeeper.importBatch(operations.map((operation, position) => ({
             registry: REGISTRY, time: blockTime(200), ordinal: [200, 0, position],
             registration: { height: 200, index: 0, txid: 'tx-200', batch: 'did:cid:batch-200', opidx: position }, operation,
@@ -240,25 +243,25 @@ describe('Sync', () => {
     it('recovers from an export that failed, at the first read and after', async () => {
         const index = new MemeplexIndex();
         const source = feed();
-        const exportDIDs = source.exportDIDs;
+        const resolveVersions = source.resolveVersions;
         const failing = async () => { throw new Error('the Gatekeeper is restarting'); };
         const sync = syncing(index, source);
 
-        source.exportDIDs = failing;
+        source.resolveVersions = failing;
         await expect(sync.poll()).rejects.toThrow('restarting');
         expect(sync.complete).toBe(false);
 
-        source.exportDIDs = exportDIDs;
+        source.resolveVersions = resolveVersions;
         expect((await sync.poll()).rebuilt).toBe(true);
         expect(sync.complete).toBe(true);
 
         const first = await post('First.');
         await anchor(200);
-        source.exportDIDs = failing;
+        source.resolveVersions = failing;
         await expect(sync.poll()).rejects.toThrow('restarting');
         expect(index.publication(first)).toBeUndefined();
 
-        source.exportDIDs = exportDIDs;
+        source.resolveVersions = resolveVersions;
         expect((await sync.poll()).rebuilt).toBe(false);
         expect(index.publication(first)).toMatchObject({ state: 'published' });
     }, 60_000);

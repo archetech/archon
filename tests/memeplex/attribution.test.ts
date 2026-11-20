@@ -19,7 +19,7 @@ beforeAll(async () => {
     expect(vectors).toStrictEqual(JSON.parse(JSON.stringify(built)));
 }, 240_000);
 
-it('derives each publication from the two exported histories', () => {
+it('derives each publication from the versions of the object and of its grant', () => {
     const wrong = vectors.cases.map(each => {
         const publication = attribute(each.object, each.grant);
         const got = {
@@ -47,10 +47,12 @@ it('gives each version its operation and each attributed one its position', () =
     for (const each of vectors.cases) {
         const { versions } = attribute(each.object, each.grant);
 
-        expect(versions.map(version => version.opid)).toStrictEqual(each.object.map(event => event.opid));
+        expect(versions.map(version => version.opid)).toStrictEqual(each.object.map(version => version.didDocumentMetadata!.versionId));
         for (const [index, version] of versions.entries()) {
             if (version.outcome === 'attributed') {
-                expect(version.position).toStrictEqual({ block: each.object[index].registration!.height, time: each.object[index].time });
+                const { height, timeISO } = each.object[index].didDocumentMetadata!.timestamp!.upperBound!;
+
+                expect(version.position).toStrictEqual({ block: height, time: timeISO });
             }
         }
     }

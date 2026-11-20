@@ -1,13 +1,13 @@
-import type { AcceptedEvent, Publication } from '@didcid/memeplex';
+import type { ResolvedVersion, Publication } from '@didcid/memeplex';
 import { agent, blockTime, cid, exported, prove } from './grant-vectors.ts';
 import type { Signer, Step } from './grant-vectors.ts';
 
-// Builds tests/fixtures/memeplex-v1-attribution-vectors.json: an object's history
-// and its grant's, both as a Gatekeeper exports them, with the publication a
-// verifier should derive from the pair.
+// Builds tests/fixtures/memeplex-v1-attribution-vectors.json: the versions of an
+// object and of its grant, both as a Gatekeeper resolves them, with the
+// publication a verifier should derive from the pair.
 //
-// As in grant-vectors.ts, every history is signed with fixed keys, imported into a
-// Gatekeeper with its chain receipts, and exported again.
+// As in grant-vectors.ts, every history is signed with fixed keys and imported
+// into a Gatekeeper with its chain receipts and their blocks.
 
 const REGISTRY = 'BTC:mainnet';
 
@@ -17,8 +17,8 @@ export type Expected = { outcome: string; reason?: string; validity?: string; gr
 
 export interface AttributionCase {
     name: string;
-    object: AcceptedEvent[];
-    grant: AcceptedEvent[];
+    object: ResolvedVersion[];
+    grant: ResolvedVersion[];
     expect: {
         state: Publication['state'];
         current?: number;
@@ -379,7 +379,7 @@ export async function build(): Promise<{ description: string; registry: string; 
     }
 
     return {
-        description: 'Memeplex v1 object histories with their grants\' histories, as a Gatekeeper exports them, '
+        description: 'The versions of Memeplex v1 objects and of their grants, as a Gatekeeper resolves them, '
             + 'and the publication derived from each pair. Written by tests/memeplex/attribution-vectors.ts.',
         registry: REGISTRY,
         cases,

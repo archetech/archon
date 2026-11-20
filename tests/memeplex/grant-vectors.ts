@@ -4,15 +4,15 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory.ts';
 import MemoryClient from '@didcid/ipfs/memory';
 import { generateCID } from '@didcid/ipfs/utils';
 import type { EcdsaJwkPair } from '@didcid/cipher/types';
-import type { AcceptedEvent, Authority, Grant, Kind } from '@didcid/memeplex';
+import type { Authority, Grant, Kind, ResolvedVersion } from '@didcid/memeplex';
 
-// Builds tests/fixtures/memeplex-v1-grant-vectors.json: grant histories as a
-// Gatekeeper exports them, each with the grant a verifier should read from it and
-// the authority it should find at a set of chain positions.
+// Builds tests/fixtures/memeplex-v1-grant-vectors.json: the versions of grants as
+// a Gatekeeper resolves them, each with the grant a verifier should read from
+// them and the authority it should find at a set of chain positions.
 //
-// Every history is signed with fixed keys, imported into a Gatekeeper with its
-// chain receipts, and exported again. What is recorded is the export, so the
-// evidence is of the shape and content a verifier is handed.
+// Every history is signed with fixed keys and imported into a Gatekeeper with
+// its chain receipts and their blocks. What is recorded is what the Gatekeeper
+// then resolves, so the evidence is of the shape and content a verifier is handed.
 
 const cipher = new CipherNode();
 const REGISTRY = 'BTC:mainnet';
@@ -28,7 +28,7 @@ export interface Probe {
 export interface GrantCase {
     name: string;
     did: string;
-    history: AcceptedEvent[];
+    history: ResolvedVersion[];
     expect: Grant;
     probes: Probe[];
 }
@@ -76,7 +76,7 @@ export interface Step {
     registry?: string;
 }
 
-export async function exported(agents: Signer[], steps: Step[]): Promise<{ did: string; history: AcceptedEvent[] }> {
+export async function exported(agents: Signer[], steps: Step[]): Promise<{ did: string; history: ResolvedVersion[] }> {
     const registries = [...new Set(['hyperswarm', REGISTRY, 'ZEC:mainnet', ...steps.map(step => step.registry ?? REGISTRY)])];
     const gatekeeper = new Gatekeeper({
         db: new DbJsonMemory('grants'), ipfs: new MemoryClient(), registries, maxQueueSize: 10_000,
@@ -99,11 +99,19 @@ export async function exported(agents: Signer[], steps: Step[]): Promise<{ did: 
             });
     }
 
+    // The node has the block of each anchor, as a mediator gives it, which is
+    // how a version comes to say where it was anchored.
+    for (const { block, registry = REGISTRY } of steps) {
+        if (block !== undefined) {
+            await gatekeeper.addBlock(registry, { height: block, hash: `block-${block}`, time: Date.parse(blockTime(block)) / 1000 });
+        }
+    }
+
     await gatekeeper.importBatch(events as never);
     await gatekeeper.processEvents();
 
     const did = `did:cid:${await cid(steps[0].operation)}`;
-    const history = await gatekeeper.exportDID(did);
+    const [history] = await gatekeeper.resolveVersions([did]);
     if (history.length !== steps.length) {
         throw new Error(`the Gatekeeper accepted ${history.length} of ${steps.length} operations of ${did}`);
     }
@@ -349,7 +357,7 @@ export async function build(): Promise<{ description: string; registry: string; 
     }
 
     return {
-        description: 'Memeplex v1 grant histories as a Gatekeeper exports them, with the grant read from each '
+        description: 'The versions of Memeplex v1 grants as a Gatekeeper resolves them, with the grant read from each '
             + 'and its authority at chain positions. Written by tests/memeplex/grant-vectors.ts.',
         registry: REGISTRY,
         cases,

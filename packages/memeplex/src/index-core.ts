@@ -1,17 +1,17 @@
 import { attribute } from './attribution.js';
 import { coauthors, currentRatings, ratingValue } from './views.js';
 import type { Publication } from './attribution.js';
-import type { AcceptedEvent } from './grant.js';
+import type { ResolvedVersion } from './grant.js';
 import type { Coauthor } from './views.js';
 
-// An index of publications, derived from accepted histories it is handed:
+// An index of publications, derived from the versions of the DIDs it is handed:
 // docs/plans/memeplex-1436.md, "A graph anyone can reconstruct".
 //
-// The index holds each DID's latest accepted history and nothing it could not
-// derive again from those. Every view is a function of the histories held, so an
-// index filled in any order, or refilled from nothing, answers the same as one
-// kept up to date. It fetches nothing: whoever runs it reads a Gatekeeper's events
-// and hands over the history of each DID that changed.
+// The index holds the versions of each DID, as a Gatekeeper resolves them, and
+// nothing it could not derive again from those. Every view is a function of the
+// versions held, so an index filled in any order, or refilled from nothing,
+// answers the same as one kept up to date. It fetches nothing: whoever runs it
+// asks a Gatekeeper which DIDs changed and hands over the versions of each.
 
 // A reply in a thread, with how far below the thread's target it sits: 1 for a
 // reply to the target, 2 for a reply to that, and so on.
@@ -43,7 +43,7 @@ function newestFirst(a: Publication, b: Publication): number {
 }
 
 export class MemeplexIndex {
-    private histories = new Map<string, AcceptedEvent[]>();
+    private histories = new Map<string, ResolvedVersion[]>();
     private publications = new Map<string, Publication>();
     // Where each object is filed, kept apart from the publications handed out so
     // that nothing a caller does to one can leave the index filed wrongly.
@@ -53,11 +53,11 @@ export class MemeplexIndex {
     private byAuthor = new Map<string, Set<string>>();
     private byTarget = new Map<string, Set<string>>();
 
-    // Records the accepted history of a DID, replacing any held for it. An empty
-    // history removes the DID. Histories of DIDs that are neither objects nor
+    // Records the versions of a DID, replacing any held for it. With no versions
+    // the DID is removed. Versions of DIDs that are neither objects nor
     // grants are kept out.
-    put(did: string, history: AcceptedEvent[]): void {
-        const data = history[0]?.operation?.data;
+    put(did: string, history: ResolvedVersion[]): void {
+        const data = history[0]?.didDocumentData as Record<string, unknown> | undefined;
         const relevant = history.length > 0 && data && typeof data === 'object'
             && (data.memeplex !== undefined || data.memeplexGrant !== undefined);
 
@@ -98,7 +98,7 @@ export class MemeplexIndex {
     private derive(did: string): void {
         const before = this.filed.get(did);
         const history = this.histories.get(did);
-        const claimed = history?.[0]?.operation?.data?.memeplex;
+        const claimed = (history?.[0]?.didDocumentData as Record<string, any> | undefined)?.memeplex;
 
         // The grant link follows what the creation claims, so that the object is
         // attributed again when that grant's history arrives or changes.

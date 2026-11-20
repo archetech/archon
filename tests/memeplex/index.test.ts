@@ -1,24 +1,24 @@
 import { MemeplexIndex } from '@didcid/memeplex';
-import type { AcceptedEvent } from '@didcid/memeplex';
+import type { ResolvedVersion } from '@didcid/memeplex';
 import { History } from './attribution-vectors.ts';
 import { agent, cid, exported } from './grant-vectors.ts';
 import type { Signer } from './grant-vectors.ts';
 
 // The index of publications: docs/plans/memeplex-1436.md, "A graph anyone can
-// reconstruct". Its histories are signed, imported into a Gatekeeper with chain
-// receipts and exported again, as in attribution-vectors.ts.
+// reconstruct". Its histories are signed and imported into a Gatekeeper with
+// chain receipts, which then resolves their versions, as in attribution-vectors.ts.
 
 let alice: Signer, bob: Signer, carol: Signer, web: Signer, bot: Signer;
 let agents: Signer[];
 let nonces = 0;
 
 // Every history the tests hand to an index: each DID's, at each length it had.
-const evidence = new Map<string, AcceptedEvent[][]>();
+const evidence = new Map<string, ResolvedVersion[][]>();
 
-// Exports a history at every length from its creation on, so that a test can hand
-// an index the history as it stood at any point.
+// Resolves a history at every length from its creation on, so that a test can
+// hand an index the DID as it stood at any point.
 async function record(history: History): Promise<string> {
-    const prefixes: AcceptedEvent[][] = [];
+    const prefixes: ResolvedVersion[][] = [];
 
     for (let length = 1; length <= history.steps.length; length++) {
         prefixes.push((await exported(agents, history.steps.slice(0, length))).history);
@@ -89,7 +89,7 @@ beforeAll(async () => {
     // Carol rates again through the same client; the later one counts.
     dids.carolLate = await record(await respond(carol, carolGrant, web, paper, { kind: 'rating', rating: 0, min: 0, max: 1 }, 350));
 
-    const paperVersion = latest(paper)[0].opid!;
+    const paperVersion = latest(paper)[0].didDocumentMetadata!.versionId!;
     dids.confirm = await record(await History.create(bot, {
         memeplex: { ...by(bob, bobGrant), kind: 'tag', target: paper, targetVersion: paperVersion, tag: 'coauthor' },
     }, 300));

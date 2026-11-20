@@ -701,7 +701,7 @@ Gatekeeper API. The Memeplex verifier and client are still to be implemented.
 | Create a grant or publication | `createAsset(data, { registry, controller })`; create on the grant's chain registry. |
 | Edit | `updateDID` / `mergeData`; each operation produces another version. |
 | Withdraw or revoke | `revokeDID`; Memeplex interprets the deletion through its attribution rule. |
-| Read history | `exportDIDs` and `resolveDID` with `versionId`; earlier versions remain resolvable while accepted. |
+| Read history | `POST /api/v1/dids/versions` for every version of a DID as resolved; `resolveDID` with `versionId` for one. Earlier versions remain resolvable while accepted. |
 | Store content | IPFS through the Gatekeeper data API; `createFile` stores `{ cid, filename, type, bytes }`. |
 | Store an image | `createImage`; the asset has `file` and `image` data. |
 | Publish a schema | `createSchema`; the protocol pins its schema DID and version. |
@@ -791,7 +791,7 @@ These queries match **current** data, so they are incomplete. An object whose la
 version is an unattributed deletion or edit (by a revoked client, for example) may
 no longer match, even though its publication state is its last attributed version. A
 thread or timeline built from queries can therefore miss such objects. Complete
-results need history-based discovery from the events feed, as the indexer does.
+results need history-based discovery, as the indexer does.
 
 ## Memepool
 

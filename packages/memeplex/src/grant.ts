@@ -3,29 +3,35 @@ import { validateGrant } from './validate.js';
 import type { Kind } from './validate.js';
 
 // A grant and the interval of chain positions over which it confers authority,
-// read from the grant's accepted history as a Gatekeeper exports it. The rules are
-// those of docs/plans/memeplex-1436.md, "One grant, one client, one chain" and
-// "Authority is an interval".
+// read from the versions of the grant's DID as a Gatekeeper resolves them. The
+// rules are those of docs/plans/memeplex-1436.md, "One grant, one client, one
+// chain" and "Authority is an interval".
 //
-// Nothing here checks a signature. The history is one a Gatekeeper accepted, so
-// its creation was signed by the controller it names and each later operation by
-// the controller before it.
+// What each version of a DID is, and where it was anchored, is the Gatekeeper's
+// to say.
 
 // The chains a grant may be created on. Adding one is a protocol revision.
 export const PERMITTED_REGISTRIES = ['BTC:mainnet', 'ZEC:mainnet', 'ETH:mainnet', 'SOL:mainnet-beta'] as const;
 
-// An accepted event, in the shape `POST /api/v1/dids/export` returns it.
-export interface AcceptedEvent {
-    registry: string;
-    time: string;
-    operation: Record<string, any>;
-    registration?: { height?: number };
-    // The DID the event belongs to, and the canonical CID of its operation.
-    did?: string;
-    opid?: string;
+// One version of a DID, as `POST /api/v1/dids/versions` returns it: the document,
+// data and registration as of that version, and its metadata.
+export interface ResolvedVersion {
+    didDocument?: { id?: string; controller?: string; [member: string]: unknown };
+    didDocumentData?: unknown;
+    didDocumentRegistration?: { type?: string; registry?: string; validUntil?: string; [member: string]: unknown };
+    didDocumentMetadata?: {
+        // The canonical CID of the operation that made the version.
+        versionId?: string;
+        // Set on the version that deletes the DID.
+        deactivated?: boolean;
+        // The blocks that bound the version on `chain`. `upperBound` is the block
+        // that anchored it.
+        timestamp?: { chain?: string; upperBound?: { height?: number; timeISO?: string } };
+        [member: string]: unknown;
+    };
 }
 
-// Where an operation sits on the grant's registry: the block that anchors it, and
+// Where a version sits on the grant's registry: the block that anchors it, and
 // that block's time. Two positions in one block are unordered.
 export interface Position {
     block: number;
@@ -41,7 +47,7 @@ export interface GrantVersion {
 }
 
 export type GrantVoidReason =
-    // There is no history, or it does not begin with the creation of an asset.
+    // There are no versions, or the first is not an asset holding a grant.
     | 'not-a-grant'
     // The creation's data is not a valid grant.
     | 'invalid'
@@ -65,98 +71,84 @@ export type Grant =
         registry: string;
         // The creation, then the anchored scope updates, in history order.
         versions: GrantVersion[];
-        // The lowest position of an anchored operation after the active history,
+        // The lowest position of an anchored version after the active history,
         // which is the creation and the scope updates that follow it directly.
         // The grant confers nothing from this position on.
         ended?: Position;
-        // Later operations not anchored on the grant's registry yet. They have no
+        // Later versions not anchored on the grant's registry yet. They have no
         // effect until they are.
         pending: number;
     };
 
-// The position of an event on a registry, if it is anchored there.
-export function positionOn(event: AcceptedEvent, registry: string): Position | undefined {
-    const height = event.registration?.height;
+// The position of a version on a registry, if it is anchored there.
+export function positionOn(version: ResolvedVersion, registry: string): Position | undefined {
+    const timestamp = version.didDocumentMetadata?.timestamp;
+    const { height, timeISO } = timestamp?.upperBound ?? {};
 
-    return event.registry === registry && Number.isSafeInteger(height) && typeof event.time === 'string'
-        ? { block: height as number, time: event.time }
+    return timestamp?.chain === registry && Number.isSafeInteger(height) && typeof timeISO === 'string'
+        ? { block: height as number, time: timeISO }
         : undefined;
 }
 
-// The parts of an asset's state that a grant's history can change.
-interface State {
-    controller: string;
-    data: unknown;
-    registration: unknown;
-    document: unknown;
-}
+const dataOf = (version: ResolvedVersion): Record<string, any> | undefined => {
+    const data = version.didDocumentData;
 
-// Whether an update leaves a grant as it was but for its scope: `actions` and
-// `expiresAt`, and nothing else. A component the update does not supply is kept;
-// one it supplies replaces the whole component, so it has to equal what it replaces.
-function scopeUpdate(state: State, operation: Record<string, any>): Record<string, any> | undefined {
-    const doc = operation.doc;
+    return data && typeof data === 'object' && !Array.isArray(data) ? data as Record<string, any> : undefined;
+};
 
-    if (operation.type !== 'update' || !doc || typeof doc !== 'object') {
-        return undefined;
-    }
+// Whether a version leaves a grant as the version before it but for its scope:
+// `actions` and `expiresAt`, and nothing else in the document, the registration
+// or the data.
+function isScopeUpdate(before: ResolvedVersion, version: ResolvedVersion): boolean {
+    const [was, is] = [dataOf(before), dataOf(version)];
 
-    if (doc.didDocumentRegistration !== undefined && !equal(doc.didDocumentRegistration, state.registration)) {
-        return undefined;
-    }
-
-    if (doc.didDocument !== undefined && !equal(doc.didDocument, state.document)) {
-        return undefined;
-    }
-
-    const data = doc.didDocumentData === undefined ? state.data : doc.didDocumentData;
-    const before = state.data as Record<string, any>;
-
-    if (!data || typeof data !== 'object' || Array.isArray(data) || validateGrant(data.memeplexGrant) !== 'valid') {
-        return undefined;
+    if (version.didDocumentMetadata?.deactivated || !was || !is || validateGrant(is.memeplexGrant) !== 'valid') {
+        return false;
     }
 
     const scopeless = ({ actions, expiresAt, ...rest }: Record<string, any>) => { void actions; void expiresAt; return rest; };
     const others = ({ memeplexGrant, ...rest }: Record<string, any>) => { void memeplexGrant; return rest; };
 
-    return equal(others(data), others(before)) && equal(scopeless(data.memeplexGrant), scopeless(before.memeplexGrant))
-        ? data
-        : undefined;
+    return equal(version.didDocument, before.didDocument)
+        && equal(version.didDocumentRegistration, before.didDocumentRegistration)
+        && equal(others(is), others(was))
+        && equal(scopeless(is.memeplexGrant), scopeless(was.memeplexGrant));
 }
 
-// Reads a grant from its accepted history, in predecessor order.
-export function readGrant(history: AcceptedEvent[]): Grant {
-    const creation = history[0]?.operation;
+// Reads a grant from the versions of its DID, oldest first.
+export function readGrant(versions: ResolvedVersion[]): Grant {
+    const creation = versions[0];
+    const data = creation && dataOf(creation);
+    const registration = creation?.didDocumentRegistration;
+    const user = creation?.didDocument?.controller;
 
-    if (!creation || creation.type !== 'create' || creation.registration?.type !== 'asset'
-        || typeof creation.controller !== 'string' || !creation.data || typeof creation.data !== 'object') {
+    if (!creation || !data || registration?.type !== 'asset' || typeof user !== 'string') {
         return { status: 'void', reason: 'not-a-grant' };
     }
 
-    const validity = validateGrant(creation.data.memeplexGrant);
+    const validity = validateGrant(data.memeplexGrant);
 
     if (validity === 'unsupported') {
         return { status: 'unsupported' };
     }
     if (validity !== 'valid') {
-        return { status: 'void', reason: creation.data.memeplexGrant === undefined ? 'not-a-grant' : 'invalid' };
+        return { status: 'void', reason: data.memeplexGrant === undefined ? 'not-a-grant' : 'invalid' };
     }
 
-    const user: string = creation.controller;
-    const client: string = creation.data.memeplexGrant.client;
-    const registry: string = creation.registration.registry;
+    const client: string = data.memeplexGrant.client;
+    const registry = registration.registry as string;
 
     if (!PERMITTED_REGISTRIES.some(permitted => permitted === registry)) {
         return { status: 'void', reason: 'registry' };
     }
-    if (creation.registration.validUntil !== undefined) {
+    if (registration.validUntil !== undefined) {
         return { status: 'void', reason: 'expires-by-registration' };
     }
     if (client === user) {
         return { status: 'void', reason: 'client-is-user' };
     }
 
-    const created = positionOn(history[0], registry);
+    const created = positionOn(creation, registry);
 
     if (!created) {
         return { status: 'pending', user, client, registry };
@@ -166,34 +158,24 @@ export function readGrant(history: AcceptedEvent[]): Grant {
         ...(actions === undefined ? {} : { actions }),
         ...(expiresAt === undefined ? {} : { expiresAt }),
     });
-    const versions: GrantVersion[] = [{ position: created, ...scope(creation.data.memeplexGrant) }];
-    // An asset's first document is the one a Gatekeeper gives it: its DID and its
-    // controller. Every later operation names the DID.
-    const state: State = {
-        controller: user,
-        data: creation.data,
-        registration: creation.registration,
-        document: { '@context': ['https://www.w3.org/ns/did/v1'], id: history[1]?.operation.did, controller: user },
-    };
+    const scopes: GrantVersion[] = [{ position: created, ...scope(data.memeplexGrant) }];
     let active = true;
     let ended: Position | undefined;
     let pending = 0;
 
-    for (const event of history.slice(1)) {
-        const position = positionOn(event, registry);
-        const data = active ? scopeUpdate(state, event.operation) : undefined;
+    for (let index = 1; index < versions.length; index++) {
+        const version = versions[index];
+        const position = positionOn(version, registry);
 
-        if (data) {
-            state.data = data;
+        active = active && isScopeUpdate(versions[index - 1], version);
+
+        if (active) {
             if (position) {
-                versions.push({ position, ...scope(data.memeplexGrant) });
+                scopes.push({ position, ...scope(dataOf(version)!.memeplexGrant) });
             }
         }
-        else {
-            active = false;
-            if (position && !(ended && ended.block <= position.block)) {
-                ended = position;
-            }
+        else if (position && !(ended && ended.block <= position.block)) {
+            ended = position;
         }
 
         if (!position) {
@@ -201,7 +183,7 @@ export function readGrant(history: AcceptedEvent[]): Grant {
         }
     }
 
-    return { status: 'valid', user, client, registry, versions, ...(ended ? { ended } : {}), pending };
+    return { status: 'valid', user, client, registry, versions: scopes, ...(ended ? { ended } : {}), pending };
 }
 
 const ACTIONS: Record<Kind, string> = {
@@ -216,7 +198,7 @@ export type Authority =
     | 'permitted'
     // The position is not after the grant's creation, or shares its block.
     | 'before-grant'
-    // The position is not before the operation that ended the grant.
+    // The position is not before the version that ended the grant.
     | 'after-end'
     // The position shares a block with a scope update, so which scope applies is
     // not established.

@@ -1,18 +1,19 @@
-import type { AcceptedEvent, MemeplexIndex } from '@didcid/memeplex';
+import type { MemeplexIndex, ResolvedVersion } from '@didcid/memeplex';
 
 // Keeping an index in step with a Gatekeeper: docs/plans/memeplex-1436.md, "A
 // graph anyone can reconstruct".
 //
-// The Gatekeeper says which DIDs have changed; the history of each is then
-// exported whole and handed to the index, which derives everything from it. What
-// the Gatekeeper lists is never the evidence itself, so being told of a DID
-// twice, or of one that turns out not to be a Memeplex object, changes nothing.
+// The Gatekeeper says which DIDs have changed, and what every version of each
+// is. Those versions are handed to the index, which applies the Memeplex rules to
+// them. Being told of a DID twice, or of one that turns out not to be a Memeplex
+// object, changes nothing.
 
 /** As much of a Gatekeeper as the indexer reads. */
 export interface FeedGatekeeper {
     /** Every DID the node has. */
     getDIDs(): Promise<string[]>;
-    exportDIDs(dids: string[]): Promise<AcceptedEvent[][]>;
+    /** Every version of each DID, as the Gatekeeper resolves it; none for a DID it does not have. */
+    resolveVersions(dids: string[]): Promise<ResolvedVersion[][]>;
     /**
      * The DIDs whose histories changed after a sequence, oldest first, with the
      * epoch the sequences belong to. With no sequence, only where the node stands.
@@ -29,14 +30,14 @@ export interface SyncOptions {
     index: MemeplexIndex;
     /** Changes read in one request. The Gatekeeper allows 1 to 1000. */
     pageSize?: number;
-    /** Histories exported in one request. */
+    /** DIDs whose versions are asked for in one request. */
     exportSize?: number;
 }
 
 export interface SyncResult {
     /** Whether every DID the node has was read, as at the start and after the Gatekeeper restarts. */
     rebuilt: boolean;
-    /** Histories exported and handed to the index. */
+    /** DIDs whose versions were read and handed to the index. */
     histories: number;
 }
 
@@ -60,13 +61,13 @@ export class Sync {
         return this.position !== undefined;
     }
 
-    /** Exports the current history of each DID and hands it to the index. */
+    /** Reads the versions of each DID and hands them to the index. */
     private async refresh(dids: string[]): Promise<number> {
         const { gatekeeper, index } = this.options;
 
         for (let start = 0; start < dids.length; start += this.exportSize) {
             const batch = dids.slice(start, start + this.exportSize);
-            const histories = await gatekeeper.exportDIDs(batch);
+            const histories = await gatekeeper.resolveVersions(batch);
 
             // A DID the Gatekeeper no longer has comes back empty, which removes
             // it. One that is neither an object nor a grant is not kept.
@@ -115,8 +116,8 @@ export class Sync {
 
             histories += await this.refresh(page.changes.map(change => change.did));
 
-            // Only once its histories are in the index is a page behind us. Had
-            // an export failed, the next poll asks for the same changes again.
+            // Only once its DIDs are in the index is a page behind us. Had the
+            // read of them failed, the next poll asks for the same changes again.
             const last = page.changes.at(-1);
 
             if (last) {
