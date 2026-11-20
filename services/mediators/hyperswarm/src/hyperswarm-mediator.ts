@@ -20,6 +20,7 @@ import { createEvents } from './events.js';
 import { ExportDeps, flushQueue } from './export.js';
 import { NodeInfo, PeerTracker } from './peers.js';
 import { TopicSwarm } from './swarm.js';
+import { dropStale, trackConnection } from './connections.js';
 import { exit } from 'process';
 
 interface HyperMessage {
@@ -238,8 +239,26 @@ function startMetricsServer(): void {
 
 goodbye(() => topicSwarm.destroy());
 
+// Whether a peer has connected since the node last joined its topic.
+let hadPeers = false;
+
 async function createSwarm(): Promise<void> {
-    nodeKey = b4a.toString(await topicSwarm.join(), 'hex');
+    // Joining again without ever having had a peer, the node stays the peer it
+    // was. Joining again after losing every peer, it comes back as a new one: see
+    // TopicSwarm.
+    //
+    // Peers connect while the join is still finding them, so the flag is cleared
+    // before the join and not after it, which would lose those.
+    const asNewPeer = hadPeers;
+    hadPeers = false;
+
+    try {
+        nodeKey = b4a.toString(await topicSwarm.join({ asNewPeer }), 'hex');
+    }
+    catch (error) {
+        hadPeers = hadPeers || asNewPeer;
+        throw error;
+    }
 
     const shortTopic = shortName(b4a.toString(topic, 'hex'));
     console.log(`hyperswarm peer id: ${shortName(nodeKey)} (${config.nodeName}) joined topic: ${shortTopic} using protocol: ${config.protocol}`);
@@ -275,34 +294,34 @@ function addConnection(conn: HyperswarmConnection): void {
     const peerKey = b4a.toString(conn.remotePublicKey, 'hex');
     const peerName = shortName(peerKey);
 
-    conn.once('close', () => closeConnection(peerKey));
-    conn.on('data', data => receiveMsg(peerKey, data));
-
     console.log(`received connection from: ${peerName}`);
+    hadPeers = true;
 
     // Push the connection to the syncQueue instead of writing directly
     syncQueue.push(conn);
 
-    connectionInfo[peerKey] = {
+    trackConnection(connectionInfo, peerKey, {
         connection: conn,
         key: peerKey,
         peerName: peerName,
         nodeName: 'anon',
         did: '',
         lastSeen: new Date().getTime(),
-    };
+    }, {
+        onData: data => receiveMsg(peerKey, data),
+        onError: (error, info) => {
+            mediatorErrors.inc({ operation: 'connection' });
+            console.log(`connection error with: ${info.peerName} (${info.nodeName}): ${error}`);
+        },
+        onClose: info => {
+            console.log(`* connection closed with: ${info.peerName} (${info.nodeName}) *`);
+            mediatorConnectionsTotal.inc({ event: 'closed' });
+        },
+    });
     mediatorConnectionsTotal.inc({ event: 'established' });
 
     const peerNames = Object.values(connectionInfo).map(info => info.peerName);
     console.log(`--- ${peerNames.length} nodes connected, detected nodes: ${peerNames.join(', ')}`);
-}
-
-function closeConnection(peerKey: string): void {
-    const conn = connectionInfo[peerKey];
-    console.log(`* connection closed with: ${conn.peerName} (${conn.nodeName}) *`);
-
-    delete connectionInfo[peerKey];
-    mediatorConnectionsTotal.inc({ event: 'closed' });
 }
 
 function shortName(peerKey: string): string {
@@ -524,6 +543,11 @@ async function receiveMsg(peerKey: string, json: string): Promise<void> {
     const conn = connectionInfo[peerKey];
     let msg;
 
+    // A connection that has been dropped as stale can still deliver what it had.
+    if (!conn) {
+        return;
+    }
+
     try {
         msg = JSON.parse(json);
     }
@@ -627,14 +651,8 @@ async function checkConnections(): Promise<void> {
     const expireLimit = 3 * 60 * 1000; // 3 minutes in milliseconds
     const now = Date.now();
 
-    for (const peerKey in connectionInfo) {
-        const conn = connectionInfo[peerKey];
-        const timeSinceLastSeen = now - conn.lastSeen;
-
-        if (timeSinceLastSeen > expireLimit) {
-            console.log(`Removing stale connection info for: ${conn.peerName} (${conn.nodeName}), last seen ${timeSinceLastSeen / 1000}s ago`);
-            delete connectionInfo[peerKey];
-        }
+    for (const conn of dropStale(connectionInfo, now, expireLimit)) {
+        console.log(`Removing stale connection for: ${conn.peerName} (${conn.nodeName}), last seen ${(now - conn.lastSeen) / 1000}s ago`);
     }
 }
 
