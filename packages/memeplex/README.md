@@ -62,6 +62,21 @@ A version that fails a check ends attribution for it and every version after it,
 
 The result is a reading of the evidence handed over. When either history changes, attribute again.
 
+## Ratings and coauthors
+
+Two readings over publications that independent indexers have to agree on:
+
+```js
+import { currentRatings, ratingValue, coauthors } from '@didcid/memeplex';
+
+currentRatings(publications);            // the rating that counts for each author and target
+ratingValue(publication.memeplex);       // from 0 (worst) to 1 (best)
+coauthors(paper, tagPublications);       // each listed coauthor: confirmed, confirmed-other or listed
+```
+
+- `currentRatings` keeps, for each author and target, the published rating whose shown version was anchored latest by block time; of two anchored at the same time, the one with the smaller version identity. A withdrawn rating does not count.
+- `coauthors` says how each coauthor a paper lists stands towards the revision it shows: `confirmed` when an attributed `coauthor` tag of theirs pins that revision, `confirmed-other` with the revisions their tags do pin, and `listed` when there is only the publisher's claim.
+
 ## The schemas
 
 `schemas` holds the seven JSON Schemas of `v: 1`. They and the compiled validators in `src` are generated from `share/schema/memeplex/v1`:

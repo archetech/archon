@@ -31,7 +31,7 @@ export interface AttributionCase {
 type Operation = Record<string, unknown>;
 
 // An asset's history under construction: its operations and the block of each.
-class History {
+export class History {
     steps: Step[] = [];
     did = '';
 
