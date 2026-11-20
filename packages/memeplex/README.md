@@ -96,6 +96,7 @@ const index = new MemeplexIndex();
 
 index.put(did, history);            // a DID's accepted history, as exported; again whenever it changes
 
+index.holds(did);                   // whether a history is held for the DID; index.dids() lists them
 index.publication(did);             // published or withdrawn, or undefined when nothing is attributed
 index.timeline([author, ...]);      // posts, papers and replies, newest first
 index.thread(target);               // replies and their replies, as a flat list with each one's depth
