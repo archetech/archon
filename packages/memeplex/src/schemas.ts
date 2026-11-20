@@ -476,13 +476,19 @@ export const schemas = {
                 "$ref": "#/$defs/versionId"
             },
             "rating": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": -100,
+                "maximum": 100
             },
             "min": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": -100,
+                "maximum": 100
             },
             "max": {
-                "type": "integer"
+                "type": "integer",
+                "minimum": -100,
+                "maximum": 100
             },
             "text": false,
             "content": false,
