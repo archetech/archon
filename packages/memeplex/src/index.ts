@@ -5,3 +5,5 @@ export { PERMITTED_REGISTRIES, authorityAt, positionOn, readGrant } from './gran
 export type { AcceptedEvent, Authority, Grant, GrantVersion, GrantVoidReason, Position } from './grant.js';
 export { attribute } from './attribution.js';
 export type { Publication, Unattributed, Version, VersionOutcome } from './attribution.js';
+export { coauthors, currentRatings, ratingValue } from './views.js';
+export type { Coauthor } from './views.js';

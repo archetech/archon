@@ -62,6 +62,8 @@ export interface Publication {
     // 'none':      the creation is not attributed and cannot become so.
     // 'unsupported': the creation states a `v` this verifier does not know.
     state: 'published' | 'withdrawn' | 'pending' | 'none' | 'unsupported';
+    // The object's DID, as the export states it.
+    did?: string;
     // One for each operation of the history, in its order.
     versions: Version[];
     // The index in `versions` of the last attributed version.
@@ -212,15 +214,18 @@ export function attribute(history: AcceptedEvent[], grantHistory: AcceptedEvent[
         }
     }
 
+    const did = history[0]?.did === undefined ? {} : { did: history[0].did };
+
     if (current === undefined) {
         const outcome = versions[0]?.outcome;
         const state = outcome === 'pending' || outcome === 'unsupported' ? outcome : 'none';
 
-        return { state, versions };
+        return { state, ...did, versions };
     }
 
     return {
         state: versions[current].type === 'delete' ? 'withdrawn' : 'published',
+        ...did,
         versions,
         current,
         memeplex,
