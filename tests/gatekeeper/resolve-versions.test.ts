@@ -86,9 +86,14 @@ describe('resolveVersions', () => {
         const second = await createAgent();
         await update(second.did, second.keypair, { n: 1 });
 
-        const result = await gatekeeper.resolveVersions(['did:cid:mock', second.did, 'not a did', first.did, second.did]);
+        // Among them a stored DID's bare identifier, and that identifier under
+        // another prefix: neither is the DID, and neither has versions.
+        const suffix = first.did.split(':').pop()!;
+        const result = await gatekeeper.resolveVersions([
+            'did:cid:mock', second.did, 'not a did', first.did, second.did, suffix, `not-a-did:${suffix}`,
+        ]);
 
-        expect(result.map(versions => versions.length)).toStrictEqual([0, 2, 0, 1, 2]);
+        expect(result.map(versions => versions.length)).toStrictEqual([0, 2, 0, 1, 2, 0, 0]);
         expect(result[1]).toStrictEqual(await expected(second.did));
         expect(result[3]).toStrictEqual(await expected(first.did));
         expect(await gatekeeper.resolveVersions([])).toStrictEqual([]);
@@ -130,6 +135,40 @@ describe('resolveVersions', () => {
             { chain: 'BTC:signet', upperBound: { height: 100, time: 1_800_000_000 } },
             { chain: 'BTC:signet', upperBound: { height: 101, time: 1_800_000_600 } },
         ]);
+    });
+
+    // Part of a history is not to be taken for the whole of it.
+    it('fails, and returns no part of a history, when a version does not resolve', async () => {
+        const { did, keypair } = await createAgent();
+        await update(did, keypair, { n: 1 });
+        const db = (gatekeeper as unknown as { db: { getEvents(did: string): Promise<unknown[]> } }).db;
+        const getEvents = db.getEvents.bind(db);
+
+        // A history whose second event has been lost in reading.
+        db.getEvents = async (asked: string) => {
+            const events = await getEvents(asked);
+            return asked === did ? [events[0], { ...(events[1] as object), operation: { type: 'unknown' } }] : events;
+        };
+
+        await expect(gatekeeper.resolveVersions([did])).rejects.toThrow();
+    });
+
+    it('reads a long history once', async () => {
+        const { did, keypair } = await createAgent();
+        for (let n = 0; n < 12; n++) await update(did, keypair, { n });
+        const db = (gatekeeper as unknown as { db: { getEvents(did: string): Promise<unknown[]> } }).db;
+        const getEvents = db.getEvents.bind(db);
+        let reads = 0;
+
+        db.getEvents = async (asked: string) => {
+            if (asked === did) reads++;
+            return getEvents(asked);
+        };
+
+        const [versions] = await gatekeeper.resolveVersions([did]);
+
+        expect(versions).toHaveLength(13);
+        expect(reads).toBe(1);
     });
 
     it('rejects a request that is not a list of DIDs', async () => {

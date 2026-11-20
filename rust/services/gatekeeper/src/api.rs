@@ -1064,31 +1064,51 @@ pub(crate) async fn resolve_versions(State(state): State<AppState>, body: Bytes)
     // One lock for them all, so that the versions of a DID are of one history.
     let _history_guard = state.history_lock.lock().await;
     let mut all: Vec<Vec<Value>> = Vec::with_capacity(dids.len());
+    let store = state.store.lock().await;
     for did in &dids {
-        let mut versions = Vec::new();
-        let mut sequence: usize = 1;
-        loop {
+        // The store finds a history by the last part of the name it is given, so
+        // what is not a DID is turned away here and has no versions.
+        if !is_valid_did(did) {
+            all.push(Vec::new());
+            continue;
+        }
+        // Read once and resolved from at each sequence: reading it again for
+        // every version would cost a long history its length squared in reads,
+        // with the lock held.
+        let events = store.get_events(did);
+        let mut versions = Vec::with_capacity(events.len());
+        for sequence in 1..=events.len() {
             let options = ResolveOptions {
                 version_sequence: Some(sequence),
                 ..Default::default()
             };
-            let Ok(mut doc) = crate::resolve_local_doc_async(&state, did, options).await else { break };
-            // Resolution stops at the last version it has, so a sequence past
-            // the end returns that one again.
-            if doc.pointer("/didResolutionMetadata/error").is_some()
-                || document_sequence(&doc) != sequence as u64
-            {
-                break;
-            }
+            // A failure here is not the end of the history. It is an error, so
+            // that a reader is never handed part of one as the whole.
+            let resolved = store.resolve_doc_from(did, options, &events);
+            let mut doc = match resolved {
+                Ok(doc)
+                    if doc.pointer("/didResolutionMetadata/error").is_none()
+                        && document_sequence(&doc) == sequence as u64 =>
+                {
+                    doc
+                }
+                _ => {
+                    record_metrics(&state, "POST", "/dids/versions", 500, start.elapsed().as_secs_f64());
+                    return text_error_response(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        &format!("Error: version {sequence} of {did} did not resolve"),
+                    );
+                }
+            };
             // When it was read is not part of what the version is.
             if let Some(object) = doc.as_object_mut() {
                 object.remove("didResolutionMetadata");
             }
             versions.push(doc);
-            sequence += 1;
         }
         all.push(versions);
     }
+    drop(store);
     record_metrics(&state, "POST", "/dids/versions", 200, start.elapsed().as_secs_f64());
     Json(json!(all)).into_response()
 }

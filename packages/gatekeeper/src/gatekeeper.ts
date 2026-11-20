@@ -1244,21 +1244,18 @@ export default class Gatekeeper implements GatekeeperInterface {
 
             for (const did of dids) {
                 const versions: DidCidDocument[] = [];
+                // Read once and resolved from at each sequence: reading it again
+                // for every version would cost a long history its length squared
+                // in reads, with the lock held.
+                const history = isValidDID(did) ? await this.db.getEvents(did) : [];
 
-                for (let sequence = 1; ; sequence++) {
-                    let doc: DidCidDocument;
+                for (let sequence = 1; sequence <= history.length; sequence++) {
+                    // A failure here is not the end of the history. It is thrown,
+                    // so that a reader is never handed part of one as the whole.
+                    const doc = await this.resolveDIDAt(did, { versionSequence: sequence }, history);
 
-                    try {
-                        doc = await this.resolveDIDAt(did, { versionSequence: sequence });
-                    }
-                    catch {
-                        break;
-                    }
-
-                    // Resolution stops at the last version it has, so a sequence
-                    // past the end returns that one again.
                     if (doc.didResolutionMetadata?.error || doc.didDocumentMetadata?.versionSequence !== String(sequence)) {
-                        break;
+                        throw new Error(`version ${sequence} of ${did} did not resolve`);
                     }
 
                     // When it was read is not part of what the version is.
@@ -1295,7 +1292,9 @@ export default class Gatekeeper implements GatekeeperInterface {
     // sequence-based.
     private async resolveDIDAt(
         did?: string,
-        options?: ResolveDIDOptions & { versionOrdinal?: { registry: string, ordinal: number[] } }
+        options?: ResolveDIDOptions & { versionOrdinal?: { registry: string, ordinal: number[] } },
+        // The DID's accepted history, when the caller has read it already.
+        history?: GatekeeperEvent[]
     ): Promise<DidCidDocument> {
         const { versionTime, versionSequence, versionId: requestedId, versionOrdinal, confirm = false, verify = false } = options || {};
 
@@ -1322,7 +1321,7 @@ export default class Gatekeeper implements GatekeeperInterface {
             };
         }
 
-        const events = await this.db.getEvents(did);
+        const events = history ?? await this.db.getEvents(did);
 
         if (events.length === 0) {
             return {

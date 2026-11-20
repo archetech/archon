@@ -152,6 +152,19 @@ async fn versions_are_each_sequence_as_resolution_returns_it() -> Result<()> {
         .all(|version| version.get("didResolutionMetadata").is_none()));
     assert_eq!(listed[3].as_array().unwrap().len(), 1);
 
+    // A stored DID's bare identifier, and that identifier under another prefix,
+    // are not the DID and have no versions.
+    let suffix = first.rsplit(':').next().unwrap().to_string();
+    let (status, body) = versions(
+        &service,
+        json!({ "dids": [suffix, format!("not-a-did:{suffix}"), first] }),
+    )
+    .await?;
+    assert_eq!(status, 200);
+    assert_eq!(body[0], json!([]));
+    assert_eq!(body[1], json!([]));
+    assert_eq!(body[2].as_array().unwrap().len(), 3);
+
     assert_eq!(versions(&service, json!({ "dids": [] })).await?, (200, json!([])));
     Ok(())
 }
