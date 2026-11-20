@@ -98,7 +98,7 @@ index.put(did, history);            // a DID's accepted history, as exported; ag
 
 index.publication(did);             // published or withdrawn, or undefined when nothing is attributed
 index.timeline([author, ...]);      // posts, papers and replies, newest first
-index.thread(target);               // replies and their replies, oldest first
+index.thread(target);               // replies and their replies, as a flat list with each one's depth
 index.boosts(target);
 index.ratings(target);              // the ratings that count, and their mean
 index.tags(target);                 // each value with the authors who applied it

@@ -13,9 +13,11 @@ import type { Coauthor } from './views.js';
 // kept up to date. It fetches nothing: whoever runs it reads a Gatekeeper's events
 // and hands over the history of each DID that changed.
 
+// A reply in a thread, with how far below the thread's target it sits: 1 for a
+// reply to the target, 2 for a reply to that, and so on.
 export interface Reply {
     publication: Publication;
-    replies: Reply[];
+    depth: number;
 }
 
 export interface RatingSummary {
@@ -43,9 +45,10 @@ function newestFirst(a: Publication, b: Publication): number {
 export class MemeplexIndex {
     private histories = new Map<string, AcceptedEvent[]>();
     private publications = new Map<string, Publication>();
-    // The grant each object's creation names, and the objects naming each grant,
-    // each author and each target.
-    private grantOf = new Map<string, string>();
+    // Where each object is filed, kept apart from the publications handed out so
+    // that nothing a caller does to one can leave the index filed wrongly.
+    private filed = new Map<string, { grant?: string; author?: string; target?: string }>();
+    // The objects naming each grant, each author and each target.
     private byGrant = new Map<string, Set<string>>();
     private byAuthor = new Map<string, Set<string>>();
     private byTarget = new Map<string, Set<string>>();
@@ -93,39 +96,49 @@ export class MemeplexIndex {
 
     // Attributes one object again from the histories held, and files the result.
     private derive(did: string): void {
-        const before = this.publications.get(did)?.memeplex;
+        const before = this.filed.get(did);
         const history = this.histories.get(did);
         const claimed = history?.[0]?.operation?.data?.memeplex;
 
         // The grant link follows what the creation claims, so that the object is
         // attributed again when that grant's history arrives or changes.
-        this.unlink(this.byGrant, this.grantOf.get(did), did);
-        this.grantOf.delete(did);
+        this.unlink(this.byGrant, before?.grant, did);
         this.unlink(this.byAuthor, before?.author, did);
         this.unlink(this.byTarget, before?.target, did);
+        this.filed.delete(did);
         this.publications.delete(did);
 
         if (!history || claimed === undefined) {
             return;
         }
 
+        const filed: { grant?: string; author?: string; target?: string } = {};
+
         if (typeof claimed?.grant === 'string') {
-            this.grantOf.set(did, claimed.grant);
-            this.link(this.byGrant, claimed.grant, did);
+            filed.grant = claimed.grant;
+            this.link(this.byGrant, filed.grant, did);
         }
 
         const publication = attribute(history, this.histories.get(claimed?.grant) ?? []);
 
         // Only an attributed object appears anywhere: a claim is not a publication.
         if (publication.current !== undefined) {
+            const { author, target } = publication.memeplex!;
+
             this.publications.set(did, publication);
-            this.link(this.byAuthor, publication.memeplex!.author, did);
-            this.link(this.byTarget, publication.memeplex!.target, did);
+            filed.author = author;
+            this.link(this.byAuthor, author, did);
+            if (typeof target === 'string') {
+                filed.target = target;
+                this.link(this.byTarget, target, did);
+            }
         }
+
+        this.filed.set(did, filed);
     }
 
     private under(index: Map<string, Set<string>>, key: string): Publication[] {
-        return [...index.get(key) ?? []].map(did => this.publications.get(did)!);
+        return [...index.get(key) ?? []].flatMap(did => this.publications.get(did) ?? []);
     }
 
     // The publication of an object, published or withdrawn. An object with no
@@ -143,20 +156,34 @@ export class MemeplexIndex {
             .sort(newestFirst);
     }
 
-    // The replies to an object, each with its own, oldest first. A withdrawn reply
-    // stays as a tombstone so that the replies under it keep their place.
-    thread(target: string, seen = new Set<string>()): Reply[] {
-        // A target is a DID anyone can write, so a reply may name one that names it back.
-        if (seen.has(target)) {
-            return [];
+    // The replies to an object and the replies to those, each directly after the
+    // one it answers and the replies to one object oldest first. A withdrawn
+    // reply stays as a tombstone so that the replies under it keep their place.
+    //
+    // The list is flat and built without recursion: anyone can publish a chain of
+    // replies as long as they like, and a thread must not fail for its depth. A
+    // reply names its target in its creation, which its own DID is the hash of, so
+    // no reply can be above itself.
+    thread(target: string): Reply[] {
+        const repliesTo = (did: string, depth: number): Reply[] => this.under(this.byTarget, did)
+            .filter(each => kindOf(each) === 'reply')
+            .sort(newestFirst)
+            .map(publication => ({ publication, depth }));
+
+        const thread: Reply[] = [];
+        // Newest first on the stack, so that the oldest is taken first.
+        const waiting = repliesTo(target, 1);
+
+        while (waiting.length > 0) {
+            const reply = waiting.pop()!;
+
+            thread.push(reply);
+            for (const below of repliesTo(reply.publication.did!, reply.depth + 1)) {
+                waiting.push(below);
+            }
         }
 
-        const below = new Set(seen).add(target);
-
-        return this.under(this.byTarget, target)
-            .filter(each => kindOf(each) === 'reply')
-            .sort((a, b) => newestFirst(b, a))
-            .map(publication => ({ publication, replies: this.thread(publication.did!, below) }));
+        return thread;
     }
 
     // The boosts and quote posts of an object: posts that name it as their target.

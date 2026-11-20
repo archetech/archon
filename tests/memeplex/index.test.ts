@@ -142,7 +142,7 @@ describe('publications', () => {
         expect(index.publication(post)).toBeUndefined();
         expect(index.timeline([alice.did]).map(each => each.did)).not.toContain(post);
         // The replies to it are publications of their own, and stay.
-        expect(index.thread(post).map(each => each.publication.did)).toStrictEqual([reply, gone]);
+        expect(index.thread(post).map(each => each.publication.did)).toStrictEqual([reply, nested, gone, underGone]);
         expect(index.snapshot()).toStrictEqual(filled([...evidence.keys()].filter(did => did !== post)).snapshot());
     });
 });
@@ -160,10 +160,41 @@ describe('views', () => {
     it('builds a thread, oldest first, keeping a withdrawn reply as a tombstone', () => {
         const thread = filled().thread(post);
 
-        expect(thread.map(each => [each.publication.did, each.publication.state])).toStrictEqual([[reply, 'published'], [gone, 'withdrawn']]);
-        expect(thread[0].replies.map(each => each.publication.did)).toStrictEqual([nested]);
-        expect(thread[1].replies.map(each => each.publication.did)).toStrictEqual([underGone]);
-        expect(thread[0].replies[0].replies).toStrictEqual([]);
+        expect(thread.map(each => [each.publication.did, each.depth, each.publication.state])).toStrictEqual([
+            [reply, 1, 'published'], [nested, 2, 'published'], [gone, 1, 'withdrawn'], [underGone, 2, 'published'],
+        ]);
+    });
+
+    // Anyone can publish a chain of replies as long as they like.
+    it('builds a thread too deep to walk by recursion', () => {
+        const index = filled();
+        const template = index.publication(reply)!;
+        const root = 'did:cid:deep-0';
+        const depth = 20_000;
+
+        // Publications as attribute returns them, filed directly: signing twenty
+        // thousand histories would test the Gatekeeper, not the walk.
+        const internals = index as unknown as { publications: Map<string, unknown>; byTarget: Map<string, Set<string>> };
+        for (let level = 1; level <= depth; level++) {
+            const did = `did:cid:deep-${level}`;
+
+            internals.publications.set(did, { ...template, did, memeplex: { ...template.memeplex, target: `did:cid:deep-${level - 1}` } });
+            internals.byTarget.set(`did:cid:deep-${level - 1}`, new Set([did]));
+        }
+
+        const thread = index.thread(root);
+        expect(thread).toHaveLength(depth);
+        expect(thread.at(-1)).toMatchObject({ depth, publication: { did: `did:cid:deep-${depth}` } });
+    });
+
+    it('is not misfiled by a caller changing a publication it was given', () => {
+        const index = filled();
+
+        index.publication(post)!.memeplex!.author = bob.did;
+        index.put(post, []);
+
+        expect(() => index.timeline([alice.did, bob.did])).not.toThrow();
+        expect(index.timeline([alice.did, bob.did]).map(each => each.did)).not.toContain(post);
     });
 
     it('lists boosts', () => {
