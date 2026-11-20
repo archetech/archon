@@ -246,8 +246,19 @@ async function createSwarm(): Promise<void> {
     // Joining again without ever having had a peer, the node stays the peer it
     // was. Joining again after losing every peer, it comes back as a new one: see
     // TopicSwarm.
-    nodeKey = b4a.toString(await topicSwarm.join({ asNewPeer: hadPeers }), 'hex');
+    //
+    // Peers connect while the join is still finding them, so the flag is cleared
+    // before the join and not after it, which would lose those.
+    const asNewPeer = hadPeers;
     hadPeers = false;
+
+    try {
+        nodeKey = b4a.toString(await topicSwarm.join({ asNewPeer }), 'hex');
+    }
+    catch (error) {
+        hadPeers = hadPeers || asNewPeer;
+        throw error;
+    }
 
     const shortTopic = shortName(b4a.toString(topic, 'hex'));
     console.log(`hyperswarm peer id: ${shortName(nodeKey)} (${config.nodeName}) joined topic: ${shortTopic} using protocol: ${config.protocol}`);
