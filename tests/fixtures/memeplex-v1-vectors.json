@@ -3335,7 +3335,7 @@
    "schema": "rating",
    "member": "memeplex",
    "expect": "valid",
-   "did": "did:cid:bagaaieracxvlcrloa4bdmt5m5cs6qgasq3d4yxr7vbpntp7ouzmvmkfmokyq",
+   "did": "did:cid:bagaaieravfkuth5sutq72vakg5j7fjgrg5uh4cxjtsceundpxpxkdq63vavq",
    "operation": {
     "type": "create",
     "created": "2026-11-17T00:00:00.000Z",
@@ -3354,8 +3354,8 @@
       "target": "did:cid:bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
       "targetVersion": "bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
       "rating": 0,
-      "min": -1000000,
-      "max": 1000000
+      "min": -100,
+      "max": 100
      }
     },
     "proof": {
@@ -3364,7 +3364,7 @@
      "created": "2026-11-17T00:00:00.000Z",
      "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
      "proofPurpose": "capabilityInvocation",
-     "proofValue": "wt-KNY9ce0kifUtdWowUqBKzTLjTH3_FTzYDfiX3mNVVuB3Md49sJNNLhbRLCfxsJm0ghZG4Y5oSJr1HXnagSw"
+     "proofValue": "qGhLm1muIcd8YCOSgbNS3XWkgPVyiyXDc6ndUFlYbeYEb-mzPuhCi-yJzE_eOE71_xVJOQtbPuydnQq31-SsQg"
     }
    }
   },
@@ -3373,7 +3373,7 @@
    "schema": "rating",
    "member": "memeplex",
    "expect": "schema",
-   "did": "did:cid:bagaaieraufsa3tpzycdfdporagviwojpv5sxj4c5zgdoikupukm76t24byka",
+   "did": "did:cid:bagaaieraxw5thpoq5cpvkiiywdbiodsteqk2h3cq6o45ctodfpubgbhxsfqa",
    "operation": {
     "type": "create",
     "created": "2026-11-17T00:00:00.000Z",
@@ -3392,7 +3392,7 @@
       "target": "did:cid:bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
       "targetVersion": "bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
       "rating": 3,
-      "min": -1000001,
+      "min": -101,
       "max": 5
      }
     },
@@ -3402,7 +3402,7 @@
      "created": "2026-11-17T00:00:00.000Z",
      "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
      "proofPurpose": "capabilityInvocation",
-     "proofValue": "7PGjpm3Gz2aCQJRDrIEdY_hJukX_IVqHU2FENRUwOyE2_ntaeh2Sw95XxArJUXW-xd56YovObyYfFgKc_Yf-AQ"
+     "proofValue": "ahQqlESzieALY4xSfJImoshaz2U4_ZWs5OgQpRXHUqJ9UXfublxcisshO4513rPPsShZKWheInSJyYbf_V2O7g"
     }
    }
   },
@@ -3411,7 +3411,7 @@
    "schema": "rating",
    "member": "memeplex",
    "expect": "schema",
-   "did": "did:cid:bagaaierangfhg37rtrwpfxo7e2h3igakwhdr4247j6iyxql7q6wqcowh2tgq",
+   "did": "did:cid:bagaaierauca4qivzhes3fp2e3yrts2t5ugigpeaoedrguigzd5s7zq74vikq",
    "operation": {
     "type": "create",
     "created": "2026-11-17T00:00:00.000Z",
@@ -3431,7 +3431,7 @@
       "targetVersion": "bagaaierahvet7ziq5hsib5kxmywxd3ecisq36nk6vmmixjxlrobtt5axsfoq",
       "rating": 3,
       "min": 1,
-      "max": 1000001
+      "max": 101
      }
     },
     "proof": {
@@ -3440,7 +3440,7 @@
      "created": "2026-11-17T00:00:00.000Z",
      "verificationMethod": "did:cid:bagaaieradvf7ss7t3z7ian2lvmidfuruqr45suuezzj4rjupgqts5pustnta#key-1",
      "proofPurpose": "capabilityInvocation",
-     "proofValue": "pMA-O-gkomd5b82n_id6u6QDaszpskRYwl3AUjt5Y8xfvrQZNJN9IwgfR7VPfvMAub1OzotG5t6LjxEreLDRLw"
+     "proofValue": "Thmwp2_XBXnmN4EuanRjymj_7aqozEo0Mym2SNNQFyRseWeMUn9i37udsnGASAwRHjI-MNa_3qzsNjQRR2Nf-w"
     }
    }
   },

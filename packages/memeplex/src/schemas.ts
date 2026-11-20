@@ -477,18 +477,18 @@ export const schemas = {
             },
             "rating": {
                 "type": "integer",
-                "minimum": -1000000,
-                "maximum": 1000000
+                "minimum": -100,
+                "maximum": 100
             },
             "min": {
                 "type": "integer",
-                "minimum": -1000000,
-                "maximum": 1000000
+                "minimum": -100,
+                "maximum": 100
             },
             "max": {
                 "type": "integer",
-                "minimum": -1000000,
-                "maximum": 1000000
+                "minimum": -100,
+                "maximum": 100
             },
             "text": false,
             "content": false,

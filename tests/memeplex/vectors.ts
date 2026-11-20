@@ -349,9 +349,9 @@ export async function build(): Promise<Vectors> {
     await objectCase('rating: a thumbs up', memepool, 'valid', { ...rating, rating: 1, min: 0, max: 1 });
     await objectCase('rating: a centred scale', memepool, 'valid', { ...rating, rating: 0, min: -2, max: 2 });
     await objectCase('rating: at the bottom of its scale', memepool, 'valid', { ...rating, rating: 1 });
-    await objectCase('rating: the widest scale', memepool, 'valid', { ...rating, rating: 0, min: -1_000_000, max: 1_000_000 });
-    await objectCase('rating: a scale that starts too low', memepool, 'schema', { ...rating, min: -1_000_001 });
-    await objectCase('rating: a scale that ends too high', memepool, 'schema', { ...rating, max: 1_000_001 });
+    await objectCase('rating: the widest scale', memepool, 'valid', { ...rating, rating: 0, min: -100, max: 100 });
+    await objectCase('rating: a scale that starts too low', memepool, 'schema', { ...rating, min: -101 });
+    await objectCase('rating: a scale that ends too high', memepool, 'schema', { ...rating, max: 101 });
     await objectCase('rating: a scale too large to subtract', memepool, 'schema', { ...rating, rating: 0, min: -1e308, max: 1e308 });
     await objectCase('rating: not an integer', memepool, 'schema', { ...rating, rating: 3.5 });
     await objectCase('rating: a string', memepool, 'schema', { ...rating, rating: '3' });
