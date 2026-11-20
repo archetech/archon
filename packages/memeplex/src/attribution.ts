@@ -30,7 +30,7 @@ export type Unattributed =
     // The object was created with `validUntil`, or gained one.
     | 'expires-by-registration'
     // An update changed `author`, `kind`, `grant` or `target`, the controller or
-    // the registration.
+    // the registry.
     | 'identity'
     // The grant confers no authority at the version's position. `authority` says why.
     | 'authority'
@@ -161,8 +161,6 @@ export function attribute(history: AcceptedEvent[], grantHistory: AcceptedEvent[
     else if (first) {
         // The checks above passed, so the grant is valid and the object is its client's.
         const grant = readGrant(grantHistory) as Extract<Grant, { status: 'valid' }>;
-        const document = { '@context': ['https://www.w3.org/ns/did/v1'], id: history[0].did, controller: grant.client };
-
         versions[0] = { ...versions[0], outcome: 'attributed', position: first };
         current = 0;
 
@@ -188,8 +186,8 @@ export function attribute(history: AcceptedEvent[], grantHistory: AcceptedEvent[
                     check = failed('expires-by-registration');
                 }
                 else if (!equal(identity(next!), identity(memeplex!))
-                    || (doc.didDocument !== undefined && !equal(doc.didDocument, document))
-                    || (doc.didDocumentRegistration !== undefined && !equal(doc.didDocumentRegistration, creation.registration))) {
+                    || (doc.didDocument !== undefined && doc.didDocument?.controller !== grant.client)
+                    || (doc.didDocumentRegistration !== undefined && doc.didDocumentRegistration?.registry !== grant.registry)) {
                     check = failed('identity');
                 }
                 else {

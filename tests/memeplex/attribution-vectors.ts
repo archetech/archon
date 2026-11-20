@@ -144,6 +144,17 @@ export async function build(): Promise<{ description: string; registry: string; 
             { state: 'published', current: 1, versions: [attributed, attributed], memeplex: edited.memeplex });
     }
 
+    // Identity is the controller and the registry, not the whole document.
+    {
+        const grant = await live();
+        const data = post(grant);
+        const object = await History.create(client, data, 200);
+        await object.update(client, { didDocument: object.document(client, { service: [] }) }, 300);
+        await object.delete(client, 350);
+        await add('its document changed but not its controller, then withdrawn', object, grant,
+            { state: 'withdrawn', current: 2, versions: [attributed, attributed, attributed], memeplex: data.memeplex });
+    }
+
     // The plan's example: an edit, a revocation, then a deletion that comes too late.
     {
         const grant = await revoked(400);
