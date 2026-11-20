@@ -2329,9 +2329,12 @@ impl JsonDb {
             .get("registry")
             .and_then(Value::as_str)
             .map(ToString::to_string);
-        if let Some(registry) = anchor_registry.as_deref() {
-            state.timestamp = self.build_timestamp(registry, &state.version_id, anchor);
-        }
+        // The event whose blocks bound the version returned, with the registry
+        // and version it was applied under. The blocks are looked up once, for
+        // the version the walk ends on.
+        let mut bounded: Option<(String, String, &EventRecord)> = anchor_registry
+            .as_deref()
+            .map(|registry| (registry.to_string(), state.version_id.clone(), anchor));
 
         for (event, expected_registry, event_confirmed) in history_entries(events).skip(1) {
             let operation_time = standard_datetime(&event.time);
@@ -2363,9 +2366,13 @@ impl JsonDb {
             apply_transition(&mut state, event, did, operation_time);
 
             if let Some(registry) = expected_registry {
-                state.timestamp = self.build_timestamp(registry, &state.version_id, event);
+                bounded = Some((registry.to_string(), state.version_id.clone(), event));
             }
         }
+
+        state.timestamp = bounded.and_then(|(registry, version_id, event)| {
+            self.build_timestamp(&registry, &version_id, event)
+        });
 
         // The requested operation is not in the accepted history this resolution
         // walked: unknown, displaced by a preferred sibling, or (with confirm)
