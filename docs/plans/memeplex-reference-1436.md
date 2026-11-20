@@ -943,7 +943,7 @@ until the verifier exists.
    assets, with signed fixtures. The schemas and fixtures are written. Publishing
    them, and pinning their DIDs here, follows the verifier: publication fixes the
    schemas of `v: 1`, so they are exercised first.
-3. **Verifier library:** the attribution rules, in a package of its own, shared by clients and the indexer, with
+3. **Verifier library:** the attribution rules, in a package of its own, used by the indexer and, for validity and their own grant, by clients, with
    cross-checks against real signed objects, including revoked and forged grants,
    transferred objects, backdated siblings, and unattributed edits and deletions after
    revocation (of ratings and coauthor confirmations in particular), and a fresh index

@@ -7,3 +7,5 @@ export { attribute } from './attribution.js';
 export type { Publication, Unattributed, Version, VersionOutcome } from './attribution.js';
 export { coauthors, currentRatings, ratingValue } from './views.js';
 export type { Coauthor } from './views.js';
+export { MemeplexIndex } from './index-core.js';
+export type { RatingSummary, Reply } from './index-core.js';

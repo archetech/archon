@@ -86,3 +86,26 @@ npm run generate -w @didcid/memeplex
 ```
 
 The validators are compiled when the package is built, not when it is used, so the package runs under a content security policy that forbids building code from strings, and depends on nothing at run time.
+
+## An index
+
+```js
+import { MemeplexIndex } from '@didcid/memeplex';
+
+const index = new MemeplexIndex();
+
+index.put(did, history);            // a DID's accepted history, as exported; again whenever it changes
+
+index.publication(did);             // published or withdrawn, or undefined when nothing is attributed
+index.timeline([author, ...]);      // posts, papers and replies, newest first
+index.thread(target);               // replies and their replies, oldest first
+index.boosts(target);
+index.ratings(target);              // the ratings that count, and their mean
+index.tags(target);                 // each value with the authors who applied it
+index.coauthors(paper);
+```
+
+`MemeplexIndex` holds the latest accepted history of each object and grant it is handed, and derives every answer from those. It fetches nothing: whoever runs it reads a Gatekeeper's events and hands over the history of each DID that changed. An object is attributed again when its grant's history arrives or changes.
+
+Because every view is a function of the histories held, an index filled in any order, or filled again from nothing, answers the same as one kept up to date. `snapshot()` returns every publication by DID, for comparing two indexes.
+
