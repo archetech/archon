@@ -38,6 +38,7 @@ Implemented natively:
 - `/api/v1/block/:registry/latest`
 - `/api/v1/block/:registry/:blockId`
 - `/api/v1/events`
+- `/api/v1/changes`
 - `/api/v1/search`
 - `/api/v1/query`
 - `/api/v1/ipfs/json`

@@ -81,6 +81,34 @@
     "compareMode": "json"
   },
   {
+    "name": "changes-bad-since",
+    "method": "GET",
+    "path": "/api/v1/changes?since=1e1",
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
+    "name": "changes-empty-since",
+    "method": "GET",
+    "path": "/api/v1/changes?since=",
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
+    "name": "changes-repeated-since",
+    "method": "GET",
+    "path": "/api/v1/changes?since=1&since=2",
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
+    "name": "changes-bad-limit",
+    "method": "GET",
+    "path": "/api/v1/changes?since=0&limit=0",
+    "expectedStatus": 400,
+    "compareMode": "json"
+  },
+  {
     "name": "api-not-found",
     "method": "GET",
     "path": "/api/nope",

@@ -44,6 +44,7 @@ The TypeScript service exposes these public routes under `/api/v1`:
 | `GET` | `/block/:registry/:blockId` | Block lookup by hash or height. |
 | `POST` | `/block/:registry` | Admin protected. |
 | `GET` | `/events` | Page through accepted events across DIDs, newest first. |
+| `GET` | `/changes` | DIDs whose accepted histories changed after a sequence, oldest first. Sequences and the epoch are the node's own and are not compared across ports. |
 | `GET` | `/search` | Full-text DID search. |
 | `POST` | `/query` | Structured query with `where`. |
 

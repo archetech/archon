@@ -213,5 +213,82 @@ export function createSearchRouter(options: CreateV1RouterOptions): express.Rout
         }
     });
 
+    /**
+     * @swagger
+     * /api/v1/changes:
+     *   get:
+     *     summary: List the DIDs whose accepted histories have changed, oldest first
+     *     description: >
+     *       Each change to a DID's accepted history on this node (an event
+     *       accepted, replaced, anchored or removed) is given the next sequence
+     *       number. This returns the DIDs changed after a sequence, in the order
+     *       they changed, each once at its latest change, so a reader can follow
+     *       a node at the cost of what changed. The sequences are this node's own
+     *       and are counted from when it last built its histories: the epoch
+     *       names that run, and a reader that meets a different epoch has to read
+     *       everything again. A removed DID is listed like any other change.
+     *     parameters:
+     *       - in: query
+     *         name: since
+     *         schema:
+     *           type: integer
+     *           minimum: 0
+     *         description: >
+     *           Only changes after this sequence. Without it no changes are
+     *           returned, only the epoch and the sequence the node has reached.
+     *       - in: query
+     *         name: limit
+     *         schema:
+     *           type: integer
+     *           minimum: 1
+     *           maximum: 1000
+     *           default: 1000
+     *         description: Page size.
+     *     responses:
+     *       200:
+     *         description: The epoch, the node's latest sequence, and one page of changes.
+     *         content:
+     *           application/json:
+     *             schema:
+     *               type: object
+     *               properties:
+     *                 epoch:
+     *                   type: string
+     *                   description: Names the run the sequences belong to.
+     *                 sequence:
+     *                   type: integer
+     *                   description: The sequence of the node's latest change.
+     *                 changes:
+     *                   type: array
+     *                   description: Changed DIDs in ascending sequence.
+     *                   items:
+     *                     type: object
+     *                     properties:
+     *                       did:
+     *                         type: string
+     *                       sequence:
+     *                         type: integer
+     *       400:
+     *         description: Invalid since or limit.
+     *       500:
+     *         description: Internal Server Error.
+     */
+    router.get('/changes', async (req, res) => {
+        try {
+            const result = await gatekeeper.listChanges({
+                since: queryInteger(req.query.since),
+                limit: queryInteger(req.query.limit),
+            });
+            res.json(result);
+        } catch (error: any) {
+            if (error?.type === InvalidParameterError.type) {
+                res.status(400).json({ error: error.message });
+                return;
+            }
+            console.error("/api/v1/changes error:", error);
+            res.status(500).json({ error: error.toString() });
+        }
+    });
+
     return router;
 }

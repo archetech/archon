@@ -327,6 +327,25 @@ export function createV1Router(options: CreateV1RouterOptions): express.Router {
         }
     });
 
+    v1router.get('/changes', ...authMiddleware, async (req, res) => {
+        const count = (value: unknown) =>
+            value === undefined ? undefined : typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : NaN;
+        try {
+            const result = await gatekeeper.listChanges({
+                since: count(req.query.since),
+                limit: count(req.query.limit),
+            });
+            res.json(result);
+        } catch (error: any) {
+            if (typeof error?.error === 'string' && error.error.startsWith('Invalid parameter')) {
+                res.status(400).json(error);
+                return;
+            }
+            logger.error({ err: error }, 'Gatekeeper proxy error');
+            res.status(502).json({ error: 'Upstream gatekeeper error' });
+        }
+    });
+
     v1router.get('/search', ...authMiddleware, async (req, res) => {
         try {
             const q = (Array.isArray(req.query.q) ? req.query.q[0] : req.query.q) as string;

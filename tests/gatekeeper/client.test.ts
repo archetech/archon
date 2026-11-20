@@ -525,6 +525,49 @@ describe('listEvents', () => {
     });
 });
 
+describe('listChanges', () => {
+    it('should send the options as query parameters and return the page', async () => {
+        const page = { epoch: 'run-1', sequence: 9, changes: [{ did: 'did:cid:abc', sequence: 8 }] };
+        nock(GatekeeperURL)
+            .get('/api/v1/changes')
+            .query({ since: '7', limit: '10' })
+            .reply(200, page);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+        const result = await gatekeeper.listChanges({ since: 7, limit: 10 });
+
+        expect(result).toStrictEqual(page);
+    });
+
+    it('should ask with no parameters for where the node stands', async () => {
+        const head = { epoch: 'run-1', sequence: 9, changes: [] };
+        nock(GatekeeperURL)
+            .get('/api/v1/changes')
+            .query(actual => Object.keys(actual).length === 0)
+            .reply(200, head);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+
+        expect(await gatekeeper.listChanges()).toStrictEqual(head);
+    });
+
+    it('should throw exception on listChanges server error', async () => {
+        nock(GatekeeperURL)
+            .get('/api/v1/changes')
+            .reply(500, ServerError);
+
+        const gatekeeper = await GatekeeperClient.create({ url: GatekeeperURL });
+
+        try {
+            await gatekeeper.listChanges();
+            throw new ExpectedExceptionError();
+        }
+        catch (error: any) {
+            expect(error.message).toBe(ServerError.message);
+        }
+    });
+});
+
 describe('importDIDs', () => {
     it('should return imported DID results', async () => {
         nock(GatekeeperURL)

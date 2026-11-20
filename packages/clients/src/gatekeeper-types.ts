@@ -104,6 +104,29 @@ export interface ListEventsResult {
     events: GatekeeperEvent[];
 }
 
+export interface ListChangesOptions {
+    /**
+     * Only changes after this sequence. Without it no changes are returned,
+     * only the epoch and the sequence the node has reached.
+     */
+    since?: number;
+    /** Page size, 1 to 1000; defaults to 1000. */
+    limit?: number;
+}
+
+export interface ListChangesResult {
+    /**
+     * Names the run the sequences belong to. They are counted from when the
+     * node last built its histories, so a different epoch means every sequence
+     * a reader holds is void and it has to read everything again.
+     */
+    epoch: string;
+    /** The sequence of the node's latest change. */
+    sequence: number;
+    /** Oldest first; each DID once, at its latest change. */
+    changes: { did: string; sequence: number }[];
+}
+
 export interface GatekeeperEvent {
     registry: string;
     time: string;
@@ -175,6 +198,7 @@ export interface GatekeeperInterface {
     getDIDs(options?: GetDIDOptions): Promise<string[] | DidCidDocument[]>;
     exportDIDs(dids?: string[]): Promise<GatekeeperEvent[][]>;
     listEvents(options?: ListEventsOptions): Promise<ListEventsResult>;
+    listChanges(options?: ListChangesOptions): Promise<ListChangesResult>;
     importDIDs(dids: GatekeeperEvent[][]): Promise<ImportBatchResult>;
     removeDIDs(dids: string[]): Promise<boolean>;
     exportBatch(dids?: string[]): Promise<GatekeeperEvent[]>;

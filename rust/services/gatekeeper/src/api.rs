@@ -1036,6 +1036,50 @@ pub(crate) async fn list_events(
     Json(json!({ "total": total, "events": events })).into_response()
 }
 
+pub(crate) async fn list_changes(
+    State(state): State<AppState>,
+    Query(pairs): Query<Vec<(String, String)>>,
+) -> Response {
+    let start = Instant::now();
+    let invalid = |field: &str| {
+        record_metrics(&state, "GET", "/changes", 400, start.elapsed().as_secs_f64());
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": format!("Invalid parameter: {field}") })),
+        )
+            .into_response()
+    };
+    // Without a sequence the answer is only where the node stands, so an absent
+    // `since` is kept apart from zero.
+    let since = match single_query_value(&pairs, "since") {
+        Ok(None) => None,
+        Ok(Some(_)) => match query_count(&pairs, "since", 0, 0, 9_007_199_254_740_991) {
+            Ok(since) => Some(since),
+            Err(()) => return invalid("since"),
+        },
+        Err(()) => return invalid("since"),
+    };
+    let Ok(limit) = query_count(&pairs, "limit", 1000, 1, 1000) else { return invalid("limit") };
+
+    if let Err(error) = crate::history::ensure_history_ready(&state).await {
+        return text_error_response(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+    }
+    let _history_guard = state.history_lock.lock().await;
+    let page = state.store.lock().await.list_changes(since, limit as usize);
+    let changes: Vec<Value> = page
+        .changes
+        .iter()
+        .map(|(key, sequence)| {
+            json!({
+                "did": format!("{}:{key}", state.config.did_prefix),
+                "sequence": sequence,
+            })
+        })
+        .collect();
+    record_metrics(&state, "GET", "/changes", 200, start.elapsed().as_secs_f64());
+    Json(json!({ "epoch": page.epoch, "sequence": page.sequence, "changes": changes })).into_response()
+}
+
 pub(crate) async fn query_docs(
     State(state): State<AppState>,
     Json(payload): Json<Value>,
