@@ -43,7 +43,8 @@ export type VersionOutcome =
     // the grant's registry yet.
     | { outcome: 'pending' }
     | { outcome: 'unattributed'; reason: Unattributed; validity?: Validity; grant?: string; authority?: Authority }
-    // The creation states a `v` this verifier does not know.
+    // The version, or one before it, states a `v` this verifier does not know. It
+    // is neither attributed nor rejected.
     | { outcome: 'unsupported' };
 
 export type Version = VersionOutcome & {
@@ -177,7 +178,10 @@ export function attribute(history: AcceptedEvent[], grantHistory: AcceptedEvent[
 
                 const validity = validateObject(next);
 
-                if (validity !== 'valid') {
+                if (validity === 'unsupported') {
+                    check = { outcome: 'unsupported' };
+                }
+                else if (validity !== 'valid') {
                     check = failed('invalid', { validity });
                 }
                 else if (doc.didDocumentRegistration?.validUntil !== undefined) {

@@ -5004,6 +5004,196 @@
      }
     ]
    }
+  },
+  {
+   "name": "edited to a later v, then deleted",
+   "object": [
+    {
+     "registry": "BTC:mainnet",
+     "time": "2026-11-02T03:20:00.000Z",
+     "ordinal": [
+      200,
+      0,
+      0
+     ],
+     "registration": {
+      "height": 200,
+      "index": 0,
+      "txid": "tx-200",
+      "batch": "did:cid:batch-200",
+      "opidx": 0
+     },
+     "did": "did:cid:bagaaiera52mupsjwygi2z4bvpnm3ohc2gmyke5dx5qek6b5rhl44ejea256a",
+     "opid": "bagaaiera52mupsjwygi2z4bvpnm3ohc2gmyke5dx5qek6b5rhl44ejea256a",
+     "operation": {
+      "type": "create",
+      "created": "2026-11-02T03:19:00.000Z",
+      "registration": {
+       "version": 1,
+       "type": "asset",
+       "registry": "BTC:mainnet"
+      },
+      "controller": "did:cid:bagaaiera3okrqx4tzwiisjvwbhjmfrws4aokr3tcu55hfx34tljwrtucadbq",
+      "data": {
+       "memeplex": {
+        "v": 1,
+        "author": "did:cid:bagaaiera4yatuanlfd54rosfkqwaboocygvnjytili7zuovh776g7h7andma",
+        "grant": "did:cid:bagaaiera7tgf4x66mjkog2jtwxo44skdexubvnte2vhx3kwmszss2jmo5pmq",
+        "kind": "post",
+        "text": "First."
+       }
+      },
+      "proof": {
+       "type": "DataIntegrityProof",
+       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+       "created": "2026-11-02T03:19:00.000Z",
+       "verificationMethod": "did:cid:bagaaiera3okrqx4tzwiisjvwbhjmfrws4aokr3tcu55hfx34tljwrtucadbq#key-1",
+       "proofPurpose": "capabilityInvocation",
+       "proofValue": "pQOlJAE3M7m4u73oMcyxXBs0gxBgME_AVV_97T1dYC8NYoaGx_Gzdm4CNJesKoFB2JnPnUbUfmI4fYChmx3ehg"
+      }
+     }
+    },
+    {
+     "registry": "BTC:mainnet",
+     "time": "2026-11-02T05:00:00.000Z",
+     "ordinal": [
+      300,
+      0,
+      1
+     ],
+     "registration": {
+      "height": 300,
+      "index": 0,
+      "txid": "tx-300",
+      "batch": "did:cid:batch-300",
+      "opidx": 1
+     },
+     "did": "did:cid:bagaaiera52mupsjwygi2z4bvpnm3ohc2gmyke5dx5qek6b5rhl44ejea256a",
+     "opid": "bagaaierak6wozef2kg5t2ov3jkx3bbaes5z7tkbji3gnrxswczg652xkv72a",
+     "operation": {
+      "type": "update",
+      "doc": {
+       "didDocumentData": {
+        "memeplex": {
+         "v": 2,
+         "author": "did:cid:bagaaiera4yatuanlfd54rosfkqwaboocygvnjytili7zuovh776g7h7andma",
+         "grant": "did:cid:bagaaiera7tgf4x66mjkog2jtwxo44skdexubvnte2vhx3kwmszss2jmo5pmq",
+         "kind": "post",
+         "text": "First."
+        }
+       }
+      },
+      "did": "did:cid:bagaaiera52mupsjwygi2z4bvpnm3ohc2gmyke5dx5qek6b5rhl44ejea256a",
+      "previd": "bagaaiera52mupsjwygi2z4bvpnm3ohc2gmyke5dx5qek6b5rhl44ejea256a",
+      "proof": {
+       "type": "DataIntegrityProof",
+       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+       "created": "2026-11-02T04:59:00.000Z",
+       "verificationMethod": "did:cid:bagaaiera3okrqx4tzwiisjvwbhjmfrws4aokr3tcu55hfx34tljwrtucadbq#key-1",
+       "proofPurpose": "capabilityInvocation",
+       "proofValue": "u5wmSLAjTxA1WzN18cSsGGvFOSR03InSZZYMFekuNwIUfGPSZom0-t1fz_9gv1IU6Ms693m2d4BonKFBl_HEyw"
+      }
+     }
+    },
+    {
+     "registry": "BTC:mainnet",
+     "time": "2026-11-02T05:50:00.000Z",
+     "ordinal": [
+      350,
+      0,
+      2
+     ],
+     "registration": {
+      "height": 350,
+      "index": 0,
+      "txid": "tx-350",
+      "batch": "did:cid:batch-350",
+      "opidx": 2
+     },
+     "did": "did:cid:bagaaiera52mupsjwygi2z4bvpnm3ohc2gmyke5dx5qek6b5rhl44ejea256a",
+     "opid": "bagaaierayoq4be4jl3q2vblvqthnzt64l3wrop6uehn4apemsjvwv2yfjl6a",
+     "operation": {
+      "type": "delete",
+      "did": "did:cid:bagaaiera52mupsjwygi2z4bvpnm3ohc2gmyke5dx5qek6b5rhl44ejea256a",
+      "previd": "bagaaierak6wozef2kg5t2ov3jkx3bbaes5z7tkbji3gnrxswczg652xkv72a",
+      "proof": {
+       "type": "DataIntegrityProof",
+       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+       "created": "2026-11-02T05:49:00.000Z",
+       "verificationMethod": "did:cid:bagaaiera3okrqx4tzwiisjvwbhjmfrws4aokr3tcu55hfx34tljwrtucadbq#key-1",
+       "proofPurpose": "capabilityInvocation",
+       "proofValue": "8IQ9lC30MKiwIemvwMlCgRM7Hs0GXDaxEdug1MzQooYwO302g9r8X6a0X0eYUHEG4mqzQVn3Fek7Bdq4gv6S-Q"
+      }
+     }
+    }
+   ],
+   "grant": [
+    {
+     "registry": "BTC:mainnet",
+     "time": "2026-11-02T01:40:00.000Z",
+     "ordinal": [
+      100,
+      0,
+      0
+     ],
+     "registration": {
+      "height": 100,
+      "index": 0,
+      "txid": "tx-100",
+      "batch": "did:cid:batch-100",
+      "opidx": 0
+     },
+     "did": "did:cid:bagaaiera7tgf4x66mjkog2jtwxo44skdexubvnte2vhx3kwmszss2jmo5pmq",
+     "opid": "bagaaiera7tgf4x66mjkog2jtwxo44skdexubvnte2vhx3kwmszss2jmo5pmq",
+     "operation": {
+      "type": "create",
+      "created": "2026-11-02T01:39:00.000Z",
+      "registration": {
+       "version": 1,
+       "type": "asset",
+       "registry": "BTC:mainnet"
+      },
+      "controller": "did:cid:bagaaiera4yatuanlfd54rosfkqwaboocygvnjytili7zuovh776g7h7andma",
+      "data": {
+       "memeplexGrant": {
+        "v": 1,
+        "client": "did:cid:bagaaiera3okrqx4tzwiisjvwbhjmfrws4aokr3tcu55hfx34tljwrtucadbq",
+        "nonce": "CQkJCQkJCQkJCQkJCQkJCQkJ36"
+       }
+      },
+      "proof": {
+       "type": "DataIntegrityProof",
+       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
+       "created": "2026-11-02T01:39:00.000Z",
+       "verificationMethod": "did:cid:bagaaiera4yatuanlfd54rosfkqwaboocygvnjytili7zuovh776g7h7andma#key-1",
+       "proofPurpose": "capabilityInvocation",
+       "proofValue": "XVHVe1T1GqWu7GoPgKNciOh9mDhU0vYJi6yh2_UWq1osoWo8wqNADStXU94WOy663Qd9_uf61R9Nq6NjpJy6QA"
+      }
+     }
+    }
+   ],
+   "expect": {
+    "state": "published",
+    "current": 0,
+    "memeplex": {
+     "v": 1,
+     "author": "did:cid:bagaaiera4yatuanlfd54rosfkqwaboocygvnjytili7zuovh776g7h7andma",
+     "grant": "did:cid:bagaaiera7tgf4x66mjkog2jtwxo44skdexubvnte2vhx3kwmszss2jmo5pmq",
+     "kind": "post",
+     "text": "First."
+    },
+    "versions": [
+     {
+      "outcome": "attributed"
+     },
+     {
+      "outcome": "unsupported"
+     },
+     {
+      "outcome": "unsupported"
+     }
+    ]
+   }
   }
  ]
 }

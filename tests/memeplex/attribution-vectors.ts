@@ -355,6 +355,18 @@ export async function build(): Promise<{ description: string; registry: string; 
             { state: 'unsupported', versions: [{ outcome: 'unsupported' }] });
     }
 
+    {
+        const grant = await live();
+        const data = post(grant);
+        const object = await History.create(client, data, 200);
+        await object.update(client, { didDocumentData: post(grant, { v: 2 }) }, 300);
+        await object.delete(client, 350);
+        await add('edited to a later v, then deleted', object, grant, {
+            state: 'published', current: 0, memeplex: data.memeplex,
+            versions: [attributed, { outcome: 'unsupported' }, { outcome: 'unsupported' }],
+        });
+    }
+
     return {
         description: 'Memeplex v1 object histories with their grants\' histories, as a Gatekeeper exports them, '
             + 'and the publication derived from each pair. Written by tests/memeplex/attribution-vectors.ts.',
