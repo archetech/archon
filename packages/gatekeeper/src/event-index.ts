@@ -84,9 +84,12 @@ export default class EventIndex {
     delete(did: string): void {
         if (!this.built) return;
         const key = storageKey(did);
-        this.histories.delete(key);
-        this.sorted = undefined;
-        this.changes.record(key);
+
+        // Removing a DID that has no history is not a change.
+        if (this.histories.delete(key)) {
+            this.sorted = undefined;
+            this.changes.record(key);
+        }
     }
 
     query({ after, before, registry, limit, offset }: EventQuery): { total: number; page: EventSummary[] } {

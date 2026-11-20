@@ -227,6 +227,18 @@ describe('listChanges', () => {
         expect(await gatekeeper.exportDIDs([did])).toStrictEqual([[]]);
     });
 
+    it('does not list a DID that was removed without having a history', async () => {
+        const { did } = await createAgent();
+        await gatekeeper.removeDIDs([did]);
+        const mark = (await gatekeeper.listChanges()).sequence;
+
+        // Once for a DID already removed, once for one the node never had.
+        expect(await gatekeeper.removeDIDs([did, 'did:cid:mock'])).toBe(true);
+
+        expect((await gatekeeper.listChanges()).sequence).toBe(mark);
+        expect((await follow(mark)).dids).toStrictEqual([]);
+    });
+
     it('begins a new epoch on reset and on restart', async () => {
         await createAgent();
         const first = await gatekeeper.listChanges({ since: 0 });

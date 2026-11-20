@@ -217,9 +217,11 @@ impl EventIndex {
             return;
         }
         let key = storage_key(did);
-        self.histories.remove(&key);
-        self.sorted = None;
-        self.changes.record(&key);
+        // Removing a DID that has no history is not a change.
+        if self.histories.remove(&key).is_some() {
+            self.sorted = None;
+            self.changes.record(&key);
+        }
     }
 
     pub(crate) fn query(&mut self, query: &EventQuery<'_>) -> (usize, Vec<EventSummary>) {

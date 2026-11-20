@@ -177,6 +177,17 @@ async fn changes_list_each_did_once_in_the_order_changed() -> Result<()> {
     // A removed DID is a change like any other.
     admin_post(&service, "dids/remove", json!([second.clone()])).await?;
     assert!(follow(&service, latest, 1000).await?.contains(&second));
+
+    // Removing it again, or a DID the node never had, changes nothing.
+    let (_, removed) = head(&service).await?;
+    admin_post(
+        &service,
+        "dids/remove",
+        json!([second.clone(), "did:cid:mock"]),
+    )
+    .await?;
+    assert_eq!(head(&service).await?.1, removed);
+    assert_eq!(follow(&service, removed, 1000).await?, Vec::<String>::new());
     drop(service);
 
     // A restart begins a new epoch, in which nothing has changed yet.
