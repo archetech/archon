@@ -4,9 +4,12 @@ import type { Publication } from './attribution.js';
 // docs/plans/memeplex-reference-1436.md, "Ratings" and "Coauthors". Each takes
 // publications as `attribute` returns them and looks at nothing else.
 
-// A rating on the scale from 0 (worst) to 1 (best).
-export function ratingValue(memeplex: { rating: number; min: number; max: number }): number {
-    return (memeplex.rating - memeplex.min) / (memeplex.max - memeplex.min);
+// A rating on the scale from 0 (worst) to 1 (best). Anyone can publish a valid
+// rating with bounds as large as a number goes, whose difference is not a number
+// at all, and one such value would spoil an average. Halving first keeps every
+// difference finite and changes no result.
+export function ratingValue({ rating, min, max }: { rating: number; min: number; max: number }): number {
+    return (rating / 2 - min / 2) / (max / 2 - min / 2);
 }
 
 const published = (publication: Publication, kind: string) =>

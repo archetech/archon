@@ -27,7 +27,9 @@ beforeAll(async () => {
 
 describe('ratingValue', () => {
     it.each([
-        [3, 1, 5, 0.5], [80, 0, 100, 0.8], [1, 0, 1, 1], [0, -2, 2, 0.5], [4, 1, 5, 0.75],
+        [3, 1, 5, 0.5], [80, 0, 100, 0.8], [1, 0, 1, 1], [0, -2, 2, 0.5], [4, 1, 5, 0.75], [1, 1, 5, 0],
+        // Bounds whose difference overflows.
+        [0, -1e308, 1e308, 0.5], [1e308, -1e308, 1e308, 1], [-1e308, -1e308, 1e308, 0],
     ])('%i on %i to %i is %f', (rating, min, max, value) => {
         expect(ratingValue({ rating, min, max })).toBe(value);
     });
