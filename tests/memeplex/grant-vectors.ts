@@ -33,13 +33,13 @@ export interface GrantCase {
     probes: Probe[];
 }
 
-interface Signer {
+export interface Signer {
     did: string;
     keypair: EcdsaJwkPair;
     operation: Record<string, unknown>;
 }
 
-function prove(operation: Record<string, unknown>, keypair: EcdsaJwkPair, verificationMethod: string, created: string) {
+export function prove(operation: Record<string, unknown>, keypair: EcdsaJwkPair, verificationMethod: string, created: string) {
     const config = {
         type: 'DataIntegrityProof',
         cryptosuite: 'archon-ecdsa-secp256k1-jcs-2026',
@@ -52,9 +52,9 @@ function prove(operation: Record<string, unknown>, keypair: EcdsaJwkPair, verifi
     return { ...operation, proof: { ...config, proofValue: Buffer.from(signature, 'hex').toString('base64url') } };
 }
 
-const cid = (operation: unknown) => generateCID(operation, { canonical: true } as never);
+export const cid = (operation: unknown) => generateCID(operation, { canonical: true } as never);
 
-async function agent(key: number): Promise<Signer> {
+export async function agent(key: number): Promise<Signer> {
     const keypair = cipher.generateJwk(new Uint8Array(32).fill(key));
     const operation = prove({
         type: 'create',
@@ -70,13 +70,13 @@ export const blockTime = (block: number) => new Date(Date.UTC(2026, 10, 2, 0, bl
 
 // One step of a history: an operation and the block that anchors it, or no block
 // when it has not been anchored.
-interface Step {
+export interface Step {
     operation: Record<string, unknown>;
     block?: number;
     registry?: string;
 }
 
-async function exported(agents: Signer[], steps: Step[]): Promise<{ did: string; history: AcceptedEvent[] }> {
+export async function exported(agents: Signer[], steps: Step[]): Promise<{ did: string; history: AcceptedEvent[] }> {
     const registries = [...new Set(['hyperswarm', REGISTRY, 'ZEC:mainnet', ...steps.map(step => step.registry ?? REGISTRY)])];
     const gatekeeper = new Gatekeeper({
         db: new DbJsonMemory('grants'), ipfs: new MemoryClient(), registries, maxQueueSize: 10_000,
