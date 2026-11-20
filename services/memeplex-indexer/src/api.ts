@@ -5,14 +5,15 @@ import type { MemeplexIndex } from '@didcid/memeplex';
 // stands; nothing here reaches a Gatekeeper.
 
 export interface IndexerStatus {
-    /** Whether the index has been filled from the whole feed at least once. */
+    /** Whether the index has been filled from everything the node has at least once. */
     ready: boolean;
     /** DIDs whose histories the index holds. */
     dids: number;
     /** Objects with an attributed version. */
     publications: number;
     lastPoll?: string;
-    lastReconcile?: string;
+    /** When every DID the node has was last read. */
+    lastRebuild?: string;
 }
 
 export interface ApiOptions {
@@ -59,7 +60,7 @@ export function createIndexerRouter({ index, status, version }: ApiOptions): exp
         res.json(status());
     });
 
-    // Everything below answers from a full reading of the feed or not at all: a
+    // Everything below answers from a full reading of the node or not at all: a
     // partly filled index would report as unpublished what it has not read yet.
     router.use((_req, res, next) => {
         if (!status().ready) {

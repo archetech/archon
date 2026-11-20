@@ -705,7 +705,7 @@ Gatekeeper API. The Memeplex verifier and client are still to be implemented.
 | Store content | IPFS through the Gatekeeper data API; `createFile` stores `{ cid, filename, type, bytes }`. |
 | Store an image | `createImage`; the asset has `file` and `image` data. |
 | Publish a schema | `createSchema`; the protocol pins its schema DID and version. |
-| Discover activity | `GET /api/v1/events`; reconcile over the full range for completeness. |
+| Discover activity | `GET /api/v1/changes`, after reading every DID once; read them all again when its epoch changes. |
 | Query current data | `POST /api/v1/query`; a discovery shortcut, not a complete publication index. |
 
 Archon also supports `transferAsset` and `changeRegistry`. Using either on a
@@ -908,7 +908,7 @@ persistence, in both Gatekeeper ports:
 - compare startup against the current production dataset to separate per-object cost
   from fixed cost;
 - run the application workload too: per-version attribution, re-verification after
-  grant changes, full reconciliation, rebuilding a fresh indexer from scratch, and
+  grant changes, rebuilding a fresh indexer from scratch, and
   publication churn (edits, deletions and revocations at a realistic rate).
 
 Acceptance targets for each measurement (latency, memory, rebuild time) are set before
