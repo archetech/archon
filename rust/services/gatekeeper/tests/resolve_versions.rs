@@ -7,9 +7,7 @@ use common::{
     create_agent_operation, create_update_operation, path_buf, respawn_service, TestService,
 };
 
-// A reader that needs every version of a DID had to export the node's events
-// and apply their operations itself, repeating what resolution does.
-// `POST /dids/versions` gives it the versions as this node resolves them.
+// `POST /dids/versions` returns every version of a DID as this node resolves it.
 
 async fn create_did(service: &TestService, operation: Value) -> Result<String> {
     let response = service

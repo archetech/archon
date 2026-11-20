@@ -1037,9 +1037,8 @@ pub(crate) async fn list_events(
 }
 
 /// Every version of each requested DID, oldest first, each as resolution
-/// returns it for that `versionSequence`. A reader that needs the whole of a
-/// DID's history gets it here as the versions this node resolves, and does not
-/// have to read the node's events and apply their operations itself.
+/// returns it for that `versionSequence`. A DID this node cannot resolve has
+/// none.
 pub(crate) async fn resolve_versions(State(state): State<AppState>, body: Bytes) -> Response {
     let start = Instant::now();
     let invalid = || {
@@ -1072,9 +1071,7 @@ pub(crate) async fn resolve_versions(State(state): State<AppState>, body: Bytes)
             all.push(Vec::new());
             continue;
         }
-        // Read once and resolved from at each sequence: reading it again for
-        // every version would cost a long history its length squared in reads,
-        // with the lock held.
+        // One read of the history serves every version of the DID.
         let events = store.get_events(did);
         let mut versions = Vec::with_capacity(events.len());
         for sequence in 1..=events.len() {

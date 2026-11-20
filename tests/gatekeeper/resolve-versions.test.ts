@@ -8,9 +8,7 @@ import TestHelper, { anchorEvent } from './helper.ts';
 import { createV1Router } from '../../services/gatekeeper/server/src/v1-router.ts';
 import defaultConfig from '../../services/gatekeeper/server/src/config.js';
 
-// A reader that needs every version of a DID, as an indexer does, had to export
-// the node's events and apply their operations itself, repeating what resolution
-// does. `resolveVersions` gives it the versions as this node resolves them.
+// `resolveVersions` returns every version of a DID as this node resolves it.
 
 const mockConsole = {
     log: (): void => { },

@@ -1229,9 +1229,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
     // Every version of each DID, oldest first, each as resolution returns it
     // when asked for that versionSequence. A DID this node cannot resolve has
-    // none. A reader that needs the whole of a DID's history, an indexer for
-    // one, gets it here as the versions this node resolves, and does not have
-    // to read the node's events and apply their operations itself.
+    // none.
     async resolveVersions(dids: string[]): Promise<DidCidDocument[][]> {
         if (!Array.isArray(dids) || dids.some(did => typeof did !== 'string')) {
             throw new InvalidParameterError('dids');
@@ -1244,9 +1242,7 @@ export default class Gatekeeper implements GatekeeperInterface {
 
             for (const did of dids) {
                 const versions: DidCidDocument[] = [];
-                // Read once and resolved from at each sequence: reading it again
-                // for every version would cost a long history its length squared
-                // in reads, with the lock held.
+                // One read of the history serves every version of the DID.
                 const history = isValidDID(did) ? await this.db.getEvents(did) : [];
 
                 for (let sequence = 1; sequence <= history.length; sequence++) {
