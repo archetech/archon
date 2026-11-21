@@ -952,7 +952,7 @@ until the verifier exists.
    identity, then create, edit, delete and query objects on the grant's registry from
    the existing CLI and SDKs; this works with today's asset commands.
 5. **Delegation:** wallet UI to create, list and revoke grants on a permitted registry.
-6. **Indexer.**
+6. **Indexer.** The `memeplex-indexer` service, enabled by the `memeplex` profile and offered through Drawbridge at `/memeplex`; see `docs/services/memeplex-indexer/README.md`.
 7. **Memepool client.**
 8. **Moderation:** block lists and labels.
 

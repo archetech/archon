@@ -71,6 +71,8 @@ jobs:
             image: drawbridge-client
           - dockerfile: docker/Dockerfile.didcomm
             image: didcomm
+          - dockerfile: docker/Dockerfile.memeplex-indexer
+            image: memeplex-indexer
           - dockerfile: docker/Dockerfile.keymaster-py
             image: keymaster-py
           - dockerfile: docker/Dockerfile.gatekeeper-rust

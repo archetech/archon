@@ -54,6 +54,7 @@ export function createV1Router(options: CreateV1RouterOptions): express.Router {
             names: config.heraldURL !== '',
             explorer: config.explorerURL !== '',
             cashu: config.cashuMintURL !== '',
+            memeplex: config.memeplexIndexerURL !== '',
         });
     });
 

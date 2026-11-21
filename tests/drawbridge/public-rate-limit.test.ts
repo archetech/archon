@@ -310,6 +310,7 @@ describe('public route mounts', () => {
         '/.well-known': 'heraldRateLimit',
         '/names': 'heraldRateLimit',
         '/explorer': 'explorerRateLimit',
+        '/memeplex': 'memeplexRateLimit',
         '/didcomm': 'didcommRateLimit',
         '/cashu': 'cashuRateLimit',
         '/1.0/identifiers': 'publicReadRateLimit',
