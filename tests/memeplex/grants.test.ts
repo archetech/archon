@@ -19,7 +19,7 @@ beforeAll(async () => {
     expect(vectors).toStrictEqual(JSON.parse(JSON.stringify(built)));
 }, 120_000);
 
-it('reads each grant from the history a Gatekeeper exported', () => {
+it('reads each grant from the versions a Gatekeeper resolved', () => {
     const wrong = vectors.cases
         .map(each => ({ name: each.name, expect: each.expect, got: readGrant(each.history) }))
         .filter(each => JSON.stringify(each.got) !== JSON.stringify(each.expect));

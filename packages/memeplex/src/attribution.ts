@@ -1,23 +1,21 @@
 import { equal } from './runtime.js';
 import { authorityAt, positionOn, readGrant } from './grant.js';
 import { validateObject } from './validate.js';
-import type { AcceptedEvent, Authority, Grant, Position } from './grant.js';
+import type { Authority, Grant, Position, ResolvedVersion } from './grant.js';
 import type { Kind, Validity } from './validate.js';
 
 // Which versions of an object are attributed to its author, and what the object
 // publishes as a result: docs/plans/memeplex-1436.md, "One rule for publication".
 //
-// The evidence is the object's accepted history and the accepted history of the
-// grant it names, both as a Gatekeeper exports them. Nothing here checks a
-// signature: an accepted creation was signed by the controller it names, and each
-// later operation by the controller before it.
+// The evidence is the versions of the object's DID and the versions of the DID of
+// the grant it names, both as a Gatekeeper resolves them.
 
 export type Unattributed =
-    // The history does not begin with the creation of an asset holding an object.
+    // The first version is not an asset holding an object.
     | 'not-an-object'
     // The version's `memeplex` is not valid. `validity` says how.
     | 'invalid'
-    // The grant history handed over is not the history of the grant the object names.
+    // The grant versions handed over are not those of the grant the object names.
     | 'grant-mismatch'
     // The grant confers nothing. `grant` says why.
     | 'grant-void'
@@ -48,9 +46,10 @@ export type VersionOutcome =
     | { outcome: 'unsupported' };
 
 export type Version = VersionOutcome & {
-    // The canonical CID of the operation, which is the version's `versionId`.
+    // The version's `versionId`.
     opid?: string;
-    type: string;
+    // What made the version: its creation, an update or its deletion.
+    type: 'create' | 'update' | 'delete';
 };
 
 export interface Publication {
@@ -62,9 +61,9 @@ export interface Publication {
     // 'none':      the creation is not attributed and cannot become so.
     // 'unsupported': the creation states a `v` this verifier does not know.
     state: 'published' | 'withdrawn' | 'pending' | 'none' | 'unsupported';
-    // The object's DID, as the export states it.
+    // The object's DID.
     did?: string;
-    // One for each operation of the history, in its order.
+    // One for each version of the object, in order.
     versions: Version[];
     // The index in `versions` of the last attributed version.
     current?: number;
@@ -76,8 +75,8 @@ type Check = Extract<VersionOutcome, { outcome: 'unattributed' | 'pending' | 'un
 const failed = (reason: Unattributed, detail: Partial<Extract<VersionOutcome, { outcome: 'unattributed' }>> = {}): Check =>
     ({ outcome: 'unattributed', reason, ...detail });
 
-function position(event: AcceptedEvent, grant: Extract<Grant, { status: 'valid' }>, kind?: Kind): Check | Position {
-    const at = positionOn(event, grant.registry);
+function position(version: ResolvedVersion, grant: Extract<Grant, { status: 'valid' }>, kind?: Kind): Check | Position {
+    const at = positionOn(version, grant.registry);
 
     if (!at) {
         return { outcome: 'pending' };
@@ -91,9 +90,17 @@ function position(event: AcceptedEvent, grant: Extract<Grant, { status: 'valid' 
 // The parts of an object that every version has to keep.
 const identity = ({ author, kind, grant, target }: Record<string, any>) => ({ author, kind, grant, target });
 
-export function attribute(history: AcceptedEvent[], grantHistory: AcceptedEvent[]): Publication {
-    const versions: Version[] = history.map(event => ({
-        outcome: 'pending', ...(event.opid ? { opid: event.opid } : {}), type: event.operation?.type,
+const memeplexOf = (version: ResolvedVersion | undefined): Record<string, any> | undefined => {
+    const data = version?.didDocumentData;
+
+    return data && typeof data === 'object' && !Array.isArray(data) ? (data as Record<string, any>).memeplex : undefined;
+};
+
+export function attribute(object: ResolvedVersion[], grantVersions: ResolvedVersion[]): Publication {
+    const versions: Version[] = object.map((version, index) => ({
+        outcome: 'pending',
+        ...(version.didDocumentMetadata?.versionId ? { opid: version.didDocumentMetadata.versionId } : {}),
+        type: index === 0 ? 'create' : version.didDocumentMetadata?.deactivated ? 'delete' : 'update',
     }));
     // Every version from an index on shares an outcome, since attribution is a prefix.
     const rest = (from: number, outcome: VersionOutcome) => {
@@ -109,12 +116,13 @@ export function attribute(history: AcceptedEvent[], grantHistory: AcceptedEvent[
         }
     };
 
-    const creation = history[0]?.operation;
-    let memeplex: Record<string, any> | undefined = creation?.data?.memeplex;
+    const creation = object[0];
+    const grant = readGrant(grantVersions);
+    let memeplex = memeplexOf(creation);
     let current: number | undefined;
 
     const first = ((): Check | Position => {
-        if (!creation || creation.type !== 'create' || creation.registration?.type !== 'asset' || memeplex === undefined) {
+        if (!creation || creation.didDocumentRegistration?.type !== 'asset' || memeplex === undefined) {
             return failed('not-an-object');
         }
 
@@ -126,12 +134,12 @@ export function attribute(history: AcceptedEvent[], grantHistory: AcceptedEvent[
         if (validity !== 'valid') {
             return failed('invalid', { validity });
         }
-        if (grantHistory[0]?.did === undefined || grantHistory[0].did !== memeplex.grant) {
+
+        const grantDid = grantVersions[0]?.didDocument?.id;
+
+        if (grantDid === undefined || grantDid !== memeplex.grant) {
             return failed('grant-mismatch');
         }
-
-        const grant = readGrant(grantHistory);
-
         if (grant.status === 'unsupported') {
             return { outcome: 'unsupported' };
         }
@@ -141,40 +149,41 @@ export function attribute(history: AcceptedEvent[], grantHistory: AcceptedEvent[
         if (grant.user !== memeplex.author) {
             return failed('author');
         }
-        if (creation.controller !== grant.client) {
+        if (creation.didDocument?.controller !== grant.client) {
             return failed('publisher');
         }
-        if (creation.registration.registry !== grant.registry) {
+        if (creation.didDocumentRegistration.registry !== grant.registry) {
             return failed('registry');
         }
-        if (creation.registration.validUntil !== undefined) {
+        if (creation.didDocumentRegistration.validUntil !== undefined) {
             return failed('expires-by-registration');
         }
         if (grant.status === 'pending') {
             return { outcome: 'pending' };
         }
 
-        return position(history[0], grant, memeplex.kind);
+        return position(creation, grant, memeplex.kind);
     })();
 
     if (first && 'outcome' in first) {
         ends(0, first);
     }
-    else if (first) {
-        // The checks above passed, so the grant is valid and the object is its client's.
-        const grant = readGrant(grantHistory) as Extract<Grant, { status: 'valid' }>;
+    else if (first && grant.status === 'valid') {
         versions[0] = { ...versions[0], outcome: 'attributed', position: first };
         current = 0;
 
-        for (let index = 1; index < history.length; index++) {
-            const operation = history[index].operation;
+        for (let index = 1; index < object.length; index++) {
+            const version = object[index];
             let next = memeplex;
             let check: Check | Position;
 
-            if (operation.type === 'update') {
-                const doc = operation.doc ?? {};
-
-                next = doc.didDocumentData === undefined ? memeplex : doc.didDocumentData?.memeplex;
+            // A deletion takes its identity from the version before it and has no
+            // data of its own to check.
+            if (version.didDocumentMetadata?.deactivated) {
+                check = position(version, grant);
+            }
+            else {
+                next = memeplexOf(version);
 
                 const validity = validateObject(next);
 
@@ -184,23 +193,17 @@ export function attribute(history: AcceptedEvent[], grantHistory: AcceptedEvent[
                 else if (validity !== 'valid') {
                     check = failed('invalid', { validity });
                 }
-                else if (doc.didDocumentRegistration?.validUntil !== undefined) {
+                else if (version.didDocumentRegistration?.validUntil !== undefined) {
                     check = failed('expires-by-registration');
                 }
                 else if (!equal(identity(next!), identity(memeplex!))
-                    || (doc.didDocument !== undefined && doc.didDocument?.controller !== grant.client)
-                    || (doc.didDocumentRegistration !== undefined && doc.didDocumentRegistration?.registry !== grant.registry)) {
+                    || version.didDocument?.controller !== grant.client
+                    || version.didDocumentRegistration?.registry !== grant.registry) {
                     check = failed('identity');
                 }
                 else {
-                    check = position(history[index], grant);
+                    check = position(version, grant);
                 }
-            }
-            else if (operation.type === 'delete') {
-                check = position(history[index], grant);
-            }
-            else {
-                check = failed('not-an-object');
             }
 
             if (check && 'outcome' in check) {
@@ -214,7 +217,7 @@ export function attribute(history: AcceptedEvent[], grantHistory: AcceptedEvent[
         }
     }
 
-    const did = history[0]?.did === undefined ? {} : { did: history[0].did };
+    const did = creation?.didDocument?.id === undefined ? {} : { did: creation.didDocument.id };
 
     if (current === undefined) {
         const outcome = versions[0]?.outcome;

@@ -6,7 +6,7 @@ import type { Signer } from './grant-vectors.ts';
 
 // The readings indexers have to agree on: docs/plans/memeplex-reference-1436.md,
 // "Ratings" and "Coauthors". The publications are attributed from signed histories
-// a Gatekeeper accepted and exported, as in attribution-vectors.ts.
+// a Gatekeeper accepted and resolved, as in attribution-vectors.ts.
 
 let alice: Signer, bob: Signer, web: Signer, bot: Signer;
 let agents: Signer[];

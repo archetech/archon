@@ -5,7 +5,7 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import { attribute, authorityAt, readGrant } from '@didcid/memeplex';
-import type { AcceptedEvent } from '@didcid/memeplex';
+import type { ResolvedVersion } from '@didcid/memeplex';
 
 // Milestone 4 of docs/plans/memeplex-reference-1436.md: a user and a client
 // publish with the asset commands a Keymaster already has, and the verifier reads
@@ -27,6 +27,8 @@ let clientDid: string;
 async function anchor(block: number) {
     const operations = await gatekeeper.getQueue(REGISTRY);
 
+    await gatekeeper.addBlock(REGISTRY, { height: block, hash: `block-${block}`, time: Date.parse(blockTime(block)) / 1000 });
+
     expect(operations.length).toBeGreaterThan(0);
     await gatekeeper.importBatch(operations.map((operation, index) => ({
         registry: REGISTRY,
@@ -39,7 +41,8 @@ async function anchor(block: number) {
     await gatekeeper.clearQueue(REGISTRY, operations);
 }
 
-const history = async (did: string) => JSON.parse(JSON.stringify(await gatekeeper.exportDID(did))) as AcceptedEvent[];
+// What the Gatekeeper returns is what the verifier takes, with no conversion.
+const history = async (did: string): Promise<ResolvedVersion[]> => (await gatekeeper.resolveVersions([did]))[0];
 const publication = async (object: string, grant: string) => attribute(await history(object), await history(grant));
 
 beforeEach(async () => {
@@ -137,7 +140,7 @@ it('reads an update that resends the whole resolved document as a scope update o
     expect(await client.updateDID(object, objectDoc)).toBe(true);
     await anchor(300);
 
-    const sent = (await history(grant))[1].operation.doc;
+    const sent = (await gatekeeper.exportDID(grant))[1].operation.doc!;
     expect(Object.keys(sent).sort()).toStrictEqual(['didDocument', 'didDocumentData', 'didDocumentRegistration']);
 
     const read = readGrant(await history(grant));

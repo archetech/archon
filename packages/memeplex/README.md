@@ -23,32 +23,32 @@ Validity says nothing about who published an object. That is attribution, below.
 ```js
 import { readGrant, authorityAt } from '@didcid/memeplex';
 
-const grant = readGrant(history);         // the grant's accepted history, as exported
+const grant = readGrant(versions);        // the versions of the grant's DID, as resolved
 
 if (grant.status === 'valid') {
     authorityAt(grant, { block, time }, 'post');   // 'permitted', or why not
 }
 ```
 
-`readGrant` takes the events a Gatekeeper returns from `POST /api/v1/dids/export` for the grant's DID. It returns the grant's user, client and registry, the scope in force from each anchored position, and the position at which the grant ended, if it has. A grant that confers nothing is `void` with a reason; one whose creation is not anchored is `pending`.
+`readGrant` takes the versions a Gatekeeper returns from `POST /api/v1/dids/versions` for the grant's DID. It returns the grant's user, client and registry, the scope in force from each anchored position, and the position at which the grant ended, if it has. A grant that confers nothing is `void` with a reason; one whose creation is not anchored is `pending`.
 
 `authorityAt` says whether a valid grant confers authority at a block of its registry: `'permitted'`, `'before-grant'`, `'after-end'`, `'unordered'`, `'expired'` or `'scope'`. Given a kind, it also checks that the scope in force permits creating that kind.
 
-Neither checks a signature. The history is one a Gatekeeper accepted, and the caller chooses which Gatekeeper to trust.
+Neither reads an operation or checks a signature. What each version of a DID is, and where it was anchored, is the Gatekeeper's to say, and the caller chooses which Gatekeeper to trust.
 
 ## Attribution
 
 ```js
 import { attribute } from '@didcid/memeplex';
 
-const publication = attribute(objectHistory, grantHistory);
+const publication = attribute(objectVersions, grantVersions);
 
 publication.state;       // 'published', 'withdrawn', 'pending', 'none' or 'unsupported'
 publication.memeplex;    // the object to show, when there is one
 publication.versions;    // each version's outcome, and why one is not attributed
 ```
 
-`attribute` takes the object's exported history and the exported history of the grant its creation names. It attributes the longest prefix of versions that pass every check of the plan's rule for publication, and the publication is the last version of that prefix:
+`attribute` takes the versions of the object's DID and the versions of the DID of the grant its creation names. It attributes the longest prefix of versions that pass every check of the plan's rule for publication, and the publication is the last version of that prefix:
 
 | State | Meaning |
 |---|---|
@@ -60,7 +60,7 @@ publication.versions;    // each version's outcome, and why one is not attribute
 
 A version that fails a check ends attribution for it and every version after it, and erases nothing before it: an unauthorized deletion or an invalid edit leaves the publication as it was. Each version says why it is not attributed, for example `authority` with `after-end` for one anchored at or after the block that revoked its grant.
 
-The result is a reading of the evidence handed over. When either history changes, attribute again.
+The result is a reading of the versions handed over. When either DID changes, attribute again.
 
 ## Ratings and coauthors
 
@@ -94,9 +94,9 @@ import { MemeplexIndex } from '@didcid/memeplex';
 
 const index = new MemeplexIndex();
 
-index.put(did, history);            // a DID's accepted history, as exported; again whenever it changes
+index.put(did, versions);           // every version of a DID, as resolved; again whenever it changes
 
-index.holds(did);                   // whether a history is held for the DID; index.dids() lists them
+index.holds(did);                   // whether the DID's versions are held; index.dids() lists them
 index.publication(did);             // published or withdrawn, or undefined when nothing is attributed
 index.timeline([author, ...]);      // posts, papers and replies, newest first
 index.thread(target);               // replies and their replies, as a flat list with each one's depth
@@ -106,7 +106,7 @@ index.tags(target);                 // each value with the authors who applied i
 index.coauthors(paper);
 ```
 
-`MemeplexIndex` holds the latest accepted history of each object and grant it is handed, and derives every answer from those. It fetches nothing: whoever runs it reads a Gatekeeper's events and hands over the history of each DID that changed. An object is attributed again when its grant's history arrives or changes.
+`MemeplexIndex` holds the versions of each object and grant it is handed, and derives every answer from those. It fetches nothing: whoever runs it asks a Gatekeeper which DIDs changed and hands over the versions of each. An object is attributed again when its grant's history arrives or changes.
 
-Because every view is a function of the histories held, an index filled in any order, or filled again from nothing, answers the same as one kept up to date. `snapshot()` returns every publication by DID, for comparing two indexes.
+Because every view is a function of the versions held, an index filled in any order, or filled again from nothing, answers the same as one kept up to date. `snapshot()` returns every publication by DID, for comparing two indexes.
 

@@ -1,5 +1,5 @@
 {
- "description": "Memeplex v1 grant histories as a Gatekeeper exports them, with the grant read from each and its authority at chain positions. Written by tests/memeplex/grant-vectors.ts.",
+ "description": "The versions of Memeplex v1 grants as a Gatekeeper resolves them, with the grant read from each and its authority at chain positions. Written by tests/memeplex/grant-vectors.ts.",
  "registry": "BTC:mainnet",
  "cases": [
   {
@@ -7,46 +7,44 @@
    "did": "did:cid:bagaaierabn7umymhhgwnv3ej73wthvgmzl44c4sd3hkey4qdv3pdo457jljq",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaierabn7umymhhgwnv3ej73wthvgmzl44c4sd3hkey4qdv3pdo457jljq",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaierabn7umymhhgwnv3ej73wthvgmzl44c4sd3hkey4qdv3pdo457jljq",
-     "opid": "bagaaierabn7umymhhgwnv3ej73wthvgmzl44c4sd3hkey4qdv3pdo457jljq",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcH"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaierabn7umymhhgwnv3ej73wthvgmzl44c4sd3hkey4qdv3pdo457jljq",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierabn7umymhhgwnv3ej73wthvgmzl44c4sd3hkey4qdv3pdo457jljq",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "gZMp7qIbyTWR2Y9n026AWHywWNF06C7YGOyqSE2pAd0OUjC7gK08xhKfscBQmCLycHBouUJp2QET_YRGfT7YuQ"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcH"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -100,34 +98,30 @@
    "did": "did:cid:bagaaieramowfjfkjb4ztuh3jfe5x3sipxnqutbdwfqievpqqyz4x6gs6qdsa",
    "history": [
     {
-     "registry": "hyperswarm",
-     "time": "2026-11-02T08:19:00.000Z",
-     "did": "did:cid:bagaaieramowfjfkjb4ztuh3jfe5x3sipxnqutbdwfqievpqqyz4x6gs6qdsa",
-     "opid": "bagaaieramowfjfkjb4ztuh3jfe5x3sipxnqutbdwfqievpqqyz4x6gs6qdsa",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T08:19:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHa"
-       }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T08:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "5BHVaxKomXP3BZxu6NPhWINi6h21YY2RUmJ5TTm_rCw0q1Tg5LK9Kacnb0ibAG042Cm_eh6gHtTNYya2i5L6mA"
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieramowfjfkjb4ztuh3jfe5x3sipxnqutbdwfqievpqqyz4x6gs6qdsa",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
+     },
+     "didDocumentMetadata": {
+      "created": "2026-11-02T08:19:00Z",
+      "versionId": "bagaaieramowfjfkjb4ztuh3jfe5x3sipxnqutbdwfqievpqqyz4x6gs6qdsa",
+      "versionSequence": "1",
+      "confirmed": true
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHa"
       }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -144,77 +138,77 @@
    "did": "did:cid:bagaaieraquxg63jj723cyqqmxv3ai4nae2xjukukdd7vsscmpwzgpsrxu6tq",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieraquxg63jj723cyqqmxv3ai4nae2xjukukdd7vsscmpwzgpsrxu6tq",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieraquxg63jj723cyqqmxv3ai4nae2xjukukdd7vsscmpwzgpsrxu6tq",
-     "opid": "bagaaieraquxg63jj723cyqqmxv3ai4nae2xjukukdd7vsscmpwzgpsrxu6tq",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHb"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaieraquxg63jj723cyqqmxv3ai4nae2xjukukdd7vsscmpwzgpsrxu6tq",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieraquxg63jj723cyqqmxv3ai4nae2xjukukdd7vsscmpwzgpsrxu6tq",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "NkuR0xr1Imqq813slqmkwaE6LGOvcY47f6oAwtJYSSQ39j37VLZRW5zVseuItfa_vcySPPY4ue2GdybOSmiJZg"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHb"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T03:20:00.000Z",
-     "ordinal": [
-      200,
-      0,
-      1
-     ],
-     "registration": {
-      "height": 200,
-      "index": 0,
-      "txid": "tx-200",
-      "batch": "did:cid:batch-200",
-      "opidx": 1
+     "didDocument": {
+      "id": "did:cid:bagaaieraquxg63jj723cyqqmxv3ai4nae2xjukukdd7vsscmpwzgpsrxu6tq"
      },
-     "did": "did:cid:bagaaieraquxg63jj723cyqqmxv3ai4nae2xjukukdd7vsscmpwzgpsrxu6tq",
-     "opid": "bagaaierac6lx46jf2sztkihqqojp4kfgtjfstxc4fzdh5ijx62rs63zcsc7a",
-     "operation": {
-      "type": "delete",
-      "did": "did:cid:bagaaieraquxg63jj723cyqqmxv3ai4nae2xjukukdd7vsscmpwzgpsrxu6tq",
-      "previd": "bagaaieraquxg63jj723cyqqmxv3ai4nae2xjukukdd7vsscmpwzgpsrxu6tq",
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T03:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "aM7WAnJbYw8ihegFGCeDzv9sQybv_xwfdPBsnLPWA1x2ScMoU1hcA40o5g165vIEILfvDSdsOAzDP9dyrv3rnw"
+     "didDocumentMetadata": {
+      "deactivated": true,
+      "created": "2026-11-02T01:39:00Z",
+      "deleted": "2026-11-02T03:20:00Z",
+      "versionId": "bagaaierac6lx46jf2sztkihqqojp4kfgtjfstxc4fzdh5ijx62rs63zcsc7a",
+      "versionSequence": "2",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierac6lx46jf2sztkihqqojp4kfgtjfstxc4fzdh5ijx62rs63zcsc7a",
+       "upperBound": {
+        "time": 1793589600,
+        "timeISO": "2026-11-02T03:20:00.000Z",
+        "blockid": "block-200",
+        "height": 200,
+        "txid": "tx-200",
+        "txidx": 0,
+        "batchid": "did:cid:batch-200",
+        "opidx": 1
+       }
       }
+     },
+     "didDocumentData": {},
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -265,65 +259,63 @@
    "did": "did:cid:bagaaierah5h3bdzcdgeljz3uima7iaswcurnvkdwbwrti4oeo54lsmupsdma",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaierah5h3bdzcdgeljz3uima7iaswcurnvkdwbwrti4oeo54lsmupsdma",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaierah5h3bdzcdgeljz3uima7iaswcurnvkdwbwrti4oeo54lsmupsdma",
-     "opid": "bagaaierah5h3bdzcdgeljz3uima7iaswcurnvkdwbwrti4oeo54lsmupsdma",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHc"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaierah5h3bdzcdgeljz3uima7iaswcurnvkdwbwrti4oeo54lsmupsdma",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierah5h3bdzcdgeljz3uima7iaswcurnvkdwbwrti4oeo54lsmupsdma",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "O9c_WsSRzhUIvtzossNUqR20FZ-fpaKzNiTsVvWrYkl4rWgCtbZA7RgmIeiQUCAWhf8tWJEZfO0t0A-x6Ni8Xg"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHc"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "hyperswarm",
-     "time": "2026-11-02T08:19:00.000Z",
-     "did": "did:cid:bagaaierah5h3bdzcdgeljz3uima7iaswcurnvkdwbwrti4oeo54lsmupsdma",
-     "opid": "bagaaierargh4exgeym5qywjsjvmqxvjpdtpydvdmrwcrssfdeds6lbq2rjiq",
-     "operation": {
-      "type": "delete",
-      "did": "did:cid:bagaaierah5h3bdzcdgeljz3uima7iaswcurnvkdwbwrti4oeo54lsmupsdma",
-      "previd": "bagaaierah5h3bdzcdgeljz3uima7iaswcurnvkdwbwrti4oeo54lsmupsdma",
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T08:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "xFpwvkNLy296hiBBbnxz_cqszPmpYBzvkChEZLpUD3dfzkHrP5qykFNr3AzGOfi-nzRyDvhk42fDyO1c0tQ4MA"
-      }
+     "didDocument": {
+      "id": "did:cid:bagaaierah5h3bdzcdgeljz3uima7iaswcurnvkdwbwrti4oeo54lsmupsdma"
+     },
+     "didDocumentMetadata": {
+      "deactivated": true,
+      "created": "2026-11-02T01:39:00Z",
+      "deleted": "2026-11-02T08:19:00Z",
+      "versionId": "bagaaierargh4exgeym5qywjsjvmqxvjpdtpydvdmrwcrssfdeds6lbq2rjiq",
+      "versionSequence": "2",
+      "confirmed": false
+     },
+     "didDocumentData": {},
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -360,129 +352,131 @@
    "did": "did:cid:bagaaieral34kesewjluxywg3u5cuuhatotbgm3emm5lhqe26bynb3dyupz5q",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieral34kesewjluxywg3u5cuuhatotbgm3emm5lhqe26bynb3dyupz5q",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieral34kesewjluxywg3u5cuuhatotbgm3emm5lhqe26bynb3dyupz5q",
-     "opid": "bagaaieral34kesewjluxywg3u5cuuhatotbgm3emm5lhqe26bynb3dyupz5q",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHd"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaieral34kesewjluxywg3u5cuuhatotbgm3emm5lhqe26bynb3dyupz5q",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieral34kesewjluxywg3u5cuuhatotbgm3emm5lhqe26bynb3dyupz5q",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "SA4EEslwT918x6s86Pvq_gkPWvznh4tR07H_zkYGZyoSAsC-IRNL2FlVrNbdOMyliBymVgBjCzWZt9dMa5Uk-A"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHd"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T03:20:00.000Z",
-     "ordinal": [
-      200,
-      0,
-      1
-     ],
-     "registration": {
-      "height": 200,
-      "index": 0,
-      "txid": "tx-200",
-      "batch": "did:cid:batch-200",
-      "opidx": 1
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieral34kesewjluxywg3u5cuuhatotbgm3emm5lhqe26bynb3dyupz5q",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieral34kesewjluxywg3u5cuuhatotbgm3emm5lhqe26bynb3dyupz5q",
-     "opid": "bagaaiera4cig4ulpd6km7rx7tyq4uaezdqj7nrjbx6cyhswmsmt4taotybra",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaieral34kesewjluxywg3u5cuuhatotbgm3emm5lhqe26bynb3dyupz5q",
-      "previd": "bagaaieral34kesewjluxywg3u5cuuhatotbgm3emm5lhqe26bynb3dyupz5q",
-      "doc": {
-       "didDocumentData": {
-        "memeplexGrant": {
-         "v": 1,
-         "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-         "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHd",
-         "actions": [
-          "memeplex:tag"
-         ]
-        }
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T03:20:00Z",
+      "versionId": "bagaaiera4cig4ulpd6km7rx7tyq4uaezdqj7nrjbx6cyhswmsmt4taotybra",
+      "versionSequence": "2",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaiera4cig4ulpd6km7rx7tyq4uaezdqj7nrjbx6cyhswmsmt4taotybra",
+       "upperBound": {
+        "time": 1793589600,
+        "timeISO": "2026-11-02T03:20:00.000Z",
+        "blockid": "block-200",
+        "height": 200,
+        "txid": "tx-200",
+        "txidx": 0,
+        "batchid": "did:cid:batch-200",
+        "opidx": 1
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T03:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "ydAeVYwjIxXiyTntvEBQdl9Au-yds45Qet8-Y9-7vCEWyc2aqlGWVHHia40UoQ5dX6QHX4YyCjdiYE4WMaBblw"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHd",
+       "actions": [
+        "memeplex:tag"
+       ]
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T05:00:00.000Z",
-     "ordinal": [
-      300,
-      0,
-      2
-     ],
-     "registration": {
-      "height": 300,
-      "index": 0,
-      "txid": "tx-300",
-      "batch": "did:cid:batch-300",
-      "opidx": 2
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieral34kesewjluxywg3u5cuuhatotbgm3emm5lhqe26bynb3dyupz5q",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieral34kesewjluxywg3u5cuuhatotbgm3emm5lhqe26bynb3dyupz5q",
-     "opid": "bagaaieraqscbwgms4tlgnmaziqmpvqtmj7gnxqevoj44nypmamzez7qgcyvq",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaieral34kesewjluxywg3u5cuuhatotbgm3emm5lhqe26bynb3dyupz5q",
-      "previd": "bagaaiera4cig4ulpd6km7rx7tyq4uaezdqj7nrjbx6cyhswmsmt4taotybra",
-      "doc": {
-       "didDocumentData": {
-        "memeplexGrant": {
-         "v": 1,
-         "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-         "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHd"
-        }
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T05:00:00Z",
+      "versionId": "bagaaieraqscbwgms4tlgnmaziqmpvqtmj7gnxqevoj44nypmamzez7qgcyvq",
+      "versionSequence": "3",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieraqscbwgms4tlgnmaziqmpvqtmj7gnxqevoj44nypmamzez7qgcyvq",
+       "upperBound": {
+        "time": 1793595600,
+        "timeISO": "2026-11-02T05:00:00.000Z",
+        "blockid": "block-300",
+        "height": 300,
+        "txid": "tx-300",
+        "txidx": 0,
+        "batchid": "did:cid:batch-300",
+        "opidx": 2
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T04:59:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "purDlexxwryv0oIuLRpuXJMXTiVOjz7Fa5hLV3vedrMv5ESDVt8svp3O3vHN8kgqnULngBwJAbML9VnBt9mk2w"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHd"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -582,88 +576,88 @@
    "did": "did:cid:bagaaiera7u5xulmuawkmskwecmsilz4marrp72sblantzt4vm66p4vnwrx5a",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaiera7u5xulmuawkmskwecmsilz4marrp72sblantzt4vm66p4vnwrx5a",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaiera7u5xulmuawkmskwecmsilz4marrp72sblantzt4vm66p4vnwrx5a",
-     "opid": "bagaaiera7u5xulmuawkmskwecmsilz4marrp72sblantzt4vm66p4vnwrx5a",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHe",
-        "expiresAt": "2026-11-02T03:20:00.000Z"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaiera7u5xulmuawkmskwecmsilz4marrp72sblantzt4vm66p4vnwrx5a",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaiera7u5xulmuawkmskwecmsilz4marrp72sblantzt4vm66p4vnwrx5a",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "hhgctZXMbDVW5aw1mZzqBCfTI0d-S8I-1nOmN8lnlb1KAQyPso1NzRC79JTAWr27tFmAuNxIgO5y4dsePPJnaw"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHe",
+       "expiresAt": "2026-11-02T03:20:00.000Z"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T02:30:00.000Z",
-     "ordinal": [
-      150,
-      0,
-      1
-     ],
-     "registration": {
-      "height": 150,
-      "index": 0,
-      "txid": "tx-150",
-      "batch": "did:cid:batch-150",
-      "opidx": 1
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaiera7u5xulmuawkmskwecmsilz4marrp72sblantzt4vm66p4vnwrx5a",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaiera7u5xulmuawkmskwecmsilz4marrp72sblantzt4vm66p4vnwrx5a",
-     "opid": "bagaaierapqmgywlp4jpilusqdedwyzpr5zhxotqdu4vu5raxafo5zctxko5a",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaiera7u5xulmuawkmskwecmsilz4marrp72sblantzt4vm66p4vnwrx5a",
-      "previd": "bagaaiera7u5xulmuawkmskwecmsilz4marrp72sblantzt4vm66p4vnwrx5a",
-      "doc": {
-       "didDocumentData": {
-        "memeplexGrant": {
-         "v": 1,
-         "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-         "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHe",
-         "expiresAt": "2026-11-02T06:40:00.000Z"
-        }
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T02:30:00Z",
+      "versionId": "bagaaierapqmgywlp4jpilusqdedwyzpr5zhxotqdu4vu5raxafo5zctxko5a",
+      "versionSequence": "2",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierapqmgywlp4jpilusqdedwyzpr5zhxotqdu4vu5raxafo5zctxko5a",
+       "upperBound": {
+        "time": 1793586600,
+        "timeISO": "2026-11-02T02:30:00.000Z",
+        "blockid": "block-150",
+        "height": 150,
+        "txid": "tx-150",
+        "txidx": 0,
+        "batchid": "did:cid:batch-150",
+        "opidx": 1
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T02:29:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "apBVEPgrBJDq1ZPOEttCr6W2xBzmkLvzjsKcv9cUaN8OTko_GKBe3zXKRirCZWwBUSMm62sXMzLeZPdq1fw4fg"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHe",
+       "expiresAt": "2026-11-02T06:40:00.000Z"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -728,47 +722,45 @@
    "did": "did:cid:bagaaiera5woxkjztamxq54hayvjts3hcegpurq3nwod4xr767zxdsh472ccq",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaiera5woxkjztamxq54hayvjts3hcegpurq3nwod4xr767zxdsh472ccq",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaiera5woxkjztamxq54hayvjts3hcegpurq3nwod4xr767zxdsh472ccq",
-     "opid": "bagaaiera5woxkjztamxq54hayvjts3hcegpurq3nwod4xr767zxdsh472ccq",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHf",
-        "expiresAt": "2026-11-02T03:20:00.000Z"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaiera5woxkjztamxq54hayvjts3hcegpurq3nwod4xr767zxdsh472ccq",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaiera5woxkjztamxq54hayvjts3hcegpurq3nwod4xr767zxdsh472ccq",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "zGF72XFCEtv1kRieBYnx7LxJ-Tz9RkpfV-rXFH5XqyFQt8OYIx-HyHrIbM3-1a5AhilnWg5yX8TGFlGJzLb3eQ"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHf",
+       "expiresAt": "2026-11-02T03:20:00.000Z"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -816,86 +808,86 @@
    "did": "did:cid:bagaaierayd3ophpj5nvr2l4xedjkzuvl64cdpwdwyvonp7gja4rqez6jpgma",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaierayd3ophpj5nvr2l4xedjkzuvl64cdpwdwyvonp7gja4rqez6jpgma",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaierayd3ophpj5nvr2l4xedjkzuvl64cdpwdwyvonp7gja4rqez6jpgma",
-     "opid": "bagaaierayd3ophpj5nvr2l4xedjkzuvl64cdpwdwyvonp7gja4rqez6jpgma",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHg"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaierayd3ophpj5nvr2l4xedjkzuvl64cdpwdwyvonp7gja4rqez6jpgma",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierayd3ophpj5nvr2l4xedjkzuvl64cdpwdwyvonp7gja4rqez6jpgma",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "DCOJ6z8pUwq5UZ2GEUHO0SeGj5eZig_-YpwtqSTi_psy-vzNpGAbAgQ8w9LXa7z7fZdvzxmJYOt3JeBhvPvoJQ"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHg"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T03:20:00.000Z",
-     "ordinal": [
-      200,
-      0,
-      1
-     ],
-     "registration": {
-      "height": 200,
-      "index": 0,
-      "txid": "tx-200",
-      "batch": "did:cid:batch-200",
-      "opidx": 1
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaierayd3ophpj5nvr2l4xedjkzuvl64cdpwdwyvonp7gja4rqez6jpgma",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaierayd3ophpj5nvr2l4xedjkzuvl64cdpwdwyvonp7gja4rqez6jpgma",
-     "opid": "bagaaierasver4naxbddrsdbuxz23assm44wzbqbx5lvwkt7d4xeokvcocula",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaierayd3ophpj5nvr2l4xedjkzuvl64cdpwdwyvonp7gja4rqez6jpgma",
-      "previd": "bagaaierayd3ophpj5nvr2l4xedjkzuvl64cdpwdwyvonp7gja4rqez6jpgma",
-      "doc": {
-       "didDocumentData": {
-        "memeplexGrant": {
-         "v": 1,
-         "client": "did:cid:bagaaierawzacl67sbxxnmhb22ep4wjqrm6pv7774nkiwuwdskhzkcvwcwuoa",
-         "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHg"
-        }
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T03:20:00Z",
+      "versionId": "bagaaierasver4naxbddrsdbuxz23assm44wzbqbx5lvwkt7d4xeokvcocula",
+      "versionSequence": "2",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierasver4naxbddrsdbuxz23assm44wzbqbx5lvwkt7d4xeokvcocula",
+       "upperBound": {
+        "time": 1793589600,
+        "timeISO": "2026-11-02T03:20:00.000Z",
+        "blockid": "block-200",
+        "height": 200,
+        "txid": "tx-200",
+        "txidx": 0,
+        "batchid": "did:cid:batch-200",
+        "opidx": 1
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T03:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "ShV0q4zG7oXONWgfqKC_-nDnnETyUA6f9EubOLhLSq5_qyxnz7TJPDFj0TaQNT9LpFSbmZ5Fn2E5rKDZxvqkwA"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaierawzacl67sbxxnmhb22ep4wjqrm6pv7774nkiwuwdskhzkcvwcwuoa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHg"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -936,87 +928,87 @@
    "did": "did:cid:bagaaieraq4yx7fuav4ovdwqvwhkxz4sn4cd7fi5bppmq5xrwajn3birl4q2q",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieraq4yx7fuav4ovdwqvwhkxz4sn4cd7fi5bppmq5xrwajn3birl4q2q",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieraq4yx7fuav4ovdwqvwhkxz4sn4cd7fi5bppmq5xrwajn3birl4q2q",
-     "opid": "bagaaieraq4yx7fuav4ovdwqvwhkxz4sn4cd7fi5bppmq5xrwajn3birl4q2q",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHh"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaieraq4yx7fuav4ovdwqvwhkxz4sn4cd7fi5bppmq5xrwajn3birl4q2q",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieraq4yx7fuav4ovdwqvwhkxz4sn4cd7fi5bppmq5xrwajn3birl4q2q",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "xqofVdy-zrVlGKhDcNI7GuHb-DMuPko-vHwqKMB1k2QpflbA8w4RVAwZ7W4z0ah1Vq3_9lroT4EimQsVGDa2jA"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHh"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T03:20:00.000Z",
-     "ordinal": [
-      200,
-      0,
-      1
-     ],
-     "registration": {
-      "height": 200,
-      "index": 0,
-      "txid": "tx-200",
-      "batch": "did:cid:batch-200",
-      "opidx": 1
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieraq4yx7fuav4ovdwqvwhkxz4sn4cd7fi5bppmq5xrwajn3birl4q2q",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieraq4yx7fuav4ovdwqvwhkxz4sn4cd7fi5bppmq5xrwajn3birl4q2q",
-     "opid": "bagaaiera4surebtoentg4t4vse7ptz6lfiubmjjavgwagv6fffqm5pvweyhq",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaieraq4yx7fuav4ovdwqvwhkxz4sn4cd7fi5bppmq5xrwajn3birl4q2q",
-      "previd": "bagaaieraq4yx7fuav4ovdwqvwhkxz4sn4cd7fi5bppmq5xrwajn3birl4q2q",
-      "doc": {
-       "didDocumentData": {
-        "memeplexGrant": {
-         "v": 1,
-         "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-         "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHh"
-        },
-        "note": "added"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T03:20:00Z",
+      "versionId": "bagaaiera4surebtoentg4t4vse7ptz6lfiubmjjavgwagv6fffqm5pvweyhq",
+      "versionSequence": "2",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaiera4surebtoentg4t4vse7ptz6lfiubmjjavgwagv6fffqm5pvweyhq",
+       "upperBound": {
+        "time": 1793589600,
+        "timeISO": "2026-11-02T03:20:00.000Z",
+        "blockid": "block-200",
+        "height": 200,
+        "txid": "tx-200",
+        "txidx": 0,
+        "batchid": "did:cid:batch-200",
+        "opidx": 1
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T03:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "b6MiuTc6gCWcGeL4yTcxzH5ue-vNn2uRk-bblHKnG6BwZf_VFqY5ne9yGnoqzf1sXm3FHtNHZpttAdYAix0abg"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHh"
+      },
+      "note": "added"
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -1046,87 +1038,87 @@
    "did": "did:cid:bagaaierasfazegbtkzsspvuurmcmv6rxx5remumlg3ms4pwulegcpjrmwbtq",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaierasfazegbtkzsspvuurmcmv6rxx5remumlg3ms4pwulegcpjrmwbtq",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaierasfazegbtkzsspvuurmcmv6rxx5remumlg3ms4pwulegcpjrmwbtq",
-     "opid": "bagaaierasfazegbtkzsspvuurmcmv6rxx5remumlg3ms4pwulegcpjrmwbtq",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHi"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaierasfazegbtkzsspvuurmcmv6rxx5remumlg3ms4pwulegcpjrmwbtq",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierasfazegbtkzsspvuurmcmv6rxx5remumlg3ms4pwulegcpjrmwbtq",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "LcixHJlhaeg-2sRM9I2bznS57BfPYwgkXdySIxwlu81VZxE_6_dHXsPFMfgqBQoASaz030JTlEE4aBmzbcot8A"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHi"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T03:20:00.000Z",
-     "ordinal": [
-      200,
-      0,
-      1
-     ],
-     "registration": {
-      "height": 200,
-      "index": 0,
-      "txid": "tx-200",
-      "batch": "did:cid:batch-200",
-      "opidx": 1
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaierasfazegbtkzsspvuurmcmv6rxx5remumlg3ms4pwulegcpjrmwbtq",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaierasfazegbtkzsspvuurmcmv6rxx5remumlg3ms4pwulegcpjrmwbtq",
-     "opid": "bagaaieraep5e6rqhtmao7d62nupnm7bjugi5qw5jmeam7a2wgzyzfymcq6mq",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaierasfazegbtkzsspvuurmcmv6rxx5remumlg3ms4pwulegcpjrmwbtq",
-      "previd": "bagaaierasfazegbtkzsspvuurmcmv6rxx5remumlg3ms4pwulegcpjrmwbtq",
-      "doc": {
-       "didDocumentData": {
-        "memeplexGrant": {
-         "v": 1,
-         "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-         "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHi",
-         "actions": []
-        }
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T03:20:00Z",
+      "versionId": "bagaaieraep5e6rqhtmao7d62nupnm7bjugi5qw5jmeam7a2wgzyzfymcq6mq",
+      "versionSequence": "2",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieraep5e6rqhtmao7d62nupnm7bjugi5qw5jmeam7a2wgzyzfymcq6mq",
+       "upperBound": {
+        "time": 1793589600,
+        "timeISO": "2026-11-02T03:20:00.000Z",
+        "blockid": "block-200",
+        "height": 200,
+        "txid": "tx-200",
+        "txidx": 0,
+        "batchid": "did:cid:batch-200",
+        "opidx": 1
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T03:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "fXO1IN6cT3uL4tk8y5V4QFTNRZT30aXtCPFZ2VOavYVgXi9mNXRwwiBywc4IHCbyMjstFDBHP2k98LbWoGFpww"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHi",
+       "actions": []
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -1156,80 +1148,80 @@
    "did": "did:cid:bagaaieraf3yraqmm5vbu7mnvhdrhpybz32zpuonhtzc3ltbsx3c3neihvuyq",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieraf3yraqmm5vbu7mnvhdrhpybz32zpuonhtzc3ltbsx3c3neihvuyq",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieraf3yraqmm5vbu7mnvhdrhpybz32zpuonhtzc3ltbsx3c3neihvuyq",
-     "opid": "bagaaieraf3yraqmm5vbu7mnvhdrhpybz32zpuonhtzc3ltbsx3c3neihvuyq",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHj"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaieraf3yraqmm5vbu7mnvhdrhpybz32zpuonhtzc3ltbsx3c3neihvuyq",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieraf3yraqmm5vbu7mnvhdrhpybz32zpuonhtzc3ltbsx3c3neihvuyq",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "1Pv566Hf28ZNYO9EfR_f0_Rq-CjH3KLNiOG8AnDvcHc_dbSagIIAKee29CdQ5BNThCkPeLvxxoErWepY4q4iuQ"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHj"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T03:20:00.000Z",
-     "ordinal": [
-      200,
-      0,
-      1
-     ],
-     "registration": {
-      "height": 200,
-      "index": 0,
-      "txid": "tx-200",
-      "batch": "did:cid:batch-200",
-      "opidx": 1
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieraf3yraqmm5vbu7mnvhdrhpybz32zpuonhtzc3ltbsx3c3neihvuyq",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieraf3yraqmm5vbu7mnvhdrhpybz32zpuonhtzc3ltbsx3c3neihvuyq",
-     "opid": "bagaaieraxcbmmpc4bnxe3isnhgxskrfuw7eslk6p6ikaqwaevv6igj73hdda",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaieraf3yraqmm5vbu7mnvhdrhpybz32zpuonhtzc3ltbsx3c3neihvuyq",
-      "previd": "bagaaieraf3yraqmm5vbu7mnvhdrhpybz32zpuonhtzc3ltbsx3c3neihvuyq",
-      "doc": {
-       "didDocumentData": {}
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T03:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "SK9R5oK_5D58TmHXVihGVrMB7CoUvbQpRNSyLZkp_SJVnXN3LfaBqprWV5DtCtgZTRYkx4xWWS65NXcsGKnbMA"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T03:20:00Z",
+      "versionId": "bagaaieraxcbmmpc4bnxe3isnhgxskrfuw7eslk6p6ikaqwaevv6igj73hdda",
+      "versionSequence": "2",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieraxcbmmpc4bnxe3isnhgxskrfuw7eslk6p6ikaqwaevv6igj73hdda",
+       "upperBound": {
+        "time": 1793589600,
+        "timeISO": "2026-11-02T03:20:00.000Z",
+        "blockid": "block-200",
+        "height": 200,
+        "txid": "tx-200",
+        "txidx": 0,
+        "batchid": "did:cid:batch-200",
+        "opidx": 1
+       }
       }
+     },
+     "didDocumentData": {},
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -1259,126 +1251,128 @@
    "did": "did:cid:bagaaierakwiygtyw4vnliyfiy2rciid7ofyolpxciytah6oxxiod5zky3zza",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaierakwiygtyw4vnliyfiy2rciid7ofyolpxciytah6oxxiod5zky3zza",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaierakwiygtyw4vnliyfiy2rciid7ofyolpxciytah6oxxiod5zky3zza",
-     "opid": "bagaaierakwiygtyw4vnliyfiy2rciid7ofyolpxciytah6oxxiod5zky3zza",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHk"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaierakwiygtyw4vnliyfiy2rciid7ofyolpxciytah6oxxiod5zky3zza",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierakwiygtyw4vnliyfiy2rciid7ofyolpxciytah6oxxiod5zky3zza",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "Z8Drn3GMNIWw3TFtDVOn571xjgtQKtpoXPWqQ-Zw-Rlgy3X5tGw-5KkrdNVzfZxRvA4hcGmf3lvwNF0fPaur4g"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHk"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T03:20:00.000Z",
-     "ordinal": [
-      200,
-      0,
-      1
-     ],
-     "registration": {
-      "height": 200,
-      "index": 0,
-      "txid": "tx-200",
-      "batch": "did:cid:batch-200",
-      "opidx": 1
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaierakwiygtyw4vnliyfiy2rciid7ofyolpxciytah6oxxiod5zky3zza",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaierakwiygtyw4vnliyfiy2rciid7ofyolpxciytah6oxxiod5zky3zza",
-     "opid": "bagaaieraufz4dru23x5m7gvhenmerof4j6mb4dh6sieygw3wccn6am5std7q",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaierakwiygtyw4vnliyfiy2rciid7ofyolpxciytah6oxxiod5zky3zza",
-      "previd": "bagaaierakwiygtyw4vnliyfiy2rciid7ofyolpxciytah6oxxiod5zky3zza",
-      "doc": {
-       "didDocumentData": {
-        "memeplexGrant": {
-         "v": 1,
-         "client": "did:cid:bagaaierawzacl67sbxxnmhb22ep4wjqrm6pv7774nkiwuwdskhzkcvwcwuoa",
-         "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHk"
-        }
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T03:20:00Z",
+      "versionId": "bagaaieraufz4dru23x5m7gvhenmerof4j6mb4dh6sieygw3wccn6am5std7q",
+      "versionSequence": "2",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieraufz4dru23x5m7gvhenmerof4j6mb4dh6sieygw3wccn6am5std7q",
+       "upperBound": {
+        "time": 1793589600,
+        "timeISO": "2026-11-02T03:20:00.000Z",
+        "blockid": "block-200",
+        "height": 200,
+        "txid": "tx-200",
+        "txidx": 0,
+        "batchid": "did:cid:batch-200",
+        "opidx": 1
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T03:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "QVa4zV4EUtxzRlzK-FYov5KeGx6b8zUjB9Rk2ng0UlM6dPglc-0iQRgBEcszYT_zR4XhS6JD1ts8Ywbzu9cpFA"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaierawzacl67sbxxnmhb22ep4wjqrm6pv7774nkiwuwdskhzkcvwcwuoa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHk"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T05:00:00.000Z",
-     "ordinal": [
-      300,
-      0,
-      2
-     ],
-     "registration": {
-      "height": 300,
-      "index": 0,
-      "txid": "tx-300",
-      "batch": "did:cid:batch-300",
-      "opidx": 2
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaierakwiygtyw4vnliyfiy2rciid7ofyolpxciytah6oxxiod5zky3zza",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaierakwiygtyw4vnliyfiy2rciid7ofyolpxciytah6oxxiod5zky3zza",
-     "opid": "bagaaierah2hcp6zk3re5ynndnuqxnxfzl2jgcvcrc7l2ps6tqckzcygejnfq",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaierakwiygtyw4vnliyfiy2rciid7ofyolpxciytah6oxxiod5zky3zza",
-      "previd": "bagaaieraufz4dru23x5m7gvhenmerof4j6mb4dh6sieygw3wccn6am5std7q",
-      "doc": {
-       "didDocumentData": {
-        "memeplexGrant": {
-         "v": 1,
-         "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-         "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHk"
-        }
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T05:00:00Z",
+      "versionId": "bagaaierah2hcp6zk3re5ynndnuqxnxfzl2jgcvcrc7l2ps6tqckzcygejnfq",
+      "versionSequence": "3",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierah2hcp6zk3re5ynndnuqxnxfzl2jgcvcrc7l2ps6tqckzcygejnfq",
+       "upperBound": {
+        "time": 1793595600,
+        "timeISO": "2026-11-02T05:00:00.000Z",
+        "blockid": "block-300",
+        "height": 300,
+        "txid": "tx-300",
+        "txidx": 0,
+        "batchid": "did:cid:batch-300",
+        "opidx": 2
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T04:59:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "w0q9ClZS4x4CLoJLE2X-P8OuvNXeeV6uuomrNvHsfaVQyMTB-E93mFIsmIA2i_7nU4CHKzP75zY3zms_a658vw"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHk"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -1414,157 +1408,135 @@
    "did": "did:cid:bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
-     "opid": "bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
+       }
+      }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHn"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
+     }
+    },
+    {
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
+     },
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T03:20:00Z",
+      "versionId": "bagaaiera7mqqumtwbvg3ztg6duvx4gt54be5fajj2kqidmzfhxajkqqrzxka",
+      "versionSequence": "2",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaiera7mqqumtwbvg3ztg6duvx4gt54be5fajj2kqidmzfhxajkqqrzxka",
+       "upperBound": {
+        "time": 1793589600,
+        "timeISO": "2026-11-02T03:20:00.000Z",
+        "blockid": "block-200",
+        "height": 200,
+        "txid": "tx-200",
+        "txidx": 0,
+        "batchid": "did:cid:batch-200",
+        "opidx": 1
+       }
+      }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHn",
+       "actions": [
+        "memeplex:rate"
+       ]
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
+     }
+    },
+    {
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
       "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHn"
-       }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "-t8H-1eriQX6dQwtq5TNkywNcGKsqpdSCx8bLjU7BIdbvdqOTlTJtt1bEhtTLywRWj7WNPmj4NP3Lot5xrRyLg"
-      }
-     }
-    },
-    {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T03:20:00.000Z",
-     "ordinal": [
-      200,
-      0,
-      1
-     ],
-     "registration": {
-      "height": 200,
-      "index": 0,
-      "txid": "tx-200",
-      "batch": "did:cid:batch-200",
-      "opidx": 1
+      "service": []
      },
-     "did": "did:cid:bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
-     "opid": "bagaaiera7mqqumtwbvg3ztg6duvx4gt54be5fajj2kqidmzfhxajkqqrzxka",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
-      "previd": "bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
-      "doc": {
-       "didDocument": {
-        "@context": [
-         "https://www.w3.org/ns/did/v1"
-        ],
-        "id": "did:cid:bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
-        "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
-       },
-       "didDocumentData": {
-        "memeplexGrant": {
-         "v": 1,
-         "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-         "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHn",
-         "actions": [
-          "memeplex:rate"
-         ]
-        }
-       },
-       "didDocumentRegistration": {
-        "version": 1,
-        "type": "asset",
-        "registry": "BTC:mainnet"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T05:00:00Z",
+      "versionId": "bagaaieracwencivfbfjzn65zyywghjkehkqudsb7ovcxdaaoao4smlqvpk2q",
+      "versionSequence": "3",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieracwencivfbfjzn65zyywghjkehkqudsb7ovcxdaaoao4smlqvpk2q",
+       "upperBound": {
+        "time": 1793595600,
+        "timeISO": "2026-11-02T05:00:00.000Z",
+        "blockid": "block-300",
+        "height": 300,
+        "txid": "tx-300",
+        "txidx": 0,
+        "batchid": "did:cid:batch-300",
+        "opidx": 2
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T03:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "ktnGdwURBT0tJfODQhTKqy-3tHlCfnwl2teWvo29vwUd_ydSe8icetknVB3USOxhkwA0Dl-QkAQNYEbrgehZxg"
       }
-     }
-    },
-    {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T05:00:00.000Z",
-     "ordinal": [
-      300,
-      0,
-      2
-     ],
-     "registration": {
-      "height": 300,
-      "index": 0,
-      "txid": "tx-300",
-      "batch": "did:cid:batch-300",
-      "opidx": 2
      },
-     "did": "did:cid:bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
-     "opid": "bagaaieracwencivfbfjzn65zyywghjkehkqudsb7ovcxdaaoao4smlqvpk2q",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
-      "previd": "bagaaiera7mqqumtwbvg3ztg6duvx4gt54be5fajj2kqidmzfhxajkqqrzxka",
-      "doc": {
-       "didDocument": {
-        "@context": [
-         "https://www.w3.org/ns/did/v1"
-        ],
-        "id": "did:cid:bagaaiera4fqejqmv76ofth2nvyntwwrg456f4kv7acuswxpb4d2adtf6am5a",
-        "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-        "service": []
-       },
-       "didDocumentData": {
-        "memeplexGrant": {
-         "v": 1,
-         "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-         "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHn",
-         "actions": [
-          "memeplex:rate"
-         ]
-        }
-       },
-       "didDocumentRegistration": {
-        "version": 1,
-        "type": "asset",
-        "registry": "BTC:mainnet"
-       }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T04:59:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "7Hpgji1ohas6yucCa2PoGf0fKrLPHpys_ybprQjCSo8aebdl89I_NUe9ySEH5M8h6KaF3L9CfRrK-qBtjv3eHw"
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHn",
+       "actions": [
+        "memeplex:rate"
+       ]
       }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -1621,86 +1593,86 @@
    "did": "did:cid:bagaaieraicnrahfb2o4t363qp356fm4t4xvzu3ybjesjduvnwvrzds55wo7q",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieraicnrahfb2o4t363qp356fm4t4xvzu3ybjesjduvnwvrzds55wo7q",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieraicnrahfb2o4t363qp356fm4t4xvzu3ybjesjduvnwvrzds55wo7q",
-     "opid": "bagaaieraicnrahfb2o4t363qp356fm4t4xvzu3ybjesjduvnwvrzds55wo7q",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHo"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaieraicnrahfb2o4t363qp356fm4t4xvzu3ybjesjduvnwvrzds55wo7q",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieraicnrahfb2o4t363qp356fm4t4xvzu3ybjesjduvnwvrzds55wo7q",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "812JhBsaQoq7dwDgLTP5iML4XH66vhj2O8uqPL3IWYISLVJDhY855brSmRT_UADjpGaDRqzxAga56fbBa3M9iQ"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHo"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T03:20:00.000Z",
-     "ordinal": [
-      200,
-      0,
-      1
-     ],
-     "registration": {
-      "height": 200,
-      "index": 0,
-      "txid": "tx-200",
-      "batch": "did:cid:batch-200",
-      "opidx": 1
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieraicnrahfb2o4t363qp356fm4t4xvzu3ybjesjduvnwvrzds55wo7q",
+      "controller": "did:cid:bagaaierawzacl67sbxxnmhb22ep4wjqrm6pv7774nkiwuwdskhzkcvwcwuoa"
      },
-     "did": "did:cid:bagaaieraicnrahfb2o4t363qp356fm4t4xvzu3ybjesjduvnwvrzds55wo7q",
-     "opid": "bagaaierai5vwpjmfarvqlin2jvpqlscko5gmyp3xdn7r35x5p2w74ar3xnea",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaieraicnrahfb2o4t363qp356fm4t4xvzu3ybjesjduvnwvrzds55wo7q",
-      "previd": "bagaaieraicnrahfb2o4t363qp356fm4t4xvzu3ybjesjduvnwvrzds55wo7q",
-      "doc": {
-       "didDocument": {
-        "@context": [
-         "https://www.w3.org/ns/did/v1"
-        ],
-        "id": "did:cid:bagaaieraicnrahfb2o4t363qp356fm4t4xvzu3ybjesjduvnwvrzds55wo7q",
-        "controller": "did:cid:bagaaierawzacl67sbxxnmhb22ep4wjqrm6pv7774nkiwuwdskhzkcvwcwuoa"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T03:20:00Z",
+      "versionId": "bagaaierai5vwpjmfarvqlin2jvpqlscko5gmyp3xdn7r35x5p2w74ar3xnea",
+      "versionSequence": "2",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierai5vwpjmfarvqlin2jvpqlscko5gmyp3xdn7r35x5p2w74ar3xnea",
+       "upperBound": {
+        "time": 1793589600,
+        "timeISO": "2026-11-02T03:20:00.000Z",
+        "blockid": "block-200",
+        "height": 200,
+        "txid": "tx-200",
+        "txidx": 0,
+        "batchid": "did:cid:batch-200",
+        "opidx": 1
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T03:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "B_lN_KlhTZspZiArcOSCBp5v7NELSXysgB3ULahdTgUuKIFJKG8L_-LXYn4cFkqzA_9_4C764_5AMKByqx8zJw"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHo"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -1741,84 +1713,86 @@
    "did": "did:cid:bagaaieradsdx7cdqp2wmelpwse5e4aojcqhcrfhg4j4hpajowzymhsgk3cga",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieradsdx7cdqp2wmelpwse5e4aojcqhcrfhg4j4hpajowzymhsgk3cga",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieradsdx7cdqp2wmelpwse5e4aojcqhcrfhg4j4hpajowzymhsgk3cga",
-     "opid": "bagaaieradsdx7cdqp2wmelpwse5e4aojcqhcrfhg4j4hpajowzymhsgk3cga",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHp"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaieradsdx7cdqp2wmelpwse5e4aojcqhcrfhg4j4hpajowzymhsgk3cga",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieradsdx7cdqp2wmelpwse5e4aojcqhcrfhg4j4hpajowzymhsgk3cga",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "p2X0979hVNAO7Ej9JFevQ2wvt3npnpX1_G-lqgLsCOZpqDltd8WEibiU7AwWEkLDITPokT6d0xz7X4t348HiZQ"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHp"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T03:20:00.000Z",
-     "ordinal": [
-      200,
-      0,
-      1
-     ],
-     "registration": {
-      "height": 200,
-      "index": 0,
-      "txid": "tx-200",
-      "batch": "did:cid:batch-200",
-      "opidx": 1
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieradsdx7cdqp2wmelpwse5e4aojcqhcrfhg4j4hpajowzymhsgk3cga",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieradsdx7cdqp2wmelpwse5e4aojcqhcrfhg4j4hpajowzymhsgk3cga",
-     "opid": "bagaaierarzfxklujwnxrzi5geywp3ptkgmq6xwxtbrxy7iuvz2k52av65pha",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaieradsdx7cdqp2wmelpwse5e4aojcqhcrfhg4j4hpajowzymhsgk3cga",
-      "previd": "bagaaieradsdx7cdqp2wmelpwse5e4aojcqhcrfhg4j4hpajowzymhsgk3cga",
-      "doc": {
-       "didDocumentRegistration": {
-        "version": 1,
-        "type": "asset",
-        "registry": "ZEC:mainnet"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T03:20:00Z",
+      "versionId": "bagaaierarzfxklujwnxrzi5geywp3ptkgmq6xwxtbrxy7iuvz2k52av65pha",
+      "versionSequence": "2",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierarzfxklujwnxrzi5geywp3ptkgmq6xwxtbrxy7iuvz2k52av65pha",
+       "upperBound": {
+        "time": 1793589600,
+        "timeISO": "2026-11-02T03:20:00.000Z",
+        "blockid": "block-200",
+        "height": 200,
+        "txid": "tx-200",
+        "txidx": 0,
+        "batchid": "did:cid:batch-200",
+        "opidx": 1
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T03:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "FLluIbWg5n4xR6HkVmxQNaiQ1u9bBNaLuDIQhzYjCHEqU9oObfu4J42mF380fppWegavSNX2-2tZs5HhP4_g6g"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHp"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "ZEC:mainnet"
      }
     }
    ],
@@ -1859,77 +1833,75 @@
    "did": "did:cid:bagaaieranfgaotmvi4bhqvz5xxlkrkcscm3tv4y6hhizivptbmy6yq2tdpua",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieranfgaotmvi4bhqvz5xxlkrkcscm3tv4y6hhizivptbmy6yq2tdpua",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieranfgaotmvi4bhqvz5xxlkrkcscm3tv4y6hhizivptbmy6yq2tdpua",
-     "opid": "bagaaieranfgaotmvi4bhqvz5xxlkrkcscm3tv4y6hhizivptbmy6yq2tdpua",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHq"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaieranfgaotmvi4bhqvz5xxlkrkcscm3tv4y6hhizivptbmy6yq2tdpua",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieranfgaotmvi4bhqvz5xxlkrkcscm3tv4y6hhizivptbmy6yq2tdpua",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "PiCrmlhOsrTQUMvk-vlRlYC7aURboMBk-gA2wGJEu2Jh6ZbhybY8XCCUwNZOJipg3qjtlG1Deq7uWbEO5hGaMg"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHq"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "hyperswarm",
-     "time": "2026-11-02T08:19:00.000Z",
-     "did": "did:cid:bagaaieranfgaotmvi4bhqvz5xxlkrkcscm3tv4y6hhizivptbmy6yq2tdpua",
-     "opid": "bagaaierazwkarb7m36q642te6cyckucyuicmnv4dbgbh6bsmrjcbgqjzkfpa",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaieranfgaotmvi4bhqvz5xxlkrkcscm3tv4y6hhizivptbmy6yq2tdpua",
-      "previd": "bagaaieranfgaotmvi4bhqvz5xxlkrkcscm3tv4y6hhizivptbmy6yq2tdpua",
-      "doc": {
-       "didDocumentData": {
-        "memeplexGrant": {
-         "v": 1,
-         "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-         "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHq",
-         "actions": [
-          "memeplex:tag"
-         ]
-        }
-       }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T08:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "JT8KmXxc12hVYjisuiB1VxMHazxwdMY3akWTadbAiGVEtKCRMzo4zC6_NTXufPJGsESLGM-nlC0ynVT7CK7kZQ"
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieranfgaotmvi4bhqvz5xxlkrkcscm3tv4y6hhizivptbmy6yq2tdpua",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
+     },
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T08:19:00Z",
+      "versionId": "bagaaierazwkarb7m36q642te6cyckucyuicmnv4dbgbh6bsmrjcbgqjzkfpa",
+      "versionSequence": "2",
+      "confirmed": false
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHq",
+       "actions": [
+        "memeplex:tag"
+       ]
       }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -1962,86 +1934,86 @@
    "did": "did:cid:bagaaieraidbuxq5ee7ssf2b524cfwbdqphdudl62rjfuuhrjcodg2ggpfk7a",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieraidbuxq5ee7ssf2b524cfwbdqphdudl62rjfuuhrjcodg2ggpfk7a",
+      "controller": "did:cid:bagaaierawzacl67sbxxnmhb22ep4wjqrm6pv7774nkiwuwdskhzkcvwcwuoa"
      },
-     "did": "did:cid:bagaaieraidbuxq5ee7ssf2b524cfwbdqphdudl62rjfuuhrjcodg2ggpfk7a",
-     "opid": "bagaaieraidbuxq5ee7ssf2b524cfwbdqphdudl62rjfuuhrjcodg2ggpfk7a",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierawzacl67sbxxnmhb22ep4wjqrm6pv7774nkiwuwdskhzkcvwcwuoa",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHr"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaieraidbuxq5ee7ssf2b524cfwbdqphdudl62rjfuuhrjcodg2ggpfk7a",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieraidbuxq5ee7ssf2b524cfwbdqphdudl62rjfuuhrjcodg2ggpfk7a",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierawzacl67sbxxnmhb22ep4wjqrm6pv7774nkiwuwdskhzkcvwcwuoa#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "U9iIk2d59eYLJ83xGW_oDJ-7Xx3TxSQeGuIsg2MD1Ghfm6eH_y-h2wZ-D4vwgUNoUHK0HuO4q3Sn3BTOfr_lYw"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHr"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     },
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T03:20:00.000Z",
-     "ordinal": [
-      200,
-      0,
-      1
-     ],
-     "registration": {
-      "height": 200,
-      "index": 0,
-      "txid": "tx-200",
-      "batch": "did:cid:batch-200",
-      "opidx": 1
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieraidbuxq5ee7ssf2b524cfwbdqphdudl62rjfuuhrjcodg2ggpfk7a",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieraidbuxq5ee7ssf2b524cfwbdqphdudl62rjfuuhrjcodg2ggpfk7a",
-     "opid": "bagaaieraq367hwtdlvtcr35j32cltxghqlr5d7ezhjsnn4nm25vjyy45lxnq",
-     "operation": {
-      "type": "update",
-      "did": "did:cid:bagaaieraidbuxq5ee7ssf2b524cfwbdqphdudl62rjfuuhrjcodg2ggpfk7a",
-      "previd": "bagaaieraidbuxq5ee7ssf2b524cfwbdqphdudl62rjfuuhrjcodg2ggpfk7a",
-      "doc": {
-       "didDocument": {
-        "@context": [
-         "https://www.w3.org/ns/did/v1"
-        ],
-        "id": "did:cid:bagaaieraidbuxq5ee7ssf2b524cfwbdqphdudl62rjfuuhrjcodg2ggpfk7a",
-        "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "updated": "2026-11-02T03:20:00Z",
+      "versionId": "bagaaieraq367hwtdlvtcr35j32cltxghqlr5d7ezhjsnn4nm25vjyy45lxnq",
+      "versionSequence": "2",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieraq367hwtdlvtcr35j32cltxghqlr5d7ezhjsnn4nm25vjyy45lxnq",
+       "upperBound": {
+        "time": 1793589600,
+        "timeISO": "2026-11-02T03:20:00.000Z",
+        "blockid": "block-200",
+        "height": 200,
+        "txid": "tx-200",
+        "txidx": 0,
+        "batchid": "did:cid:batch-200",
+        "opidx": 1
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T03:19:00.000Z",
-       "verificationMethod": "did:cid:bagaaierawzacl67sbxxnmhb22ep4wjqrm6pv7774nkiwuwdskhzkcvwcwuoa#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "n7_DogoKgbf8h2dcIAlpGQ0KMXXcMmDFh21rGnDpE5Z4i9bc3Gs3bUdOiFu6bXtcXkWNqO4G1BeOQ31k63dCtg"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHr"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -2077,46 +2049,44 @@
    "did": "did:cid:bagaaieraullsecztwfwy6kksqtmkqudzjlfamwqdty2sonqb3awdugqj3piq",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieraullsecztwfwy6kksqtmkqudzjlfamwqdty2sonqb3awdugqj3piq",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieraullsecztwfwy6kksqtmkqudzjlfamwqdty2sonqb3awdugqj3piq",
-     "opid": "bagaaieraullsecztwfwy6kksqtmkqudzjlfamwqdty2sonqb3awdugqj3piq",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcH"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaieraullsecztwfwy6kksqtmkqudzjlfamwqdty2sonqb3awdugqj3piq",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieraullsecztwfwy6kksqtmkqudzjlfamwqdty2sonqb3awdugqj3piq",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "R4XZEdhtu3L_1y2j46bjK7NlZPNjxZRSjeCphgd7TgJP4KSK_KHzB7avBW6K0qsiwJo_woFZPOa6SFj13pPEsA"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcH"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -2131,47 +2101,45 @@
    "did": "did:cid:bagaaierajmfegz4lrzpfhdvtth4nusry4ogbglpqodi2wogmhzhgauwyzmca",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaierajmfegz4lrzpfhdvtth4nusry4ogbglpqodi2wogmhzhgauwyzmca",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaierajmfegz4lrzpfhdvtth4nusry4ogbglpqodi2wogmhzhgauwyzmca",
-     "opid": "bagaaierajmfegz4lrzpfhdvtth4nusry4ogbglpqodi2wogmhzhgauwyzmca",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet",
-       "validUntil": "2099-01-01T00:00:00Z"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHl"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaierajmfegz4lrzpfhdvtth4nusry4ogbglpqodi2wogmhzhgauwyzmca",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierajmfegz4lrzpfhdvtth4nusry4ogbglpqodi2wogmhzhgauwyzmca",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "RO-EWass80ukBOTAXltIRbXsLkkwE3F0mRncUZ_rXD5kSHDnq1e8lGGmeVyrNVIaEJmiXheUiVqovVlbkkM0QA"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHl"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet",
+      "validUntil": "2099-01-01T00:00:00Z"
      }
     }
    ],
@@ -2186,46 +2154,44 @@
    "did": "did:cid:bagaaiera2oeex3cekhgeyrpebmsnoinvxsj4khyh4hrhg5jqzfmtdo3v2l5a",
    "history": [
     {
-     "registry": "BTC:signet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaiera2oeex3cekhgeyrpebmsnoinvxsj4khyh4hrhg5jqzfmtdo3v2l5a",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaiera2oeex3cekhgeyrpebmsnoinvxsj4khyh4hrhg5jqzfmtdo3v2l5a",
-     "opid": "bagaaiera2oeex3cekhgeyrpebmsnoinvxsj4khyh4hrhg5jqzfmtdo3v2l5a",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:signet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHm"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaiera2oeex3cekhgeyrpebmsnoinvxsj4khyh4hrhg5jqzfmtdo3v2l5a",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:signet",
+       "opid": "bagaaiera2oeex3cekhgeyrpebmsnoinvxsj4khyh4hrhg5jqzfmtdo3v2l5a",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "T-O5c6Iikd4LaAc2-VKMQ5cHG3wIU6GK5LwYp_mcRwUsaMdOupPG_Oy5mHWN0ZG-OE9hc0-3GcUIZDNreN8bfw"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcHm"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:signet"
      }
     }
    ],
@@ -2240,47 +2206,45 @@
    "did": "did:cid:bagaaierarrtaejenlqbfvl7qocpdehpa5i7q6yqty4nhon6efbvkafbzd2ka",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaierarrtaejenlqbfvl7qocpdehpa5i7q6yqty4nhon6efbvkafbzd2ka",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaierarrtaejenlqbfvl7qocpdehpa5i7q6yqty4nhon6efbvkafbzd2ka",
-     "opid": "bagaaierarrtaejenlqbfvl7qocpdehpa5i7q6yqty4nhon6efbvkafbzd2ka",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 1,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcH",
-        "actions": []
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaierarrtaejenlqbfvl7qocpdehpa5i7q6yqty4nhon6efbvkafbzd2ka",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierarrtaejenlqbfvl7qocpdehpa5i7q6yqty4nhon6efbvkafbzd2ka",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "Vg0X_NEF5m1D0qWYF7dumHt9FrA_CaAqjRa0L8BrRC0UFSyo63tsXTCpelPE6iiqz5Yb-AoRNZJACy5BXy5n0g"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 1,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcH",
+       "actions": []
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -2295,42 +2259,40 @@
    "did": "did:cid:bagaaieracaakkbn7ry6swxooeuahyqxwrb4cpj4azrxqoocajsk7jwoczwvq",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaieracaakkbn7ry6swxooeuahyqxwrb4cpj4azrxqoocajsk7jwoczwvq",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaieracaakkbn7ry6swxooeuahyqxwrb4cpj4azrxqoocajsk7jwoczwvq",
-     "opid": "bagaaieracaakkbn7ry6swxooeuahyqxwrb4cpj4azrxqoocajsk7jwoczwvq",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "note": "no grant here"
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "rbyCiQOp_RfDjrSolAJQY3wti6u3POKLcG1-KeTO9yp5m2FFbhInroggsHpGXPxTKGtxWExKNbwo6_nnx4gFpw"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaieracaakkbn7ry6swxooeuahyqxwrb4cpj4azrxqoocajsk7jwoczwvq",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaieracaakkbn7ry6swxooeuahyqxwrb4cpj4azrxqoocajsk7jwoczwvq",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
+       }
       }
+     },
+     "didDocumentData": {
+      "note": "no grant here"
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
@@ -2345,46 +2307,44 @@
    "did": "did:cid:bagaaierablkzfgt7xpykvjocyxhvhi7or63ksgxx364aku2vc7p7msl3c7la",
    "history": [
     {
-     "registry": "BTC:mainnet",
-     "time": "2026-11-02T01:40:00.000Z",
-     "ordinal": [
-      100,
-      0,
-      0
-     ],
-     "registration": {
-      "height": 100,
-      "index": 0,
-      "txid": "tx-100",
-      "batch": "did:cid:batch-100",
-      "opidx": 0
+     "didDocument": {
+      "@context": [
+       "https://www.w3.org/ns/did/v1"
+      ],
+      "id": "did:cid:bagaaierablkzfgt7xpykvjocyxhvhi7or63ksgxx364aku2vc7p7msl3c7la",
+      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja"
      },
-     "did": "did:cid:bagaaierablkzfgt7xpykvjocyxhvhi7or63ksgxx364aku2vc7p7msl3c7la",
-     "opid": "bagaaierablkzfgt7xpykvjocyxhvhi7or63ksgxx364aku2vc7p7msl3c7la",
-     "operation": {
-      "type": "create",
-      "created": "2026-11-02T01:39:00.000Z",
-      "registration": {
-       "version": 1,
-       "type": "asset",
-       "registry": "BTC:mainnet"
-      },
-      "controller": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja",
-      "data": {
-       "memeplexGrant": {
-        "v": 2,
-        "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
-        "nonce": "BwcHBwcHBwcHBwcHBwcHBwcH"
+     "didDocumentMetadata": {
+      "created": "2026-11-02T01:39:00Z",
+      "versionId": "bagaaierablkzfgt7xpykvjocyxhvhi7or63ksgxx364aku2vc7p7msl3c7la",
+      "versionSequence": "1",
+      "confirmed": true,
+      "timestamp": {
+       "chain": "BTC:mainnet",
+       "opid": "bagaaierablkzfgt7xpykvjocyxhvhi7or63ksgxx364aku2vc7p7msl3c7la",
+       "upperBound": {
+        "time": 1793583600,
+        "timeISO": "2026-11-02T01:40:00.000Z",
+        "blockid": "block-100",
+        "height": 100,
+        "txid": "tx-100",
+        "txidx": 0,
+        "batchid": "did:cid:batch-100",
+        "opidx": 0
        }
-      },
-      "proof": {
-       "type": "DataIntegrityProof",
-       "cryptosuite": "archon-ecdsa-secp256k1-jcs-2026",
-       "created": "2026-11-02T01:39:00.000Z",
-       "verificationMethod": "did:cid:bagaaierabrxakby2qxu7bahd2qzsvdv7ux5lrilwzdpppjxv5nsu2va3ntja#key-1",
-       "proofPurpose": "capabilityInvocation",
-       "proofValue": "AbFifQcIP8QhFszC4XSR2ANNrEM5z6fJMiZr3J5oAgl8fie9GsUqGePLa-rpyWUWMRBrecLPpYr18qM_eZDLSw"
       }
+     },
+     "didDocumentData": {
+      "memeplexGrant": {
+       "v": 2,
+       "client": "did:cid:bagaaieraubifxohhosai6o5nbl6zpn2rsdcfnlp6faopb3kawauykmdtj6xa",
+       "nonce": "BwcHBwcHBwcHBwcHBwcHBwcH"
+      }
+     },
+     "didDocumentRegistration": {
+      "version": 1,
+      "type": "asset",
+      "registry": "BTC:mainnet"
      }
     }
    ],
