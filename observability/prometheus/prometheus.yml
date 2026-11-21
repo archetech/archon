@@ -27,6 +27,11 @@ scrape_configs:
       - targets: ['hyperswarm-mediator:4232']
     metrics_path: '/metrics'
 
+  - job_name: 'memeplex-indexer'
+    static_configs:
+      - targets: ['memeplex-indexer:4238']
+    metrics_path: '/metrics'
+
   - job_name: 'btc-mainnet-wallet'
     static_configs:
       - targets: ['btc-mainnet-wallet:4243']

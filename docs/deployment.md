@@ -242,7 +242,7 @@ COMPOSE_PROFILES=
 COMPOSE_PROFILES=hyperswarm,cli,explorer,gatekeeper-client,keymaster-client,react-wallet,observability,btc-signet
 ```
 
-Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `mongodb`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `btc-testnet4-hosted`, `lightning`, `drawbridge`, `herald`, `tor`, `didcomm`, `cashu`, `zcash-mainnet`, `eth-mainnet`, `eth-sepolia`, `sol-mainnet`, `sol-devnet`, `pinning`, and `filecoin`.
+Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `mongodb`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `btc-testnet4-hosted`, `lightning`, `drawbridge`, `herald`, `tor`, `didcomm`, `cashu`, `memeplex`, `zcash-mainnet`, `eth-mainnet`, `eth-sepolia`, `sol-mainnet`, `sol-devnet`, `pinning`, and `filecoin`.
 
 `drawbridge`, `lightning`, `herald`, and `tor` are independent — each starts only what it is named after, and they compose freely. See [§9](#9-adding-drawbridge-api-gateway--tor).
 
@@ -677,7 +677,7 @@ COMPOSE_PROFILES=hyperswarm,didcomm,drawbridge
 ARCHON_DIDCOMM_TOR_PROXY=
 ```
 
-**Drawbridge offers what the profiles run.** It reads `COMPOSE_PROFILES` from `.env`: with `lightning`, `herald`, `explorer`, `didcomm` or `cashu` listed, it proxies to that service's container and `GET /api/v1/capabilities` reports it; without the profile, the capability is `false` and the route returns HTTP 501. The upstream URLs (`ARCHON_LIGHTNING_MEDIATOR_URL`, `ARCHON_HERALD_URL`, `ARCHON_EXPLORER_URL`, `ARCHON_DIDCOMM_URL`, `ARCHON_CASHU_MINT_URL`) are needed only to point Drawbridge at a service somewhere else; a URL that is set is offered whether or not its profile runs. Profiles passed with `docker compose --profile` rather than `COMPOSE_PROFILES` are not visible to Drawbridge, so set the URL for those.
+**Drawbridge offers what the profiles run.** It reads `COMPOSE_PROFILES` from `.env`: with `lightning`, `herald`, `explorer`, `didcomm`, `cashu` or `memeplex` listed, it proxies to that service's container and `GET /api/v1/capabilities` reports it; without the profile, the capability is `false` and the route returns HTTP 501. The upstream URLs (`ARCHON_LIGHTNING_MEDIATOR_URL`, `ARCHON_HERALD_URL`, `ARCHON_EXPLORER_URL`, `ARCHON_DIDCOMM_URL`, `ARCHON_CASHU_MINT_URL`, `ARCHON_MEMEPLEX_INDEXER_URL`) are needed only to point Drawbridge at a service somewhere else; a URL that is set is offered whether or not its profile runs. Profiles passed with `docker compose --profile` rather than `COMPOSE_PROFILES` are not visible to Drawbridge, so set the URL for those.
 
 Herald links to `<public host>/explorer` by default, so running Herald without the `explorer` profile gives every visitor a broken link from the identity pages. Either run the profile or set `ARCHON_HERALD_EXPLORER_URL` to a reachable explorer — or empty, to hide the links.
 

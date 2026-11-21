@@ -27,6 +27,8 @@ export const UPSTREAMS = {
     // A node without a mint must not advertise one, so there is no
     // standalone default.
     cashuMint: { variable: 'ARCHON_CASHU_MINT_URL', profile: 'cashu', container: 'http://cashu-mint:8085', standalone: '' },
+    // Likewise an indexer: a node that runs none serves no index.
+    memeplexIndexer: { variable: 'ARCHON_MEMEPLEX_INDEXER_URL', profile: 'memeplex', container: 'http://memeplex-indexer:4238', standalone: '' },
 } satisfies Record<string, Upstream>;
 
 export function upstreamURL(upstream: Upstream, env: NodeJS.ProcessEnv = process.env): string {

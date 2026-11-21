@@ -1,0 +1,46 @@
+# Memeplex indexer. Pulled into docker-compose.yml via the `include:`
+# directive. Optional: enable with the `memeplex` profile
+# (COMPOSE_PROFILES=memeplex). Follows the Gatekeeper's changes, applies the
+# Memeplex rules to the DIDs it holds, and serves publications, timelines and
+# threads. The index is in memory and is built again from the Gatekeeper at
+# each start, so the service has no volume.
+services:
+  memeplex-indexer:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.memeplex-indexer
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/memeplex-indexer
+    profiles: ["memeplex"]
+    environment:
+      - ARCHON_MEMEPLEX_INDEXER_PORT=4238
+      - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      # Seconds between polls of the Gatekeeper's changes.
+      - ARCHON_MEMEPLEX_INDEXER_POLL_INTERVAL=${ARCHON_MEMEPLEX_INDEXER_POLL_INTERVAL:-5}
+      # Seconds a request to the Gatekeeper may take.
+      - ARCHON_MEMEPLEX_INDEXER_GATEKEEPER_TIMEOUT=${ARCHON_MEMEPLEX_INDEXER_GATEKEEPER_TIMEOUT:-120}
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "${ARCHON_MEMEPLEX_INDEXER_HOST_BIND:-127.0.0.1}:${ARCHON_MEMEPLEX_INDEXER_PORT:-4238}:4238"
+    # Healthy once it is listening. It answers its views only after reading
+    # every DID the node has, which `GET /api/v1/ready` reports and which can
+    # take longer than a health check should wait.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const http=require('http');const
+            req=http.get('http://127.0.0.1:4238/api/v1/version',res=>{res.resume();res.on('end',()=>process.\
+            exit(res.statusCode===200?0:1));});req.on('error',()=>process.exit(1));",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      gatekeeper:
+        condition: service_healthy

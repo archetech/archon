@@ -15,6 +15,7 @@ import { routeLabel } from './metrics-path.js';
 import { REDACTED_LOG_PATHS } from './log-redaction.js';
 import { buildProxyBody, proxyHeraldRequest } from './herald-proxy.js';
 import { proxyRequest } from './proxy.js';
+import { memeplexProxy } from './memeplex-proxy.js';
 import { cashuProxyHandlers, publicCashuMintUrl } from './cashu-proxy.js';
 import { keymasterCashuPayments, type CashuPayments } from './cashu-payment.js';
 import { DEFAULT_CORS_OPTIONS } from './cors-options.js';
@@ -326,6 +327,15 @@ async function main() {
         logger,
     });
 
+    const memeplexRateLimit = publicRateLimit({
+        store,
+        name: 'memeplex',
+        readPerSourceMax: config.memeplexReadPerSource,
+        readGlobalMax: config.memeplexReadGlobal,
+        windowSeconds: config.publicRateLimitWindow,
+        logger,
+    });
+
     const nameWriteRateLimit = publicRateLimit({
         store,
         name: 'names:write',
@@ -407,6 +417,9 @@ async function main() {
             res.status(502).json({ error: 'Upstream explorer error' });
         }
     });
+
+    // Public face for the node's Memeplex indexer; see memeplex-proxy.ts.
+    app.use('/memeplex', memeplexRateLimit, memeplexProxy({ indexerURL: config.memeplexIndexerURL, logger }));
 
     // Public face for the DIDComm relay (mailbox). The published
     // DIDCommMessaging endpoint is `<drawbridge public host>/didcomm`.

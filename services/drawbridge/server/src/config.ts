@@ -33,6 +33,7 @@ const config = {
     explorerURL: upstreamURL(UPSTREAMS.explorer),
     didcommURL: upstreamURL(UPSTREAMS.didcomm),
     cashuMintURL: upstreamURL(UPSTREAMS.cashuMint),
+    memeplexIndexerURL: upstreamURL(UPSTREAMS.memeplexIndexer),
     // Public base URL this node is reachable at (clearnet host or Tor onion).
     // Used to advertise the DIDComm relay endpoint (`<publicHost>/didcomm`).
     publicHost: process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || '',
@@ -95,6 +96,12 @@ const config = {
         process.env.ARCHON_DRAWBRIDGE_EXPLORER_READ_PER_SOURCE, 600),
     explorerReadGlobal: positiveInt('ARCHON_DRAWBRIDGE_EXPLORER_READ_GLOBAL',
         process.env.ARCHON_DRAWBRIDGE_EXPLORER_READ_GLOBAL, 6000),
+    // A page of a Memeplex client is many reads of the index: a timeline, then
+    // a thread, ratings and tags for what it shows.
+    memeplexReadPerSource: positiveInt('ARCHON_DRAWBRIDGE_MEMEPLEX_READ_PER_SOURCE',
+        process.env.ARCHON_DRAWBRIDGE_MEMEPLEX_READ_PER_SOURCE, 600),
+    memeplexReadGlobal: positiveInt('ARCHON_DRAWBRIDGE_MEMEPLEX_READ_GLOBAL',
+        process.env.ARCHON_DRAWBRIDGE_MEMEPLEX_READ_GLOBAL, 6000),
     nameWritePerSource: positiveInt('ARCHON_DRAWBRIDGE_NAME_WRITE_PER_SOURCE',
         process.env.ARCHON_DRAWBRIDGE_NAME_WRITE_PER_SOURCE, 10),
     nameWriteGlobal: positiveInt('ARCHON_DRAWBRIDGE_NAME_WRITE_GLOBAL',
