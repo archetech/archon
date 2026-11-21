@@ -1,3 +1,4 @@
+import cors from 'cors';
 import express from 'express';
 import type { AddressInfo } from 'net';
 import type { Server } from 'http';
@@ -10,6 +11,7 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import { MemeplexClient } from '@didcid/memeplex/client';
 import { createMemepoolApp } from '../../services/memepool/src/api.ts';
+import { DEFAULT_CORS_OPTIONS } from '../../services/drawbridge/server/src/cors-options.ts';
 import { memepoolProxy } from '../../services/drawbridge/server/src/memepool-proxy.ts';
 
 // Drawbridge's public mount of the node's Memepool service, with the real
@@ -27,9 +29,10 @@ function listen(app: express.Express): Promise<Server> {
     });
 }
 
-// The mount as drawbridge-api.ts makes it, after its body parser and without
-// its rate limiter, beside another route of the node's.
+// The mount as drawbridge-api.ts makes it, after its CORS handling and body
+// parser and without its rate limiter, beside another route of the node's.
 const drawbridge = (url = memepoolURL) => express()
+    .use(cors(DEFAULT_CORS_OPTIONS))
     .use(express.json({ limit: '10mb' }))
     .use('/memepool', memepoolProxy({ memepoolURL: url }))
     .get('/elsewhere', (req, res) => { res.json({ cookie: req.headers.cookie ?? null }); });
@@ -113,8 +116,22 @@ it.each([
     expect((await request(drawbridge()).get(path)).status).toBe(400);
 });
 
-it.each(['patch', 'options'] as const)('refuses %s', async method => {
-    expect((await request(drawbridge())[method]('/memepool/api/v1/me')).status).toBe(405);
+it('refuses a method the service has no use for', async () => {
+    expect((await request(drawbridge()).patch('/memepool/api/v1/me')).status).toBe(405);
+});
+
+// A preflight is answered by the node's CORS handling, as on every mount, and
+// does not reach the service. Any origin may ask, and none with a user's
+// cookies: the answer allows no credentials.
+it('answers a preflight without the service, allowing no credentials', async () => {
+    const response = await request(drawbridge())
+        .options('/memepool/api/v1/objects')
+        .set('Origin', 'https://elsewhere.example')
+        .set('Access-Control-Request-Method', 'POST');
+
+    expect(response.status).toBe(204);
+    expect(response.headers['access-control-allow-origin']).toBe('*');
+    expect(response.headers['access-control-allow-credentials']).toBeUndefined();
 });
 
 it('says the service is not enabled on a node that runs none', async () => {

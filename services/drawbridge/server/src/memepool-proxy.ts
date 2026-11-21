@@ -5,6 +5,9 @@ import { proxyRequest } from './proxy.js';
 // Only the service's API is reachable: the mount's prefix is stripped and what
 // is left has to stay under /api/v1.
 //
+// A preflight (OPTIONS) does not reach here: the node's CORS handling answers
+// it first, for any origin and without credentials, as on every mount.
+//
 // The service signs users in and keeps them signed in with cookies, which it
 // sets for all its own paths. Here they are set for this mount, so that a
 // browser sends them back to Memepool and to nothing else the node serves.
