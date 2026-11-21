@@ -24,6 +24,7 @@ The four long-running services every Archon node depends on.
 | [Drawbridge](drawbridge/README.md) | Public-facing API gateway. Enforces the L402 paywall and subscription credentials, then proxies to Gatekeeper / Herald / Lightning. |
 | [Herald](herald/README.md) | Name service. Issues membership credentials and publishes a directory as JSON, IPNS, LUD-16, WebFinger, and OIDC. |
 | [Memeplex indexer](memeplex-indexer/README.md) | Optional. Follows a Gatekeeper and serves Memeplex publications, timelines and threads. |
+| [Memepool](memepool/README.md) | Optional. A Memeplex client run as a service: signs users in with a wallet and publishes under their grants. |
 
 ---
 

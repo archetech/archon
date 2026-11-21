@@ -1,0 +1,52 @@
+# Memepool. Pulled into docker-compose.yml via the `include:` directive.
+# Optional: enable with the `memepool` profile (COMPOSE_PROFILES=memepool).
+# A Memeplex client run as a service: it holds its own key, in a wallet under
+# data/memepool, signs users in by a wallet challenge and publishes under the
+# grants they make to it. Reading comes from the indexer (the `memeplex`
+# profile).
+services:
+  memepool:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile.memepool
+      args:
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+    image: ghcr.io/archetech/memepool
+    profiles: ["memepool"]
+    environment:
+      - ARCHON_MEMEPOOL_PORT=4237
+      - ARCHON_BIND_ADDRESS=${ARCHON_BIND_ADDRESS:-0.0.0.0}
+      - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
+      - ARCHON_MEMEPOOL_NAME=${ARCHON_MEMEPOOL_NAME:-memepool}
+      - ARCHON_MEMEPOOL_DATA_DIR=/app/memepool/data
+      # Encrypts the wallet that holds the service's key. The service does not
+      # start without it.
+      - ARCHON_MEMEPOOL_WALLET_PASSPHRASE=${ARCHON_MEMEPOOL_WALLET_PASSPHRASE:-}
+      - ARCHON_MEMEPOOL_REGISTRY=${ARCHON_MEMEPOOL_REGISTRY:-hyperswarm}
+      - ARCHON_MEMEPOOL_CHALLENGES_PER_MINUTE=${ARCHON_MEMEPOOL_CHALLENGES_PER_MINUTE:-60}
+      - ARCHON_MEMEPOOL_SESSION_HOURS=${ARCHON_MEMEPOOL_SESSION_HOURS:-24}
+      # Proxies between the service and its users. With one or more, cookies
+      # are marked for HTTPS only when the last proxy says the request was.
+      - ARCHON_MEMEPOOL_TRUSTED_PROXIES=${ARCHON_MEMEPOOL_TRUSTED_PROXIES:-0}
+    volumes:
+      - ../../data/memepool:/app/memepool/data
+    user: "${ARCHON_UID}:${ARCHON_GID}"
+    ports:
+      - "${ARCHON_MEMEPOOL_HOST_BIND:-127.0.0.1}:${ARCHON_MEMEPOOL_PORT:-4237}:4237"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const http=require('http');const
+            req=http.get('http://127.0.0.1:4237/api/v1/ready',res=>{res.resume();res.on('end',()=>process.\
+            exit(res.statusCode===200?0:1));});req.on('error',()=>process.exit(1));",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    depends_on:
+      gatekeeper:
+        condition: service_healthy

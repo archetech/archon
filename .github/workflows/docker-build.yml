@@ -99,6 +99,8 @@ jobs:
             image: didcomm
           - dockerfile: docker/Dockerfile.memeplex-indexer
             image: memeplex-indexer
+          - dockerfile: docker/Dockerfile.memepool
+            image: memepool
           - dockerfile: docker/Dockerfile.keymaster-py
             image: keymaster-py
           - dockerfile: docker/Dockerfile.gatekeeper-rust

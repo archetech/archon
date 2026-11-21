@@ -242,7 +242,7 @@ COMPOSE_PROFILES=
 COMPOSE_PROFILES=hyperswarm,cli,explorer,gatekeeper-client,keymaster-client,react-wallet,observability,btc-signet
 ```
 
-Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `mongodb`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `btc-testnet4-hosted`, `lightning`, `drawbridge`, `herald`, `tor`, `didcomm`, `cashu`, `memeplex`, `zcash-mainnet`, `eth-mainnet`, `eth-sepolia`, `sol-mainnet`, `sol-devnet`, `pinning`, and `filecoin`.
+Available profiles: `hyperswarm`, `cli`, `explorer`, `gatekeeper-client`, `keymaster-client`, `react-wallet`, `observability`, `mongodb`, `btc-mainnet`, `btc-signet`, `btc-testnet4`, `btc-testnet4-hosted`, `lightning`, `drawbridge`, `herald`, `tor`, `didcomm`, `cashu`, `memeplex`, `memepool`, `zcash-mainnet`, `eth-mainnet`, `eth-sepolia`, `sol-mainnet`, `sol-devnet`, `pinning`, and `filecoin`.
 
 `drawbridge`, `lightning`, `herald`, and `tor` are independent — each starts only what it is named after, and they compose freely. See [§9](#9-adding-drawbridge-api-gateway--tor).
 
