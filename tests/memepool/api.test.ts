@@ -384,6 +384,41 @@ describe('signing in with a wallet that sends its answer to the callback', () =>
         expect((await agent.post('/api/v1/login').send()).status).toBe(202);
     });
 
+    it('verifies no more than eight answers at once, and frees a place when one is done or fails', async () => {
+        const { challenge } = (await browser().get('/api/v1/challenge')).body;
+        const response = await alice.createResponse(challenge);
+        const held: { answer: (value: never) => void; fail: (error: Error) => void }[] = [];
+        const verify = jest.spyOn(service, 'verifyResponse').mockImplementation(
+            () => new Promise((answer, fail) => { held.push({ answer, fail }); }) as never,
+        );
+        const callback = () => request(app).post('/api/v1/callback').send({ response });
+
+        const eight = Array.from({ length: 8 }, () => callback().then(sent => sent.status));
+        await new Promise(wait => setTimeout(wait, 100));
+        expect(verify).toHaveBeenCalledTimes(8);
+
+        expect((await callback()).status).toBe(429);
+        expect(verify).toHaveBeenCalledTimes(8);
+
+        // One is refused by the verifier, and one fails outright.
+        held[0].answer({ match: false, challenge } as never);
+        held[1].fail(new Error('node unreachable'));
+        await new Promise(wait => setTimeout(wait, 100));
+
+        const two = [callback().then(sent => sent.status), callback().then(sent => sent.status)];
+        await new Promise(wait => setTimeout(wait, 100));
+        expect(verify).toHaveBeenCalledTimes(10);
+        expect((await callback()).status).toBe(429);
+
+        for (const each of held.slice(2)) {
+            each.answer({ match: false, challenge } as never);
+        }
+        expect((await Promise.all([...eight, ...two])).sort()).toStrictEqual([401, 401, 401, 401, 401, 401, 401, 401, 401, 500]);
+
+        verify.mockRestore();
+        expect((await callback()).status).toBe(200);
+    });
+
     it('does not keep an answer past the challenge\'s lifetime', async () => {
         const agent = browser();
         const { challenge } = (await agent.get('/api/v1/challenge')).body;
