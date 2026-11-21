@@ -9,3 +9,5 @@ export { coauthors, currentRatings, ratingValue } from './views.js';
 export type { Coauthor } from './views.js';
 export { MemeplexIndex } from './index-core.js';
 export type { RatingSummary, Reply } from './index-core.js';
+export { GRANT_LINK_PREFIX, MAX_GRANT_LINK_LENGTH, decodeGrantLink, encodeGrantLink } from './grant-link.js';
+export type { GrantLink, GrantLinkError } from './grant-link.js';
