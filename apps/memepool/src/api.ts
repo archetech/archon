@@ -41,7 +41,8 @@ export interface Api {
     logout(): Promise<void>;
     publish(object: Record<string, unknown>): Promise<string>;
     withdraw(did: string): Promise<void>;
-    timeline(authors: string[]): Promise<Publication[]>;
+    // One page of a timeline, newest first, and how many publications it has in all.
+    timeline(authors: string[], offset?: number): Promise<{ total: number; publications: Publication[] }>;
     thread(did: string): Promise<Reply[]>;
     publication(did: string): Promise<Publication | undefined>;
 }
@@ -90,14 +91,18 @@ export function createApi(bases: { memepool: string; memeplex: string }, fetcher
         async withdraw(did) {
             await json(await post(`/objects/${encodeURIComponent(did)}`, undefined, 'DELETE'));
         },
-        async timeline(authors) {
+        async timeline(authors, offset = 0) {
             if (authors.length === 0) {
-                return [];
+                return { total: 0, publications: [] };
             }
 
             const query = new URLSearchParams(authors.map(author => ['author', author]));
 
-            return (await json(await call(bases.memeplex, `/timeline?${query}`))).publications;
+            if (offset > 0) {
+                query.set('offset', String(offset));
+            }
+
+            return json(await call(bases.memeplex, `/timeline?${query}`));
         },
         thread: async did => json(await call(bases.memeplex, `/threads/${encodeURIComponent(did)}`)),
         async publication(did) {

@@ -5,6 +5,7 @@
     --paper: #ffffff;
     --ground: #f6f7f9;
     --accent: #2f5bea;
+    --on-accent: #ffffff;
     --warn: #b3261e;
     color-scheme: light dark;
 }
@@ -17,6 +18,7 @@
         --paper: #1b1e24;
         --ground: #121418;
         --accent: #7f9cff;
+        --on-accent: #1b1e24;
         --warn: #ff8a80;
     }
 }
@@ -92,7 +94,7 @@ button {
     border: 1px solid var(--accent);
     border-radius: 0.375rem;
     background: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
     font: inherit;
     cursor: pointer;
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import type { Api, Me, Publication, Reply } from './api';
 
@@ -36,14 +36,27 @@ function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: () => void;
     const [response, setResponse] = useState('');
     const [error, setError] = useState('');
 
+    // Counts the challenges asked for, so that an answer about one that has been
+    // replaced is not taken for the one on show.
+    const asking = useRef(0);
+
     const ask = useCallback(async () => {
+        const mine = asking.current += 1;
+
         setError('');
         setAnswered(null);
+        setAsked(null);
         try {
-            setAsked(await api.challenge());
+            const challenge = await api.challenge();
+
+            if (mine === asking.current) {
+                setAsked(challenge);
+            }
         }
         catch (failure) {
-            setError(message(failure));
+            if (mine === asking.current) {
+                setError(message(failure));
+            }
         }
     }, [api]);
 
@@ -54,17 +67,20 @@ function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: () => void;
             return;
         }
 
+        const mine = asking.current;
         const timer = setInterval(async () => {
             try {
                 const state = await api.login();
 
-                if (state.answered) {
+                if (mine === asking.current && state.answered) {
                     setAnswered(state.answered);
                 }
             }
             catch (failure) {
-                setAsked(null);
-                setError(message(failure));
+                if (mine === asking.current) {
+                    setAsked(null);
+                    setError(message(failure));
+                }
             }
         }, pollMs);
 
@@ -208,7 +224,7 @@ function Composer({ label, onPublish }: { label: string; onPublish: (text: strin
         <div className="composer">
             <label>
                 {label}
-                <textarea value={text} onChange={event => setText(event.target.value)} rows={3} />
+                <textarea value={text} disabled={busy} onChange={event => setText(event.target.value)} rows={3} />
             </label>
             {error && <p role="alert" className="error">{error}</p>}
             <button disabled={busy || !text.trim()} onClick={publish}>Publish</button>
@@ -229,17 +245,34 @@ function Thread({ api, me, root, waiting, onPublished, onBack }: {
 }) {
     const [replies, setReplies] = useState<Reply[] | null>(null);
     const [error, setError] = useState('');
+    const reads = useRef(0);
+
+    const load = useCallback(async () => {
+        const mine = reads.current += 1;
+
+        try {
+            const thread = await api.thread(root.did!);
+
+            if (mine === reads.current) {
+                setReplies(thread);
+                setError('');
+            }
+        }
+        catch (failure) {
+            if (mine === reads.current) {
+                setError(message(failure));
+            }
+        }
+    }, [api, root.did]);
 
     useEffect(() => {
-        let current = true;
+        load();
 
-        api.thread(root.did!).then(
-            thread => { if (current) setReplies(thread); },
-            failure => { if (current) setError(message(failure)); },
-        );
+        return () => { reads.current += 1; };
+    }, [load]);
 
-        return () => { current = false; };
-    }, [api, root.did]);
+    // A reply the indexer shows is a publication, and no longer waits.
+    const shown = new Set(replies?.map(each => each.publication.did));
 
     const reply = async (text: string) => {
         const targetVersion = root.versions[root.current ?? 0]?.opid;
@@ -250,7 +283,8 @@ function Thread({ api, me, root, waiting, onPublished, onBack }: {
 
     return (
         <section>
-            <button className="quiet" onClick={onBack}>Back</button>
+            <button className="quiet" onClick={onBack}>Back</button>{' '}
+            <button className="quiet" onClick={load}>Refresh</button>
             <Post publication={root} />
             {error && <p role="alert" className="error">{error}</p>}
             {replies === null && !error && <p className="muted">Loading replies…</p>}
@@ -259,7 +293,7 @@ function Thread({ api, me, root, waiting, onPublished, onBack }: {
                     <Post publication={each.publication} />
                 </div>
             ))}
-            {waiting.filter(each => each.target === root.did).map(each => (
+            {waiting.filter(each => each.target === root.did && !shown.has(each.did)).map(each => (
                 <article key={each.did} className="post waiting">
                     <p className="text">{each.text}</p>
                     <footer className="muted">Waiting to be anchored</footer>
@@ -274,6 +308,8 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
     const [me, setMe] = useState<Me | null | undefined>(undefined);
     const [follows, setFollows] = useState<string[]>(readFollows);
     const [timeline, setTimeline] = useState<Publication[] | null>(null);
+    const [total, setTotal] = useState(0);
+    const reads = useRef(0);
     const [waiting, setWaiting] = useState<Waiting[]>([]);
     const [open, setOpen] = useState<Publication | null>(null);
     const [following, setFollowing] = useState('');
@@ -291,25 +327,45 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
 
     useEffect(() => { loadMe(); }, [loadMe]);
 
-    const loadTimeline = useCallback(async () => {
+    // Reads the timeline from its start, or the page after what is shown. A read
+    // that another has followed, or that the reader's identity or follows have
+    // changed under, is dropped: its answer is to a question no longer asked.
+    const loadTimeline = useCallback(async (older: Publication[] = []) => {
         if (!me) {
             return;
         }
+
+        const mine = reads.current += 1;
+
         try {
-            const read = await api.timeline([me.did, ...follows.filter(did => did !== me.did)]);
+            const page = await api.timeline([me.did, ...follows.filter(did => did !== me.did)], older.length);
+
+            if (mine !== reads.current) {
+                return;
+            }
+
+            const known = new Set(older.map(each => each.did));
+            const read = [...older, ...page.publications.filter(each => !known.has(each.did))];
             const shown = new Set(read.map(each => each.did));
 
             setTimeline(read);
+            setTotal(page.total);
             // Once the indexer shows an object, it is a publication.
             setWaiting(current => current.filter(each => !shown.has(each.did)));
             setError('');
         }
         catch (failure) {
-            setError(message(failure));
+            if (mine === reads.current) {
+                setError(message(failure));
+            }
         }
     }, [api, me, follows]);
 
-    useEffect(() => { loadTimeline(); }, [loadTimeline]);
+    useEffect(() => {
+        loadTimeline();
+
+        return () => { reads.current += 1; };
+    }, [loadTimeline]);
 
     const follow = () => {
         const did = following.trim();
@@ -346,11 +402,22 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
         );
     }
 
+    // Signed out only when the service says so: the session is a cookie the
+    // page cannot remove, and a reader who is told they are signed out must be.
     const signOut = async () => {
-        await api.logout().catch(() => undefined);
+        try {
+            await api.logout();
+        }
+        catch (failure) {
+            setError(`You are still signed in: ${message(failure)}`);
+            return;
+        }
         setMe(null);
         setTimeline(null);
+        setTotal(0);
+        setWaiting([]);
         setOpen(null);
+        setError('');
     };
 
     return (
@@ -387,7 +454,7 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
                     )}
 
                     <section>
-                        <h2>Timeline <button className="quiet" onClick={loadTimeline}>Refresh</button></h2>
+                        <h2>Timeline <button className="quiet" onClick={() => loadTimeline()}>Refresh</button></h2>
                         {waiting.filter(each => !each.target).map(each => (
                             <article key={each.did} className="post waiting">
                                 <p className="text">{each.text}</p>
@@ -414,6 +481,9 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
                                     : undefined}
                             />
                         ))}
+                        {timeline && timeline.length < total && (
+                            <button className="quiet" onClick={() => loadTimeline(timeline)}>Older</button>
+                        )}
                     </section>
 
                     <section className="card">

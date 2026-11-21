@@ -17,6 +17,9 @@ const post = (did: string, author: string, text: string, more: Partial<Publicati
     ...more,
 });
 
+// How many publications the indexer gives at once.
+const PAGE = 50;
+
 // The services, as far as the pages can tell.
 function services(start: { me?: Me; timeline?: Publication[] } = {}) {
     const state = { me: start.me as Me | undefined, timeline: start.timeline ?? [], published: [] as Record<string, unknown>[] };
@@ -27,7 +30,11 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
         logout: vi.fn(async () => { state.me = undefined; }),
         publish: vi.fn(async object => { state.published.push(object); return `did:cid:new${state.published.length}`; }),
         withdraw: vi.fn(async did => { state.timeline = state.timeline.map(each => (each.did === did ? { ...each, state: 'withdrawn' as const } : each)); }),
-        timeline: vi.fn(async authors => state.timeline.filter(each => authors.includes(each.memeplex!.author))),
+        timeline: vi.fn(async (authors, offset = 0) => {
+            const all = state.timeline.filter(each => authors.includes(each.memeplex!.author));
+
+            return { total: all.length, publications: all.slice(offset, offset + PAGE) };
+        }),
         thread: vi.fn(async () => []),
         publication: vi.fn(async () => undefined),
     };
@@ -66,6 +73,25 @@ describe('signing in', () => {
 
         expect(await screen.findByRole('heading', { name: /Timeline/ })).toBeTruthy();
         expect(login).toHaveBeenCalledWith({ confirm: ALICE });
+    });
+
+    it('does not bring back an identity the user refused, from an answer about the old challenge', async () => {
+        const { api } = services();
+        vi.mocked(api.login).mockResolvedValue({ answered: BOB });
+        let next!: (challenge: { challenge: string; link: string }) => void;
+        render(<App api={api} pollMs={10} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Sign in with your wallet' }));
+        await screen.findByText(BOB);
+        vi.mocked(api.challenge).mockReturnValue(new Promise(answer => { next = answer; }));
+        await user.click(screen.getByRole('button', { name: 'That is not me' }));
+        await new Promise(wait => setTimeout(wait, 60));
+        expect(screen.queryByText(BOB)).toBeNull();
+
+        vi.mocked(api.login).mockResolvedValue({ waiting: true });
+        next({ challenge: 'did:cid:second', link: 'archon://auth?challenge=did%3Acid%3Asecond' });
+        expect((await screen.findByRole('link', { name: 'Open in your wallet' })).getAttribute('href')).toBe('archon://auth?challenge=did%3Acid%3Asecond');
     });
 
     it('asks for another challenge when the user says the answer is not theirs', async () => {
@@ -143,7 +169,7 @@ describe('reading and publishing', () => {
         expect(await screen.findByText('Mine.')).toBeTruthy();
         expect(screen.getByText('Bob\'s.')).toBeTruthy();
         expect(screen.queryByText('Carol\'s.')).toBeNull();
-        expect(api.timeline).toHaveBeenCalledWith([ALICE, BOB]);
+        expect(api.timeline).toHaveBeenCalledWith([ALICE, BOB], 0);
     });
 
     it('publishes a post, and shows it as waiting until the indexer has it', async () => {
@@ -238,6 +264,105 @@ describe('reading and publishing', () => {
         expect(JSON.parse(localStorage.getItem('memepool.follows')!)).toStrictEqual([]);
     });
 
+    it('reads older publications a page at a time', async () => {
+        const { api } = services({ me: granted, timeline: Array.from({ length: 60 }, (_, index) => post(`did:cid:p${index}`, ALICE, `Post ${index}.`)) });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        expect(await screen.findByText('Post 49.')).toBeTruthy();
+        expect(screen.queryByText('Post 50.')).toBeNull();
+
+        await user.click(screen.getByRole('button', { name: 'Older' }));
+
+        expect(await screen.findByText('Post 59.')).toBeTruthy();
+        expect(screen.getByText('Post 0.')).toBeTruthy();
+        expect(api.timeline).toHaveBeenLastCalledWith([ALICE], 50);
+        expect(screen.queryByRole('button', { name: 'Older' })).toBeNull();
+    });
+
+    it('does not show an author\'s posts from a read that finished after they were unfollowed', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted });
+        let late!: (page: { total: number; publications: Publication[] }) => void;
+        vi.mocked(api.timeline).mockImplementation(authors => (authors.includes(BOB)
+            ? new Promise(answer => { late = answer; })
+            : Promise.resolve({ total: 0, publications: [] })));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Unfollow' }));
+        await waitFor(() => expect(api.timeline).toHaveBeenLastCalledWith([ALICE], 0));
+        late({ total: 1, publications: [post('did:cid:2', BOB, 'Bob\'s.')] });
+
+        expect(await screen.findByText('Nothing here yet.')).toBeTruthy();
+        expect(screen.queryByText('Bob\'s.')).toBeNull();
+    });
+
+    it('shows a reply as published once its thread has it', async () => {
+        const root = post('did:cid:1', ALICE, 'A post.');
+        const { api } = services({ me: granted, timeline: [root] });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await user.type(await screen.findByLabelText('Reply'), 'A reply.');
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        expect(await screen.findByText('Waiting to be anchored')).toBeTruthy();
+
+        vi.mocked(api.thread).mockResolvedValue([{ publication: post('did:cid:new1', ALICE, 'A reply.'), depth: 1 }]);
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        await waitFor(() => expect(screen.queryByText('Waiting to be anchored')).toBeNull());
+        expect(screen.getAllByText('A reply.')).toHaveLength(1);
+    });
+
+    it('does not take what is typed while a post is being published', async () => {
+        const { api } = services({ me: granted });
+        let done!: (did: string) => void;
+        vi.mocked(api.publish).mockReturnValue(new Promise(answer => { done = answer; }));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await user.type(await screen.findByLabelText('Post'), 'One.');
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+
+        expect((screen.getByLabelText('Post') as HTMLTextAreaElement).disabled).toBe(true);
+        done('did:cid:new1');
+        await waitFor(() => expect((screen.getByLabelText('Post') as HTMLTextAreaElement).disabled).toBe(false));
+    });
+
+    it('stays signed in, and says so, when the service does not sign the reader out', async () => {
+        const { api } = services({ me: granted });
+        vi.mocked(api.logout).mockRejectedValue(new ApiError(502, 'the service could not answer'));
+        render(<App api={api} />);
+
+        await userEvent.setup().click(await screen.findByRole('button', { name: 'Sign out' }));
+
+        expect((await screen.findByRole('alert')).textContent).toMatch(/still signed in/);
+        expect(screen.getByRole('heading', { name: /Timeline/ })).toBeTruthy();
+    });
+
+    it('shows the next reader nothing the last one was waiting on', async () => {
+        const { api, state } = services({ me: granted });
+        render(<App api={api} pollMs={60_000} />);
+        const user = userEvent.setup();
+
+        await user.type(await screen.findByLabelText('Post'), 'Alice\'s draft.');
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        expect(await screen.findByText('Waiting to be anchored')).toBeTruthy();
+
+        await user.click(screen.getByRole('button', { name: 'Sign out' }));
+        await screen.findByRole('button', { name: 'Sign in with your wallet' });
+        vi.mocked(api.login).mockImplementation(async () => { state.me = { did: BOB, grant: 'did:cid:g2', registry: 'BTC:mainnet' }; return { did: BOB }; });
+        await user.click(screen.getByRole('button', { name: 'Sign in with your wallet' }));
+        await user.click(await screen.findByText('My wallet gave me a response to paste'));
+        await user.type(screen.getByLabelText('Response'), 'did:cid:response');
+        await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+        await screen.findByRole('heading', { name: /Timeline/ });
+        expect(screen.queryByText('Alice\'s draft.')).toBeNull();
+    });
+
     it('signs out', async () => {
         const { api } = services({ me: granted });
         render(<App api={api} />);
@@ -277,8 +402,8 @@ describe('the services\' client', () => {
     it('asks the indexer for a timeline of several authors, and for none asks nothing', async () => {
         const { api, asked } = answering({ 'GET /memeplex/api/v1/timeline?author=did%3Acid%3Aa&author=did%3Acid%3Ab': { status: 200, body: { total: 0, publications: [] } } });
 
-        expect(await api.timeline(['did:cid:a', 'did:cid:b'])).toStrictEqual([]);
-        expect(await api.timeline([])).toStrictEqual([]);
+        expect(await api.timeline(['did:cid:a', 'did:cid:b'])).toStrictEqual({ total: 0, publications: [] });
+        expect(await api.timeline([])).toStrictEqual({ total: 0, publications: [] });
         expect(asked).toHaveLength(1);
     });
 
