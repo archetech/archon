@@ -23,7 +23,7 @@ use crate::{
     build_search_index, chrono_like_now, classify_conformant_error, clear_search_index,
     generate_did_from_operation, handle_did_operation, import_batch_impl,
     relay_hints,
-    normalize_path, process_events_impl, query_docs_impl, record_metrics,
+    process_events_impl, query_docs_impl, record_metrics,
     is_valid_did, resolve_local_doc_async, search_docs_impl, verify_db_impl, AppState, BlockLookup,
     GatekeeperDb, ResolveOptions,
 };
@@ -2025,8 +2025,7 @@ pub(crate) async fn conformant_not_found(
     request: Request,
 ) -> Response {
     let method = request.method().clone();
-    let route = normalize_path(request.uri().path());
-    record_metrics(&state, method.as_str(), &route, 404, 0.0);
+    record_metrics(&state, method.as_str(), crate::metrics::UNROUTED, 404, 0.0);
     (StatusCode::NOT_FOUND, error_json("notFound")).into_response()
 }
 
@@ -2432,9 +2431,8 @@ pub(crate) async fn get_metrics(State(state): State<AppState>) -> Response {
 pub(crate) async fn not_found(State(state): State<AppState>, request: Request) -> Response {
     let method = request.method().clone();
     let path = request.uri().path().to_string();
-    let route = normalize_path(&path);
     tracing::warn!("Warning: Unhandled endpoint - {} {}", method, path);
-    record_metrics(&state, method.as_str(), &route, 404, 0.0);
+    record_metrics(&state, method.as_str(), crate::metrics::UNROUTED, 404, 0.0);
     (
         StatusCode::NOT_FOUND,
         Json(json!({ "message": "Endpoint not found" })),
@@ -2445,9 +2443,8 @@ pub(crate) async fn not_found(State(state): State<AppState>, request: Request) -
 pub(crate) async fn api_not_found(State(state): State<AppState>, request: Request) -> Response {
     let method = request.method().clone();
     let path = request.uri().path().to_string();
-    let route = normalize_path(&path);
     tracing::warn!("Warning: Unhandled API endpoint - {} {}", method, path);
-    record_metrics(&state, method.as_str(), &route, 404, 0.0);
+    record_metrics(&state, method.as_str(), crate::metrics::UNROUTED, 404, 0.0);
     (
         StatusCode::NOT_FOUND,
         Json(json!({ "message": "Endpoint not found" })),

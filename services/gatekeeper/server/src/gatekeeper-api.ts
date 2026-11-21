@@ -74,20 +74,31 @@ const defaultLogger = pino({
     level: process.env.LOG_LEVEL || 'info',
 });
 
-// Normalize paths to prevent high cardinality metrics
-function normalizePath(path: string): string {
-    // Remove query string
-    const basePath = path.split('?')[0];
-    // Normalize known dynamic segments
-    return basePath
-        .replace(/\/did\/(?:did:[^/]+|did%3[aA][^/]+)/g, '/did/:did')
-        .replace(/\/identifiers\/(?:did:[^/]+|did%3[aA][^/]+)/g, '/identifiers/:did')
-        .replace(/\/block\/[^/]+\/latest/g, '/block/:registry/latest')
-        .replace(/\/block\/[^/]+/g, '/block/:registry')
-        .replace(/\/queue\/[^/]+\/clear/g, '/queue/:registry/clear')
-        .replace(/\/queue\/[^/]+/g, '/queue/:registry')
-        .replace(/\/events\/[^/]+/g, '/events/:registry')
-        .replace(/\/dids\/[^/]+/g, '/dids/:prefix');
+// The label of every request that matched no declared route.
+export const UNROUTED = '/:unrouted';
+
+// The route label a finished request is recorded under: the pattern of the
+// route it matched, as declared, under its mount (`/api/v1/did/:did`,
+// `/1.0/identifiers/:did`), so that a label never holds what a caller put in a
+// path.
+export function routeLabel(req: { baseUrl?: string; route?: { path?: unknown } }): string {
+    const pattern = req.route?.path;
+
+    if (typeof pattern !== 'string') {
+        return UNROUTED;
+    }
+
+    // The mount is as the caller wrote it, and Express matches it in any case.
+    return collapse(`${(req.baseUrl ?? '').toLowerCase()}${pattern}`);
+}
+
+// Routes that share a label: the Rust Gatekeeper records them alike, and the
+// dashboards read both. Every route under /dids/ is `/dids/:prefix`, and
+// /events/process is `/events/:registry`.
+function collapse(label: string): string {
+    return label
+        .replace(/\/events\/[^/]+/, '/events/:registry')
+        .replace(/\/dids\/[^/]+/, '/dids/:prefix');
 }
 
 const require = createRequire(import.meta.url);
@@ -132,7 +143,7 @@ export function createGatekeeperApp(options: CreateGatekeeperAppOptions) {
         const start = Date.now();
         res.on('finish', () => {
             const duration = (Date.now() - start) / 1000;
-            const route = normalizePath(req.path);
+            const route = routeLabel(req);
             httpRequestsTotal.inc({ method: req.method, route, status: res.statusCode });
             httpRequestDuration.observe({ method: req.method, route, status: res.statusCode }, duration);
         });
