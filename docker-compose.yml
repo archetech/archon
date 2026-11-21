@@ -40,6 +40,8 @@ include:
   - docker/compose/cashu-mint.yml
   # Memeplex indexer. Optional: enable with COMPOSE_PROFILES=memeplex.
   - docker/compose/memeplex.yml
+  # Memepool. Optional: enable with COMPOSE_PROFILES=memepool.
+  - docker/compose/memepool.yml
   - docker/compose/btc-testnet4.yml
   - docker/compose/btc-testnet4-hosted.yml
   - docker/compose/zcash-mainnet.yml

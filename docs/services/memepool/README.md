@@ -82,3 +82,34 @@ at that position decides whether it is attributed. The service refuses what it
 can tell is wrong before creating anything. It does not check an object's kind
 against the grant's actions: an object of a kind the grant does not allow is
 created and is not attributed.
+
+## Running it
+
+Add `memepool` to `COMPOSE_PROFILES`, and `memeplex` for the indexer its readers
+use, and set `ARCHON_MEMEPOOL_WALLET_PASSPHRASE`. The service listens on port 4237,
+on the host's loopback address unless `ARCHON_MEMEPOOL_HOST_BIND` says otherwise.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `ARCHON_MEMEPOOL_WALLET_PASSPHRASE` | none | Encrypts the service's wallet. The service does not start without it |
+| `ARCHON_MEMEPOOL_NAME` | `memepool` | The name of the service's identity, and the name it gives in a grant request |
+| `ARCHON_MEMEPOOL_REGISTRY` | `hyperswarm` | The registry the service's own identity is created on |
+| `ARCHON_MEMEPOOL_PORT` | `4237` | The host port |
+| `ARCHON_MEMEPOOL_HOST_BIND` | `127.0.0.1` | The host address the port is bound to |
+| `ARCHON_MEMEPOOL_CHALLENGES_PER_MINUTE` | `60` | Challenges issued in a minute |
+| `ARCHON_MEMEPOOL_SESSION_HOURS` | `24` | How long a session lasts |
+| `ARCHON_MEMEPOOL_TRUSTED_PROXIES` | `0` | Proxies in front of the service. With one or more, cookies are marked for HTTPS only when the last proxy says the request arrived over HTTPS |
+
+### The service's key
+
+The service is the DID in its wallet, `data/memepool/wallet.json`. The repository carries `data/memepool`, so that the directory belongs to whoever checked it out and the service, which runs as that user, can write to it. If it is missing when the container starts, Docker creates it as root and the service cannot make its wallet: create it first, owned by `ARCHON_UID`. Every grant a
+user has made names that DID. On a first start the service makes the wallet and the
+identity, and says so in its log.
+
+**Back the wallet up, with its passphrase.** A service started without them is a new
+client, with a new DID, that nobody has granted: what it published before stays
+attributed, and every user has to grant it again before it can publish for them.
+
+The service does not yet have a route through Drawbridge. Put a proxy of your own
+in front of it to serve it publicly.
+

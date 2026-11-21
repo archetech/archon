@@ -163,7 +163,7 @@ describe('signing in', () => {
         const response = await bob.createResponse(challenge);
 
         expect(await bob.transferAsset(response, aliceDid)).toBe(true);
-        expect((await service.verifyResponse(response)).responder).toBe(aliceDid);
+        expect((await service.verifyResponse(response)).match).toBe(false);
 
         expect((await agent.post('/api/v1/login').send({ response })).status).toBe(401);
         expect((await agent.get('/api/v1/me')).status).toBe(401);
