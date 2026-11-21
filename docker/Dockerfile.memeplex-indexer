@@ -37,6 +37,6 @@ WORKDIR /app/memeplex-indexer
 ARG GIT_COMMIT=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
 
-EXPOSE 4238
+EXPOSE 4233
 
 CMD ["node", "dist/memeplex-indexer.js"]

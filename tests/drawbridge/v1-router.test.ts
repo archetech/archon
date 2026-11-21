@@ -111,7 +111,7 @@ describe('drawbridge v1 unprotected routes', () => {
                 heraldURL: 'http://herald',
                 explorerURL: 'http://explorer',
                 cashuMintURL: 'http://cashu-mint:8085',
-                memeplexIndexerURL: 'http://memeplex-indexer:4238',
+                memeplexIndexerURL: 'http://memeplex-indexer:4233',
                 memepoolURL: 'http://memepool:4237',
             },
         });

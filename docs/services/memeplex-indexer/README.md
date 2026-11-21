@@ -18,7 +18,7 @@ The service has no volume and no database. At each start it reads every DID the 
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `ARCHON_MEMEPLEX_INDEXER_PORT` | `4238` | Port the service listens on. |
+| `ARCHON_MEMEPLEX_INDEXER_PORT` | `4233` | Port the service listens on. |
 | `ARCHON_MEMEPLEX_INDEXER_HOST_BIND` | `127.0.0.1` | Host interface the port is published on. Expose the index through Drawbridge, not directly. |
 | `ARCHON_MEMEPLEX_INDEXER_POLL_INTERVAL` | `5` | Seconds between polls of the Gatekeeper's changes. |
 | `ARCHON_MEMEPLEX_INDEXER_GATEKEEPER_TIMEOUT` | `120` | Seconds a request to the Gatekeeper may take. |

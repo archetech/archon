@@ -15,7 +15,7 @@ const env = process.env;
 
 const config = {
     gatekeeperURL: env.ARCHON_GATEKEEPER_URL || 'http://localhost:4224',
-    port: positiveInt('ARCHON_MEMEPLEX_INDEXER_PORT', env.ARCHON_MEMEPLEX_INDEXER_PORT, 4238),
+    port: positiveInt('ARCHON_MEMEPLEX_INDEXER_PORT', env.ARCHON_MEMEPLEX_INDEXER_PORT, 4233),
     bindAddress: env.ARCHON_BIND_ADDRESS || '0.0.0.0',
     // Seconds between polls of the Gatekeeper's changes.
     pollInterval: positiveInt('ARCHON_MEMEPLEX_INDEXER_POLL_INTERVAL', env.ARCHON_MEMEPLEX_INDEXER_POLL_INTERVAL, 5),
