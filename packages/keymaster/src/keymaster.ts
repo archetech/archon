@@ -5101,6 +5101,10 @@ export default class Keymaster implements KeymasterInterface {
         }
         const { response } = wrapper as { response: ChallengeResponse };
 
+        if (!response || typeof response !== 'object' || typeof response.challenge !== 'string' || !Array.isArray(response.credentials)) {
+            throw new InvalidParameterError('responseDID not a valid challenge response');
+        }
+
         const result = this.assetData(await resolve(response.challenge, 'challenge'));
         if (!result) {
             throw new InvalidParameterError('challenge not found');
@@ -5174,10 +5178,34 @@ export default class Keymaster implements KeymasterInterface {
         const used = new Set(assigned);
 
         response.vps = accepted.filter((_, index) => used.has(index));
-        response.match = assigned.every(index => index >= 0);
-        response.responder = responseDoc.didDocument?.controller;
+        // The response's own contents are its author's to write, and may name
+        // a responder of their choosing.
+        delete response.responder;
+        const responder = this.responderOf(responseDoc);
+
+        if (responder !== undefined) {
+            response.responder = responder;
+        }
+        response.match = responder !== undefined && assigned.every(index => index >= 0);
 
         return response;
+    }
+
+    // Who answered a challenge: the controller of the response, when the
+    // response is as it was created.
+    //
+    // A response's controller alone does not say. An asset's owner can
+    // transfer it to any identity, which signs nothing, and can replace its
+    // contents first. Nothing in the contents says either: they are encrypted
+    // to the challenger by a key made for the purpose, not by the responder's.
+    // The creation is signed by its controller and holds the contents that
+    // controller gave it. So a response that has had any version after its
+    // first has no responder and does not match: no later version shows who
+    // wrote what it holds.
+    private responderOf(responseDoc: DidCidDocument): string | undefined {
+        const version = Number(responseDoc.didDocumentMetadata?.versionSequence);
+
+        return version === 1 ? responseDoc.didDocument?.controller : undefined;
     }
 
     async createGroup(

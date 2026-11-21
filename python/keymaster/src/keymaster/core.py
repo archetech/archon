@@ -4372,6 +4372,12 @@ class Keymaster:
         if not isinstance(wrapper, dict) or "response" not in wrapper:
             raise KeymasterError("Invalid parameter: responseDID not a valid challenge response")
         response = deepcopy(wrapper["response"])
+        if (
+            not isinstance(response, dict)
+            or not isinstance(response.get("challenge"), str)
+            or not isinstance(response.get("credentials"), list)
+        ):
+            raise KeymasterError("Invalid parameter: responseDID not a valid challenge response")
         challenge_doc = await resolve(response["challenge"], "challenge")
         challenge_asset = self._asset_data(challenge_doc)
         challenge = challenge_asset.get("challenge") if isinstance(challenge_asset, dict) else None
@@ -4439,9 +4445,35 @@ class Keymaster:
         used = set(assigned)
 
         response["vps"] = [vp for index, vp in enumerate(accepted) if index in used]
-        response["match"] = all(index >= 0 for index in assigned)
-        response["responder"] = response_doc.get("didDocument", {}).get("controller")
+        # The response's own contents are its author's to write, and may name
+        # a responder of their choosing.
+        response.pop("responder", None)
+        responder = self._responder_of(response_doc)
+        response["match"] = responder is not None and all(index >= 0 for index in assigned)
+        if responder is not None:
+            response["responder"] = responder
         return response
+
+    def _responder_of(self, response_doc: dict[str, Any]) -> str | None:
+        """Who answered a challenge: the controller of the response, when the
+        response is as it was created.
+
+        A response's controller alone does not say. An asset's owner can
+        transfer it to any identity, which signs nothing, and can replace its
+        contents first. Nothing in the contents says either: they are encrypted
+        to the challenger by a key made for the purpose, not by the responder's.
+        The creation is signed by its controller and holds the contents that
+        controller gave it. So a response that has had any version after its
+        first has no responder and does not match: no later version shows who
+        wrote what it holds.
+        """
+        try:
+            version = int((response_doc.get("didDocumentMetadata") or {}).get("versionSequence"))
+        except (TypeError, ValueError):
+            return None
+        if version != 1:
+            return None
+        return (response_doc.get("didDocument") or {}).get("controller") or None
 
     # --- DIDComm v2 ----------------------------------------------------------
     # Port of the TypeScript Keymaster DIDComm surface (see keymaster.ts). The

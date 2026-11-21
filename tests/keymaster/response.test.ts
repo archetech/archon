@@ -425,6 +425,119 @@ describe('verifyResponse', () => {
     });
 });
 
+describe('verifyResponse responder', () => {
+    // An asset's owner can transfer it to any identity, which signs nothing.
+    it('does not name the identity a response was transferred to', async () => {
+        const alice = await keymaster.createId('Alice');
+        await keymaster.createId('Mallory');
+        await keymaster.createId('Victor');
+
+        await keymaster.setCurrentId('Victor');
+        const challengeDID = await keymaster.createChallenge();
+
+        await keymaster.setCurrentId('Mallory');
+        const responseDID = await keymaster.createResponse(challengeDID);
+        expect(await keymaster.transferAsset(responseDID, alice)).toBe(true);
+        expect((await keymaster.resolveDID(responseDID)).didDocument!.controller).toBe(alice);
+
+        await keymaster.setCurrentId('Victor');
+        const verify = await keymaster.verifyResponse(responseDID);
+
+        expect(verify.match).toBe(false);
+        expect(verify.responder).toBeUndefined();
+    });
+
+    // An identity that was once handed an asset can put its own answer in it
+    // and hand it back.
+    it('does not name the creator of an asset that came back holding another identity\'s answer', async () => {
+        const alice = await keymaster.createId('Alice');
+        const mallory = await keymaster.createId('Mallory');
+        await keymaster.createId('Victor');
+
+        await keymaster.setCurrentId('Victor');
+        const earlier = await keymaster.createChallenge();
+        const challengeDID = await keymaster.createChallenge();
+
+        await keymaster.setCurrentId('Alice');
+        const assetDID = await keymaster.createResponse(earlier);
+        await keymaster.transferAsset(assetDID, mallory);
+
+        await keymaster.setCurrentId('Mallory');
+        const answer = (await keymaster.resolveDID(await keymaster.createResponse(challengeDID))).didDocumentData;
+        const held = await keymaster.resolveDID(assetDID);
+        await keymaster.updateDID(assetDID, { ...held, didDocumentData: answer });
+        await keymaster.transferAsset(assetDID, alice);
+        expect((await keymaster.resolveDID(assetDID)).didDocument!.controller).toBe(alice);
+
+        await keymaster.setCurrentId('Victor');
+        const verify = await keymaster.verifyResponse(assetDID);
+
+        expect(verify.challenge).toBe(challengeDID);
+        expect(verify.match).toBe(false);
+        expect(verify.responder).toBeUndefined();
+    });
+
+    // A response's contents are whatever its author encrypted.
+    it('does not repeat a responder that a response\'s own contents name', async () => {
+        const alice = await keymaster.createId('Alice');
+        const mallory = await keymaster.createId('Mallory');
+        const victor = await keymaster.createId('Victor');
+
+        await keymaster.setCurrentId('Victor');
+        const challengeDID = await keymaster.createChallenge();
+
+        await keymaster.setCurrentId('Mallory');
+        const contents = { response: { challenge: challengeDID, credentials: [], requested: 0, fulfilled: 0, match: true, responder: alice } };
+        const forged = await keymaster.encryptJSON(contents, victor, { registry: 'hyperswarm' });
+
+        await keymaster.setCurrentId('Victor');
+        expect(await keymaster.verifyResponse(forged)).toMatchObject({ match: true, responder: mallory });
+
+        await keymaster.setCurrentId('Mallory');
+        await keymaster.transferAsset(forged, alice);
+
+        await keymaster.setCurrentId('Victor');
+        const verify = await keymaster.verifyResponse(forged);
+
+        expect(verify.match).toBe(false);
+        expect('responder' in verify).toBe(false);
+    });
+
+    it('refuses a response whose contents are not a response', async () => {
+        await keymaster.createId('Mallory');
+        const victor = await keymaster.createId('Victor');
+
+        await keymaster.setCurrentId('Victor');
+        const challengeDID = await keymaster.createChallenge();
+
+        await keymaster.setCurrentId('Mallory');
+        const malformed = await keymaster.encryptJSON({ response: { challenge: challengeDID } }, victor, { registry: 'hyperswarm' });
+
+        await keymaster.setCurrentId('Victor');
+        await expect(keymaster.verifyResponse(malformed)).rejects.toThrow('Invalid parameter: responseDID not a valid challenge response');
+    });
+
+    // A response's contents are public, though encrypted, and say nothing of who made them.
+    it('names whoever published a copy of another identity\'s response, not that identity', async () => {
+        await keymaster.createId('Bob');
+        const mallory = await keymaster.createId('Mallory');
+        await keymaster.createId('Victor');
+
+        await keymaster.setCurrentId('Victor');
+        const challengeDID = await keymaster.createChallenge();
+
+        await keymaster.setCurrentId('Bob');
+        const responseDID = await keymaster.createResponse(challengeDID);
+        const contents = (await keymaster.resolveDID(responseDID)).didDocumentData;
+
+        await keymaster.setCurrentId('Mallory');
+        const copyDID = await keymaster.createAsset(contents, { registry: 'hyperswarm' });
+
+        await keymaster.setCurrentId('Victor');
+        expect(await keymaster.verifyResponse(copyDID)).toMatchObject({ match: true, responder: mallory });
+    });
+});
+
 describe('verifyResponse presentation binding', () => {
     it('does not count a credential without a valid issuer proof', async () => {
         const alice = await keymaster.createId('Alice');

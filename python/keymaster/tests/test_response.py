@@ -652,3 +652,81 @@ def test_verify_response_finds_an_assignment_the_presentation_order_hides(testbe
     verified = run(km.verify_response(response))
     assert len(verified["vps"]) == 2
     assert verified["match"] is True
+
+
+def test_verify_response_does_not_name_the_identity_a_response_was_transferred_to(testbed):
+    # An asset's owner can transfer it to any identity, which signs nothing.
+    alice = run(testbed.keymaster.create_id("Alice"))
+    run(testbed.keymaster.create_id("Mallory"))
+    run(testbed.keymaster.create_id("Victor"))
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    challenge_did = run(testbed.keymaster.create_challenge())
+
+    run(testbed.keymaster.set_current_id("Mallory"))
+    response_did = run(testbed.keymaster.create_response(challenge_did))
+    assert run(testbed.keymaster.transfer_asset(response_did, alice)) is True
+    assert run(testbed.keymaster.resolve_did(response_did))["didDocument"]["controller"] == alice
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    verify = run(testbed.keymaster.verify_response(response_did))
+
+    assert verify["match"] is False
+    assert "responder" not in verify
+
+
+def test_verify_response_does_not_name_the_creator_of_an_asset_returned_with_another_answer(testbed):
+    # An identity that was once handed an asset can put its own answer in it
+    # and hand it back.
+    alice = run(testbed.keymaster.create_id("Alice"))
+    mallory = run(testbed.keymaster.create_id("Mallory"))
+    run(testbed.keymaster.create_id("Victor"))
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    earlier = run(testbed.keymaster.create_challenge())
+    challenge_did = run(testbed.keymaster.create_challenge())
+
+    run(testbed.keymaster.set_current_id("Alice"))
+    asset_did = run(testbed.keymaster.create_response(earlier))
+    run(testbed.keymaster.transfer_asset(asset_did, mallory))
+
+    run(testbed.keymaster.set_current_id("Mallory"))
+    answer = run(testbed.keymaster.resolve_did(run(testbed.keymaster.create_response(challenge_did))))["didDocumentData"]
+    run(testbed.keymaster.update_did(asset_did, {"didDocumentData": answer}))
+    run(testbed.keymaster.transfer_asset(asset_did, alice))
+    assert run(testbed.keymaster.resolve_did(asset_did))["didDocument"]["controller"] == alice
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    verify = run(testbed.keymaster.verify_response(asset_did))
+
+    assert verify["challenge"] == challenge_did
+    assert verify["match"] is False
+    assert "responder" not in verify
+
+
+def test_verify_response_does_not_repeat_a_responder_its_contents_name(testbed):
+    # A response's contents are whatever its author encrypted.
+    alice = run(testbed.keymaster.create_id("Alice"))
+    mallory = run(testbed.keymaster.create_id("Mallory"))
+    victor = run(testbed.keymaster.create_id("Victor"))
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    challenge_did = run(testbed.keymaster.create_challenge())
+
+    run(testbed.keymaster.set_current_id("Mallory"))
+    contents = {"response": {"challenge": challenge_did, "credentials": [], "requested": 0, "fulfilled": 0, "match": True, "responder": alice}}
+    forged = run(testbed.keymaster.encrypt_json(contents, victor))
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    verify = run(testbed.keymaster.verify_response(forged))
+    assert verify["match"] is True
+    assert verify["responder"] == mallory
+
+    run(testbed.keymaster.set_current_id("Mallory"))
+    run(testbed.keymaster.transfer_asset(forged, alice))
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    verify = run(testbed.keymaster.verify_response(forged))
+    assert verify["match"] is False
+    assert "responder" not in verify
+

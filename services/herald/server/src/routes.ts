@@ -881,7 +881,9 @@ export function createHeraldRoutes(ctx: HeraldContext): {
                 return;
             }
             const verify = await loginUser(response);
-            if (!verify.challenge) {
+            // A session is for a response that matched, from a responder the
+            // verifier named. One that did not match signs nobody in.
+            if (!verify.challenge || !verify.match || !verify.responder) {
                 res.json({ authenticated: false });
                 return;
             }
@@ -899,7 +901,9 @@ export function createHeraldRoutes(ctx: HeraldContext): {
         try {
             const { response } = req.body;
             const verify = await loginUser(response);
-            if (!verify.challenge) {
+            // A session is for a response that matched, from a responder the
+            // verifier named. One that did not match signs nobody in.
+            if (!verify.challenge || !verify.match || !verify.responder) {
                 res.json({ authenticated: false });
                 return;
             }
