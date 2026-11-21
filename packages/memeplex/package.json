@@ -2,7 +2,7 @@
   "name": "@didcid/memeplex",
   "version": "0.1.0",
   "private": true,
-  "description": "Memeplex verifier: validity and attribution of objects published under a grant",
+  "description": "Memeplex verifier and client: validity and attribution of objects published under a grant, and what a client does to publish them",
   "type": "module",
   "main": "./dist/cjs/index.cjs",
   "module": "./dist/esm/index.js",
@@ -19,6 +19,18 @@
       "import": "./dist/esm/index.js",
       "require": "./dist/cjs/index.cjs",
       "types": "./dist/types/index.d.ts"
+    },
+    "./client": {
+      "import": "./dist/esm/client.js",
+      "require": "./dist/cjs/client.cjs",
+      "types": "./dist/types/client.d.ts"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "client": [
+        "./dist/types/client.d.ts"
+      ]
     }
   },
   "scripts": {

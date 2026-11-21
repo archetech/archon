@@ -10,7 +10,8 @@ const external = [
 
 const config = {
     input: {
-        'index': 'dist/esm/index.js'
+        'index': 'dist/esm/index.js',
+        'client': 'dist/esm/client.js'
     },
     output: {
         dir: 'dist/cjs',
