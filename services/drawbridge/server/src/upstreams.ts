@@ -28,7 +28,7 @@ export const UPSTREAMS = {
     // standalone default.
     cashuMint: { variable: 'ARCHON_CASHU_MINT_URL', profile: 'cashu', container: 'http://cashu-mint:8085', standalone: '' },
     // Likewise an indexer: a node that runs none serves no index.
-    memeplexIndexer: { variable: 'ARCHON_MEMEPLEX_INDEXER_URL', profile: 'memeplex', container: 'http://memeplex-indexer:4238', standalone: '' },
+    memeplexIndexer: { variable: 'ARCHON_MEMEPLEX_INDEXER_URL', profile: 'memeplex', container: 'http://memeplex-indexer:4233', standalone: '' },
     memepool: { variable: 'ARCHON_MEMEPOOL_URL', profile: 'memepool', container: 'http://memepool:4237', standalone: '' },
 } satisfies Record<string, Upstream>;
 

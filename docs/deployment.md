@@ -1008,6 +1008,8 @@ The repo provisions Grafana's notification policy, so Grafana shows it as read-o
 | 9050 | Tor SOCKS | 127.0.0.1:9050 | `ARCHON_TOR_SOCKS_PORT` | localhost; overrides should use `HOST_IP:HOST_PORT` |
 | 38332 | BTC Signet Node RPC | 38332 | -- | localhost |
 | 4232 | Hyperswarm Metrics | 4232 | -- | localhost |
+| 4233 | Memeplex Indexer | 127.0.0.1:4233 | `ARCHON_MEMEPLEX_INDEXER_HOST_BIND` / `ARCHON_MEMEPLEX_INDEXER_PORT` | localhost; offered through Drawbridge at `/memeplex` |
+| 4237 | Memepool | 127.0.0.1:4237 | `ARCHON_MEMEPOOL_HOST_BIND` / `ARCHON_MEMEPOOL_PORT` | localhost; offered through Drawbridge at `/memepool` |
 | 4234 | BTC Mainnet Mediator Metrics | 4234 | -- | localhost |
 | 4236 | BTC Signet Mediator Metrics | 4236 | -- | localhost |
 | 4238 | Zcash Mainnet Mediator Metrics | 4238 | -- | localhost |
