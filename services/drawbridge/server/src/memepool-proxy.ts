@@ -31,7 +31,16 @@ export function memepoolProxy({ memepoolURL, logger }: MemepoolProxyOptions): ex
         }
         // The path as the service will see it, with dot segments resolved, so
         // that one written to look like a page cannot reach the API.
-        const path = new URL(req.originalUrl.replace(/^\/memepool/, '') || '/', 'http://memepool').pathname;
+        let path: string;
+
+        try {
+            path = new URL(req.originalUrl.replace(/^\/memepool/, '') || '/', 'http://memepool').pathname;
+        }
+        catch {
+            // What follows the mount is not a path at all, such as `//`.
+            res.status(400).json({ error: 'Invalid path' });
+            return;
+        }
         const api = path === '/api' || path.startsWith('/api/');
         const reading = req.method === 'GET' || req.method === 'HEAD';
 

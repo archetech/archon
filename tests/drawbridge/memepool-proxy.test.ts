@@ -149,6 +149,9 @@ it.each([
     ['/memepool/api', 400],
     ['/memepool/api/', 400],
     ['/memepool//attacker.example/api/v1/ready', 400],
+    // What follows the mount is no path.
+    ['/memepool//', 400],
+    ['/memepool//[', 400],
     // A path written to look like a page, that is one under the API.
     ['/memepool/assets/../api/v2/me', 400],
     // And one written to look like the API, that is a page nobody has.
