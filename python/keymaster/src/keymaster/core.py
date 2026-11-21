@@ -87,6 +87,10 @@ _UNFETCHED = object()
 # Data Integrity verification methods are Multikeys, whose term this context
 # defines.
 MULTIKEY_CONTEXT = "https://w3id.org/security/multikey/v1"
+# Registries with no chain to anchor an operation: what a node accepts on one
+# of them is in effect at once.
+UNANCHORED_REGISTRIES = ("local", "hyperswarm", "pin")
+MAX_SAFE_INTEGER = 2**53 - 1
 
 # No registered Data Integrity cryptosuite covers secp256k1 -- vc-di-ecdsa
 # defines P-256 and P-384 only -- so the secp256k1 credential proof names a
@@ -2478,8 +2482,86 @@ class Keymaster:
         signed = await self._add_operation_proof(payload, controller)
         ok = await self.gatekeeper.delete_did(signed)
         if ok and current.get("didDocument", {}).get("controller"):
-            await self.remove_from_owned(did, current["didDocument"]["controller"])
+            owner = current["didDocument"]["controller"]
+            # On a chain registry the deletion takes effect once it is anchored.
+            # The asset is remembered until then, for list_revocations.
+            if registry and registry not in UNANCHORED_REGISTRIES:
+                await self._add_to_revoking(did, owner)
+            await self.remove_from_owned(did, owner)
         return ok
+
+    async def _add_to_revoking(self, did: str, owner: str) -> None:
+        async with self._lock:
+            wallet = await self.load_wallet()
+            id_info = await self.fetch_id_info(owner, wallet)
+            revoking = dict.fromkeys(id_info.get("revoking", []))
+            revoking[did] = None
+            id_info["revoking"] = list(revoking)
+            await self._save_loaded_wallet(wallet, overwrite=True)
+
+    async def list_revocations(self, owner: str | None = None) -> list[dict[str, Any]]:
+        """The assets of an identity whose deletion a node has accepted and their
+        chain registry has yet to anchor.
+
+        An entry leaves the wallet's record, and is not returned, once its
+        deletion is anchored on its registry: the resolved version names that
+        registry as its chain and has the height and time of a block.
+        ``confirmed`` is not that. An entry the node resolves as live lost its
+        deletion to another change. It is returned once as ``displaced`` and
+        leaves the record; if the identity still controls the asset, it goes
+        back among the assets list_assets returns. An entry the node cannot
+        resolve stays, as ``unresolved``.
+        """
+        id_info = await self.fetch_id_info(owner)
+        revocations: list[dict[str, Any]] = []
+        settled: list[str] = []
+        restored: list[str] = []
+
+        for did in list(id_info.get("revoking", [])):
+            try:
+                doc = await self.resolve_did(did)
+            except Exception:
+                revocations.append({"did": did, "status": "unresolved"})
+                continue
+
+            metadata = doc.get("didDocumentMetadata") or {}
+            registry = (doc.get("didDocumentRegistration") or {}).get("registry")
+            timestamp = metadata.get("timestamp")
+            timestamp = timestamp if isinstance(timestamp, dict) else {}
+            upper_bound = timestamp.get("upperBound")
+            upper_bound = upper_bound if isinstance(upper_bound, dict) else {}
+            height = upper_bound.get("height")
+            entry = {"did": did, **({"registry": registry} if registry else {})}
+
+            if not metadata.get("deactivated"):
+                revocations.append({**entry, "status": "displaced"})
+                settled.append(did)
+                if self.did_match((doc.get("didDocument") or {}).get("controller") or "", id_info["did"]):
+                    restored.append(did)
+            elif (
+                registry
+                and timestamp.get("chain") == registry
+                and isinstance(height, int)
+                and not isinstance(height, bool)
+                and abs(height) <= MAX_SAFE_INTEGER
+                and isinstance(upper_bound.get("timeISO"), str)
+            ):
+                settled.append(did)
+            else:
+                revocations.append({**entry, "status": "pending"})
+
+        if settled:
+            async with self._lock:
+                wallet = await self.load_wallet()
+                info = await self.fetch_id_info(id_info["did"], wallet)
+                info["revoking"] = [did for did in info.get("revoking", []) if did not in settled]
+                if not info["revoking"]:
+                    del info["revoking"]
+                if restored:
+                    info["owned"] = list(dict.fromkeys([*info.get("owned", []), *restored]))
+                await self._save_loaded_wallet(wallet, overwrite=True)
+
+        return revocations
 
     async def change_registry(self, identifier: str, registry: str) -> bool:
         if not isinstance(registry, str) or not registry:

@@ -62,6 +62,25 @@ def test_resolve_and_fetch_helpers_forward_query_options(monkeypatch):
     ]
 
 
+def test_list_revocations_names_the_owner_asked_for(monkeypatch):
+    calls: list[tuple[str, str, dict]] = []
+    revocations = [{"did": "did:test:asset", "registry": "BTC:mainnet", "status": "pending"}]
+
+    def fake_proxy_request(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        return {"revocations": revocations}
+
+    monkeypatch.setattr(sdk, "proxy_request", fake_proxy_request)
+    monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
+
+    assert sdk.list_revocations() == revocations
+    assert sdk.list_revocations("Alice") == revocations
+    assert calls == [
+        ("GET", "http://unit.test/api/v1/revocations", {}),
+        ("GET", "http://unit.test/api/v1/revocations?owner=Alice", {}),
+    ]
+
+
 def test_test_vault_posts_options_body(monkeypatch):
     calls: list[tuple[str, str, dict]] = []
 

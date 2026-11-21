@@ -27,7 +27,7 @@ import EmptyState from "./layout/EmptyState";
 // name. docs/plans/memeplex-reference-1436.md, "Grant request flow" and "Wallet".
 
 export type GrantsKeymaster = Pick<KeymasterInterface,
-    "createAsset" | "listAssets" | "resolveDID" | "mergeData"
+    "createAsset" | "listAssets" | "listRevocations" | "resolveDID" | "mergeData"
 > & {
     revokeDID(id: string): Promise<boolean>;
 };
@@ -38,8 +38,8 @@ type Props = {
     // every call names it, so a call under way when the identity changes still
     // acts for the identity it was started for.
     identity: string;
-    // What this identity's revocations are remembered under while the wallet is
-    // open. Hosts pass the identity's DID, which a rename does not change.
+    // What this identity's revocations are shown from while the wallet is open.
+    // Hosts pass the identity's DID, which a rename does not change.
     sessionKey?: string;
     // The registries this node can create on.
     registries: string[];
@@ -87,16 +87,15 @@ type HeldGrant = {
 // that deletion is anchored. A client can publish until it is effective.
 //
 // `displaced` is a revocation a node accepted and that then lost its place to
-// another change to the grant, made elsewhere: the grant is live, and Keymaster
-// stopped listing it when the revocation was accepted.
+// another change to the grant, made elsewhere: the grant is live.
 export type RevocationState = "requested" | "submitted" | "effective" | "displaced";
 
 // `uncertain` marks a revocation the node was never seen to accept.
 type Revocation = { grant: HeldGrant; state: RevocationState; uncertain?: boolean };
 
-// Revocations made while the wallet is open, by identity. Keymaster does not
-// list a revoked asset, so this is what lets the view warn about one when the
-// user leaves the tab and comes back.
+// The revocations shown while the wallet is open, by identity: those made in
+// this session, from the moment the user asks, and those Keymaster reports as
+// accepted and awaiting anchoring, which it keeps in the wallet.
 const sessionRevocations = new Map<string, Revocation[]>();
 
 const tracked = (key: string): Revocation[] => sessionRevocations.get(key) ?? [];
@@ -301,6 +300,59 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         setGrants(held.filter(grant => !revoking.has(grant.did)));
     }, [keymaster, identity, sessionKey]);
 
+    // Revocations Keymaster holds for the identity that this session has no
+    // record of, such as one made before the wallet was last closed. Only those
+    // of grants are shown: the grant is read from the version the deletion
+    // followed, since a deleted asset has no data.
+    const readHeld = useCallback(async () => {
+        let reported: Awaited<ReturnType<GrantsKeymaster["listRevocations"]>>;
+
+        try {
+            reported = await keymaster.listRevocations(identity);
+        }
+        catch {
+            return;
+        }
+
+        for (const { did, status } of reported) {
+            if (status === "unresolved" || tracked(sessionKey).some(revocation => revocation.grant.did === did)) {
+                continue;
+            }
+            try {
+                const current = await keymaster.resolveDID(did);
+                const sequence = Number(current.didDocumentMetadata?.versionSequence);
+
+                if (status === "pending" && (!Number.isInteger(sequence) || sequence < 2)) {
+                    continue;
+                }
+
+                const before = status === "displaced"
+                    ? current
+                    : await keymaster.resolveDID(did, { versionSequence: sequence - 1 });
+                const data = before.didDocumentData as { memeplexGrant?: unknown } | undefined;
+
+                if (validateGrant(data?.memeplexGrant) !== "valid") {
+                    continue;
+                }
+
+                const registry = before.didDocumentRegistration?.registry ?? "";
+                const grant: HeldGrant = {
+                    did,
+                    grant: data!.memeplexGrant as GrantData,
+                    registry,
+                    anchored: isAnchored(before, registry),
+                    created: Number(before.didDocumentMetadata?.versionSequence ?? 1) <= 1,
+                };
+
+                track(sessionKey, did, revocation => revocation
+                    ?? { grant, state: status === "displaced" ? "displaced" : "submitted" });
+            }
+            catch {
+                // Read again at the next refresh, while Keymaster reports it.
+            }
+        }
+    }, [keymaster, identity, sessionKey]);
+
     // Whether each revocation the node has accepted is anchored. An anchor can be
     // withdrawn by a reorganization, so one seen as effective is read as well.
     const readRevocations = useCallback(async () => {
@@ -338,6 +390,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
     const refresh = useCallback(async (report: boolean) => {
         // Revocations first, so that the grants read after them include one
         // whose revocation the node turned out not to have accepted.
+        await readHeld();
         await readRevocations();
         try {
             await load();
@@ -349,7 +402,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                 notifyRef.current.error(error);
             }
         }
-    }, [load, readRevocations]);
+    }, [load, readHeld, readRevocations]);
 
     // Each read is started an interval after the one before it finished, so a
     // read slower than the interval is not overtaken by the next.

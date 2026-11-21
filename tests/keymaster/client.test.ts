@@ -2017,6 +2017,41 @@ describe('createAsset', () => {
     });
 });
 
+describe('listRevocations', () => {
+    const revocations = [{ did: 'did1', registry: 'BTC:mainnet', status: 'pending' }];
+
+    it('should list revocations', async () => {
+        nock(KeymasterURL)
+            .get('/api/v1/revocations')
+            .reply(200, { revocations });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        expect(await keymaster.listRevocations()).toStrictEqual(revocations);
+    });
+
+    it('should name the owner asked for', async () => {
+        nock(KeymasterURL)
+            .get('/api/v1/revocations')
+            .query({ owner: 'Alice' })
+            .reply(200, { revocations });
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        expect(await keymaster.listRevocations('Alice')).toStrictEqual(revocations);
+    });
+
+    it('should throw exception on listRevocations server error', async () => {
+        nock(KeymasterURL)
+            .get('/api/v1/revocations')
+            .reply(500, ServerError);
+
+        const keymaster = await KeymasterClient.create({ url: KeymasterURL });
+
+        await expect(keymaster.listRevocations()).rejects.toMatchObject({ message: ServerError.message });
+    });
+});
+
 describe('listAssets', () => {
     const mockAssets = ['did1', 'did2', 'did3'];
 

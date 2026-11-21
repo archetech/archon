@@ -117,6 +117,7 @@ const ROUTES: Array<[Method, string, number]> = [
     // asset
     ['POST', '/assets', 400],
     ['GET', '/assets', 400],
+    ['GET', '/revocations', 400],
     ['GET', '/assets/test-id', 404],
     ['PUT', '/assets/test-id', 400],
     ['POST', '/assets/test-id/transfer', 400],

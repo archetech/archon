@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import Gatekeeper from '@didcid/gatekeeper';
 import Keymaster from '@didcid/keymaster';
 import CipherNode from '@didcid/cipher/node';
@@ -419,6 +420,140 @@ describe('resolveAsset', () => {
         const asset = await keymaster.resolveAsset(did);
 
         expect(asset).toStrictEqual({});
+    });
+});
+
+describe('listRevocations', () => {
+    const block = { height: 100, timeISO: '2026-11-01T00:00:00.000Z' };
+
+    // What the node resolves for one DID, with the metadata a test adds to it.
+    function resolving(did: string, more: (doc: any) => any) {
+        const resolve = gatekeeper.resolveDID.bind(gatekeeper);
+
+        return jest.spyOn(gatekeeper, 'resolveDID').mockImplementation(async (id, options) => {
+            const doc = await resolve(id, options);
+            return id === did ? more(doc) : doc;
+        });
+    }
+
+    async function revokedOn(registry: string) {
+        await keymaster.createId('Bob', { registry: 'hyperswarm' });
+        const did = await keymaster.createAsset({ name: 'mockAnchor' }, { registry });
+        await keymaster.revokeDID(did);
+        return did;
+    }
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
+    it('should list nothing for a wallet with no record of revocations', async () => {
+        await keymaster.createId('Bob');
+
+        expect(await keymaster.listRevocations()).toStrictEqual([]);
+        expect((await keymaster.fetchIdInfo('Bob')).revoking).toBeUndefined();
+    });
+
+    it('should list a revoked asset on a chain registry as pending, and not among the assets', async () => {
+        const did = await revokedOn('BTC:signet');
+
+        expect(await keymaster.listAssets()).toStrictEqual([]);
+        expect(await keymaster.listRevocations()).toStrictEqual([{ did, registry: 'BTC:signet', status: 'pending' }]);
+        expect(await keymaster.listRevocations('Bob')).toStrictEqual([{ did, registry: 'BTC:signet', status: 'pending' }]);
+        expect((await keymaster.fetchIdInfo('Bob')).revoking).toStrictEqual([did]);
+    });
+
+    it.each(['local', 'hyperswarm'])('should not track a revocation on %s', async registry => {
+        await revokedOn(registry);
+
+        expect(await keymaster.listAssets()).toStrictEqual([]);
+        expect(await keymaster.listRevocations()).toStrictEqual([]);
+        expect((await keymaster.fetchIdInfo('Bob')).revoking).toBeUndefined();
+    });
+
+    it('should list the revocations of the identity that owned the asset', async () => {
+        const did = await revokedOn('BTC:signet');
+        await keymaster.createId('Carol');
+
+        expect(await keymaster.listRevocations()).toStrictEqual([]);
+        expect(await keymaster.listRevocations('Bob')).toStrictEqual([{ did, registry: 'BTC:signet', status: 'pending' }]);
+    });
+
+    it('should keep a revocation that is confirmed, or anchored on another chain', async () => {
+        const did = await revokedOn('BTC:signet');
+        const pending = [{ did, registry: 'BTC:signet', status: 'pending' }];
+
+        const spy = resolving(did, doc => ({ ...doc, didDocumentMetadata: { ...doc.didDocumentMetadata, confirmed: true } }));
+        expect(await keymaster.listRevocations()).toStrictEqual(pending);
+        spy.mockRestore();
+
+        resolving(did, doc => ({
+            ...doc,
+            didDocumentMetadata: { ...doc.didDocumentMetadata, confirmed: true, timestamp: { chain: 'ZEC:mainnet', upperBound: block } },
+        }));
+        expect(await keymaster.listRevocations()).toStrictEqual(pending);
+
+        jest.restoreAllMocks();
+        resolving(did, doc => ({
+            ...doc,
+            didDocumentMetadata: { ...doc.didDocumentMetadata, timestamp: { chain: 'BTC:signet', lowerBound: block } },
+        }));
+        expect(await keymaster.listRevocations()).toStrictEqual(pending);
+        expect((await keymaster.fetchIdInfo('Bob')).revoking).toStrictEqual([did]);
+    });
+
+    it('should drop a revocation once it is anchored on the asset\'s registry', async () => {
+        const did = await revokedOn('BTC:signet');
+
+        resolving(did, doc => ({
+            ...doc,
+            didDocumentMetadata: { ...doc.didDocumentMetadata, timestamp: { chain: 'BTC:signet', upperBound: block } },
+        }));
+        expect(await keymaster.listRevocations()).toStrictEqual([]);
+
+        jest.restoreAllMocks();
+        expect(await keymaster.listRevocations()).toStrictEqual([]);
+        expect((await keymaster.fetchIdInfo('Bob')).revoking).toBeUndefined();
+        expect(await keymaster.listAssets()).toStrictEqual([]);
+    });
+
+    it('should report a displaced revocation once, and list the asset again', async () => {
+        await keymaster.createId('Bob', { registry: 'hyperswarm' });
+        const did = await keymaster.createAsset({ name: 'mockAnchor' }, { registry: 'BTC:signet' });
+        const live = await gatekeeper.resolveDID(did);
+        await keymaster.revokeDID(did);
+
+        resolving(did, () => live);
+        expect(await keymaster.listRevocations()).toStrictEqual([{ did, registry: 'BTC:signet', status: 'displaced' }]);
+        expect(await keymaster.listRevocations()).toStrictEqual([]);
+        expect(await keymaster.listAssets()).toStrictEqual([did]);
+        expect((await keymaster.fetchIdInfo('Bob')).revoking).toBeUndefined();
+    });
+
+    it('should not list a displaced asset that another identity controls', async () => {
+        const did = await revokedOn('BTC:signet');
+        const live = await gatekeeper.resolveDID(did, { versionSequence: 1 });
+
+        resolving(did, () => ({ ...live, didDocument: { ...live.didDocument, controller: 'did:cid:someone-else' } }));
+        expect(await keymaster.listRevocations()).toStrictEqual([{ did, registry: 'BTC:signet', status: 'displaced' }]);
+        expect(await keymaster.listAssets()).toStrictEqual([]);
+    });
+
+    it('should keep a revocation the node cannot resolve', async () => {
+        const did = await revokedOn('BTC:signet');
+
+        const spy = jest.spyOn(gatekeeper, 'resolveDID').mockRejectedValue(new Error('unreachable'));
+        expect(await keymaster.listRevocations()).toStrictEqual([{ did, status: 'unresolved' }]);
+        spy.mockRestore();
+
+        expect(await keymaster.listRevocations()).toStrictEqual([{ did, registry: 'BTC:signet', status: 'pending' }]);
+    });
+
+    it('should keep the record across a reload of the wallet', async () => {
+        const did = await revokedOn('BTC:signet');
+        const reloaded = new Keymaster({ gatekeeper, wallet, cipher, passphrase: 'passphrase' });
+
+        expect(await reloaded.listRevocations()).toStrictEqual([{ did, registry: 'BTC:signet', status: 'pending' }]);
     });
 });
 

@@ -713,6 +713,10 @@ class StubService:
         self.calls.append(("revoke_did", identifier))
         return True
 
+    async def list_revocations(self, owner=None):
+        self.calls.append(("list_revocations", owner))
+        return [{"did": "did:test:asset", "registry": "BTC:mainnet", "status": "pending"}]
+
     async def test_agent(self, identifier: str) -> bool:
         self.calls.append(("test_agent", identifier))
         return True
@@ -1517,6 +1521,14 @@ def test_file_and_image_handlers(stub_service: StubService):
         ("get_file", "did:test:file"),
         ("test_file", "did:test:file"),
     ]
+
+
+def test_list_revocations_handler_names_the_owner(stub_service: StubService):
+    revocations = [{"did": "did:test:asset", "registry": "BTC:mainnet", "status": "pending"}]
+
+    assert run(app_module.list_revocations()) == {"revocations": revocations}
+    assert run(app_module.list_revocations("did:test:bob")) == {"revocations": revocations}
+    assert stub_service.calls == [("list_revocations", None), ("list_revocations", "did:test:bob")]
 
 
 def test_poll_handlers(stub_service: StubService):

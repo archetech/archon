@@ -10,7 +10,7 @@ const NONCE = 'Qm9vdHN0cmFwIG5vbmNlMTIz';
 const SCHEMA = `did:cid:bagaaieraschema?versionId=b${'a'.repeat(58)}`;
 
 const keymaster = {
-    createAsset: vi.fn(), listAssets: vi.fn(), resolveDID: vi.fn(), mergeData: vi.fn(), revokeDID: vi.fn(),
+    createAsset: vi.fn(), listAssets: vi.fn(), listRevocations: vi.fn(), resolveDID: vi.fn(), mergeData: vi.fn(), revokeDID: vi.fn(),
 };
 const notify = { error: vi.fn(), success: vi.fn() };
 
@@ -62,6 +62,7 @@ async function review(link: string) {
 beforeEach(() => {
     vi.resetAllMocks();
     holding({});
+    keymaster.listRevocations.mockResolvedValue([]);
     keymaster.createAsset.mockResolvedValue(GRANT);
     keymaster.mergeData.mockResolvedValue(true);
     keymaster.revokeDID.mockResolvedValue(true);
@@ -583,6 +584,83 @@ describe('Grants view: revoking', () => {
         await user.click(await screen.findByRole('button', { name: 'Revoke Again' }));
         expect(await screen.findByText('Revocation submitted')).toBeTruthy();
         expect(keymaster.revokeDID).toHaveBeenCalledTimes(2);
+    });
+
+    describe('held by Keymaster from before the wallet was opened', () => {
+        const granted = doc({ memeplexGrant: { v: 1, client: CLIENT } });
+        const deleted = (metadata: Record<string, unknown>) => doc({}, { ...metadata, deactivated: true, versionSequence: '2' });
+
+        // A deleted grant, as the node resolves it now and at its first version.
+        function revoked(now: unknown, did = GRANT, first: unknown = granted) {
+            keymaster.listAssets.mockResolvedValue([]);
+            keymaster.resolveDID.mockImplementation(async (id: string, options?: { versionSequence?: number }) => {
+                if (id !== did) {
+                    throw new Error('unknown DID');
+                }
+                return options?.versionSequence === 1 ? first : now;
+            });
+        }
+
+        it('shows a revocation Keymaster reports as submitted, with no record from this session', async () => {
+            keymaster.listRevocations.mockResolvedValue([{ did: GRANT, registry: 'BTC:mainnet', status: 'pending' }]);
+            revoked(deleted(pending()));
+            view({ identity });
+
+            expect(await screen.findByText('Revocation submitted')).toBeTruthy();
+            expect(screen.getByText(CLIENT)).toBeTruthy();
+            expect(screen.getByText(/can still publish until the revocation is anchored on BTC:mainnet/)).toBeTruthy();
+            expect(screen.queryByTestId('grant')).toBeNull();
+            expect(keymaster.listRevocations).toHaveBeenCalledWith(identity);
+        });
+
+        it('shows it as effective once it is anchored and Keymaster has dropped it', async () => {
+            keymaster.listRevocations.mockResolvedValue([{ did: GRANT, registry: 'BTC:mainnet', status: 'pending' }]);
+            revoked(deleted(pending()));
+            view({ identity, pollMs: 20 });
+            expect(await screen.findByText('Revocation submitted')).toBeTruthy();
+
+            keymaster.listRevocations.mockResolvedValue([]);
+            revoked(deleted(anchoredOn('BTC:mainnet')));
+            expect(await screen.findByText('Revoked')).toBeTruthy();
+            expect(screen.queryByText(/can still publish/)).toBeNull();
+        });
+
+        it('says when Keymaster reports the revocation displaced, and revokes again', async () => {
+            keymaster.listRevocations.mockResolvedValueOnce([{ did: GRANT, registry: 'BTC:mainnet', status: 'displaced' }]);
+            holding({ [GRANT]: granted });
+            keymaster.revokeDID.mockImplementation(async () => {
+                revoked(deleted(pending()));
+                return true;
+            });
+            view({ identity, pollMs: 20 });
+
+            expect(await screen.findByText('Revocation did not take effect')).toBeTruthy();
+            expect(screen.getByText(/can still publish/)).toBeTruthy();
+            expect(screen.queryByTestId('grant')).toBeNull();
+
+            const user = userEvent.setup();
+            await user.click(screen.getByRole('button', { name: 'Revoke Again' }));
+            expect(await screen.findByText('Revocation submitted')).toBeTruthy();
+            expect(keymaster.revokeDID).toHaveBeenCalledWith(GRANT);
+        });
+
+        it('shows no revocation for an asset that was not a grant', async () => {
+            keymaster.listRevocations.mockResolvedValue([{ did: GRANT, registry: 'BTC:mainnet', status: 'pending' }]);
+            revoked(deleted(pending()), GRANT, doc({ name: 'not a grant' }));
+            view({ identity });
+
+            await screen.findByText('No grants');
+            expect(screen.queryByText(/Revocation/)).toBeNull();
+        });
+
+        it('shows the grants when Keymaster cannot say what it holds', async () => {
+            keymaster.listRevocations.mockRejectedValue(new Error('wallet locked'));
+            holding(held);
+            view({ identity });
+
+            expect(await screen.findByTestId('grant')).toBeTruthy();
+            expect(screen.queryByText(/Revocation/)).toBeNull();
+        });
     });
 
     it('revokes nothing when the user cancels', async () => {

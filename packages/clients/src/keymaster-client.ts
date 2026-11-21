@@ -28,6 +28,7 @@ import {
     AddressCheckResult,
     ResolvedAddressInfo,
     CheckWalletResult,
+    AssetRevocation,
     CheckDIDResult,
     RepairDIDResult,
     CreateAssetOptions,
@@ -1187,6 +1188,16 @@ export default class KeymasterClient implements KeymasterInterface {
         try {
             const response = await this.axios.get(`${this.API}/assets`);
             return response.data.assets;
+        }
+        catch (error) {
+            throwError(error);
+        }
+    }
+
+    async listRevocations(owner?: string): Promise<AssetRevocation[]> {
+        try {
+            const response = await this.axios.get(`${this.API}/revocations`, owner ? { params: { owner } } : undefined);
+            return response.data.revocations;
         }
         catch (error) {
             throwError(error);

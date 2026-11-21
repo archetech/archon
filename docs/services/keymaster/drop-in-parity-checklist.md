@@ -76,9 +76,11 @@ Source of truth:
 
 - [x] Library support for `createAsset`
 - [x] Library support for `listAssets`
+- [x] Library support for `listRevocations`
 - [x] Library support for `resolveAsset`
 - [x] Library support for `mergeData`
 - [x] Service route parity for `POST /assets`
+- [x] Service route parity for `GET /revocations`
 - [x] Service route parity for `PUT /assets/:id`
 - [x] `cloneAsset`
 - [x] `transferAsset`
