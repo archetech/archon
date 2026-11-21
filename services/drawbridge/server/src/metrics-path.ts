@@ -10,7 +10,7 @@ export function routeLabel(req: { originalUrl: string }): string {
 // registries, identifiers) are replaced with placeholders so dashboards do not
 // get one time series per identifier.
 export function normalizePath(path: string): string {
-    return path
+    const label = path
         .replace(/\/did\/(?:did:[^/]+|did%3[aA][^/]+)/, '/did/:did')
         .replace(/\/identifiers\/(?:did:[^/]+|did%3[aA][^/]+)/, '/identifiers/:did')
         .replace(/\/invoice\/(?:did:[^/]+|did%3[aA][^/]+)/, '/invoice/:did')
@@ -37,4 +37,14 @@ export function normalizePath(path: string): string {
         // The Memeplex indexer's views of one object carry its DID, or whatever
         // a caller sends in its place.
         .replace(/\/memeplex\/api\/v1\/(publications|threads|boosts|ratings|tags|coauthors)\/[^/]+/, '/memeplex/api/v1/$1/:did');
+
+    // The indexer's routes are few and fixed, and its mount is public, so a
+    // path under it that is none of them shares one label.
+    if ((label === '/memeplex' || label.startsWith('/memeplex/')) && !MEMEPLEX_ROUTES.test(label)) {
+        return '/memeplex/:other';
+    }
+
+    return label;
 }
+
+const MEMEPLEX_ROUTES = /^\/memeplex\/api\/v1\/(?:ready|version|status|timeline|(?:publications|threads|boosts|ratings|tags|coauthors)\/:did)$/;

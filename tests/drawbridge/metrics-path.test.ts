@@ -32,6 +32,15 @@ describe('metrics route labels', () => {
         ['/memeplex/api/v1/coauthors/did:cid:bagaaiera', '/memeplex/api/v1/coauthors/:did'],
         ['/memeplex/api/v1/timeline', '/memeplex/api/v1/timeline'],
         ['/memeplex/api/v1/ready', '/memeplex/api/v1/ready'],
+        ['/memeplex/api/v1/version', '/memeplex/api/v1/version'],
+        ['/memeplex/api/v1/status', '/memeplex/api/v1/status'],
+        ['/memeplex/api/v1/publications/example/nonce1', '/memeplex/:other'],
+        ['/memeplex/api/v1/publications', '/memeplex/:other'],
+        ['/memeplex/api/v1/unknown-1', '/memeplex/:other'],
+        ['/memeplex/api/v1/timeline/extra', '/memeplex/:other'],
+        ['/memeplex/metrics', '/memeplex/:other'],
+        ['/memeplex', '/memeplex/:other'],
+        ['/memeplexity', '/memeplexity'],
     ])('labels %s as %s', (path, label) => {
         expect(normalizePath(path)).toBe(label);
     });
