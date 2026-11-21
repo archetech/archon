@@ -10,12 +10,13 @@ import KeymasterClient from '@didcid/clients/keymaster';
 
 import config from './config.js';
 import { RedisStore } from './store.js';
-import { byHeraldRoute, publicRateLimit } from './middleware/public-rate-limit.js';
+import { byHeraldRoute, byMethod, publicRateLimit } from './middleware/public-rate-limit.js';
 import { labelLimiter, markUnrouted, requestLabel } from './metrics-path.js';
 import { REDACTED_LOG_PATHS } from './log-redaction.js';
 import { buildProxyBody, proxyHeraldRequest } from './herald-proxy.js';
 import { proxyRequest } from './proxy.js';
 import { memeplexProxy } from './memeplex-proxy.js';
+import { memepoolProxy } from './memepool-proxy.js';
 import { cashuProxyHandlers, publicCashuMintUrl } from './cashu-proxy.js';
 import { keymasterCashuPayments, type CashuPayments } from './cashu-payment.js';
 import { DEFAULT_CORS_OPTIONS } from './cors-options.js';
@@ -337,6 +338,25 @@ async function main() {
         logger,
     });
 
+    const memepoolRateLimit = byMethod({
+        read: publicRateLimit({
+            store,
+            name: 'memepool',
+            readPerSourceMax: config.memepoolReadPerSource,
+            readGlobalMax: config.memepoolReadGlobal,
+            windowSeconds: config.publicRateLimitWindow,
+            logger,
+        }),
+        write: publicRateLimit({
+            store,
+            name: 'memepool:write',
+            readPerSourceMax: config.memepoolWritePerSource,
+            readGlobalMax: config.memepoolWriteGlobal,
+            windowSeconds: config.publicRateLimitWindow,
+            logger,
+        }),
+    });
+
     const nameWriteRateLimit = publicRateLimit({
         store,
         name: 'names:write',
@@ -421,6 +441,9 @@ async function main() {
 
     // Public face for the node's Memeplex indexer; see memeplex-proxy.ts.
     app.use('/memeplex', memeplexRateLimit, memeplexProxy({ indexerURL: config.memeplexIndexerURL, logger }));
+
+    // Public face for the node's Memepool service; see memepool-proxy.ts.
+    app.use('/memepool', memepoolRateLimit, memepoolProxy({ memepoolURL: config.memepoolURL, logger }));
 
     // Public face for the DIDComm relay (mailbox). The published
     // DIDCommMessaging endpoint is `<drawbridge public host>/didcomm`.

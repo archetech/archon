@@ -110,6 +110,16 @@ identity, and says so in its log.
 client, with a new DID, that nobody has granted: what it published before stays
 attributed, and every user has to grant it again before it can publish for them.
 
-The service does not yet have a route through Drawbridge. Put a proxy of your own
-in front of it to serve it publicly.
+### Through Drawbridge
+
+With the `memepool` profile, Drawbridge offers the service at `<node>/memepool`:
+its API is at `<node>/memepool/api/v1`. Drawbridge sets the service's cookies for
+`/memepool`, so a browser sends them to Memepool and to nothing else on the node's
+host, and it limits how often one source reads and writes (see the
+[Drawbridge](../drawbridge/README.md) rate limits).
+
+When the node is served over HTTPS, by a proxy that ends TLS in front of
+Drawbridge and sends `X-Forwarded-Proto`, set `ARCHON_MEMEPOOL_TRUSTED_PROXIES=1`.
+The service then marks its cookies `Secure`, so that a browser never sends them
+over plain HTTP.
 
