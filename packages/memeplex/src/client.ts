@@ -140,9 +140,26 @@ export class MemeplexClient {
         );
     }
 
-    // Replaces a published object with another version of it.
+    // Replaces a published object with another version of it. An object's
+    // author, kind, grant and target are fixed at its creation: a version that
+    // changes one is not attributed, and neither is anything after it, so such
+    // an edit is refused.
     async edit(did: string, grant: UsableGrant, object: ObjectFields): Promise<void> {
-        if (!await this.keymaster.mergeData(did, { memeplex: this.stated(grant, object) })) {
+        const memeplex = this.stated(grant, object);
+        const [versions] = await this.gatekeeper.resolveVersions([did]);
+        const created = (versions?.[0]?.didDocumentData as { memeplex?: Record<string, unknown> } | undefined)?.memeplex;
+
+        if (!created) {
+            throw new Error(`${did} is not a published object`);
+        }
+
+        for (const field of ['author', 'kind', 'grant', 'target']) {
+            if (created[field] !== memeplex[field]) {
+                throw new Error(`an edit cannot change an object's ${field}`);
+            }
+        }
+
+        if (!await this.keymaster.mergeData(did, { memeplex })) {
             throw new Error('the node did not accept the edit');
         }
     }
@@ -174,9 +191,19 @@ export class MemeplexClient {
 }
 
 // The grant among those found that a client may publish under, if there is
-// exactly one that is valid and has not ended.
-export function usable(found: FoundGrant[]): UsableGrant | undefined {
-    const live = found.filter(({ grant }) => grant.status === 'valid' && !grant.ended);
+// exactly one that is valid, has not ended and has not expired. Expiry is
+// judged against `now`; what counts for a publication is the time of the block
+// that anchors it, which is later.
+export function usable(found: FoundGrant[], now: Date = new Date()): UsableGrant | undefined {
+    const live = found.filter(({ grant }) => {
+        if (grant.status !== 'valid' || grant.ended) {
+            return false;
+        }
+
+        const { expiresAt } = grant.versions[grant.versions.length - 1];
+
+        return expiresAt === undefined || now.getTime() < Date.parse(expiresAt);
+    });
 
     if (live.length !== 1) {
         return undefined;
@@ -198,10 +225,10 @@ export class IndexerClient {
         this.fetch = fetcher;
     }
 
-    private async get(path: string): Promise<unknown> {
+    private async get(path: string, absent = false): Promise<unknown> {
         const response = await this.fetch(`${this.base}${path}`);
 
-        if (response.status === 404) {
+        if (absent && response.status === 404) {
             return undefined;
         }
         if (!response.ok) {
@@ -219,7 +246,7 @@ export class IndexerClient {
 
     // An object's publication, or undefined when it has no attributed version.
     async publication(did: string): Promise<Publication | undefined> {
-        return await this.get(`/publications/${encodeURIComponent(did)}`) as Publication | undefined;
+        return await this.get(`/publications/${encodeURIComponent(did)}`, true) as Publication | undefined;
     }
 
     // The posts, papers and replies of some authors, newest first.

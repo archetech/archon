@@ -248,9 +248,45 @@ it('states the grant\'s user and DID in what it publishes, whatever it is handed
     expect(await indexer.publication(post)).toMatchObject({ state: 'published', memeplex: { v: 1, author: userDid, grant: grant.did } });
 }, 120_000);
 
-it('tells a missing publication from an indexer that is failing', async () => {
+it('tells a missing publication from an indexer that is failing or is not one', async () => {
     const failing = new IndexerClient('http://indexer.invalid', async () => new Response('{}', { status: 503 }));
+    const absent = new IndexerClient('http://indexer.invalid', async () => new Response('{}', { status: 404 }));
 
     await expect(failing.publication('did:cid:any')).rejects.toThrow('the indexer answered 503');
     expect(await indexer.publication('did:cid:bagaaieranothing')).toBeUndefined();
+    await expect(absent.ready()).rejects.toThrow('the indexer answered 404');
+    await expect(absent.timeline(['did:cid:any'])).rejects.toThrow('the indexer answered 404');
+    await expect(absent.thread('did:cid:any')).rejects.toThrow('the indexer answered 404');
 });
+
+it('refuses an edit that would change what an object is', async () => {
+    const { request, link } = await client.requestGrant({ name: 'Memepool' });
+    await grantFrom(link);
+    await anchor();
+    const grant = usable(await client.findGrants(request))!;
+    const post = await client.publish(grant, { kind: 'post', text: 'First.' });
+    const other = await client.publish(grant, { kind: 'post', text: 'Second.' });
+    await anchor();
+    const targetVersion = (await client.publication(post, grant.did)).versions[0].opid;
+    const reply = await client.publish(grant, { kind: 'reply', target: post, targetVersion, text: 'A reply.' });
+    await anchor();
+
+    await expect(client.edit(reply, grant, { kind: 'reply', target: other, targetVersion, text: 'Moved.' })).rejects.toThrow('cannot change an object\'s target');
+    await expect(client.edit(post, grant, { kind: 'reply', target: other, targetVersion, text: 'Now a reply.' })).rejects.toThrow('cannot change an object\'s kind');
+    await expect(client.edit(post, { ...grant, did: other }, { kind: 'post', text: 'Another grant.' })).rejects.toThrow('cannot change an object\'s grant');
+    await expect(client.edit(grant.did, grant, { kind: 'post', text: 'Not an object.' })).rejects.toThrow('is not a published object');
+
+    await client.edit(reply, grant, { kind: 'reply', target: post, targetVersion, text: 'A better reply.' });
+    await anchor();
+    expect(await indexer.publication(reply)).toMatchObject({ state: 'published', current: 1, memeplex: { text: 'A better reply.' } });
+}, 120_000);
+
+it('does not take an expired grant as one to publish under', async () => {
+    const { request, link } = await client.requestGrant({ name: 'Memepool', expiresAt: '2027-01-01T00:00:00Z' });
+    await grantFrom(link);
+    await anchor();
+    const found = await client.findGrants(request);
+
+    expect(usable(found, new Date('2026-12-31T23:59:59Z'))).toBeDefined();
+    expect(usable(found, new Date('2027-01-01T00:00:00Z'))).toBeUndefined();
+}, 120_000);

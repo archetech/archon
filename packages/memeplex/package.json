@@ -26,6 +26,13 @@
       "types": "./dist/types/client.d.ts"
     }
   },
+  "typesVersions": {
+    "*": {
+      "client": [
+        "./dist/types/client.d.ts"
+      ]
+    }
+  },
   "scripts": {
     "clean": "rm -rf dist",
     "generate": "node scripts/generate.mjs",
