@@ -275,7 +275,23 @@ The `route` label is the request path with dynamic segments collapsed:
 /payments/<did>            -> /payments/:did
 ```
 
-The label does NOT include the `/api/v1` prefix.
+The label is the full path, with its mount: `/api/v1/did/:did`,
+`/names/poppy/api/names/:name`.
+
+A path is a caller's to choose, and a label is a series the node keeps for as
+long as it runs, so a caller cannot make labels at will:
+
+- **A request that matches a declared route** is labelled by that route's own
+  pattern under its mount, whatever stands in its parameters. These are a fixed
+  set, and nothing below takes from them.
+- **A request that a proxy mount forwards** (`/names`, `/.well-known`,
+  `/explorer`, `/didcomm`, `/cashu`, `/memeplex`, `/1.0/identifiers`,
+  `/api/v1/lightning`) is labelled by its path with the segments above
+  collapsed. The paths under a mount cannot be listed, so a node keeps at most
+  500 distinct labels of this kind, and a request whose label would be one more
+  is recorded as `/:other`.
+- **A request that no route or mount takes** is labelled `/:unrouted`, whatever
+  its path. Its answer is a 404.
 
 ---
 

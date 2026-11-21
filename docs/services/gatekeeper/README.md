@@ -1692,25 +1692,37 @@ Implementations SHOULD additionally emit standard Prometheus process metrics
 `process_cpu_seconds_total`, etc.) to keep the existing Grafana dashboards
 working.
 
-### 13.1 Route normalization
+### 13.1 Route labels
 
-The `route` label MUST collapse dynamic path segments to placeholder names
-so cardinality stays bounded. Required normalizations:
+The `route` label is the route a request matched, never the path it was sent
+to. A path is a caller's to choose and a label is a series the node keeps, so a
+label MUST NOT hold anything from a path: a DID, a registry, a block, or the
+name of an endpoint that does not exist.
+
+A request that matched a route is labelled by the route's pattern, with its
+own prefix (`/api/v1` for the versioned API, `/1.0/identifiers` for the
+conformant surface):
 
 ```
-/api/v1/did/did:...          -> /api/v1/did/:did
-/api/v1/block/<r>/latest     -> /api/v1/block/:registry/latest
-/api/v1/block/<r>/<id>       -> /api/v1/block/:registry/<id>
-/api/v1/queue/<r>/clear      -> /api/v1/queue/:registry/clear
-/api/v1/queue/<r>            -> /api/v1/queue/:registry
-/api/v1/events/<x>           -> /api/v1/events/:registry
-/api/v1/dids/<x>             -> /api/v1/dids/:prefix
-/1.0/identifiers/did:...     -> /1.0/identifiers/:did   (the /data and /registration suffixes are preserved)
+/api/v1/did/:did
+/api/v1/block/:registry/latest
+/api/v1/block/:registry/:blockId
+/api/v1/queue/:registry
+/api/v1/queue/:registry/clear
+/1.0/identifiers/:did
+/1.0/identifiers/:did/data
+/1.0/identifiers/:did/registration
 ```
 
-The label MUST retain each route's own prefix (`/api/v1` for the versioned
-API, `/1.0/identifiers` for the conformant surface); only the dynamic DID /
-registry segments are collapsed.
+Two groups of routes share a label, which the dashboards rely on:
+
+```
+/api/v1/dids/<anything>      -> /api/v1/dids/:prefix
+/api/v1/events/<anything>    -> /api/v1/events/:registry
+```
+
+A request that matched no route, under the API, under the conformant surface
+or under neither, is labelled `/:unrouted`.
 
 ### 13.2 Counter semantics
 

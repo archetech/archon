@@ -146,16 +146,15 @@ The gatekeeper-specific Prometheus metrics that must remain stable are:
 - `gatekeeper_dids_by_registry{registry}`
 - `service_version_info{version,commit}`
 
-The TypeScript normalization behavior for `route` is intentionally preserved,
-including these normalizations:
+The `route` label is the route a request matched, never the path it was sent
+to, in both ports (Gatekeeper spec §13.1):
 
-- `/api/v1/did/did:...` -> `/api/v1/did/:did`
-- `/api/v1/block/<registry>/latest` -> `/api/v1/block/:registry/latest`
-- `/api/v1/block/<registry>/<blockId>` -> `/api/v1/block/:registry/<blockId>`
-- `/api/v1/queue/<registry>/clear` -> `/api/v1/queue/:registry/clear`
-- `/api/v1/queue/<registry>` -> `/api/v1/queue/:registry`
-- `/api/v1/events/<registry>` -> `/api/v1/events/:registry`
-- `/api/v1/dids/<prefix>` -> `/api/v1/dids/:prefix`
+- a matched route is labelled by its pattern with its prefix, for example
+  `/api/v1/did/:did`, `/api/v1/block/:registry/:blockId` and
+  `/1.0/identifiers/:did/data`;
+- every route under `/api/v1/dids/` is `/api/v1/dids/:prefix`, and
+  `/api/v1/events/process` is `/api/v1/events/:registry`;
+- a request that matched no route is `/:unrouted`.
 
 ## Memory usage compatibility
 

@@ -29,7 +29,9 @@ pub(crate) use events::{
 };
 #[cfg(test)]
 pub(crate) use events::queue_outbound_operation;
-pub(crate) use metrics::{normalize_path, record_metrics, Metrics};
+#[cfg(test)]
+pub(crate) use metrics::normalize_path;
+pub(crate) use metrics::{record_metrics, Metrics};
 pub(crate) use proofs::{
     ensure_event_opid, generate_did_from_operation, generate_json_cid, infer_event_did,
     is_valid_did, verify_event_shape,

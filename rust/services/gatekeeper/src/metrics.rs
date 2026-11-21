@@ -36,7 +36,15 @@ pub(crate) fn record_metrics(
         .observe(duration_seconds);
 }
 
+/// The label of every request that matched no declared route. A handler
+/// records a route by its own name, so only these requests would otherwise be
+/// labelled by a path, which is a caller's to choose.
+pub(crate) const UNROUTED: &str = "/:unrouted";
+
 fn qualify_route(route: &str) -> String {
+    if route == UNROUTED {
+        return route.to_string();
+    }
     if route.starts_with("/api/") || route == "/metrics" || route.starts_with("/1.0/") {
         return route.to_string();
     }

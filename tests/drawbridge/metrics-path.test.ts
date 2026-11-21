@@ -1,7 +1,9 @@
 import express from 'express';
 import request from 'supertest';
 
-import { normalizePath, routeLabel } from '../../services/drawbridge/server/src/metrics-path.ts';
+import {
+    MAX_ROUTE_LABELS, OVERFLOW, UNROUTED, labelLimiter, markUnrouted, normalizePath, requestLabel, routeLabel,
+} from '../../services/drawbridge/server/src/metrics-path.ts';
 
 describe('metrics route labels', () => {
     it.each([
@@ -69,5 +71,108 @@ describe('route labels of mounted handlers', () => {
         ['/memeplex', '/memeplex/api/v1/threads/did:cid:bagaaiera?x=1', '/memeplex/api/v1/threads/:did'],
     ])('labels %s%s by its full path', async (mount, path, label) => {
         await expect(labelOf(mount, path)).resolves.toBe(label);
+    });
+});
+
+// A path is a caller's to choose, so what a caller can make of it is bounded (#1697).
+describe('bounds on route labels', () => {
+    // An app as the server mounts it: the recorder first, a route, a proxy mount
+    // that takes anything under its prefix, and the marker last.
+    function server(limit = MAX_ROUTE_LABELS) {
+        const labels: string[] = [];
+        const bounded = labelLimiter(limit);
+        const app = express();
+
+        app.use((req, res, next) => {
+            res.on('finish', () => { labels.push(requestLabel(req, res, bounded)); });
+            next();
+        });
+        const v1 = express.Router();
+        v1.get('/ready', (_req, res) => { res.json(true); });
+        v1.get('/did/:did', (_req, res) => { res.json({}); });
+        app.use('/api/v1', v1);
+        app.get('/invoice/:did', (_req, res) => { res.json({}); });
+        app.use('/names', (_req, res) => { res.status(404).json({ error: 'unknown name' }); });
+        app.use(markUnrouted);
+
+        return { app, labels };
+    }
+
+    it('gives every request that nothing took one label, and still answers 404', async () => {
+        const { app, labels } = server();
+
+        for (const path of ['/anything-1', '/anything-2', '/api/v1/nothing-3', '/Anything-4/deeper?x=1']) {
+            expect((await request(app).get(path)).status).toBe(404);
+        }
+        await request(app).post('/anything-5').send({});
+
+        expect(labels).toStrictEqual([UNROUTED, UNROUTED, UNROUTED, UNROUTED, UNROUTED]);
+    });
+
+    it('labels a request that matched a declared route by the route\'s pattern', async () => {
+        const { app, labels } = server();
+
+        await request(app).get('/api/v1/ready');
+        await request(app).get('/api/v1/did/did:cid:bagaaiera');
+        // Whatever stands in the parameter's place, and in whatever case.
+        await request(app).get('/api/v1/did/anything-a-caller-sends');
+        await request(app).get('/API/V1/DID/another?x=1');
+        await request(app).get('/invoice/did:cid:bagaaiera');
+
+        expect(labels).toStrictEqual([
+            '/api/v1/ready', '/api/v1/did/:did', '/api/v1/did/:did', '/api/v1/did/:did', '/invoice/:did',
+        ]);
+    });
+
+    it('labels a request that a mount forwarded by its path', async () => {
+        const { app, labels } = server();
+
+        await request(app).get('/names/alice');
+
+        expect(labels).toStrictEqual(['/names/alice']);
+    });
+
+    // Filling the limit with made-up paths under a mount takes nothing from the
+    // node's own routes, seen before or not.
+    it('labels a declared route as itself after the limit is reached', async () => {
+        const { app, labels } = server(2);
+
+        for (let n = 1; n <= 4; n++) {
+            await request(app).get(`/names/made-up-${n}`);
+        }
+        await request(app).get('/api/v1/ready');
+        await request(app).get('/api/v1/did/did:cid:bagaaiera');
+
+        expect(labels).toStrictEqual([
+            '/names/made-up-1', '/names/made-up-2', OVERFLOW, OVERFLOW, '/api/v1/ready', '/api/v1/did/:did',
+        ]);
+    });
+
+    it('keeps no more labels than its limit, whatever is asked for under a mount', async () => {
+        const { app, labels } = server(3);
+
+        for (let n = 1; n <= 6; n++) {
+            await request(app).get(`/names/made-up-${n}`);
+        }
+        // In another case too, which Express routes to the same mount.
+        await request(app).get('/NAMES/made-up-7');
+        await request(app).get('/names/made-up-2');
+
+        expect(labels).toStrictEqual([
+            '/names/made-up-1', '/names/made-up-2', '/names/made-up-3',
+            OVERFLOW, OVERFLOW, OVERFLOW, OVERFLOW,
+            '/names/made-up-2',
+        ]);
+        expect(new Set(labels).size).toBe(4);
+    });
+
+    it('does not count unrouted requests against the limit', async () => {
+        const { app, labels } = server(1);
+
+        await request(app).get('/anything-1');
+        await request(app).get('/anything-2');
+        await request(app).get('/api/v1/ready');
+
+        expect(labels).toStrictEqual([UNROUTED, UNROUTED, '/api/v1/ready']);
     });
 });
