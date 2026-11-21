@@ -184,6 +184,32 @@ function GrantPrompt({ me, onChecked }: { me: Me; onChecked: () => void }) {
     );
 }
 
+// What an object says. A short one says it in `text`. A longer one keeps its
+// words apart, under `content`, and a paper gives a `summary` of them. A post
+// with neither and a `target` is a boost of that object.
+function Body({ object }: { object: NonNullable<Publication['memeplex']> }) {
+    const words = object.text ?? (typeof object.summary === 'string' ? object.summary : undefined);
+
+    if (words) {
+        return (
+            <>
+                <p className="text">{words}</p>
+                {object.text === undefined && object.content !== undefined && (
+                    <p className="muted">The full text is kept apart from this entry, and this page does not show it yet.</p>
+                )}
+            </>
+        );
+    }
+    if (object.content !== undefined) {
+        return <p className="muted">The text is kept apart from this entry, and this page does not show it yet.</p>;
+    }
+    if (object.target) {
+        return <p className="muted">A boost of <span className="mono" title={object.target}>{short(object.target)}</span></p>;
+    }
+
+    return null;
+}
+
 function Post({ publication, onOpen, onWithdraw }: { publication: Publication; onOpen?: () => void; onWithdraw?: () => void }) {
     const object = publication.memeplex;
 
@@ -198,7 +224,7 @@ function Post({ publication, onOpen, onWithdraw }: { publication: Publication; o
                 <time>{when(publication)}</time>
             </header>
             {object.title && <h3>{object.title}</h3>}
-            <p className="text">{object.text}</p>
+            <Body object={object} />
             <footer>
                 {onOpen && <button className="quiet" onClick={onOpen}>Open</button>}
                 {onWithdraw && <button className="quiet" onClick={onWithdraw}>Withdraw</button>}

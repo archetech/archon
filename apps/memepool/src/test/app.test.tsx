@@ -457,6 +457,24 @@ describe('reading and publishing', () => {
         expect((button as HTMLButtonElement).disabled).toBe(true);
     });
 
+    it('says what an entry is when it has no text of its own to show', async () => {
+        const { api } = services({
+            me: granted,
+            timeline: [
+                { ...post('did:cid:1', ALICE, ''), memeplex: { kind: 'post', author: ALICE, content: { cid: 'bafy' } } },
+                { ...post('did:cid:2', ALICE, ''), memeplex: { kind: 'paper', author: ALICE, title: 'On DIDs', summary: 'A summary.', content: { cid: 'bafy' } } },
+                { ...post('did:cid:3', ALICE, ''), memeplex: { kind: 'post', author: ALICE, target: 'did:cid:bagaaieraboostedboostedboostedboostedboostedboosted' } },
+            ],
+        });
+        render(<App api={api} />);
+
+        expect(await screen.findByText('The text is kept apart from this entry, and this page does not show it yet.')).toBeTruthy();
+        expect(screen.getByText('On DIDs')).toBeTruthy();
+        expect(screen.getByText('A summary.')).toBeTruthy();
+        expect(screen.getByText(/The full text is kept apart/)).toBeTruthy();
+        expect(screen.getByText(/A boost of/)).toBeTruthy();
+    });
+
     it('signs out', async () => {
         const { api } = services({ me: granted });
         render(<App api={api} />);
