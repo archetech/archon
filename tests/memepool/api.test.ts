@@ -139,7 +139,11 @@ describe('signing in', () => {
 
         const elsewhere = await alice.createResponse(await service.createChallenge());
         expect((await agent.post('/api/v1/login').send({ response: elsewhere })).status).toBe(401);
-        expect((await agent.post('/api/v1/login').send({})).status).toBe(400);
+
+        const fresh = browser();
+        await fresh.get('/api/v1/challenge');
+        expect((await fresh.post('/api/v1/login').send({ response: 7 })).status).toBe(400);
+        expect((await fresh.post('/api/v1/login').send({ response: 'answer' })).status).toBe(400);
     });
 
     // A wallet publishes its answer as an asset, whose DID anyone can see.
@@ -257,6 +261,87 @@ describe('signing in', () => {
         const again = await signIn(alice);
         expect((await again.post('/api/v1/logout')).body).toBe(true);
         expect((await again.get('/api/v1/me')).status).toBe(401);
+    });
+});
+
+describe('signing in with a wallet that sends its answer to the callback', () => {
+    beforeEach(() => {
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' },
+            sessionLifetime: 60_000, challengeLifetime: 60_000, now: () => clock, publicURL: 'https://node.example/memepool/',
+        });
+    });
+
+    it('names its callback in the challenge', async () => {
+        const { challenge } = (await request(app).get('/api/v1/challenge')).body;
+        const data = (await service.resolveDID(challenge)).didDocumentData as { challenge: { callback?: string } };
+
+        expect(data.challenge.callback).toBe('https://node.example/memepool/api/v1/callback');
+    });
+
+    it('signs in the browser that asked, once the wallet has answered', async () => {
+        const agent = browser();
+        const { challenge } = (await agent.get('/api/v1/challenge')).body;
+
+        const waiting = await agent.post('/api/v1/login').send();
+        expect(waiting.status).toBe(202);
+        expect(waiting.body).toStrictEqual({ waiting: true });
+
+        // The wallet, which is not the browser and has none of its cookies.
+        const sent = await request(app).post('/api/v1/callback').send({ response: await alice.createResponse(challenge) });
+        expect(sent.body).toBe(true);
+        expect(sent.headers['set-cookie']).toBeUndefined();
+
+        expect((await agent.post('/api/v1/login').send()).body).toStrictEqual({ did: aliceDid });
+        expect((await agent.get('/api/v1/me')).body.did).toBe(aliceDid);
+        // Once.
+        expect((await agent.post('/api/v1/login').send()).status).toBe(401);
+    });
+
+    it('signs in no other browser with that answer', async () => {
+        const asking = browser();
+        const { challenge } = (await asking.get('/api/v1/challenge')).body;
+        const another = browser();
+        await another.get('/api/v1/challenge');
+
+        await request(app).post('/api/v1/callback').send({ response: await alice.createResponse(challenge) });
+
+        expect((await request(app).post('/api/v1/login').send()).status).toBe(401);
+        expect((await another.post('/api/v1/login').send()).status).toBe(202);
+        expect((await asking.post('/api/v1/login').send()).body).toStrictEqual({ did: aliceDid });
+    });
+
+    it('takes at the callback only an answer to a challenge of its own that is as its author made it', async () => {
+        const agent = browser();
+        const { challenge } = (await agent.get('/api/v1/challenge')).body;
+        const callback = (response: unknown) => request(app).post('/api/v1/callback').send({ response });
+
+        expect((await callback(undefined)).status).toBe(400);
+        expect((await callback('answer')).status).toBe(400);
+        expect((await callback(serviceDid)).status).toBe(401);
+        expect((await callback(await alice.createResponse(await service.createChallenge()))).status).toBe(401);
+
+        const transferred = await bob.createResponse(challenge);
+        await bob.transferAsset(transferred, aliceDid);
+        expect((await callback(transferred)).status).toBe(401);
+
+        expect((await agent.post('/api/v1/login').send()).status).toBe(202);
+    });
+
+    it('does not keep an answer past the challenge\'s lifetime', async () => {
+        const agent = browser();
+        const { challenge } = (await agent.get('/api/v1/challenge')).body;
+
+        await request(app).post('/api/v1/callback').send({ response: await alice.createResponse(challenge) });
+        clock += 60_000;
+        expect((await agent.post('/api/v1/login').send()).status).toBe(401);
+    });
+
+    it('still takes an answer carried back by hand', async () => {
+        const agent = browser();
+        const { challenge } = (await agent.get('/api/v1/challenge')).body;
+
+        expect((await agent.post('/api/v1/login').send({ response: await alice.createResponse(challenge) })).body).toStrictEqual({ did: aliceDid });
     });
 });
 

@@ -54,6 +54,7 @@ beforeEach(async () => {
         port: 0,
         bindAddress: '127.0.0.1',
         name: 'memepool',
+        publicURL: '',
         dataDir: dataDir(),
         passphrase: 'a passphrase',
         registry: 'hyperswarm',

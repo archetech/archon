@@ -25,6 +25,10 @@ const config = {
     // The name of the service's identity in its wallet, and the name it gives
     // itself in a grant request.
     name: env.ARCHON_MEMEPOOL_NAME || 'memepool',
+    // The address users reach the service at, such as `https://node/memepool`.
+    // With it, a challenge names the service's callback and a wallet sends its
+    // answer there.
+    publicURL: env.ARCHON_MEMEPOOL_PUBLIC_URL || '',
     // Where the wallet that holds the service's key is kept.
     dataDir: env.ARCHON_MEMEPOOL_DATA_DIR || 'data',
     // The passphrase that encrypts that wallet. Required.

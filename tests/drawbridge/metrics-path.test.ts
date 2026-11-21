@@ -35,6 +35,7 @@ describe('metrics route labels', () => {
         ['/memepool/api/v1/objects/did:cid:bagaaiera', '/memepool/api/v1/objects/:did'],
         ['/memepool/api/v1/objects', '/memepool/api/v1/objects'],
         ['/memepool/api/v1/me', '/memepool/api/v1/me'],
+        ['/memepool/api/v1/callback', '/memepool/api/v1/callback'],
         ['/memepool/api/v1/anything-a-caller-sends', '/memepool/:other'],
         ['/memepool/metrics', '/memepool/:other'],
         ['/memeplex/api/v1/timeline', '/memeplex/api/v1/timeline'],

@@ -30,7 +30,8 @@ All routes are under `/api/v1`. Those after the sign-in routes need a session.
 | `GET /version` | The service's version and commit |
 | `GET /config` | The service's name and its DID, which is the client a grant names |
 | `GET /challenge` | A challenge, and the `archon://auth?challenge=…` link that hands it to a wallet |
-| `POST /login` | Takes `{ "response": "did:cid:…" }`, the wallet's answer. Sets the session cookie and returns the DID signed in |
+| `POST /callback` | Where a wallet sends `{ "response": "did:cid:…" }`, its answer, when the challenge names this as its callback. Signs nobody in: the answer is kept for the browser that asked |
+| `POST /login` | Signs in the browser that asked for the challenge. With `{ "response": "did:cid:…" }` it takes the answer directly. With no body it collects an answer sent to the callback, and answers `202` with `{ "waiting": true }` until there is one. Sets the session cookie and returns the DID signed in |
 | `POST /logout` | Ends the session |
 | `GET /me` | The DID signed in, with its `grant` and `registry` (and any `others` in force), or with the grant `link` to show and any grants still `pending` |
 | `POST /objects` | Publishes an object. Takes its fields, with `kind`; returns its `did` |
@@ -64,6 +65,15 @@ An answer signs a browser in when all of these hold:
   an asset can replace its contents and hand it to any identity without that
   identity's consent, so only an answer at its first version shows who wrote it.
 
+A wallet that sends its answer to the callback is not the browser, so the callback
+signs nobody in. It keeps the answer, and the browser that asked for that challenge
+collects the sign-in.
+
+Signing in this way is as safe as the user's care over which challenge they answer.
+Someone who asks for a challenge and persuades a user to answer it is signed in as
+that user, as with any sign-in by a link. A wallet shows the challenge's callback
+before it answers, and that is where the user sees whose challenge it is.
+
 Each challenge is an asset the node stores and gossips, and anyone can ask for one,
 so the service issues a limited number a minute (60 unless set otherwise).
  Sessions and challenges are held in memory: a restart signs everyone out,
@@ -92,6 +102,7 @@ on the host's loopback address unless `ARCHON_MEMEPOOL_HOST_BIND` says otherwise
 | Setting | Default | Meaning |
 |---|---|---|
 | `ARCHON_MEMEPOOL_WALLET_PASSPHRASE` | none | Encrypts the service's wallet. The service does not start without it |
+| `ARCHON_MEMEPOOL_PUBLIC_URL` | none | Where users reach the service, such as `https://node.example/memepool`. With it, a challenge names the service's callback and a wallet sends its answer straight back. Without it, a user copies the answer from the wallet to the page |
 | `ARCHON_MEMEPOOL_NAME` | `memepool` | The name of the service's identity, and the name it gives in a grant request |
 | `ARCHON_MEMEPOOL_REGISTRY` | `hyperswarm` | The registry the service's own identity is created on |
 | `ARCHON_MEMEPOOL_PORT` | `4237` | The host port |
