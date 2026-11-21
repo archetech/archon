@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 import { VerifiedUser } from "@mui/icons-material";
 import type { KeymasterInterface } from "@didcid/clients/keymaster-types";
-import { PERMITTED_REGISTRIES, decodeGrantLink, validateGrant } from "@didcid/memeplex";
+import { PERMITTED_REGISTRIES, decodeGrantLink, positionOn, validateGrant } from "@didcid/memeplex";
 import PageHeader from "./layout/PageHeader";
 import EmptyState from "./layout/EmptyState";
 
@@ -44,8 +44,8 @@ type Props = {
         error: (error: unknown) => void;
         success: (message: string) => void;
     };
-    // How often, in milliseconds, a revocation that is not yet anchored is read
-    // again.
+    // How often, in milliseconds, the grants and revocations shown are read from
+    // the node.
     pollMs?: number;
 };
 
@@ -64,14 +64,19 @@ type GrantData = {
     actions?: string[];
     nonce?: string;
     expiresAt?: string;
+    [other: string]: unknown;
 };
 
 type HeldGrant = {
     did: string;
+    // The grant as its latest version states it.
     grant: GrantData;
     registry: string;
-    // Whether the grant's latest version is anchored.
+    // Whether that version is anchored on the grant's registry. One that is not
+    // has no effect yet.
     anchored: boolean;
+    // Whether that version is the grant's creation.
+    created: boolean;
 };
 
 // A revocation, from the wallet's side: `requested` once the user has asked,
@@ -81,7 +86,14 @@ export type RevocationState = "requested" | "submitted" | "effective";
 
 type Revocation = { grant: HeldGrant; state: RevocationState };
 
-type Scope = { actions: string[]; chosen: string[]; expiry: string };
+// Revocations made while the wallet is open, by identity. Keymaster does not
+// list a revoked asset, so this is what lets the view warn about one when the
+// user leaves the tab and comes back.
+const sessionRevocations = new Map<string, Revocation[]>();
+
+// `expiresAt` is the instant the editor was opened with, kept so that an expiry
+// the user leaves alone is written back exactly.
+type Scope = { actions: string[]; chosen: string[]; expiry: string; expiresAt?: string };
 
 function actionName(action: string): string {
     return ACTION_NAMES[action] ?? action;
@@ -111,7 +123,19 @@ function fromLocalInput(value: string): string | undefined {
 // What a scope editor starts from: the actions on offer, all chosen.
 function scopeOf(actions: string[] | undefined, expiresAt: string | undefined, offered = actions): Scope {
     const all = offered ?? CORE_ACTIONS;
-    return { actions: all, chosen: actions ?? all, expiry: toLocalInput(expiresAt) };
+    return { actions: all, chosen: actions ?? all, expiry: toLocalInput(expiresAt), expiresAt };
+}
+
+function expiryOf(scope: Scope): string | undefined {
+    return scope.expiry === toLocalInput(scope.expiresAt) ? scope.expiresAt : fromLocalInput(scope.expiry);
+}
+
+type Resolved = Awaited<ReturnType<GrantsKeymaster["resolveDID"]>>;
+
+// Whether a resolved version is anchored on a registry: confirmation alone is
+// not that, since a creation is confirmed from the start.
+function isAnchored(doc: Resolved, registry: string): boolean {
+    return positionOn(doc as Parameters<typeof positionOn>[0], registry) !== undefined;
 }
 
 // The `actions` a scope stands for: none when it is every core kind, which a
@@ -187,7 +211,8 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
     notifyRef.current = hostNotify;
 
     const [grants, setGrants] = useState<HeldGrant[] | null>(null);
-    const [revocations, setRevocations] = useState<Revocation[]>([]);
+    const [revocations, setRevocationState] = useState<Revocation[]>(() => sessionRevocations.get(identity) ?? []);
+    const [unresolved, setUnresolved] = useState(0);
     const [link, setLink] = useState("");
     const [request, setRequest] = useState<Record<string, any> | null>(null);
     const [linkError, setLinkError] = useState("");
@@ -199,9 +224,18 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
 
     const permitted = PERMITTED_REGISTRIES.filter(name => registries.includes(name));
 
+    const setRevocations = useCallback((change: (current: Revocation[]) => Revocation[]) => {
+        setRevocationState(current => {
+            const next = change(current);
+            sessionRevocations.set(identity, next);
+            return next;
+        });
+    }, [identity]);
+
     const load = useCallback(async () => {
         const held: HeldGrant[] = [];
         const owned = await keymaster.listAssets(identity);
+        let failed = 0;
 
         for (let start = 0; start < owned.length; start += 8) {
             const docs = await Promise.all(owned.slice(start, start + 8).map(async did => {
@@ -214,64 +248,78 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
             }));
 
             for (const found of docs) {
-                const data = found?.doc.didDocumentData as { memeplexGrant?: unknown } | undefined;
-
-                if (!found || found.doc.didDocumentMetadata?.deactivated || validateGrant(data?.memeplexGrant) !== "valid") {
+                if (!found) {
+                    failed += 1;
                     continue;
                 }
+
+                const data = found.doc.didDocumentData as { memeplexGrant?: unknown } | undefined;
+
+                if (found.doc.didDocumentMetadata?.deactivated || validateGrant(data?.memeplexGrant) !== "valid") {
+                    continue;
+                }
+
+                const registry = found.doc.didDocumentRegistration?.registry ?? "";
 
                 held.push({
                     did: found.did,
                     grant: data!.memeplexGrant as GrantData,
-                    registry: found.doc.didDocumentRegistration?.registry ?? "",
-                    anchored: found.doc.didDocumentMetadata?.confirmed === true,
+                    registry,
+                    anchored: isAnchored(found.doc, registry),
+                    created: Number(found.doc.didDocumentMetadata?.versionSequence ?? 1) <= 1,
                 });
             }
         }
 
+        setUnresolved(failed);
         setGrants(held);
     }, [keymaster, identity]);
 
-    useEffect(() => {
-        load().catch(error => {
-            setGrants([]);
-            notifyRef.current.error(error);
-        });
-    }, [load]);
+    // Whether each revocation the node has accepted is anchored. An anchor can be
+    // withdrawn by a reorganization, so one seen as effective is read as well.
+    const readRevocations = useCallback(async () => {
+        const states = new Map<string, RevocationState>();
 
-    const awaiting = revocations.some(revocation => revocation.state === "submitted");
-
-    useEffect(() => {
-        if (!awaiting) {
-            return;
+        for (const revocation of sessionRevocations.get(identity) ?? []) {
+            if (revocation.state === "requested") {
+                continue;
+            }
+            try {
+                const doc = await keymaster.resolveDID(revocation.grant.did);
+                const effective = doc.didDocumentMetadata?.deactivated === true && isAnchored(doc, revocation.grant.registry);
+                states.set(revocation.grant.did, effective ? "effective" : "submitted");
+            }
+            catch {
+                // Left as it is shown until the node answers.
+            }
         }
 
-        const timer = setInterval(async () => {
-            const anchored = new Set<string>();
+        setRevocations(current => current.map(revocation => {
+            const state = revocation.state === "requested" ? undefined : states.get(revocation.grant.did);
+            return state && state !== revocation.state ? { ...revocation, state } : revocation;
+        }));
+    }, [keymaster, identity, setRevocations]);
 
-            for (const revocation of revocations) {
-                if (revocation.state !== "submitted") {
-                    continue;
-                }
-                try {
-                    const doc = await keymaster.resolveDID(revocation.grant.did);
-                    if (doc.didDocumentMetadata?.deactivated && doc.didDocumentMetadata?.confirmed === true) {
-                        anchored.add(revocation.grant.did);
-                    }
-                }
-                catch {
-                    // Read again at the next interval.
-                }
-            }
+    const refresh = useCallback(async () => {
+        try {
+            await load();
+        }
+        catch (error) {
+            setGrants(current => current ?? []);
+            notifyRef.current.error(error);
+        }
+        await readRevocations();
+    }, [load, readRevocations]);
 
-            if (anchored.size > 0) {
-                setRevocations(current => current.map(revocation =>
-                    anchored.has(revocation.grant.did) ? { ...revocation, state: "effective" } : revocation));
-            }
+    useEffect(() => {
+        refresh();
+        const timer = setInterval(() => {
+            load().catch(() => undefined);
+            readRevocations();
         }, pollMs);
 
         return () => clearInterval(timer);
-    }, [awaiting, revocations, keymaster, pollMs]);
+    }, [refresh, load, readRevocations, pollMs]);
 
     function readLink() {
         const decoded = decodeGrantLink(link.trim());
@@ -300,7 +348,7 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
         }
 
         const actions = actionsOf(scope);
-        const expiresAt = fromLocalInput(scope.expiry);
+        const expiresAt = expiryOf(scope);
         const memeplexGrant: GrantData = {
             v: 1,
             client: request.client,
@@ -311,6 +359,18 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
 
         setBusy(true);
         try {
+            // Keymaster creates a local identity's assets on `local` whatever
+            // registry is asked for, and a grant there, like a grant to oneself,
+            // is void.
+            const grantor = await keymaster.resolveDID(identity, { confirm: true });
+
+            if (grantor.didDocumentRegistration?.registry === "local") {
+                throw new Error("A local identity cannot make a grant: its assets cannot be created on a chain registry");
+            }
+            if (grantor.didDocument?.id === request.client) {
+                throw new Error("This request names this identity as the client. An identity cannot grant itself.");
+            }
+
             await keymaster.createAsset({ memeplexGrant }, { registry, controller: identity });
             discard();
             notifyRef.current.success("Grant created");
@@ -331,14 +391,16 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
 
         const { grant: held, scope: edited } = editing;
         const actions = actionsOf(edited);
-        const expiresAt = fromLocalInput(edited.expiry);
-        const memeplexGrant: GrantData = { v: 1, client: held.grant.client };
+        const expiresAt = expiryOf(edited);
+        // Everything else the grant holds is kept: a change to anything but
+        // `actions` and `expiresAt` would end the grant.
+        const memeplexGrant: GrantData = { ...held.grant };
+
+        delete memeplexGrant.actions;
+        delete memeplexGrant.expiresAt;
 
         if (actions) {
             memeplexGrant.actions = actions;
-        }
-        if (held.grant.nonce !== undefined) {
-            memeplexGrant.nonce = held.grant.nonce;
         }
         if (expiresAt) {
             memeplexGrant.expiresAt = expiresAt;
@@ -346,7 +408,9 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
 
         setBusy(true);
         try {
-            await keymaster.mergeData(held.did, { memeplexGrant });
+            if (!await keymaster.mergeData(held.did, { memeplexGrant })) {
+                throw new Error("The node did not accept the change");
+            }
             setEditing(null);
             notifyRef.current.success("Grant changed");
             await load();
@@ -488,9 +552,20 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
                 </Alert>
             ))}
 
+            {unresolved > 0 && (
+                <Alert
+                    severity="warning"
+                    sx={{ mb: 1 }}
+                    action={<Button color="inherit" size="small" onClick={refresh}>Retry</Button>}
+                >
+                    {unresolved === 1 ? "One asset" : `${unresolved} assets`} of this identity could not be read,
+                    so this list may be missing grants.
+                </Alert>
+            )}
+
             {grants === null && <CircularProgress size={24} aria-label="Loading grants" />}
 
-            {grants !== null && grants.length === 0 && (
+            {grants !== null && grants.length === 0 && unresolved === 0 && (
                 <EmptyState
                     icon={<VerifiedUser />}
                     title="No grants"
@@ -506,8 +581,15 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
                             ? <Chip size="small" color="default" label="Expired" />
                             : held.anchored
                                 ? <Chip size="small" color="success" label="Active" />
-                                : <Chip size="small" color="warning" label="Awaiting anchoring" />}
+                                : <Chip size="small" color="warning" label={held.created ? "Awaiting anchoring" : "Change awaiting anchoring"} />}
                     </Box>
+                    {!held.anchored && (
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                            {held.created
+                                ? `The client cannot publish until this grant is anchored on ${held.registry}.`
+                                : `What is shown takes effect once it is anchored on ${held.registry}. Until then the grant is as it was.`}
+                        </Typography>
+                    )}
                     <Typography variant="body2" color="text.secondary">Client</Typography>
                     <Typography variant="body2" sx={{ fontFamily: "monospace", wordBreak: "break-all", mb: 1 }}>
                         {held.grant.client}

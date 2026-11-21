@@ -1055,7 +1055,7 @@ export default class Keymaster implements KeymasterInterface {
 
         // Keep assets that will be garbage-collected out of the owned list
         if (!validUntil) {
-            await this.addToOwned(did);
+            await this.addToOwned(did, id.did);
         }
 
         if (alias) {

@@ -117,6 +117,16 @@ describe('createAsset', () => {
         expect(doc.didDocumentData).toStrictEqual(mockAnchor);
     });
 
+    it('should list an asset under the identity that controls it, not the current one', async () => {
+        await keymaster.createId('Bob');
+        await keymaster.createId('Alice');
+
+        const dataDid = await keymaster.createAsset({ name: 'mockAnchor' }, { registry: 'hyperswarm', controller: 'Bob' });
+
+        expect(await keymaster.listAssets('Bob')).toStrictEqual([dataDid]);
+        expect(await keymaster.listAssets('Alice')).toStrictEqual([]);
+    });
+
     it('should create asset with specified alias', async () => {
         const ownerDid = await keymaster.createId('Bob');
         const mockAnchor = { name: 'mockAnchor' };
