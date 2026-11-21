@@ -24,23 +24,38 @@ export function markUnrouted(
 }
 
 // The label a finished request is recorded under.
+//
+// A request that matched a declared route is labelled by that route's own
+// pattern under its mount, `/api/v1/did/:did`: the routes are the code's, so
+// these labels are a fixed set and are never crowded out. A request taken by a
+// mount that forwards it has only its path, which is normalized and then
+// bounded.
 export function requestLabel(
-    req: { originalUrl: string },
+    req: { originalUrl: string; baseUrl?: string; route?: { path?: unknown } },
     res: { locals: Record<string, unknown> },
     bounded: (label: string) => string,
 ): string {
-    return res.locals.unrouted ? UNROUTED : bounded(routeLabel(req));
+    if (res.locals.unrouted) {
+        return UNROUTED;
+    }
+    if (typeof req.route?.path === 'string') {
+        // The mount is given as the caller wrote it, and Express matches it in
+        // any case. Drawbridge's mounts are lower-case.
+        return `${(req.baseUrl ?? '').toLowerCase()}${req.route.path}`;
+    }
+    return bounded(routeLabel(req));
 }
 
 // The label of a request whose own label would be one too many.
 export const OVERFLOW = '/:other';
 
-// How many labels a node keeps. Its own routes are a fraction of this.
+// How many labels a node keeps for the paths its proxy mounts forward.
 export const MAX_ROUTE_LABELS = 500;
 
 // Lets the first `limit` distinct labels through and gives every later one
 // the overflow label. A proxy mount forwards whatever follows its prefix, so
-// the paths under it cannot be listed, and this is what bounds them.
+// the paths under it cannot be listed, and this is what bounds them. Declared
+// routes do not pass through it: see requestLabel.
 export function labelLimiter(limit: number = MAX_ROUTE_LABELS): (label: string) => string {
     const kept = new Set<string>();
 

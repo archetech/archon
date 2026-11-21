@@ -87,7 +87,11 @@ describe('bounds on route labels', () => {
             res.on('finish', () => { labels.push(requestLabel(req, res, bounded)); });
             next();
         });
-        app.get('/api/v1/ready', (_req, res) => { res.json(true); });
+        const v1 = express.Router();
+        v1.get('/ready', (_req, res) => { res.json(true); });
+        v1.get('/did/:did', (_req, res) => { res.json({}); });
+        app.use('/api/v1', v1);
+        app.get('/invoice/:did', (_req, res) => { res.json({}); });
         app.use('/names', (_req, res) => { res.status(404).json({ error: 'unknown name' }); });
         app.use(markUnrouted);
 
@@ -105,13 +109,43 @@ describe('bounds on route labels', () => {
         expect(labels).toStrictEqual([UNROUTED, UNROUTED, UNROUTED, UNROUTED, UNROUTED]);
     });
 
-    it('labels a request that a route or a mount took by its path', async () => {
+    it('labels a request that matched a declared route by the route\'s pattern', async () => {
         const { app, labels } = server();
 
         await request(app).get('/api/v1/ready');
+        await request(app).get('/api/v1/did/did:cid:bagaaiera');
+        // Whatever stands in the parameter's place, and in whatever case.
+        await request(app).get('/api/v1/did/anything-a-caller-sends');
+        await request(app).get('/API/V1/DID/another?x=1');
+        await request(app).get('/invoice/did:cid:bagaaiera');
+
+        expect(labels).toStrictEqual([
+            '/api/v1/ready', '/api/v1/did/:did', '/api/v1/did/:did', '/api/v1/did/:did', '/invoice/:did',
+        ]);
+    });
+
+    it('labels a request that a mount forwarded by its path', async () => {
+        const { app, labels } = server();
+
         await request(app).get('/names/alice');
 
-        expect(labels).toStrictEqual(['/api/v1/ready', '/names/alice']);
+        expect(labels).toStrictEqual(['/names/alice']);
+    });
+
+    // Filling the limit with made-up paths under a mount takes nothing from the
+    // node's own routes, seen before or not.
+    it('labels a declared route as itself after the limit is reached', async () => {
+        const { app, labels } = server(2);
+
+        for (let n = 1; n <= 4; n++) {
+            await request(app).get(`/names/made-up-${n}`);
+        }
+        await request(app).get('/api/v1/ready');
+        await request(app).get('/api/v1/did/did:cid:bagaaiera');
+
+        expect(labels).toStrictEqual([
+            '/names/made-up-1', '/names/made-up-2', OVERFLOW, OVERFLOW, '/api/v1/ready', '/api/v1/did/:did',
+        ]);
     });
 
     it('keeps no more labels than its limit, whatever is asked for under a mount', async () => {

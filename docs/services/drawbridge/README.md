@@ -279,14 +279,19 @@ The label is the full path, with its mount: `/api/v1/did/:did`,
 `/names/poppy/api/names/:name`.
 
 A path is a caller's to choose, and a label is a series the node keeps for as
-long as it runs, so two bounds apply to what a caller can make of one:
+long as it runs, so a caller cannot make labels at will:
 
+- **A request that matches a declared route** is labelled by that route's own
+  pattern under its mount, whatever stands in its parameters. These are a fixed
+  set, and nothing below takes from them.
+- **A request that a proxy mount forwards** (`/names`, `/.well-known`,
+  `/explorer`, `/didcomm`, `/cashu`, `/memeplex`, `/1.0/identifiers`,
+  `/api/v1/lightning`) is labelled by its path with the segments above
+  collapsed. The paths under a mount cannot be listed, so a node keeps at most
+  500 distinct labels of this kind, and a request whose label would be one more
+  is recorded as `/:other`.
 - **A request that no route or mount takes** is labelled `/:unrouted`, whatever
   its path. Its answer is a 404.
-- **A node keeps at most 500 distinct labels.** Once it has them, a request
-  whose label would be a new one is recorded as `/:other`. A proxy mount
-  forwards whatever follows its prefix, so the paths under it cannot be listed,
-  and this is what bounds them. A node's own routes are a fraction of 500.
 
 ---
 
