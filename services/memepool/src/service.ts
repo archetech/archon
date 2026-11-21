@@ -13,6 +13,7 @@ export interface MemepoolSettings {
     port: number;
     bindAddress: string;
     name: string;
+    publicURL: string;
     dataDir: string;
     passphrase: string;
     registry: string;
@@ -82,6 +83,7 @@ export async function startMemepool(
         client,
         keymaster,
         name: settings.name,
+        publicURL: settings.publicURL || undefined,
         version,
         challengesPerMinute: settings.challengesPerMinute,
         sessionLifetime: settings.sessionHours * 60 * 60_000,

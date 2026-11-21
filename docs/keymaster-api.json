@@ -7285,6 +7285,80 @@
         }
       }
     },
+    "/revocations": {
+      "get": {
+        "summary": "List the assets whose deletion a node has accepted and their chain registry has yet to anchor.",
+        "description": "An asset leaves this list once its deletion is anchored on its registry. An asset the node resolves as live is returned once, as `displaced`, and then leaves the list.\n",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "owner",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The ID name or DID whose revocations to list. Defaults to the current ID."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The revocations awaiting anchoring.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revocations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "did",
+                          "status"
+                        ],
+                        "properties": {
+                          "did": {
+                            "type": "string"
+                          },
+                          "registry": {
+                            "type": "string",
+                            "description": "The asset's registry. Absent when the node could not resolve the asset."
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "displaced",
+                              "unresolved"
+                            ],
+                            "description": "`pending` when the deletion is not anchored yet, `displaced` when another change took the deletion's place and the asset is live, `unresolved` when the node could not resolve the asset.\n"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/assets/{id}": {
       "get": {
         "summary": "Resolve (retrieve) an asset by DID or name.",

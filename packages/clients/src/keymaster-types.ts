@@ -44,6 +44,9 @@ export interface IDInfo {
     index: number;
     held?: string[];
     owned?: string[];
+    // Assets whose deletion a node has accepted and a chain registry has yet to
+    // anchor. They are absent from `owned`.
+    revoking?: string[];
     addresses?: Record<string, StoredAddressInfo>;
     nostr?: StoredNostrInfo;
     dmail?: Record<string, any>;
@@ -654,6 +657,18 @@ export interface NodeCapabilities {
 }
 
 /** Inspection is read-only; changes replace only the indicated document component. */
+// An asset on a chain registry whose deletion a node has accepted.
+export interface AssetRevocation {
+    did: string;
+    // The asset's registry. Absent when the node could not resolve the asset.
+    registry?: string;
+    // `pending`: the node resolves the asset as deleted, and the deletion is not
+    // anchored on the asset's registry. `displaced`: the node resolves the asset
+    // as live, so another change took the deletion's place. `unresolved`: the
+    // node could not resolve the asset.
+    status: 'pending' | 'displaced' | 'unresolved';
+}
+
 export interface CheckDIDResult {
     did: string;
     type?: string;
@@ -795,6 +810,7 @@ export interface KeymasterInterface {
     // Assets
     createAsset(data: unknown, options?: CreateAssetOptions): Promise<string>;
     listAssets(owner?: string): Promise<string[]>;
+    listRevocations(owner?: string): Promise<AssetRevocation[]>;
     resolveAsset(did: string, options?: ResolveDIDOptions): Promise<unknown | null>;
     mergeData(did: string, data: Record<string, unknown>): Promise<boolean>;
 

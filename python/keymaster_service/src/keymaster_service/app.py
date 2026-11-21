@@ -696,6 +696,11 @@ async def list_assets(owner: str | None = None) -> dict[str, Any]:
     return {"assets": await service.list_assets(owner)}
 
 
+@protected_api.get("/revocations")
+async def list_revocations(owner: str | None = None) -> dict[str, Any]:
+    return {"revocations": await service.list_revocations(owner)}
+
+
 @protected_api.post("/assets")
 async def create_asset(body: dict[str, Any]) -> dict[str, str]:
     return {"did": await service.create_asset(body["data"], body.get("options") or {})}
