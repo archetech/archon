@@ -652,3 +652,48 @@ def test_verify_response_finds_an_assignment_the_presentation_order_hides(testbe
     verified = run(km.verify_response(response))
     assert len(verified["vps"]) == 2
     assert verified["match"] is True
+
+
+def test_verify_response_does_not_name_the_identity_a_response_was_transferred_to(testbed):
+    # An asset's owner can transfer it to any identity, which signs nothing.
+    testbed.gatekeeper.historical = True
+    alice = run(testbed.keymaster.create_id("Alice"))
+    run(testbed.keymaster.create_id("Mallory"))
+    run(testbed.keymaster.create_id("Victor"))
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    challenge_did = run(testbed.keymaster.create_challenge())
+
+    run(testbed.keymaster.set_current_id("Mallory"))
+    response_did = run(testbed.keymaster.create_response(challenge_did))
+    assert run(testbed.keymaster.transfer_asset(response_did, alice)) is True
+    assert run(testbed.keymaster.resolve_did(response_did))["didDocument"]["controller"] == alice
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    verify = run(testbed.keymaster.verify_response(response_did))
+
+    assert verify["match"] is False
+    assert "responder" not in verify
+
+
+def test_verify_response_names_the_creator_of_a_response_transferred_and_returned(testbed):
+    testbed.gatekeeper.historical = True
+    alice = run(testbed.keymaster.create_id("Alice"))
+    mallory = run(testbed.keymaster.create_id("Mallory"))
+    run(testbed.keymaster.create_id("Victor"))
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    challenge_did = run(testbed.keymaster.create_challenge())
+
+    run(testbed.keymaster.set_current_id("Mallory"))
+    response_did = run(testbed.keymaster.create_response(challenge_did))
+    run(testbed.keymaster.transfer_asset(response_did, alice))
+    run(testbed.keymaster.set_current_id("Alice"))
+    run(testbed.keymaster.transfer_asset(response_did, mallory))
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    verify = run(testbed.keymaster.verify_response(response_did))
+
+    assert verify["match"] is True
+    assert verify["responder"] == mallory
+

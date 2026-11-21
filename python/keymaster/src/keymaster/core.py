@@ -4439,9 +4439,37 @@ class Keymaster:
         used = set(assigned)
 
         response["vps"] = [vp for index, vp in enumerate(accepted) if index in used]
-        response["match"] = all(index >= 0 for index in assigned)
-        response["responder"] = response_doc.get("didDocument", {}).get("controller")
+        responder = await self._responder_of(response_did, response_doc)
+        response["match"] = responder is not None and all(index >= 0 for index in assigned)
+        if responder is not None:
+            response["responder"] = responder
         return response
+
+    async def _responder_of(self, response_did: str, response_doc: dict[str, Any]) -> str | None:
+        """Who answered a challenge: the identity that created the response, when
+        it still controls the response.
+
+        The response's controller alone does not say. An asset's owner can
+        transfer it to any identity, which signs nothing, so the controller can
+        be someone who never answered. Nothing in a response's contents says
+        either: they are encrypted to the challenger by a key made for the
+        purpose, not by the responder's. The creation is signed by its
+        controller and cannot change. A response that has changed hands, or
+        that names another identity as its sender, has no responder and does
+        not match.
+        """
+        controller = (response_doc.get("didDocument") or {}).get("controller")
+        created = await self.resolve_did(response_did, {"versionSequence": 1})
+        creator = (created.get("didDocument") or {}).get("controller")
+        asset = response_doc.get("didDocumentData")
+        crypt = asset.get("encrypted", asset) if isinstance(asset, dict) else {}
+        sender = crypt.get("sender") if isinstance(crypt, dict) else None
+
+        if not controller or not creator or not self.did_match(controller, creator):
+            return None
+        if sender and not self.did_match(sender, creator):
+            return None
+        return creator
 
     # --- DIDComm v2 ----------------------------------------------------------
     # Port of the TypeScript Keymaster DIDComm surface (see keymaster.ts). The

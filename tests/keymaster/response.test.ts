@@ -425,6 +425,67 @@ describe('verifyResponse', () => {
     });
 });
 
+describe('verifyResponse responder', () => {
+    // An asset's owner can transfer it to any identity, which signs nothing.
+    it('does not name the identity a response was transferred to', async () => {
+        const alice = await keymaster.createId('Alice');
+        await keymaster.createId('Mallory');
+        await keymaster.createId('Victor');
+
+        await keymaster.setCurrentId('Victor');
+        const challengeDID = await keymaster.createChallenge();
+
+        await keymaster.setCurrentId('Mallory');
+        const responseDID = await keymaster.createResponse(challengeDID);
+        expect(await keymaster.transferAsset(responseDID, alice)).toBe(true);
+        expect((await keymaster.resolveDID(responseDID)).didDocument!.controller).toBe(alice);
+
+        await keymaster.setCurrentId('Victor');
+        const verify = await keymaster.verifyResponse(responseDID);
+
+        expect(verify.match).toBe(false);
+        expect(verify.responder).toBeUndefined();
+    });
+
+    it('names the creator of a response that was transferred and returned', async () => {
+        const alice = await keymaster.createId('Alice');
+        const mallory = await keymaster.createId('Mallory');
+        await keymaster.createId('Victor');
+
+        await keymaster.setCurrentId('Victor');
+        const challengeDID = await keymaster.createChallenge();
+
+        await keymaster.setCurrentId('Mallory');
+        const responseDID = await keymaster.createResponse(challengeDID);
+        await keymaster.transferAsset(responseDID, alice);
+        await keymaster.setCurrentId('Alice');
+        await keymaster.transferAsset(responseDID, mallory);
+
+        await keymaster.setCurrentId('Victor');
+        expect(await keymaster.verifyResponse(responseDID)).toMatchObject({ match: true, responder: mallory });
+    });
+
+    // A response's contents are public, though encrypted, and say nothing of who made them.
+    it('names whoever published a copy of another identity\'s response, not that identity', async () => {
+        await keymaster.createId('Bob');
+        const mallory = await keymaster.createId('Mallory');
+        await keymaster.createId('Victor');
+
+        await keymaster.setCurrentId('Victor');
+        const challengeDID = await keymaster.createChallenge();
+
+        await keymaster.setCurrentId('Bob');
+        const responseDID = await keymaster.createResponse(challengeDID);
+        const contents = (await keymaster.resolveDID(responseDID)).didDocumentData;
+
+        await keymaster.setCurrentId('Mallory');
+        const copyDID = await keymaster.createAsset(contents, { registry: 'hyperswarm' });
+
+        await keymaster.setCurrentId('Victor');
+        expect(await keymaster.verifyResponse(copyDID)).toMatchObject({ match: true, responder: mallory });
+    });
+});
+
 describe('verifyResponse presentation binding', () => {
     it('does not count a credential without a valid issuer proof', async () => {
         const alice = await keymaster.createId('Alice');

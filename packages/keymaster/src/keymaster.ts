@@ -5174,10 +5174,34 @@ export default class Keymaster implements KeymasterInterface {
         const used = new Set(assigned);
 
         response.vps = accepted.filter((_, index) => used.has(index));
-        response.match = assigned.every(index => index >= 0);
-        response.responder = responseDoc.didDocument?.controller;
+        response.responder = await this.responderOf(responseDID, responseDoc);
+        response.match = response.responder !== undefined && assigned.every(index => index >= 0);
 
         return response;
+    }
+
+    // Who answered a challenge: the identity that created the response, when
+    // it still controls the response.
+    //
+    // The response's controller alone does not say. An asset's owner can
+    // transfer it to any identity, which signs nothing, so the controller can
+    // be someone who never answered. Nothing in a response's contents says
+    // either: they are encrypted to the challenger by a key made for the
+    // purpose, not by the responder's. The creation is signed by its
+    // controller and cannot change. A response that has changed hands, or
+    // that names another identity as its sender, has no responder and does
+    // not match.
+    private async responderOf(responseDID: string, responseDoc: DidCidDocument): Promise<string | undefined> {
+        const controller = responseDoc.didDocument?.controller;
+        const creator = (await this.resolveDID(responseDID, { versionSequence: 1 })).didDocument?.controller;
+        const asset = responseDoc.didDocumentData as ({ encrypted?: EncryptedMessage } & Partial<EncryptedMessage>) | undefined;
+        const sender = (asset?.encrypted ?? asset)?.sender;
+
+        if (!controller || !creator || !this.didMatch(controller, creator) || (sender && !this.didMatch(sender, creator))) {
+            return undefined;
+        }
+
+        return creator;
     }
 
     async createGroup(
