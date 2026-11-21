@@ -14,7 +14,7 @@ From then on the service publishes what the user writes, as objects it creates o
 the grant's registry, naming the user as author. The user ends this at any time by
 revoking the grant in the wallet.
 
-Reading is not this service's job. Timelines and threads come from the
+The service also serves Memepool's pages, as files, beside its API. Reading is not this service's job. Timelines and threads come from the
 [indexer](../memeplex-indexer/README.md).
 
 The rules are in [the Memeplex plan](../../plans/memeplex-1436.md) and its
@@ -117,6 +117,7 @@ on the host's loopback address unless `ARCHON_MEMEPOOL_HOST_BIND` says otherwise
 |---|---|---|
 | `ARCHON_MEMEPOOL_WALLET_PASSPHRASE` | none | Encrypts the service's wallet. The service does not start without it |
 | `ARCHON_MEMEPOOL_PUBLIC_URL` | none | Where users reach the service, such as `https://node.example/memepool`. With it, a challenge names the service's callback and a wallet sends its answer straight back. Without it, a user copies the answer from the wallet to the page |
+| `ARCHON_MEMEPOOL_PAGES_DIR` | `public` | The built [pages](../../../apps/memepool/README.md), which the service serves beside its API. The image carries them. Empty serves none |
 | `ARCHON_MEMEPOOL_NAME` | `memepool` | The name of the service's identity, and the name it gives in a grant request |
 | `ARCHON_MEMEPOOL_REGISTRY` | `hyperswarm` | The registry the service's own identity is created on |
 | `ARCHON_MEMEPOOL_PORT` | `4237` | The host port |
@@ -138,7 +139,7 @@ attributed, and every user has to grant it again before it can publish for them.
 ### Through Drawbridge
 
 With the `memepool` profile, Drawbridge offers the service at `<node>/memepool`:
-its API is at `<node>/memepool/api/v1`. Drawbridge sets the service's cookies for
+its pages are at `<node>/memepool/` and its API at `<node>/memepool/api/v1`. Drawbridge sets the service's cookies for
 `/memepool`, so a browser sends them to Memepool and to nothing else on the node's
 host, and it limits how often one source reads and writes (see the
 [Drawbridge](../drawbridge/README.md) rate limits).

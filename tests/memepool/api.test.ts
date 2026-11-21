@@ -436,6 +436,15 @@ describe('signing in with a wallet that sends its answer to the callback', () =>
     });
 });
 
+describe('the pages', () => {
+    it('serves none, and no route under the API as a page, when it has no pages', async () => {
+        expect((await request(app).get('/')).status).toBe(404);
+        // Under the API's own prefix, a route nobody has is not told from one that needs a session.
+        expect((await request(app).get('/api/v1/no-such-route')).status).toBe(401);
+        expect((await request(app).get('/api/v2/ready')).body).toStrictEqual({ error: 'no such route' });
+    });
+});
+
 describe('the user\'s grant', () => {
     it('asks for a grant to the service\'s DID, sees it pending, then publishes under it', async () => {
         const agent = await signIn(alice);
