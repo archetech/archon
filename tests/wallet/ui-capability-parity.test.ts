@@ -59,6 +59,7 @@ const ABSENT_FROM_CLIENTS: Record<string, string> = {
     getDmailMessage: 'The clients resolve the message DID directly rather than asking for it by name.',
     getGroup: 'The clients read groups through resolveAsset, which returns the same document.',
     getSchema: 'The clients read schemas through resolveAsset, as they do groups.',
+    listAssets: 'How the Grants tab finds an identity\'s Memeplex grants among its assets. Granting a client is a wallet\'s job: it is where a user approves a grant link. The clients can make the same asset with their own asset controls.',
     signNostrEvent: 'The NIP-07 approval flow in the browser extension, which signs on behalf of a visited page. A client demo has no page asking it to sign.',
 };
 

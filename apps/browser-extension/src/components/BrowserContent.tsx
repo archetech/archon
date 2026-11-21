@@ -6,6 +6,7 @@ import {
     Badge,
     Bolt,
     Toll,
+    VerifiedUser,
     DarkMode,
     Forum,
     LightMode,
@@ -34,6 +35,7 @@ import { AssetsTab } from "@didcid/wallet-ui";
 import { DmailTab } from "@didcid/wallet-ui";
 import { LightningTab } from "@didcid/wallet-ui";
 import { CashuTab } from "@didcid/wallet-ui";
+import { GrantsTab } from "@didcid/wallet-ui";
 import { DidCommTab } from "@didcid/wallet-ui";
 import { PollTab } from "@didcid/wallet-ui";
 import { AuthTab } from "@didcid/wallet-ui";
@@ -325,6 +327,17 @@ function BrowserContent() {
 
                             {displayComponent && (
                                 <Tab
+                                    icon={<VerifiedUser />}
+                                    label={menuOpen ? "Grants" : ""}
+                                    value="grants"
+                                    iconPosition="start"
+                                    className="sidebarTab"
+                                    sx={{ gap: 0.25 }}
+                                />
+                            )}
+
+                            {displayComponent && (
+                                <Tab
                                     icon={<Token />}
                                     label={menuOpen ? "Assets" : ""}
                                     value="assets"
@@ -419,6 +432,12 @@ function BrowserContent() {
                         {displayComponent && (
                             <TabPanel value="cashu" sx={{ p: 0 }}>
                                 <CashuTab />
+                            </TabPanel>
+                        )}
+
+                        {displayComponent && (
+                            <TabPanel value="grants" sx={{ p: 0 }}>
+                                <GrantsTab />
                             </TabPanel>
                         )}
 

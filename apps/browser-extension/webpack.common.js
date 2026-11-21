@@ -73,6 +73,7 @@ module.exports = {
             // function in another file.
             "@noble/hashes/sha256$": path.resolve(__dirname, "node_modules/@noble/hashes/sha2.js"),
             "@didcid/wallet-ui": path.resolve(__dirname, "../../packages/wallet-ui/src/index.ts"),
+            "@didcid/memeplex": path.resolve(__dirname, "../../packages/memeplex/dist/esm/index.js"),
             "@didcid/cipher/web": path.resolve(__dirname, "../../packages/cipher/dist/esm/cipher-web.js"),
             "@didcid/common/errors": path.resolve(__dirname, "../../packages/common/dist/esm/errors.js"),
             "@didcid/clients/gatekeeper": path.resolve(__dirname, "../../packages/clients/dist/esm/gatekeeper-client.js"),
