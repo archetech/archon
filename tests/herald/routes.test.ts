@@ -386,6 +386,16 @@ describe('herald session login', () => {
         expect(post.body).toEqual({ authenticated: false });
     });
 
+    it('reports not authenticated, and records no login, for a response that names a responder and does not match', async () => {
+        const db = createDb();
+        const keymaster = keymasterVerifying({ match: false, challenge: 'did:cid:challenge', responder: 'did:cid:alice' });
+        const { app } = mount({ db, keymaster });
+
+        expect((await request(app).get('/api/login?response=abc')).body).toEqual({ authenticated: false });
+        expect((await request(app).post('/api/login').send({ response: 'abc' })).body).toEqual({ authenticated: false });
+        expect(await db.getUser('did:cid:alice')).toBeFalsy();
+    });
+
     it('authenticates a verified response and records the login', async () => {
         const db = createDb();
         const keymaster = keymasterVerifying({

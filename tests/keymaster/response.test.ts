@@ -477,6 +477,32 @@ describe('verifyResponse responder', () => {
         expect(verify.responder).toBeUndefined();
     });
 
+    // A response's contents are whatever its author encrypted.
+    it('does not repeat a responder that a response\'s own contents name', async () => {
+        const alice = await keymaster.createId('Alice');
+        const mallory = await keymaster.createId('Mallory');
+        const victor = await keymaster.createId('Victor');
+
+        await keymaster.setCurrentId('Victor');
+        const challengeDID = await keymaster.createChallenge();
+
+        await keymaster.setCurrentId('Mallory');
+        const contents = { response: { challenge: challengeDID, credentials: [], requested: 0, fulfilled: 0, match: true, responder: alice } };
+        const forged = await keymaster.encryptJSON(contents, victor, { registry: 'hyperswarm' });
+
+        await keymaster.setCurrentId('Victor');
+        expect(await keymaster.verifyResponse(forged)).toMatchObject({ match: true, responder: mallory });
+
+        await keymaster.setCurrentId('Mallory');
+        await keymaster.transferAsset(forged, alice);
+
+        await keymaster.setCurrentId('Victor');
+        const verify = await keymaster.verifyResponse(forged);
+
+        expect(verify.match).toBe(false);
+        expect('responder' in verify).toBe(false);
+    });
+
     it('refuses a response whose contents are not a response', async () => {
         await keymaster.createId('Mallory');
         const victor = await keymaster.createId('Victor');

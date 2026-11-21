@@ -5178,8 +5178,15 @@ export default class Keymaster implements KeymasterInterface {
         const used = new Set(assigned);
 
         response.vps = accepted.filter((_, index) => used.has(index));
-        response.responder = this.responderOf(responseDoc);
-        response.match = response.responder !== undefined && assigned.every(index => index >= 0);
+        // The response's own contents are its author's to write, and may name
+        // a responder of their choosing.
+        delete response.responder;
+        const responder = this.responderOf(responseDoc);
+
+        if (responder !== undefined) {
+            response.responder = responder;
+        }
+        response.match = responder !== undefined && assigned.every(index => index >= 0);
 
         return response;
     }

@@ -702,3 +702,31 @@ def test_verify_response_does_not_name_the_creator_of_an_asset_returned_with_ano
     assert verify["challenge"] == challenge_did
     assert verify["match"] is False
     assert "responder" not in verify
+
+
+def test_verify_response_does_not_repeat_a_responder_its_contents_name(testbed):
+    # A response's contents are whatever its author encrypted.
+    alice = run(testbed.keymaster.create_id("Alice"))
+    mallory = run(testbed.keymaster.create_id("Mallory"))
+    victor = run(testbed.keymaster.create_id("Victor"))
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    challenge_did = run(testbed.keymaster.create_challenge())
+
+    run(testbed.keymaster.set_current_id("Mallory"))
+    contents = {"response": {"challenge": challenge_did, "credentials": [], "requested": 0, "fulfilled": 0, "match": True, "responder": alice}}
+    forged = run(testbed.keymaster.encrypt_json(contents, victor))
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    verify = run(testbed.keymaster.verify_response(forged))
+    assert verify["match"] is True
+    assert verify["responder"] == mallory
+
+    run(testbed.keymaster.set_current_id("Mallory"))
+    run(testbed.keymaster.transfer_asset(forged, alice))
+
+    run(testbed.keymaster.set_current_id("Victor"))
+    verify = run(testbed.keymaster.verify_response(forged))
+    assert verify["match"] is False
+    assert "responder" not in verify
+

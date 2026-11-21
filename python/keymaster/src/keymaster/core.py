@@ -4445,6 +4445,9 @@ class Keymaster:
         used = set(assigned)
 
         response["vps"] = [vp for index, vp in enumerate(accepted) if index in used]
+        # The response's own contents are its author's to write, and may name
+        # a responder of their choosing.
+        response.pop("responder", None)
         responder = self._responder_of(response_doc)
         response["match"] = responder is not None and all(index >= 0 for index in assigned)
         if responder is not None:
