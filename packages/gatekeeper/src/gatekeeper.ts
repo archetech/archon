@@ -1375,7 +1375,10 @@ export default class Gatekeeper implements GatekeeperInterface {
                     }
                 }
 
-                if (blockchain) {
+                // The block that anchored the operation is one of the chain its
+                // receipt is on. A receipt on another registry than the version's
+                // has a height that means nothing here.
+                if (blockchain && event.registry === registry) {
                     const upperBlock = await this.db.getBlock(registry, blockchain.height);
 
                     if (upperBlock) {
