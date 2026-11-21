@@ -656,7 +656,6 @@ def test_verify_response_finds_an_assignment_the_presentation_order_hides(testbe
 
 def test_verify_response_does_not_name_the_identity_a_response_was_transferred_to(testbed):
     # An asset's owner can transfer it to any identity, which signs nothing.
-    testbed.gatekeeper.historical = True
     alice = run(testbed.keymaster.create_id("Alice"))
     run(testbed.keymaster.create_id("Mallory"))
     run(testbed.keymaster.create_id("Victor"))
@@ -676,24 +675,30 @@ def test_verify_response_does_not_name_the_identity_a_response_was_transferred_t
     assert "responder" not in verify
 
 
-def test_verify_response_names_the_creator_of_a_response_transferred_and_returned(testbed):
-    testbed.gatekeeper.historical = True
+def test_verify_response_does_not_name_the_creator_of_an_asset_returned_with_another_answer(testbed):
+    # An identity that was once handed an asset can put its own answer in it
+    # and hand it back.
     alice = run(testbed.keymaster.create_id("Alice"))
     mallory = run(testbed.keymaster.create_id("Mallory"))
     run(testbed.keymaster.create_id("Victor"))
 
     run(testbed.keymaster.set_current_id("Victor"))
+    earlier = run(testbed.keymaster.create_challenge())
     challenge_did = run(testbed.keymaster.create_challenge())
 
-    run(testbed.keymaster.set_current_id("Mallory"))
-    response_did = run(testbed.keymaster.create_response(challenge_did))
-    run(testbed.keymaster.transfer_asset(response_did, alice))
     run(testbed.keymaster.set_current_id("Alice"))
-    run(testbed.keymaster.transfer_asset(response_did, mallory))
+    asset_did = run(testbed.keymaster.create_response(earlier))
+    run(testbed.keymaster.transfer_asset(asset_did, mallory))
+
+    run(testbed.keymaster.set_current_id("Mallory"))
+    answer = run(testbed.keymaster.resolve_did(run(testbed.keymaster.create_response(challenge_did))))["didDocumentData"]
+    run(testbed.keymaster.update_did(asset_did, {"didDocumentData": answer}))
+    run(testbed.keymaster.transfer_asset(asset_did, alice))
+    assert run(testbed.keymaster.resolve_did(asset_did))["didDocument"]["controller"] == alice
 
     run(testbed.keymaster.set_current_id("Victor"))
-    verify = run(testbed.keymaster.verify_response(response_did))
+    verify = run(testbed.keymaster.verify_response(asset_did))
 
-    assert verify["match"] is True
-    assert verify["responder"] == mallory
-
+    assert verify["challenge"] == challenge_did
+    assert verify["match"] is False
+    assert "responder" not in verify

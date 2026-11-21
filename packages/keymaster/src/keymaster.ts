@@ -5101,6 +5101,10 @@ export default class Keymaster implements KeymasterInterface {
         }
         const { response } = wrapper as { response: ChallengeResponse };
 
+        if (!response || typeof response !== 'object' || typeof response.challenge !== 'string' || !Array.isArray(response.credentials)) {
+            throw new InvalidParameterError('responseDID not a valid challenge response');
+        }
+
         const result = this.assetData(await resolve(response.challenge, 'challenge'));
         if (!result) {
             throw new InvalidParameterError('challenge not found');
@@ -5174,34 +5178,27 @@ export default class Keymaster implements KeymasterInterface {
         const used = new Set(assigned);
 
         response.vps = accepted.filter((_, index) => used.has(index));
-        response.responder = await this.responderOf(responseDID, responseDoc);
+        response.responder = this.responderOf(responseDoc);
         response.match = response.responder !== undefined && assigned.every(index => index >= 0);
 
         return response;
     }
 
-    // Who answered a challenge: the identity that created the response, when
-    // it still controls the response.
+    // Who answered a challenge: the controller of the response, when the
+    // response is as it was created.
     //
-    // The response's controller alone does not say. An asset's owner can
-    // transfer it to any identity, which signs nothing, so the controller can
-    // be someone who never answered. Nothing in a response's contents says
-    // either: they are encrypted to the challenger by a key made for the
-    // purpose, not by the responder's. The creation is signed by its
-    // controller and cannot change. A response that has changed hands, or
-    // that names another identity as its sender, has no responder and does
-    // not match.
-    private async responderOf(responseDID: string, responseDoc: DidCidDocument): Promise<string | undefined> {
-        const controller = responseDoc.didDocument?.controller;
-        const creator = (await this.resolveDID(responseDID, { versionSequence: 1 })).didDocument?.controller;
-        const asset = responseDoc.didDocumentData as ({ encrypted?: EncryptedMessage } & Partial<EncryptedMessage>) | undefined;
-        const sender = (asset?.encrypted ?? asset)?.sender;
+    // A response's controller alone does not say. An asset's owner can
+    // transfer it to any identity, which signs nothing, and can replace its
+    // contents first. Nothing in the contents says either: they are encrypted
+    // to the challenger by a key made for the purpose, not by the responder's.
+    // The creation is signed by its controller and holds the contents that
+    // controller gave it. So a response that has had any version after its
+    // first has no responder and does not match: no later version shows who
+    // wrote what it holds.
+    private responderOf(responseDoc: DidCidDocument): string | undefined {
+        const version = Number(responseDoc.didDocumentMetadata?.versionSequence);
 
-        if (!controller || !creator || !this.didMatch(controller, creator) || (sender && !this.didMatch(sender, creator))) {
-            return undefined;
-        }
-
-        return creator;
+        return version === 1 ? responseDoc.didDocument?.controller : undefined;
     }
 
     async createGroup(

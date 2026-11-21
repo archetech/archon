@@ -4372,6 +4372,12 @@ class Keymaster:
         if not isinstance(wrapper, dict) or "response" not in wrapper:
             raise KeymasterError("Invalid parameter: responseDID not a valid challenge response")
         response = deepcopy(wrapper["response"])
+        if (
+            not isinstance(response, dict)
+            or not isinstance(response.get("challenge"), str)
+            or not isinstance(response.get("credentials"), list)
+        ):
+            raise KeymasterError("Invalid parameter: responseDID not a valid challenge response")
         challenge_doc = await resolve(response["challenge"], "challenge")
         challenge_asset = self._asset_data(challenge_doc)
         challenge = challenge_asset.get("challenge") if isinstance(challenge_asset, dict) else None
@@ -4439,37 +4445,32 @@ class Keymaster:
         used = set(assigned)
 
         response["vps"] = [vp for index, vp in enumerate(accepted) if index in used]
-        responder = await self._responder_of(response_did, response_doc)
+        responder = self._responder_of(response_doc)
         response["match"] = responder is not None and all(index >= 0 for index in assigned)
         if responder is not None:
             response["responder"] = responder
         return response
 
-    async def _responder_of(self, response_did: str, response_doc: dict[str, Any]) -> str | None:
-        """Who answered a challenge: the identity that created the response, when
-        it still controls the response.
+    def _responder_of(self, response_doc: dict[str, Any]) -> str | None:
+        """Who answered a challenge: the controller of the response, when the
+        response is as it was created.
 
-        The response's controller alone does not say. An asset's owner can
-        transfer it to any identity, which signs nothing, so the controller can
-        be someone who never answered. Nothing in a response's contents says
-        either: they are encrypted to the challenger by a key made for the
-        purpose, not by the responder's. The creation is signed by its
-        controller and cannot change. A response that has changed hands, or
-        that names another identity as its sender, has no responder and does
-        not match.
+        A response's controller alone does not say. An asset's owner can
+        transfer it to any identity, which signs nothing, and can replace its
+        contents first. Nothing in the contents says either: they are encrypted
+        to the challenger by a key made for the purpose, not by the responder's.
+        The creation is signed by its controller and holds the contents that
+        controller gave it. So a response that has had any version after its
+        first has no responder and does not match: no later version shows who
+        wrote what it holds.
         """
-        controller = (response_doc.get("didDocument") or {}).get("controller")
-        created = await self.resolve_did(response_did, {"versionSequence": 1})
-        creator = (created.get("didDocument") or {}).get("controller")
-        asset = response_doc.get("didDocumentData")
-        crypt = asset.get("encrypted", asset) if isinstance(asset, dict) else {}
-        sender = crypt.get("sender") if isinstance(crypt, dict) else None
-
-        if not controller or not creator or not self.did_match(controller, creator):
+        try:
+            version = int((response_doc.get("didDocumentMetadata") or {}).get("versionSequence"))
+        except (TypeError, ValueError):
             return None
-        if sender and not self.did_match(sender, creator):
+        if version != 1:
             return None
-        return creator
+        return (response_doc.get("didDocument") or {}).get("controller") or None
 
     # --- DIDComm v2 ----------------------------------------------------------
     # Port of the TypeScript Keymaster DIDComm surface (see keymaster.ts). The
