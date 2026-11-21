@@ -279,7 +279,7 @@ describe('signing in with a wallet that sends its answer to the callback', () =>
         expect(data.challenge.callback).toBe('https://node.example/memepool/api/v1/callback');
     });
 
-    it('signs in the browser that asked, once the wallet has answered', async () => {
+    it('tells the browser that asked who answered, and signs it in when the user confirms', async () => {
         const agent = browser();
         const { challenge } = (await agent.get('/api/v1/challenge')).body;
 
@@ -292,10 +292,16 @@ describe('signing in with a wallet that sends its answer to the callback', () =>
         expect(sent.body).toBe(true);
         expect(sent.headers['set-cookie']).toBeUndefined();
 
-        expect((await agent.post('/api/v1/login').send()).body).toStrictEqual({ did: aliceDid });
+        const told = await agent.post('/api/v1/login').send();
+        expect(told.body).toStrictEqual({ answered: aliceDid });
+        expect(told.headers['set-cookie']).toBeUndefined();
+        expect((await agent.get('/api/v1/me')).status).toBe(401);
+
+        expect((await agent.post('/api/v1/login').send({ confirm: 'did:cid:someoneelse' })).body).toStrictEqual({ answered: aliceDid });
+        expect((await agent.post('/api/v1/login').send({ confirm: aliceDid })).body).toStrictEqual({ did: aliceDid });
         expect((await agent.get('/api/v1/me')).body.did).toBe(aliceDid);
         // Once.
-        expect((await agent.post('/api/v1/login').send()).status).toBe(401);
+        expect((await agent.post('/api/v1/login').send({ confirm: aliceDid })).status).toBe(401);
     });
 
     it('signs in no other browser with that answer', async () => {
@@ -306,9 +312,59 @@ describe('signing in with a wallet that sends its answer to the callback', () =>
 
         await request(app).post('/api/v1/callback').send({ response: await alice.createResponse(challenge) });
 
-        expect((await request(app).post('/api/v1/login').send()).status).toBe(401);
-        expect((await another.post('/api/v1/login').send()).status).toBe(202);
-        expect((await asking.post('/api/v1/login').send()).body).toStrictEqual({ did: aliceDid });
+        expect((await request(app).post('/api/v1/login').send({ confirm: aliceDid })).status).toBe(401);
+        expect((await another.post('/api/v1/login').send({ confirm: aliceDid })).status).toBe(202);
+        expect((await asking.post('/api/v1/login').send({ confirm: aliceDid })).body).toStrictEqual({ did: aliceDid });
+    });
+
+    // A challenge is an asset anyone on the network can see and answer.
+    it('signs nobody in when someone else has answered the challenge too', async () => {
+        const agent = browser();
+        const { challenge } = (await agent.get('/api/v1/challenge')).body;
+
+        await request(app).post('/api/v1/callback').send({ response: await bob.createResponse(challenge) });
+        await request(app).post('/api/v1/callback').send({ response: await alice.createResponse(challenge) });
+
+        const answer = await agent.post('/api/v1/login').send({ confirm: aliceDid });
+        expect(answer.status).toBe(409);
+        expect((await agent.get('/api/v1/me')).status).toBe(401);
+        expect((await agent.post('/api/v1/login').send({ confirm: aliceDid })).status).toBe(401);
+    });
+
+    it('does not sign the user in as someone else who answered first, unless the user says that is them', async () => {
+        const agent = browser();
+        const { challenge } = (await agent.get('/api/v1/challenge')).body;
+        const bobDid = (await bob.resolveDID('bob')).didDocument!.id!;
+
+        await request(app).post('/api/v1/callback').send({ response: await bob.createResponse(challenge) });
+
+        expect((await agent.post('/api/v1/login').send()).body).toStrictEqual({ answered: bobDid });
+        expect((await agent.post('/api/v1/login').send({ confirm: aliceDid })).body).toStrictEqual({ answered: bobDid });
+        expect((await agent.get('/api/v1/me')).status).toBe(401);
+    });
+
+    it('answers a wallet in a browser from another origin, at the callback and nowhere else', async () => {
+        const preflight = await request(app).options('/api/v1/callback').set('Origin', 'https://wallet.example').set('Access-Control-Request-Method', 'POST');
+
+        expect(preflight.status).toBe(204);
+        expect(preflight.headers['access-control-allow-origin']).toBe('*');
+        expect(preflight.headers['access-control-allow-credentials']).toBeUndefined();
+
+        const { challenge } = (await request(app).get('/api/v1/challenge')).body;
+        const sent = await request(app).post('/api/v1/callback').set('Origin', 'https://wallet.example').send({ response: await alice.createResponse(challenge) });
+
+        expect(sent.headers['access-control-allow-origin']).toBe('*');
+        expect((await request(app).get('/api/v1/config').set('Origin', 'https://wallet.example')).headers['access-control-allow-origin']).toBeUndefined();
+        expect((await request(app).options('/api/v1/login').set('Origin', 'https://wallet.example')).headers['access-control-allow-origin']).toBeUndefined();
+    });
+
+    it('signs in once when two requests carry the same answer together', async () => {
+        const agent = browser();
+        const { challenge } = (await agent.get('/api/v1/challenge')).body;
+        const response = await alice.createResponse(challenge);
+        const both = await Promise.all([agent.post('/api/v1/login').send({ response }), agent.post('/api/v1/login').send({ response })]);
+
+        expect(both.map(each => each.status).sort()).toStrictEqual([200, 401]);
     });
 
     it('takes at the callback only an answer to a challenge of its own that is as its author made it', async () => {
@@ -334,7 +390,7 @@ describe('signing in with a wallet that sends its answer to the callback', () =>
 
         await request(app).post('/api/v1/callback').send({ response: await alice.createResponse(challenge) });
         clock += 60_000;
-        expect((await agent.post('/api/v1/login').send()).status).toBe(401);
+        expect((await agent.post('/api/v1/login').send({ confirm: aliceDid })).status).toBe(401);
     });
 
     it('still takes an answer carried back by hand', async () => {

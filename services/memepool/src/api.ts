@@ -106,8 +106,10 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // A challenge's browser mark, and the challenge a mark was set with.
     const challenges = new Expiring<string>(options.challengeLifetime ?? 10 * 60_000, now);
     const marks = new Expiring<string>(options.challengeLifetime ?? 10 * 60_000, now);
-    // The identity that answered a challenge through the callback.
-    const answered = new Expiring<string>(options.challengeLifetime ?? 10 * 60_000, now);
+    // The identities that answered a challenge through the callback. A
+    // challenge is an asset anyone on the network can see, so anyone can
+    // answer one: more than one answer is no answer.
+    const answered = new Expiring<Set<string>>(options.challengeLifetime ?? 10 * 60_000, now);
     let verifying = 0;
     const perMinute = options.challengesPerMinute ?? 60;
     let issued: number[] = [];
@@ -208,7 +210,23 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     // callback. The answer is kept for the browser that asked for the
     // challenge, which collects it at /login: nobody is signed in here, since
     // the wallet is not that browser.
+    //
+    // A wallet in a browser sends from another origin, so this one route
+    // answers a preflight and allows any origin. It allows no credentials, and
+    // none of the routes that read a session allow another origin at all.
+    const fromAnyOrigin = (res: Response) => res.set('Access-Control-Allow-Origin', '*');
+
+    router.options('/callback', (_req, res) => {
+        fromAnyOrigin(res)
+            .set('Access-Control-Allow-Methods', 'POST')
+            .set('Access-Control-Allow-Headers', 'Content-Type')
+            .status(204)
+            .end();
+    });
+
     router.post('/callback', async (req, res) => {
+        fromAnyOrigin(res);
+
         const response = responseIn(req);
 
         if (!response) {
@@ -229,7 +247,14 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
                 res.status(401).json({ error: 'the response does not answer a challenge from this service' });
                 return;
             }
-            answered.set(answer.challenge, answer.responder);
+
+            const responders = answered.get(answer.challenge) ?? new Set<string>();
+
+            // Two are enough to know the challenge has no one answer.
+            if (responders.size < 2) {
+                responders.add(answer.responder);
+            }
+            answered.set(answer.challenge, responders);
             res.json(true);
         }
         finally {
@@ -238,8 +263,15 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     });
 
     // Signs in the browser that asked for a challenge, once the challenge is
-    // answered: with the answer in the request, or with nothing when a wallet
-    // has sent it to the callback, in which case the browser asks until it has.
+    // answered.
+    //
+    // With `{ response }`, the answer is in the request: the user carried it
+    // from the wallet to this browser.
+    //
+    // With nothing, the browser is asking whether a wallet has sent an answer
+    // to the callback. It is told who answered, and is not signed in: anyone
+    // who sees the challenge can answer it, so the user confirms the identity
+    // is theirs, with `{ confirm }`, before there is a session.
     router.post('/login', async (req, res) => {
         const refused = () => res.status(401).json({ error: 'the response does not answer a challenge this browser asked for' });
         const asked = cookieOf(req, ASKED);
@@ -252,9 +284,10 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
             return;
         }
 
+        const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
         let responder: string | undefined;
 
-        if (req.body && typeof req.body === 'object' && 'response' in req.body) {
+        if ('response' in body) {
             const response = responseIn(req);
 
             if (!response) {
@@ -271,14 +304,33 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
             }
         }
         else {
-            responder = answered.get(challenge);
-            if (!responder) {
+            const responders = [...answered.get(challenge) ?? []];
+
+            if (responders.length === 0) {
                 res.status(202).json({ waiting: true });
                 return;
             }
+            if (responders.length > 1) {
+                challenges.take(challenge);
+                marks.take(asked);
+                answered.take(challenge);
+                res.status(409).json({ error: 'more than one identity answered this challenge; ask for another' });
+                return;
+            }
+            if (body.confirm !== responders[0]) {
+                res.json({ answered: responders[0] });
+                return;
+            }
+            responder = responders[0];
         }
 
-        challenges.take(challenge);
+        // Taken once: of two requests that reach here together, or one that
+        // reaches here after the challenge has lapsed, only one that still
+        // finds the challenge bound to this browser is signed in.
+        if (challenges.get(challenge) !== asked || !challenges.take(challenge)) {
+            refused();
+            return;
+        }
         marks.take(asked);
         answered.take(challenge);
         res.clearCookie(ASKED, { path: '/' });

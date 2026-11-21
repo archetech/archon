@@ -31,7 +31,7 @@ All routes are under `/api/v1`. Those after the sign-in routes need a session.
 | `GET /config` | The service's name and its DID, which is the client a grant names |
 | `GET /challenge` | A challenge, and the `archon://auth?challenge=…` link that hands it to a wallet |
 | `POST /callback` | Where a wallet sends `{ "response": "did:cid:…" }`, its answer, when the challenge names this as its callback. Signs nobody in: the answer is kept for the browser that asked |
-| `POST /login` | Signs in the browser that asked for the challenge. With `{ "response": "did:cid:…" }` it takes the answer directly. With no body it collects an answer sent to the callback, and answers `202` with `{ "waiting": true }` until there is one. Sets the session cookie and returns the DID signed in |
+| `POST /login` | Signs in the browser that asked for the challenge. With `{ "response": "did:cid:…" }` it takes the answer directly. With no body it asks whether a wallet has sent an answer to the callback: `202` with `{ "waiting": true }` until one has, then `{ "answered": "did:cid:…" }`, which is who answered and not yet a session. With `{ "confirm": "did:cid:…" }` naming that identity it signs the browser in. Sets the session cookie and returns the DID signed in |
 | `POST /logout` | Ends the session |
 | `GET /me` | The DID signed in, with its `grant` and `registry` (and any `others` in force), or with the grant `link` to show and any grants still `pending` |
 | `POST /objects` | Publishes an object. Takes its fields, with `kind`; returns its `did` |
@@ -45,6 +45,7 @@ and the grant, whatever the request carries.
 |---|---|
 | 400 | The object is not valid, an edit would change what the object is, or the object was not published under a grant of the user's that is in force |
 | 401 | Not signed in, or the answer is not one this service takes (see Sessions) |
+| 409 | More than one identity answered the challenge |
 | 403 | The user has no grant to publish under: none, one not yet anchored, or one revoked or expired |
 | 429 | The service has issued as many challenges this minute as it is set to |
 | 502 | The node did not accept the operation |
@@ -69,10 +70,23 @@ A wallet that sends its answer to the callback is not the browser, so the callba
 signs nobody in. It keeps the answer, and the browser that asked for that challenge
 collects the sign-in.
 
-Signing in this way is as safe as the user's care over which challenge they answer.
-Someone who asks for a challenge and persuades a user to answer it is signed in as
-that user, as with any sign-in by a link. A wallet shows the challenge's callback
-before it answers, and that is where the user sees whose challenge it is.
+A challenge is an asset anyone on the network can see, and anyone can answer one. So
+an answer at the callback does not sign the browser in by itself:
+
+- the browser is told who answered, and the user confirms that identity is theirs
+  before there is a session;
+- when more than one identity has answered a challenge, nobody is signed in with it
+  (`409`), and the user asks for another.
+
+Someone who answers a user's challenge before the user does can therefore stop that
+sign-in, and cannot become the user or put the user in their own account unnoticed.
+The other way round, someone who asks for a challenge and persuades a user to answer
+it is signed in as that user, as with any sign-in by a link. A wallet shows the
+challenge's callback before it answers, and that is where the user sees whose
+challenge it is.
+
+The callback answers a wallet running in a browser on another origin. It is the only
+route that does, and it allows no credentials.
 
 Each challenge is an asset the node stores and gossips, and anyone can ask for one,
 so the service issues a limited number a minute (60 unless set otherwise).
