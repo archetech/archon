@@ -102,7 +102,7 @@ on the host's loopback address unless `ARCHON_MEMEPOOL_HOST_BIND` says otherwise
 
 ### The service's key
 
-The service is the DID in its wallet, `data/memepool/wallet.json`. Every grant a
+The service is the DID in its wallet, `data/memepool/wallet.json`. The repository carries `data/memepool`, so that the directory belongs to whoever checked it out and the service, which runs as that user, can write to it. If it is missing when the container starts, Docker creates it as root and the service cannot make its wallet: create it first, owned by `ARCHON_UID`. Every grant a
 user has made names that DID. On a first start the service makes the wallet and the
 identity, and says so in its log.
 
