@@ -2481,7 +2481,9 @@ class Keymaster:
             controller = current.get("didDocument", {}).get("controller")
         signed = await self._add_operation_proof(payload, controller)
         ok = await self.gatekeeper.delete_did(signed)
-        if ok and current.get("didDocument", {}).get("controller"):
+        # Only an asset is owned. An agent may name itself as its controller.
+        is_asset = current.get("didDocumentRegistration", {}).get("type") == "asset"
+        if ok and is_asset and current.get("didDocument", {}).get("controller"):
             owner = current["didDocument"]["controller"]
             # On a chain registry the deletion takes effect once it is anchored.
             # The asset is remembered until then, for list_revocations.
@@ -2536,7 +2538,8 @@ class Keymaster:
             if not metadata.get("deactivated"):
                 revocations.append({**entry, "status": "displaced"})
                 settled.append(did)
-                if self.did_match((doc.get("didDocument") or {}).get("controller") or "", id_info["did"]):
+                is_asset = (doc.get("didDocumentRegistration") or {}).get("type") == "asset"
+                if is_asset and self.did_match((doc.get("didDocument") or {}).get("controller") or "", id_info["did"]):
                     restored.append(did)
             elif (
                 registry

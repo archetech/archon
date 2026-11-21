@@ -471,6 +471,28 @@ describe('listRevocations', () => {
         expect((await keymaster.fetchIdInfo('Bob')).revoking).toBeUndefined();
     });
 
+    it('should not track the deletion of an agent that names itself as its controller', async () => {
+        const did = await keymaster.createId('Bob', { registry: 'BTC:signet' });
+        const live = await gatekeeper.resolveDID(did);
+        const spy = resolving(did, doc => ({ ...doc, didDocument: { ...doc.didDocument, controller: did } }));
+
+        expect(await keymaster.revokeDID(did)).toBe(true);
+        spy.mockRestore();
+
+        expect((await keymaster.fetchIdInfo('Bob')).revoking).toBeUndefined();
+        expect(await keymaster.listRevocations('Bob')).toStrictEqual([]);
+        expect(live.didDocumentRegistration?.type).toBe('agent');
+    });
+
+    it('should not list a displaced DID that is not an asset', async () => {
+        const did = await revokedOn('BTC:signet');
+        const live = await gatekeeper.resolveDID(did, { versionSequence: 1 });
+
+        resolving(did, () => ({ ...live, didDocumentRegistration: { ...live.didDocumentRegistration, type: 'agent' } }));
+        expect(await keymaster.listRevocations()).toStrictEqual([{ did, registry: 'BTC:signet', status: 'displaced' }]);
+        expect(await keymaster.listAssets()).toStrictEqual([]);
+    });
+
     it('should list the revocations of the identity that owned the asset', async () => {
         const did = await revokedOn('BTC:signet');
         await keymaster.createId('Carol');

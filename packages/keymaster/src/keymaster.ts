@@ -1978,9 +1978,10 @@ export default class Keymaster implements KeymasterInterface {
 
         const ok = await this.gatekeeper.deleteDID(signed);
 
-        if (ok && current.didDocument?.controller) {
+        // Only an asset is owned. An agent may name itself as its controller.
+        if (ok && current.didDocumentRegistration?.type === 'asset' && current.didDocument?.controller) {
             const owner = current.didDocument.controller;
-            const registry = current.didDocumentRegistration?.registry;
+            const registry = current.didDocumentRegistration.registry;
 
             // On a chain registry the deletion takes effect once it is anchored.
             // The asset is remembered until then, for listRevocations.
@@ -2038,7 +2039,8 @@ export default class Keymaster implements KeymasterInterface {
             if (!metadata?.deactivated) {
                 revocations.push({ did, ...(registry ? { registry } : {}), status: 'displaced' });
                 settled.push(did);
-                if (this.didMatch(doc.didDocument?.controller ?? '', id.did)) {
+                if (doc.didDocumentRegistration?.type === 'asset'
+                    && this.didMatch(doc.didDocument?.controller ?? '', id.did)) {
                     restored.push(did);
                 }
             }

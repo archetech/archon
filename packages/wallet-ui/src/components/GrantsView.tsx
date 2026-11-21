@@ -234,6 +234,9 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
     const [unresolved, setUnresolved] = useState(0);
     const [unlisted, setUnlisted] = useState(false);
     const reads = useRef(0);
+    // What the last read of Keymaster's revocations left unknown: whether the
+    // read failed, with what, and how many of its entries could not be read.
+    const heldRead = useRef<{ error?: unknown; failed: boolean; unread: number }>({ failed: false, unread: 0 });
     const [link, setLink] = useState("");
     const [request, setRequest] = useState<Record<string, any> | null>(null);
     const [linkError, setLinkError] = useState("");
@@ -295,8 +298,8 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         // A grant being revoked is shown as a revocation, not as a card.
         const revoking = new Set(tracked(sessionKey).map(revocation => revocation.grant.did));
 
-        setUnresolved(failed);
-        setUnlisted(false);
+        setUnresolved(failed + heldRead.current.unread);
+        setUnlisted(heldRead.current.failed);
         setGrants(held.filter(grant => !revoking.has(grant.did)));
     }, [keymaster, identity, sessionKey]);
 
@@ -310,12 +313,21 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         try {
             reported = await keymaster.listRevocations(identity);
         }
-        catch {
+        catch (error) {
+            // What is held is unknown, so neither is whether a client can
+            // still publish under a grant that is not listed.
+            heldRead.current = { error, failed: true, unread: 0 };
             return;
         }
 
+        let unread = 0;
+
         for (const { did, status } of reported) {
-            if (status === "unresolved" || tracked(sessionKey).some(revocation => revocation.grant.did === did)) {
+            if (tracked(sessionKey).some(revocation => revocation.grant.did === did)) {
+                continue;
+            }
+            if (status === "unresolved") {
+                unread += 1;
                 continue;
             }
             try {
@@ -349,8 +361,11 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
             }
             catch {
                 // Read again at the next refresh, while Keymaster reports it.
+                unread += 1;
             }
         }
+
+        heldRead.current = { failed: false, unread };
     }, [keymaster, identity, sessionKey]);
 
     // Whether each revocation the node has accepted is anchored. An anchor can be
@@ -394,6 +409,9 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         await readRevocations();
         try {
             await load();
+            if (heldRead.current.failed && report) {
+                notifyRef.current.error(heldRead.current.error);
+            }
         }
         catch (error) {
             setUnlisted(true);

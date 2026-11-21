@@ -653,12 +653,48 @@ describe('Grants view: revoking', () => {
             expect(screen.queryByText(/Revocation/)).toBeNull();
         });
 
-        it('shows the grants when Keymaster cannot say what it holds', async () => {
+        it('shows the grants, and says they may be incomplete, when Keymaster cannot say what it holds', async () => {
             keymaster.listRevocations.mockRejectedValue(new Error('wallet locked'));
             holding(held);
             view({ identity });
 
             expect(await screen.findByTestId('grant')).toBeTruthy();
+            expect(screen.getByText(/grants could not be read/)).toBeTruthy();
+            expect(screen.queryByText(/Revocation/)).toBeNull();
+        });
+
+        it('does not say there are no grants when Keymaster cannot say what it holds, and reads again on Retry', async () => {
+            keymaster.listRevocations.mockRejectedValue(new Error('wallet locked'));
+            revoked(deleted(pending()));
+            view({ identity });
+
+            expect(await screen.findByText(/grants could not be read/)).toBeTruthy();
+            expect(screen.queryByText('No grants')).toBeNull();
+            expect(notify.error).toHaveBeenCalledTimes(1);
+
+            keymaster.listRevocations.mockResolvedValue([{ did: GRANT, registry: 'BTC:mainnet', status: 'pending' }]);
+            await userEvent.setup().click(screen.getByRole('button', { name: 'Retry' }));
+
+            expect(await screen.findByText('Revocation submitted')).toBeTruthy();
+            await waitFor(() => expect(screen.queryByText(/grants could not be read/)).toBeNull());
+        });
+
+        it('says an asset could not be read when Keymaster reports a revocation unresolved', async () => {
+            keymaster.listRevocations.mockResolvedValue([{ did: GRANT, status: 'unresolved' }]);
+            view({ identity });
+
+            expect(await screen.findByText(/One asset of this identity could not be read/)).toBeTruthy();
+            expect(screen.queryByText('No grants')).toBeNull();
+        });
+
+        it('says an asset could not be read when the grant a revocation deleted cannot be read', async () => {
+            keymaster.listRevocations.mockResolvedValue([{ did: GRANT, registry: 'BTC:mainnet', status: 'pending' }]);
+            keymaster.listAssets.mockResolvedValue([]);
+            keymaster.resolveDID.mockRejectedValue(new Error('node unreachable'));
+            view({ identity });
+
+            expect(await screen.findByText(/One asset of this identity could not be read/)).toBeTruthy();
+            expect(screen.queryByText('No grants')).toBeNull();
             expect(screen.queryByText(/Revocation/)).toBeNull();
         });
     });

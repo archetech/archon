@@ -137,6 +137,29 @@ def test_revocation_on_an_unanchored_registry_is_not_tracked(testbed, registry):
     assert _revoking(testbed) is None
 
 
+def test_deleting_an_agent_that_names_itself_as_its_controller_is_not_tracked(testbed):
+    did = run(testbed.keymaster.create_id("Bob", {"registry": "BTC:signet"}))
+    doc = testbed.gatekeeper.docs[did]
+    assert doc["didDocumentRegistration"]["type"] == "agent"
+    doc["didDocument"]["controller"] = did
+
+    assert run(testbed.keymaster.revoke_did(did)) is True
+    assert _revoking(testbed) is None
+    assert run(testbed.keymaster.list_revocations("Bob")) == []
+
+
+def test_list_revocations_does_not_list_a_displaced_did_that_is_not_an_asset(testbed):
+    run(testbed.keymaster.create_id("Bob", {"registry": "hyperswarm"}))
+    did = run(testbed.keymaster.create_asset({"name": "asset"}, {"registry": "BTC:signet"}))
+    live = deepcopy(testbed.gatekeeper.docs[did])
+    assert run(testbed.keymaster.revoke_did(did)) is True
+
+    live["didDocumentRegistration"]["type"] = "agent"
+    testbed.gatekeeper.docs[did] = live
+    assert run(testbed.keymaster.list_revocations()) == [{"did": did, "registry": "BTC:signet", "status": "displaced"}]
+    assert run(testbed.keymaster.list_assets()) == []
+
+
 def test_list_revocations_is_by_the_identity_that_owned_the_asset(testbed):
     did = _revoked_on(testbed, "BTC:signet")
     run(testbed.keymaster.create_id("Carol"))
