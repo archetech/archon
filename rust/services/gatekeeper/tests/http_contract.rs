@@ -102,6 +102,22 @@ async fn http_contract_covers_ready_version_status_admin_and_metrics() -> Result
         .await?;
     assert!(response.status().is_success());
 
+    // Paths that are no route, each answered 404: under the API, under the
+    // conformant surface, and under neither.
+    for path in [
+        "/api/v1/made-up-1",
+        "/api/made-up-2",
+        "/1.0/identifiers/made-up-3/and/more",
+        "/made-up-4",
+    ] {
+        let response = service
+            .client
+            .get(format!("{}{path}", service.root_url))
+            .send()
+            .await?;
+        assert_eq!(response.status().as_u16(), 404, "{path}");
+    }
+
     let response = service
         .client
         .get(format!("{}/metrics", service.root_url))
@@ -112,6 +128,9 @@ async fn http_contract_covers_ready_version_status_admin_and_metrics() -> Result
     let metrics = response.text().await?;
     assert!(metrics.contains("route=\"/api/v1/did/:did\""));
     assert!(metrics.contains("route=\"/api/v1/queue/:registry\""));
+    // A path is a caller's to choose, so none of them is a label (#1697).
+    assert!(metrics.contains("route=\"/:unrouted\""));
+    assert!(!metrics.contains("made-up"));
 
     Ok(())
 }

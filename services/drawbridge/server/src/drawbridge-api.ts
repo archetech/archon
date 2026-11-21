@@ -11,7 +11,7 @@ import KeymasterClient from '@didcid/clients/keymaster';
 import config from './config.js';
 import { RedisStore } from './store.js';
 import { byHeraldRoute, publicRateLimit } from './middleware/public-rate-limit.js';
-import { routeLabel } from './metrics-path.js';
+import { labelLimiter, markUnrouted, requestLabel } from './metrics-path.js';
 import { REDACTED_LOG_PATHS } from './log-redaction.js';
 import { buildProxyBody, proxyHeraldRequest } from './herald-proxy.js';
 import { proxyRequest } from './proxy.js';
@@ -212,11 +212,12 @@ async function main() {
     });
 
     // Metrics tracking middleware
+    const boundedLabel = labelLimiter();
     app.use((req, res, next) => {
         const start = process.hrtime.bigint();
         res.on('finish', () => {
             const duration = Number(process.hrtime.bigint() - start) / 1e9;
-            const route = routeLabel(req);
+            const route = requestLabel(req, res, boundedLabel);
             httpRequestsTotal.inc({ method: req.method, route, status: res.statusCode });
             httpRequestDuration.observe({ method: req.method, route }, duration);
         });
@@ -482,6 +483,11 @@ async function main() {
             res.status(500).end(error.toString());
         }
     });
+
+    // Reached only by a request that nothing above took. It is marked for the
+    // metrics, which give all such requests one label, and passed on to
+    // Express's own 404.
+    app.use(markUnrouted);
 
     // Start server
     const server = app.listen(config.port, config.bindAddress, () => {

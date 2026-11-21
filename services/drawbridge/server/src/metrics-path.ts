@@ -6,6 +6,71 @@ export function routeLabel(req: { originalUrl: string }): string {
     return normalizePath(req.originalUrl.split('?')[0]);
 }
 
+// A path is a caller's to choose, and a label is a series the node keeps for
+// as long as it runs. Two bounds keep a caller from making series at will.
+
+// The label of every request that no route or mount took.
+export const UNROUTED = '/:unrouted';
+
+// Mounted after every route and mount, so it is reached only by a request that
+// none of them took. It marks the request and passes it on to Express's own 404.
+export function markUnrouted(
+    _req: unknown,
+    res: { locals: Record<string, unknown> },
+    next: () => void,
+): void {
+    res.locals.unrouted = true;
+    next();
+}
+
+// The label a finished request is recorded under.
+//
+// A request that matched a declared route is labelled by that route's own
+// pattern under its mount, `/api/v1/did/:did`: the routes are the code's, so
+// these labels are a fixed set and are never crowded out. A request taken by a
+// mount that forwards it has only its path, which is normalized and then
+// bounded.
+export function requestLabel(
+    req: { originalUrl: string; baseUrl?: string; route?: { path?: unknown } },
+    res: { locals: Record<string, unknown> },
+    bounded: (label: string) => string,
+): string {
+    if (res.locals.unrouted) {
+        return UNROUTED;
+    }
+    if (typeof req.route?.path === 'string') {
+        // The mount is given as the caller wrote it, and Express matches it in
+        // any case. Drawbridge's mounts are lower-case.
+        return `${(req.baseUrl ?? '').toLowerCase()}${req.route.path}`;
+    }
+    return bounded(routeLabel(req));
+}
+
+// The label of a request whose own label would be one too many.
+export const OVERFLOW = '/:other';
+
+// How many labels a node keeps for the paths its proxy mounts forward.
+export const MAX_ROUTE_LABELS = 500;
+
+// Lets the first `limit` distinct labels through and gives every later one
+// the overflow label. A proxy mount forwards whatever follows its prefix, so
+// the paths under it cannot be listed, and this is what bounds them. Declared
+// routes do not pass through it: see requestLabel.
+export function labelLimiter(limit: number = MAX_ROUTE_LABELS): (label: string) => string {
+    const kept = new Set<string>();
+
+    return label => {
+        if (kept.has(label)) {
+            return label;
+        }
+        if (kept.size >= limit) {
+            return OVERFLOW;
+        }
+        kept.add(label);
+        return label;
+    };
+}
+
 // Route labels for Drawbridge's request metrics. Dynamic segments (DIDs, CIDs,
 // registries, identifiers) are replaced with placeholders so dashboards do not
 // get one time series per identifier.
