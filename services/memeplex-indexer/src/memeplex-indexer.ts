@@ -57,7 +57,12 @@ async function main(startupComplete: () => void): Promise<void> {
         timeoutMs: config.gatekeeperTimeout * 1000,
     });
 
-    const sync = new Sync({ gatekeeper: gatekeeper as unknown as FeedGatekeeper, index });
+    const feed: FeedGatekeeper = {
+        getDIDs: async () => await gatekeeper.getDIDs() as string[],
+        resolveVersions: dids => gatekeeper.resolveVersions(dids),
+        listChanges: options => gatekeeper.listChanges(options),
+    };
+    const sync = new Sync({ gatekeeper: feed, index });
 
     // One poll at a time. A poll that finds one running is dropped: another
     // follows shortly, and takes in whatever that one did not.

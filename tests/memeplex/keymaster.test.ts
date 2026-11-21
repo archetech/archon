@@ -41,7 +41,8 @@ async function anchor(block: number) {
     await gatekeeper.clearQueue(REGISTRY, operations);
 }
 
-const history = async (did: string) => JSON.parse(JSON.stringify((await gatekeeper.resolveVersions([did]))[0])) as ResolvedVersion[];
+// What the Gatekeeper returns is what the verifier takes, with no conversion.
+const history = async (did: string): Promise<ResolvedVersion[]> => (await gatekeeper.resolveVersions([did]))[0];
 const publication = async (object: string, grant: string) => attribute(await history(object), await history(grant));
 
 beforeEach(async () => {

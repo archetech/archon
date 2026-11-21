@@ -16,9 +16,9 @@ export const PERMITTED_REGISTRIES = ['BTC:mainnet', 'ZEC:mainnet', 'ETH:mainnet'
 // One version of a DID, as `POST /api/v1/dids/versions` returns it: the document,
 // data and registration as of that version, and its metadata.
 export interface ResolvedVersion {
-    didDocument?: { id?: string; controller?: string; [member: string]: unknown };
+    didDocument?: { id?: string; controller?: string };
     didDocumentData?: unknown;
-    didDocumentRegistration?: { type?: string; registry?: string; validUntil?: string; [member: string]: unknown };
+    didDocumentRegistration?: { type?: string; registry?: string; validUntil?: string };
     didDocumentMetadata?: {
         // The canonical CID of the operation that made the version.
         versionId?: string;
@@ -27,7 +27,6 @@ export interface ResolvedVersion {
         // The blocks that bound the version on `chain`. `upperBound` is the block
         // that anchored it.
         timestamp?: { chain?: string; upperBound?: { height?: number; timeISO?: string } };
-        [member: string]: unknown;
     };
 }
 
