@@ -1100,6 +1100,63 @@ mod tests {
         assert!(db.build_timestamp("ZEC:mainnet", "create-op", &event).is_none());
     }
 
+    // A receipt on another registry than the version's gives no upper bound,
+    // though the version's registry has a block at the receipt's height.
+    #[test]
+    fn resolve_doc_timestamp_has_no_upper_bound_from_a_receipt_on_another_registry() {
+        let config = test_config();
+        let did = "did:cid:bagaaieratimestampother";
+        let (mut db, _temp_dir) = temp_json_db();
+        db.add_block(
+            "ZEC:mainnet",
+            json!({ "hash": "zec-block", "height": 101, "time": 1100 }),
+        )
+        .expect("block should be added");
+        let event = |registry: &str| EventRecord {
+            registry: registry.to_string(),
+            time: "2026-04-11T12:00:00.000Z".to_string(),
+            ordinal: Some(vec![101, 3, 0]),
+            operation: json!({
+                "type": "create",
+                "created": "2026-04-11T12:00:00.000Z",
+                "publicJwk": {},
+                "registration": {
+                    "version": 1,
+                    "type": "agent",
+                    "registry": "ZEC:mainnet"
+                }
+            }),
+            opid: Some("create-op".to_string()),
+            did: Some(did.to_string()),
+            registration: Some(json!({
+                "height": 101,
+                "index": 3,
+                "txid": "other-txid",
+                "batch": "did:cid:other-batch",
+                "opidx": 0
+            })),
+        };
+
+        db.data
+            .dids
+            .insert("bagaaieratimestampother".to_string(), vec![event("ETH:mainnet")]);
+        let resolved = db
+            .resolve_doc(&config, did, ResolveOptions::default())
+            .expect("resolve should succeed");
+        assert!(resolved["didDocumentMetadata"].get("timestamp").is_none());
+
+        db.data
+            .dids
+            .insert("bagaaieratimestampother".to_string(), vec![event("ZEC:mainnet")]);
+        let resolved = db
+            .resolve_doc(&config, did, ResolveOptions::default())
+            .expect("resolve should succeed");
+        let timestamp = &resolved["didDocumentMetadata"]["timestamp"];
+        assert_eq!(timestamp["chain"], "ZEC:mainnet");
+        assert_eq!(timestamp["upperBound"]["blockid"], "zec-block");
+        assert_eq!(timestamp["upperBound"]["txid"], "other-txid");
+    }
+
     #[test]
     fn resolve_doc_supports_confirm_version_sequence_version_time_and_canonical_id() {
         let config = test_config();

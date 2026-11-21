@@ -811,10 +811,17 @@ missing-evidence differences. Genesis creation-time behavior is unchanged.
 
 ### 6.3 Block timestamps
 
-If `doc.didDocumentRegistration.registry` has a non-empty value and the
-event has either `operation.blockid` (lower bound) or `event.registration`
-with a `height` (upper bound), look up the matching block(s) via
-`store.get_block(registry, ...)` and emit:
+If `doc.didDocumentRegistration.registry` has a non-empty value, look up the
+block of each bound via `store.get_block(registry, ...)`:
+
+- the **lower bound** when the event has `operation.blockid`;
+- the **upper bound** when the event has `event.registration` with a `height`
+  **and `event.registry` equals that registry**. The upper bound is the block
+  that anchored the operation, which is a block of the chain the receipt is on.
+  A receipt on any other registry gives none, whatever blocks the node holds at
+  that height.
+
+Emit:
 
 ```jsonc
 "timestamp": {
