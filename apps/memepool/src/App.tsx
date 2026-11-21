@@ -499,7 +499,10 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
 
                     <section className="card">
                         <h2>Following</h2>
-                        <p className="muted">Kept in this browser. Nobody is told whom you follow.</p>
+                        <p className="muted">
+                            Kept in this browser and published nowhere. The node that serves your timeline
+                            does see which authors you ask it for.
+                        </p>
                         {follows.map(did => (
                             <p key={did}>
                                 <span className="mono" title={did}>{short(did)}</span>{' '}
