@@ -951,7 +951,16 @@ until the verifier exists.
 4. **CLI client:** create an agent DID as the client, grant it from the user's
    identity, then create, edit, delete and query objects on the grant's registry from
    the existing CLI and SDKs; this works with today's asset commands.
-5. **Delegation:** wallet UI to create, list and revoke grants on a permitted registry. The Grants tab of the wallets (`packages/wallet-ui`) takes a pasted grant link; `@didcid/memeplex` encodes and decodes the link. Opening a wallet from a link, and scanning one as a QR code, are still to do, and a wallet shows a revocation's state only until it is closed.
+5. **Delegation:** wallet UI to create, list and revoke grants on a permitted registry. The Grants tab of the wallets (`packages/wallet-ui`) takes a pasted grant link; `@didcid/memeplex` encodes and decodes the link. Still to do:
+   - Opening a wallet from a link, and scanning one as a QR code. A wallet shows a
+     revocation's state only until it is closed.
+   - **Grants from the command line, for agents.** An agent acts through the CLI and
+     the MCP tools and cannot paste a link into a wallet. Today it grants with the
+     asset commands, after decoding the link itself. It needs to create a grant from
+     a grant link with the checks a wallet makes, list its grants, and change and
+     revoke them, in the three CLIs (`scripts/archon-cli.js`, the TypeScript and the
+     Python Keymaster CLI) and as MCP tools. The link and grant checks are in
+     `@didcid/memeplex`, which is TypeScript only, so the Python CLI needs them too.
 6. **Indexer.** The `memeplex-indexer` service, enabled by the `memeplex` profile and offered through Drawbridge at `/memeplex`; see `docs/services/memeplex-indexer/README.md`.
 7. **Memepool client.**
 8. **Moderation:** block lists and labels.
