@@ -30,7 +30,7 @@ const when = (publication: Publication) => {
     return time ? new Date(time).toLocaleString() : '';
 };
 
-function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: () => void; pollMs: number }) {
+function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: (did: string) => void; pollMs: number }) {
     const [asked, setAsked] = useState<{ challenge: string; link: string } | null>(null);
     const [answered, setAnswered] = useState<string | null>(null);
     const [response, setResponse] = useState('');
@@ -100,7 +100,7 @@ function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: () => void;
             const state = await api.login(body);
 
             if (state.did) {
-                onSignedIn();
+                onSignedIn(state.did);
             }
             else if (state.answered) {
                 setAnswered(state.answered);
@@ -413,6 +413,11 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
         setFollows(next);
     };
 
+    // The grants the service can change an object under. An object published
+    // under another, by another client or under a grant since revoked, is the
+    // reader's and is not this service's to withdraw.
+    const grants = new Set([...(me.grant ? [me.grant] : []), ...me.others ?? []]);
+
     // Signed out only when the service says so: the session is a cookie the
     // page cannot remove, and a reader who is told they are signed out must be.
     const signOut = async () => {
@@ -474,7 +479,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                                 key={each.did}
                                 publication={each}
                                 onOpen={() => setOpen(each)}
-                                onWithdraw={me.grant && each.memeplex?.author === me.did && each.state === 'published'
+                                onWithdraw={each.memeplex?.author === me.did && each.state === 'published' && grants.has(String(each.memeplex.grant))
                                     ? async () => {
                                         try {
                                             await api.withdraw(each.did!);
@@ -521,13 +526,19 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
     const sessions = useRef(0);
     const [session, setSession] = useState(0);
 
+    // Counts the reads of who is signed in, so that of two under way the later
+    // one's answer stands.
+    const checks = useRef(0);
+
     const loadMe = useCallback(async () => {
         const mine = sessions.current;
+        const check = checks.current += 1;
+        const current = () => mine === sessions.current && check === checks.current;
 
         try {
             const read = await api.me() ?? null;
 
-            if (mine === sessions.current) {
+            if (current()) {
                 setMe(read);
                 setError('');
             }
@@ -535,8 +546,8 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
         catch (failure) {
             // The service did not say the reader is signed out, so someone who
             // was signed in still is, and keeps the way to sign out.
-            if (mine === sessions.current) {
-                setMe(current => current ?? null);
+            if (current()) {
+                setMe(known => known ?? null);
                 setError(message(failure));
             }
         }
@@ -553,7 +564,10 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
             <main>
                 <h1>Memepool</h1>
                 {error && <p role="alert" className="error">{error}</p>}
-                <SignIn api={api} onSignedIn={loadMe} pollMs={pollMs} />
+                {/* The service has signed this browser in, whatever a read of the
+                    grant says next: the reader is shown as signed in, with the
+                    way to sign out, from here. */}
+                <SignIn api={api} onSignedIn={did => { setMe({ did }); loadMe(); }} pollMs={pollMs} />
             </main>
         );
     }

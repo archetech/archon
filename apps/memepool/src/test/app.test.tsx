@@ -43,6 +43,7 @@ function services(start: { me?: Me; timeline?: Publication[] } = {}) {
 }
 
 const granted: Me = { did: ALICE, grant: 'did:cid:grant', registry: 'BTC:mainnet' };
+const under = (publication: Publication, grant: string): Publication => ({ ...publication, memeplex: { ...publication.memeplex!, grant } });
 
 describe('signing in', () => {
     it('shows the challenge as a code and a link, and signs in when the user confirms who answered', async () => {
@@ -231,11 +232,21 @@ describe('reading and publishing', () => {
 
     it('lets the user withdraw their own post, and not another author\'s', async () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
-        const { api } = services({ me: granted, timeline: [post('did:cid:1', ALICE, 'Mine.'), post('did:cid:2', BOB, 'Bob\'s.')] });
+        const { api } = services({
+            me: { ...granted, others: ['did:cid:second'] },
+            timeline: [
+                under(post('did:cid:1', ALICE, 'Mine.'), 'did:cid:grant'),
+                post('did:cid:2', BOB, 'Bob\'s.'),
+                under(post('did:cid:3', ALICE, 'Under my other grant.'), 'did:cid:second'),
+                under(post('did:cid:4', ALICE, 'Through another client.'), 'did:cid:elsewhere'),
+            ],
+        });
         render(<App api={api} />);
         const user = userEvent.setup();
 
         const mine = (await screen.findByText('Mine.')).closest('article')!;
+        expect(within(screen.getByText('Under my other grant.').closest('article')!).getByRole('button', { name: 'Withdraw' })).toBeTruthy();
+        expect(within(screen.getByText('Through another client.').closest('article')!).queryByRole('button', { name: 'Withdraw' })).toBeNull();
         const theirs = screen.getByText('Bob\'s.').closest('article')!;
         expect(within(theirs).queryByRole('button', { name: 'Withdraw' })).toBeNull();
 
@@ -473,6 +484,40 @@ describe('reading and publishing', () => {
         expect(screen.getByText('A summary.')).toBeTruthy();
         expect(screen.getByText(/The full text is kept apart/)).toBeTruthy();
         expect(screen.getByText(/A boost of/)).toBeTruthy();
+    });
+
+    it('shows a reader as signed in, with the way to sign out, when the read after signing in fails', async () => {
+        const { api } = services();
+        vi.mocked(api.login).mockResolvedValue({ did: ALICE });
+        vi.mocked(api.me).mockResolvedValueOnce(undefined).mockRejectedValue(new ApiError(502, 'the service could not answer'));
+        render(<App api={api} pollMs={60_000} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Sign in with your wallet' }));
+        await user.click(await screen.findByText('My wallet gave me a response to paste'));
+        await user.type(screen.getByLabelText('Response'), 'did:cid:response');
+        await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+        expect(await screen.findByRole('button', { name: 'Sign out' })).toBeTruthy();
+        expect((await screen.findAllByRole('alert'))[0].textContent).toBe('the service could not answer');
+    });
+
+    it('takes the later of two checks of the grant, whichever answers last', async () => {
+        const waitingForGrant: Me = { did: ALICE, pending: ['did:cid:grant'], link: 'archon://grant?request=abc' };
+        const { api } = services({ me: waitingForGrant });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText(/waiting to be anchored on its chain/);
+        let first!: (me: Me) => void;
+        vi.mocked(api.me).mockReturnValueOnce(new Promise(answer => { first = answer; })).mockResolvedValueOnce(granted);
+        await user.click(screen.getByRole('button', { name: 'Check again' }));
+        await user.click(screen.getByRole('button', { name: 'Check again' }));
+        expect(await screen.findByLabelText('Post')).toBeTruthy();
+
+        first(waitingForGrant);
+        await new Promise(wait => setTimeout(wait, 50));
+        expect(screen.getByLabelText('Post')).toBeTruthy();
     });
 
     it('signs out', async () => {

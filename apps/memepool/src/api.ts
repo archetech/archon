@@ -20,6 +20,8 @@ export interface Reply {
 export interface Me {
     did: string;
     grant?: string;
+    // Other grants of theirs that are in force.
+    others?: string[];
     registry?: string;
     link?: string;
     pending?: string[];
