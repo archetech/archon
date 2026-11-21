@@ -2175,7 +2175,10 @@ impl JsonDb {
                 "height": block.get("height").cloned().unwrap_or(Value::Null)
             }));
 
-        let upper = event.registration.as_ref().and_then(|reg| {
+        // The block that anchored the operation is one of the chain its receipt
+        // is on. A receipt on another registry than the version's has a height
+        // that means nothing here.
+        let upper = event.registration.as_ref().filter(|_| event.registry == registry).and_then(|reg| {
             let height = reg.get("height").and_then(Value::as_u64)?;
             let block = self.get_block(registry, Some(BlockLookup::Height(height)))?;
             let mut obj = serde_json::Map::new();
