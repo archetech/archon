@@ -286,6 +286,43 @@ describe('Grants view: the grants an identity holds', () => {
         });
     });
 
+    it('will not save a change to a grant that has changed since it was shown', async () => {
+        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT } }) });
+        view();
+        const user = userEvent.setup();
+        await user.click(await screen.findByRole('button', { name: 'Change' }));
+        // Narrowed from another device while the editor is open.
+        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, actions: ['memeplex:post'] } }) });
+        await user.clear(within(screen.getByRole('dialog')).getByLabelText('Expires'));
+        await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => expect(notify.error).toHaveBeenCalled());
+        expect(String(notify.error.mock.calls[0][0])).toMatch(/has changed since/);
+        expect(keymaster.mergeData).not.toHaveBeenCalled();
+        expect(await screen.findByText('Post')).toBeTruthy();
+    });
+
+    it('shows a change that is not anchored as awaiting anchoring, whatever expiry it sets', async () => {
+        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT, expiresAt: '2020-01-01T00:00:00Z' } }, pending({ versionSequence: '2' })) });
+        view();
+
+        expect(await screen.findByText('Change awaiting anchoring')).toBeTruthy();
+        expect(screen.queryByText('Expired')).toBeNull();
+    });
+
+    it('says the grants could not be read, and not that there are none, when the list fails', async () => {
+        keymaster.listAssets.mockRejectedValue(new Error('node unreachable'));
+        view();
+
+        expect(await screen.findByText(/grants could not be read/)).toBeTruthy();
+        expect(screen.queryByText('No grants')).toBeNull();
+
+        holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT } }) });
+        await userEvent.setup().click(screen.getByRole('button', { name: 'Retry' }));
+        expect(await screen.findByTestId('grant')).toBeTruthy();
+        expect(screen.queryByText(/grants could not be read/)).toBeNull();
+    });
+
     it('keeps the editor open and says so when the node refuses a change', async () => {
         keymaster.mergeData.mockResolvedValue(false);
         holding({ [GRANT]: doc({ memeplexGrant: { v: 1, client: CLIENT } }) });
@@ -441,6 +478,56 @@ describe('Grants view: revoking', () => {
         await waitFor(() => expect(notify.error).toHaveBeenCalled());
         expect(await screen.findByTestId('grant')).toBeTruthy();
         expect(screen.queryByText(/Revocation/)).toBeNull();
+    });
+
+    it('treats a revocation that failed after the node accepted it as submitted', async () => {
+        keymaster.revokeDID.mockImplementation(async () => {
+            holding({ [GRANT]: doc({}, pending({ deactivated: true })) });
+            throw new Error('connection lost');
+        });
+        holding(held);
+        view({ identity });
+        await revoke();
+
+        expect(await screen.findByText('Revocation submitted')).toBeTruthy();
+        expect(screen.getByText(/can still publish/)).toBeTruthy();
+    });
+
+    it('puts the grant back when a revocation failed and the node still resolves the grant', async () => {
+        keymaster.revokeDID.mockRejectedValue(new Error('refused'));
+        holding(held);
+        view({ identity });
+        await revoke();
+
+        expect(await screen.findByTestId('grant')).toBeTruthy();
+        expect(screen.queryByText(/Revocation/)).toBeNull();
+        expect(notify.error).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows a revocation the node accepted after the user left the tab, when they return', async () => {
+        let accept!: (ok: boolean) => void;
+        keymaster.revokeDID.mockReturnValue(new Promise(settle => { accept = settle; }));
+        holding(held);
+        const first = view({ identity });
+        await revoke();
+        expect(await screen.findByText('Revocation requested')).toBeTruthy();
+        first.unmount();
+
+        await act(async () => accept(true));
+        view({ identity });
+        expect(await screen.findByText('Revocation submitted')).toBeTruthy();
+    });
+
+    it('does not show the grant again while its revocation is under way', async () => {
+        keymaster.revokeDID.mockReturnValue(new Promise(() => undefined));
+        holding(held);
+        view({ identity, pollMs: 20 });
+        await revoke();
+        expect(await screen.findByText('Revocation requested')).toBeTruthy();
+
+        await new Promise(wait => setTimeout(wait, 100));
+        expect(screen.queryByTestId('grant')).toBeNull();
+        expect(screen.getByText('Revocation requested')).toBeTruthy();
     });
 
     it('revokes nothing when the user cancels', async () => {

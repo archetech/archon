@@ -5,7 +5,7 @@ import GrantsView from "./GrantsView";
 
 export default function GrantsTab() {
     const { keymaster } = useWalletContext();
-    const { currentId, registries } = useVariablesContext();
+    const { currentId, currentDID, registries } = useVariablesContext();
     const { setError, setSuccess } = useSnackbar();
 
     if (!keymaster || !currentId) {
@@ -13,9 +13,10 @@ export default function GrantsTab() {
     }
     return (
         <GrantsView
-            key={currentId}
+            key={currentDID || currentId}
             keymaster={keymaster}
             identity={currentId}
+            sessionKey={currentDID || currentId}
             registries={registries ?? []}
             notify={{ error: setError, success: setSuccess }}
         />

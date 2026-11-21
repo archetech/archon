@@ -38,6 +38,9 @@ type Props = {
     // every call names it, so a call under way when the identity changes still
     // acts for the identity it was started for.
     identity: string;
+    // What this identity's revocations are remembered under while the wallet is
+    // open. Hosts pass the identity's DID, which a rename does not change.
+    sessionKey?: string;
     // The registries this node can create on.
     registries: string[];
     notify: {
@@ -90,6 +93,17 @@ type Revocation = { grant: HeldGrant; state: RevocationState };
 // list a revoked asset, so this is what lets the view warn about one when the
 // user leaves the tab and comes back.
 const sessionRevocations = new Map<string, Revocation[]>();
+
+const tracked = (key: string): Revocation[] => sessionRevocations.get(key) ?? [];
+
+// Written here first and shown from here, so that a revocation started in a view
+// the user has since left is where the next view finds it.
+function track(key: string, did: string, change: (revocation?: Revocation) => Revocation | undefined): void {
+    const others = tracked(key).filter(revocation => revocation.grant.did !== did);
+    const next = change(tracked(key).find(revocation => revocation.grant.did === did));
+
+    sessionRevocations.set(key, next ? [...others, next] : others);
+}
 
 // `expiresAt` is the instant the editor was opened with, kept so that an expiry
 // the user leaves alone is written back exactly.
@@ -206,13 +220,15 @@ const REVOCATION_TEXT: Record<RevocationState, string> = {
     effective: "Revoked",
 };
 
-export default function GrantsView({ keymaster, identity, registries, notify: hostNotify, pollMs = 30000 }: Props) {
+export default function GrantsView({ keymaster, identity, sessionKey = identity, registries, notify: hostNotify, pollMs = 30000 }: Props) {
     const notifyRef = useRef(hostNotify);
     notifyRef.current = hostNotify;
 
     const [grants, setGrants] = useState<HeldGrant[] | null>(null);
-    const [revocations, setRevocationState] = useState<Revocation[]>(() => sessionRevocations.get(identity) ?? []);
+    const [revocations, setRevocations] = useState<Revocation[]>(() => tracked(sessionKey));
     const [unresolved, setUnresolved] = useState(0);
+    const [unlisted, setUnlisted] = useState(false);
+    const reads = useRef(0);
     const [link, setLink] = useState("");
     const [request, setRequest] = useState<Record<string, any> | null>(null);
     const [linkError, setLinkError] = useState("");
@@ -224,15 +240,10 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
 
     const permitted = PERMITTED_REGISTRIES.filter(name => registries.includes(name));
 
-    const setRevocations = useCallback((change: (current: Revocation[]) => Revocation[]) => {
-        setRevocationState(current => {
-            const next = change(current);
-            sessionRevocations.set(identity, next);
-            return next;
-        });
-    }, [identity]);
+    const showRevocations = useCallback(() => setRevocations(tracked(sessionKey)), [sessionKey]);
 
     const load = useCallback(async () => {
+        const read = reads.current += 1;
         const held: HeldGrant[] = [];
         const owned = await keymaster.listAssets(identity);
         let failed = 0;
@@ -271,55 +282,62 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
             }
         }
 
+        // A later read has started: its answer is the one to show.
+        if (read !== reads.current) {
+            return;
+        }
+
+        // A grant being revoked is shown as a revocation, not as a card.
+        const revoking = new Set(tracked(sessionKey).map(revocation => revocation.grant.did));
+
         setUnresolved(failed);
-        setGrants(held);
-    }, [keymaster, identity]);
+        setUnlisted(false);
+        setGrants(held.filter(grant => !revoking.has(grant.did)));
+    }, [keymaster, identity, sessionKey]);
 
     // Whether each revocation the node has accepted is anchored. An anchor can be
     // withdrawn by a reorganization, so one seen as effective is read as well.
     const readRevocations = useCallback(async () => {
-        const states = new Map<string, RevocationState>();
-
-        for (const revocation of sessionRevocations.get(identity) ?? []) {
-            if (revocation.state === "requested") {
+        for (const { grant: held, state: shown } of tracked(sessionKey)) {
+            if (shown === "requested") {
                 continue;
             }
             try {
-                const doc = await keymaster.resolveDID(revocation.grant.did);
-                const effective = doc.didDocumentMetadata?.deactivated === true && isAnchored(doc, revocation.grant.registry);
-                states.set(revocation.grant.did, effective ? "effective" : "submitted");
+                const doc = await keymaster.resolveDID(held.did);
+                const effective = doc.didDocumentMetadata?.deactivated === true && isAnchored(doc, held.registry);
+
+                track(sessionKey, held.did, revocation => revocation && revocation.state !== "requested"
+                    ? { ...revocation, state: effective ? "effective" : "submitted" }
+                    : revocation);
             }
             catch {
                 // Left as it is shown until the node answers.
             }
         }
 
-        setRevocations(current => current.map(revocation => {
-            const state = revocation.state === "requested" ? undefined : states.get(revocation.grant.did);
-            return state && state !== revocation.state ? { ...revocation, state } : revocation;
-        }));
-    }, [keymaster, identity, setRevocations]);
+        showRevocations();
+    }, [keymaster, sessionKey, showRevocations]);
 
-    const refresh = useCallback(async () => {
+    const refresh = useCallback(async (report: boolean) => {
         try {
             await load();
         }
         catch (error) {
+            setUnlisted(true);
             setGrants(current => current ?? []);
-            notifyRef.current.error(error);
+            if (report) {
+                notifyRef.current.error(error);
+            }
         }
         await readRevocations();
     }, [load, readRevocations]);
 
     useEffect(() => {
-        refresh();
-        const timer = setInterval(() => {
-            load().catch(() => undefined);
-            readRevocations();
-        }, pollMs);
+        refresh(true);
+        const timer = setInterval(() => refresh(false), pollMs);
 
         return () => clearInterval(timer);
-    }, [refresh, load, readRevocations, pollMs]);
+    }, [refresh, pollMs]);
 
     function readLink() {
         const decoded = decodeGrantLink(link.trim());
@@ -408,6 +426,16 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
 
         setBusy(true);
         try {
+            // The change is to the grant as the user saw it. If the grant has
+            // changed since, saving would put back what that change took away.
+            const latest = (await keymaster.resolveDID(held.did)).didDocumentData as { memeplexGrant?: unknown } | undefined;
+
+            if (JSON.stringify(latest?.memeplexGrant) !== JSON.stringify(held.grant)) {
+                setEditing(null);
+                await load();
+                throw new Error("This grant has changed since it was shown. Review it and make the change again.");
+            }
+
             if (!await keymaster.mergeData(held.did, { memeplexGrant })) {
                 throw new Error("The node did not accept the change");
             }
@@ -429,26 +457,44 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
         }
 
         const held = revoking;
-        const mark = (state: RevocationState) => setRevocations(current => [
-            ...current.filter(revocation => revocation.grant.did !== held.did),
-            { grant: held, state },
-        ]);
+        const mark = (state?: RevocationState) => {
+            track(sessionKey, held.did, () => state && { grant: held, state });
+            showRevocations();
+        };
 
         setRevoking(null);
         mark("requested");
         setGrants(current => current?.filter(grant => grant.did !== held.did) ?? current);
 
+        let accepted: boolean;
+        let failed = false;
+
         try {
-            if (!await keymaster.revokeDID(held.did)) {
-                throw new Error("The node did not accept the revocation");
-            }
-            mark("submitted");
+            accepted = await keymaster.revokeDID(held.did);
         }
         catch (error) {
-            setRevocations(current => current.filter(revocation => revocation.grant.did !== held.did));
+            failed = true;
             notifyRef.current.error(error);
-            await load().catch(() => undefined);
+            // A failure does not say the node refused: it may have accepted
+            // the deletion before the failure. What the node resolves says.
+            try {
+                accepted = (await keymaster.resolveDID(held.did)).didDocumentMetadata?.deactivated === true;
+            }
+            catch {
+                accepted = true;
+            }
         }
+
+        if (accepted) {
+            mark("submitted");
+            return;
+        }
+
+        mark(undefined);
+        if (!failed) {
+            notifyRef.current.error(new Error("The node did not accept the revocation"));
+        }
+        await load().catch(() => undefined);
     }
 
     const scopeEmpty = (edited: Scope) => edited.chosen.length === 0;
@@ -537,7 +583,7 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
                     severity={state === "effective" ? "success" : "warning"}
                     sx={{ mb: 1 }}
                     onClose={state === "effective"
-                        ? () => setRevocations(current => current.filter(revocation => revocation.grant.did !== held.did))
+                        ? () => { track(sessionKey, held.did, () => undefined); showRevocations(); }
                         : undefined}
                 >
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>{REVOCATION_TEXT[state]}</Typography>
@@ -556,16 +602,26 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
                 <Alert
                     severity="warning"
                     sx={{ mb: 1 }}
-                    action={<Button color="inherit" size="small" onClick={refresh}>Retry</Button>}
+                    action={<Button color="inherit" size="small" onClick={() => refresh(true)}>Retry</Button>}
                 >
                     {unresolved === 1 ? "One asset" : `${unresolved} assets`} of this identity could not be read,
                     so this list may be missing grants.
                 </Alert>
             )}
 
+            {unlisted && (
+                <Alert
+                    severity="warning"
+                    sx={{ mb: 1 }}
+                    action={<Button color="inherit" size="small" onClick={() => refresh(true)}>Retry</Button>}
+                >
+                    This identity's grants could not be read, so what is shown may be out of date or incomplete.
+                </Alert>
+            )}
+
             {grants === null && <CircularProgress size={24} aria-label="Loading grants" />}
 
-            {grants !== null && grants.length === 0 && unresolved === 0 && (
+            {grants !== null && grants.length === 0 && unresolved === 0 && !unlisted && (
                 <EmptyState
                     icon={<VerifiedUser />}
                     title="No grants"
@@ -577,11 +633,11 @@ export default function GrantsView({ keymaster, identity, registries, notify: ho
                 <Paper key={held.did} variant="outlined" sx={{ p: 2, mb: 1 }} data-testid="grant">
                     <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center", mb: 1 }}>
                         <Chip size="small" label={held.registry} />
-                        {isExpired(held.grant)
-                            ? <Chip size="small" color="default" label="Expired" />
-                            : held.anchored
-                                ? <Chip size="small" color="success" label="Active" />
-                                : <Chip size="small" color="warning" label={held.created ? "Awaiting anchoring" : "Change awaiting anchoring"} />}
+                        {!held.anchored
+                            ? <Chip size="small" color="warning" label={held.created ? "Awaiting anchoring" : "Change awaiting anchoring"} />
+                            : isExpired(held.grant)
+                                ? <Chip size="small" color="default" label="Expired" />
+                                : <Chip size="small" color="success" label="Active" />}
                     </Box>
                     {!held.anchored && (
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
