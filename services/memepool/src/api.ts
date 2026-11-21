@@ -15,7 +15,7 @@ import type { MemeplexClient, UsableGrant } from '@didcid/memeplex/client';
 export interface LoginKeymaster {
     createChallenge(challenge?: Record<string, unknown>): Promise<string>;
     verifyResponse(response: string, options?: { retries?: number }): Promise<{ challenge: string; match: boolean; responder?: string }>;
-    resolveDID(did: string, options?: { versionSequence?: number }): Promise<{ didDocument?: { controller?: string } }>;
+    resolveDID(did: string): Promise<{ didDocument?: { controller?: string }; didDocumentMetadata?: { versionSequence?: string | number } }>;
 }
 
 export interface MemepoolOptions {
@@ -145,8 +145,10 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     router.post('/login', async (req, res) => {
         const { response } = req.body ?? {};
 
-        if (typeof response !== 'string' || !response) {
-            res.status(400).json({ error: 'expected a response' });
+        // A DID and nothing else: a name would be looked up each time it is
+        // read, and need not lead to the same asset twice.
+        if (typeof response !== 'string' || !response.startsWith('did:')) {
+            res.status(400).json({ error: 'expected the DID of a response' });
             return;
         }
 
@@ -182,13 +184,15 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         challenges.take(verified.challenge);
         marks.take(asked);
 
-        // Who answered is whoever created the response. An asset's controller
-        // can be changed by its owner to anyone, with no consent of theirs, so
-        // the response's present controller is not evidence of who that is.
-        const created = await keymaster.resolveDID(response, { versionSequence: 1 });
+        // Who answered is whoever created the response, with what it holds.
+        // An asset's owner can hand it to anyone, with no consent of theirs,
+        // and can replace its contents first, so only a response still at its
+        // first version shows who wrote it. Versions only increase: one that
+        // is at its first here was at its first when it was verified.
+        const held = await keymaster.resolveDID(response);
 
-        if (created.didDocument?.controller !== verified.responder) {
-            res.status(401).json({ error: 'the response is not controlled by the identity that created it' });
+        if (Number(held.didDocumentMetadata?.versionSequence) !== 1 || held.didDocument?.controller !== verified.responder) {
+            res.status(401).json({ error: 'the response is not as its author created it' });
             return;
         }
 
@@ -265,10 +269,16 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
                 res.json(await act(req as Signed, grant));
             }
             catch (error) {
-                if (!(error instanceof MemeplexClientError)) {
-                    throw error;
+                if (error instanceof MemeplexClientError) {
+                    res.status(error.reason === 'invalid' ? 400 : 502).json({ error: error.message });
+                    return;
                 }
-                res.status(error.reason === 'invalid' ? 400 : 502).json({ error: error.message });
+                // The node's own refusal of an operation, such as one too large.
+                if (typeof (error as { type?: unknown }).type === 'string') {
+                    res.status(502).json({ error: 'the node did not accept the operation' });
+                    return;
+                }
+                throw error;
             }
         };
 

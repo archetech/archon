@@ -169,6 +169,31 @@ describe('signing in', () => {
         expect((await agent.get('/api/v1/me')).status).toBe(401);
     });
 
+    // An identity that was once handed an asset can put its own answer in it
+    // and hand it back.
+    it('does not sign in the creator of an asset that came back holding another identity\'s answer', async () => {
+        const agent = browser();
+        const { challenge } = (await agent.get('/api/v1/challenge')).body;
+        const asset = await alice.createResponse(await service.createChallenge());
+        const bobDid = (await bob.resolveDID('bob')).didDocument!.id!;
+
+        expect(await alice.transferAsset(asset, bobDid)).toBe(true);
+        const answer = (await bob.resolveDID(await bob.createResponse(challenge))).didDocumentData;
+        await bob.updateDID(asset, { ...await bob.resolveDID(asset), didDocumentData: answer });
+        expect(await bob.transferAsset(asset, aliceDid)).toBe(true);
+
+        expect((await agent.post('/api/v1/login').send({ response: asset })).status).toBe(401);
+        expect((await agent.get('/api/v1/me')).status).toBe(401);
+    });
+
+    it('takes a DID as an answer, and not a name', async () => {
+        const agent = browser();
+        const { challenge } = (await agent.get('/api/v1/challenge')).body;
+
+        await service.addAlias('answer', await alice.createResponse(challenge));
+        expect((await agent.post('/api/v1/login').send({ response: 'answer' })).status).toBe(400);
+    });
+
     it('does not take an answer to a challenge that has lapsed', async () => {
         const agent = browser();
         const { challenge } = (await agent.get('/api/v1/challenge')).body;
@@ -309,6 +334,12 @@ describe('publishing', () => {
         expect((await agent.post('/api/v1/objects').send([1])).status).toBe(400);
         expect((await agent.post('/api/v1/objects').send({ kind: 'essay', text: 'x' })).body).toStrictEqual({ error: 'not a valid essay: kind' });
         expect((await agent.put(`/api/v1/objects/${did}`).send({ kind: 'paper', title: 'x' })).status).toBe(400);
+    }, 120_000);
+
+    it('answers 502 when the node refuses an operation', async () => {
+        const { agent } = await granted(alice);
+
+        expect((await agent.post('/api/v1/objects').send({ kind: 'post', text: 'A post.', extra: 'x'.repeat(100_000) })).status).toBe(502);
     }, 120_000);
 
     it('lets a user change or withdraw only what is theirs', async () => {

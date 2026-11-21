@@ -60,9 +60,9 @@ An answer signs a browser in when all of these hold:
 - it comes from the browser that asked for that challenge, which the service marks
   with a second cookie. A wallet publishes its answer as an asset whose DID anyone
   can see, so the DID alone must not be enough;
-- the identity that controls the answer is the one that created it. The owner of an
-  asset can hand it to any identity without that identity's consent, so an answer's
-  present controller does not show who answered.
+- the answer is given as a DID, and is still as its author created it. The owner of
+  an asset can replace its contents and hand it to any identity without that
+  identity's consent, so only an answer at its first version shows who wrote it.
 
 Each challenge is an asset the node stores and gossips, and anyone can ask for one,
 so the service issues a limited number a minute (60 unless set otherwise).
