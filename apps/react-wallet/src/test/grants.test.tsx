@@ -562,6 +562,29 @@ describe('Grants view: revoking', () => {
         expect(await screen.findByTestId('grant')).toBeTruthy();
     });
 
+    it('says when an accepted revocation lost its place to another change, and revokes again', async () => {
+        const deleted = { [GRANT]: doc({}, pending({ deactivated: true })) };
+        keymaster.revokeDID.mockImplementation(async () => {
+            holding(deleted);
+            keymaster.listAssets.mockResolvedValue([]);
+            return true;
+        });
+        holding(held);
+        view({ identity, pollMs: 20 });
+        const user = await revoke();
+        expect(await screen.findByText('Revocation submitted')).toBeTruthy();
+
+        // The grant is live, and Keymaster does not list it.
+        holding(held);
+        keymaster.listAssets.mockResolvedValue([]);
+        expect(await screen.findByText('Revocation did not take effect')).toBeTruthy();
+        expect(screen.getByText(/can still publish/)).toBeTruthy();
+
+        await user.click(await screen.findByRole('button', { name: 'Revoke Again' }));
+        expect(await screen.findByText('Revocation submitted')).toBeTruthy();
+        expect(keymaster.revokeDID).toHaveBeenCalledTimes(2);
+    });
+
     it('revokes nothing when the user cancels', async () => {
         holding(held);
         view({ identity });

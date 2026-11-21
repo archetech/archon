@@ -85,9 +85,14 @@ type HeldGrant = {
 // A revocation, from the wallet's side: `requested` once the user has asked,
 // `submitted` once a node has accepted the signed deletion, `effective` once
 // that deletion is anchored. A client can publish until it is effective.
-export type RevocationState = "requested" | "submitted" | "effective";
+//
+// `displaced` is a revocation a node accepted and that then lost its place to
+// another change to the grant, made elsewhere: the grant is live, and Keymaster
+// stopped listing it when the revocation was accepted.
+export type RevocationState = "requested" | "submitted" | "effective" | "displaced";
 
-type Revocation = { grant: HeldGrant; state: RevocationState };
+// `uncertain` marks a revocation the node was never seen to accept.
+type Revocation = { grant: HeldGrant; state: RevocationState; uncertain?: boolean };
 
 // Revocations made while the wallet is open, by identity. Keymaster does not
 // list a revoked asset, so this is what lets the view warn about one when the
@@ -218,6 +223,7 @@ const REVOCATION_TEXT: Record<RevocationState, string> = {
     requested: "Revocation requested",
     submitted: "Revocation submitted",
     effective: "Revoked",
+    displaced: "Revocation did not take effect",
 };
 
 export default function GrantsView({ keymaster, identity, sessionKey = identity, registries, notify: hostNotify, pollMs = 30000 }: Props) {
@@ -307,12 +313,19 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                 const deleted = doc.didDocumentMetadata?.deactivated === true;
                 const effective = deleted && isAnchored(doc, held.registry);
 
-                // A node that accepted the deletion resolves the grant as
-                // deactivated from then on. One that resolves it live did not
-                // accept it, so the grant goes back among the cards.
-                track(sessionKey, held.did, revocation => revocation && revocation.state !== "requested"
-                    ? (deleted ? { ...revocation, state: effective ? "effective" : "submitted" } : undefined)
-                    : revocation);
+                // A live grant after a revocation the node was not seen to
+                // accept was not revoked: Keymaster still lists it, and it goes
+                // back among the cards. After one the node accepted, it is live
+                // because another change took the deletion's place.
+                track(sessionKey, held.did, revocation => {
+                    if (!revocation || revocation.state === "requested") {
+                        return revocation;
+                    }
+                    if (deleted) {
+                        return { grant: revocation.grant, state: effective ? "effective" : "submitted" };
+                    }
+                    return revocation.uncertain ? undefined : { ...revocation, state: "displaced" };
+                });
             }
             catch {
                 // Left as it is shown until the node answers.
@@ -471,14 +484,9 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
         }
     }
 
-    async function revoke() {
-        if (!revoking) {
-            return;
-        }
-
-        const held = revoking;
-        const mark = (state?: RevocationState) => {
-            track(sessionKey, held.did, () => state && { grant: held, state });
+    async function revoke(held: HeldGrant) {
+        const mark = (state?: RevocationState, uncertain = false) => {
+            track(sessionKey, held.did, () => state && { grant: held, state, ...(uncertain ? { uncertain } : {}) });
             showRevocations();
         };
 
@@ -488,6 +496,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
 
         let accepted: boolean;
         let failed = false;
+        let uncertain = false;
 
         try {
             accepted = await keymaster.revokeDID(held.did);
@@ -502,11 +511,12 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
             }
             catch {
                 accepted = true;
+                uncertain = true;
             }
         }
 
         if (accepted) {
-            mark("submitted");
+            mark("submitted", uncertain);
             return;
         }
 
@@ -600,8 +610,11 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
             {revocations.map(({ grant: held, state }) => (
                 <Alert
                     key={held.did}
-                    severity={state === "effective" ? "success" : "warning"}
+                    severity={state === "effective" ? "success" : state === "displaced" ? "error" : "warning"}
                     sx={{ mb: 1 }}
+                    action={state === "displaced"
+                        ? <Button color="inherit" size="small" onClick={() => revoke(held)}>Revoke Again</Button>
+                        : undefined}
                     onClose={state === "effective"
                         ? () => { track(sessionKey, held.did, () => undefined); showRevocations(); }
                         : undefined}
@@ -610,7 +623,12 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                     <Typography variant="body2" sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>
                         {held.grant.client}
                     </Typography>
-                    {state !== "effective" && (
+                    {state === "displaced" && (
+                        <Typography variant="body2">
+                            Another change to this grant took the revocation's place. The client can still publish.
+                        </Typography>
+                    )}
+                    {(state === "requested" || state === "submitted") && (
                         <Typography variant="body2">
                             The client can still publish until the revocation is anchored on {held.registry}.
                         </Typography>
@@ -732,7 +750,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setRevoking(null)}>Cancel</Button>
-                    <Button variant="contained" color="error" onClick={revoke}>Revoke</Button>
+                    <Button variant="contained" color="error" onClick={() => revoking && revoke(revoking)}>Revoke</Button>
                 </DialogActions>
             </Dialog>
         </Box>
