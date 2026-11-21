@@ -962,7 +962,7 @@ until the verifier exists.
      Python Keymaster CLI) and as MCP tools. The link and grant checks are in
      `@didcid/memeplex`, which is TypeScript only, so the Python CLI needs them too.
 6. **Indexer.** The `memeplex-indexer` service, enabled by the `memeplex` profile and offered through Drawbridge at `/memeplex`; see `docs/services/memeplex-indexer/README.md`.
-7. **Memepool client.** Its library is `@didcid/memeplex/client`: `MemeplexClient` asks for a grant, finds it and publishes under it through a Keymaster and a Gatekeeper it is handed, and `IndexerClient` reads an indexer's views. `tests/memeplex/client.test.ts` runs the whole flow, from a grant link to a thread read over HTTP, with the test anchoring as a mediator does. The application is still to do.
+7. **Memepool client.** Its library is `@didcid/memeplex/client`: `MemeplexClient` asks for a grant, finds it and publishes under it through a Keymaster and a Gatekeeper it is handed, and `IndexerClient` reads an indexer's views. `tests/memeplex/client.test.ts` runs the whole flow, from a grant link to a thread read over HTTP, with the test anchoring as a mediator does. The service that holds Memepool's key and publishes for the users who sign in to it is `services/memepool` (`docs/services/memepool/README.md`). Its deployment and its pages are still to do.
 8. **Moderation:** block lists and labels.
 
 ## Open question

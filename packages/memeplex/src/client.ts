@@ -53,6 +53,18 @@ export interface UsableGrant {
 // grant's to state.
 export type ObjectFields = { kind: string } & Record<string, unknown>;
 
+// Why a client would not do what it was asked: the object is not one the rules
+// allow (`invalid`), or the node would not take the operation (`refused`).
+export class MemeplexClientError extends Error {
+    readonly reason: 'invalid' | 'refused';
+
+    constructor(reason: 'invalid' | 'refused', message: string) {
+        super(message);
+        this.name = 'MemeplexClientError';
+        this.reason = reason;
+    }
+}
+
 // How many histories are asked of a Gatekeeper at once.
 const BATCH = 100;
 
@@ -112,7 +124,21 @@ export class MemeplexClient {
     // request can create one, so there may be several, from different users;
     // the client shows whose each is and lets its user choose.
     async findGrants(request: Pick<GrantRequest, 'client' | 'nonce'>): Promise<FoundGrant[]> {
-        const dids = await this.gatekeeper.queryDocs({ 'memeplexGrant.client': { $in: [request.client] } });
+        return this.grantsNaming(request.client, created => created.memeplexGrant?.nonce === request.nonce);
+    }
+
+    // The grants a user has made to this client, whatever request they answer.
+    // A client that knows who its user is, because the user signed in to it,
+    // needs no nonce to tell that user's grants from another's.
+    async grantsFrom(user: string): Promise<FoundGrant[]> {
+        return this.grantsNaming(await this.did(), created => created.controller === user);
+    }
+
+    private async grantsNaming(
+        client: string,
+        wanted: (created: { controller?: string; memeplexGrant?: { nonce?: unknown } }) => boolean,
+    ): Promise<FoundGrant[]> {
+        const dids = await this.gatekeeper.queryDocs({ 'memeplexGrant.client': { $in: [client] } });
         const found: FoundGrant[] = [];
 
         for (let start = 0; start < dids.length; start += BATCH) {
@@ -120,9 +146,10 @@ export class MemeplexClient {
             const histories = await this.gatekeeper.resolveVersions(batch);
 
             histories.forEach((history, index) => {
-                const created = history[0]?.didDocumentData as { memeplexGrant?: { client?: unknown; nonce?: unknown } } | undefined;
+                const data = history[0]?.didDocumentData as { memeplexGrant?: { client?: unknown; nonce?: unknown } } | undefined;
 
-                if (created?.memeplexGrant?.client === request.client && created.memeplexGrant.nonce === request.nonce) {
+                if (data?.memeplexGrant?.client === client
+                    && wanted({ controller: history[0].didDocument?.controller, memeplexGrant: data.memeplexGrant })) {
                     found.push({ did: batch[index], grant: readGrant(history) });
                 }
             });
@@ -146,29 +173,39 @@ export class MemeplexClient {
     // an edit is refused.
     async edit(did: string, grant: UsableGrant, object: ObjectFields): Promise<void> {
         const memeplex = this.stated(grant, object);
-        const [versions] = await this.gatekeeper.resolveVersions([did]);
-        const created = (versions?.[0]?.didDocumentData as { memeplex?: Record<string, unknown> } | undefined)?.memeplex;
-
-        if (!created) {
-            throw new Error(`${did} is not a published object`);
-        }
+        const created = await this.created(did);
 
         for (const field of ['author', 'kind', 'grant', 'target']) {
             if (created[field] !== memeplex[field]) {
-                throw new Error(`an edit cannot change an object's ${field}`);
+                throw new MemeplexClientError('invalid', `an edit cannot change an object's ${field}`);
             }
         }
 
         if (!await this.keymaster.mergeData(did, { memeplex })) {
-            throw new Error('the node did not accept the edit');
+            throw new MemeplexClientError('refused', 'the node did not accept the edit');
         }
     }
 
-    // Withdraws a published object.
-    async withdraw(did: string): Promise<void> {
-        if (!await this.keymaster.revokeDID(did)) {
-            throw new Error('the node did not accept the withdrawal');
+    // Withdraws an object the grant's user published.
+    async withdraw(did: string, grant: UsableGrant): Promise<void> {
+        if ((await this.created(did)).author !== grant.user) {
+            throw new MemeplexClientError('invalid', `${did} is not an object of this user's`);
         }
+        if (!await this.keymaster.revokeDID(did)) {
+            throw new MemeplexClientError('refused', 'the node did not accept the withdrawal');
+        }
+    }
+
+    // An object as it was created.
+    private async created(did: string): Promise<Record<string, unknown>> {
+        const [versions] = await this.gatekeeper.resolveVersions([did]);
+        const created = (versions?.[0]?.didDocumentData as { memeplex?: Record<string, unknown> } | undefined)?.memeplex;
+
+        if (!created || typeof created !== 'object') {
+            throw new MemeplexClientError('invalid', `${did} is not a published object`);
+        }
+
+        return created;
     }
 
     // What an object is, as the verifier reads it from the Gatekeeper's evidence.
@@ -183,7 +220,7 @@ export class MemeplexClient {
         const validity = validateObject(memeplex);
 
         if (validity !== 'valid') {
-            throw new Error(`not a valid ${object.kind}: ${validity}`);
+            throw new MemeplexClientError('invalid', `not a valid ${object.kind}: ${validity}`);
         }
 
         return memeplex;

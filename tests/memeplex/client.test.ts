@@ -170,7 +170,7 @@ it('carries a user from a grant link to a thread a reader sees', async () => {
     await anchor();
     expect(await indexer.publication(post)).toMatchObject({ state: 'published', current: 1, memeplex: { text: 'Every post is a DID, and so is every reply.' } });
 
-    await client.withdraw(reply);
+    await client.withdraw(reply, grant);
     await anchor();
     expect(await indexer.publication(reply)).toMatchObject({ state: 'withdrawn' });
     expect((await indexer.timeline([userDid])).publications.map(each => each.did)).toStrictEqual([post]);
