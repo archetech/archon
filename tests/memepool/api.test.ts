@@ -124,28 +124,69 @@ describe('signing in', () => {
         const answer = await agent.post('/api/v1/login').send({ response: await alice.createResponse(challenge) });
 
         expect(answer.body).toStrictEqual({ did: aliceDid });
-        expect(answer.headers['set-cookie'][0]).toMatch(/^memepool_session=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Strict$/);
+        expect(answer.headers['set-cookie']).toContainEqual(expect.stringMatching(/^memepool_session=[A-Za-z0-9_-]{43}; Path=\/; HttpOnly; SameSite=Strict$/));
         expect((await agent.get('/api/v1/me')).body.did).toBe(aliceDid);
     });
 
     it('takes an answer once, and only to a challenge of its own', async () => {
-        const { challenge } = (await request(app).get('/api/v1/challenge')).body;
+        const agent = browser();
+        const { challenge } = (await agent.get('/api/v1/challenge')).body;
         const response = await alice.createResponse(challenge);
 
-        expect((await request(app).post('/api/v1/login').send({ response })).status).toBe(200);
-        expect((await request(app).post('/api/v1/login').send({ response })).status).toBe(401);
+        expect((await agent.post('/api/v1/login').send({ response })).status).toBe(200);
+        expect((await agent.post('/api/v1/login').send({ response })).status).toBe(401);
 
         const elsewhere = await alice.createResponse(await service.createChallenge());
-        expect((await request(app).post('/api/v1/login').send({ response: elsewhere })).status).toBe(401);
-        expect((await request(app).post('/api/v1/login').send({})).status).toBe(400);
+        expect((await agent.post('/api/v1/login').send({ response: elsewhere })).status).toBe(401);
+        expect((await agent.post('/api/v1/login').send({})).status).toBe(400);
+    });
+
+    // A wallet publishes its answer as an asset, whose DID anyone can see.
+    it('signs in only the browser that asked for the challenge', async () => {
+        const asking = browser();
+        const { challenge } = (await asking.get('/api/v1/challenge')).body;
+        const response = await alice.createResponse(challenge);
+
+        expect((await request(app).post('/api/v1/login').send({ response })).status).toBe(401);
+        const another = browser();
+        await another.get('/api/v1/challenge');
+        expect((await another.post('/api/v1/login').send({ response })).status).toBe(401);
+
+        expect((await asking.post('/api/v1/login').send({ response })).body).toStrictEqual({ did: aliceDid });
+    });
+
+    // An asset's owner can hand it to anyone, without their consent.
+    it('does not sign in the identity a response was transferred to', async () => {
+        const agent = browser();
+        const { challenge } = (await agent.get('/api/v1/challenge')).body;
+        const response = await bob.createResponse(challenge);
+
+        expect(await bob.transferAsset(response, aliceDid)).toBe(true);
+        expect((await service.verifyResponse(response)).responder).toBe(aliceDid);
+
+        expect((await agent.post('/api/v1/login').send({ response })).status).toBe(401);
+        expect((await agent.get('/api/v1/me')).status).toBe(401);
     });
 
     it('does not take an answer to a challenge that has lapsed', async () => {
-        const { challenge } = (await request(app).get('/api/v1/challenge')).body;
+        const agent = browser();
+        const { challenge } = (await agent.get('/api/v1/challenge')).body;
         const response = await alice.createResponse(challenge);
 
         clock += 60_000;
-        expect((await request(app).post('/api/v1/login').send({ response })).status).toBe(401);
+        expect((await agent.post('/api/v1/login').send({ response })).status).toBe(401);
+    });
+
+    it('issues no more challenges in a minute than it is set to', async () => {
+        app = createMemepoolApp({
+            client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, now: () => clock, challengesPerMinute: 2,
+        });
+
+        expect((await request(app).get('/api/v1/challenge')).status).toBe(200);
+        expect((await request(app).get('/api/v1/challenge')).status).toBe(200);
+        expect((await request(app).get('/api/v1/challenge')).status).toBe(429);
+        clock += 60_000;
+        expect((await request(app).get('/api/v1/challenge')).status).toBe(200);
     });
 
     it('ends a session at its lifetime, and at sign-out', async () => {
@@ -195,6 +236,31 @@ describe('the user\'s grant', () => {
 
         expect((await agent.post('/api/v1/objects').send({ kind: 'post', text: 'After.' })).status).toBe(403);
         expect((await agent.get('/api/v1/me')).body.link).toMatch(/^archon:\/\/grant\?request=/);
+    }, 120_000);
+});
+
+describe('a user with more than one grant', () => {
+    it('publishes under the earliest, and changes each object under the grant it was published under', async () => {
+        const { agent, grantDid: first } = await granted(alice);
+        const { did: early } = (await agent.post('/api/v1/objects').send({ kind: 'post', text: 'Under the first.' })).body;
+        await anchor();
+
+        const second = await alice.createAsset({ memeplexGrant: { v: 1, client: serviceDid } }, { registry: REGISTRY });
+        await anchor();
+        expect((await agent.get('/api/v1/me')).body).toStrictEqual({ did: aliceDid, grant: first, registry: REGISTRY, others: [second] });
+
+        expect(await alice.revokeDID(first)).toBe(true);
+        await anchor();
+        expect((await agent.get('/api/v1/me')).body).toStrictEqual({ did: aliceDid, grant: second, registry: REGISTRY });
+
+        const { did: late } = (await agent.post('/api/v1/objects').send({ kind: 'post', text: 'Under the second.' })).body;
+        await anchor();
+        expect(await client.publication(late, second)).toMatchObject({ state: 'published' });
+
+        // A deletion under another grant than the object's would not be attributed.
+        expect((await agent.delete(`/api/v1/objects/${early}`)).status).toBe(400);
+        expect((await agent.put(`/api/v1/objects/${early}`).send({ kind: 'post', text: 'Edited.' })).status).toBe(400);
+        expect((await agent.delete(`/api/v1/objects/${late}`)).status).toBe(200);
     }, 120_000);
 });
 

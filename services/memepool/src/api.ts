@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import { MemeplexClientError, usable } from '@didcid/memeplex/client';
+import { MemeplexClientError, liveGrants } from '@didcid/memeplex/client';
 import type { MemeplexClient, UsableGrant } from '@didcid/memeplex/client';
 
 // The Memepool service over HTTP. Memepool is a Memeplex client: an agent DID
@@ -15,6 +15,7 @@ import type { MemeplexClient, UsableGrant } from '@didcid/memeplex/client';
 export interface LoginKeymaster {
     createChallenge(challenge?: Record<string, unknown>): Promise<string>;
     verifyResponse(response: string, options?: { retries?: number }): Promise<{ challenge: string; match: boolean; responder?: string }>;
+    resolveDID(did: string, options?: { versionSequence?: number }): Promise<{ didDocument?: { controller?: string } }>;
 }
 
 export interface MemepoolOptions {
@@ -26,10 +27,15 @@ export interface MemepoolOptions {
     // Milliseconds a challenge may wait for its answer, and a session lasts.
     challengeLifetime?: number;
     sessionLifetime?: number;
+    // How many challenges the service issues in a minute. Each is an asset the
+    // node stores and gossips, and anyone can ask for one.
+    challengesPerMinute?: number;
     now?: () => number;
 }
 
 const COOKIE = 'memepool_session';
+// Set with a challenge, on the browser that asked for it.
+const ASKED = 'memepool_challenge';
 // How many challenges and sessions are kept at once. Anyone can ask for a
 // challenge, so the oldest are dropped past this.
 const MAX_HELD = 10_000;
@@ -73,11 +79,11 @@ class Expiring<V> {
     }
 }
 
-function cookieOf(req: Request): string | undefined {
+function cookieOf(req: Request, wanted = COOKIE): string | undefined {
     for (const part of (req.headers.cookie ?? '').split(';')) {
         const [name, ...value] = part.trim().split('=');
 
-        if (name === COOKIE) {
+        if (name === wanted) {
             return value.join('=');
         }
     }
@@ -90,7 +96,9 @@ type Signed = Request & { user: string };
 export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     const { client, keymaster, name, version } = options;
     const now = options.now ?? Date.now;
-    const challenges = new Expiring<true>(options.challengeLifetime ?? 10 * 60_000, now);
+    const challenges = new Expiring<string>(options.challengeLifetime ?? 10 * 60_000, now);
+    const perMinute = options.challengesPerMinute ?? 60;
+    let issued: number[] = [];
     const sessions = new Expiring<string>(options.sessionLifetime ?? 24 * 60 * 60_000, now);
     const router = express.Router();
 
@@ -109,10 +117,24 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     });
 
     // A challenge for a wallet to answer, and the link that hands it to one.
-    router.get('/challenge', async (_req, res) => {
-        const challenge = await keymaster.createChallenge();
+    //
+    // The challenge is bound to the browser that asked: a wallet publishes its
+    // answer as an asset anyone can see the DID of, and without this whoever
+    // submitted that DID first would be signed in.
+    router.get('/challenge', async (req, res) => {
+        issued = issued.filter(at => at > now() - 60_000);
 
-        challenges.set(challenge, true);
+        if (issued.length >= perMinute) {
+            res.status(429).json({ error: 'too many challenges; try again in a minute' });
+            return;
+        }
+        issued.push(now());
+
+        const challenge = await keymaster.createChallenge();
+        const asked = randomBytes(32).toString('base64url');
+
+        challenges.set(challenge, asked);
+        res.cookie(ASKED, asked, { httpOnly: true, sameSite: 'strict', secure: req.secure, path: '/' });
         res.json({ challenge, link: `archon://auth?challenge=${encodeURIComponent(challenge)}` });
     });
 
@@ -127,10 +149,25 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
 
         const verified = await keymaster.verifyResponse(response, { retries: 10 });
 
-        if (!verified.match || !verified.responder || !challenges.take(verified.challenge)) {
-            res.status(401).json({ error: 'the response does not answer a challenge from this service' });
+        const asked = cookieOf(req, ASKED);
+
+        if (!verified.match || !verified.responder || !asked || challenges.get(verified.challenge) !== asked) {
+            res.status(401).json({ error: 'the response does not answer a challenge this browser asked for' });
             return;
         }
+        challenges.take(verified.challenge);
+
+        // Who answered is whoever created the response. An asset's controller
+        // can be changed by its owner to anyone, with no consent of theirs, so
+        // the response's present controller is not evidence of who that is.
+        const created = await keymaster.resolveDID(response, { versionSequence: 1 });
+
+        if (created.didDocument?.controller !== verified.responder) {
+            res.status(401).json({ error: 'the response is not controlled by the identity that created it' });
+            return;
+        }
+
+        res.clearCookie(ASKED, { path: '/' });
 
         const token = randomBytes(32).toString('base64url');
 
@@ -161,19 +198,16 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         next();
     });
 
-    // The grant the signed-in user has made to this service, if there is one to
-    // publish under. A user is known by signing in, so the grant is found by
-    // who made it.
-    const grantOf = async (user: string): Promise<UsableGrant | undefined> => usable(await client.grantsFrom(user));
-
-    // Who is signed in, and their grant or the link that asks for one.
+    // Who is signed in, and their grant or the link that asks for one. A user is
+    // known by signing in, so their grants are found by who made them. With
+    // more than one in force, new objects go under the earliest.
     router.get('/me', async (req, res) => {
         const { user } = req as Signed;
         const found = await client.grantsFrom(user);
-        const grant = usable(found);
+        const [grant, ...others] = liveGrants(found, new Date(now()));
 
         if (grant) {
-            res.json({ did: user, grant: grant.did, registry: grant.registry });
+            res.json({ did: user, grant: grant.did, registry: grant.registry, ...(others.length ? { others: others.map(each => each.did) } : {}) });
             return;
         }
 
@@ -183,16 +217,26 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         res.json({ did: user, pending, link });
     });
 
-    const publishing = (act: (req: Signed, grant: UsableGrant) => Promise<unknown>) =>
+    // `of` names the object a request changes. A change goes under the grant
+    // the object was published under, which is the only one it counts under.
+    const publishing = (act: (req: Signed, grant: UsableGrant) => Promise<unknown>, of?: (req: Request) => string) =>
         async (req: Request, res: Response) => {
-            const grant = await grantOf((req as Signed).user);
+            const live = liveGrants(await client.grantsFrom((req as Signed).user), new Date(now()));
 
-            if (!grant) {
+            if (live.length === 0) {
                 res.status(403).json({ error: 'no grant to publish under' });
                 return;
             }
 
             try {
+                const under = of ? await client.grantOf(of(req)) : live[0].did;
+                const grant = live.find(each => each.did === under);
+
+                if (!grant) {
+                    res.status(400).json({ error: 'the grant this object was published under is not one of yours in force' });
+                    return;
+                }
+
                 res.json(await act(req as Signed, grant));
             }
             catch (error) {
@@ -210,12 +254,12 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     router.put('/objects/:did', publishing(async (req, grant) => {
         await client.edit(String(req.params.did), grant, fields(req));
         return true;
-    }));
+    }, req => String(req.params.did)));
 
     router.delete('/objects/:did', publishing(async (req, grant) => {
         await client.withdraw(String(req.params.did), grant);
         return true;
-    }));
+    }, req => String(req.params.did)));
 
     return router;
 }

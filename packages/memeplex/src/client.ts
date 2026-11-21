@@ -186,14 +186,24 @@ export class MemeplexClient {
         }
     }
 
-    // Withdraws an object the grant's user published.
+    // Withdraws an object published under the grant. A deletion under another
+    // grant is not attributed, and would leave the publication standing.
     async withdraw(did: string, grant: UsableGrant): Promise<void> {
-        if ((await this.created(did)).author !== grant.user) {
-            throw new MemeplexClientError('invalid', `${did} is not an object of this user's`);
+        const created = await this.created(did);
+
+        if (created.author !== grant.user || created.grant !== grant.did) {
+            throw new MemeplexClientError('invalid', `${did} was not published under this grant`);
         }
         if (!await this.keymaster.revokeDID(did)) {
             throw new MemeplexClientError('refused', 'the node did not accept the withdrawal');
         }
+    }
+
+    // The grant an object was published under.
+    async grantOf(did: string): Promise<string | undefined> {
+        const { grant } = await this.created(did);
+
+        return typeof grant === 'string' ? grant : undefined;
     }
 
     // An object as it was created.
@@ -227,28 +237,37 @@ export class MemeplexClient {
     }
 }
 
-// The grant among those found that a client may publish under, if there is
-// exactly one that is valid, has not ended and has not expired. Expiry is
-// judged against `now`; what counts for a publication is the time of the block
-// that anchors it, which is later.
-export function usable(found: FoundGrant[], now: Date = new Date()): UsableGrant | undefined {
-    const live = found.filter(({ grant }) => {
+// The grants among those found that a client may publish under: valid, not ended
+// and not expired, the earliest created first. Expiry is judged against `now`;
+// what counts for a publication is the time of the block that anchors it, which
+// is later.
+export function liveGrants(found: FoundGrant[], now: Date = new Date()): UsableGrant[] {
+    const live: { usable: UsableGrant; block: number }[] = [];
+
+    for (const { did, grant } of found) {
         if (grant.status !== 'valid' || grant.ended) {
-            return false;
+            continue;
         }
 
         const { expiresAt } = grant.versions[grant.versions.length - 1];
 
-        return expiresAt === undefined || now.getTime() < Date.parse(expiresAt);
-    });
-
-    if (live.length !== 1) {
-        return undefined;
+        if (expiresAt === undefined || now.getTime() < Date.parse(expiresAt)) {
+            live.push({ usable: { did, user: grant.user, registry: grant.registry }, block: grant.versions[0].position.block });
+        }
     }
 
-    const [{ did, grant }] = live;
+    return live
+        .sort((a, b) => a.block - b.block || (a.usable.did < b.usable.did ? -1 : 1))
+        .map(each => each.usable);
+}
 
-    return grant.status === 'valid' ? { did, user: grant.user, registry: grant.registry } : undefined;
+// The grant to publish under, when exactly one of those found is live. Grants
+// found by a request's nonce can be from different users, and a client does not
+// choose between users.
+export function usable(found: FoundGrant[], now: Date = new Date()): UsableGrant | undefined {
+    const live = liveGrants(found, now);
+
+    return live.length === 1 ? live[0] : undefined;
 }
 
 // A reader of a Memeplex indexer's views (`docs/services/memeplex-indexer`).
