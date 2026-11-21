@@ -304,10 +304,14 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
             }
             try {
                 const doc = await keymaster.resolveDID(held.did);
-                const effective = doc.didDocumentMetadata?.deactivated === true && isAnchored(doc, held.registry);
+                const deleted = doc.didDocumentMetadata?.deactivated === true;
+                const effective = deleted && isAnchored(doc, held.registry);
 
+                // A node that accepted the deletion resolves the grant as
+                // deactivated from then on. One that resolves it live did not
+                // accept it, so the grant goes back among the cards.
                 track(sessionKey, held.did, revocation => revocation && revocation.state !== "requested"
-                    ? { ...revocation, state: effective ? "effective" : "submitted" }
+                    ? (deleted ? { ...revocation, state: effective ? "effective" : "submitted" } : undefined)
                     : revocation);
             }
             catch {
@@ -319,6 +323,9 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
     }, [keymaster, sessionKey, showRevocations]);
 
     const refresh = useCallback(async (report: boolean) => {
+        // Revocations first, so that the grants read after them include one
+        // whose revocation the node turned out not to have accepted.
+        await readRevocations();
         try {
             await load();
         }
@@ -329,14 +336,27 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
                 notifyRef.current.error(error);
             }
         }
-        await readRevocations();
     }, [load, readRevocations]);
 
+    // Each read is started an interval after the one before it finished, so a
+    // read slower than the interval is not overtaken by the next.
     useEffect(() => {
-        refresh(true);
-        const timer = setInterval(() => refresh(false), pollMs);
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let stopped = false;
 
-        return () => clearInterval(timer);
+        const read = async (report: boolean) => {
+            await refresh(report);
+            if (!stopped) {
+                timer = setTimeout(() => read(false), pollMs);
+            }
+        };
+
+        read(true);
+
+        return () => {
+            stopped = true;
+            clearTimeout(timer);
+        };
     }, [refresh, pollMs]);
 
     function readLink() {

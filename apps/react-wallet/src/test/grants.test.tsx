@@ -431,6 +431,11 @@ describe('Grants view: revoking', () => {
     });
 
     it('shows it as effective once the deletion is anchored, and not before', async () => {
+        // A node that accepts a deletion resolves the grant as deactivated at once.
+        keymaster.revokeDID.mockImplementation(async () => {
+            holding({ [GRANT]: doc({}, pending({ deactivated: true })) });
+            return true;
+        });
         holding(held);
         view({ pollMs: 20, identity });
         await revoke();
@@ -528,6 +533,33 @@ describe('Grants view: revoking', () => {
         await new Promise(wait => setTimeout(wait, 100));
         expect(screen.queryByTestId('grant')).toBeNull();
         expect(screen.getByText('Revocation requested')).toBeTruthy();
+    });
+
+    it('puts the grant back when neither the revocation nor the check answered and the node later resolves it live', async () => {
+        keymaster.revokeDID.mockImplementation(async () => {
+            keymaster.resolveDID.mockRejectedValue(new Error('node unreachable'));
+            throw new Error('node unreachable');
+        });
+        holding(held);
+        view({ identity, pollMs: 20 });
+        await revoke();
+        expect(await screen.findByText('Revocation submitted')).toBeTruthy();
+
+        holding(held);
+        expect(await screen.findByTestId('grant')).toBeTruthy();
+        expect(screen.queryByText(/Revocation/)).toBeNull();
+    });
+
+    it('shows the grants when reading them takes longer than the interval', async () => {
+        holding(held);
+        const resolve = keymaster.resolveDID.getMockImplementation()!;
+        keymaster.resolveDID.mockImplementation(async (did: string) => {
+            await new Promise(wait => setTimeout(wait, 60));
+            return resolve(did);
+        });
+        view({ identity, pollMs: 10 });
+
+        expect(await screen.findByTestId('grant')).toBeTruthy();
     });
 
     it('revokes nothing when the user cancels', async () => {
