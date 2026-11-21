@@ -35,6 +35,7 @@ function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: () => void;
     const [answered, setAnswered] = useState<string | null>(null);
     const [response, setResponse] = useState('');
     const [error, setError] = useState('');
+    const [requesting, setAsking] = useState(false);
 
     // Counts the challenges asked for, so that an answer about one that has been
     // replaced is not taken for the one on show.
@@ -46,6 +47,9 @@ function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: () => void;
         setError('');
         setAnswered(null);
         setAsked(null);
+        // One at a time: each challenge sets the cookie that says which one
+        // this browser asked for, and the last to arrive would win.
+        setAsking(true);
         try {
             const challenge = await api.challenge();
 
@@ -57,6 +61,9 @@ function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: () => void;
             if (mine === asking.current) {
                 setError(message(failure));
             }
+        }
+        finally {
+            setAsking(false);
         }
     }, [api]);
 
@@ -112,7 +119,7 @@ function SignIn({ api, onSignedIn, pollMs }: { api: Api; onSignedIn: () => void;
             <p>Memepool publishes for you with your permission. Your key stays in your wallet.</p>
             {error && <p role="alert" className="error">{error}</p>}
 
-            {!asked && <button onClick={ask}>Sign in with your wallet</button>}
+            {!asked && <button disabled={requesting} onClick={ask}>Sign in with your wallet</button>}
 
             {asked && !answered && (
                 <>
@@ -304,10 +311,17 @@ function Thread({ api, me, root, waiting, onPublished, onBack }: {
     );
 }
 
-export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number }) {
-    const [me, setMe] = useState<Me | null | undefined>(undefined);
+// Everything a signed-in reader sees and does. It is mounted for one session
+// and unmounted at sign-out, so whatever a request of that session answers
+// afterwards has nothing to change: the next reader starts with nothing of the
+// last one's.
+function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: () => void; onSignedOut: () => void }) {
     const [follows, setFollows] = useState<string[]>(readFollows);
     const [timeline, setTimeline] = useState<Publication[] | null>(null);
+    // How many publications the indexer has given, which is where its next page
+    // starts, and how many it has in all. Neither is the number shown: a
+    // publication that arrives between two reads is given twice and shown once.
+    const [fetched, setFetched] = useState(0);
     const [total, setTotal] = useState(0);
     const reads = useRef(0);
     const [waiting, setWaiting] = useState<Waiting[]>([]);
@@ -315,52 +329,25 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
     const [following, setFollowing] = useState('');
     const [error, setError] = useState('');
 
-    // Counts sign-outs, so that an answer about who was signed in before one is
-    // not taken for who is signed in after it.
-    const sessions = useRef(0);
-
-    const loadMe = useCallback(async () => {
-        const mine = sessions.current;
-
-        try {
-            const read = await api.me() ?? null;
-
-            if (mine === sessions.current) {
-                setMe(read);
-            }
-        }
-        catch (failure) {
-            if (mine === sessions.current) {
-                setMe(null);
-                setError(message(failure));
-            }
-        }
-    }, [api]);
-
-    useEffect(() => { loadMe(); }, [loadMe]);
-
-    // Reads the timeline from its start, or the page after what is shown. A read
-    // that another has followed, or that the reader's identity or follows have
+    // Reads the timeline from its start, or the page after what has been given.
+    // A read that another has followed, or that the reader's follows have
     // changed under, is dropped: its answer is to a question no longer asked.
-    const loadTimeline = useCallback(async (older: Publication[] = []) => {
-        if (!me) {
-            return;
-        }
-
+    const loadTimeline = useCallback(async (older?: { shown: Publication[]; from: number }) => {
         const mine = reads.current += 1;
 
         try {
-            const page = await api.timeline([me.did, ...follows.filter(did => did !== me.did)], older.length);
+            const page = await api.timeline([me.did, ...follows.filter(did => did !== me.did)], older?.from ?? 0);
 
             if (mine !== reads.current) {
                 return;
             }
 
-            const known = new Set(older.map(each => each.did));
-            const read = [...older, ...page.publications.filter(each => !known.has(each.did))];
+            const known = new Set(older?.shown.map(each => each.did));
+            const read = [...older?.shown ?? [], ...page.publications.filter(each => !known.has(each.did))];
             const shown = new Set(read.map(each => each.did));
 
             setTimeline(read);
+            setFetched((older?.from ?? 0) + page.publications.length);
             setTotal(page.total);
             // Once the indexer shows an object, it is a publication.
             setWaiting(current => current.filter(each => !shown.has(each.did)));
@@ -371,7 +358,7 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
                 setError(message(failure));
             }
         }
-    }, [api, me, follows]);
+    }, [api, me.did, follows]);
 
     useEffect(() => {
         loadTimeline();
@@ -400,20 +387,6 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
         setFollows(next);
     };
 
-    if (me === undefined) {
-        return <main><h1>Memepool</h1><p className="muted">Loading…</p></main>;
-    }
-
-    if (me === null) {
-        return (
-            <main>
-                <h1>Memepool</h1>
-                {error && <p role="alert" className="error">{error}</p>}
-                <SignIn api={api} onSignedIn={loadMe} pollMs={pollMs} />
-            </main>
-        );
-    }
-
     // Signed out only when the service says so: the session is a cookie the
     // page cannot remove, and a reader who is told they are signed out must be.
     const signOut = async () => {
@@ -424,13 +397,7 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
             setError(`You are still signed in: ${message(failure)}`);
             return;
         }
-        sessions.current += 1;
-        setMe(null);
-        setTimeline(null);
-        setTotal(0);
-        setWaiting([]);
-        setOpen(null);
-        setError('');
+        onSignedOut();
     };
 
     return (
@@ -441,7 +408,7 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
                 <button className="quiet" onClick={signOut}>Sign out</button>
             </header>
 
-            {!me.grant && <GrantPrompt me={me} onChecked={loadMe} />}
+            {!me.grant && <GrantPrompt me={me} onChecked={onCheck} />}
             {error && <p role="alert" className="error">{error}</p>}
 
             {open ? (
@@ -494,8 +461,8 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
                                     : undefined}
                             />
                         ))}
-                        {timeline && timeline.length < total && (
-                            <button className="quiet" onClick={() => loadTimeline(timeline)}>Older</button>
+                        {timeline && fetched < total && (
+                            <button className="quiet" onClick={() => loadTimeline({ shown: timeline, from: fetched })}>Older</button>
                         )}
                     </section>
 
@@ -517,5 +484,69 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
                 </>
             )}
         </main>
+    );
+}
+
+export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number }) {
+    const [me, setMe] = useState<Me | null | undefined>(undefined);
+    const [error, setError] = useState('');
+    // Counts sign-outs, so that an answer about who was signed in before one is
+    // not taken for who is signed in after it.
+    const sessions = useRef(0);
+    const [session, setSession] = useState(0);
+
+    const loadMe = useCallback(async () => {
+        const mine = sessions.current;
+
+        try {
+            const read = await api.me() ?? null;
+
+            if (mine === sessions.current) {
+                setMe(read);
+                setError('');
+            }
+        }
+        catch (failure) {
+            // The service did not say the reader is signed out, so someone who
+            // was signed in still is, and keeps the way to sign out.
+            if (mine === sessions.current) {
+                setMe(current => current ?? null);
+                setError(message(failure));
+            }
+        }
+    }, [api]);
+
+    useEffect(() => { loadMe(); }, [loadMe]);
+
+    if (me === undefined) {
+        return <main><h1>Memepool</h1><p className="muted">Loading…</p></main>;
+    }
+
+    if (me === null) {
+        return (
+            <main>
+                <h1>Memepool</h1>
+                {error && <p role="alert" className="error">{error}</p>}
+                <SignIn api={api} onSignedIn={loadMe} pollMs={pollMs} />
+            </main>
+        );
+    }
+
+    return (
+        <>
+            {error && <p role="alert" className="error">{error}</p>}
+            <Reader
+                key={session}
+                api={api}
+                me={me}
+                onCheck={loadMe}
+                onSignedOut={() => {
+                    sessions.current += 1;
+                    setSession(sessions.current);
+                    setMe(null);
+                    setError('');
+                }}
+            />
+        </>
     );
 }

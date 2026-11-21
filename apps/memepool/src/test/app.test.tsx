@@ -383,6 +383,80 @@ describe('reading and publishing', () => {
         expect(screen.queryByText('Alice\'s draft.')).toBeNull();
     });
 
+    it('reads the rest, each publication once, when a post arrived between two reads', async () => {
+        const all = Array.from({ length: 120 }, (_, index) => post(`did:cid:p${index}`, ALICE, `Post ${index}.`));
+        const { api, state } = services({ me: granted, timeline: all });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText('Post 49.');
+        // The next page begins one publication early: with the last one already shown.
+        state.timeline = [post('did:cid:newest', ALICE, 'Newest.'), ...all];
+        await user.click(screen.getByRole('button', { name: 'Older' }));
+        await screen.findByText('Post 98.');
+        expect(screen.getAllByText('Post 49.')).toHaveLength(1);
+        expect(screen.queryByText('Post 99.')).toBeNull();
+
+        await user.click(screen.getByRole('button', { name: 'Older' }));
+        expect(await screen.findByText('Post 119.')).toBeTruthy();
+        expect(api.timeline).toHaveBeenLastCalledWith([ALICE], 100);
+        expect(screen.queryByRole('button', { name: 'Older' })).toBeNull();
+    });
+
+    it('keeps a reader signed in, with the way to sign out, when a check of who they are fails', async () => {
+        const { api } = services({ me: { did: ALICE, pending: ['did:cid:grant'], link: 'archon://grant?request=abc' } });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText(/waiting to be anchored on its chain/);
+        vi.mocked(api.me).mockRejectedValue(new ApiError(502, 'the service could not answer'));
+        await user.click(screen.getByRole('button', { name: 'Check again' }));
+
+        expect((await screen.findByRole('alert')).textContent).toBe('the service could not answer');
+        expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy();
+    });
+
+    it('does not show the next reader a post of the last one\'s that was accepted after they signed out', async () => {
+        const { api, state } = services({ me: granted });
+        let accepted!: (did: string) => void;
+        vi.mocked(api.publish).mockReturnValue(new Promise(answer => { accepted = answer; }));
+        render(<App api={api} pollMs={60_000} />);
+        const user = userEvent.setup();
+
+        await user.type(await screen.findByLabelText('Post'), 'Alice\'s words.');
+        await user.click(screen.getByRole('button', { name: 'Publish' }));
+        await user.click(screen.getByRole('button', { name: 'Sign out' }));
+        await screen.findByRole('button', { name: 'Sign in with your wallet' });
+
+        state.me = { did: BOB, grant: 'did:cid:g2', registry: 'BTC:mainnet' };
+        vi.mocked(api.login).mockResolvedValue({ did: BOB });
+        await user.click(screen.getByRole('button', { name: 'Sign in with your wallet' }));
+        await user.click(await screen.findByText('My wallet gave me a response to paste'));
+        await user.type(screen.getByLabelText('Response'), 'did:cid:response');
+        await user.click(screen.getByRole('button', { name: 'Sign in' }));
+        await screen.findByRole('heading', { name: /Timeline/ });
+
+        accepted('did:cid:late');
+        await new Promise(wait => setTimeout(wait, 50));
+
+        expect(screen.queryByText('Alice\'s words.')).toBeNull();
+        expect(screen.queryByText('Waiting to be anchored')).toBeNull();
+    });
+
+    it('asks for one challenge at a time', async () => {
+        const { api } = services();
+        vi.mocked(api.challenge).mockReturnValue(new Promise(() => undefined));
+        render(<App api={api} />);
+        const user = userEvent.setup();
+        const button = await screen.findByRole('button', { name: 'Sign in with your wallet' });
+
+        await user.click(button);
+        await user.click(button);
+
+        expect(api.challenge).toHaveBeenCalledTimes(1);
+        expect((button as HTMLButtonElement).disabled).toBe(true);
+    });
+
     it('signs out', async () => {
         const { api } = services({ me: granted });
         render(<App api={api} />);
