@@ -22,6 +22,16 @@ describe('metrics route labels', () => {
         ['/cashu/v1/mint/bolt11', '/cashu/v1/mint/:method'],
         ['/cashu/v1/melt/anything-a-caller-sends', '/cashu/v1/melt/:method'],
         ['/cashu/v1/swap', '/cashu/v1/swap'],
+        ['/memeplex/api/v1/publications/did:cid:bagaaiera', '/memeplex/api/v1/publications/:did'],
+        ['/memeplex/api/v1/publications/did%3Acid%3Abagaaiera', '/memeplex/api/v1/publications/:did'],
+        ['/memeplex/api/v1/publications/anything-a-caller-sends', '/memeplex/api/v1/publications/:did'],
+        ['/memeplex/api/v1/threads/did:cid:bagaaiera', '/memeplex/api/v1/threads/:did'],
+        ['/memeplex/api/v1/boosts/did:cid:bagaaiera', '/memeplex/api/v1/boosts/:did'],
+        ['/memeplex/api/v1/ratings/did:cid:bagaaiera', '/memeplex/api/v1/ratings/:did'],
+        ['/memeplex/api/v1/tags/did%3acid%3abagaaiera', '/memeplex/api/v1/tags/:did'],
+        ['/memeplex/api/v1/coauthors/did:cid:bagaaiera', '/memeplex/api/v1/coauthors/:did'],
+        ['/memeplex/api/v1/timeline', '/memeplex/api/v1/timeline'],
+        ['/memeplex/api/v1/ready', '/memeplex/api/v1/ready'],
     ])('labels %s as %s', (path, label) => {
         expect(normalizePath(path)).toBe(label);
     });
@@ -47,6 +57,7 @@ describe('route labels of mounted handlers', () => {
         ['/cashu', '/cashu/v1/keys/01df97b6fb8a572a?x=1', '/cashu/v1/keys/:keyset'],
         ['/names', '/names/poppy/signin/sgn_AbC123/status', '/names/poppy/signin/:id/status'],
         ['/api/v1', '/api/v1/did/did:cid:bagaaiera', '/api/v1/did/:did'],
+        ['/memeplex', '/memeplex/api/v1/threads/did:cid:bagaaiera?x=1', '/memeplex/api/v1/threads/:did'],
     ])('labels %s%s by its full path', async (mount, path, label) => {
         await expect(labelOf(mount, path)).resolves.toBe(label);
     });

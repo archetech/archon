@@ -33,5 +33,8 @@ export function normalizePath(path: string): string {
         .replace(/\/cashu\/v1\/keys\/[^/]+/, '/cashu/v1/keys/:keyset')
         .replace(/\/cashu\/v1\/(mint|melt)\/quote\/[^/]+\/[^/]+/, '/cashu/v1/$1/quote/:method/:quote')
         .replace(/\/cashu\/v1\/(mint|melt)\/quote\/[^/]+$/, '/cashu/v1/$1/quote/:method')
-        .replace(/\/cashu\/v1\/(mint|melt)\/(?!quote$)[^/]+$/, '/cashu/v1/$1/:method');
+        .replace(/\/cashu\/v1\/(mint|melt)\/(?!quote$)[^/]+$/, '/cashu/v1/$1/:method')
+        // The Memeplex indexer's views of one object carry its DID, or whatever
+        // a caller sends in its place.
+        .replace(/\/memeplex\/api\/v1\/(publications|threads|boosts|ratings|tags|coauthors)\/[^/]+/, '/memeplex/api/v1/$1/:did');
 }
