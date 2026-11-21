@@ -1169,6 +1169,11 @@ def list_assets():
     return response["assets"]
 
 
+def list_revocations(owner=None):
+    response = proxy_request("GET", _with_query(f"{_keymaster_api}/revocations", {"owner": owner}))
+    return response["revocations"]
+
+
 def clone_asset(identifier, options=None):
     if options is None:
         options = {}

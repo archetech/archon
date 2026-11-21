@@ -40,6 +40,7 @@ import {
     AddressCheckResult,
     ResolvedAddressInfo,
     CheckWalletResult,
+    AssetRevocation,
     CheckDIDResult,
     RepairDIDResult,
     CreateAssetOptions,
@@ -173,6 +174,9 @@ function isValidDID(did: string): boolean {
 }
 
 const REMOTE_NAME_LOOKUP_TIMEOUT_MS = 2000;
+// Registries with no chain to anchor an operation: what a node accepts on one
+// of them is in effect at once.
+const UNANCHORED_REGISTRIES = ['local', 'hyperswarm', 'pin'];
 const ADDRESS_CHALLENGE_RESPONSE_RETRIES = 5;
 const ADDRESS_CHALLENGE_RESPONSE_DELAY_MS = 1000;
 
@@ -1974,11 +1978,96 @@ export default class Keymaster implements KeymasterInterface {
 
         const ok = await this.gatekeeper.deleteDID(signed);
 
-        if (ok && current.didDocument?.controller) {
-            await this.removeFromOwned(did, current.didDocument.controller);
+        // Only an asset is owned. An agent may name itself as its controller.
+        if (ok && current.didDocumentRegistration?.type === 'asset' && current.didDocument?.controller) {
+            const owner = current.didDocument.controller;
+            const registry = current.didDocumentRegistration.registry;
+
+            // On a chain registry the deletion takes effect once it is anchored.
+            // The asset is remembered until then, for listRevocations.
+            if (registry && !UNANCHORED_REGISTRIES.includes(registry)) {
+                await this.addToRevoking(did, owner);
+            }
+
+            await this.removeFromOwned(did, owner);
         }
 
         return ok;
+    }
+
+    private async addToRevoking(did: string, owner: string): Promise<void> {
+        await this.mutateWallet(async (wallet) => {
+            const id = await this.fetchIdInfo(owner, wallet);
+            const revoking = new Set(id.revoking);
+            revoking.add(did);
+            id.revoking = Array.from(revoking);
+        });
+    }
+
+    // The assets of an identity whose deletion a node has accepted and their
+    // chain registry has yet to anchor.
+    //
+    // An entry leaves the wallet's record, and is not returned, once its
+    // deletion is anchored on its registry: the resolved version names that
+    // registry as its chain and has the height and time of a block. `confirmed`
+    // is not that. An entry the node resolves as live lost its deletion to
+    // another change. It is returned once as `displaced` and leaves the record;
+    // if the identity still controls the asset, it goes back among the assets
+    // listAssets returns. An entry the node cannot resolve stays, as
+    // `unresolved`.
+    async listRevocations(owner?: string): Promise<AssetRevocation[]> {
+        const id = await this.fetchIdInfo(owner);
+        const revocations: AssetRevocation[] = [];
+        const settled: string[] = [];
+        const restored: string[] = [];
+
+        for (const did of id.revoking ?? []) {
+            let doc: DidCidDocument;
+
+            try {
+                doc = await this.resolveDID(did);
+            }
+            catch {
+                revocations.push({ did, status: 'unresolved' });
+                continue;
+            }
+
+            const metadata = doc.didDocumentMetadata;
+            const registry = doc.didDocumentRegistration?.registry;
+            const { height, timeISO } = metadata?.timestamp?.upperBound ?? {};
+
+            if (!metadata?.deactivated) {
+                revocations.push({ did, ...(registry ? { registry } : {}), status: 'displaced' });
+                settled.push(did);
+                if (doc.didDocumentRegistration?.type === 'asset'
+                    && this.didMatch(doc.didDocument?.controller ?? '', id.did)) {
+                    restored.push(did);
+                }
+            }
+            else if (registry && metadata.timestamp?.chain === registry
+                && Number.isSafeInteger(height) && typeof timeISO === 'string') {
+                settled.push(did);
+            }
+            else {
+                revocations.push({ did, ...(registry ? { registry } : {}), status: 'pending' });
+            }
+        }
+
+        if (settled.length > 0) {
+            await this.mutateWallet(async (wallet) => {
+                const info = await this.fetchIdInfo(id.did, wallet);
+
+                info.revoking = (info.revoking ?? []).filter(did => !settled.includes(did));
+                if (info.revoking.length === 0) {
+                    delete info.revoking;
+                }
+                if (restored.length > 0) {
+                    info.owned = Array.from(new Set([...(info.owned ?? []), ...restored]));
+                }
+            });
+        }
+
+        return revocations;
     }
 
     async changeRegistry(id: string, registry: string): Promise<boolean> {

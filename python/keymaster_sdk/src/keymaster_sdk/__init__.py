@@ -86,6 +86,7 @@ from .keymaster_sdk import (
     list_poll_voters,
     list_polls,
     list_registries,
+    list_revocations,
     list_schemas,
     load_wallet,
     merge_data,
