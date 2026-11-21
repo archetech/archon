@@ -23,6 +23,10 @@ export interface MemepoolOptions {
     keymaster: LoginKeymaster;
     // The name the service gives itself in a grant request.
     name: string;
+    // The address users reach the service at, such as `https://node/memepool`.
+    // With it, a challenge names the service's callback, and a wallet sends
+    // its answer there. Without it, a user carries the answer back by hand.
+    publicURL?: string;
     version: { version: string; commit: string };
     // Milliseconds a challenge may wait for its answer, and a session lasts.
     challengeLifetime?: number;
@@ -39,6 +43,8 @@ const ASKED = 'memepool_challenge';
 // How many challenges and sessions are kept at once. Anyone can ask for a
 // challenge, so the oldest are dropped past this.
 const MAX_HELD = 10_000;
+// How many answers sent to the callback are verified at once.
+const MAX_VERIFYING = 8;
 
 // A map whose entries end at a time, and that holds no more than a limit.
 class Expiring<V> {
@@ -95,10 +101,16 @@ type Signed = Request & { user: string };
 
 export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     const { client, keymaster, name, version } = options;
+    const callback = options.publicURL ? `${options.publicURL.replace(/\/+$/, '')}/api/v1/callback` : undefined;
     const now = options.now ?? Date.now;
     // A challenge's browser mark, and the challenge a mark was set with.
     const challenges = new Expiring<string>(options.challengeLifetime ?? 10 * 60_000, now);
     const marks = new Expiring<string>(options.challengeLifetime ?? 10 * 60_000, now);
+    // The identities that answered a challenge through the callback. A
+    // challenge is an asset anyone on the network can see, so anyone can
+    // answer one: more than one answer is no answer.
+    const answered = new Expiring<Set<string>>(options.challengeLifetime ?? 10 * 60_000, now);
+    let verifying = 0;
     const perMinute = options.challengesPerMinute ?? 60;
     let issued: number[] = [];
     const sessions = new Expiring<string>(options.sessionLifetime ?? 24 * 60 * 60_000, now);
@@ -132,7 +144,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         }
         issued.push(now());
 
-        const challenge = await keymaster.createChallenge();
+        const challenge = await keymaster.createChallenge(callback ? { callback } : undefined);
 
         // A challenge's DID comes from its contents and the moment it was
         // made, so two made in one moment are one challenge. It stays bound to
@@ -151,26 +163,9 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     });
 
     // The answer to a challenge this service issued, which it takes once.
-    router.post('/login', async (req, res) => {
-        const { response } = req.body ?? {};
-
-        // A DID and nothing else: a name would be looked up each time it is
-        // read, and need not lead to the same asset twice.
-        if (typeof response !== 'string' || !response.startsWith('did:')) {
-            res.status(400).json({ error: 'expected the DID of a response' });
-            return;
-        }
-
-        const refused = () => res.status(401).json({ error: 'the response does not answer a challenge this browser asked for' });
-        const asked = cookieOf(req, ASKED);
-
-        // Checked before the node is asked anything: verifying an answer waits
-        // for it to arrive, and a caller with no challenge of its own has none.
-        if (!asked || !marks.get(asked)) {
-            refused();
-            return;
-        }
-
+    // Who answered a challenge of this service's with a response, or nothing
+    // when the response is not such an answer.
+    const answerOf = async (response: string): Promise<{ challenge: string; responder: string } | undefined> => {
         let verified: Awaited<ReturnType<LoginKeymaster['verifyResponse']>>;
 
         try {
@@ -182,16 +177,12 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
             if (typeof (error as { type?: unknown }).type !== 'string') {
                 throw error;
             }
-            refused();
-            return;
+            return undefined;
         }
 
-        if (!verified.match || !verified.responder || challenges.get(verified.challenge) !== asked) {
-            refused();
-            return;
+        if (!verified.match || !verified.responder || challenges.get(verified.challenge) === undefined) {
+            return undefined;
         }
-        challenges.take(verified.challenge);
-        marks.take(asked);
 
         // Who answered is whoever created the response, with what it holds.
         // An asset's owner can hand it to anyone, with no consent of theirs,
@@ -201,17 +192,154 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         const held = await keymaster.resolveDID(response);
 
         if (Number(held.didDocumentMetadata?.versionSequence) !== 1 || held.didDocument?.controller !== verified.responder) {
-            res.status(401).json({ error: 'the response is not as its author created it' });
+            return undefined;
+        }
+
+        return { challenge: verified.challenge, responder: verified.responder };
+    };
+
+    // A DID and nothing else: a name would be looked up each time it is read,
+    // and need not lead to the same asset twice.
+    const responseIn = (req: Request): string | undefined => {
+        const { response } = req.body ?? {};
+
+        return typeof response === 'string' && response.startsWith('did:') ? response : undefined;
+    };
+
+    // Where a wallet sends its answer, when the challenge names this as its
+    // callback. The answer is kept for the browser that asked for the
+    // challenge, which collects it at /login: nobody is signed in here, since
+    // the wallet is not that browser.
+    //
+    // A wallet in a browser sends from another origin, so this one route
+    // answers a preflight and allows any origin. It allows no credentials, and
+    // none of the routes that read a session allow another origin at all.
+    const fromAnyOrigin = (res: Response) => res.set('Access-Control-Allow-Origin', '*');
+
+    router.options('/callback', (_req, res) => {
+        fromAnyOrigin(res)
+            .set('Access-Control-Allow-Methods', 'POST')
+            .set('Access-Control-Allow-Headers', 'Content-Type')
+            .status(204)
+            .end();
+    });
+
+    router.post('/callback', async (req, res) => {
+        fromAnyOrigin(res);
+
+        const response = responseIn(req);
+
+        if (!response) {
+            res.status(400).json({ error: 'expected the DID of a response' });
+            return;
+        }
+        // Anyone can call this, and verifying an answer waits for it to arrive.
+        if (verifying >= MAX_VERIFYING) {
+            res.status(429).json({ error: 'try again shortly' });
             return;
         }
 
+        verifying += 1;
+        try {
+            const answer = await answerOf(response);
+
+            if (!answer) {
+                res.status(401).json({ error: 'the response does not answer a challenge from this service' });
+                return;
+            }
+
+            const responders = answered.get(answer.challenge) ?? new Set<string>();
+
+            // Two are enough to know the challenge has no one answer.
+            if (responders.size < 2) {
+                responders.add(answer.responder);
+            }
+            answered.set(answer.challenge, responders);
+            res.json(true);
+        }
+        finally {
+            verifying -= 1;
+        }
+    });
+
+    // Signs in the browser that asked for a challenge, once the challenge is
+    // answered.
+    //
+    // With `{ response }`, the answer is in the request: the user carried it
+    // from the wallet to this browser.
+    //
+    // With nothing, the browser is asking whether a wallet has sent an answer
+    // to the callback. It is told who answered, and is not signed in: anyone
+    // who sees the challenge can answer it, so the user confirms the identity
+    // is theirs, with `{ confirm }`, before there is a session.
+    router.post('/login', async (req, res) => {
+        const refused = () => res.status(401).json({ error: 'the response does not answer a challenge this browser asked for' });
+        const asked = cookieOf(req, ASKED);
+        const challenge = asked ? marks.get(asked) : undefined;
+
+        // Checked before the node is asked anything: verifying an answer waits
+        // for it to arrive, and a caller with no challenge of its own has none.
+        if (!asked || !challenge || challenges.get(challenge) !== asked) {
+            refused();
+            return;
+        }
+
+        const body = req.body && typeof req.body === 'object' ? req.body as Record<string, unknown> : {};
+        let responder: string | undefined;
+
+        if ('response' in body) {
+            const response = responseIn(req);
+
+            if (!response) {
+                res.status(400).json({ error: 'expected the DID of a response' });
+                return;
+            }
+
+            const answer = await answerOf(response);
+
+            responder = answer?.challenge === challenge ? answer.responder : undefined;
+            if (!responder) {
+                refused();
+                return;
+            }
+        }
+        else {
+            const responders = [...answered.get(challenge) ?? []];
+
+            if (responders.length === 0) {
+                res.status(202).json({ waiting: true });
+                return;
+            }
+            if (responders.length > 1) {
+                challenges.take(challenge);
+                marks.take(asked);
+                answered.take(challenge);
+                res.status(409).json({ error: 'more than one identity answered this challenge; ask for another' });
+                return;
+            }
+            if (body.confirm !== responders[0]) {
+                res.json({ answered: responders[0] });
+                return;
+            }
+            responder = responders[0];
+        }
+
+        // Taken once: of two requests that reach here together, or one that
+        // reaches here after the challenge has lapsed, only one that still
+        // finds the challenge bound to this browser is signed in.
+        if (challenges.get(challenge) !== asked || !challenges.take(challenge)) {
+            refused();
+            return;
+        }
+        marks.take(asked);
+        answered.take(challenge);
         res.clearCookie(ASKED, { path: '/' });
 
         const token = randomBytes(32).toString('base64url');
 
-        sessions.set(token, verified.responder);
+        sessions.set(token, responder);
         res.cookie(COOKIE, token, { httpOnly: true, sameSite: 'strict', secure: req.secure, path: '/' });
-        res.json({ did: verified.responder });
+        res.json({ did: responder });
     });
 
     router.post('/logout', (req, res) => {
