@@ -112,17 +112,18 @@ describe('drawbridge v1 unprotected routes', () => {
                 explorerURL: 'http://explorer',
                 cashuMintURL: 'http://cashu-mint:8085',
                 memeplexIndexerURL: 'http://memeplex-indexer:4238',
+                memepoolURL: 'http://memepool:4237',
             },
         });
         await expect(request(all.app).get('/api/v1/capabilities')).resolves.toMatchObject({
-            body: { didcomm: true, lightning: true, names: true, explorer: true, cashu: true, memeplex: true },
+            body: { didcomm: true, lightning: true, names: true, explorer: true, cashu: true, memeplex: true, memepool: true },
         });
 
         const none = mount({
-            config: { didcommURL: '', lightningMediatorURL: '', heraldURL: '', explorerURL: '', cashuMintURL: '', memeplexIndexerURL: '' },
+            config: { didcommURL: '', lightningMediatorURL: '', heraldURL: '', explorerURL: '', cashuMintURL: '', memeplexIndexerURL: '', memepoolURL: '' },
         });
         await expect(request(none.app).get('/api/v1/capabilities')).resolves.toMatchObject({
-            body: { didcomm: false, lightning: false, names: false, explorer: false, cashu: false, memeplex: false },
+            body: { didcomm: false, lightning: false, names: false, explorer: false, cashu: false, memeplex: false, memepool: false },
         });
     });
 

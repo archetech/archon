@@ -34,6 +34,7 @@ const config = {
     didcommURL: upstreamURL(UPSTREAMS.didcomm),
     cashuMintURL: upstreamURL(UPSTREAMS.cashuMint),
     memeplexIndexerURL: upstreamURL(UPSTREAMS.memeplexIndexer),
+    memepoolURL: upstreamURL(UPSTREAMS.memepool),
     // Public base URL this node is reachable at (clearnet host or Tor onion).
     // Used to advertise the DIDComm relay endpoint (`<publicHost>/didcomm`).
     publicHost: process.env.ARCHON_DRAWBRIDGE_PUBLIC_HOST || '',
@@ -102,6 +103,16 @@ const config = {
         process.env.ARCHON_DRAWBRIDGE_MEMEPLEX_READ_PER_SOURCE, 600),
     memeplexReadGlobal: positiveInt('ARCHON_DRAWBRIDGE_MEMEPLEX_READ_GLOBAL',
         process.env.ARCHON_DRAWBRIDGE_MEMEPLEX_READ_GLOBAL, 6000),
+    // Memepool's reads are who is signed in and their grant. Its writes are
+    // sign-ins and what a user publishes, each an operation on the node.
+    memepoolReadPerSource: positiveInt('ARCHON_DRAWBRIDGE_MEMEPOOL_READ_PER_SOURCE',
+        process.env.ARCHON_DRAWBRIDGE_MEMEPOOL_READ_PER_SOURCE, 300),
+    memepoolReadGlobal: positiveInt('ARCHON_DRAWBRIDGE_MEMEPOOL_READ_GLOBAL',
+        process.env.ARCHON_DRAWBRIDGE_MEMEPOOL_READ_GLOBAL, 3000),
+    memepoolWritePerSource: positiveInt('ARCHON_DRAWBRIDGE_MEMEPOOL_WRITE_PER_SOURCE',
+        process.env.ARCHON_DRAWBRIDGE_MEMEPOOL_WRITE_PER_SOURCE, 30),
+    memepoolWriteGlobal: positiveInt('ARCHON_DRAWBRIDGE_MEMEPOOL_WRITE_GLOBAL',
+        process.env.ARCHON_DRAWBRIDGE_MEMEPOOL_WRITE_GLOBAL, 600),
     nameWritePerSource: positiveInt('ARCHON_DRAWBRIDGE_NAME_WRITE_PER_SOURCE',
         process.env.ARCHON_DRAWBRIDGE_NAME_WRITE_PER_SOURCE, 10),
     nameWriteGlobal: positiveInt('ARCHON_DRAWBRIDGE_NAME_WRITE_GLOBAL',

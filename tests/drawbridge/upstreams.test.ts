@@ -32,6 +32,7 @@ describe('upstreamURL', () => {
             expect(upstreamURL(UPSTREAMS.herald, {})).toBe('http://localhost:4230');
             expect(upstreamURL(UPSTREAMS.cashuMint, {})).toBe('');
             expect(upstreamURL(UPSTREAMS.memeplexIndexer, {})).toBe('');
+            expect(upstreamURL(UPSTREAMS.memepool, {})).toBe('');
         });
 
         it('turns the service off when the URL is empty', () => {

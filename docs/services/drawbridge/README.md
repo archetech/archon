@@ -82,7 +82,7 @@ Binds to `${ARCHON_BIND_ADDRESS}:${ARCHON_DRAWBRIDGE_PORT}` (default
 | --- | --- | --- |
 | `GET` | `/api/v1/ready` | Returns `<bool>` — proxies upstream Gatekeeper readiness. `false` on connect failure. |
 | `GET` | `/api/v1/version` | `{ version, commit }` (commit is `GIT_COMMIT` sliced to 7 chars; the sentinel string `"unknown"` is returned when `GIT_COMMIT` is unset). |
-| `GET` | `/api/v1/capabilities` | `{ didcomm, lightning, names, explorer, cashu, memeplex }` — which optional services this node offers (each `true` iff its downstream URL is configured). Reflects node *intent* (config), not live health. See [Optional services](#optional-services). |
+| `GET` | `/api/v1/capabilities` | `{ didcomm, lightning, names, explorer, cashu, memeplex, memepool }` — which optional services this node offers (each `true` iff its downstream URL is configured). Reflects node *intent* (config), not live health. See [Optional services](#optional-services). |
 | `GET` | `/api/v1/status` | `{ service: "drawbridge", upstream: GatekeeperStatus, uptime: <seconds>, memoryUsage: <node memUsage> }`. HTTP 502 if Gatekeeper is unreachable. |
 | `GET` | `/api/v1/didcomm-endpoint` | `{ endpoint: <string\|null> }` — this node's public DIDComm relay endpoint for `publish-didcomm` auto-discovery: `<ARCHON_DRAWBRIDGE_PUBLIC_HOST>/didcomm`, else the Tor onion only when a SOCKS connection to its hidden service succeeds, else `null`. |
 | `POST` | `/api/v1/l402/pay` | Final step of L402 flow. Body: `{ paymentHash }`. Marks the matching macaroon as paid + returns the bearer credential. See [§4.4](#44-payment-completion). |
@@ -92,6 +92,7 @@ Binds to `${ARCHON_BIND_ADDRESS}:${ARCHON_DRAWBRIDGE_PORT}` (default
 | `GET\|POST\|PUT\|DELETE` | `/names/*` | Forwarded to Herald (`/api/*`). **501** if name resolution is disabled. |
 | `GET` | `/explorer/**` | Forwarded to the node's own DID explorer. **501** if the explorer is disabled. Unlike the routes above, the `/explorer` prefix is **not** stripped: the explorer's bundle is built with `base=/explorer/` and the app is mounted there, so the prefix has to survive the hop or its asset URLs point somewhere the upstream no longer answers. |
 | `GET` | `/memeplex/**` | Forwarded to the node's [Memeplex indexer](../memeplex-indexer/README.md) (path prefix `/memeplex` stripped). Only the indexer's `/api/v1` is reachable; any other path is 400, and any method but `GET` or `HEAD` is 405. **501** if the node runs no indexer. |
+| `GET`, `POST`, `PUT`, `DELETE` | `/memepool/**` | Forwarded to the node's [Memepool service](../memepool/README.md) (path prefix `/memepool` stripped). Only the service's `/api/v1` is reachable; any other path is 400, and any other method is 405 (a preflight is answered by the node's CORS handling, as on every mount). Cookies the service sets are set for `/memepool`, so a browser sends them to Memepool and to nothing else on the host. **501** if the node runs no Memepool. |
 | `*` | `/1.0/identifiers/**` | Forwarded verbatim to the Gatekeeper's standards-conformant DID resolution / dereferencing surface (`/1.0/identifiers/:did`, `/:did/data`, `/:did/registration`; see [Gatekeeper spec §2.6](../gatekeeper/README.md)). **Not paywalled** — public DID resolution for interop with universal resolvers, which do not speak L402. Proxied unchanged (no prefix stripped), so the Gatekeeper's resolution triple, raw dereferenced resources, and status/error shapes pass through intact. |
 | `GET` | `/metrics` | Prometheus exposition. |
 
@@ -129,6 +130,10 @@ Each surface therefore carries a bucket of its own, on the same middleware
 | | `ARCHON_DRAWBRIDGE_EXPLORER_READ_GLOBAL` | 6000 | requests, whole bucket |
 | `/memeplex/**` | `ARCHON_DRAWBRIDGE_MEMEPLEX_READ_PER_SOURCE` | 600 | requests, per source |
 | | `ARCHON_DRAWBRIDGE_MEMEPLEX_READ_GLOBAL` | 6000 | requests, whole bucket |
+| `/memepool/**`, reads | `ARCHON_DRAWBRIDGE_MEMEPOOL_READ_PER_SOURCE` | 300 | requests, per source |
+| | `ARCHON_DRAWBRIDGE_MEMEPOOL_READ_GLOBAL` | 3000 | requests, whole bucket |
+| `/memepool/**`, writes | `ARCHON_DRAWBRIDGE_MEMEPOOL_WRITE_PER_SOURCE` | 30 | requests, per source |
+| | `ARCHON_DRAWBRIDGE_MEMEPOOL_WRITE_GLOBAL` | 600 | requests, whole bucket |
 | `POST /names/poppy/*` except `/names/poppy/api/*` | `ARCHON_DRAWBRIDGE_POPPY_AUTH_PER_SOURCE` | 120 | requests, per source |
 | | `ARCHON_DRAWBRIDGE_POPPY_AUTH_GLOBAL` | 1200 | requests, whole bucket |
 | other `POST\|PUT\|DELETE /names/*` | `ARCHON_DRAWBRIDGE_NAME_WRITE_PER_SOURCE` | 10 | requests, per source |
@@ -285,7 +290,8 @@ long as it runs, so a caller cannot make labels at will:
   pattern under its mount, whatever stands in its parameters. These are a fixed
   set, and nothing below takes from them.
 - **A request that a proxy mount forwards** (`/names`, `/.well-known`,
-  `/explorer`, `/didcomm`, `/cashu`, `/memeplex`, `/1.0/identifiers`,
+  `/explorer`, `/didcomm`, `/cashu`, `/memeplex`, `/memepool`,
+  `/1.0/identifiers`,
   `/api/v1/lightning`) is labelled by its path with the segments above
   collapsed. The paths under a mount cannot be listed, so a node keeps at most
   500 distinct labels of this kind, and a request whose label would be one more
