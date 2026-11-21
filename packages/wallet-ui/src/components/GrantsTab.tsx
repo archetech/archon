@@ -13,7 +13,7 @@ export default function GrantsTab() {
     }
     return (
         <GrantsView
-            key={currentDID || currentId}
+            key={`${currentId} ${currentDID}`}
             keymaster={keymaster}
             identity={currentId}
             sessionKey={currentDID || currentId}
