@@ -47,15 +47,12 @@ export interface Api {
 }
 
 export function createApi(bases: { memepool: string; memeplex: string }, fetcher: typeof fetch = (...args) => fetch(...args)): Api {
-    const call = async (base: string, path: string, init?: RequestInit): Promise<Response> => {
-        const response = await fetcher(`${base}/api/v1${path}`, {
+    const call = (base: string, path: string, init?: RequestInit): Promise<Response> =>
+        fetcher(`${base}/api/v1${path}`, {
             credentials: 'same-origin',
             ...init,
             headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
         });
-
-        return response;
-    };
     const failure = async (response: Response): Promise<ApiError> => {
         let message = `the service answered ${response.status}`;
 
