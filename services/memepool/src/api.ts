@@ -133,6 +133,15 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         issued.push(now());
 
         const challenge = await keymaster.createChallenge();
+
+        // A challenge's DID comes from its contents and the moment it was
+        // made, so two made in one moment are one challenge. It stays bound to
+        // the browser it was first given to.
+        if (challenges.get(challenge) !== undefined) {
+            res.status(503).json({ error: 'try again' });
+            return;
+        }
+
         const asked = randomBytes(32).toString('base64url');
 
         challenges.set(challenge, asked);

@@ -220,6 +220,20 @@ describe('signing in', () => {
         expect((await agent.post('/api/v1/login').send({ response: 'x'.repeat(300_000) })).status).toBe(413);
     });
 
+    it('does not hand one challenge to two browsers', async () => {
+        const first = browser();
+        const { challenge } = (await first.get('/api/v1/challenge')).body;
+        const made = jest.spyOn(service, 'createChallenge').mockResolvedValue(challenge);
+        const second = browser();
+
+        expect((await second.get('/api/v1/challenge')).status).toBe(503);
+        made.mockRestore();
+
+        const response = await alice.createResponse(challenge);
+        expect((await second.post('/api/v1/login').send({ response })).status).toBe(401);
+        expect((await first.post('/api/v1/login').send({ response })).body).toStrictEqual({ did: aliceDid });
+    });
+
     it('issues no more challenges in a minute than it is set to', async () => {
         app = createMemepoolApp({
             client, keymaster: service, name: 'Memepool', version: { version: 'test', commit: 'test' }, now: () => clock, challengesPerMinute: 2,
