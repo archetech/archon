@@ -49,6 +49,9 @@
       "@didcid/memeplex": [
         "packages/memeplex/src/index.ts"
       ],
+      "@didcid/memeplex/client": [
+        "packages/memeplex/src/client.ts"
+      ],
       "@didcid/common/errors": [
         "packages/common/src/errors.ts"
       ],
