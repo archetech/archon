@@ -342,6 +342,26 @@ describe('reading and publishing', () => {
         expect(screen.getByRole('heading', { name: /Timeline/ })).toBeTruthy();
     });
 
+    it('stays signed out when an answer about who was signed in arrives afterwards', async () => {
+        const waitingForGrant: Me = { did: ALICE, pending: ['did:cid:grant'], link: 'archon://grant?request=abc' };
+        const { api } = services({ me: waitingForGrant });
+        render(<App api={api} />);
+        const user = userEvent.setup();
+
+        await screen.findByText(/waiting to be anchored on its chain/);
+        let late!: (me: Me) => void;
+        vi.mocked(api.me).mockReturnValue(new Promise(answer => { late = answer; }));
+        await user.click(screen.getByRole('button', { name: 'Check again' }));
+        await user.click(screen.getByRole('button', { name: 'Sign out' }));
+        await screen.findByRole('button', { name: 'Sign in with your wallet' });
+
+        late(granted);
+        await new Promise(wait => setTimeout(wait, 50));
+
+        expect(screen.getByRole('button', { name: 'Sign in with your wallet' })).toBeTruthy();
+        expect(screen.queryByLabelText('Post')).toBeNull();
+    });
+
     it('shows the next reader nothing the last one was waiting on', async () => {
         const { api, state } = services({ me: granted });
         render(<App api={api} pollMs={60_000} />);

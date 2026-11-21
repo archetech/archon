@@ -315,13 +315,25 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
     const [following, setFollowing] = useState('');
     const [error, setError] = useState('');
 
+    // Counts sign-outs, so that an answer about who was signed in before one is
+    // not taken for who is signed in after it.
+    const sessions = useRef(0);
+
     const loadMe = useCallback(async () => {
+        const mine = sessions.current;
+
         try {
-            setMe(await api.me() ?? null);
+            const read = await api.me() ?? null;
+
+            if (mine === sessions.current) {
+                setMe(read);
+            }
         }
         catch (failure) {
-            setMe(null);
-            setError(message(failure));
+            if (mine === sessions.current) {
+                setMe(null);
+                setError(message(failure));
+            }
         }
     }, [api]);
 
@@ -412,6 +424,7 @@ export default function App({ api, pollMs = 3000 }: { api: Api; pollMs?: number 
             setError(`You are still signed in: ${message(failure)}`);
             return;
         }
+        sessions.current += 1;
         setMe(null);
         setTimeline(null);
         setTotal(0);
