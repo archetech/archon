@@ -238,11 +238,12 @@ export class MemeplexClient {
 }
 
 // The grants among those found that a client may publish under: valid, not ended
-// and not expired, the earliest created first. Expiry is judged against `now`;
+// and not expired, the earliest created first by the time of the block that
+// anchored it, since heights on different chains do not compare. Expiry is judged against `now`;
 // what counts for a publication is the time of the block that anchors it, which
 // is later.
 export function liveGrants(found: FoundGrant[], now: Date = new Date()): UsableGrant[] {
-    const live: { usable: UsableGrant; block: number }[] = [];
+    const live: { usable: UsableGrant; created: number }[] = [];
 
     for (const { did, grant } of found) {
         if (grant.status !== 'valid' || grant.ended) {
@@ -252,12 +253,12 @@ export function liveGrants(found: FoundGrant[], now: Date = new Date()): UsableG
         const { expiresAt } = grant.versions[grant.versions.length - 1];
 
         if (expiresAt === undefined || now.getTime() < Date.parse(expiresAt)) {
-            live.push({ usable: { did, user: grant.user, registry: grant.registry }, block: grant.versions[0].position.block });
+            live.push({ usable: { did, user: grant.user, registry: grant.registry }, created: Date.parse(grant.versions[0].position.time) });
         }
     }
 
     return live
-        .sort((a, b) => a.block - b.block || (a.usable.did < b.usable.did ? -1 : 1))
+        .sort((a, b) => a.created - b.created || (a.usable.did < b.usable.did ? -1 : 1))
         .map(each => each.usable);
 }
 

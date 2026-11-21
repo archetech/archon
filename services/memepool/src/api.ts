@@ -96,7 +96,9 @@ type Signed = Request & { user: string };
 export function createMemepoolRouter(options: MemepoolOptions): express.Router {
     const { client, keymaster, name, version } = options;
     const now = options.now ?? Date.now;
+    // A challenge's browser mark, and the challenge a mark was set with.
     const challenges = new Expiring<string>(options.challengeLifetime ?? 10 * 60_000, now);
+    const marks = new Expiring<string>(options.challengeLifetime ?? 10 * 60_000, now);
     const perMinute = options.challengesPerMinute ?? 60;
     let issued: number[] = [];
     const sessions = new Expiring<string>(options.sessionLifetime ?? 24 * 60 * 60_000, now);
@@ -134,6 +136,7 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
         const asked = randomBytes(32).toString('base64url');
 
         challenges.set(challenge, asked);
+        marks.set(asked, challenge);
         res.cookie(ASKED, asked, { httpOnly: true, sameSite: 'strict', secure: req.secure, path: '/' });
         res.json({ challenge, link: `archon://auth?challenge=${encodeURIComponent(challenge)}` });
     });
@@ -147,15 +150,37 @@ export function createMemepoolRouter(options: MemepoolOptions): express.Router {
             return;
         }
 
-        const verified = await keymaster.verifyResponse(response, { retries: 10 });
-
+        const refused = () => res.status(401).json({ error: 'the response does not answer a challenge this browser asked for' });
         const asked = cookieOf(req, ASKED);
 
-        if (!verified.match || !verified.responder || !asked || challenges.get(verified.challenge) !== asked) {
-            res.status(401).json({ error: 'the response does not answer a challenge this browser asked for' });
+        // Checked before the node is asked anything: verifying an answer waits
+        // for it to arrive, and a caller with no challenge of its own has none.
+        if (!asked || !marks.get(asked)) {
+            refused();
+            return;
+        }
+
+        let verified: Awaited<ReturnType<LoginKeymaster['verifyResponse']>>;
+
+        try {
+            verified = await keymaster.verifyResponse(response, { retries: 10 });
+        }
+        catch (error) {
+            // What Keymaster says of an answer it cannot read, as distinct from
+            // a failure to reach the node.
+            if (typeof (error as { type?: unknown }).type !== 'string') {
+                throw error;
+            }
+            refused();
+            return;
+        }
+
+        if (!verified.match || !verified.responder || challenges.get(verified.challenge) !== asked) {
+            refused();
             return;
         }
         challenges.take(verified.challenge);
+        marks.take(asked);
 
         // Who answered is whoever created the response. An asset's controller
         // can be changed by its owner to anyone, with no consent of theirs, so
@@ -270,6 +295,13 @@ export function createMemepoolApp(options: MemepoolOptions): express.Express {
     app.use('/api/v1', createMemepoolRouter(options));
     app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
         void _next;
+        const { status } = error as { status?: unknown };
+
+        // A body that is not JSON, or is too large, is the caller's to correct.
+        if (typeof status === 'number' && status >= 400 && status < 500) {
+            res.status(status).json({ error: 'the request could not be read' });
+            return;
+        }
         console.error(error);
         res.status(500).json({ error: 'the service could not answer' });
     });

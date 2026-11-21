@@ -7,7 +7,7 @@ import DbJsonMemory from '@didcid/gatekeeper/db/json-memory';
 import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import { MemeplexIndex, decodeGrantLink, validateGrantRequest } from '@didcid/memeplex';
-import { IndexerClient, MemeplexClient, usable } from '@didcid/memeplex/client';
+import { IndexerClient, MemeplexClient, liveGrants, usable } from '@didcid/memeplex/client';
 import type { ClientGatekeeper } from '@didcid/memeplex/client';
 import { Sync } from '../../services/memeplex-indexer/src/sync.ts';
 import { createIndexerApp } from '../../services/memeplex-indexer/src/api.ts';
@@ -290,3 +290,18 @@ it('does not take an expired grant as one to publish under', async () => {
     expect(usable(found, new Date('2026-12-31T23:59:59Z'))).toBeDefined();
     expect(usable(found, new Date('2027-01-01T00:00:00Z'))).toBeUndefined();
 }, 120_000);
+
+it('orders the grants in force by when they were anchored, across chains', () => {
+    const valid = (did: string, registry: string, block: number, time: string) => ({
+        did,
+        grant: { status: 'valid' as const, user: 'did:cid:user', client: 'did:cid:client', registry, versions: [{ position: { block, time } }], pending: 0 },
+    });
+    const found = [
+        valid('did:cid:b', 'BTC:mainnet', 920_000, '2026-11-02T00:00:00Z'),
+        valid('did:cid:a', 'ETH:mainnet', 23_000_000, '2026-11-01T00:00:00Z'),
+        valid('did:cid:c', 'BTC:mainnet', 920_000, '2026-11-02T00:00:00Z'),
+    ];
+
+    expect(liveGrants(found).map(each => each.did)).toStrictEqual(['did:cid:a', 'did:cid:b', 'did:cid:c']);
+    expect(usable(found)).toBeUndefined();
+});

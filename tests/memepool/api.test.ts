@@ -1,3 +1,4 @@
+import { jest } from '@jest/globals';
 import request from 'supertest';
 import Gatekeeper from '@didcid/gatekeeper';
 import Keymaster from '@didcid/keymaster';
@@ -175,6 +176,23 @@ describe('signing in', () => {
 
         clock += 60_000;
         expect((await agent.post('/api/v1/login').send({ response })).status).toBe(401);
+    });
+
+    it('asks the node nothing about an answer from a browser with no challenge of its own', async () => {
+        const verify = jest.spyOn(service, 'verifyResponse');
+
+        expect((await request(app).post('/api/v1/login').send({ response: 'did:cid:bagaaieranothing' })).status).toBe(401);
+        expect((await request(app).post('/api/v1/login').set('Cookie', 'memepool_challenge=made-up').send({ response: 'did:cid:bagaaieranothing' })).status).toBe(401);
+        expect(verify).not.toHaveBeenCalled();
+    });
+
+    it('refuses an answer that is not one, and a request it cannot read, without failing', async () => {
+        const agent = browser();
+        await agent.get('/api/v1/challenge');
+
+        expect((await agent.post('/api/v1/login').send({ response: serviceDid })).status).toBe(401);
+        expect((await agent.post('/api/v1/login').set('Content-Type', 'application/json').send('{"response":')).status).toBe(400);
+        expect((await agent.post('/api/v1/login').send({ response: 'x'.repeat(300_000) })).status).toBe(413);
     });
 
     it('issues no more challenges in a minute than it is set to', async () => {
