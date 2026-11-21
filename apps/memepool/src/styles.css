@@ -1,0 +1,103 @@
+:root {
+    --ink: #16181d;
+    --soft: #5b6270;
+    --line: #dfe2e8;
+    --paper: #ffffff;
+    --ground: #f6f7f9;
+    --accent: #2f5bea;
+    --warn: #b3261e;
+    color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ink: #e9ebf0;
+        --soft: #9aa2b1;
+        --line: #2c313a;
+        --paper: #1b1e24;
+        --ground: #121418;
+        --accent: #7f9cff;
+        --warn: #ff8a80;
+    }
+}
+
+body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 16px/1.5 system-ui, sans-serif;
+}
+
+main {
+    max-width: 42rem;
+    margin: 0 auto;
+    padding: 1rem;
+}
+
+h1 { font-size: 1.4rem; margin: 0; }
+h2 { font-size: 1.1rem; margin: 0 0 0.5rem; }
+h3 { font-size: 1rem; margin: 0 0 0.25rem; }
+
+.top {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.top h1 { flex: 1; }
+
+.card, .post, .composer {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.post header {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    color: var(--soft);
+    font-size: 0.85rem;
+}
+
+.post .text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0.5rem 0; }
+.post.waiting { border-style: dashed; }
+
+.mono { font-family: ui-monospace, monospace; font-size: 0.85rem; overflow-wrap: anywhere; }
+.muted { color: var(--soft); }
+.error { color: var(--warn); }
+
+label { display: block; font-size: 0.9rem; color: var(--soft); margin: 0.5rem 0; }
+
+input, textarea {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 0.25rem;
+    padding: 0.5rem;
+    border: 1px solid var(--line);
+    border-radius: 0.375rem;
+    background: var(--ground);
+    color: var(--ink);
+    font: inherit;
+}
+
+button {
+    padding: 0.45rem 0.9rem;
+    border: 1px solid var(--accent);
+    border-radius: 0.375rem;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    cursor: pointer;
+}
+
+button.quiet { background: transparent; color: var(--accent); border-color: transparent; padding: 0.2rem 0.4rem; }
+button:disabled { opacity: 0.5; cursor: default; }
+a { color: var(--accent); }
+svg { background: #fff; padding: 0.5rem; border-radius: 0.375rem; }
