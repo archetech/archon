@@ -1174,13 +1174,13 @@ def list_revocations(owner=None):
     return response["revocations"]
 
 
-def create_grant(link, options=None):
+def create_grant(request, options=None):
     if options is None:
         options = {}
     response = proxy_request(
         "POST",
         f"{_keymaster_api}/grants",
-        json={"link": link, "options": options},
+        json={"request": request, "options": options},
     )
     return response["did"]
 

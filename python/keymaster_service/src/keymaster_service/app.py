@@ -703,7 +703,7 @@ async def list_revocations(owner: str | None = None) -> dict[str, Any]:
 
 @protected_api.post("/grants")
 async def create_grant(body: dict[str, Any]) -> dict[str, str]:
-    return {"did": await service.create_grant(body.get("link"), body.get("options") or {})}
+    return {"did": await service.create_grant(body.get("request"), body.get("options") or {})}
 
 
 @protected_api.get("/grants")

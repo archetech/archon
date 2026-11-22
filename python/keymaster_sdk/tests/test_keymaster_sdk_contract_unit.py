@@ -72,23 +72,23 @@ def test_grant_helpers_call_the_grant_routes(monkeypatch):
 
     monkeypatch.setattr(sdk, "proxy_request", fake_proxy_request)
     monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
-    link = "archon://grant?request=abc"
-    options = {"registry": "ETH:mainnet", "actions": ["memeplex:tag"], "expiresAt": None}
+    request = "archon://grant?request=did:cid:request"
+    options = {"registry": "ETH:mainnet", "actions": ["example:tag"], "expiresAt": None}
     changes = {"actions": None, "expiresAt": "2028-01-01T00:00:00Z"}
 
-    assert sdk.create_grant(link) == "did:test:grant"
-    assert sdk.create_grant(link, options) == "did:test:grant"
+    assert sdk.create_grant(request) == "did:test:grant"
+    assert sdk.create_grant(request, options) == "did:test:grant"
     assert sdk.list_grants() == []
     assert sdk.list_grants("Alice") == []
-    assert sdk.update_grant("clients/memepool", changes) is True
-    assert sdk.revoke_grant("clients/memepool") is True
+    assert sdk.update_grant("clients/example", changes) is True
+    assert sdk.revoke_grant("clients/example") is True
     assert calls == [
-        ("POST", "http://unit.test/api/v1/grants", {"json": {"link": link, "options": {}}}),
-        ("POST", "http://unit.test/api/v1/grants", {"json": {"link": link, "options": options}}),
+        ("POST", "http://unit.test/api/v1/grants", {"json": {"request": request, "options": {}}}),
+        ("POST", "http://unit.test/api/v1/grants", {"json": {"request": request, "options": options}}),
         ("GET", "http://unit.test/api/v1/grants", {}),
         ("GET", "http://unit.test/api/v1/grants?owner=Alice", {}),
-        ("PUT", "http://unit.test/api/v1/grants/clients%2Fmemepool", {"json": {"changes": changes}}),
-        ("DELETE", "http://unit.test/api/v1/grants/clients%2Fmemepool", {}),
+        ("PUT", "http://unit.test/api/v1/grants/clients%2Fexample", {"json": {"changes": changes}}),
+        ("DELETE", "http://unit.test/api/v1/grants/clients%2Fexample", {}),
     ]
 
 

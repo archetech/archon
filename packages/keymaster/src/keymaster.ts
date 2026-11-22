@@ -2,13 +2,7 @@ import { attachedJson, isCashuTokenMessage, issueCredentialMessage, type DidComm
 import { proofsOf } from '@didcid/common/utils';
 import { isPrivateHostname, fetchPublicHttps } from '@didcid/common/net';
 import { CashuWallet, hasCashuState } from './cashu.js';
-import {
-    CORE_GRANT_ACTIONS,
-    PERMITTED_GRANT_REGISTRIES,
-    decodeGrantLink,
-    isInstant,
-    validateGrant,
-} from './grant.js';
+import { grantIn, grantMember, grantRequestFault, grantRequestId, grantRequestIn, isDateTime, isNameList } from './grant.js';
 import type { CashuHost } from './cashu.js';
 import { imageSize } from 'image-size';
 import { fileTypeFromBuffer } from 'file-type';
@@ -50,11 +44,11 @@ import {
     AssetRevocation,
     CheckDIDResult,
     RepairDIDResult,
+    AppGrant,
     CreateAssetOptions,
     CreateGrantOptions,
     GrantChanges,
     GrantInfo,
-    MemeplexGrant,
     EncryptedMessage,
     FileAssetOptions,
     CreateResponseOptions,
@@ -2091,82 +2085,146 @@ export default class Keymaster implements KeymasterInterface {
         return timestamp?.chain === registry && Number.isSafeInteger(height) && typeof timeISO === 'string';
     }
 
-    // The `actions` a grant states for a choice among the actions on offer, in
-    // the order they are offered: none when the choice is exactly the core
-    // actions, which a grant states by leaving `actions` out.
-    private grantActions(offered: string[], chosen: unknown, label: string): string[] | undefined {
-        if (!Array.isArray(chosen) || chosen.length === 0) {
-            throw new InvalidParameterError(`${label}: at least one action is needed`);
+    // The actions a caller names for a grant: a list of at least one, none
+    // empty and none twice. What an action means is the app's.
+    private grantActions(actions: unknown, label: string): string[] {
+        if (!isNameList(actions)) {
+            throw new InvalidParameterError(`${label}: a list of at least one action, each once, is needed`);
         }
 
-        if (!chosen.every(action => offered.includes(action))) {
-            throw new InvalidParameterError(`${label}: every action must be one of ${offered.join(', ')}`);
-        }
-
-        const actions = offered.filter(action => chosen.includes(action));
-        const everyCore = actions.length === CORE_GRANT_ACTIONS.length
-            && CORE_GRANT_ACTIONS.every(action => actions.includes(action));
-
-        return everyCore ? undefined : actions;
+        return actions;
     }
 
     private grantExpiry(expiresAt: unknown, label: string): string {
-        if (typeof expiresAt !== 'string' || !isInstant(expiresAt)) {
-            throw new InvalidParameterError(`${label}: not an instant such as 2027-01-31T00:00:00Z`);
+        if (!isDateTime(expiresAt)) {
+            throw new InvalidParameterError(`${label}: not a date-time such as 2027-01-31T00:00:00Z`);
         }
 
         return expiresAt;
     }
 
-    // Creates the grant a grant link asks for, as an asset of the granting
-    // identity, and returns its DID. The checks are those a wallet makes before
-    // it creates one (docs/plans/memeplex-reference-1436.md, "Grant request
-    // flow"): each refusal here is of a grant that would be void or wider than
-    // what was asked for.
+    // The app, the client and the request of a grant request, which is an
+    // asset the client created. Refuses one that cannot be read as that.
     //
-    // The grant has the request's `client` and `nonce`, the scope the request
-    // asks for unless `options.actions` narrows it, and the expiry the request
-    // asks for unless `options.expiresAt` changes or removes it.
-    async createGrant(link: string, options: CreateGrantOptions = {}): Promise<string> {
-        const decoded = decodeGrantLink(typeof link === 'string' ? link.trim() : link);
+    // Who asks is the request's controller, and only while the request is as
+    // it was created. An asset's owner can transfer it to any identity, which
+    // signs nothing, and can replace its contents first. The creation is signed
+    // by its controller and holds the contents that controller gave it, so a
+    // request that has had any version after its first does not say who asks
+    // for what it holds. Nothing in the data is read for who asks.
+    private async readGrantRequest(named: unknown): Promise<{ did: string; app: string; client: string; request: Record<string, any> }> {
+        const id = typeof named === 'string' ? grantRequestId(named) : '';
 
-        if ('error' in decoded) {
-            const validity = decoded.validity ? ` (${decoded.validity})` : '';
-
-            throw new InvalidParameterError(`link: ${decoded.error}${validity}`);
+        if (!id) {
+            throw new InvalidParameterError('request: a DID, an alias or an archon://grant link is needed');
         }
 
-        const { request } = decoded;
+        let doc: DidCidDocument;
+
+        try {
+            doc = await this.resolveDID(id);
+        }
+        catch (error) {
+            if (error instanceof ArchonError) {
+                throw new InvalidParameterError('request: not found');
+            }
+            throw error;
+        }
+
+        const did = doc.didDocument?.id;
+        const client = doc.didDocument?.controller;
+
+        if (doc.didDocumentMetadata?.deactivated) {
+            throw new InvalidParameterError('request: deleted');
+        }
+        if (doc.didDocumentRegistration?.type !== 'asset' || !did || !client) {
+            throw new InvalidParameterError('request: not an asset');
+        }
+        if (Number(doc.didDocumentMetadata?.versionSequence) !== 1) {
+            throw new InvalidParameterError('request: changed since it was created, so who asks is not established');
+        }
+
+        const held = grantRequestIn(doc.didDocumentData);
+
+        if (!held) {
+            throw new InvalidParameterError('request: not a grant request');
+        }
+
+        const fault = grantRequestFault(held.request);
+
+        if (fault) {
+            throw new InvalidParameterError(`request: invalid (${fault})`);
+        }
+
+        return { did, app: held.app, client, request: held.request as Record<string, any> };
+    }
+
+    // Creates the grant a grant request asks for, as an asset of the granting
+    // identity, and returns its DID. The request is named by its DID, by an
+    // alias for it, or by a link, `archon://grant?request=<did>`. The grant's
+    // data is one member, named for the app the request names: a request held
+    // as `exampleGrantRequest` makes a grant held as `exampleGrant`.
+    //
+    // The grant has the request's `v`, its `client`, which is the identity
+    // that created the request, the DID of the `request`, and the request's
+    // `actions` and `expiresAt`, each when the request has it.
+    // `options.actions` narrows the actions the request lists, and
+    // `options.expiresAt` changes or removes the expiry.
+    //
+    // The grant is created on a registry the request lists and the node
+    // supports: the first such in the request's order when none is named.
+    // Whether the grant is valid under the app's rules is for the app's
+    // verifier, which this does not consult.
+    async createGrant(named: string, options: CreateGrantOptions = {}): Promise<string> {
+        const { did: requestDid, app, client, request } = await this.readGrantRequest(named);
         const { alias } = options;
-        const offered: string[] = request.actions ?? CORE_GRANT_ACTIONS;
-        const actions = this.grantActions(offered, options.actions ?? offered, 'options.actions');
+        let actions: string[] | undefined = request.actions;
+
+        if (options.actions !== undefined && options.actions !== null) {
+            const chosen = this.grantActions(options.actions, 'options.actions');
+            const offered: string[] = request.actions ?? [];
+
+            if (!chosen.every(action => offered.includes(action))) {
+                throw new InvalidParameterError(offered.length > 0
+                    ? `options.actions: every action must be one of ${offered.join(', ')}`
+                    : 'options.actions: the request lists no actions to choose from');
+            }
+
+            actions = offered.filter(action => chosen.includes(action));
+        }
+
         const requested = options.expiresAt === undefined ? request.expiresAt : options.expiresAt;
         const expiresAt = requested === undefined || requested === null
             ? undefined
             : this.grantExpiry(requested, 'options.expiresAt');
 
-        // A request lists the registries its client can publish on. The grant
-        // is created on one of them, since the client's objects go on the
-        // grant's registry. The default is taken in the order of the permitted
-        // registries, so it does not depend on the order a client listed them.
+        const id = await this.fetchIdInfo(options.controller);
+        const grantor = await this.resolveDID(id.did, { confirm: true });
+
+        if (grantor.didDocument?.id === client) {
+            throw new InvalidParameterError('request: the granting identity made the request, and cannot grant itself');
+        }
+
         const listed: string[] = request.registries;
         const supported = await this.listRegistries();
         let { registry } = options;
 
+        // createAsset puts a local identity's assets on `local` whatever
+        // registry is asked for, so that is where its grant would be.
+        if (grantor.didDocumentRegistration?.registry === 'local') {
+            if (!listed.includes('local') || (registry && registry !== 'local')) {
+                throw new InvalidParameterError(`options.controller: a local identity's grant is created on local, and the request lists ${listed.join(', ')}`);
+            }
+
+            registry = 'local';
+        }
+
         if (!registry) {
-            registry = PERMITTED_GRANT_REGISTRIES
-                .find(permitted => supported.includes(permitted) && listed.includes(permitted));
+            registry = listed.find(name => supported.includes(name));
 
             if (!registry) {
-                // Of the registries a grant may be created on, those the node has.
-                const offered = PERMITTED_GRANT_REGISTRIES.filter(permitted => supported.includes(permitted));
-                const has = offered.length > 0 ? offered.join(', ') : `none of ${PERMITTED_GRANT_REGISTRIES.join(', ')}`;
-
-                throw new InvalidParameterError(`options.registry: the request lists ${listed.join(', ')} and this node supports ${has}`);
+                throw new InvalidParameterError(`options.registry: the request lists ${listed.join(', ')} and this node supports none of them`);
             }
-        }
-        else if (!PERMITTED_GRANT_REGISTRIES.includes(registry)) {
-            throw new InvalidParameterError(`options.registry: a grant may be created on ${PERMITTED_GRANT_REGISTRIES.join(', ')}`);
         }
         else if (!listed.includes(registry)) {
             throw new InvalidParameterError(`options.registry: the request lists ${listed.join(', ')}, not ${registry}`);
@@ -2175,41 +2233,29 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError(`options.registry: this node does not support ${registry}`);
         }
 
-        // createAsset puts a local identity's assets on `local` whatever
-        // registry is asked for, and a grant there, like a grant to oneself, is
-        // void.
-        const id = await this.fetchIdInfo(options.controller);
-        const grantor = await this.resolveDID(id.did, { confirm: true });
-
-        if (grantor.didDocumentRegistration?.registry === 'local') {
-            throw new InvalidParameterError('options.controller: a local identity cannot make a grant');
-        }
-        if (grantor.didDocument?.id === request.client) {
-            throw new InvalidParameterError('link: the request names the granting identity as the client');
-        }
-
-        const memeplexGrant: MemeplexGrant = {
-            v: 1,
-            client: request.client,
-            ...(actions ? { actions } : {}),
-            nonce: request.nonce,
-            ...(expiresAt ? { expiresAt } : {}),
+        const grant: AppGrant = {
+            ...(request.v === undefined ? {} : { v: request.v }),
+            client,
+            request: requestDid,
+            ...(actions === undefined ? {} : { actions }),
+            ...(expiresAt === undefined ? {} : { expiresAt }),
         };
 
         // The identity checked is named as the controller, so that it is the
         // one that owns and signs the grant whatever the current ID is by then.
-        return this.createAsset({ memeplexGrant }, { registry, controller: id.did, alias });
+        return this.createAsset({ [grantMember(app)]: grant }, { registry, controller: id.did, alias });
     }
 
     // The grants among the assets of an identity, each as its latest version
-    // states it. A grant whose deletion a node has accepted is not among them:
-    // listRevocations has it until the deletion is anchored. An asset the node
-    // cannot resolve is listed as `unresolved`, since it may be a grant.
+    // states it, with the app it names. A grant whose deletion a node has
+    // accepted is not among them: listRevocations has it until the deletion is
+    // anchored. An asset the node cannot resolve is listed as `unresolved`,
+    // since it may be a grant.
     //
     // The identity's revocations are read first. A revocation that another
     // change displaced left the grant live, and reading them is what puts such
     // an asset back among those listAssets returns: without it a grant the
-    // client can still publish under would be missing here.
+    // client can still act under would be missing here.
     async listGrants(owner?: string): Promise<GrantInfo[]> {
         const grants: GrantInfo[] = [];
 
@@ -2226,9 +2272,9 @@ export default class Keymaster implements KeymasterInterface {
                 continue;
             }
 
-            const grant = (doc.didDocumentData as { memeplexGrant?: unknown } | undefined)?.memeplexGrant;
+            const held = grantIn(doc.didDocumentData);
 
-            if (doc.didDocumentMetadata?.deactivated || validateGrant(grant) !== 'valid') {
+            if (doc.didDocumentMetadata?.deactivated || !held) {
                 continue;
             }
 
@@ -2237,7 +2283,9 @@ export default class Keymaster implements KeymasterInterface {
             grants.push({
                 did,
                 status: this.anchoredOn(doc, registry) ? 'anchored' : 'pending',
-                grant: grant as MemeplexGrant,
+                app: held.app,
+                grant: held.grant as AppGrant,
+                ...(typeof held.grant.request === 'string' ? { request: held.grant.request } : {}),
                 registry,
                 created: Number(doc.didDocumentMetadata?.versionSequence ?? 1) <= 1,
             });
@@ -2246,34 +2294,33 @@ export default class Keymaster implements KeymasterInterface {
         return grants;
     }
 
-    // A live asset of the current ID that holds a valid grant, with the
-    // version of the asset it was read from.
-    private async ownGrant(id: string): Promise<{ did: string; grant: MemeplexGrant; doc: DidCidDocument }> {
+    // A live asset of the current ID that holds a grant, with the member of
+    // its data the grant is and the version of the asset it was read from.
+    private async ownGrant(id: string): Promise<{ did: string; member: string; grant: AppGrant; doc: DidCidDocument }> {
         const owner = await this.fetchIdInfo();
         const did = await this.lookupDID(id);
         const doc = await this.resolveDID(did);
-        const grant = (doc.didDocumentData as { memeplexGrant?: unknown } | undefined)?.memeplexGrant;
+        const held = grantIn(doc.didDocumentData);
 
-        if (doc.didDocumentMetadata?.deactivated || doc.didDocumentRegistration?.type !== 'asset'
-            || validateGrant(grant) !== 'valid') {
+        if (doc.didDocumentMetadata?.deactivated || doc.didDocumentRegistration?.type !== 'asset' || !held) {
             throw new InvalidParameterError('id: not a grant');
         }
         if (!this.didMatch(doc.didDocument?.controller ?? '', owner.did)) {
             throw new InvalidParameterError('id: not a grant of the current ID');
         }
 
-        return { did, grant: grant as MemeplexGrant, doc };
+        return { did, member: held.member, grant: held.grant as AppGrant, doc };
     }
 
-    // Changes the scope of a grant of the current ID in place. Every field of
-    // the grant but `actions` and `expiresAt` is kept, since a change to any
-    // other ends the grant. The actions on offer are the core actions and the
-    // extension kinds the grant lists. Nothing is written when the change
+    // Changes the scope of a grant of the current ID in place: its `actions`,
+    // its `expiresAt` or both. `null` removes the member, which an app reads
+    // as it reads a grant made without one. Nothing is written when the change
     // leaves the grant as it is.
     //
-    // The update states the asset's whole data with `memeplexGrant` replaced.
-    // mergeData is not used: it drops a member whose value is null, and a
-    // change to the data outside the grant's scope ends the grant too.
+    // The update states the asset's whole data with the grant replaced, and
+    // every other member of the grant and of the data as it was. mergeData is
+    // not used: it drops a member whose value is null, and an app may read any
+    // other change to a grant's asset as the end of the grant.
     //
     // The update is signed as the successor of the version the grant was read
     // from. If the grant has changed since, the node refuses it: writing it
@@ -2284,22 +2331,14 @@ export default class Keymaster implements KeymasterInterface {
             throw new InvalidParameterError('changes: actions or expiresAt is needed');
         }
 
-        const { did, grant, doc } = await this.ownGrant(id);
+        const { did, member, grant, doc } = await this.ownGrant(id);
         const data = doc.didDocumentData as Record<string, unknown>;
-        const updated: MemeplexGrant = { ...grant };
+        const updated: AppGrant = { ...grant };
 
         if (changes.actions !== undefined) {
-            const offered = [
-                ...CORE_GRANT_ACTIONS,
-                ...(grant.actions ?? []).filter(action => !CORE_GRANT_ACTIONS.includes(action)),
-            ];
-            const actions = changes.actions === null
-                ? undefined
-                : this.grantActions(offered, changes.actions, 'changes.actions');
-
             delete updated.actions;
-            if (actions) {
-                updated.actions = actions;
+            if (changes.actions !== null) {
+                updated.actions = this.grantActions(changes.actions, 'changes.actions');
             }
         }
 
@@ -2314,12 +2353,12 @@ export default class Keymaster implements KeymasterInterface {
             return true;
         }
 
-        return this.updateFromDocument(did, { didDocumentData: { ...data, memeplexGrant: updated } }, doc);
+        return this.updateFromDocument(did, { didDocumentData: { ...data, [member]: updated } }, doc);
     }
 
-    // Revokes a grant of the current ID by deleting its asset. The client can
-    // publish until the deletion is anchored on the grant's registry;
-    // listRevocations says whether it is.
+    // Revokes a grant of the current ID by deleting its asset. On a chain
+    // registry the deletion takes effect once it is anchored; listRevocations
+    // says whether it is.
     async revokeGrant(id: string): Promise<boolean> {
         const { did } = await this.ownGrant(id);
 

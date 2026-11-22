@@ -10,109 +10,65 @@ import WalletJsonMemory from '@didcid/keymaster/wallet/json-memory';
 import MemoryClient from '@didcid/ipfs/memory';
 import * as memeplex from '@didcid/memeplex';
 import type { ResolvedVersion } from '@didcid/memeplex';
-import { MemeplexClient } from '@didcid/memeplex/client';
 import * as grants from '../../packages/keymaster/src/grant.ts';
 
-// Grants from a Keymaster: docs/plans/memeplex-reference-1436.md, "Grant request
-// flow" and "Wallet". Keymaster states the link and grant rules itself, since it
-// cannot depend on @didcid/memeplex; the first half of this file holds it to the
-// verifier's answers and to the fixtures the Python port also runs. The second
-// half is createGrant, listGrants, updateGrant and revokeGrant against a
-// Gatekeeper, with the verifier reading what they wrote.
-// python/keymaster/tests/test_grant.py is this file for the Python port.
+// Grants from a Keymaster: what an identity lets a client application do in its
+// name. Keymaster knows no app. A client asks with a grant request, an asset it
+// creates whose data holds `<app>GrantRequest`, and the grant is an asset of the
+// granting identity holding `<app>Grant`. What a grant means is the app's.
+//
+// Most of this file uses a made-up app. Memeplex appears as one consumer: its
+// verifier reads the grants made here, which is what shows the commands serve it.
+// python/keymaster/tests/test_grant.py is this file for the Python port, and both
+// run tests/fixtures/grant-request-vectors.json.
 
 const FIXTURES = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
-const read = (name: string) => JSON.parse(readFileSync(path.join(FIXTURES, name), 'utf-8'));
 
-type LinkCase = { name: string; link: string; expect: Record<string, unknown> };
-type ValidityCase = { name: string; member: string; expect: string; request?: unknown; operation?: { data: Record<string, unknown> } };
+type RequestCase = { name: string; data: unknown; expect: { app: string; fault?: string } | null };
 
-const linkCases: LinkCase[] = read('memeplex-grant-link-vectors.json').cases;
-const validityCases: ValidityCase[] = read('memeplex-v1-vectors.json').cases
-    .filter((each: ValidityCase) => each.member !== 'memeplex');
+const requestCases: RequestCase[] = JSON.parse(readFileSync(path.join(FIXTURES, 'grant-request-vectors.json'), 'utf-8')).cases;
 
-describe('the rules Keymaster states', () => {
-    it('are the verifier\'s constants', () => {
-        expect(grants.PERMITTED_GRANT_REGISTRIES).toStrictEqual([...memeplex.PERMITTED_REGISTRIES]);
-        expect(grants.GRANT_LINK_PREFIX).toBe(memeplex.GRANT_LINK_PREFIX);
-        expect(grants.MAX_GRANT_LINK_LENGTH).toBe(memeplex.MAX_GRANT_LINK_LENGTH);
-        expect(grants.CORE_GRANT_ACTIONS.map(action => grants.isGrantAction(action))).toStrictEqual([true, true, true, true]);
-        expect([...new Set(memeplex.KINDS.map(kind => memeplex.actionFor(kind)))].sort()).toStrictEqual([...grants.CORE_GRANT_ACTIONS].sort());
+describe('the shape every grant request has', () => {
+    it.each(requestCases.map(each => [each.name, each] as const))('reads data with %s as its vector states', (_name, each) => {
+        const held = grants.grantRequestIn(each.data);
+        const read = held ? { app: held.app, ...(grants.grantRequestFault(held.request) ? { fault: grants.grantRequestFault(held.request) } : {}) } : null;
+
+        expect(read).toStrictEqual(each.expect);
     });
 
-    it('have vectors for grants and for grant requests', () => {
-        expect(validityCases.filter(each => each.member === 'memeplexGrant').length).toBeGreaterThan(20);
-        expect(validityCases.filter(each => each.member === 'memeplexGrantRequest').length).toBeGreaterThan(5);
-        expect([...new Set(validityCases.map(each => each.expect))].sort())
-            .toStrictEqual(['expiry-instant', 'schema', 'unsupported', 'valid', 'version']);
+    it('has vectors for every fault, for a sound request and for data that holds none', () => {
+        expect([...new Set(requestCases.map(each => each.expect === null ? 'none' : each.expect.fault ?? 'sound'))].sort())
+            .toStrictEqual(['actions', 'expiresAt', 'name', 'none', 'registries', 'request', 'sound', 'v']);
     });
 
-    it.each(validityCases.map(each => [each.name, each] as const))('judge %s as its vector states', (_name, each) => {
-        const value = each.request ?? each.operation!.data[each.member];
-        const [ours, theirs] = each.member === 'memeplexGrant'
-            ? [grants.validateGrant(value), memeplex.validateGrant(value)]
-            : [grants.validateGrantRequest(value), memeplex.validateGrantRequest(value)];
-
-        expect(ours).toBe(each.expect);
-        expect(theirs).toBe(each.expect);
+    it('names a request by its DID, an alias, or a link to it', () => {
+        expect(grants.grantRequestId('did:cid:abc')).toBe('did:cid:abc');
+        expect(grants.grantRequestId('  did:cid:abc\n')).toBe('did:cid:abc');
+        expect(grants.grantRequestId('archon://grant?request=did:cid:abc')).toBe('did:cid:abc');
+        expect(grants.grantRequestId('\tarchon://grant?request=did:cid:abc \n')).toBe('did:cid:abc');
+        expect(grants.grantRequestId('my-request')).toBe('my-request');
+        expect(grants.grantRequestId('archon://grant?request=')).toBe('');
+        expect(grants.grantRequestId('archon://auth?challenge=did:cid:abc')).toBe('archon://auth?challenge=did:cid:abc');
     });
 
-    it.each(linkCases.map(each => [each.name, each] as const))('decode a link with %s as its vector states', (_name, each) => {
-        expect(grants.decodeGrantLink(each.link)).toStrictEqual(each.expect);
-        expect(memeplex.decodeGrantLink(each.link)).toStrictEqual(each.expect);
-    });
+    it('finds the one grant in an asset\'s data', () => {
+        const grant = { client: 'did:cid:client' };
 
-    it('judge the request each link vector carries as the verifier does, as a grant too', () => {
-        const carried = linkCases
-            .map(each => {
-                try {
-                    return JSON.parse(Buffer.from(each.link.slice(grants.GRANT_LINK_PREFIX.length), 'base64url').toString('utf8'));
-                }
-                catch {
-                    return undefined;
-                }
-            })
-            .map(value => value?.memeplexGrantRequest);
-
-        expect(carried.filter(value => value !== undefined).length).toBeGreaterThan(40);
-        for (const value of carried) {
-            expect(grants.validateGrant(value)).toBe(memeplex.validateGrant(value));
-            expect(grants.validateGrantRequest(value)).toBe(memeplex.validateGrantRequest(value));
-        }
-    });
-
-    it('allow a grant a registries member, which is no field of a grant', () => {
-        const grant = { v: 1, client: 'did:cid:bagaaieraclient', registries: 'anything' };
-
-        expect(grants.validateGrant(grant)).toBe('valid');
-        expect(memeplex.validateGrant(grant)).toBe('valid');
-    });
-
-    it('show every refusal of a link', () => {
-        expect([...new Set(linkCases.map(each => each.expect.error ?? 'accepted'))].sort())
-            .toStrictEqual(['accepted', 'invalid-request', 'not-a-grant-link', 'too-long', 'undecodable']);
-    });
-
-    it('refuse a link that is not a string', () => {
-        expect(grants.decodeGrantLink(5 as never)).toStrictEqual({ error: 'not-a-grant-link' });
-        expect(grants.decodeGrantLink(undefined as never)).toStrictEqual({ error: 'not-a-grant-link' });
-    });
-
-    it('decode the links the verifier encodes', () => {
-        const request = {
-            v: 1, client: 'did:cid:bagaaieraclient', name: 'Mémépool 🌊', actions: ['memeplex:tag'],
-            nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz', registries: ['SOL:mainnet-beta'],
-        };
-
-        expect(grants.decodeGrantLink(memeplex.encodeGrantLink(request))).toStrictEqual({ request });
+        expect(grants.grantIn({ exampleGrant: grant, note: null })).toStrictEqual({ app: 'example', member: 'exampleGrant', grant });
+        expect(grants.grantIn({ exampleGrant: grant, exampleGrantRequest: { registries: ['local'] } })?.app).toBe('example');
+        expect(grants.grantIn({ exampleGrant: grant, otherGrant: grant })).toBeUndefined();
+        expect(grants.grantIn({ exampleGrant: { client: 7 } })).toBeUndefined();
+        expect(grants.grantIn({ exampleGrant: [grant] })).toBeUndefined();
+        expect(grants.grantIn({ ExampleGrant: grant })).toBeUndefined();
+        expect(grants.grantIn({ Grant: grant })).toBeUndefined();
+        expect(grants.grantIn([grant])).toBeUndefined();
+        expect(grants.grantIn(undefined)).toBeUndefined();
+        expect(grants.grantMember('example')).toBe('exampleGrant');
     });
 });
 
 const BTC = 'BTC:mainnet';
 const ETH = 'ETH:mainnet';
-const NONCE = 'Qm9vdHN0cmFwIG5vbmNlMTIz';
-const EXTENSION = `did:cid:bagaaieraschemaschemaschemaschemaschemaschemaschemaschemasch?versionId=b${'a'.repeat(58)}`;
-const OTHER_EXTENSION = `did:cid:bagaaieraotherotherotherotherotherotherotherotherotherotherot?versionId=b${'c'.repeat(58)}`;
 const blockTime = (block: number) => new Date(Date.UTC(2026, 10, 2, 0, block)).toISOString();
 
 let ipfs: MemoryClient;
@@ -130,18 +86,14 @@ afterAll(async () => {
     await ipfs.stop();
 });
 
-function nodeWith(registries: string[]) {
+beforeEach(async () => {
     gatekeeper = new Gatekeeper({
-        db: new DbJsonMemory('grants'), ipfs, registries,
+        db: new DbJsonMemory('grants'), ipfs, registries: ['local', 'hyperswarm', BTC, ETH],
         console: { log: () => undefined, error: () => undefined, time: () => undefined, timeEnd: () => undefined } as never,
     });
     keymaster = new Keymaster({ gatekeeper, wallet: new WalletJsonMemory(), cipher: new CipherNode(), passphrase: 'passphrase' });
-}
-
-beforeEach(async () => {
-    nodeWith(['local', 'hyperswarm', BTC, ETH]);
     await keymaster.loadOrCreateWallet();
-    client = await keymaster.createId('Memepool', { registry: 'hyperswarm' });
+    client = await keymaster.createId('Client', { registry: 'hyperswarm' });
     alice = await keymaster.createId('Alice', { registry: 'hyperswarm' });
 });
 
@@ -164,178 +116,235 @@ async function anchor(block: number, registry = BTC) {
     await gatekeeper.clearQueue(registry, operations);
 }
 
-const PERMITTED = ['BTC:mainnet', 'ZEC:mainnet', 'ETH:mainnet', 'SOL:mainnet-beta'];
-// A link for a request that lists every permitted registry, unless it says otherwise.
-const linkFor = (request: Record<string, unknown> = {}) =>
-    memeplex.encodeGrantLink({ v: 1, client, name: 'Memepool', nonce: NONCE, registries: PERMITTED, ...request });
-const grantOf = async (did: string) => ((await keymaster.resolveDID(did)).didDocumentData as Record<string, any>).memeplexGrant;
-const verified = async (did: string) => memeplex.readGrant((await gatekeeper.resolveVersions([did]))[0] as ResolvedVersion[]);
+// A grant request as a client makes one: an asset of the client's, holding what
+// it asks for under its app's name. It lists both chains unless told otherwise.
+const requestOf = (request: Record<string, unknown> = {}, app = 'example') =>
+    keymaster.createAsset({ [`${app}GrantRequest`]: { registries: [BTC, ETH], ...request } }, { registry: 'hyperswarm', controller: 'Client' });
+const dataOf = async (did: string) => (await keymaster.resolveDID(did)).didDocumentData as Record<string, any>;
+const grantOf = async (did: string, app = 'example') => (await dataOf(did))[`${app}Grant`];
+const registryOf = async (did: string) => (await keymaster.resolveDID(did)).didDocumentRegistration?.registry;
 const sequenceOf = async (did: string) => (await keymaster.resolveDID(did)).didDocumentMetadata?.versionSequence;
+const verified = async (did: string) => memeplex.readGrant((await gatekeeper.resolveVersions([did]))[0] as ResolvedVersion[]);
 
 describe('createGrant', () => {
-    it('creates the grant a link asks for, on the first permitted registry the node supports', async () => {
-        const did = await keymaster.createGrant(linkFor());
+    it('creates the grant a request asks for, to the identity that made the request', async () => {
+        const request = await requestOf({ v: 1, name: 'Example', actions: ['example:read', 'example:write'], expiresAt: '2028-02-29T23:59:59.5Z' });
+        const did = await keymaster.createGrant(request);
         const doc = await keymaster.resolveDID(did);
 
-        expect(doc.didDocumentData).toStrictEqual({ memeplexGrant: { v: 1, client, nonce: NONCE } });
+        expect(doc.didDocumentData).toStrictEqual({
+            exampleGrant: { v: 1, client, request, actions: ['example:read', 'example:write'], expiresAt: '2028-02-29T23:59:59.5Z' },
+        });
+        expect(Object.keys((doc.didDocumentData as Record<string, any>).exampleGrant)).toStrictEqual(['v', 'client', 'request', 'actions', 'expiresAt']);
         expect(doc.didDocumentRegistration).toMatchObject({ type: 'asset', registry: BTC });
         expect(doc.didDocument?.controller).toBe(alice);
         expect(await keymaster.listAssets()).toStrictEqual([did]);
-        expect(await verified(did)).toStrictEqual({ status: 'pending', user: alice, client, registry: BTC });
-
-        await anchor(100);
-        expect(await verified(did)).toMatchObject({ status: 'valid', user: alice, client, registry: BTC, pending: 0 });
     });
 
-    it('creates, from the link a client makes, a grant that client finds', async () => {
-        const asking = new MemeplexClient({ keymaster, gatekeeper, identity: 'Memepool' } as never);
-        const { request, link } = await asking.requestGrant({ name: 'Memepool', registries: [ETH], actions: ['memeplex:post'] });
+    it('holds only the client and the request when the request asks for no more', async () => {
+        const request = await requestOf({ name: 'Example' });
 
-        await keymaster.setCurrentId('Alice');
-        const did = await keymaster.createGrant(link);
-
-        expect((await keymaster.resolveDID(did)).didDocumentRegistration).toMatchObject({ registry: ETH });
-        await anchor(100, ETH);
-        expect(await asking.findGrants(request)).toMatchObject([{ did, grant: { status: 'valid', user: alice, registry: ETH } }]);
+        expect(await grantOf(await keymaster.createGrant(request))).toStrictEqual({ client, request });
     });
 
-    it('grants the actions and the expiry the link asks for', async () => {
-        const asked = { actions: ['memeplex:tag', 'memeplex:post', EXTENSION], expiresAt: '2028-02-29T23:59:59.5Z' };
-        const did = await keymaster.createGrant(linkFor(asked));
+    it('names the grant for the app the request names', async () => {
+        const request = await requestOf({ v: 2 }, 'myApp2');
+        const did = await keymaster.createGrant(request);
 
-        expect(await grantOf(did)).toStrictEqual({ v: 1, client, actions: asked.actions, nonce: NONCE, expiresAt: asked.expiresAt });
+        expect(await dataOf(did)).toStrictEqual({ myApp2Grant: { v: 2, client, request } });
     });
 
-    it('accepts a link with white space around it', async () => {
-        const did = await keymaster.createGrant(`  ${linkFor()}\n`);
+    it('takes a link to the request, an alias for it, and white space around either', async () => {
+        const request = await requestOf();
+        await keymaster.addAlias('example-request', request);
 
-        expect(await grantOf(did)).toStrictEqual({ v: 1, client, nonce: NONCE });
+        for (const named of [`archon://grant?request=${request}`, `  archon://grant?request=${request}\n`, 'example-request', ` ${request} `, 'archon://grant?request=example-request']) {
+            expect(await grantOf(await keymaster.createGrant(named))).toStrictEqual({ client, request });
+        }
     });
 
-    it('narrows the actions, in the order they were asked for', async () => {
-        const link = linkFor({ actions: ['memeplex:tag', 'memeplex:post', EXTENSION] });
+    it('takes who asks from who made the request, and nothing from its data', async () => {
+        const request = await requestOf({ client: alice, nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz', request: 'did:cid:another' });
 
-        expect(await grantOf(await keymaster.createGrant(link, { actions: [EXTENSION, 'memeplex:tag'] })))
-            .toMatchObject({ actions: ['memeplex:tag', EXTENSION] });
-        expect(await grantOf(await keymaster.createGrant(link, { actions: ['memeplex:post', 'memeplex:post'] })))
-            .toMatchObject({ actions: ['memeplex:post'] });
-        expect(await grantOf(await keymaster.createGrant(linkFor(), { actions: ['memeplex:rate', 'memeplex:reply'] })))
-            .toMatchObject({ actions: ['memeplex:reply', 'memeplex:rate'] });
-    });
-
-    it('leaves actions out for exactly the core actions', async () => {
-        const core = ['memeplex:tag', 'memeplex:rate', 'memeplex:reply', 'memeplex:post'];
-
-        expect(await grantOf(await keymaster.createGrant(linkFor({ actions: core }))))
-            .toStrictEqual({ v: 1, client, nonce: NONCE });
-        expect(await grantOf(await keymaster.createGrant(linkFor(), { actions: core })))
-            .toStrictEqual({ v: 1, client, nonce: NONCE });
-        expect(await grantOf(await keymaster.createGrant(linkFor({ actions: [...core, EXTENSION] }))))
-            .toMatchObject({ actions: [...core, EXTENSION] });
+        expect(await grantOf(await keymaster.createGrant(request))).toStrictEqual({ client, request });
     });
 
     it.each([
-        ['an action the link does not ask for', { actions: ['memeplex:tag'] }, ['memeplex:post'], 'every action must be one of memeplex:tag'],
-        ['an extension kind when the link lists no actions', {}, [EXTENSION], 'every action must be one of memeplex:post, memeplex:reply, memeplex:rate, memeplex:tag'],
-        ['no actions', {}, [], 'at least one action is needed'],
-        ['actions that are not a list', {}, 'memeplex:post', 'at least one action is needed'],
-        ['an action that is not a string', {}, [1], 'every action must be one of'],
-    ])('refuses %s', async (_name, asked, actions, message) => {
-        await expect(keymaster.createGrant(linkFor(asked), { actions: actions as never }))
-            .rejects.toThrow(`Invalid parameter: options.actions: ${message}`);
+        ['nothing', ''],
+        ['white space', '  \n'],
+        ['a link to nothing', 'archon://grant?request='],
+        ['what is not a string', 7],
+        ['no request at all', undefined],
+    ])('refuses %s', async (_name, named) => {
+        await expect(keymaster.createGrant(named as never))
+            .rejects.toThrow('Invalid parameter: request: a DID, an alias or an archon://grant link is needed');
+    });
+
+    it('refuses a request the node does not have', async () => {
+        const unknown = (await requestOf()).replace(/.{6}$/, 'aaaaaa');
+
+        await expect(keymaster.createGrant(unknown)).rejects.toThrow('Invalid parameter: request: not found');
+        await expect(keymaster.createGrant(`archon://grant?request=${unknown}`)).rejects.toThrow('Invalid parameter: request: not found');
+        await expect(keymaster.createGrant('no-such-alias')).rejects.toThrow('Invalid parameter: request: not found');
+        await expect(keymaster.createGrant('archon://auth?challenge=did:cid:abc')).rejects.toThrow('Invalid parameter: request: not found');
         expect(await keymaster.listAssets()).toStrictEqual([]);
     });
 
-    it('changes or removes the expiry', async () => {
-        const link = linkFor({ expiresAt: '2027-01-01T00:00:00Z' });
+    it('refuses a request its client has deleted', async () => {
+        const request = await requestOf();
+        await keymaster.setCurrentId('Client');
+        expect(await keymaster.revokeDID(request)).toBe(true);
+        await keymaster.setCurrentId('Alice');
 
-        expect(await grantOf(await keymaster.createGrant(link, { expiresAt: '2027-06-30T12:00:00.000Z' })))
-            .toStrictEqual({ v: 1, client, nonce: NONCE, expiresAt: '2027-06-30T12:00:00.000Z' });
-        expect(await grantOf(await keymaster.createGrant(link, { expiresAt: null })))
-            .toStrictEqual({ v: 1, client, nonce: NONCE });
-        expect(await grantOf(await keymaster.createGrant(linkFor(), { expiresAt: '2027-06-30T12:00:00Z' })))
+        await expect(keymaster.createGrant(request)).rejects.toThrow('Invalid parameter: request: deleted');
+    });
+
+    it('refuses what is not an asset', async () => {
+        await expect(keymaster.createGrant(client)).rejects.toThrow('Invalid parameter: request: not an asset');
+        await expect(keymaster.createGrant('Client')).rejects.toThrow('Invalid parameter: request: not an asset');
+    });
+
+    it('refuses a request transferred to another identity, which signed nothing', async () => {
+        const request = await requestOf();
+        const bob = await keymaster.createId('Bob', { registry: 'hyperswarm' });
+        await keymaster.setCurrentId('Client');
+        expect(await keymaster.transferAsset(request, bob)).toBe(true);
+        await keymaster.setCurrentId('Alice');
+
+        expect((await keymaster.resolveDID(request)).didDocument?.controller).toBe(bob);
+        await expect(keymaster.createGrant(request))
+            .rejects.toThrow('Invalid parameter: request: changed since it was created, so who asks is not established');
+        expect(await keymaster.listAssets()).toStrictEqual([]);
+    });
+
+    it('refuses a request whose contents were replaced, even by its client', async () => {
+        const request = await requestOf({ actions: ['example:read'] });
+        await keymaster.setCurrentId('Client');
+        expect(await keymaster.mergeData(request, { exampleGrantRequest: { registries: [BTC], actions: ['example:write'] } })).toBe(true);
+        await keymaster.setCurrentId('Alice');
+
+        await expect(keymaster.createGrant(request))
+            .rejects.toThrow('Invalid parameter: request: changed since it was created, so who asks is not established');
+    });
+
+    it('refuses an asset that holds no one request', async () => {
+        const plain = await keymaster.createAsset({ name: 'not a request' }, { registry: 'hyperswarm', controller: 'Client' });
+        const two = await keymaster.createAsset(
+            { exampleGrantRequest: { registries: [BTC] }, otherGrantRequest: { registries: [BTC] } }, { registry: 'hyperswarm', controller: 'Client' });
+        const grant = await keymaster.createGrant(await requestOf());
+
+        for (const did of [plain, two, grant]) {
+            await expect(keymaster.createGrant(did)).rejects.toThrow('Invalid parameter: request: not a grant request');
+        }
+    });
+
+    it.each(requestCases.filter(each => each.expect?.fault).map(each => [each.name, each] as const))(
+        'refuses a request with %s', async (_name, each) => {
+            const request = await keymaster.createAsset(each.data, { registry: 'hyperswarm', controller: 'Client' });
+
+            await expect(keymaster.createGrant(request)).rejects.toThrow(`Invalid parameter: request: invalid (${each.expect!.fault})`);
+            expect(await keymaster.listAssets()).toStrictEqual([]);
+        });
+
+    it('grants some of the actions the request lists, in the order it lists them', async () => {
+        const request = await requestOf({ actions: ['c', 'a', 'b'] });
+
+        expect((await grantOf(await keymaster.createGrant(request, { actions: ['b', 'c'] }))).actions).toStrictEqual(['c', 'b']);
+        expect((await grantOf(await keymaster.createGrant(request, { actions: ['a'] }))).actions).toStrictEqual(['a']);
+        expect((await grantOf(await keymaster.createGrant(request, { actions: ['b', 'a', 'c'] }))).actions).toStrictEqual(['c', 'a', 'b']);
+    });
+
+    it.each([
+        ['an action the request does not list', { actions: ['a'] }, ['b'], 'every action must be one of a'],
+        ['any action when the request lists none', {}, ['a'], 'the request lists no actions to choose from'],
+        ['no actions', { actions: ['a'] }, [], 'a list of at least one action, each once, is needed'],
+        ['an action twice', { actions: ['a'] }, ['a', 'a'], 'a list of at least one action, each once, is needed'],
+        ['actions that are not a list', { actions: ['a'] }, 'a', 'a list of at least one action, each once, is needed'],
+        ['an action that is not a string', { actions: ['a'] }, [1], 'a list of at least one action, each once, is needed'],
+    ])('refuses %s', async (_name, asked, actions, message) => {
+        const request = await requestOf(asked);
+
+        await expect(keymaster.createGrant(request, { actions: actions as never })).rejects.toThrow(`Invalid parameter: options.actions: ${message}`);
+        expect(await keymaster.listAssets()).toStrictEqual([]);
+    });
+
+    it('changes or removes the expiry the request asks for', async () => {
+        const request = await requestOf({ expiresAt: '2027-01-01T00:00:00Z' });
+
+        expect(await grantOf(await keymaster.createGrant(request))).toStrictEqual({ client, request, expiresAt: '2027-01-01T00:00:00Z' });
+        expect(await grantOf(await keymaster.createGrant(request, { expiresAt: '2027-06-30T12:00:00+05:30' })))
+            .toStrictEqual({ client, request, expiresAt: '2027-06-30T12:00:00+05:30' });
+        expect(await grantOf(await keymaster.createGrant(request, { expiresAt: null }))).toStrictEqual({ client, request });
+        expect(await grantOf(await keymaster.createGrant(await requestOf(), { expiresAt: '2027-06-30T12:00:00Z' })))
             .toMatchObject({ expiresAt: '2027-06-30T12:00:00Z' });
     });
 
-    it.each([
-        '2027-02-30T00:00:00Z', '2027-06-30', '2027-06-30T12:00:00+00:00', '2027-06-30T12:00:00Z\n', '', 1798675200,
-    ])('refuses the expiry %j', async expiresAt => {
-        await expect(keymaster.createGrant(linkFor(), { expiresAt: expiresAt as never }))
-            .rejects.toThrow('Invalid parameter: options.expiresAt: not an instant such as 2027-01-31T00:00:00Z');
-        expect(await keymaster.listAssets()).toStrictEqual([]);
+    it.each(['2027-02-30T00:00:00Z', '2027-06-30', '2027-06-30T12:00:00', '2027-06-30T12:00:00Z\n', '', 1798675200])(
+        'refuses the expiry %j', async expiresAt => {
+            await expect(keymaster.createGrant(await requestOf(), { expiresAt: expiresAt as never }))
+                .rejects.toThrow('Invalid parameter: options.expiresAt: not a date-time such as 2027-01-31T00:00:00Z');
+            expect(await keymaster.listAssets()).toStrictEqual([]);
+        });
+
+    it('takes the first registry the request lists that the node supports', async () => {
+        expect(await registryOf(await keymaster.createGrant(await requestOf({ registries: [ETH, BTC] })))).toBe(ETH);
+        expect(await registryOf(await keymaster.createGrant(await requestOf({ registries: ['ZEC:mainnet', ETH, BTC] })))).toBe(ETH);
+        expect(await registryOf(await keymaster.createGrant(await requestOf({ registries: ['hyperswarm'] })))).toBe('hyperswarm');
     });
 
-    it('creates the grant on the registry asked for', async () => {
-        const did = await keymaster.createGrant(linkFor(), { registry: ETH });
+    it('creates the grant on the registry named, when the request lists it', async () => {
+        const request = await requestOf({ registries: [BTC, ETH, 'hyperswarm'] });
 
-        expect((await keymaster.resolveDID(did)).didDocumentRegistration?.registry).toBe(ETH);
+        expect(await registryOf(await keymaster.createGrant(request, { registry: ETH }))).toBe(ETH);
+        expect(await registryOf(await keymaster.createGrant(request, { registry: 'hyperswarm' }))).toBe('hyperswarm');
     });
 
-    it.each(['hyperswarm', 'local', 'BTC:signet', 'pin'])('refuses %s, where a grant would be void', async registry => {
-        await expect(keymaster.createGrant(linkFor(), { registry })).rejects.toThrow(
-            'Invalid parameter: options.registry: a grant may be created on BTC:mainnet, ZEC:mainnet, ETH:mainnet, SOL:mainnet-beta');
-        expect(await keymaster.listAssets()).toStrictEqual([]);
-    });
-
-    it('refuses a permitted registry the node does not support', async () => {
-        await expect(keymaster.createGrant(linkFor(), { registry: 'ZEC:mainnet' }))
-            .rejects.toThrow('Invalid parameter: options.registry: this node does not support ZEC:mainnet');
-    });
-
-    it('refuses when the node supports no permitted registry', async () => {
-        jest.spyOn(gatekeeper, 'listRegistries').mockResolvedValue(['local', 'hyperswarm', 'BTC:signet']);
-
-        await expect(keymaster.createGrant(linkFor())).rejects.toThrow(
-            'Invalid parameter: options.registry: the request lists BTC:mainnet, ZEC:mainnet, ETH:mainnet, SOL:mainnet-beta and this node supports none of BTC:mainnet, ZEC:mainnet, ETH:mainnet, SOL:mainnet-beta');
-    });
-
-    it('refuses a request that lists no registries', async () => {
-        const link = `${grants.GRANT_LINK_PREFIX}${Buffer.from(JSON.stringify({ memeplexGrantRequest: { v: 1, client, name: 'Memepool', nonce: NONCE } })).toString('base64url')}`;
-
-        await expect(keymaster.createGrant(link)).rejects.toThrow('Invalid parameter: link: invalid-request (schema)');
-        await expect(keymaster.createGrant(link, { registry: BTC })).rejects.toThrow('Invalid parameter: link: invalid-request (schema)');
-        expect(await keymaster.listAssets()).toStrictEqual([]);
-    });
-
-    it('takes the next permitted registry when the node lacks the first', async () => {
-        jest.spyOn(gatekeeper, 'listRegistries').mockResolvedValue(['hyperswarm', ETH]);
-
-        const did = await keymaster.createGrant(linkFor());
-
-        expect((await keymaster.resolveDID(did)).didDocumentRegistration?.registry).toBe(ETH);
-    });
-
-    it('creates the grant on a registry the request lists, and leaves the list out of the grant', async () => {
-        const did = await keymaster.createGrant(linkFor({ registries: [ETH] }));
-
-        expect((await keymaster.resolveDID(did)).didDocumentRegistration?.registry).toBe(ETH);
-        expect(await grantOf(did)).toStrictEqual({ v: 1, client, nonce: NONCE });
-
-        // The order of the permitted registries, not the order the request lists them in.
-        const first = await keymaster.createGrant(linkFor({ registries: [ETH, BTC] }));
-        expect((await keymaster.resolveDID(first)).didDocumentRegistration?.registry).toBe(BTC);
-
-        const named = await keymaster.createGrant(linkFor({ registries: [ETH, BTC] }), { registry: ETH });
-        expect((await keymaster.resolveDID(named)).didDocumentRegistration?.registry).toBe(ETH);
-    });
-
-    it('refuses a registry the request does not list', async () => {
-        await expect(keymaster.createGrant(linkFor({ registries: [ETH, 'SOL:mainnet-beta'] }), { registry: BTC }))
+    it('refuses a registry the request does not list, or the node does not support', async () => {
+        await expect(keymaster.createGrant(await requestOf({ registries: [ETH, 'SOL:mainnet-beta'] }), { registry: BTC }))
             .rejects.toThrow('Invalid parameter: options.registry: the request lists ETH:mainnet, SOL:mainnet-beta, not BTC:mainnet');
-        await expect(keymaster.createGrant(linkFor({ registries: ['ZEC:mainnet'] }), { registry: 'ZEC:mainnet' }))
+        await expect(keymaster.createGrant(await requestOf({ registries: ['ZEC:mainnet', BTC] }), { registry: 'ZEC:mainnet' }))
             .rejects.toThrow('Invalid parameter: options.registry: this node does not support ZEC:mainnet');
-        await expect(keymaster.createGrant(linkFor({ registries: [ETH] }), { registry: 'hyperswarm' }))
-            .rejects.toThrow('Invalid parameter: options.registry: a grant may be created on');
+        await expect(keymaster.createGrant(await requestOf({ registries: ['ZEC:mainnet', 'my chain'] })))
+            .rejects.toThrow('Invalid parameter: options.registry: the request lists ZEC:mainnet, my chain and this node supports none of them');
         expect(await keymaster.listAssets()).toStrictEqual([]);
     });
 
-    it('refuses when the node supports none of the registries the request lists', async () => {
-        await expect(keymaster.createGrant(linkFor({ registries: ['ZEC:mainnet', 'SOL:mainnet-beta'] }))).rejects.toThrow(
-            'Invalid parameter: options.registry: the request lists ZEC:mainnet, SOL:mainnet-beta and this node supports BTC:mainnet, ETH:mainnet');
+    it('creates a local identity\'s grant on local, and only when the request lists local', async () => {
+        await keymaster.createId('Larry', { registry: 'local' });
+
+        await expect(keymaster.createGrant(await requestOf()))
+            .rejects.toThrow('Invalid parameter: options.controller: a local identity\'s grant is created on local, and the request lists BTC:mainnet, ETH:mainnet');
+        await expect(keymaster.createGrant(await requestOf({ registries: [BTC, 'local'] }), { registry: BTC }))
+            .rejects.toThrow('Invalid parameter: options.controller: a local identity\'s grant is created on local, and the request lists BTC:mainnet, local');
         expect(await keymaster.listAssets()).toStrictEqual([]);
+
+        expect(await registryOf(await keymaster.createGrant(await requestOf({ registries: [BTC, 'local'] })))).toBe('local');
+        expect(await registryOf(await keymaster.createGrant(await requestOf({ registries: [BTC, 'local'] }), { registry: 'local' }))).toBe('local');
+    });
+
+    it('refuses a request the granting identity made itself', async () => {
+        const request = await requestOf();
+
+        await expect(keymaster.createGrant(request, { controller: 'Client' }))
+            .rejects.toThrow('Invalid parameter: request: the granting identity made the request, and cannot grant itself');
+        await keymaster.setCurrentId('Client');
+        await expect(keymaster.createGrant(request)).rejects.toThrow('cannot grant itself');
+        expect(await keymaster.listAssets()).toStrictEqual([request]);
+    });
+
+    it('grants from the identity named as controller, under an alias', async () => {
+        const bob = await keymaster.createId('Bob', { registry: 'hyperswarm' });
+        await keymaster.setCurrentId('Alice');
+
+        const did = await keymaster.createGrant(await requestOf(), { controller: 'Bob', alias: 'example-grant' });
+
+        expect((await keymaster.resolveDID('example-grant')).didDocument).toMatchObject({ id: did, controller: bob });
+        expect(await keymaster.listAssets()).toStrictEqual([]);
+        expect(await keymaster.listAssets('Bob')).toStrictEqual([did]);
     });
 
     it('creates and signs the grant as the identity it checked, whatever the current ID becomes', async () => {
+        const request = await requestOf();
         const resolve = gatekeeper.resolveDID.bind(gatekeeper);
         let switched = false;
 
@@ -343,128 +352,79 @@ describe('createGrant', () => {
         jest.spyOn(gatekeeper, 'resolveDID').mockImplementation(async (did, options) => {
             if (did === alice && options?.confirm && !switched) {
                 switched = true;
-                await keymaster.setCurrentId('Memepool');
+                await keymaster.setCurrentId('Client');
             }
             return resolve(did, options);
         });
 
-        const did = await keymaster.createGrant(linkFor());
+        const did = await keymaster.createGrant(request);
 
         expect(switched).toBe(true);
-        expect(await keymaster.getCurrentId()).toBe('Memepool');
+        expect(await keymaster.getCurrentId()).toBe('Client');
         expect((await keymaster.resolveDID(did)).didDocument?.controller).toBe(alice);
         expect(await keymaster.listAssets('Alice')).toStrictEqual([did]);
-        expect(await keymaster.listAssets('Memepool')).toStrictEqual([]);
-        expect(await verified(did)).toStrictEqual({ status: 'pending', user: alice, client, registry: BTC });
-    });
-
-    it('refuses a local identity, whose assets are created on local', async () => {
-        await keymaster.createId('Larry', { registry: 'local' });
-
-        await expect(keymaster.createGrant(linkFor()))
-            .rejects.toThrow('Invalid parameter: options.controller: a local identity cannot make a grant');
-        expect(await keymaster.listAssets()).toStrictEqual([]);
-    });
-
-    it('refuses a request that names the granting identity as the client', async () => {
-        await expect(keymaster.createGrant(linkFor({ client: alice })))
-            .rejects.toThrow('Invalid parameter: link: the request names the granting identity as the client');
-        expect(await keymaster.listAssets()).toStrictEqual([]);
-    });
-
-    it('grants from the identity named as controller, under an alias', async () => {
-        const bob = await keymaster.createId('Bob', { registry: 'hyperswarm' });
-        await keymaster.setCurrentId('Alice');
-
-        const did = await keymaster.createGrant(linkFor(), { controller: 'Bob', alias: 'memepool-grant' });
-
-        expect((await keymaster.resolveDID('memepool-grant')).didDocument).toMatchObject({ id: did, controller: bob });
-        expect(await keymaster.listAssets()).toStrictEqual([]);
-        expect(await keymaster.listAssets('Bob')).toStrictEqual([did]);
-        await expect(keymaster.createGrant(linkFor(), { controller: 'Memepool' }))
-            .rejects.toThrow('the request names the granting identity as the client');
-    });
-
-    it('says why it refuses a link', async () => {
-        await expect(keymaster.createGrant('archon://auth?challenge=did:cid:abc'))
-            .rejects.toThrow('Invalid parameter: link: not-a-grant-link');
-        await expect(keymaster.createGrant(`${grants.GRANT_LINK_PREFIX}not base64!`))
-            .rejects.toThrow('Invalid parameter: link: undecodable');
-        await expect(keymaster.createGrant(linkFor() + 'A'.repeat(2048)))
-            .rejects.toThrow('Invalid parameter: link: too-long');
-        await expect(keymaster.createGrant(`${grants.GRANT_LINK_PREFIX}${Buffer.from('{"memeplexGrantRequest":{"v":2}}').toString('base64url')}`))
-            .rejects.toThrow('Invalid parameter: link: invalid-request (unsupported)');
-        await expect(keymaster.createGrant(undefined as never))
-            .rejects.toThrow('Invalid parameter: link: not-a-grant-link');
-        expect(await keymaster.listAssets()).toStrictEqual([]);
-    });
-
-    // A link is read without the white space around it, so a vector refused
-    // only for that white space is accepted.
-    it.each(linkCases.map(each => [each.name, each] as const))('reads a link with %s as its vector states', async (_name, each) => {
-        const decoded = grants.decodeGrantLink(each.link.trim()) as { error?: string; validity?: string };
-
-        if (each.link.trim() === each.link) {
-            expect(decoded).toStrictEqual(each.expect);
-        }
-
-        if (decoded.error) {
-            const validity = decoded.validity ? ` (${decoded.validity})` : '';
-
-            await expect(keymaster.createGrant(each.link))
-                .rejects.toThrow(`Invalid parameter: link: ${decoded.error}${validity}`);
-            expect(await keymaster.listAssets()).toStrictEqual([]);
-        }
-        else {
-            const did = await keymaster.createGrant(each.link);
-
-            expect(memeplex.validateGrant(await grantOf(did))).toBe('valid');
-        }
+        expect(await keymaster.listAssets('Client')).toStrictEqual([request]);
     });
 });
 
 describe('listGrants', () => {
-    it('is empty for an identity with no grants', async () => {
+    it('lists only assets that hold one grant', async () => {
+        const grant = { client };
+
         await keymaster.createAsset({ name: 'not a grant' }, { registry: BTC });
-        await keymaster.createAsset({ memeplexGrant: { v: 1, client: 'memepool' } }, { registry: BTC });
-        await keymaster.createAsset({ memeplexGrant: { v: 2, client } }, { registry: BTC });
-        await keymaster.createAsset(['memeplexGrant'], { registry: BTC });
+        await keymaster.createAsset({ exampleGrant: { client: 7 } }, { registry: BTC });
+        await keymaster.createAsset({ exampleGrant: grant, otherGrant: grant }, { registry: BTC });
+        await keymaster.createAsset({ exampleGrantRequest: { registries: [BTC] } }, { registry: BTC });
+        await keymaster.createAsset(['exampleGrant'], { registry: BTC });
 
         expect(await keymaster.listGrants()).toStrictEqual([]);
     });
 
-    it('lists a grant as pending until it is anchored on its registry', async () => {
-        const did = await keymaster.createGrant(linkFor({ actions: ['memeplex:tag'], expiresAt: '2028-01-01T00:00:00Z' }));
-        const grant = { v: 1, client, actions: ['memeplex:tag'], nonce: NONCE, expiresAt: '2028-01-01T00:00:00Z' };
+    it('lists a grant with its app and its request, as pending until it is anchored on its registry', async () => {
+        const request = await requestOf({ actions: ['example:read'], expiresAt: '2028-01-01T00:00:00Z' });
+        const did = await keymaster.createGrant(request);
+        const listed = { did, app: 'example', grant: { client, request, actions: ['example:read'], expiresAt: '2028-01-01T00:00:00Z' }, request, registry: BTC, created: true };
 
-        expect(await keymaster.listGrants()).toStrictEqual([{ did, status: 'pending', grant, registry: BTC, created: true }]);
+        expect(await keymaster.listGrants()).toStrictEqual([{ ...listed, status: 'pending' }]);
+        expect(Object.keys((await keymaster.listGrants())[0])).toStrictEqual(['did', 'status', 'app', 'grant', 'request', 'registry', 'created']);
 
         await anchor(100);
-        expect(await keymaster.listGrants()).toStrictEqual([{ did, status: 'anchored', grant, registry: BTC, created: true }]);
+        expect(await keymaster.listGrants()).toStrictEqual([{ ...listed, status: 'anchored' }]);
+    });
+
+    it('lists the grants of every app, and one made without a request', async () => {
+        const first = await keymaster.createGrant(await requestOf());
+        const second = await keymaster.createGrant(await requestOf({}, 'memeplex'));
+        const third = await keymaster.createAsset({ handGrant: { client, label: 'made by hand' } }, { registry: 'hyperswarm' });
+
+        expect((await keymaster.listGrants()).map(({ did, app }) => ({ did, app }))).toStrictEqual([
+            { did: first, app: 'example' }, { did: second, app: 'memeplex' }, { did: third, app: 'hand' },
+        ]);
+        expect((await keymaster.listGrants())[2])
+            .toStrictEqual({ did: third, status: 'pending', app: 'hand', grant: { client, label: 'made by hand' }, registry: 'hyperswarm', created: true });
     });
 
     it('lists a change as pending until it is anchored, and as not the creation', async () => {
-        const did = await keymaster.createGrant(linkFor());
+        const did = await keymaster.createGrant(await requestOf());
         await anchor(100);
 
-        expect(await keymaster.updateGrant(did, { actions: ['memeplex:tag'] })).toBe(true);
-        const grant = { v: 1, client, nonce: NONCE, actions: ['memeplex:tag'] };
-
-        expect(await keymaster.listGrants()).toStrictEqual([{ did, status: 'pending', grant, registry: BTC, created: false }]);
+        expect(await keymaster.updateGrant(did, { actions: ['example:read'] })).toBe(true);
+        expect(await keymaster.listGrants()).toMatchObject([{ did, status: 'pending', created: false, grant: { actions: ['example:read'] } }]);
         await anchor(200);
-        expect(await keymaster.listGrants()).toStrictEqual([{ did, status: 'anchored', grant, registry: BTC, created: false }]);
+        expect(await keymaster.listGrants()).toMatchObject([{ did, status: 'anchored', created: false }]);
     });
 
     it('does not take an anchor on another chain, or confirmation, for an anchor', async () => {
-        const did = await keymaster.createGrant(linkFor());
+        const did = await keymaster.createGrant(await requestOf());
         const resolved = await gatekeeper.resolveDID(did);
-        const resolve = jest.spyOn(gatekeeper, 'resolveDID');
-        const withTimestamp = (timestamp: unknown) => resolve.mockResolvedValue({
-            ...resolved,
-            didDocumentMetadata: { ...resolved.didDocumentMetadata, confirmed: true, timestamp },
-        } as never);
-        const statusWith = async (timestamp: unknown) => {
-            withTimestamp(timestamp);
+        const resolve = gatekeeper.resolveDID.bind(gatekeeper);
+        let timestamp: unknown;
+
+        jest.spyOn(gatekeeper, 'resolveDID').mockImplementation(async (id, options) => id === did
+            ? { ...resolved, didDocumentMetadata: { ...resolved.didDocumentMetadata, confirmed: true, timestamp } } as never
+            : resolve(id, options));
+        const statusWith = async (given: unknown) => {
+            timestamp = given;
             return (await keymaster.listGrants())[0].status;
         };
         const block = { height: 100, timeISO: blockTime(100) };
@@ -477,27 +437,21 @@ describe('listGrants', () => {
         expect(await statusWith({ chain: BTC, upperBound: block })).toBe('anchored');
     });
 
-    it('lists a grant on a registry where it is void, which is never anchored', async () => {
-        const grant = { v: 1, client, nonce: NONCE };
-        const did = await keymaster.createAsset({ memeplexGrant: grant }, { registry: 'hyperswarm' });
-
-        expect(await keymaster.listGrants()).toStrictEqual([{ did, status: 'pending', grant, registry: 'hyperswarm', created: true }]);
-    });
-
     it('lists the grants of the identity asked for', async () => {
-        const did = await keymaster.createGrant(linkFor());
+        const did = await keymaster.createGrant(await requestOf());
         await keymaster.createId('Bob', { registry: 'hyperswarm' });
 
         expect(await keymaster.listGrants()).toStrictEqual([]);
         expect((await keymaster.listGrants('Alice')).map(each => each.did)).toStrictEqual([did]);
         expect((await keymaster.listGrants(alice)).map(each => each.did)).toStrictEqual([did]);
+        expect(await keymaster.listGrants('Client')).toStrictEqual([]);
         await expect(keymaster.listGrants('Nobody')).rejects.toThrow('Unknown ID');
     });
 
     it('lists an asset the node cannot resolve as unresolved', async () => {
-        const first = await keymaster.createGrant(linkFor());
+        const first = await keymaster.createGrant(await requestOf());
         const asset = await keymaster.createAsset({ name: 'not a grant' }, { registry: BTC });
-        const second = await keymaster.createGrant(linkFor({ actions: ['memeplex:tag'] }));
+        const second = await keymaster.createGrant(await requestOf());
         const resolve = gatekeeper.resolveDID.bind(gatekeeper);
 
         jest.spyOn(gatekeeper, 'resolveDID').mockImplementation(async (did, options) => {
@@ -512,21 +466,21 @@ describe('listGrants', () => {
             { did: asset, status: 'unresolved' },
             { did: second, status: 'pending' },
         ]);
+        expect((await keymaster.listGrants())[0]).toStrictEqual({ did: first, status: 'unresolved' });
     });
 
     it('does not list a revoked grant, which listRevocations has', async () => {
-        const kept = await keymaster.createGrant(linkFor());
-        const revoked = await keymaster.createGrant(linkFor({ actions: ['memeplex:tag'] }));
+        const kept = await keymaster.createGrant(await requestOf());
+        const revoked = await keymaster.createGrant(await requestOf());
 
         expect(await keymaster.revokeGrant(revoked)).toBe(true);
         expect((await keymaster.listGrants()).map(each => each.did)).toStrictEqual([kept]);
         expect(await keymaster.listRevocations()).toStrictEqual([{ did: revoked, registry: BTC, status: 'pending' }]);
     });
-});
 
-describe('listGrants after a revocation that did not take effect', () => {
-    it('lists the grant again, for the identity that made it', async () => {
-        const did = await keymaster.createGrant(linkFor({ actions: ['memeplex:tag'] }));
+    it('lists a grant again after a revocation that did not take effect', async () => {
+        const request = await requestOf({ actions: ['example:read'] });
+        const did = await keymaster.createGrant(request);
         const live = await gatekeeper.resolveDID(did);
         const resolve = gatekeeper.resolveDID.bind(gatekeeper);
 
@@ -540,7 +494,7 @@ describe('listGrants after a revocation that did not take effect', () => {
 
         expect(await keymaster.listGrants()).toStrictEqual([]);
         expect(await keymaster.listGrants('Alice')).toStrictEqual([{
-            did, status: 'pending', grant: { v: 1, client, actions: ['memeplex:tag'], nonce: NONCE }, registry: BTC, created: true,
+            did, status: 'pending', app: 'example', grant: { client, request, actions: ['example:read'] }, request, registry: BTC, created: true,
         }]);
         expect(await keymaster.listAssets('Alice')).toStrictEqual([did]);
         expect((await keymaster.fetchIdInfo('Alice')).revoking).toBeUndefined();
@@ -548,34 +502,48 @@ describe('listGrants after a revocation that did not take effect', () => {
 });
 
 describe('updateGrant', () => {
-    it('changes the actions and keeps every other field', async () => {
-        const scope = { v: 1, client, nonce: NONCE, label: 'phone', expiresAt: '2028-01-01T00:00:00Z' };
-        const did = await keymaster.createAsset({ memeplexGrant: scope, note: 'kept' }, { registry: BTC });
+    it('changes the actions to any the caller names, and keeps every other member', async () => {
+        const scope = { v: 1, client, nonce: 'Qm9vdHN0cmFwIG5vbmNlMTIz', label: 'phone', expiresAt: '2028-01-01T00:00:00Z' };
+        const did = await keymaster.createAsset({ exampleGrant: scope, note: 'kept' }, { registry: BTC });
 
-        expect(await keymaster.updateGrant(did, { actions: ['memeplex:tag', 'memeplex:post'] })).toBe(true);
-        expect((await keymaster.resolveDID(did)).didDocumentData)
-            .toStrictEqual({ memeplexGrant: { ...scope, actions: ['memeplex:post', 'memeplex:tag'] }, note: 'kept' });
+        expect(await keymaster.updateGrant(did, { actions: ['example:write', 'anything at all'] })).toBe(true);
+        expect(await dataOf(did)).toStrictEqual({ exampleGrant: { ...scope, actions: ['example:write', 'anything at all'] }, note: 'kept' });
     });
 
-    it('keeps a member of the data whose value is null, so the verifier reads a scope update', async () => {
-        const scope = { v: 1, client, nonce: NONCE };
-        const did = await keymaster.createAsset({ memeplexGrant: scope, note: null, kept: { deep: null } }, { registry: BTC });
-        await anchor(100);
+    it('keeps a member of the data whose value is null', async () => {
+        const did = await keymaster.createAsset({ exampleGrant: { client }, note: null, kept: { deep: null } }, { registry: BTC });
 
-        expect(await keymaster.updateGrant(did, { actions: ['memeplex:tag'] })).toBe(true);
-        expect((await keymaster.resolveDID(did)).didDocumentData)
-            .toStrictEqual({ memeplexGrant: { ...scope, actions: ['memeplex:tag'] }, note: null, kept: { deep: null } });
-        await anchor(200);
+        expect(await keymaster.updateGrant(did, { actions: ['example:read'] })).toBe(true);
+        expect(await dataOf(did)).toStrictEqual({ exampleGrant: { client, actions: ['example:read'] }, note: null, kept: { deep: null } });
+    });
 
-        const read = await verified(did);
+    it('removes the actions or the expiry with null, and sets either', async () => {
+        const request = await requestOf({ actions: ['example:read'] });
+        const did = await keymaster.createGrant(request);
 
-        expect(read).toMatchObject({ status: 'valid', pending: 0 });
-        expect(read.status === 'valid' && read.ended).toBeUndefined();
-        expect(read.status === 'valid' && read.versions.map(version => version.actions)).toStrictEqual([undefined, ['memeplex:tag']]);
+        expect(await keymaster.updateGrant(did, { expiresAt: '2028-01-01T00:00:00Z' })).toBe(true);
+        expect(await grantOf(did)).toStrictEqual({ client, request, actions: ['example:read'], expiresAt: '2028-01-01T00:00:00Z' });
+        expect(await keymaster.updateGrant(did, { actions: null, expiresAt: '2029-01-01T00:00:00-08:00' })).toBe(true);
+        expect(await grantOf(did)).toStrictEqual({ client, request, expiresAt: '2029-01-01T00:00:00-08:00' });
+        expect(await keymaster.updateGrant(did, { expiresAt: null })).toBe(true);
+        expect(await grantOf(did)).toStrictEqual({ client, request });
+    });
+
+    it('writes nothing when the change leaves the grant as it is', async () => {
+        const did = await keymaster.createGrant(await requestOf({ actions: ['example:read'], expiresAt: '2028-01-01T00:00:00Z' }));
+        const before = await sequenceOf(did);
+
+        expect(await keymaster.updateGrant(did, { actions: ['example:read'], expiresAt: '2028-01-01T00:00:00Z' })).toBe(true);
+        expect(await keymaster.updateGrant(did, { actions: ['example:read'] })).toBe(true);
+        expect(await sequenceOf(did)).toBe(before);
+
+        expect(await keymaster.updateGrant(did, { actions: ['example:write'] })).toBe(true);
+        expect(await sequenceOf(did)).not.toBe(before);
     });
 
     it('is refused when the grant has changed since it was read, and leaves that change standing', async () => {
-        const did = await keymaster.createGrant(linkFor());
+        const request = await requestOf();
+        const did = await keymaster.createGrant(request);
         const resolve = gatekeeper.resolveDID.bind(gatekeeper);
         let intervened = false;
 
@@ -585,7 +553,7 @@ describe('updateGrant', () => {
 
             if (id === did && !intervened) {
                 intervened = true;
-                expect(await keymaster.updateGrant(did, { actions: ['memeplex:tag'] })).toBe(true);
+                expect(await keymaster.updateGrant(did, { actions: ['example:read'] })).toBe(true);
             }
             return read;
         });
@@ -594,12 +562,127 @@ describe('updateGrant', () => {
             .rejects.toThrow('Invalid operation: previd');
 
         expect(intervened).toBe(true);
-        expect(await grantOf(did)).toStrictEqual({ v: 1, client, nonce: NONCE, actions: ['memeplex:tag'] });
+        expect(await grantOf(did)).toStrictEqual({ client, request, actions: ['example:read'] });
         expect(await sequenceOf(did)).toBe('2');
     });
 
-    it('is read by the verifier as a scope update that does not end the grant', async () => {
-        const did = await keymaster.createGrant(linkFor({ actions: ['memeplex:post', 'memeplex:tag'] }));
+    it.each([
+        ['no change', {}, 'changes: actions or expiresAt is needed'],
+        ['changes that are not an object', 'actions', 'changes: actions or expiresAt is needed'],
+        ['no changes at all', undefined, 'changes: actions or expiresAt is needed'],
+        ['no actions', { actions: [] }, 'changes.actions: a list of at least one action, each once, is needed'],
+        ['an action twice', { actions: ['a', 'a'] }, 'changes.actions: a list of at least one action, each once, is needed'],
+        ['an empty action', { actions: [''] }, 'changes.actions: a list of at least one action, each once, is needed'],
+        ['an expiry that is not a date-time', { expiresAt: '2027-02-30T00:00:00Z' }, 'changes.expiresAt: not a date-time such as 2027-01-31T00:00:00Z'],
+        ['a sound action with an unsound expiry', { actions: ['a'], expiresAt: 'tomorrow' }, 'changes.expiresAt: not a date-time'],
+    ])('refuses %s', async (_name, changes, message) => {
+        const did = await keymaster.createGrant(await requestOf({ actions: ['example:read'] }));
+        const before = await sequenceOf(did);
+
+        await expect(keymaster.updateGrant(did, changes as never)).rejects.toThrow(`Invalid parameter: ${message}`);
+        expect(await sequenceOf(did)).toBe(before);
+    });
+
+    it('finds a grant by its alias', async () => {
+        await keymaster.createGrant(await requestOf(), { alias: 'example-grant' });
+
+        expect(await keymaster.updateGrant('example-grant', { actions: ['example:read'] })).toBe(true);
+        expect((await grantOf('example-grant')).actions).toStrictEqual(['example:read']);
+    });
+
+    it('refuses what is not a live grant of the current ID', async () => {
+        const asset = await keymaster.createAsset({ name: 'not a grant' }, { registry: BTC });
+        const request = await requestOf();
+        const revoked = await keymaster.createGrant(request);
+        const grant = await keymaster.createGrant(await requestOf({ actions: ['example:read'] }));
+        const changes = { actions: ['example:write'] };
+
+        expect(await keymaster.revokeGrant(revoked)).toBe(true);
+
+        for (const did of [asset, revoked, alice]) {
+            await expect(keymaster.updateGrant(did, changes)).rejects.toThrow('Invalid parameter: id: not a grant');
+            await expect(keymaster.revokeGrant(did)).rejects.toThrow('Invalid parameter: id: not a grant');
+        }
+
+        // The request is the client's, and is no grant.
+        await expect(keymaster.updateGrant(request, changes)).rejects.toThrow('Invalid parameter: id: not a grant');
+
+        await keymaster.createId('Bob', { registry: 'hyperswarm' });
+        await expect(keymaster.updateGrant(grant, changes)).rejects.toThrow('Invalid parameter: id: not a grant of the current ID');
+        await expect(keymaster.revokeGrant(grant)).rejects.toThrow('Invalid parameter: id: not a grant of the current ID');
+
+        await keymaster.setCurrentId('Alice');
+        expect((await grantOf(grant)).actions).toStrictEqual(['example:read']);
+        expect((await keymaster.resolveDID(asset)).didDocumentMetadata?.deactivated).toBeFalsy();
+        expect((await keymaster.resolveDID(alice)).didDocumentMetadata?.deactivated).toBeFalsy();
+    });
+});
+
+describe('revokeGrant', () => {
+    it('deletes the grant, which listRevocations has until the deletion is anchored', async () => {
+        const did = await keymaster.createGrant(await requestOf());
+        await anchor(100);
+
+        expect(await keymaster.revokeGrant(did)).toBe(true);
+        expect((await keymaster.resolveDID(did)).didDocumentMetadata?.deactivated).toBe(true);
+        expect(await keymaster.listGrants()).toStrictEqual([]);
+        expect(await keymaster.listRevocations()).toStrictEqual([{ did, registry: BTC, status: 'pending' }]);
+
+        await anchor(200);
+        expect(await keymaster.listRevocations()).toStrictEqual([]);
+    });
+
+    it('revokes a grant by its alias', async () => {
+        const did = await keymaster.createGrant(await requestOf(), { alias: 'example-grant' });
+
+        expect(await keymaster.revokeGrant('example-grant')).toBe(true);
+        expect((await keymaster.resolveDID(did)).didDocumentMetadata?.deactivated).toBe(true);
+    });
+});
+
+describe('an app of its own', () => {
+    it('is granted, listed, changed and revoked by its name alone', async () => {
+        const request = await keymaster.createAsset(
+            { birdwatchGrantRequest: { v: 3, name: 'Birdwatch', registries: ['hyperswarm'], actions: ['sightings:add', 'sightings:edit'], colour: 'teal' } },
+            { registry: 'hyperswarm', controller: 'Client' });
+
+        const did = await keymaster.createGrant(`archon://grant?request=${request}`, { actions: ['sightings:add'] });
+        const grant = { v: 3, client, request, actions: ['sightings:add'] };
+
+        expect(await dataOf(did)).toStrictEqual({ birdwatchGrant: grant });
+        expect(await keymaster.listGrants())
+            .toStrictEqual([{ did, status: 'pending', app: 'birdwatch', grant, request, registry: 'hyperswarm', created: true }]);
+
+        expect(await keymaster.updateGrant(did, { actions: ['sightings:edit', 'sightings:delete'], expiresAt: '2030-01-01T00:00:00Z' })).toBe(true);
+        expect(await dataOf(did))
+            .toStrictEqual({ birdwatchGrant: { ...grant, actions: ['sightings:edit', 'sightings:delete'], expiresAt: '2030-01-01T00:00:00Z' } });
+        expect(await keymaster.listGrants()).toMatchObject([{ did, app: 'birdwatch', created: false }]);
+
+        expect(await keymaster.revokeGrant(did)).toBe(true);
+        expect(await keymaster.listGrants()).toStrictEqual([]);
+        expect((await keymaster.resolveDID(did)).didDocumentMetadata?.deactivated).toBe(true);
+    });
+});
+
+// Memeplex as one app that uses these grants. Its verifier knows nothing of
+// Keymaster: it reads the versions a Gatekeeper resolves.
+describe('a Memeplex grant', () => {
+    const memeplexRequest = (request: Record<string, unknown> = {}) =>
+        requestOf({ v: 1, name: 'Memepool', registries: [BTC, ETH], ...request }, 'memeplex');
+
+    it('is read by the Memeplex verifier as valid, once it is anchored', async () => {
+        const request = await memeplexRequest({ actions: ['memeplex:post', 'memeplex:reply'] });
+        const did = await keymaster.createGrant(request);
+
+        expect(await dataOf(did)).toStrictEqual({ memeplexGrant: { v: 1, client, request, actions: ['memeplex:post', 'memeplex:reply'] } });
+        expect(await verified(did)).toStrictEqual({ status: 'pending', user: alice, client, registry: BTC });
+
+        await anchor(100);
+        expect(await verified(did)).toMatchObject({ status: 'valid', user: alice, client, registry: BTC, pending: 0 });
+    });
+
+    it('has its changes read as scope updates that do not end it', async () => {
+        const did = await keymaster.createGrant(await memeplexRequest({ actions: ['memeplex:post', 'memeplex:tag'] }));
         await anchor(100);
         expect(await keymaster.updateGrant(did, { actions: ['memeplex:tag'], expiresAt: '2028-01-01T00:00:00Z' })).toBe(true);
         await anchor(200);
@@ -617,122 +700,46 @@ describe('updateGrant', () => {
         ]);
     });
 
-    it('widens to every core kind, by null or by naming the core actions', async () => {
-        const did = await keymaster.createGrant(linkFor({ actions: ['memeplex:tag'] }));
+    it('keeps null data through a change, so the verifier still reads a scope update', async () => {
+        const did = await keymaster.createAsset({ memeplexGrant: { v: 1, client }, note: null }, { registry: BTC });
+        await anchor(100);
 
-        expect(await keymaster.updateGrant(did, { actions: null })).toBe(true);
-        expect(await grantOf(did)).toStrictEqual({ v: 1, client, nonce: NONCE });
-
-        expect(await keymaster.updateGrant(did, { actions: ['memeplex:rate'] })).toBe(true);
-        expect(await keymaster.updateGrant(did, { actions: ['memeplex:tag', 'memeplex:rate', 'memeplex:reply', 'memeplex:post'] })).toBe(true);
-        expect(await grantOf(did)).toStrictEqual({ v: 1, client, nonce: NONCE });
-    });
-
-    it('offers the extension kinds the grant lists, and no others', async () => {
-        const did = await keymaster.createGrant(linkFor({ actions: ['memeplex:tag', EXTENSION] }));
-
-        expect(await keymaster.updateGrant(did, { actions: [EXTENSION, 'memeplex:reply', 'memeplex:post', 'memeplex:rate', 'memeplex:tag'] })).toBe(true);
-        expect((await grantOf(did)).actions)
-            .toStrictEqual(['memeplex:post', 'memeplex:reply', 'memeplex:rate', 'memeplex:tag', EXTENSION]);
-        await expect(keymaster.updateGrant(did, { actions: [OTHER_EXTENSION] })).rejects.toThrow(
-            `Invalid parameter: changes.actions: every action must be one of memeplex:post, memeplex:reply, memeplex:rate, memeplex:tag, ${EXTENSION}`);
-
-        expect(await keymaster.updateGrant(did, { actions: ['memeplex:post'] })).toBe(true);
-        await expect(keymaster.updateGrant(did, { actions: [EXTENSION] })).rejects.toThrow('every action must be one of');
-        expect((await grantOf(did)).actions).toStrictEqual(['memeplex:post']);
-    });
-
-    it('sets, changes and removes the expiry, leaving the actions', async () => {
-        const did = await keymaster.createGrant(linkFor({ actions: ['memeplex:tag'] }));
-
-        expect(await keymaster.updateGrant(did, { expiresAt: '2028-01-01T00:00:00Z' })).toBe(true);
-        expect(await grantOf(did)).toStrictEqual({ v: 1, client, actions: ['memeplex:tag'], nonce: NONCE, expiresAt: '2028-01-01T00:00:00Z' });
-        expect(await keymaster.updateGrant(did, { expiresAt: '2029-01-01T00:00:00.000Z' })).toBe(true);
-        expect((await grantOf(did)).expiresAt).toBe('2029-01-01T00:00:00.000Z');
-        expect(await keymaster.updateGrant(did, { expiresAt: null })).toBe(true);
-        expect(await grantOf(did)).toStrictEqual({ v: 1, client, actions: ['memeplex:tag'], nonce: NONCE });
-    });
-
-    it('writes nothing when the change leaves the grant as it is', async () => {
-        const did = await keymaster.createGrant(linkFor({ actions: ['memeplex:tag'], expiresAt: '2028-01-01T00:00:00Z' }));
-        const before = await sequenceOf(did);
-
-        expect(await keymaster.updateGrant(did, { actions: ['memeplex:tag'], expiresAt: '2028-01-01T00:00:00Z' })).toBe(true);
         expect(await keymaster.updateGrant(did, { actions: ['memeplex:tag'] })).toBe(true);
-        expect(await sequenceOf(did)).toBe(before);
+        expect(await dataOf(did)).toStrictEqual({ memeplexGrant: { v: 1, client, actions: ['memeplex:tag'] }, note: null });
+        await anchor(200);
 
-        expect(await keymaster.updateGrant(did, { actions: ['memeplex:post'] })).toBe(true);
-        expect(await sequenceOf(did)).not.toBe(before);
+        const read = await verified(did);
+
+        expect(read.status === 'valid' && read.ended).toBeUndefined();
+        expect(read.status === 'valid' && read.versions.map(version => version.actions)).toStrictEqual([undefined, ['memeplex:tag']]);
     });
 
-    it.each([
-        ['no change', {}, 'changes: actions or expiresAt is needed'],
-        ['changes that are not an object', 'actions', 'changes: actions or expiresAt is needed'],
-        ['no changes at all', undefined, 'changes: actions or expiresAt is needed'],
-        ['no actions', { actions: [] }, 'changes.actions: at least one action is needed'],
-        ['an unknown action', { actions: ['memeplex:delete'] }, 'changes.actions: every action must be one of'],
-        ['an expiry that is not an instant', { expiresAt: '2027-02-30T00:00:00Z' }, 'changes.expiresAt: not an instant such as 2027-01-31T00:00:00Z'],
-        ['a valid action with an invalid expiry', { actions: ['memeplex:post'], expiresAt: 'tomorrow' }, 'changes.expiresAt: not an instant'],
-    ])('refuses %s', async (_name, changes, message) => {
-        const did = await keymaster.createGrant(linkFor({ actions: ['memeplex:tag'] }));
-        const before = await sequenceOf(did);
-
-        await expect(keymaster.updateGrant(did, changes as never)).rejects.toThrow(`Invalid parameter: ${message}`);
-        expect(await sequenceOf(did)).toBe(before);
-    });
-
-    it('finds a grant by its alias', async () => {
-        await keymaster.createGrant(linkFor(), { alias: 'memepool-grant' });
-
-        expect(await keymaster.updateGrant('memepool-grant', { actions: ['memeplex:tag'] })).toBe(true);
-        expect((await grantOf('memepool-grant')).actions).toStrictEqual(['memeplex:tag']);
-    });
-
-    it('refuses what is not a live, valid grant of the current ID', async () => {
-        const asset = await keymaster.createAsset({ name: 'not a grant' }, { registry: BTC });
-        const invalid = await keymaster.createAsset({ memeplexGrant: { v: 1, client, nonce: 'short' } }, { registry: BTC });
-        const revoked = await keymaster.createGrant(linkFor());
-        const grant = await keymaster.createGrant(linkFor({ actions: ['memeplex:tag'] }));
-        const changes = { actions: ['memeplex:post'] };
-
-        expect(await keymaster.revokeGrant(revoked)).toBe(true);
-
-        for (const did of [asset, invalid, revoked, alice]) {
-            await expect(keymaster.updateGrant(did, changes)).rejects.toThrow('Invalid parameter: id: not a grant');
-            await expect(keymaster.revokeGrant(did)).rejects.toThrow('Invalid parameter: id: not a grant');
-        }
-
-        await keymaster.createId('Bob', { registry: 'hyperswarm' });
-        await expect(keymaster.updateGrant(grant, changes)).rejects.toThrow('Invalid parameter: id: not a grant of the current ID');
-        await expect(keymaster.revokeGrant(grant)).rejects.toThrow('Invalid parameter: id: not a grant of the current ID');
-
-        await keymaster.setCurrentId('Alice');
-        expect((await grantOf(grant)).actions).toStrictEqual(['memeplex:tag']);
-        expect((await keymaster.resolveDID(asset)).didDocumentMetadata?.deactivated).toBeFalsy();
-        expect((await keymaster.resolveDID(alice)).didDocumentMetadata?.deactivated).toBeFalsy();
-    });
-});
-
-describe('revokeGrant', () => {
-    it('deletes the grant, which the verifier reads as its end once anchored', async () => {
-        const did = await keymaster.createGrant(linkFor());
+    it('has its revocation read as its end, once that is anchored', async () => {
+        const did = await keymaster.createGrant(await memeplexRequest());
         await anchor(100);
 
         expect(await keymaster.revokeGrant(did)).toBe(true);
-        expect((await keymaster.resolveDID(did)).didDocumentMetadata?.deactivated).toBe(true);
-        expect(await keymaster.listGrants()).toStrictEqual([]);
-        expect(await keymaster.listRevocations()).toStrictEqual([{ did, registry: BTC, status: 'pending' }]);
         expect(await verified(did)).toMatchObject({ status: 'valid', pending: 1 });
 
         await anchor(200);
         expect(await verified(did)).toMatchObject({ status: 'valid', ended: { block: 200 }, pending: 0 });
-        expect(await keymaster.listRevocations()).toStrictEqual([]);
     });
 
-    it('revokes a grant by its alias', async () => {
-        const did = await keymaster.createGrant(linkFor(), { alias: 'memepool-grant' });
+    // Keymaster applies no app's rules. A request that has the shape every
+    // request has is granted, and the app's verifier says what the grant is worth.
+    it('is created when Memeplex would not accept it, and the verifier says so', async () => {
+        const nonsense = await keymaster.createGrant(await memeplexRequest({ actions: ['memeplex:nonsense'] }));
+        const offChain = await keymaster.createGrant(await memeplexRequest({ registries: ['hyperswarm'] }));
+        const offset = await keymaster.createGrant(await memeplexRequest({ expiresAt: '2028-01-01T00:00:00+01:00' }));
+        const version = await keymaster.createGrant(await memeplexRequest({ v: 2 }));
 
-        expect(await keymaster.revokeGrant('memepool-grant')).toBe(true);
-        expect((await keymaster.resolveDID(did)).didDocumentMetadata?.deactivated).toBe(true);
+        expect((await grantOf(nonsense, 'memeplex')).actions).toStrictEqual(['memeplex:nonsense']);
+        expect(await registryOf(offChain)).toBe('hyperswarm');
+        expect((await keymaster.listGrants()).map(each => each.app)).toStrictEqual(['memeplex', 'memeplex', 'memeplex', 'memeplex']);
+
+        expect(await verified(nonsense)).toStrictEqual({ status: 'void', reason: 'invalid' });
+        expect(await verified(offChain)).toStrictEqual({ status: 'void', reason: 'registry' });
+        expect(await verified(offset)).toStrictEqual({ status: 'void', reason: 'invalid' });
+        expect(await verified(version)).toStrictEqual({ status: 'unsupported' });
     });
 });

@@ -172,12 +172,16 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      * @swagger
      * /grants:
      *   post:
-     *     summary: Create a Memeplex grant from a grant link.
+     *     summary: Create the grant a client app's grant request asks for.
      *     description: >
-     *       Creates the grant a client asks for with an `archon://grant?request=` link, as an asset of the granting
-     *       identity. Refuses a link that does not decode or does not carry a valid grant request, a registry a grant
-     *       may not be created on, the request does not list or the node does not support, a granting identity registered on `local`, a request
-     *       that names the granting identity as its client, and a scope wider than the request asks for.
+     *       A grant is what an identity lets a client application do in its name. The client asks by creating an
+     *       asset whose data is `{ "<app>GrantRequest": { … } }`, and the grant is an asset of the granting identity
+     *       whose data is `{ "<app>Grant": { … } }`, naming the same app: `memeplexGrantRequest` is answered by
+     *       `memeplexGrant`. The client is the identity that created the request. Refuses a request that is not
+     *       found, is deleted, is not an asset, has changed since it was created or does not have the shape of a
+     *       request; a registry the request does not list or the node does not support; a request the granting
+     *       identity made itself; and actions the request does not list. Whether the grant is valid under the app's
+     *       own rules is for the app to check.
      *     requestBody:
      *       required: true
      *       content:
@@ -185,20 +189,20 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      *           schema:
      *             type: object
      *             required:
-     *               - link
+     *               - request
      *             properties:
-     *               link:
+     *               request:
      *                 type: string
-     *                 description: The grant link the client presents.
+     *                 description: >
+     *                   The grant request: its DID, an alias for it, or a link `archon://grant?request=<did>`.
      *               options:
      *                 type: object
      *                 properties:
      *                   registry:
      *                     type: string
      *                     description: >
-     *                       One of the registries the request lists, which are among `BTC:mainnet`, `ZEC:mainnet`,
-     *                       `ETH:mainnet` and `SOL:mainnet-beta`. Defaults to the first of those four that the node
-     *                       supports and the request lists.
+     *                       One of the registries the request lists. Defaults to the first of them, in the request's
+     *                       order, that the node supports.
      *                   controller:
      *                     type: string
      *                     description: The ID name or DID that grants. Defaults to the current ID.
@@ -209,16 +213,14 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      *                     type: array
      *                     items:
      *                       type: string
-     *                     description: >
-     *                       A subset of the actions the request asks for, or of the core actions when it lists none.
-     *                       Defaults to what the request asks for.
+     *                     description: Some of the actions the request lists. Defaults to all it lists.
      *                   expiresAt:
      *                     type: string
      *                     format: date-time
      *                     nullable: true
      *                     description: >
      *                       When the grant expires. Defaults to the expiry the request asks for; `null` for a grant
-     *                       that lasts until it is revoked.
+     *                       with none.
      *     responses:
      *       200:
      *         description: The DID of the grant.
@@ -230,7 +232,7 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      *                 did:
      *                   type: string
      *       400:
-     *         description: The link, the registry, the granting identity or the scope is refused.
+     *         description: The request, the registry, the granting identity or the scope is refused.
      *         content:
      *           application/json:
      *             schema:
@@ -239,10 +241,10 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      *                 error:
      *                   type: string
      *   get:
-     *     summary: List the Memeplex grants among an identity's assets.
+     *     summary: List the grants among an identity's assets.
      *     description: >
-     *       A grant whose deletion a node has accepted is not listed: `GET /revocations` has it until the deletion is
-     *       anchored.
+     *       The assets whose data holds one member named `<app>Grant` with a `client`. A grant whose deletion a node
+     *       has accepted is not listed: `GET /revocations` has it until the deletion is anchored.
      *     parameters:
      *       - in: query
      *         name: owner
@@ -273,30 +275,34 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      *                         enum: [anchored, pending, unresolved]
      *                         description: >
      *                           `anchored` when the latest version of the grant is anchored on its registry, `pending`
-     *                           when it is not and so has no effect yet, `unresolved` when the node could not resolve
-     *                           the asset, which may or may not be a grant.
+     *                           when it is not, `unresolved` when the node could not resolve the asset, which may or
+     *                           may not be a grant.
+     *                       app:
+     *                         type: string
+     *                         description: The app the grant names, `memeplex` for a grant held as `memeplexGrant`.
      *                       grant:
      *                         type: object
      *                         required:
-     *                           - v
      *                           - client
      *                         properties:
      *                           v:
-     *                             type: integer
-     *                             enum: [1]
+     *                             type: number
      *                           client:
      *                             type: string
-     *                             description: The DID of the client the grant lets publish.
+     *                             description: The DID of the client the grant is to.
+     *                           request:
+     *                             type: string
+     *                             description: The DID of the request the grant answers.
      *                           actions:
      *                             type: array
      *                             items:
      *                               type: string
-     *                             description: The actions the grant permits. Absent when it permits every core kind.
-     *                           nonce:
-     *                             type: string
      *                           expiresAt:
      *                             type: string
      *                             format: date-time
+     *                       request:
+     *                         type: string
+     *                         description: The DID of the request the grant answers, when the grant names one.
      *                       registry:
      *                         type: string
      *                       created:
@@ -314,8 +320,8 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      */
     router.post('/grants', async (req, res) => {
         try {
-            const { link, options } = req.body;
-            const did = await getKeymaster().createGrant(link, options);
+            const { request, options } = req.body;
+            const did = await getKeymaster().createGrant(request, options);
             res.json({ did });
         } catch (error: any) {
             sendError(res, error);
@@ -336,10 +342,11 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      * @swagger
      * /grants/{id}:
      *   put:
-     *     summary: Change the scope of a Memeplex grant of the current ID.
+     *     summary: Change the scope of a grant of the current ID.
      *     description: >
-     *       Changes `actions`, `expiresAt` or both, and keeps every other field of the grant. Refuses a DID that is
-     *       not a live, valid grant of the current ID.
+     *       Changes `actions`, `expiresAt` or both, and keeps every other member of the grant and of its asset's
+     *       data. Refuses a DID that is not a live grant of the current ID, and a change to a grant that has changed
+     *       since it was read.
      *     parameters:
      *       - in: path
      *         name: id
@@ -364,9 +371,7 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      *                     nullable: true
      *                     items:
      *                       type: string
-     *                     description: >
-     *                       The actions the grant permits, from the core actions and the extension kinds it lists.
-     *                       `null` for every core kind.
+     *                     description: The actions the grant lists. `null` removes the list.
      *                   expiresAt:
      *                     type: string
      *                     format: date-time
@@ -392,9 +397,9 @@ export function createAssetRouter(options: CreateKeymasterRouterOptions): expres
      *                 error:
      *                   type: string
      *   delete:
-     *     summary: Revoke a Memeplex grant of the current ID.
+     *     summary: Revoke a grant of the current ID.
      *     description: >
-     *       Deletes the grant's asset. The client can publish until the deletion is anchored on the grant's registry;
+     *       Deletes the grant's asset. On a chain registry the deletion takes effect once it is anchored;
      *       `GET /revocations` lists it until then.
      *     parameters:
      *       - in: path

@@ -1354,14 +1354,14 @@ program
     });
 
 program
-    .command('create-grant <link>')
-    .description('Create a Memeplex grant from a grant link')
+    .command('create-grant <request>')
+    .description('Create the grant a client app asks for with a grant request')
     .option('-a, --alias <alias>', 'DID alias')
-    .option('-r, --registry <registry>', 'registry to use (default: the first permitted registry the node supports and the link lists)')
-    .option('--actions <actions>', 'comma-separated actions, from those the link asks for (default: all of them)')
-    .option('--expires <instant>', 'when the grant expires, such as 2027-01-31T00:00:00Z (default: what the link asks for)')
-    .option('--no-expiry', 'make a grant that lasts until it is revoked')
-    .action(async (link, options) => {
+    .option('-r, --registry <registry>', 'registry to use, one the request lists (default: the first it lists that the node supports)')
+    .option('--actions <actions>', 'comma-separated actions, from those the request lists (default: all of them)')
+    .option('--expires <instant>', 'when the grant expires, such as 2027-01-31T00:00:00Z (default: what the request asks for)')
+    .option('--no-expiry', 'make a grant with no expiry')
+    .action(async (request, options) => {
         try {
             const { alias, registry, actions, expires, expiry } = options;
 
@@ -1370,7 +1370,7 @@ program
                 return;
             }
 
-            const did = await keymaster.createGrant(link, {
+            const did = await keymaster.createGrant(request, {
                 alias,
                 registry,
                 actions: actions === undefined ? undefined : splitActions(actions),
@@ -1386,7 +1386,7 @@ program
 
 program
     .command('list-grants')
-    .description('List Memeplex grants made by current ID')
+    .description('List grants made by current ID')
     .action(async () => {
         try {
             const grants = await keymaster.listGrants();
@@ -1399,9 +1399,9 @@ program
 
 program
     .command('update-grant <id>')
-    .description('Change the actions or expiry of a Memeplex grant')
+    .description('Change the actions or expiry of a grant')
     .option('--actions <actions>', 'comma-separated actions the grant permits')
-    .option('--all-actions', 'permit every core kind')
+    .option('--all-actions', 'remove the list of actions')
     .option('--expires <instant>', 'when the grant expires, such as 2027-01-31T00:00:00Z')
     .option('--no-expiry', 'remove the expiry')
     .action(async (id, options) => {
@@ -1431,7 +1431,7 @@ program
 
 program
     .command('revoke-grant <id>')
-    .description('Revoke a Memeplex grant')
+    .description('Revoke a grant')
     .action(async (id) => {
         try {
             const ok = await keymaster.revokeGrant(id);

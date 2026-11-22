@@ -1302,7 +1302,7 @@ async def cmd_create_grant(km: Keymaster, args: argparse.Namespace) -> None:
         opts["expiresAt"] = None
     elif args.expires is not None:
         opts["expiresAt"] = args.expires
-    did = await km.create_grant(args.link, opts)
+    did = await km.create_grant(args.request, opts)
     print(did)
     # The registry is named for a command that did not have to name one. The
     # grant exists whether or not the node can be asked.
@@ -1974,21 +1974,21 @@ def build_parser() -> argparse.ArgumentParser:
     add("list-assets", "List assets owned by current ID", cmd_list_assets)
 
     # Grants
-    sp = add("create-grant", "Create a Memeplex grant from a grant link", cmd_create_grant)
-    sp.add_argument("link")
+    sp = add("create-grant", "Create the grant a client app asks for with a grant request", cmd_create_grant)
+    sp.add_argument("request", help="the request's DID, an alias for it, or a link archon://grant?request=<did>")
     sp.add_argument("-a", "--alias", help="DID alias")
-    sp.add_argument("-r", "--registry", help="registry to use (default: the first permitted registry the node supports and the link lists)")
-    sp.add_argument("--actions", help="comma-separated actions, from those the link asks for (default: all of them)")
-    sp.add_argument("--expires", metavar="INSTANT", help="when the grant expires, such as 2027-01-31T00:00:00Z (default: what the link asks for)")
-    sp.add_argument("--no-expiry", action="store_true", help="make a grant that lasts until it is revoked")
-    add("list-grants", "List Memeplex grants made by current ID", cmd_list_grants)
-    sp = add("update-grant", "Change the actions or expiry of a Memeplex grant", cmd_update_grant)
+    sp.add_argument("-r", "--registry", help="registry to use, one the request lists (default: the first it lists that the node supports)")
+    sp.add_argument("--actions", help="comma-separated actions, from those the request lists (default: all of them)")
+    sp.add_argument("--expires", metavar="INSTANT", help="when the grant expires, such as 2027-01-31T00:00:00Z (default: what the request asks for)")
+    sp.add_argument("--no-expiry", action="store_true", help="make a grant with no expiry")
+    add("list-grants", "List grants made by current ID", cmd_list_grants)
+    sp = add("update-grant", "Change the actions or expiry of a grant", cmd_update_grant)
     sp.add_argument("id")
     sp.add_argument("--actions", help="comma-separated actions the grant permits")
-    sp.add_argument("--all-actions", action="store_true", help="permit every core kind")
+    sp.add_argument("--all-actions", action="store_true", help="remove the list of actions")
     sp.add_argument("--expires", metavar="INSTANT", help="when the grant expires, such as 2027-01-31T00:00:00Z")
     sp.add_argument("--no-expiry", action="store_true", help="remove the expiry")
-    sp = add("revoke-grant", "Revoke a Memeplex grant", cmd_revoke_grant)
+    sp = add("revoke-grant", "Revoke a grant", cmd_revoke_grant)
     sp.add_argument("id")
 
     # Polls

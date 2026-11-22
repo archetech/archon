@@ -177,8 +177,8 @@ def test_did_repair_routes_accept_encoded_slashes(monkeypatch):
 def test_grant_routes_accept_encoded_slashes_and_pass_null_changes(monkeypatch):
     calls = []
 
-    async def create(link, options=None):
-        calls.append(("create", link, options))
+    async def create(request, options=None):
+        calls.append(("create", request, options))
         return "did:cid:grant"
 
     async def list_grants(owner=None):
@@ -201,16 +201,16 @@ def test_grant_routes_accept_encoded_slashes_and_pass_null_changes(monkeypatch):
     app.include_router(app_module.protected_api)
     app.dependency_overrides[app_module.require_admin_key] = lambda: None
     client = TestClient(app)
-    link = "archon://grant?request=abc"
+    named = "archon://grant?request=did:cid:request"
     options = {"registry": "ETH:mainnet", "expiresAt": None}
     changes = {"actions": None, "expiresAt": "2028-01-01T00:00:00Z"}
 
-    assert client.post("/api/v1/grants", json={"link": link, "options": options}).json() == {"did": "did:cid:grant"}
+    assert client.post("/api/v1/grants", json={"request": named, "options": options}).json() == {"did": "did:cid:grant"}
     assert client.get("/api/v1/grants").json() == {"grants": []}
     assert client.get("/api/v1/grants", params={"owner": "Alice"}).json() == {"grants": []}
-    assert calls == [("create", link, options), ("list", None), ("list", "Alice")]
+    assert calls == [("create", named, options), ("list", None), ("list", "Alice")]
 
-    for identifier in ["clients/memepool", "Alice / grant", "did:cid:grant"]:
+    for identifier in ["clients/example", "Alice / grant", "did:cid:grant"]:
         path = f"/api/v1/grants/{quote(identifier, safe='')}"
         updated = client.put(path, json={"changes": changes})
         revoked = client.delete(path)

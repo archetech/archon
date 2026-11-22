@@ -1234,9 +1234,9 @@ export default class KeymasterClient implements KeymasterInterface {
         }
     }
 
-    async createGrant(link: string, options?: CreateGrantOptions): Promise<string> {
+    async createGrant(request: string, options?: CreateGrantOptions): Promise<string> {
         try {
-            const response = await this.axios.post(`${this.API}/grants`, { link, options });
+            const response = await this.axios.post(`${this.API}/grants`, { request, options });
             return response.data.did;
         }
         catch (error) {

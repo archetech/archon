@@ -58,7 +58,6 @@ const defaultToolArgs = {
     endpoint: 'https://example.com/didcomm',
     file: inlineFile,
     group: 'did:cid:group',
-    link: 'archon://grant?request=abc',
     groupName: 'Friends',
     id: 'did:cid:asset',
     includeIds: true,
@@ -466,24 +465,24 @@ describe('mcp server tools', () => {
         expect(runtime.keymaster.revokeDID).not.toHaveBeenCalled();
     });
 
-    it('passes a grant link, its options and changes to Keymaster, with null kept', async () => {
+    it('passes a grant request, its options and changes to Keymaster, with null kept', async () => {
         const server = new FakeServer();
         const runtime = mockRuntime();
         registerArchonTools(server, runtime as any, baseConfig);
-        const link = 'archon://grant?request=abc';
+        const request = 'archon://grant?request=did:cid:request';
         const call = (name: string, args: Record<string, unknown>) => server.tools.get(name)!.handler(args);
 
         runtime.keymaster.resolveDID.mockResolvedValue({ didDocumentRegistration: { registry: 'BTC:mainnet' } });
-        expect(expectOk(await call('archon_create_grant', { link }))).toStrictEqual({ did: 'did:cid:grant', registry: 'BTC:mainnet' });
-        expect(runtime.keymaster.createGrant).toHaveBeenLastCalledWith(link, undefined);
+        expect(expectOk(await call('archon_create_grant', { request }))).toStrictEqual({ did: 'did:cid:grant', registry: 'BTC:mainnet' });
+        expect(runtime.keymaster.createGrant).toHaveBeenLastCalledWith(request, undefined);
         expect(runtime.keymaster.resolveDID).toHaveBeenLastCalledWith('did:cid:grant');
 
         runtime.keymaster.resolveDID.mockRejectedValueOnce(new Error('unreachable'));
-        expect(expectOk(await call('archon_create_grant', { link }))).toStrictEqual({ did: 'did:cid:grant' });
+        expect(expectOk(await call('archon_create_grant', { request }))).toStrictEqual({ did: 'did:cid:grant' });
 
-        expectOk(await call('archon_create_grant', { link, registry: 'ETH:mainnet', actions: ['memeplex:tag'], expiresAt: null }));
+        expectOk(await call('archon_create_grant', { request, registry: 'ETH:mainnet', actions: ['example:tag'], expiresAt: null }));
         expect(runtime.keymaster.createGrant)
-            .toHaveBeenLastCalledWith(link, { registry: 'ETH:mainnet', actions: ['memeplex:tag'], expiresAt: null });
+            .toHaveBeenLastCalledWith(request, { registry: 'ETH:mainnet', actions: ['example:tag'], expiresAt: null });
 
         expect(expectOk(await call('archon_list_grants', { owner: 'Alice' }))).toStrictEqual([{ did: 'did:cid:grant', status: 'pending' }]);
         expect(runtime.keymaster.listGrants).toHaveBeenLastCalledWith('Alice');
@@ -495,7 +494,7 @@ describe('mcp server tools', () => {
         expectOk(await call('archon_update_grant', { id: 'did:cid:grant' }));
         expect(runtime.keymaster.updateGrant).toHaveBeenLastCalledWith('did:cid:grant', {});
 
-        expect(expectFail(await call('archon_create_grant', { link, actions: [] }))).toContain('actions');
+        expect(expectFail(await call('archon_create_grant', { request, actions: [] }))).toContain('actions');
         expect(expectFail(await call('archon_revoke_grant', { id: 'did:cid:grant' }))).toContain('Invalid input: expected true');
         expect(runtime.keymaster.revokeGrant).not.toHaveBeenCalled();
 

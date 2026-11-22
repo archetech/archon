@@ -773,7 +773,7 @@ test.each(['Alice / backup', 'Alice/check', 'Alice/repair', 'did:cid:alice'])(
     },
 );
 
-test.each(['clients/memepool', 'Alice / grant', 'did:cid:grant'])(
+test.each(['clients/example', 'Alice / grant', 'did:cid:grant'])(
     'grant routes preserve encoded identifier %s', async identifier => {
         const { app, keymaster } = mount();
         const path = `/grants/${encodeURIComponent(identifier)}`;
@@ -801,18 +801,18 @@ test('metric labels give every asset, and every grant, one label', () => {
     expect(metricLabel('/api/v1/grants')).toBe('/api/v1/grants');
     expect(metricLabel('/api/v1/grants?owner=Alice')).toBe('/api/v1/grants');
     expect(metricLabel('/api/v1/grants/did:cid:abcdef')).toBe('/api/v1/grants/:id');
-    expect(metricLabel(`/api/v1/grants/${encodeURIComponent('clients/memepool')}`)).toBe('/api/v1/grants/:id');
+    expect(metricLabel(`/api/v1/grants/${encodeURIComponent('clients/example')}`)).toBe('/api/v1/grants/:id');
 });
 
-test('grant routes pass the link, its options and the owner', async () => {
+test('grant routes pass the request, its options and the owner', async () => {
     const { app, keymaster } = mount();
-    const link = 'archon://grant?request=abc';
-    const options = { registry: 'ETH:mainnet', actions: ['memeplex:tag'], expiresAt: null };
+    const named = 'archon://grant?request=did:cid:request';
+    const options = { registry: 'ETH:mainnet', actions: ['example:read'], expiresAt: null };
 
-    expect((await request(app).post('/grants').send({ link, options })).status).toBe(200);
+    expect((await request(app).post('/grants').send({ request: named, options })).status).toBe(200);
     expect((await request(app).get('/grants')).status).toBe(200);
     expect((await request(app).get('/grants').query({ owner: 'Alice' })).status).toBe(200);
-    expect(keymaster.createGrant).toHaveBeenCalledWith(link, options);
+    expect(keymaster.createGrant).toHaveBeenCalledWith(named, options);
     expect(keymaster.listGrants).toHaveBeenNthCalledWith(1, undefined);
     expect(keymaster.listGrants).toHaveBeenNthCalledWith(2, 'Alice');
 });

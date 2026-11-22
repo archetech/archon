@@ -1,0 +1,904 @@
+{
+    "description": "The data of assets, and how each is read as a grant request: the app it names, with the member of the request that does not have the shape every request has when there is one, or null when the data holds no one request. Both Keymasters run it: tests/keymaster/grant.test.ts and python/keymaster/tests/test_grant.py.",
+    "cases": [
+        {
+            "name": "the least a request holds",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "hyperswarm"
+                    ]
+                }
+            },
+            "expect": {
+                "app": "example"
+            }
+        },
+        {
+            "name": "everything a request may hold",
+            "data": {
+                "exampleGrantRequest": {
+                    "v": 1,
+                    "name": "Example",
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "actions": [
+                        "example:read",
+                        "example:write"
+                    ],
+                    "expiresAt": "2028-02-29T23:59:59.5Z"
+                }
+            },
+            "expect": {
+                "app": "example"
+            }
+        },
+        {
+            "name": "another app",
+            "data": {
+                "memeplexGrantRequest": {
+                    "v": 1,
+                    "name": "Memepool",
+                    "registries": [
+                        "BTC:mainnet"
+                    ]
+                }
+            },
+            "expect": {
+                "app": "memeplex"
+            }
+        },
+        {
+            "name": "an app named in mixed case with digits",
+            "data": {
+                "myApp2GrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
+                }
+            },
+            "expect": {
+                "app": "myApp2"
+            }
+        },
+        {
+            "name": "an app of one letter",
+            "data": {
+                "xGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
+                }
+            },
+            "expect": {
+                "app": "x"
+            }
+        },
+        {
+            "name": "members of the request that are the app's",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "client": 7,
+                    "nonce": null,
+                    "label": {
+                        "deep": [
+                            1
+                        ]
+                    }
+                }
+            },
+            "expect": {
+                "app": "example"
+            }
+        },
+        {
+            "name": "other members of the data",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
+                },
+                "note": "kept",
+                "exampleGrant": {
+                    "client": "did:cid:x"
+                }
+            },
+            "expect": {
+                "app": "example"
+            }
+        },
+        {
+            "name": "a registry of any name",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "local",
+                        "my chain",
+                        "BTC:signet"
+                    ]
+                }
+            },
+            "expect": {
+                "app": "example"
+            }
+        },
+        {
+            "name": "an expiry with an offset",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2027-06-30T12:00:00+05:30"
+                }
+            },
+            "expect": {
+                "app": "example"
+            }
+        },
+        {
+            "name": "an expiry with a negative offset and a fraction",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2027-06-30T12:00:00.123456-08:00"
+                }
+            },
+            "expect": {
+                "app": "example"
+            }
+        },
+        {
+            "name": "a v with a fraction",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "v": 1.5
+                }
+            },
+            "expect": {
+                "app": "example"
+            }
+        },
+        {
+            "name": "an empty name",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "name": ""
+                }
+            },
+            "expect": {
+                "app": "example"
+            }
+        },
+        {
+            "name": "no member that names an app",
+            "data": {
+                "note": "kept"
+            },
+            "expect": null
+        },
+        {
+            "name": "a grant, which is no request",
+            "data": {
+                "exampleGrant": {
+                    "client": "did:cid:x"
+                }
+            },
+            "expect": null
+        },
+        {
+            "name": "two requests",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
+                },
+                "otherGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
+                }
+            },
+            "expect": null
+        },
+        {
+            "name": "an app that begins with a capital",
+            "data": {
+                "ExampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
+                }
+            },
+            "expect": null
+        },
+        {
+            "name": "an app that begins with a digit",
+            "data": {
+                "1appGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
+                }
+            },
+            "expect": null
+        },
+        {
+            "name": "an app with a hyphen",
+            "data": {
+                "my-appGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
+                }
+            },
+            "expect": null
+        },
+        {
+            "name": "an app with a letter outside ASCII",
+            "data": {
+                "caféGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
+                }
+            },
+            "expect": null
+        },
+        {
+            "name": "no app",
+            "data": {
+                "GrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
+                }
+            },
+            "expect": null
+        },
+        {
+            "name": "a member that only ends like a request",
+            "data": {
+                "exampleGrantRequest ": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
+                }
+            },
+            "expect": null
+        },
+        {
+            "name": "a member in another case",
+            "data": {
+                "examplegrantrequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ]
+                }
+            },
+            "expect": null
+        },
+        {
+            "name": "data that is a list",
+            "data": [
+                {
+                    "exampleGrantRequest": {
+                        "registries": [
+                            "BTC:mainnet",
+                            "ETH:mainnet"
+                        ]
+                    }
+                }
+            ],
+            "expect": null
+        },
+        {
+            "name": "data that is a string",
+            "data": "exampleGrantRequest",
+            "expect": null
+        },
+        {
+            "name": "no data",
+            "data": null,
+            "expect": null
+        },
+        {
+            "name": "a request that is a list",
+            "data": {
+                "exampleGrantRequest": [
+                    {
+                        "registries": [
+                            "BTC:mainnet",
+                            "ETH:mainnet"
+                        ]
+                    }
+                ]
+            },
+            "expect": {
+                "app": "example",
+                "fault": "request"
+            }
+        },
+        {
+            "name": "a request that is a string",
+            "data": {
+                "exampleGrantRequest": "did:cid:x"
+            },
+            "expect": {
+                "app": "example",
+                "fault": "request"
+            }
+        },
+        {
+            "name": "a request that is null",
+            "data": {
+                "exampleGrantRequest": null
+            },
+            "expect": {
+                "app": "example",
+                "fault": "request"
+            }
+        },
+        {
+            "name": "no registries",
+            "data": {
+                "exampleGrantRequest": {
+                    "v": 1
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "registries"
+            }
+        },
+        {
+            "name": "no registries listed",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": []
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "registries"
+            }
+        },
+        {
+            "name": "registries that are not a list",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": "BTC:mainnet"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "registries"
+            }
+        },
+        {
+            "name": "a registry twice",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "BTC:mainnet"
+                    ]
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "registries"
+            }
+        },
+        {
+            "name": "an empty registry",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        ""
+                    ]
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "registries"
+            }
+        },
+        {
+            "name": "a registry that is not a string",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        1
+                    ]
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "registries"
+            }
+        },
+        {
+            "name": "null registries",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": null
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "registries"
+            }
+        },
+        {
+            "name": "no actions listed",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "actions": []
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "actions"
+            }
+        },
+        {
+            "name": "actions that are not a list",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "actions": "example:read"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "actions"
+            }
+        },
+        {
+            "name": "an action twice",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "actions": [
+                        "a",
+                        "a"
+                    ]
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "actions"
+            }
+        },
+        {
+            "name": "an empty action",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "actions": [
+                        ""
+                    ]
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "actions"
+            }
+        },
+        {
+            "name": "an action that is not a string",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "actions": [
+                        true
+                    ]
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "actions"
+            }
+        },
+        {
+            "name": "null actions",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "actions": null
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "actions"
+            }
+        },
+        {
+            "name": "an expiry without a time",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2026-12-31"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "an expiry without a zone",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2026-12-31T00:00:00"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "an expiry with a space for T",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2026-12-31 00:00:00Z"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "an expiry in lower case",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2026-12-31t00:00:00z"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "an expiry followed by a line feed",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2026-12-31T00:00:00Z\n"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "an expiry in digits outside ASCII",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "٢٠٢٦-12-31T00:00:00Z"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "an expiry on a day that does not exist",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2027-02-30T00:00:00Z"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "an expiry on a leap day a century year lacks",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2100-02-29T00:00:00Z"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "an expiry in a month that does not exist",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2026-13-01T00:00:00Z"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "an expiry at an hour that does not exist",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2026-12-31T24:00:00Z"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "an expiry at a second that does not exist",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2026-12-31T23:59:60Z"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "an expiry with an offset that does not exist",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2026-12-31T00:00:00+24:00"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "an expiry with an offset without a colon",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": "2026-12-31T00:00:00+0530"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "an expiry that is a number",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": 1798675200
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "a null expiry",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "expiresAt": null
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "expiresAt"
+            }
+        },
+        {
+            "name": "a name that is not a string",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "name": 7
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "name"
+            }
+        },
+        {
+            "name": "a v that is a string",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "v": "1"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "v"
+            }
+        },
+        {
+            "name": "a v that is a boolean",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "v": true
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "v"
+            }
+        },
+        {
+            "name": "a null v",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "v": null
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "v"
+            }
+        },
+        {
+            "name": "bad registries before bad actions",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [],
+                    "actions": []
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "registries"
+            }
+        },
+        {
+            "name": "bad actions before a bad expiry",
+            "data": {
+                "exampleGrantRequest": {
+                    "registries": [
+                        "BTC:mainnet",
+                        "ETH:mainnet"
+                    ],
+                    "actions": [],
+                    "expiresAt": "never"
+                }
+            },
+            "expect": {
+                "app": "example",
+                "fault": "actions"
+            }
+        }
+    ]
+}

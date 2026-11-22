@@ -13,7 +13,7 @@ import path from 'path';
 type Reply = { status?: number, body: unknown };
 
 const SCRIPT = path.resolve('scripts/archon-cli.js');
-const LINK = 'archon://grant?request=abc';
+const REQUEST = 'archon://grant?request=did:cid:request';
 const GRANTS = [{ did: 'did:cid:grant', status: 'pending', grant: { v: 1, client: 'did:cid:client' }, registry: 'BTC:mainnet', created: true }];
 
 let server: http.Server;
@@ -62,7 +62,7 @@ beforeEach(() => {
         'GET /did/did:cid:grant': () => ({ body: { docs: { didDocumentRegistration: { registry: 'BTC:mainnet' } } } }),
         'PUT /grants/did%3Acid%3Agrant': () => ({ body: { ok: true } }),
         'DELETE /grants/did%3Acid%3Agrant': () => ({ body: { ok: true } }),
-        'DELETE /grants/clients%2Fmemepool': () => ({ body: { ok: true } }),
+        'DELETE /grants/clients%2Fexample': () => ({ body: { ok: true } }),
     };
 });
 
@@ -78,14 +78,14 @@ function run(...args: string[]): Promise<{ status: number, stdout: string, stder
 }
 
 describe('create-grant', () => {
-    it('sends the link alone, prints the DID alone, and says which registry was used', async () => {
-        const { status, stdout, stderr } = await run('create-grant', LINK);
+    it('sends the request as it was named, prints the DID alone, and says which registry was used', async () => {
+        const { status, stdout, stderr } = await run('create-grant', REQUEST);
 
         expect(status).toBe(0);
         expect(stdout).toBe('did:cid:grant');
         expect(stderr).toBe('Created on BTC:mainnet');
         expect(requests).toEqual([
-            { route: 'POST /grants', body: { link: LINK, options: {} } },
+            { route: 'POST /grants', body: { request: REQUEST, options: {} } },
             { route: 'GET /did/did:cid:grant', body: undefined },
         ]);
     });
@@ -93,7 +93,7 @@ describe('create-grant', () => {
     it('succeeds when the grant is made and the node cannot then say where', async () => {
         routes['GET /did/did:cid:grant'] = () => ({ status: 500, body: { error: 'unreachable' } });
 
-        const { status, stdout, stderr } = await run('create-grant', LINK);
+        const { status, stdout, stderr } = await run('create-grant', REQUEST);
 
         expect(status).toBe(0);
         expect(stdout).toBe('did:cid:grant');
@@ -101,46 +101,46 @@ describe('create-grant', () => {
     });
 
     it('sends its options', async () => {
-        const { status } = await run('create-grant', LINK, '-r', 'ETH:mainnet', '-a', 'memepool-grant',
-            '--actions', 'memeplex:post, memeplex:tag,', '--expires', '2028-01-01T00:00:00Z');
+        const { status } = await run('create-grant', REQUEST, '-r', 'ETH:mainnet', '-a', 'example-grant',
+            '--actions', 'example:post, example:tag,', '--expires', '2028-01-01T00:00:00Z');
 
         expect(status).toBe(0);
         expect(requests[0].body).toEqual({
-            link: LINK,
+            request: REQUEST,
             options: {
-                alias: 'memepool-grant',
+                alias: 'example-grant',
                 registry: 'ETH:mainnet',
-                actions: ['memeplex:post', 'memeplex:tag'],
+                actions: ['example:post', 'example:tag'],
                 expiresAt: '2028-01-01T00:00:00Z',
             },
         });
     });
 
     it('with --no-expiry sends a null expiry', async () => {
-        const { status } = await run('create-grant', LINK, '--no-expiry');
+        const { status } = await run('create-grant', REQUEST, '--no-expiry');
 
         expect(status).toBe(0);
-        expect(requests[0].body).toEqual({ link: LINK, options: { expiresAt: null } });
+        expect(requests[0].body).toEqual({ request: REQUEST, options: { expiresAt: null } });
     });
 
     it('sends an empty list of actions for Keymaster to refuse', async () => {
-        await run('create-grant', LINK, '--actions', '');
+        await run('create-grant', REQUEST, '--actions', '');
 
-        expect(requests[0].body).toEqual({ link: LINK, options: { actions: [] } });
+        expect(requests[0].body).toEqual({ request: REQUEST, options: { actions: [] } });
     });
 
     it('fails with the refusal Keymaster gives', async () => {
-        routes['POST /grants'] = () => ({ status: 400, body: { error: 'Error: Invalid parameter: link: not-a-grant-link' } });
+        routes['POST /grants'] = () => ({ status: 400, body: { error: 'Error: Invalid parameter: request: not found' } });
 
-        const { status, stdout, stderr } = await run('create-grant', 'https://example.com');
+        const { status, stdout, stderr } = await run('create-grant', 'did:cid:nothing');
 
         expect(status).toBe(1);
         expect(stdout).toBe('');
-        expect(stderr).toContain('Invalid parameter: link: not-a-grant-link');
+        expect(stderr).toContain('Invalid parameter: request: not found');
     });
 
     it('refuses --expires with --no-expiry before calling Keymaster', async () => {
-        const { status, stderr } = await run('create-grant', LINK, '--expires', '2028-01-01T00:00:00Z', '--no-expiry');
+        const { status, stderr } = await run('create-grant', REQUEST, '--expires', '2028-01-01T00:00:00Z', '--no-expiry');
 
         expect(status).toBe(1);
         expect(stderr).toContain('--expires and --no-expiry cannot be used together');
@@ -160,12 +160,12 @@ describe('list-grants', () => {
 
 describe('update-grant', () => {
     it.each([
-        [['--actions', 'memeplex:tag'], { actions: ['memeplex:tag'] }],
+        [['--actions', 'example:tag'], { actions: ['example:tag'] }],
         [['--all-actions'], { actions: null }],
         [['--expires', '2028-01-01T00:00:00Z'], { expiresAt: '2028-01-01T00:00:00Z' }],
         [['--no-expiry'], { expiresAt: null }],
         [['--all-actions', '--no-expiry'], { actions: null, expiresAt: null }],
-        [['--actions', 'memeplex:tag,memeplex:rate', '--expires', '2028-01-01T00:00:00Z'], { actions: ['memeplex:tag', 'memeplex:rate'], expiresAt: '2028-01-01T00:00:00Z' }],
+        [['--actions', 'example:tag,example:rate', '--expires', '2028-01-01T00:00:00Z'], { actions: ['example:tag', 'example:rate'], expiresAt: '2028-01-01T00:00:00Z' }],
         [[], {}],
     ])('with %j sends the changes asked for', async (options, changes) => {
         const { status, stdout } = await run('update-grant', 'did:cid:grant', ...options);
@@ -176,7 +176,7 @@ describe('update-grant', () => {
     });
 
     it.each([
-        [['--actions', 'memeplex:tag', '--all-actions'], '--actions and --all-actions cannot be used together'],
+        [['--actions', 'example:tag', '--all-actions'], '--actions and --all-actions cannot be used together'],
         [['--expires', '2028-01-01T00:00:00Z', '--no-expiry'], '--expires and --no-expiry cannot be used together'],
     ])('refuses %j before calling Keymaster', async (options, message) => {
         const { status, stderr } = await run('update-grant', 'did:cid:grant', ...options);
@@ -206,10 +206,10 @@ describe('revoke-grant', () => {
     });
 
     it('names an alias with a slash as one path segment', async () => {
-        const { status } = await run('revoke-grant', 'clients/memepool');
+        const { status } = await run('revoke-grant', 'clients/example');
 
         expect(status).toBe(0);
-        expect(requests).toEqual([{ route: 'DELETE /grants/clients%2Fmemepool', body: undefined }]);
+        expect(requests).toEqual([{ route: 'DELETE /grants/clients%2Fexample', body: undefined }]);
     });
 
     it('fails with the refusal Keymaster gives', async () => {
