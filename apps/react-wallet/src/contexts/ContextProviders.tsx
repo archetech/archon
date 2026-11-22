@@ -39,6 +39,8 @@ function Navigation({ children }: { children: ReactNode }) {
         setOpenBrowser,
         pendingChallenge,
         setPendingChallenge,
+        pendingGrant,
+        setPendingGrant,
         pendingHeldDID,
         setPendingHeldDID,
     } = useUIContext();
@@ -53,6 +55,8 @@ function Navigation({ children }: { children: ReactNode }) {
             // that read them simply never fire.
             pendingChallenge={pendingChallenge}
             setPendingChallenge={setPendingChallenge}
+            pendingGrant={pendingGrant}
+            setPendingGrant={setPendingGrant}
             pendingHeldDID={pendingHeldDID}
             setPendingHeldDID={setPendingHeldDID}
             dispatchDeepLink={dispatchDeepLink}

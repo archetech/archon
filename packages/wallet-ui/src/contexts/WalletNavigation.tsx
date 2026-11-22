@@ -36,6 +36,9 @@ export interface WalletNavigation {
     // mechanism, and the screens that read them simply never fire.
     pendingChallenge?: string | null;
     setPendingChallenge?: (value: string | null) => void;
+    // A grant request that arrived by a link, `archon://auth?grant=<DID>`.
+    pendingGrant?: string | null;
+    setPendingGrant?: (value: string | null) => void;
     pendingHeldDID?: string | null;
     setPendingHeldDID?: (value: string | null) => void;
     // Hand a URL back to the host's own deep-link handling.

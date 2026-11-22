@@ -9,12 +9,14 @@ const params = new URLSearchParams(window.location.search);
 const nostrRequestId = params.get("nostrRequest");
 const nostrAutoApprove = params.get("autoApprove") === "true";
 const urlChallenge = params.get("challenge") || "";
+const urlGrant = params.get("grant") || "";
 const urlCredential = params.get("credential");
 const urlAlias = params.get("alias") || "";
 const urlAliasDid = params.get("did") || "";
 
 const PopupUI = () => {
     const [pendingAuth, setPendingAuth] = useState<string>(urlChallenge);
+    const [pendingGrant, setPendingGrant] = useState<string>(urlGrant);
     const [pendingCredential, setPendingCredential] = useState<string>(
         urlCredential ? JSON.parse(decodeURIComponent(urlCredential)) : ""
     );
@@ -23,7 +25,7 @@ const PopupUI = () => {
     );
 
     useEffect(() => {
-        if (nostrRequestId || urlChallenge || urlCredential || (urlAlias && urlAliasDid)) {
+        if (nostrRequestId || urlChallenge || urlGrant || urlCredential || (urlAlias && urlAliasDid)) {
             return;
         }
         const handleMessage = (
@@ -32,7 +34,11 @@ const PopupUI = () => {
             sendResponse: (response?: any) => void
         ) => {
             if (message.action === "SHOW_POPUP_AUTH") {
-                setPendingAuth(message.challenge);
+                if (message.grant) {
+                    setPendingGrant(message.grant);
+                } else {
+                    setPendingAuth(message.challenge);
+                }
                 sendResponse({ success: true });
             } else if (message.action === "SHOW_POPUP_CREDENTIAL") {
                 setPendingCredential(message.credential);
@@ -58,7 +64,7 @@ const PopupUI = () => {
     }
 
     return (
-        <ContextProviders pendingCredential={pendingCredential} pendingAuth={pendingAuth} pendingAlias={pendingAlias} isBrowser={false}>
+        <ContextProviders pendingCredential={pendingCredential} pendingAuth={pendingAuth} pendingGrant={pendingGrant} pendingAlias={pendingAlias} isBrowser={false}>
             <PopupContent />
         </ContextProviders>
     );

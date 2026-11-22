@@ -1975,7 +1975,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Grants
     sp = add("create-grant", "Create the grant a client app asks for with a grant request", cmd_create_grant)
-    sp.add_argument("request", help="the request's DID, an alias for it, or a link archon://auth?challenge=<did>")
+    sp.add_argument("request", help="the request's DID, an alias for it, or a link archon://auth?grant=<did>")
     sp.add_argument("-a", "--alias", help="DID alias")
     sp.add_argument("-r", "--registry", help="registry to use, one the request lists (default: the first it lists that the node supports)")
     sp.add_argument("--actions", help="comma-separated actions, from those the request lists (default: all of them)")

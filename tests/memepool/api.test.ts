@@ -483,7 +483,7 @@ describe('the user\'s grant', () => {
         await anchor();
 
         expect((await agent.post('/api/v1/objects').send({ kind: 'post', text: 'After.' })).status).toBe(403);
-        expect((await agent.get('/api/v1/me')).body.link).toMatch(/^archon:\/\/auth\?challenge=/);
+        expect((await agent.get('/api/v1/me')).body.link).toMatch(/^archon:\/\/auth\?grant=/);
     }, 120_000);
 });
 
@@ -624,7 +624,7 @@ describe('the registries the service can publish on', () => {
         const after = (await agent.get('/api/v1/me')).body;
 
         expect(after.pending).toStrictEqual([]);
-        expect(after.link).toMatch(/^archon:\/\/auth\?challenge=/);
+        expect(after.link).toMatch(/^archon:\/\/auth\?grant=/);
         expect(before.pending).toStrictEqual([]);
     }, 120_000);
 
@@ -658,7 +658,7 @@ describe('the registries the service can publish on', () => {
         const me = (await elsewhere.get('/api/v1/me')).body;
 
         expect(me.grant).toBeUndefined();
-        expect(me.link).toMatch(/^archon:\/\/auth\?challenge=/);
+        expect(me.link).toMatch(/^archon:\/\/auth\?grant=/);
         expect((await elsewhere.post('/api/v1/objects').send({ kind: 'post', text: 'Unreachable.' })).status).toBe(403);
 
         app = on(['BTC:mainnet']);

@@ -332,7 +332,7 @@ A request has `registries`, a list of the registries the grant may be created on
 ```bash
 # Grant what the request asks for. The request is named by its DID, an alias, or a link to it
 keymaster create-grant did:cid:…request
-keymaster create-grant 'archon://auth?challenge=did:cid:…request'
+keymaster create-grant 'archon://auth?grant=did:cid:…request'
 
 # Grant some of the actions it lists, on a chosen registry, until a chosen date-time
 keymaster create-grant did:cid:…request -r ETH:mainnet --actions example:read --expires 2027-01-31T00:00:00Z

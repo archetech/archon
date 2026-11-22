@@ -38,6 +38,8 @@ interface UIContextValue {
     setSelectedTab: Dispatch<SetStateAction<string>>;
     pendingChallenge: string | null;
     setPendingChallenge: Dispatch<SetStateAction<string | null>>;
+    pendingGrant: string | null;
+    setPendingGrant: Dispatch<SetStateAction<string | null>>;
     pendingSubTab: string | null;
     setPendingSubTab: Dispatch<SetStateAction<string | null>>;
     pendingHeldDID: string | null;
@@ -72,6 +74,7 @@ export function UIProvider(
     }) {
     const [pendingTab, setPendingTab] = useState<string | null>(null);
     const [pendingChallenge, setPendingChallenge] = useState<string | null>(null);
+    const [pendingGrant, setPendingGrant] = useState<string | null>(null);
     const [pendingSubTab, setPendingSubTab] = useState<string | null>(null);
     const [pendingHeldDID, setPendingHeldDID] = useState<string | null>(null);
     const [selectedTab, setSelectedTab] = useState<string>("identities");
@@ -250,6 +253,19 @@ export function UIProvider(
     }, []);
 
     useEffect(() => {
+        const onOpenGrant = (e: Event) => {
+            const did = (e as CustomEvent<{ did?: string }>).detail?.did;
+
+            setPendingTab('auth');
+            if (typeof did === 'string' && did.startsWith('did:')) {
+                setPendingGrant(did);
+            }
+        };
+        window.addEventListener('archon:openGrant', onOpenGrant as EventListener);
+        return () => window.removeEventListener('archon:openGrant', onOpenGrant as EventListener);
+    }, []);
+
+    useEffect(() => {
         const onOpenAccept = (e: Event) => {
             const ce = e as CustomEvent<{ did?: string }>;
             const did = ce.detail?.did;
@@ -335,6 +351,8 @@ export function UIProvider(
         setSelectedTab,
         pendingChallenge,
         setPendingChallenge,
+        pendingGrant,
+        setPendingGrant,
         pendingSubTab,
         setPendingSubTab,
         pendingHeldDID,

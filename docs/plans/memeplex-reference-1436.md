@@ -735,24 +735,25 @@ cutoff, even though Archon supports historical resolution by time.
    would have paid to anchor it. Every request lists at least one: a client that can
    publish on all four says so.
 
-   The client presents the request as a **grant link**, which is the link that
-   presents a challenge:
+   The client presents the request as a **grant link**: an auth link, as the one
+   that presents a challenge is (`archon://auth?challenge=<DID>`), with the
+   request's DID as its `grant`:
 
    ```text
-   archon://auth?challenge=<DID of the request>
+   archon://auth?grant=<DID of the request>
    ```
 
    A challenge and a grant request are both a DID that a service made and a wallet
-   answers, so one link names either, and a wallet tells them apart by what the DID
-   holds: a `challenge`, or an app's grant request. A wallet that opens such a link,
-   or scans it, shows a grant request for review and creates nothing until the user
+   answers, and the parameter says which the DID is. A wallet goes by what the DID
+   holds all the same: it answers no challenge from a `grant` link and makes no
+   grant from a `challenge` link, and says so. A wallet that opens a grant link, or
+   scans it, shows the request for review and creates nothing until the user
    approves.
 
    - The client shows the link as a QR code for a wallet on another device, as a
      clickable link for a wallet on the same device (the browser extension or the
      mobile app), and as copyable text that the wallet accepts when pasted. A wallet
-     also accepts the DID alone. A wallet from before grants takes the link for a
-     challenge and says it cannot answer it.
+     also accepts the DID alone.
    - The wallet sends nothing back: the client finds the grant by query (step 3).
 2. The wallet resolves the request and reads who is asking from it. It creates no
    grant, and says why, when the request cannot be resolved, is deleted, is not an

@@ -201,7 +201,7 @@ def test_grant_routes_accept_encoded_slashes_and_pass_null_changes(monkeypatch):
     app.include_router(app_module.protected_api)
     app.dependency_overrides[app_module.require_admin_key] = lambda: None
     client = TestClient(app)
-    named = "archon://auth?challenge=did:cid:request"
+    named = "archon://auth?grant=did:cid:request"
     options = {"registry": "ETH:mainnet", "expiresAt": None}
     changes = {"actions": None, "expiresAt": "2028-01-01T00:00:00Z"}
 

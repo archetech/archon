@@ -1,6 +1,22 @@
 import {Capacitor} from "@capacitor/core";
 import {BarcodeFormat, BarcodeScanner} from "@capacitor-mlkit/barcode-scanning";
 
+// The DID of the grant request a link names: `archon://auth?grant=<DID>`, or a
+// web address that carries `grant`. A link that names a challenge has none.
+export function extractGrant(input: string): string | null {
+    try {
+        const url = new URL(input);
+        const auth = url.protocol === 'archon:' && (url.host || '').toLowerCase() === 'auth';
+        const web = url.protocol === 'https:' || url.protocol === 'http:';
+        const grant = auth || web ? url.searchParams.get('grant') : null;
+
+        return grant?.startsWith('did:') ? grant : null;
+    }
+    catch {
+        return null;
+    }
+}
+
 export function extractDid(input: string): string | null {
     if (!input) {
         return null;

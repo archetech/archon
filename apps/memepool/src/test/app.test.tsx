@@ -145,10 +145,10 @@ describe('signing in', () => {
 
 describe('the grant', () => {
     it('shows the grant link to a user with no grant, and no way to publish', async () => {
-        const { api } = services({ me: { did: ALICE, pending: [], link: 'archon://auth?challenge=abc' } });
+        const { api } = services({ me: { did: ALICE, pending: [], link: 'archon://auth?grant=abc' } });
         render(<App api={api} />);
 
-        expect((await screen.findByLabelText('Or copy the grant link') as HTMLInputElement).value).toBe('archon://auth?challenge=abc');
+        expect((await screen.findByLabelText('Or copy the grant link') as HTMLInputElement).value).toBe('archon://auth?grant=abc');
         expect(screen.getByLabelText('Grant request')).toBeTruthy();
         expect(screen.queryByLabelText('Post')).toBeNull();
     });
@@ -163,13 +163,13 @@ describe('the grant', () => {
     });
 
     it('copies the grant link, and says when it could not', async () => {
-        const { api } = services({ me: { did: ALICE, pending: [], link: 'archon://auth?challenge=abc' } });
+        const { api } = services({ me: { did: ALICE, pending: [], link: 'archon://auth?grant=abc' } });
         const user = userEvent.setup();
         const write = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
         render(<App api={api} />);
 
         await user.click(await screen.findByRole('button', { name: 'Copy grant link' }));
-        expect(write).toHaveBeenCalledWith('archon://auth?challenge=abc');
+        expect(write).toHaveBeenCalledWith('archon://auth?grant=abc');
         expect((await screen.findByRole('status')).textContent).toMatch(/Copied/);
 
         write.mockRejectedValue(new Error('not allowed'));
@@ -178,7 +178,7 @@ describe('the grant', () => {
     });
 
     it('says a grant is waiting to be anchored, and checks again when asked', async () => {
-        const { api, state } = services({ me: { did: ALICE, pending: ['did:cid:grant'], link: 'archon://auth?challenge=abc' } });
+        const { api, state } = services({ me: { did: ALICE, pending: ['did:cid:grant'], link: 'archon://auth?grant=abc' } });
         render(<App api={api} />);
 
         expect(await screen.findByText(/waiting to be anchored on its chain/)).toBeTruthy();
@@ -386,7 +386,7 @@ describe('reading and publishing', () => {
     });
 
     it('stays signed out when an answer about who was signed in arrives afterwards', async () => {
-        const waitingForGrant: Me = { did: ALICE, pending: ['did:cid:grant'], link: 'archon://auth?challenge=abc' };
+        const waitingForGrant: Me = { did: ALICE, pending: ['did:cid:grant'], link: 'archon://auth?grant=abc' };
         const { api } = services({ me: waitingForGrant });
         render(<App api={api} />);
         const user = userEvent.setup();
@@ -447,7 +447,7 @@ describe('reading and publishing', () => {
     });
 
     it('keeps a reader signed in, with the way to sign out, when a check of who they are fails', async () => {
-        const { api } = services({ me: { did: ALICE, pending: ['did:cid:grant'], link: 'archon://auth?challenge=abc' } });
+        const { api } = services({ me: { did: ALICE, pending: ['did:cid:grant'], link: 'archon://auth?grant=abc' } });
         render(<App api={api} />);
         const user = userEvent.setup();
 
@@ -535,7 +535,7 @@ describe('reading and publishing', () => {
     });
 
     it('takes the later of two checks of the grant, whichever answers last', async () => {
-        const waitingForGrant: Me = { did: ALICE, pending: ['did:cid:grant'], link: 'archon://auth?challenge=abc' };
+        const waitingForGrant: Me = { did: ALICE, pending: ['did:cid:grant'], link: 'archon://auth?grant=abc' };
         const { api } = services({ me: waitingForGrant });
         render(<App api={api} />);
         const user = userEvent.setup();
@@ -741,7 +741,7 @@ describe('responding to a post', () => {
 
     it('offers no response to a reader with no grant', async () => {
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
-        const { api } = services({ me: { did: ALICE, pending: [], link: 'archon://auth?challenge=abc' }, timeline: [root] });
+        const { api } = services({ me: { did: ALICE, pending: [], link: 'archon://auth?grant=abc' }, timeline: [root] });
         render(<App api={api} />);
 
         await userEvent.setup().click(await screen.findByRole('button', { name: 'Open' }));

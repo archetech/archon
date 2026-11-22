@@ -249,7 +249,7 @@ function isExpired(grant: GrantData): boolean {
     return isDateTime(grant.expiresAt) && new Date(grant.expiresAt).getTime() <= Date.now();
 }
 
-const NOT_A_LINK = "This is not a link to a grant request. One is archon://auth?challenge= followed by the DID of the request.";
+const NOT_A_LINK = "This is not a link to a grant request. One is archon://auth?grant= followed by the DID of the request.";
 const NOT_FOUND = "This node cannot find the request this link names. A request may last only an hour: ask the client for a new link.";
 
 const LINK_ERRORS: Record<GrantRequestRefusal, string> = {

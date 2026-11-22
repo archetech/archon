@@ -2147,7 +2147,7 @@ export default class Keymaster implements KeymasterInterface {
 
     // Creates the grant a grant request asks for, as an asset of the granting
     // identity, and returns its DID. The request is named by its DID, by an
-    // alias for it, or by a link, `archon://auth?challenge=<did>`. The grant's
+    // alias for it, or by a link, `archon://auth?grant=<did>`. The grant's
     // data is one member, named for the app the request names: a request held
     // as `exampleGrantRequest` makes a grant held as `exampleGrant`.
     //

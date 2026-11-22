@@ -65,7 +65,7 @@ function linkFor(request: Record<string, unknown> = {}, as: Record<string, unkno
         ...as,
     };
 
-    return `archon://auth?challenge=${did}`;
+    return `archon://auth?grant=${did}`;
 }
 
 // Reviewing resolves the request, so the view is read once it has an answer.
@@ -282,9 +282,10 @@ describe('Grants view: a grant link', () => {
 
     it.each([
         ['another archon link', () => 'archon://accept?credential=did:cid:abc', /not a link to a grant request/],
-        ['a link that names no DID', () => 'archon://auth?challenge=!!!', /not a link to a grant request/],
+        ['a link that names a challenge', () => 'archon://auth?challenge=did:cid:abc', /not a link to a grant request/],
+        ['a link that names no DID', () => 'archon://auth?grant=!!!', /not a link to a grant request/],
         ['a DID with a query that asks for an earlier version', () => `${linkFor({}, { didDocumentMetadata: { versionSequence: '1' } })}?versionSequence=1`, /not a link to a grant request/],
-        ['a request the node cannot find', () => `archon://auth?challenge=${REQUEST}9`, /cannot find the request/],
+        ['a request the node cannot find', () => `archon://auth?grant=${REQUEST}9`, /cannot find the request/],
         ['a deleted request', () => linkFor({}, { didDocumentMetadata: { versionSequence: '2', deactivated: true } }), /was withdrawn/],
         ['a DID that is not an asset', () => linkFor({}, { didDocumentRegistration: { type: 'agent' } }), /does not name a grant request/],
         ['a request changed since it was made', () => linkFor({}, { didDocumentMetadata: { versionSequence: '2' } }), /does not say who is asking/],

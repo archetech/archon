@@ -12,7 +12,7 @@ import pytest
 
 from keymaster import cli
 
-REQUEST = "archon://auth?challenge=did:cid:request"
+REQUEST = "archon://auth?grant=did:cid:request"
 GRANTS = [{"did": "did:cid:grant", "status": "pending", "grant": {"v": 1, "client": "did:cid:client"}, "registry": "BTC:mainnet", "created": True}]
 
 

@@ -2629,7 +2629,7 @@ class Keymaster:
         granting identity, and returns its DID.
 
         The request is named by its DID, by an alias for it, or by a link,
-        ``archon://auth?challenge=<did>``. The grant's data is one member, named
+        ``archon://auth?grant=<did>``. The grant's data is one member, named
         for the app the request names: a request held as
         ``exampleGrantRequest`` makes a grant held as ``exampleGrant``.
 

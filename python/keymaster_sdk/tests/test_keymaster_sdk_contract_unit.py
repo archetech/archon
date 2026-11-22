@@ -72,7 +72,7 @@ def test_grant_helpers_call_the_grant_routes(monkeypatch):
 
     monkeypatch.setattr(sdk, "proxy_request", fake_proxy_request)
     monkeypatch.setattr(sdk, "_keymaster_api", "http://unit.test/api/v1")
-    request = "archon://auth?challenge=did:cid:request"
+    request = "archon://auth?grant=did:cid:request"
     options = {"registry": "ETH:mainnet", "actions": ["example:tag"], "expiresAt": None}
     changes = {"actions": None, "expiresAt": "2028-01-01T00:00:00Z"}
 

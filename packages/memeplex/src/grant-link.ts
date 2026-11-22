@@ -7,16 +7,14 @@ import type { ResolvedVersion } from './grant.js';
 //
 // A client asks by creating an asset whose data is
 // `{ "memeplexGrantRequest": { … } }`, as a challenge is an asset, and shows a
-// wallet its DID in the link that shows a challenge's:
+// wallet its DID in an auth link, as a challenge's is shown:
 //
-//   archon://auth?challenge=<DID of the request>
-//
-// A wallet tells a request from a challenge by what the DID holds.
+//   archon://auth?grant=<DID of the request>
 //
 // The client is whoever created the request, which a wallet reads from the
 // request as its node resolves it. Nothing in the request names the client.
 
-export const GRANT_LINK_PREFIX = 'archon://auth?challenge=';
+export const GRANT_LINK_PREFIX = 'archon://auth?grant=';
 
 const DID = /^did:[a-z0-9]+:[A-Za-z0-9._:%-]+$/;
 
@@ -37,7 +35,10 @@ export function parseGrantLink(link: unknown): string | undefined {
     }
 
     const text = link.trim();
-    const did = text.startsWith(GRANT_LINK_PREFIX) ? text.slice(GRANT_LINK_PREFIX.length) : text;
+    // A link built with a URL library has the DID's colons percent-encoded.
+    const did = text.startsWith(GRANT_LINK_PREFIX)
+        ? text.slice(GRANT_LINK_PREFIX.length).replace(/%3A/gi, ':')
+        : text;
 
     return DID.test(did) ? did : undefined;
 }
