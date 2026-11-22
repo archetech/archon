@@ -276,7 +276,8 @@ interface Waiting {
 // A word as a tag is published: lower case, composed, with the spaces inside
 // it made hyphens, so that one tag does not splinter across spellings.
 export function tagWord(written: string): string {
-    return written.normalize('NFC').trim().toLowerCase().replace(/\s+/g, '-');
+    // Composed after lower-casing, which can take a composed letter apart.
+    return written.trim().toLowerCase().normalize('NFC').replace(/\s+/g, '-');
 }
 
 const LIKE = '❤️';
@@ -284,9 +285,18 @@ const LIKE = '❤️';
 // What others have made of an object, and the reader's own responses to it: a
 // boost, a thumb up or down, a like, a tag. Each is an object of the reader's,
 // and counts once its chain has anchored it.
-function Respond({ api, me, target }: { api: Api; me: Me; target: Publication }) {
+// A response the reader has sent that its chain has not anchored yet, and how
+// to tell from what the indexer shows that it has been.
+interface Sent {
+    what: string;
+    shown: (responses: Responses) => boolean;
+}
+
+function Respond({ api, me, grants, target }: { api: Api; me: Me; grants: Set<string>; target: Publication }) {
     const [responses, setResponses] = useState<Responses | null>(null);
-    const [sent, setSent] = useState<string[]>([]);
+    const [sent, setSent] = useState<Sent[]>([]);
+    // The rating the reader made here, before the indexer shows it.
+    const [rated, setRated] = useState<string | undefined>(undefined);
     const [word, setWord] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
@@ -300,6 +310,8 @@ function Respond({ api, me, target }: { api: Api; me: Me; target: Publication })
 
             if (mine === reads.current) {
                 setResponses(read);
+                // What the indexer shows has been anchored, and waits no more.
+                setSent(current => current.filter(each => !each.shown(read)));
             }
         }
         catch (failure) {
@@ -316,15 +328,20 @@ function Respond({ api, me, target }: { api: Api; me: Me; target: Publication })
     }, [load]);
 
     const about = { target: target.did, targetVersion: target.versions[target.current ?? 0]?.opid };
-    // The reader has one rating of an object: a second thumb changes it.
-    const mine = responses?.ratings.ratings.find(each => each.memeplex?.author === me.did);
+    // The reader has one rating of an object: a second thumb changes it. It is
+    // one this service can change, made here or shown by the indexer under a
+    // grant of the reader's to this service. A rating made through another
+    // client is left alone, and a new one made, which counts as the later.
+    const mine = rated ?? responses?.ratings.ratings.find(
+        each => each.memeplex?.author === me.did && grants.has(String(each.memeplex.grant)),
+    )?.did;
 
-    const send = async (what: string, act: () => Promise<unknown>) => {
+    const send = async (what: string, shown: Sent['shown'], act: () => Promise<unknown>) => {
         setBusy(true);
         setError('');
         try {
             await act();
-            setSent(current => [...current, what]);
+            setSent(current => [...current, { what, shown }]);
         }
         catch (failure) {
             setError(message(failure));
@@ -334,12 +351,34 @@ function Respond({ api, me, target }: { api: Api; me: Me; target: Publication })
         }
     };
 
-    const rate = (rating: 0 | 1) => send(rating ? 'Your thumb up' : 'Your thumb down', () => {
-        const object = { kind: 'rating', ...about, rating, min: 0, max: 1 };
+    const byMe = (each: Publication) => each.memeplex?.author === me.did;
 
-        return mine?.did ? api.edit(mine.did, object) : api.publish(object);
-    });
-    const tag = (value: string, what: string) => send(what, () => api.publish({ kind: 'tag', ...about, tag: value }));
+    const rate = (rating: 0 | 1) => send(
+        rating ? 'Your thumb up' : 'Your thumb down',
+        read => read.ratings.ratings.some(each => byMe(each) && each.memeplex?.rating === rating),
+        async () => {
+            const object = { kind: 'rating', ...about, rating, min: 0, max: 1 };
+
+            if (mine) {
+                await api.edit(mine, object);
+            }
+            else {
+                setRated(await api.publish(object));
+            }
+        },
+    );
+    const tag = (value: string, what: string) => send(
+        what,
+        read => read.tags.some(each => each.tag === value && each.authors.includes(me.did)),
+        () => api.publish({ kind: 'tag', ...about, tag: value }),
+    );
+    const boost = () => {
+        let did: string | undefined;
+
+        return send('Your boost', read => read.boosts.some(each => each.did === did), async () => {
+            did = await api.publish({ kind: 'post', ...about });
+        });
+    };
 
     return (
         <div className="respond">
@@ -358,9 +397,11 @@ function Respond({ api, me, target }: { api: Api; me: Me; target: Publication })
             {error && <p role="alert" className="error">{error}</p>}
             {me.grant && (
                 <>
-                    <button className="quiet" disabled={busy} onClick={() => send('Your boost', () => api.publish({ kind: 'post', ...about }))}>Boost</button>
-                    <button className="quiet" disabled={busy} onClick={() => rate(1)} aria-label="Thumb up">👍</button>
-                    <button className="quiet" disabled={busy} onClick={() => rate(0)} aria-label="Thumb down">👎</button>
+                    <button className="quiet" disabled={busy} onClick={boost}>Boost</button>
+                    {/* Not until the ratings have been read: a thumb has to know
+                        whether the reader has a rating to change. */}
+                    <button className="quiet" disabled={busy || !responses} onClick={() => rate(1)} aria-label="Thumb up">👍</button>
+                    <button className="quiet" disabled={busy || !responses} onClick={() => rate(0)} aria-label="Thumb down">👎</button>
                     <button className="quiet" disabled={busy} onClick={() => tag(LIKE, 'Your like')} aria-label="Like">{LIKE}</button>
                     <label className="inline">
                         Tag
@@ -375,7 +416,7 @@ function Respond({ api, me, target }: { api: Api; me: Me; target: Publication })
                     </button>
                 </>
             )}
-            {sent.map((what, index) => <p key={index} className="muted">{what} is waiting to be anchored.</p>)}
+            {sent.map((each, index) => <p key={index} className="muted">{each.what} is waiting to be anchored.</p>)}
             <button className="quiet" onClick={load}>Refresh counts</button>
         </div>
     );
@@ -383,7 +424,7 @@ function Respond({ api, me, target }: { api: Api; me: Me; target: Publication })
 
 // The reader's own post or reply, being rewritten. Its kind and what it answers
 // stay as they are: an edit that changed them would not be the same object.
-function Edit({ api, publication, onDone }: { api: Api; publication: Publication; onDone: (edited: boolean) => void }) {
+function Edit({ api, publication, onDone }: { api: Api; publication: Publication; onDone: (saved?: string) => void }) {
     const object = publication.memeplex!;
     const [text, setText] = useState(object.text ?? '');
     const [busy, setBusy] = useState(false);
@@ -397,7 +438,7 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
 
             void _v; void _author; void _grant;
             await api.edit(publication.did!, { ...fields, text: text.trim() });
-            onDone(true);
+            onDone(text.trim());
         }
         catch (failure) {
             setError(message(failure));
@@ -413,16 +454,20 @@ function Edit({ api, publication, onDone }: { api: Api; publication: Publication
             </label>
             {error && <p role="alert" className="error">{error}</p>}
             <button disabled={busy || !text.trim() || text.trim() === object.text} onClick={save}>Save</button>{' '}
-            <button className="quiet" disabled={busy} onClick={() => onDone(false)}>Cancel</button>
+            <button className="quiet" disabled={busy} onClick={() => onDone()}>Cancel</button>
         </div>
     );
 }
 
-function Thread({ api, me, root, mine, waiting, onPublished, onBack }: {
-    api: Api; me: Me; root: Publication; mine: boolean; waiting: Waiting[]; onPublished: (waiting: Waiting) => void; onBack: () => void;
+function Thread({ api, me, grants, root: opened, mine, waiting, onPublished, onBack }: {
+    api: Api; me: Me; grants: Set<string>; root: Publication; mine: boolean; waiting: Waiting[];
+    onPublished: (waiting: Waiting) => void; onBack: () => void;
 }) {
+    // The post as the indexer last showed it, which an edit changes once it is anchored.
+    const [root, setRoot] = useState(opened);
     const [editing, setEditing] = useState(false);
-    const [edited, setEdited] = useState(false);
+    // The text of an edit that its chain has not anchored yet.
+    const [edited, setEdited] = useState<string | undefined>(undefined);
     const [replies, setReplies] = useState<Reply[] | null>(null);
     const [error, setError] = useState('');
     const reads = useRef(0);
@@ -431,10 +476,14 @@ function Thread({ api, me, root, mine, waiting, onPublished, onBack }: {
         const mine = reads.current += 1;
 
         try {
-            const thread = await api.thread(root.did!);
+            const [thread, latest] = await Promise.all([api.thread(opened.did!), api.publication(opened.did!)]);
 
             if (mine === reads.current) {
                 setReplies(thread);
+                if (latest) {
+                    setRoot(latest);
+                    setEdited(text => (latest.memeplex?.text === text ? undefined : text));
+                }
                 setError('');
             }
         }
@@ -443,7 +492,7 @@ function Thread({ api, me, root, mine, waiting, onPublished, onBack }: {
                 setError(message(failure));
             }
         }
-    }, [api, root.did]);
+    }, [api, opened.did]);
 
     useEffect(() => {
         load();
@@ -466,12 +515,13 @@ function Thread({ api, me, root, mine, waiting, onPublished, onBack }: {
             <button className="quiet" onClick={onBack}>Back</button>{' '}
             <button className="quiet" onClick={load}>Refresh</button>
             <Post publication={root} />
-            {mine && root.memeplex?.text !== undefined && !editing && (
+            {/* One edit at a time: the next is of the post as the last one left it. */}
+            {mine && root.memeplex?.text !== undefined && !editing && edited === undefined && (
                 <button className="quiet" onClick={() => setEditing(true)}>Edit</button>
             )}
-            {editing && <Edit api={api} publication={root} onDone={saved => { setEditing(false); setEdited(current => current || saved); }} />}
-            {edited && <p className="muted">Your edit is waiting to be anchored.</p>}
-            <Respond api={api} me={me} target={root} />
+            {editing && <Edit api={api} publication={root} onDone={saved => { setEditing(false); setEdited(saved); }} />}
+            {edited !== undefined && <p className="muted">Your edit is waiting to be anchored.</p>}
+            <Respond api={api} me={me} grants={grants} target={root} />
             {error && <p role="alert" className="error">{error}</p>}
             {replies === null && !error && <p className="muted">Loading replies…</p>}
             {replies?.map(each => (
@@ -602,6 +652,7 @@ function Reader({ api, me, onCheck, onSignedOut }: { api: Api; me: Me; onCheck: 
                 <Thread
                     api={api}
                     me={me}
+                    grants={grants}
                     root={open}
                     mine={changeable(open)}
                     waiting={waiting}

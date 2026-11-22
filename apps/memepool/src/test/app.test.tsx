@@ -599,7 +599,7 @@ describe('responding to a post', () => {
 
     it('edits the rating the reader already has, where a second would not count', async () => {
         const made = services({ me: granted, timeline: [root] });
-        made.state.responses = { boosts: [], ratings: { ratings: [post('did:cid:myrating', ALICE, '')], mean: 1 }, tags: [] };
+        made.state.responses = { boosts: [], ratings: { ratings: [under(post('did:cid:myrating', ALICE, ''), 'did:cid:grant')], mean: 1 }, tags: [] };
         localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
         render(<App api={made.api} />);
         const user = userEvent.setup();
@@ -612,6 +612,64 @@ describe('responding to a post', () => {
             { did: 'did:cid:myrating', object: { kind: 'rating', ...about, rating: 0, min: 0, max: 1 } },
         ]));
         expect(made.state.published).toStrictEqual([]);
+    });
+
+    it('makes a rating of its own when the reader\'s is one this service cannot change', async () => {
+        const made = services({ me: granted, timeline: [root] });
+        made.state.responses = { boosts: [], ratings: { ratings: [under(post('did:cid:elsewhere', ALICE, ''), 'did:cid:another-client')], mean: 1 }, tags: [] };
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        render(<App api={made.api} />);
+        const user = userEvent.setup();
+
+        await user.click(await screen.findByRole('button', { name: 'Open' }));
+        await screen.findByText(/rated 100% by 1/);
+        await user.click(screen.getByRole('button', { name: 'Thumb down' }));
+
+        await waitFor(() => expect(made.state.published).toStrictEqual([{ kind: 'rating', ...about, rating: 0, min: 0, max: 1 }]));
+        expect(made.state.edited).toStrictEqual([]);
+    });
+
+    it('changes the rating it has just made when the reader thinks again, before the indexer shows it', async () => {
+        const { state, user } = await opened();
+
+        await user.click(screen.getByRole('button', { name: 'Thumb up' }));
+        await screen.findByText('Your thumb up is waiting to be anchored.');
+        await user.click(screen.getByRole('button', { name: 'Thumb down' }));
+
+        await waitFor(() => expect(state.edited).toStrictEqual([
+            { did: 'did:cid:new1', object: { kind: 'rating', ...about, rating: 0, min: 0, max: 1 } },
+        ]));
+        expect(state.published).toHaveLength(1);
+    });
+
+    it('takes no thumb until it knows whether the reader has a rating', async () => {
+        localStorage.setItem('memepool.follows', JSON.stringify([BOB]));
+        const { api } = services({ me: granted, timeline: [root] });
+        vi.mocked(api.responses).mockReturnValue(new Promise(() => undefined));
+        render(<App api={api} />);
+
+        await userEvent.setup().click(await screen.findByRole('button', { name: 'Open' }));
+
+        expect((await screen.findByRole('button', { name: 'Thumb up' }) as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole('button', { name: 'Boost' }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it('stops saying a response is waiting once the indexer shows it', async () => {
+        const { state, user } = await opened();
+
+        await user.click(screen.getByRole('button', { name: 'Boost' }));
+        await user.click(screen.getByRole('button', { name: 'Like' }));
+        await screen.findByText('Your like is waiting to be anchored.');
+
+        state.responses = { boosts: [post('did:cid:new1', ALICE, '')], ratings: { ratings: [] }, tags: [] };
+        await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
+
+        await waitFor(() => expect(screen.queryByText('Your boost is waiting to be anchored.')).toBeNull());
+        expect(screen.getByText('Your like is waiting to be anchored.')).toBeTruthy();
+
+        state.responses = { ...state.responses, tags: [{ tag: '❤️', authors: [ALICE] }] };
+        await user.click(screen.getByRole('button', { name: 'Refresh counts' }));
+        await waitFor(() => expect(screen.queryByText(/is waiting to be anchored/)).toBeNull());
     });
 
     it('says why a response was refused', async () => {
@@ -639,6 +697,9 @@ describe('responding to a post', () => {
         expect(tagWord('  Zero  Knowledge ')).toBe('zero-knowledge');
         expect(tagWord('Cafe\u0301')).toBe('caf\u00e9');
         expect(tagWord('   ')).toBe('');
+        // Lower-casing takes this letter apart; what is published is composed.
+        expect(tagWord('J\u030c')).toBe('\u01f0');
+        expect(tagWord('J\u030c')).toBe(tagWord('\u01f0'));
     });
 });
 
@@ -659,6 +720,17 @@ describe('editing', () => {
             { did: 'did:cid:1', object: { kind: 'reply', target: 'did:cid:0', targetVersion: 'op-0', text: 'A better reply.' } },
         ]));
         expect(await screen.findByText('Your edit is waiting to be anchored.')).toBeTruthy();
+        // One edit at a time, and the post is as it was until the edit is anchored.
+        expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+        expect(screen.getByText('A reply.')).toBeTruthy();
+
+        vi.mocked(api.publication).mockResolvedValue({ ...mine, current: 1, memeplex: { ...mine.memeplex!, text: 'A better reply.' } });
+        await user.click(screen.getByRole('button', { name: 'Refresh' }));
+
+        expect(await screen.findByText('A better reply.')).toBeTruthy();
+        await waitFor(() => expect(screen.queryByText('Your edit is waiting to be anchored.')).toBeNull());
+        await user.click(screen.getByRole('button', { name: 'Edit' }));
+        expect((screen.getByLabelText('Edit') as HTMLTextAreaElement).value).toBe('A better reply.');
     });
 
     it('offers no edit of another author\'s post, or of one published through another client', async () => {
