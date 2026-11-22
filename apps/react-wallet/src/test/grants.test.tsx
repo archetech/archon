@@ -197,6 +197,25 @@ describe('Grants view: a grant link', () => {
         expect((screen.getByRole('button', { name: 'Create Grant' }) as HTMLButtonElement).disabled).toBe(true);
     });
 
+    it('follows the node when a registry it was offering goes', async () => {
+        const shown = view();
+        const user = await review(linkFor({ registries: ['BTC:mainnet', 'ZEC:mainnet'] }));
+        const props = { keymaster: keymaster as any, identity: 'Alice', notify };
+
+        shown.rerender(<GrantsView {...props} registries={['hyperswarm', 'ZEC:mainnet']} />);
+        await user.click(screen.getByRole('button', { name: 'Create Grant' }));
+        await waitFor(() => expect(keymaster.createAsset).toHaveBeenCalledTimes(1));
+        expect(keymaster.createAsset.mock.calls[0][1].registry).toBe('ZEC:mainnet');
+    });
+
+    it('creates nothing once the node supports none of the registries it was offering', async () => {
+        const shown = view();
+        await review(linkFor({ registries: ['BTC:mainnet'] }));
+
+        shown.rerender(<GrantsView keymaster={keymaster as any} identity="Alice" notify={notify} registries={['hyperswarm', 'ZEC:mainnet']} />);
+        expect((screen.getByRole('button', { name: 'Create Grant' }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
     it('does not carry one request\'s registry over to another that does not list it', async () => {
         view();
         const user = await review(linkFor({ registries: ['BTC:mainnet'] }));

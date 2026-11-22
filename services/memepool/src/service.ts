@@ -87,6 +87,15 @@ export async function startMemepool(
 
     log.log(`Memepool is ${did}`);
 
+    // Keymaster creates what a local identity makes on `local`, whatever
+    // registry is asked for, and nothing there is attributed. Such a service
+    // would take grants and publish nothing under them.
+    const own = await keymaster.resolveDID(did);
+
+    if (own.didDocumentRegistration?.registry === 'local') {
+        throw new Error(`Memepool's identity ${settings.name} is registered on local, so nothing it publishes can be on a grant's registry. Give the service a wallet whose identity is on another registry (ARCHON_MEMEPOOL_REGISTRY, which is used when the identity is created).`);
+    }
+
     const app = createMemepoolApp({
         client,
         keymaster,

@@ -42,7 +42,7 @@ beforeEach(async () => {
     dirs = [];
     running = [];
     const gatekeeper = new Gatekeeper({
-        db: new DbJsonMemory('memepool-service'), ipfs: new MemoryClient(), registries: ['hyperswarm', 'BTC:mainnet'],
+        db: new DbJsonMemory('memepool-service'), ipfs: new MemoryClient(), registries: ['local', 'hyperswarm', 'BTC:mainnet'],
         console: { log: () => undefined, error: () => undefined, time: () => undefined, timeEnd: () => undefined } as never,
     });
 
@@ -98,6 +98,10 @@ it('is the same client at the next start, and another with another data director
     expect(warned).toHaveLength(2);
     expect(elsewhere.did).not.toBe(first.did);
 }, 60_000);
+
+it('does not start as an identity registered on local, which could publish on no grant\'s registry', async () => {
+    await expect(start({ registry: 'local' })).rejects.toThrow(/registered on local/);
+});
 
 it('does not start with no passphrase, or with the wrong one for its wallet', async () => {
     await expect(start({ passphrase: '' })).rejects.toThrow('ARCHON_MEMEPOOL_WALLET_PASSPHRASE is not set');

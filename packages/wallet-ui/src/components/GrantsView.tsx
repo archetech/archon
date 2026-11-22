@@ -241,7 +241,7 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
     const [request, setRequest] = useState<Record<string, any> | null>(null);
     const [linkError, setLinkError] = useState("");
     const [scope, setScope] = useState<Scope>(scopeOf(undefined, undefined));
-    const [registry, setRegistry] = useState("");
+    const [chosen, setRegistry] = useState("");
     const [busy, setBusy] = useState(false);
     const [editing, setEditing] = useState<{ grant: HeldGrant; scope: Scope } | null>(null);
     const [revoking, setRevoking] = useState<HeldGrant | null>(null);
@@ -252,6 +252,8 @@ export default function GrantsView({ keymaster, identity, sessionKey = identity,
     const supported = PERMITTED_REGISTRIES.filter(name => registries.includes(name));
     const asked: string[] = request?.registries ?? [];
     const permitted = supported.filter(name => asked.includes(name));
+    // The choice holds only while it is one of the registries on offer.
+    const registry = permitted.find(name => name === chosen) ?? permitted[0] ?? "";
 
     const showRevocations = useCallback(() => setRevocations(tracked(sessionKey)), [sessionKey]);
 
