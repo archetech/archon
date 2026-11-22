@@ -507,9 +507,13 @@ describe('Grants view: the grants an identity holds', () => {
             [GRANT]: doc({ exampleGrant: { client: CLIENT, actions: 'read' } }),
             'did:cid:empty': doc({ exampleGrant: { client: CLIENT, actions: [] } }),
             'did:cid:when': doc({ exampleGrant: { client: CLIENT, expiresAt: { toString: null } } }),
+            'did:cid:whenever': doc({ exampleGrant: { client: CLIENT, expiresAt: 'not-a-date' } }),
         });
         view();
-        const [odd, empty, when] = await screen.findAllByTestId('grant');
+        const [odd, empty, when, whenever] = await screen.findAllByTestId('grant');
+
+        expect(within(whenever).getByText('In a form this wallet cannot read')).toBeTruthy();
+        expect((within(whenever).getByRole('button', { name: 'Change' }) as HTMLButtonElement).disabled).toBe(true);
 
         expect(within(when).getByText('In a form this wallet cannot read')).toBeTruthy();
         expect((within(when).getByRole('button', { name: 'Change' }) as HTMLButtonElement).disabled).toBe(true);

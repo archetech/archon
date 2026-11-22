@@ -42,6 +42,8 @@ describe('the Auth tab', () => {
 
         expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toStrictEqual(['Sign in', 'Grants']);
         expect(screen.getByRole('tab', { name: 'Sign in' }).getAttribute('aria-selected')).toBe('true');
+        expect(screen.getByRole('tabpanel', { name: 'Sign in' })).toBeTruthy();
+        expect(screen.queryByRole('tabpanel', { name: 'Grants' })).toBeNull();
         expect(screen.getByLabelText('Challenge')).toBeTruthy();
         expect(screen.queryByLabelText('Grant link')).toBeNull();
         expect(keymaster.listAssets).not.toHaveBeenCalled();
@@ -54,6 +56,7 @@ describe('the Auth tab', () => {
         await user.click(screen.getByRole('tab', { name: 'Grants' }));
 
         expect(await screen.findByLabelText('Grant link')).toBeTruthy();
+        expect(within(screen.getByRole('tabpanel', { name: 'Grants' })).getByLabelText('Grant link')).toBeTruthy();
         expect(within(await screen.findByTestId('grant')).getByText('example')).toBeTruthy();
         expect(keymaster.listAssets).toHaveBeenCalledWith('Alice');
         // Signing in stays mounted, out of sight.

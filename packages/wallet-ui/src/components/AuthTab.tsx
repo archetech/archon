@@ -602,17 +602,15 @@ function AuthTab() {
                 aria-label="Authentication and grants"
                 sx={{ borderBottom: 1, borderColor: "divider", mb: 1 }}
             >
-                <Tab label="Sign in" value="sign-in" />
-                <Tab label="Grants" value="grants" />
+                <Tab label="Sign in" value="sign-in" id="auth-tab-sign-in" aria-controls="auth-panel-sign-in" />
+                <Tab label="Grants" value="grants" id="auth-tab-grants" aria-controls="auth-panel-grants" />
             </Tabs>
-            <Box role="tabpanel" hidden={section !== "sign-in"}>
+            <Box role="tabpanel" id="auth-panel-sign-in" aria-labelledby="auth-tab-sign-in" hidden={section !== "sign-in"}>
                 <SignIn />
             </Box>
-            {section === "grants" && (
-                <Box role="tabpanel">
-                    <GrantsTab />
-                </Box>
-            )}
+            <Box role="tabpanel" id="auth-panel-grants" aria-labelledby="auth-tab-grants" hidden={section !== "grants"}>
+                {section === "grants" && <GrantsTab />}
+            </Box>
         </Box>
     );
 }

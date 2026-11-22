@@ -19,7 +19,7 @@ import {
 } from "@mui/material";
 import { VerifiedUser } from "@mui/icons-material";
 import type { KeymasterInterface } from "@didcid/clients/keymaster-types";
-import { anchoredOn, grantIn, grantMember, grantRequestId, grantRequestOf } from "@didcid/keymaster/grant";
+import { anchoredOn, grantIn, grantMember, grantRequestId, grantRequestOf, isDateTime } from "@didcid/keymaster/grant";
 import type { GrantRequestRefusal } from "@didcid/keymaster/grant";
 import PageHeader from "./layout/PageHeader";
 import EmptyState from "./layout/EmptyState";
@@ -169,7 +169,7 @@ function readable(grant: GrantData): boolean {
     const { actions, expiresAt } = grant as { actions?: unknown; expiresAt?: unknown };
 
     return (actions === undefined || (Array.isArray(actions) && actions.every(action => typeof action === "string")))
-        && (expiresAt === undefined || typeof expiresAt === "string");
+        && (expiresAt === undefined || isDateTime(expiresAt));
 }
 
 // The `actions` a scope stands for: none when none are listed, which a grant
@@ -237,11 +237,11 @@ function expiryText(grant: GrantData): string {
         return "Never";
     }
 
-    return typeof expiresAt === "string" ? new Date(expiresAt).toLocaleString() : "In a form this wallet cannot read";
+    return isDateTime(expiresAt) ? new Date(expiresAt).toLocaleString() : "In a form this wallet cannot read";
 }
 
 function isExpired(grant: GrantData): boolean {
-    return typeof grant.expiresAt === "string" && new Date(grant.expiresAt).getTime() <= Date.now();
+    return isDateTime(grant.expiresAt) && new Date(grant.expiresAt).getTime() <= Date.now();
 }
 
 const NOT_A_LINK = "This is not a grant link. A grant link is archon://grant?request= followed by the DID of a request.";
