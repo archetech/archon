@@ -29,6 +29,8 @@ const config = {
     // With it, a challenge names the service's callback and a wallet sends its
     // answer there.
     publicURL: env.ARCHON_MEMEPOOL_PUBLIC_URL || '',
+    // The built pages, served beside the API. Empty serves none.
+    pagesDir: env.ARCHON_MEMEPOOL_PAGES_DIR ?? 'public',
     // Where the wallet that holds the service's key is kept.
     dataDir: env.ARCHON_MEMEPOOL_DATA_DIR || 'data',
     // The passphrase that encrypts that wallet. Required.

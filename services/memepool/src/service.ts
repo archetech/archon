@@ -1,3 +1,4 @@
+import { existsSync } from 'fs';
 import type { Server } from 'http';
 
 import CipherNode from '@didcid/cipher/node';
@@ -14,6 +15,7 @@ export interface MemepoolSettings {
     bindAddress: string;
     name: string;
     publicURL: string;
+    pagesDir: string;
     dataDir: string;
     passphrase: string;
     registry: string;
@@ -84,6 +86,7 @@ export async function startMemepool(
         keymaster,
         name: settings.name,
         publicURL: settings.publicURL || undefined,
+        pagesDir: settings.pagesDir && existsSync(settings.pagesDir) ? settings.pagesDir : undefined,
         version,
         challengesPerMinute: settings.challengesPerMinute,
         sessionLifetime: settings.sessionHours * 60 * 60_000,

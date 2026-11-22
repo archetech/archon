@@ -16,6 +16,14 @@ COPY services/memepool ./memepool/
 WORKDIR /app/memepool
 RUN npm ci && npm run build
 
+# The pages, which the service serves beside its API. They use none of the
+# repository's packages, so they are built by themselves.
+COPY apps/memepool /app/memepool-app/
+WORKDIR /app/memepool-app
+RUN npm ci && npm run build && cp -r dist /app/memepool/public
+
+WORKDIR /app/memepool
+
 # Drop dev dependencies once everything is compiled.
 RUN npm prune --omit=dev \
     && cd /app && npm prune --omit=dev

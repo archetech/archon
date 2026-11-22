@@ -1,9 +1,12 @@
 import type express from 'express';
 import { proxyRequest } from './proxy.js';
 
-// The public face of the node's Memepool service: `<node>/memepool/api/v1/...`.
-// Only the service's API is reachable: the mount's prefix is stripped and what
-// is left has to stay under /api/v1.
+// The public face of the node's Memepool service: its pages at `<node>/memepool/`
+// and its API at `<node>/memepool/api/v1/...`. The mount's prefix is stripped.
+//
+// Under `/api` only the service's `/api/v1` is reachable, by the methods it
+// uses. Anything else under the mount is a page or a file of one, which is read
+// and never written: only GET and HEAD reach it.
 //
 // A preflight (OPTIONS) does not reach here: the node's CORS handling answers
 // it first, for any origin and without credentials, as on every mount.
@@ -26,12 +29,33 @@ export function memepoolProxy({ memepoolURL, logger }: MemepoolProxyOptions): ex
             res.status(501).json({ error: 'Memepool is not enabled on this node' });
             return;
         }
-        if (!METHODS.has(req.method)) {
+        // The path as the service will see it, with dot segments resolved, so
+        // that one written to look like a page cannot reach the API.
+        let path: string;
+
+        try {
+            path = new URL(req.originalUrl.replace(/^\/memepool/, '') || '/', 'http://memepool').pathname;
+        }
+        catch {
+            // What follows the mount is not a path at all, such as `//`.
+            res.status(400).json({ error: 'Invalid path' });
+            return;
+        }
+        const api = path === '/api' || path.startsWith('/api/');
+        const reading = req.method === 'GET' || req.method === 'HEAD';
+
+        if (api ? !METHODS.has(req.method) : !reading) {
             res.status(405).json({ error: 'Method not allowed' });
             return;
         }
+        // `/memepool` names the pages' directory, and a page's own files are
+        // found relative to it.
+        if (req.originalUrl.split('?')[0] === '/memepool') {
+            res.redirect(308, '/memepool/');
+            return;
+        }
         try {
-            await proxyRequest(req, res, memepoolURL, '/memepool', '/api/v1', '/memepool');
+            await proxyRequest(req, res, memepoolURL, '/memepool', api ? '/api/v1' : undefined, '/memepool');
         } catch (error: any) {
             logger?.error({ err: error, path: req.originalUrl }, 'Memepool proxy error');
             res.status(502).json({ error: 'Upstream memepool error' });

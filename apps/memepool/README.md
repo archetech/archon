@@ -40,4 +40,5 @@ change that at build time. The session is a cookie, so the Memepool service has 
 be on the pages' own origin.
 
 The build is a set of static files with relative paths, so it can be served from
-any path. The node does not serve them yet.
+any path. The Memepool service's image carries them and serves them beside its API,
+so a node with the `memepool` profile has the pages at `<node>/memepool/`.

@@ -19,6 +19,8 @@ services:
       - ARCHON_GATEKEEPER_URL=http://gatekeeper:4224
       - ARCHON_MEMEPOOL_NAME=${ARCHON_MEMEPOOL_NAME:-memepool}
       - ARCHON_MEMEPOOL_DATA_DIR=/app/memepool/data
+      # The pages the image carries. Set it empty to serve the API alone.
+      - ARCHON_MEMEPOOL_PAGES_DIR=${ARCHON_MEMEPOOL_PAGES_DIR-public}
       # Where users reach the service, such as https://node.example/memepool.
       # With it, a wallet sends its answer to a challenge straight back.
       - ARCHON_MEMEPOOL_PUBLIC_URL=${ARCHON_MEMEPOOL_PUBLIC_URL:-}

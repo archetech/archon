@@ -28,6 +28,9 @@ export interface MemepoolOptions {
     // its answer there. Without it, a user carries the answer back by hand.
     publicURL?: string;
     version: { version: string; commit: string };
+    // A directory of static files to serve beside the API: the built pages.
+    // Without it the service is its API alone.
+    pagesDir?: string;
     // Milliseconds a challenge may wait for its answer, and a session lasts.
     challengeLifetime?: number;
     sessionLifetime?: number;
@@ -440,6 +443,19 @@ export function createMemepoolApp(options: MemepoolOptions): express.Express {
     const app = express();
 
     app.use('/api/v1', createMemepoolRouter(options));
+    // A path under the API that is no route of it is not a page.
+    app.use('/api', (_req, res) => {
+        res.status(404).json({ error: 'no such route' });
+    });
+    if (options.pagesDir) {
+        // The pages are files a browser may keep; the page that names them is
+        // asked for each time, so that a new build is picked up.
+        app.use(express.static(options.pagesDir, {
+            setHeaders: (res, file) => {
+                res.setHeader('Cache-Control', file.endsWith('.html') ? 'no-cache' : 'public, max-age=31536000, immutable');
+            },
+        }));
+    }
     app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
         void _next;
         const { status } = error as { status?: unknown };
